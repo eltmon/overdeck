@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue Cockpit — interactive prototype (Opus)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8;
+    --success:#10b981; --success-foreground:#047857;
+    --signal-review:#a855f7; --signal-review-foreground:#7e22ce;
+    --signal-cost:#06b6d4; --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background); color:var(--foreground); font-family:"DM Sans",system-ui,sans-serif; font-weight:500; font-size:13px; line-height:1.4; -webkit-font-smoothing:antialiased}
+  .wordmark{font-family:"Space Grotesk",sans-serif; letter-spacing:-.01em}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .add{color:var(--success-foreground); font-variant-numeric:tabular-nums} .del{color:var(--destructive-foreground); font-variant-numeric:tabular-nums}
+
+  .caption{max-width:1480px; margin:16px auto 0; padding:11px 16px; border:1px dashed var(--border); border-radius:14px; background:var(--card-2); font-size:12.5px; display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+  .caption b{font-weight:500}
+  .hintkbd{border:1px solid var(--border); border-radius:6px; padding:1px 6px; font-size:11px; background:var(--card)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--info); position:relative; display:inline-block}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid color-mix(in srgb,var(--info) 60%,transparent); animation:ring 1.6s ease-out infinite}
+  @keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+  @keyframes blink{50%{opacity:.35}}
+
+  .app{max-width:1480px; margin:12px auto 40px; padding:0 18px}
+  .topbar{display:flex; align-items:center; gap:14px; padding:8px 4px 12px; color:var(--muted-foreground); font-size:12px}
+  .topbar .wordmark{color:var(--foreground); font-size:15px} .topbar .spacer{flex:1}
+  .topbar .navitem{padding:4px 8px; border-radius:8px} .topbar .navitem.active{background:var(--accent); color:var(--foreground)}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:20px}
+
+  /* header */
+  .ihead{padding:14px 18px; border-radius:22px}
+  .crumb{font-size:11px; color:color-mix(in srgb,var(--muted-foreground) 80%,transparent)} .crumb b{color:var(--muted-foreground); font-weight:500}
+  .htop{display:flex; gap:16px; align-items:flex-start; margin-top:7px}
+  .titleblock{min-width:0; flex:1}
+  .titlerow{display:flex; flex-wrap:wrap; align-items:center; gap:10px}
+  .iid{font-family:var(--mono); font-size:13px} .ititle{font-size:16px; margin:0; line-height:1.3; font-weight:500}
+  .pill{display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 10px; border-radius:var(--radius-sm); font-size:11px; border:1px solid transparent}
+  .pill.info{background:color-mix(in srgb,var(--info) 8%,transparent); border-color:color-mix(in srgb,var(--info) 32%,transparent); color:var(--info-foreground)}
+  .hfacts{display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:flex-end}
+  .hf{display:flex; flex-direction:column; align-items:flex-end; gap:1px; cursor:pointer}
+  .hf .k{font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-foreground)}
+  .hf .v{font-size:12.5px} .hf .v.cost{color:var(--signal-cost-foreground); font-variant-numeric:tabular-nums}
+  .hf.diff .v{border-bottom:1px dashed color-mix(in srgb,var(--muted-foreground) 50%,transparent)}
+  .hactions{display:flex; gap:8px; align-items:center}
+  .btn{border:1px solid var(--border); background:var(--card); border-radius:9px; padding:7px 11px; font-size:12px; color:var(--foreground); cursor:pointer; display:inline-flex; align-items:center; gap:7px}
+  .btn.primary{background:var(--primary); color:var(--primary-foreground); border-color:transparent}
+  .btn.sm{padding:5px 9px; font-size:11.5px}
+  .btn.disabled{color:var(--muted-foreground); cursor:not-allowed}
+
+  /* clickable stepper */
+  .stepper{margin-top:14px; display:flex; gap:10px}
+  .step{flex:1; min-width:0; cursor:pointer; border:none; background:none; padding:0; text-align:left}
+  .step .bar{height:7px; border-radius:99px; background:color-mix(in srgb,var(--muted-foreground) 18%,transparent); transition:filter .15s}
+  .step:hover .bar{filter:brightness(.92)}
+  .step.done .bar{background:var(--success)} .step.active .bar{background:var(--info)} .step.blocked .bar{background:var(--destructive)}
+  .step .lbl{margin-top:6px; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-foreground); display:flex; align-items:center; gap:5px}
+  .step.done .lbl{color:var(--success-foreground)} .step.active .lbl{color:var(--info-foreground)} .step.blocked .lbl{color:var(--destructive-foreground)}
+  .step .lbl .st{margin-left:auto; text-transform:none; letter-spacing:0; color:var(--muted-foreground)}
+  .step.navsel .bar{outline:2px solid color-mix(in srgb,var(--primary) 55%,transparent); outline-offset:2px}
+
+  .body{display:grid; grid-template-columns:248px minmax(0,1fr) 296px; gap:14px; align-items:start; margin-top:14px}
+
+  /* LEFT lane: Agents + Verification + Stack */
+  .lane{padding:8px; border-radius:20px; background:color-mix(in srgb,var(--card-2) 70%,var(--card)); position:sticky; top:12px}
+  .lane-h{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); padding:8px 8px 4px; display:flex; align-items:center; gap:6px} .lane-h .n{margin-left:auto}
+  .trow{display:flex; align-items:center; gap:8px; padding:8px; border-radius:11px; cursor:pointer; position:relative; border:1px solid transparent}
+  .trow:hover{background:var(--accent)} .trow.navsel{background:var(--card); border-color:var(--border)}
+  .trow .car{width:11px; text-align:center; font-size:10px; color:var(--muted-foreground)}
+  .trow .ic{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .trow .ic.work{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .trow .ic.rev{color:var(--success-foreground);border-color:color-mix(in srgb,var(--success) 32%,transparent);background:color-mix(in srgb,var(--success) 8%,transparent)}
+  .trow .ic.test{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .trow .nm{font-size:13px} .trow .md{font-size:10px;color:var(--muted-foreground);font-family:var(--mono);margin-left:6px}
+  .trow .rt{margin-left:auto;font-size:10px;color:var(--muted-foreground)} .trow .sub{display:block;font-size:10px;color:var(--muted-foreground);margin-top:1px}
+  .trow.child{margin-left:18px} .trow.child::after{content:"";position:absolute;left:-9px;top:50%;width:8px;height:1px;background:var(--border)}
+  .verdict{width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff;flex:none}
+  .verdict.ok{background:var(--success)} .verdict.bad{background:var(--destructive)}
+  .rolebadge{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:9px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+
+  /* verification gates widget (the new observability) */
+  .vsection{margin-top:10px; border-top:1px solid var(--border); padding-top:6px}
+  .vh{display:flex; align-items:center; gap:6px; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); padding:6px 8px}
+  .vh .more{margin-left:auto; text-transform:none; letter-spacing:0; font-size:10px; color:var(--info-foreground); cursor:pointer}
+  .vrow{display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:9px; font-size:12px; cursor:pointer}
+  .vrow:hover{background:var(--accent)}
+  .vrow .m{width:15px;height:15px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff;flex:none}
+  .vrow .m.ok{background:var(--success)} .vrow .m.run{background:var(--info)} .vrow .m.wait{background:transparent;border:1.5px solid var(--muted-foreground);color:var(--muted-foreground)}
+  .vrow .st{margin-left:auto;font-size:10px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+  .vrow.run .st{color:var(--info-foreground)}
+  .vbar{height:4px;border-radius:99px;background:var(--accent);overflow:hidden;margin:0 8px 6px}
+  .vbar .f{height:100%;background:var(--info); width:57%; animation:blink 1.6s ease-in-out infinite}
+
+  .drawer{margin-top:10px;border-top:1px solid var(--border);padding-top:6px}
+  .drawer-h{display:flex;align-items:center;gap:8px;padding:8px;font-size:11px;color:var(--muted-foreground);cursor:pointer;border-radius:10px} .drawer-h .sum{margin-left:auto;font-size:10px}
+
+  /* CENTER stage */
+  .center{min-width:0}
+  .stagebar{display:flex; align-items:center; gap:10px; padding:2px 2px 12px}
+  .stagebar .home{font-size:12px; color:var(--muted-foreground); cursor:pointer; border:1px solid var(--border); border-radius:8px; padding:5px 9px; background:var(--card)}
+  .stagebar #crumb{font-size:13px}
+  .stagebar .detnav{margin-left:auto; display:flex; gap:2px; flex-wrap:wrap}
+  .detnav .t{padding:6px 10px;border-radius:8px;font-size:12px;color:var(--muted-foreground);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .detnav .t:hover{background:var(--accent)} .detnav .t.navsel{background:var(--accent);color:var(--foreground)}
+  .detnav .t .b{font-size:10px;color:var(--muted-foreground)}
+
+  .view{display:none} .view.active{display:block}
+  .panel{border:1px solid var(--border); border-radius:18px; background:var(--card); overflow:hidden; margin-bottom:14px}
+  .ph{display:flex; align-items:center; gap:10px; padding:12px 15px; border-bottom:1px solid var(--border); font-size:13px}
+  .ph .tag{margin-left:auto; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-foreground)}
+  .pb{padding:14px 15px}
+  h4.sec{margin:0 0 9px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .kv:last-child{border-bottom:none} .kv .muted{color:var(--muted-foreground)}
+  .banner{border-radius:14px; padding:13px 15px; margin-bottom:14px; font-size:12.5px}
+  .banner.info{border:1px solid color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 6%,var(--card))}
+  .banner.info .lead{display:flex;align-items:center;gap:8px;color:var(--info-foreground);font-size:13px}
+  .banner .acts{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  .twoup{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media(max-width:1280px){.twoup{grid-template-columns:1fr}}
+
+  /* findings / specialists */
+  .finding{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)} .finding:last-child{border-bottom:none}
+  .finding .sev{width:8px;height:8px;border-radius:2px;margin-top:5px;flex:none;background:var(--success)} .finding .sev.bad{background:var(--destructive)} .finding .sev.warn{background:var(--warning)}
+  .finding .ft{font-size:12.5px} .finding .fl{font-size:11px;color:var(--muted-foreground);margin-top:2px}
+  .spec{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:12.5px;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)} .spec:last-child{border-bottom:none}
+  .spec .role{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:9px;border:1px solid var(--border);color:var(--muted-foreground);flex:none}
+  .spec .vt{margin-left:auto;font-size:11px} .spec .vt.ok{color:var(--success-foreground)} .spec .vt.bad{color:var(--destructive-foreground)}
+  .gaterow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .gaterow:last-child{border-bottom:none}
+  .chk{display:inline-flex;align-items:center;gap:8px} .chk .m{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff}
+  .chk .m.ok{background:var(--success)} .chk .m.run{background:var(--info)} .chk .m.wait{background:transparent;border:1.5px solid var(--muted-foreground);color:var(--muted-foreground)}
+
+  /* conversation */
+  .conv-h{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)}
+  .branchchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:11px;color:var(--muted-foreground)} .branchchip .mono{color:var(--foreground)}
+  .seg2{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .seg2 .s{padding:5px 11px;font-size:12px;color:var(--muted-foreground);cursor:pointer} .seg2 .s.active{background:var(--accent);color:var(--foreground)}
+  .conv-h .spacer{flex:1} .conv-h .tool{border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:11px;color:var(--muted-foreground);cursor:pointer}
+  .transcript{padding:14px 15px;display:flex;flex-direction:column;gap:12px;max-height:440px;overflow:auto}
+  .msg{font-size:12.5px;line-height:1.5} .msg.assistant{max-width:90%} .msg.assistant .who{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-bottom:3px}
+  .msg.user{align-self:flex-end;max-width:80%} .msg.user .bubble{background:var(--accent);border:1px solid var(--border);border-radius:14px 14px 4px 14px;padding:9px 12px}
+  .toolgroup{border:1px solid var(--border);border-radius:10px;background:var(--card-2);overflow:hidden}
+  .toolgroup .gh{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:11.5px;color:var(--muted-foreground);cursor:pointer}
+  .toolcall{display:flex;align-items:center;gap:9px;padding:7px 11px;border-top:1px solid var(--border);font-size:11.5px}
+  .toolcall .k{font-family:var(--mono);color:var(--info-foreground);font-size:11px} .toolcall .d{color:var(--muted-foreground);font-family:var(--mono);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .working{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--info-foreground)}
+  .term{background:#0f1115;border-radius:12px;margin:0;padding:12px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.7;color:#cbd5e1;max-height:440px;overflow:auto}
+  .term .g{color:#34d399} .term .r{color:#f87171} .term .b{color:#60a5fa} .term .d{color:#64748b}
+  .composer{border-top:1px solid var(--border);padding:11px 14px;background:var(--card)}
+  .composer .inp{border:1px solid var(--border);border-radius:12px;padding:10px 12px;color:var(--muted-foreground);font-size:12.5px}
+  .composer .tools{display:flex;align-items:center;gap:8px;margin-top:9px}
+  .composer .picker{border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11.5px;display:inline-flex;align-items:center;gap:6px} .composer .picker .mono{color:var(--foreground)}
+  .composer .spacer{flex:1}
+  .composer .meter{width:84px;height:6px;border-radius:99px;background:var(--accent);overflow:hidden} .composer .meter .f{height:100%;width:62%;background:var(--info)}
+  .composer .send{width:30px;height:30px;border-radius:8px;background:var(--primary);color:#fff;display:grid;place-items:center} .composer .mic{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);color:var(--muted-foreground);display:grid;place-items:center}
+
+  /* code group */
+  .codegrid{display:grid;grid-template-columns:minmax(0,330px) minmax(0,1fr);gap:14px} @media(max-width:1200px){.codegrid{grid-template-columns:1fr}}
+  .ftpanel{border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .fthead{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .fthead .sum{color:var(--foreground);text-transform:none;letter-spacing:0} .fthead .acts{margin-left:auto;display:flex;gap:6px}
+  .fttree{padding:6px}
+  .ftrow{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;font-size:12.5px;cursor:pointer} .ftrow:hover{background:var(--accent)} .ftrow.sel{background:var(--accent)}
+  .ftrow .car{width:11px;text-align:center;font-size:9px;color:var(--muted-foreground)} .ftrow .ico{width:15px;text-align:center;font-size:11px}
+  .ftrow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .ftrow .cnt{margin-left:auto;font-size:11px;font-family:var(--mono);white-space:nowrap}
+  .ind1{padding-left:20px}
+  .diffpanel{border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .diffhead{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px} .diffhead .cnt{margin-left:auto;font-family:var(--mono);font-size:11px}
+  .difflines{font-family:var(--mono);font-size:11.5px;line-height:1.6;max-height:300px;overflow:auto}
+  .dl{display:flex;padding:0 10px;white-space:pre} .dl .gut{width:28px;color:var(--muted-foreground);opacity:.6;text-align:right;padding-right:10px;flex:none}
+  .dl.add{background:color-mix(in srgb,var(--success) 10%,transparent)} .dl.add .tx{color:var(--success-foreground)}
+  .dl.del{background:color-mix(in srgb,var(--destructive) 9%,transparent)} .dl.del .tx{color:var(--destructive-foreground)}
+  .dl.hunk{background:var(--card-2);color:var(--muted-foreground)} .dl .tx{color:var(--foreground)}
+  .cirow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .cirow:last-child{border-bottom:none}
+  .cirow .m{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff} .cirow .m.ok{background:var(--success)} .cirow .m.bad{background:var(--destructive)} .cirow .m.run{background:var(--info)}
+  .cirow .st{margin-left:auto;font-size:10px;text-transform:uppercase;color:var(--muted-foreground)}
+
+  /* costs / plan / timeline / discussion */
+  .costrow{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center;padding:6px 0;font-size:12px}
+  .costrow .bar{height:8px;border-radius:99px;background:var(--accent);overflow:hidden} .costrow .bar .f{height:100%;background:var(--signal-cost)} .costrow .amt{text-align:right;font-family:var(--mono);font-size:11.5px;color:var(--signal-cost-foreground)}
+  .pitem{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .pitem:last-child{border-bottom:none}
+  .pitem .n{width:16px;height:16px;border-radius:50%;background:var(--success);color:#fff;display:grid;place-items:center;font-size:9px;flex:none} .pitem .n.open{background:transparent;border:1.5px solid var(--muted-foreground);color:var(--muted-foreground)}
+  .pitem .frtag{font-size:10px;color:var(--muted-foreground);font-family:var(--mono)}
+  .tl{position:relative;padding-left:18px} .tl::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--border)}
+  .tlrow{position:relative;padding:7px 0;font-size:12.5px} .tlrow .d{position:absolute;left:-16px;top:11px;width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);border:2px solid var(--card)}
+  .tlrow .d.bad{background:var(--destructive)} .tlrow .d.ok{background:var(--success)} .tlrow .d.info{background:var(--info)} .tlrow .d.rev{background:var(--signal-review)} .tlrow .w{font-size:10.5px;color:var(--muted-foreground)}
+  .disc{padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .disc:last-child{border-bottom:none}
+  .disc .top{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted-foreground)} .srcchip{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--muted-foreground)}
+
+  /* beads rail */
+  .beads{padding:0;border-radius:20px;overflow:hidden;position:sticky;top:12px}
+  .beads-h{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)} .beads-h .t{font-size:13px} .beads-h .counts{margin-left:auto;font-size:11px;color:var(--muted-foreground)}
+  .progresswrap{padding:12px 14px 8px} .progresswrap .ptop{display:flex;justify-content:space-between;font-size:11px;color:var(--muted-foreground);margin-bottom:6px} .progresswrap .ptop b{color:var(--foreground)}
+  .track{height:8px;border-radius:99px;background:var(--accent);overflow:hidden;display:flex} .track .fd{background:var(--success)} .track .fa{background:var(--info)}
+  .rail{padding:2px 10px 14px}
+  .group-h{display:flex;align-items:center;gap:8px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);padding:12px 6px 6px} .group-h .line{flex:1;height:1px;background:var(--border)}
+  .spine{position:relative;padding-left:24px} .spine::before{content:"";position:absolute;left:10px;top:6px;bottom:6px;width:2px;background:var(--border);border-radius:2px}
+  .bead{position:relative;margin:5px 0;padding:8px 9px;border-radius:11px} .bead .node{position:absolute;left:-19px;top:11px;width:14px;height:14px;border-radius:50%;background:var(--card);border:2px solid var(--muted-foreground);display:grid;place-items:center;font-size:9px;color:#fff}
+  .bead .ttl{font-size:12px;line-height:1.35} .bead.done .ttl{color:var(--muted-foreground)} .bead.done .node{background:var(--success);border-color:var(--success)}
+  .more{text-align:center;font-size:11px;color:var(--muted-foreground);padding:7px;border:1px dashed var(--border);border-radius:10px;margin:6px 4px}
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <span style="display:inline-flex;align-items:center;gap:7px;"><span class="pulse"></span> <b>Interactive prototype — click around.</b></span>
+  <span class="muted">Try: an <b style="color:var(--foreground)">agent</b> on the left → its conversation · a <b style="color:var(--foreground)">phase</b> bar (Plan…Merge) → that phase's info · the <b style="color:var(--foreground)">Tests</b> gate (left) → watch tests run · the <b style="color:var(--foreground)">detail tabs</b> (top-right of the stage).</span>
+  <span class="muted">Scene: review just passed, <b style="color:var(--info-foreground)">tests running</b>.</span>
+</div>
+
+<div class="app">
+  <div class="topbar"><span class="wordmark">Overdeck</span><span class="navitem">Command Deck</span><span class="navitem active">Issues</span><span class="navitem">Pipeline</span><span class="navitem">Agents</span><span class="spacer"></span><span class="muted">edward.becker</span></div>
+
+  <!-- HEADER -->
+  <div class="card ihead">
+    <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+    <div class="htop">
+      <div class="titleblock"><div class="titlerow"><span class="iid">PAN-1866</span><h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1><span class="pill info"><span class="pulse" style="width:7px;height:7px"></span> In&nbsp;Progress</span></div></div>
+      <div class="hfacts">
+        <div class="hf"><span class="k">Branch</span><span class="v mono">feature/pan-1866</span></div>
+        <div class="hf" onclick="show('view-code',null,'phase-cicd')"><span class="k">PR / CI</span><span class="v">#1975 · running</span></div>
+        <div class="hf diff" onclick="show('view-code',null,'tab-code')" title="Open changed files"><span class="k">Diff</span><span class="v"><span class="add">+5039</span> <span class="del">−42</span> · 61 files</span></div>
+        <div class="hf" onclick="show('view-costs',null,'tab-costs')"><span class="k">Cost</span><span class="v cost">$67.72</span></div>
+        <div class="hactions"><button class="btn disabled" title="Merge gated: tests running">Merge</button><button class="btn">⌘ Actions ▾</button></div>
+      </div>
+    </div>
+    <!-- clickable phases -->
+    <div class="stepper" id="stepper">
+      <button class="step done"  id="phase-plan"   onclick="show('view-plan',this)"><div class="bar"></div><div class="lbl">Plan</div></button>
+      <button class="step done"  id="phase-work"   onclick="show('view-conv-work',this)"><div class="bar"></div><div class="lbl">Work <span class="st">done</span></div></button>
+      <button class="step done"  id="phase-review" onclick="show('view-quality',this)"><div class="bar"></div><div class="lbl">Review <span class="st">passed</span></div></button>
+      <button class="step active" id="phase-test"  onclick="show('view-quality',this)"><div class="bar"></div><div class="lbl">Test <span class="st">34/60</span></div></button>
+      <button class="step active" id="phase-cicd"  onclick="show('view-code',this)"><div class="bar"></div><div class="lbl">CI/CD <span class="st">running</span></div></button>
+      <button class="step"        id="phase-ship"  onclick="show('view-shipmerge',this)"><div class="bar"></div><div class="lbl">Ship</div></button>
+      <button class="step"        id="phase-merge" onclick="show('view-shipmerge',this)"><div class="bar"></div><div class="lbl">Merge</div></button>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- LEFT: Agents + Verification + Stack -->
+    <aside class="card lane">
+      <div class="lane-h">Agents <span class="n">4</span></div>
+      <div class="trow" id="ag-work" onclick="show('view-conv-work',this)"><span class="car"></span><span class="ic work">▷</span><span class="nm">Work</span><span class="md">sonnet-4-6</span><span class="rt add">done</span></div>
+      <div class="trow" id="ag-review" onclick="show('view-conv-review',this)"><span class="car">▾</span><span class="ic rev">◉</span><span class="nm">Review</span><span class="sub">4 reviewers · all passed</span><span class="rt add">passed</span></div>
+      <div class="trow child" onclick="show('view-conv-review',this)"><span class="verdict ok">✓</span><span class="rolebadge">Co</span><span class="nm">Correctness</span></div>
+      <div class="trow child" onclick="show('view-conv-review',this)"><span class="verdict ok">✓</span><span class="rolebadge">Re</span><span class="nm">Requirements</span></div>
+      <div class="trow" id="ag-test" onclick="show('view-conv-test',this)"><span class="car"></span><span class="ic test">▷</span><span class="nm">Test</span><span class="md">running</span><span class="rt" style="color:var(--info-foreground)">34/60</span></div>
+      <div class="trow" id="ag-plan" onclick="show('view-conv-plan',this)"><span class="car"></span><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="md">opus</span></div>
+
+      <!-- Verification gates (observability) -->
+      <div class="vsection">
+        <div class="vh">Verification <span class="more" onclick="show('view-conv-test',null,'ag-test')">watch tests ↗</span></div>
+        <div class="vrow" onclick="show('view-quality',null,'phase-test')"><span class="m ok">✓</span> Typecheck <span class="st">passed</span></div>
+        <div class="vrow" onclick="show('view-quality',null,'phase-test')"><span class="m ok">✓</span> Lint <span class="st">passed</span></div>
+        <div class="vrow run" onclick="show('view-conv-test',null,'ag-test')"><span class="m run">▷</span> Tests <span class="st">34/60 running</span></div>
+        <div class="vbar"><span class="f"></span></div>
+        <div class="vrow" onclick="show('view-quality',null,'phase-test')"><span class="m wait">○</span> Browser UAT <span class="st">pending</span></div>
+      </div>
+
+      <div class="drawer"><div class="drawer-h">▸ Stack <span class="sum">3 containers · 1 PR · 2 branches</span></div></div>
+    </aside>
+
+    <!-- CENTER STAGE -->
+    <section class="center">
+      <div class="stagebar">
+        <span class="home" onclick="show('view-overview',null,'home')">← Overview</span>
+        <span id="crumb">Overview</span>
+        <span class="detnav" id="detnav">
+          <span class="t" id="tab-quality" onclick="show('view-quality',this)">Quality</span>
+          <span class="t" id="tab-code" onclick="show('view-code',this)">Code <span class="b"><span class="add">+5039</span> <span class="del">−42</span></span></span>
+          <span class="t" id="tab-plan" onclick="show('view-plan',this)">Plan <span class="b">19/20</span></span>
+          <span class="t" id="tab-timeline" onclick="show('view-timeline',this)">Timeline</span>
+          <span class="t" id="tab-discussion" onclick="show('view-discussion',this)">Discussion <span class="b">6</span></span>
+          <span class="t" id="tab-costs" onclick="show('view-costs',this)">Costs <span class="b">$67.72</span></span>
+        </span>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="view active" id="view-overview">
+        <div class="banner info">
+          <div class="lead"><span class="pulse" style="width:7px;height:7px"></span> Tests running — 34/60 passed, ~2 min left</div>
+          <div class="muted" style="margin-top:6px">Review passed (convoy, 4/4). Work agent is idle awaiting verification; CI is green except one frontend spec still running. Nothing needs you right now.</div>
+          <div class="acts"><button class="btn" onclick="show('view-conv-test',null,'ag-test')">Watch tests ↗</button><button class="btn" onclick="show('view-code',null,'tab-code')">Open diff</button><button class="btn" onclick="show('view-conv-work',null,'ag-work')">Open work agent</button></div>
+        </div>
+        <div class="twoup">
+          <div class="panel"><div class="ph">Now</div><div class="pb">
+            <div class="kv"><span class="muted">Active</span><span><span class="mono">test</span> · running 34/60</span></div>
+            <div class="kv"><span class="muted">Review</span><span class="add">passed · convoy 4/4</span></div>
+            <div class="kv"><span class="muted">Verification</span><span><span class="add">typecheck ✓ lint ✓</span> · tests running</span></div>
+            <div class="kv"><span class="muted">Next</span><span>tests pass → ready for merge</span></div>
+          </div></div>
+          <div class="panel"><div class="ph">Issue</div><div class="pb">
+            <div class="kv"><span class="muted">Pull request</span><span>#1975 · mergeable</span></div>
+            <div class="kv"><span class="muted">Diff</span><span><span class="add">+5039</span> <span class="del">−42</span> · 61 files</span></div>
+            <div class="kv"><span class="muted">Beads</span><span>19 / 20 closed</span></div>
+            <div class="kv"><span class="muted">Cost</span><span class="cost" style="color:var(--signal-cost-foreground)">$67.72</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- CONVERSATION: WORK -->
+      <div class="view" id="view-conv-work"><div class="panel" style="margin:0">
+        <div class="conv-h"><span class="branchchip">⎇ <span class="mono">feature/pan-1866</span></span><div class="seg2"><span class="s active">Conversation</span><span class="s">Terminal</span></div><span class="spacer"></span><span class="tool">🔧 Tools</span></div>
+        <div class="transcript">
+          <div class="msg assistant"><div class="who">work · sonnet-4-6</div>Both issues are clear. Fix 1: add <span class="mono">readFileSync</span> to the <span class="mono">node:fs</span> import and <span class="mono">parseSequenceMd</span> to <span class="mono">sequence-io</span>. Fix 2: match the <span class="mono">inPipeline + ready</span> logic from <span class="mono">backlog-input.ts</span>.</div>
+          <div class="toolgroup"><div class="gh">{ } 3 tool calls — expand</div>
+            <div class="toolcall"><span class="k">Read</span><span class="d">routes/backlog.ts</span></div>
+            <div class="toolcall"><span class="k">Edit</span><span class="d">backlog.ts · +2 imports</span></div>
+            <div class="toolcall"><span class="k">Edit</span><span class="d">backlog.ts · inPipeline guard</span></div>
+          </div>
+          <div class="msg assistant">All 60 pass locally. Committed and resubmitted — review came back clean. Handing off to the verification gate.</div>
+          <div class="msg user"><div class="bubble">Make sure the FR-17 gate also covers the <span class="mono">--auto</span> path.</div></div>
+        </div>
+        <div class="composer"><div class="inp">Message the work agent…</div><div class="tools"><span class="picker">✦ <span class="mono">Claude Sonnet 4.6</span> ▾</span><span class="picker">Effort: Medium ▾</span><span class="spacer"></span><span class="mic">🎙</span><span class="meter"><span class="f"></span></span><span class="send">➤</span></div></div>
+      </div></div>
+
+      <!-- CONVERSATION: REVIEW -->
+      <div class="view" id="view-conv-review"><div class="panel" style="margin:0">
+        <div class="conv-h"><span class="branchchip">Review convoy · <span class="mono">gpt-5.5</span></span><div class="seg2"><span class="s active">Findings</span><span class="s">Conversation</span></div><span class="spacer"></span><span class="tool">4 reviewers</span></div>
+        <div class="pb">
+          <h4 class="sec">Convoy verdict — passed (re-review)</h4>
+          <div class="spec"><span class="role">Co</span> Correctness <span class="vt ok">approved</span></div>
+          <div class="spec"><span class="role">Se</span> Security <span class="vt ok">approved</span></div>
+          <div class="spec"><span class="role">Pe</span> Performance <span class="vt ok">approved</span></div>
+          <div class="spec"><span class="role">Re</span> Requirements <span class="vt ok">approved — FR-17 now gated</span></div>
+          <h4 class="sec" style="margin-top:14px">Resolved this cycle</h4>
+          <div class="finding"><span class="sev"></span><div><div class="ft">FR-17 human gate now enforced in selectNextWork (was blocking)</div><div class="fl"><span class="mono">src/lib/cloister/flywheel/select.ts:212</span> · fixed 3m ago</div></div></div>
+        </div>
+      </div></div>
+
+      <!-- CONVERSATION: TEST (terminal — tests running) -->
+      <div class="view" id="view-conv-test"><div class="panel" style="margin:0">
+        <div class="conv-h"><span class="branchchip">⎇ <span class="mono">feature/pan-1866</span></span><div class="seg2"><span class="s">Conversation</span><span class="s active">Terminal</span></div><span class="spacer"></span><span class="working"><span class="pulse" style="width:7px;height:7px"></span> running</span></div>
+        <pre class="term"><span class="d">$ npm test -- --reporter=verbose</span>
+<span class="b"> RUN </span> v4.1.6  feature/pan-1866
+<span class="g"> ✓ </span>src/lib/sequencer/writeSequenceMd.test.ts <span class="d">(12)</span>
+<span class="g"> ✓ </span>src/lib/sequencer/parseSequenceMd.test.ts <span class="d">(9)</span>
+<span class="g"> ✓ </span>src/lib/sequencer/rank.test.ts <span class="d">(7)</span>
+<span class="g"> ✓ </span>src/lib/cloister/flywheel/select.test.ts <span class="d">(6) — FR-17 gate</span>
+<span class="b"> » </span>src/dashboard/server/routes/backlog.test.ts <span class="d">running…</span>
+   <span class="g">✓</span> GET /api/backlog returns ranked DAG
+   <span class="g">✓</span> inPipeline excludes merged
+   <span class="b">»</span> ready reflects beads + workspace <span class="d">…</span>
+
+<span class="d"> Test Files </span> <span class="g">4 passed</span> <span class="d">| 1 running (6 total)</span>
+<span class="d"> Tests </span> <span class="g">34 passed</span> <span class="d">| 26 running (60)</span>
+<span class="d"> Duration </span> 11.4s
+</pre>
+      </div></div>
+
+      <!-- CONVERSATION: PLAN -->
+      <div class="view" id="view-conv-plan"><div class="panel" style="margin:0">
+        <div class="conv-h"><span class="branchchip">Planning · <span class="mono">opus</span></span><div class="seg2"><span class="s active">Conversation</span></div><span class="spacer"></span><span class="tool">vBRIEF →</span></div>
+        <div class="transcript">
+          <div class="msg user"><div class="bubble">Make the markdown the source of truth, reproducible across runs.</div></div>
+          <div class="msg assistant"><div class="who">planning · opus</div>Proposed approach: a deterministic <span class="mono">sequence.md</span> with a ranked table + a fenced JSON block as the machine-readable source. 20 beads across schema → writer → parser → ranker → route → FR-17 gate. Acceptance criteria traced to FR-1…FR-17.</div>
+          <div class="msg assistant">Plan approved → 20 beads created. Handing off to work.</div>
+        </div>
+      </div></div>
+
+      <!-- QUALITY (Review phase + Test phase) -->
+      <div class="view" id="view-quality">
+        <div class="panel"><div class="ph">Verification &amp; Test <span class="tag">live</span></div><div class="pb">
+          <div class="gaterow"><span class="chk"><span class="m ok">✓</span> Typecheck</span><span class="muted">passed · 0 errors</span></div>
+          <div class="gaterow"><span class="chk"><span class="m ok">✓</span> Lint</span><span class="muted">passed</span></div>
+          <div class="gaterow"><span class="chk"><span class="m run">▷</span> Tests</span><span style="color:var(--info-foreground)">34 / 60 running · ~2m</span></div>
+          <div class="gaterow"><span class="chk"><span class="m wait">○</span> Browser UAT</span><span class="muted">pending — runs after unit</span></div>
+          <div style="margin-top:10px"><button class="btn sm" onclick="show('view-conv-test',null,'ag-test')">Watch test output ↗</button></div>
+        </div></div>
+        <div class="panel"><div class="ph">Code review <span class="tag">convoy · gpt-5.5 · passed</span></div><div class="pb twoup" style="padding:14px 15px">
+          <div>
+            <h4 class="sec">Specialists</h4>
+            <div class="spec"><span class="role">Co</span> Correctness <span class="vt ok">approved</span></div>
+            <div class="spec"><span class="role">Se</span> Security <span class="vt ok">approved</span></div>
+            <div class="spec"><span class="role">Pe</span> Performance <span class="vt ok">approved</span></div>
+            <div class="spec"><span class="role">Re</span> Requirements <span class="vt ok">approved</span></div>
+          </div>
+          <div>
+            <h4 class="sec">Resolved findings</h4>
+            <div class="finding"><span class="sev"></span><div><div class="ft">FR-17 human gate enforced</div><div class="fl mono">select.ts:212 · was blocking</div></div></div>
+            <div class="finding"><span class="sev warn"></span><div><div class="ft">Rationale fence overflow</div><div class="fl mono">writeSequenceMd.ts:88 · non-blocking</div></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- CODE (CI/CD phase + Code tab) -->
+      <div class="view" id="view-code"><div class="panel" style="margin:0">
+        <div class="ph">Code <span class="tag"><span class="add">+5039</span> <span class="del">−42</span> · 61 files</span></div>
+        <div class="pb">
+          <div class="codegrid">
+            <div class="ftpanel">
+              <div class="fthead"><span>Changed files</span> <span class="sum"><span class="add">+5039</span> <span class="del">−42</span></span><span class="acts"><button class="btn sm">Collapse</button><button class="btn sm">View diff</button></span></div>
+              <div class="fttree">
+                <div class="ftrow"><span class="car">▾</span><span class="ico">📁</span><span class="nm">src/lib/sequencer</span><span class="cnt"><span class="add">+612</span> <span class="del">−4</span></span></div>
+                <div class="ftrow ind1 sel"><span class="ico">TS</span><span class="nm">writeSequenceMd.ts</span><span class="cnt"><span class="add">+318</span></span></div>
+                <div class="ftrow ind1"><span class="ico">TS</span><span class="nm">parseSequenceMd.ts</span><span class="cnt"><span class="add">+204</span></span></div>
+                <div class="ftrow"><span class="car">▾</span><span class="ico">📁</span><span class="nm">…/flywheel</span><span class="cnt"><span class="add">+86</span> <span class="del">−12</span></span></div>
+                <div class="ftrow ind1"><span class="ico">TS</span><span class="nm">select.ts</span><span class="cnt"><span class="add">+74</span> <span class="del">−12</span></span></div>
+                <div class="ftrow"><span class="car">▸</span><span class="ico">📁</span><span class="nm">…/frontend/backlog</span><span class="cnt"><span class="add">+3210</span></span></div>
+                <div class="ftrow"><span class="car">▸</span><span class="ico">📁</span><span class="nm">tests</span><span class="cnt"><span class="add">+540</span> <span class="del">−16</span></span></div>
+              </div>
+            </div>
+            <div class="diffpanel">
+              <div class="diffhead"><span class="ico">TS</span> <span class="mono">writeSequenceMd.ts</span><span class="cnt"><span class="add">+318</span></span></div>
+              <div class="difflines">
+                <div class="dl hunk"><span class="gut"></span><span class="tx">@@ -0,0 +1,12 @@ new file</span></div>
+                <div class="dl add"><span class="gut">1</span><span class="tx">+export function writeSequenceMd(plan: SequencePlan) {</span></div>
+                <div class="dl add"><span class="gut">2</span><span class="tx">+  const rows = plan.items.map((it,i) =&gt;</span></div>
+                <div class="dl add"><span class="gut">3</span><span class="tx">+    `| ${i+1} | ${it.id} | ${it.score} | ${it.title} |`)</span></div>
+                <div class="dl add"><span class="gut">4</span><span class="tx">+  return [HEAD, ...rows, fence(JSON.stringify(plan))].join('\n')</span></div>
+                <div class="dl add"><span class="gut">5</span><span class="tx">+}</span></div>
+              </div>
+            </div>
+          </div>
+          <h4 class="sec" style="margin-top:14px">CI · PR #1975 · feature/pan-1866 → main</h4>
+          <div class="cirow"><span class="m ok">✓</span> lint <span class="st">success</span></div>
+          <div class="cirow"><span class="m ok">✓</span> typecheck <span class="st">success</span></div>
+          <div class="cirow"><span class="m ok">✓</span> unit (root) <span class="st">success</span></div>
+          <div class="cirow"><span class="m run">▷</span> unit (frontend) <span class="st">running</span></div>
+          <div class="cirow"><span class="m ok">✓</span> build <span class="st">success</span></div>
+        </div>
+      </div></div>
+
+      <!-- PLAN -->
+      <div class="view" id="view-plan"><div class="panel" style="margin:0">
+        <div class="ph">Plan <span class="tag">vBRIEF · PRD · STATE</span></div><div class="pb">
+          <div style="display:flex;gap:6px;margin-bottom:10px"><span class="btn sm" style="background:var(--accent)">List</span><span class="btn sm">DAG</span><span class="btn sm">Raw</span><span class="btn sm">PRD</span><span class="btn sm">STATE</span></div>
+          <div class="pitem"><span class="n">✓</span><div><div>Define sequence.md JSON schema + TS types</div><div class="frtag">FR-1 · medium</div></div></div>
+          <div class="pitem"><span class="n">✓</span><div><div>Implement writeSequenceMd / parseSequenceMd</div><div class="frtag">FR-2 FR-3 · medium</div></div></div>
+          <div class="pitem"><span class="n">✓</span><div><div>Rank backlog into a DAG</div><div class="frtag">FR-5 · medium</div></div></div>
+          <div class="pitem"><span class="n">✓</span><div><div>Gate sequencer selection behind FR-17 approval</div><div class="frtag">FR-17 · expert</div></div></div>
+        </div>
+      </div></div>
+
+      <!-- TIMELINE -->
+      <div class="view" id="view-timeline"><div class="panel" style="margin:0">
+        <div class="ph">Timeline <span class="tag">Activity + History</span></div><div class="pb"><div class="tl">
+          <div class="tlrow"><span class="d info"></span>Tests started · 60 specs <span class="w">2m ago</span></div>
+          <div class="tlrow"><span class="d ok"></span>Re-review passed · convoy 4/4 <span class="w">3m ago</span></div>
+          <div class="tlrow"><span class="d info"></span>Work pushed fix · FR-17 gate <span class="w">7m ago</span></div>
+          <div class="tlrow"><span class="d bad"></span>Review → BLOCKED (FR-17) <span class="w">41m ago</span></div>
+          <div class="tlrow"><span class="d rev"></span>Review convoy started · 4 reviewers <span class="w">1h ago</span></div>
+          <div class="tlrow"><span class="d"></span>19th bead closed <span class="w">1h ago</span></div>
+        </div></div>
+      </div></div>
+
+      <!-- DISCUSSION -->
+      <div class="view" id="view-discussion"><div class="panel" style="margin:0">
+        <div class="ph">Discussion <span class="tag">Linear · PR · review · inline</span></div><div class="pb">
+          <div class="disc"><div class="top"><span class="srcchip">review</span> requirements-reviewer <span style="margin-left:auto">41m</span></div><div style="margin-top:4px">FR-17 requires a human approval before any interactive issue is auto-selected.</div></div>
+          <div class="disc"><div class="top"><span class="srcchip">inline</span> on <span class="mono" style="font-size:11px">select.ts:212</span> <span style="margin-left:auto">41m</span></div><div style="margin-top:4px">Check <span class="mono">requiresHumanApproval</span> here.</div></div>
+          <div class="disc"><div class="top"><span class="srcchip">linear</span> edward.becker <span style="margin-left:auto">2d</span></div><div style="margin-top:4px">Markdown should be the reproducible source of truth.</div></div>
+        </div>
+      </div></div>
+
+      <!-- COSTS -->
+      <div class="view" id="view-costs"><div class="panel" style="margin:0">
+        <div class="ph">Costs <span class="tag">by stage · by model</span></div><div class="pb">
+          <div style="font-size:20px;color:var(--signal-cost-foreground);font-variant-numeric:tabular-nums">$67.72 <span style="font-size:11px;color:var(--muted-foreground)">· 4.1M tokens · 6 sessions</span></div>
+          <h4 class="sec" style="margin-top:12px">By stage</h4>
+          <div class="costrow"><span class="muted">Work</span><span class="bar"><span class="f" style="width:74%"></span></span><span class="amt">$50.10</span></div>
+          <div class="costrow"><span class="muted">Review</span><span class="bar"><span class="f" style="width:18%"></span></span><span class="amt">$12.20</span></div>
+          <div class="costrow"><span class="muted">Plan</span><span class="bar"><span class="f" style="width:8%"></span></span><span class="amt">$5.42</span></div>
+          <h4 class="sec" style="margin-top:10px">By model</h4>
+          <div class="costrow"><span class="muted">sonnet-4-6</span><span class="bar"><span class="f" style="width:60%"></span></span><span class="amt">$40.6</span></div>
+          <div class="costrow"><span class="muted">gpt-5.5</span><span class="bar"><span class="f" style="width:25%"></span></span><span class="amt">$16.9</span></div>
+          <div class="costrow"><span class="muted">opus</span><span class="bar"><span class="f" style="width:15%"></span></span><span class="amt">$10.2</span></div>
+        </div>
+      </div></div>
+
+      <!-- SHIP & MERGE -->
+      <div class="view" id="view-shipmerge"><div class="panel" style="margin:0">
+        <div class="ph">Ship &amp; Merge <span class="tag">gated until verification passes</span></div><div class="pb">
+          <div class="kv"><span class="muted">Branch rebased on main</span><span class="add">clean · 0 conflicts</span></div>
+          <div class="kv"><span class="muted">Merge queue</span><span>not queued</span></div>
+          <div class="kv"><span class="muted">Merge-ready</span><span>blocked — tests running</span></div>
+          <div class="kv"><span class="muted">After merge</span><span class="muted">verify-on-main → close-out</span></div>
+          <div style="margin-top:12px"><button class="btn disabled">Merge — waiting on tests</button></div>
+        </div>
+      </div></div>
+
+    </section>
+
+    <!-- RIGHT: beads rail -->
+    <aside class="card beads">
+      <div class="beads-h"><span class="t">Beads</span><span class="counts">0 · 0 · 19</span></div>
+      <div class="progresswrap"><div class="ptop"><span>Plan progress</span><span><b>19</b> / 20 · 95%</span></div><div class="track"><div class="fd" style="width:95%"></div><div class="fa" style="width:5%"></div></div></div>
+      <div class="rail">
+        <div class="group-h">19 completed <span class="line"></span></div>
+        <div class="spine">
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Gate sequencer selection behind FR-17 approval</div></div>
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Implement writeSequenceMd (render + JSON)</div></div>
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Implement parseSequenceMd</div></div>
+          <div class="more">↑ 16 earlier completed</div>
+          <div class="group-h">1 in verification <span class="line"></span></div>
+          <div class="bead"><div class="node" style="border-color:var(--info)"><span class="pulse" style="width:6px;height:6px"></span></div><div class="ttl">Sequencer route + DAG view — <span style="color:var(--info-foreground)">tests running</span></div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  const CRUMB = {
+    'view-overview':'Overview',
+    'view-conv-work':'Work · sonnet-4-6 — conversation',
+    'view-conv-review':'Review convoy — findings',
+    'view-conv-test':'Test — live terminal',
+    'view-conv-plan':'Planning · opus — conversation',
+    'view-quality':'Quality — verification & review',
+    'view-code':'Code — changed files, diff & CI',
+    'view-plan':'Plan — vBRIEF / PRD',
+    'view-timeline':'Timeline — activity & history',
+    'view-discussion':'Discussion',
+    'view-costs':'Costs',
+    'view-shipmerge':'Ship & Merge',
+  };
+  // which left/tab/phase control should highlight for each view (when not clicked directly)
+  const NAV_FOR = {
+    'view-conv-work':'ag-work','view-conv-review':'ag-review','view-conv-test':'ag-test','view-conv-plan':'ag-plan',
+    'view-quality':'tab-quality','view-code':'tab-code','view-plan':'tab-plan','view-timeline':'tab-timeline','view-discussion':'tab-discussion','view-costs':'tab-costs',
+  };
+  function clearNav(){ document.querySelectorAll('.navsel').forEach(n=>n.classList.remove('navsel')); }
+  function show(viewId, clickedEl, navId){
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id===viewId));
+    const cr=document.getElementById('crumb'); if(cr) cr.textContent = CRUMB[viewId]||'';
+    clearNav();
+    const target = clickedEl || (navId && document.getElementById(navId)) || (NAV_FOR[viewId] && document.getElementById(NAV_FOR[viewId]));
+    if(target) target.classList.add('navsel');
+    // scroll the stage into view a touch
+    const c=document.querySelector('.center'); if(c) c.scrollIntoView({block:'nearest'});
+  }
+</script>
+
+</body>
+</html>

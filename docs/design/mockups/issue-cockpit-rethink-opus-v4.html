@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue Cockpit — v4 (Opus): changed-files tree + full detail-group content</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted:color-mix(in srgb, black 4%, transparent); --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8;
+    --success:#10b981; --success-foreground:#047857;
+    --signal-review:#a855f7; --signal-review-foreground:#7e22ce;
+    --signal-cost:#06b6d4; --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background); color:var(--foreground); font-family:"DM Sans",system-ui,sans-serif; font-weight:500; font-size:13px; line-height:1.4; -webkit-font-smoothing:antialiased}
+  .wordmark{font-family:"Space Grotesk",sans-serif; letter-spacing:-.01em}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .add{color:var(--success-foreground); font-variant-numeric:tabular-nums} .del{color:var(--destructive-foreground); font-variant-numeric:tabular-nums}
+
+  .caption{max-width:1480px; margin:18px auto 0; padding:11px 18px; border:1px dashed var(--border); border-radius:14px; background:var(--card-2); font-size:12.5px}
+  .caption b{font-weight:500}
+  .screen-label{max-width:1480px; margin:30px auto 0; padding:0 20px; font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted-foreground); display:flex; align-items:center; gap:10px}
+  .screen-label .ln{flex:1; height:1px; background:var(--border)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--info); position:relative; display:inline-block}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid color-mix(in srgb,var(--info) 60%,transparent); animation:ring 1.6s ease-out infinite}
+  @keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+
+  .app{max-width:1480px; margin:12px auto 0; padding:0 18px}
+  .topbar{display:flex; align-items:center; gap:14px; padding:8px 4px 14px; color:var(--muted-foreground); font-size:12px}
+  .topbar .wordmark{color:var(--foreground); font-size:15px} .topbar .spacer{flex:1}
+  .topbar .navitem{padding:4px 8px; border-radius:8px} .topbar .navitem.active{background:var(--accent); color:var(--foreground)}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:20px}
+
+  /* header (from v3) */
+  .ihead{padding:14px 18px; border-radius:22px}
+  .crumb{font-size:11px; color:color-mix(in srgb,var(--muted-foreground) 80%,transparent)} .crumb b{color:var(--muted-foreground); font-weight:500}
+  .htop{display:flex; gap:16px; align-items:flex-start; margin-top:7px}
+  .titleblock{min-width:0; flex:1}
+  .titlerow{display:flex; flex-wrap:wrap; align-items:center; gap:10px}
+  .iid{font-family:var(--mono); font-size:13px}
+  .ititle{font-size:16px; margin:0; line-height:1.3; font-weight:500}
+  .pill{display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 10px; border-radius:var(--radius-sm); font-size:11px; border:1px solid transparent}
+  .pill.bad{background:color-mix(in srgb,var(--destructive) 8%,transparent); border-color:color-mix(in srgb,var(--destructive) 32%,transparent); color:var(--destructive-foreground)}
+  .hfacts{display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:flex-end}
+  .hf{display:flex; flex-direction:column; align-items:flex-end; gap:1px}
+  .hf .k{font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-foreground)}
+  .hf .v{font-size:12.5px} .hf .v.cost{color:var(--signal-cost-foreground); font-variant-numeric:tabular-nums}
+  /* the diff fact is now a clickable entry point to the Code/changed-files view */
+  .hf.diff{cursor:pointer}
+  .hf.diff .v{border-bottom:1px dashed color-mix(in srgb,var(--muted-foreground) 50%,transparent)}
+  .hactions{display:flex; gap:8px; align-items:center}
+  .btn{border:1px solid var(--border); background:var(--card); border-radius:9px; padding:7px 11px; font-size:12px; color:var(--foreground); cursor:pointer; display:inline-flex; align-items:center; gap:7px}
+  .btn.primary{background:var(--primary); color:var(--primary-foreground); border-color:transparent}
+  .btn.sm{padding:5px 9px; font-size:11.5px}
+  .btn.ghostbad{color:var(--destructive-foreground)} .btn.disabled{color:var(--muted-foreground); cursor:not-allowed}
+
+  .stepper{margin-top:14px; display:flex; gap:10px}
+  .step{flex:1; min-width:0}
+  .step .bar{height:6px; border-radius:99px; background:color-mix(in srgb,var(--muted-foreground) 18%,transparent)}
+  .step.done .bar{background:var(--success)} .step.active .bar{background:var(--info)} .step.blocked .bar{background:var(--destructive)}
+  .step .lbl{margin-top:6px; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-foreground)}
+  .step.done .lbl{color:var(--success-foreground)} .step.active .lbl{color:var(--info-foreground)} .step.blocked .lbl{color:var(--destructive-foreground)}
+
+  .body{display:grid; grid-template-columns:240px minmax(0,1fr) 300px; gap:14px; align-items:start; margin-top:14px}
+
+  /* left lane (condensed) */
+  .lane{padding:8px; border-radius:20px; background:color-mix(in srgb,var(--card-2) 70%,var(--card)); position:sticky; top:12px}
+  .lane-h{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); padding:8px 8px 4px; display:flex; align-items:center; gap:6px} .lane-h .n{margin-left:auto}
+  .trow{display:flex; align-items:center; gap:8px; padding:8px; border-radius:11px; cursor:pointer; position:relative; border:1px solid transparent}
+  .trow:hover{background:var(--accent)} .trow.sel{background:var(--card); border-color:var(--border)}
+  .trow .car{width:11px; text-align:center; font-size:10px; color:var(--muted-foreground)}
+  .trow .ic{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .trow .ic.work{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .trow .ic.review{color:var(--destructive-foreground);border-color:color-mix(in srgb,var(--destructive) 32%,transparent);background:color-mix(in srgb,var(--destructive) 8%,transparent)}
+  .trow .nm{font-size:13px} .trow .md{font-size:10px;color:var(--muted-foreground);font-family:var(--mono);margin-left:6px}
+  .trow .rt{margin-left:auto;font-size:10px;color:var(--muted-foreground)} .trow .sub{display:block;font-size:10px;color:var(--muted-foreground);margin-top:1px}
+  .trow.child{margin-left:18px} .trow.child::after{content:"";position:absolute;left:-9px;top:50%;width:8px;height:1px;background:var(--border)}
+  .verdict{width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff;flex:none}
+  .verdict.ok{background:var(--success)} .verdict.bad{background:var(--destructive)}
+  .rolebadge{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:9px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .drawer{margin-top:10px;border-top:1px solid var(--border);padding-top:6px}
+  .drawer-h{display:flex;align-items:center;gap:8px;padding:8px;font-size:11px;color:var(--muted-foreground);cursor:pointer;border-radius:10px} .drawer-h .sum{margin-left:auto;font-size:10px}
+
+  .center{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+  /* detail wrap */
+  .detwrap{border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden}
+  .detnav{display:flex;gap:2px;padding:8px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .detnav .t{padding:7px 12px;border-radius:9px;font-size:12.5px;color:var(--muted-foreground);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .detnav .t:hover{background:var(--accent)} .detnav .t.active{background:var(--accent);color:var(--foreground)}
+  .detnav .t .b{font-size:10px;color:var(--muted-foreground)} .detnav .t .x{color:var(--destructive-foreground)}
+  .detbody{padding:14px}
+
+  /* ── CHANGED FILES tree (the new bit) ── */
+  .codegrid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:14px}
+  @media (max-width:1240px){ .codegrid{grid-template-columns:1fr} }
+  .ftpanel{border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .fthead{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .fthead .sum{color:var(--foreground);text-transform:none;letter-spacing:0}
+  .fthead .acts{margin-left:auto;display:flex;gap:6px}
+  .fttree{padding:6px 6px 10px}
+  .ftrow{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;font-size:12.5px;cursor:pointer}
+  .ftrow:hover{background:var(--accent)}
+  .ftrow.sel{background:var(--accent)}
+  .ftrow .car{width:11px;text-align:center;font-size:9px;color:var(--muted-foreground)}
+  .ftrow .ico{width:15px;text-align:center;font-size:11px}
+  .ftrow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ftrow .cnt{margin-left:auto;font-size:11px;font-family:var(--mono);white-space:nowrap}
+  .ftrow.dir .nm{color:var(--foreground)}
+  .ftrow.file .nm{color:var(--foreground)}
+  .ind1{padding-left:20px} .ind2{padding-left:38px} .ind3{padding-left:56px}
+
+  /* diff viewer for selected file */
+  .diffpanel{border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .diffhead{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px}
+  .diffhead .mono{font-size:11.5px}
+  .diffhead .cnt{margin-left:auto;font-family:var(--mono);font-size:11px}
+  .difflines{font-family:var(--mono);font-size:11.5px;line-height:1.6;overflow:auto;max-height:340px}
+  .dl{display:flex;gap:0;padding:0 10px;white-space:pre}
+  .dl .gut{width:30px;color:var(--muted-foreground);opacity:.6;text-align:right;padding-right:10px;flex:none;user-select:none}
+  .dl.add{background:color-mix(in srgb,var(--success) 10%,transparent)}
+  .dl.add .tx{color:var(--success-foreground)}
+  .dl.del{background:color-mix(in srgb,var(--destructive) 9%,transparent)}
+  .dl.del .tx{color:var(--destructive-foreground)}
+  .dl.hunk{background:var(--card-2);color:var(--muted-foreground)}
+  .dl .tx{color:var(--foreground)}
+
+  /* CI checks rollup under code */
+  .ci{margin-top:12px}
+  .cirow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px}
+  .cirow:last-child{border-bottom:none}
+  .cirow .m{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff}
+  .cirow .m.ok{background:var(--success)} .cirow .m.bad{background:var(--destructive)} .cirow .m.run{background:var(--info)}
+  .cirow .st{margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground)}
+
+  /* generic section + gallery */
+  .gallery{max-width:1480px;margin:14px auto 0;padding:0 18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:1100px){ .gallery{grid-template-columns:1fr} }
+  .gpanel{border:1px solid var(--border);border-radius:16px;background:var(--card);overflow:hidden}
+  .gpanel .gh{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--border);font-size:12px}
+  .gpanel .gh .tag{margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .gpanel .gb{padding:13px 14px}
+  h4.sec{margin:0 0 9px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .kv:last-child{border-bottom:none} .kv .muted{color:var(--muted-foreground)}
+
+  /* costs bars */
+  .costrow{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center;padding:6px 0;font-size:12px}
+  .costrow .bar{height:8px;border-radius:99px;background:var(--accent);overflow:hidden}
+  .costrow .bar .f{height:100%;background:var(--signal-cost)}
+  .costrow .amt{text-align:right;font-family:var(--mono);font-size:11.5px;color:var(--signal-cost-foreground)}
+  /* plan items */
+  .pitem{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .pitem:last-child{border-bottom:none}
+  .pitem .n{width:16px;height:16px;border-radius:50%;background:var(--success);color:#fff;display:grid;place-items:center;font-size:9px;flex:none}
+  .pitem .n.open{background:transparent;border:1.5px solid var(--muted-foreground);color:var(--muted-foreground)}
+  .pitem .frtag{font-size:10px;color:var(--muted-foreground);font-family:var(--mono)}
+  /* timeline */
+  .tl{position:relative;padding-left:18px} .tl::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--border)}
+  .tlrow{position:relative;padding:7px 0;font-size:12.5px}
+  .tlrow .d{position:absolute;left:-16px;top:11px;width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);border:2px solid var(--card)}
+  .tlrow .d.bad{background:var(--destructive)} .tlrow .d.ok{background:var(--success)} .tlrow .d.info{background:var(--info)} .tlrow .d.rev{background:var(--signal-review)}
+  .tlrow .w{font-size:10.5px;color:var(--muted-foreground)}
+  /* discussion */
+  .disc{padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .disc:last-child{border-bottom:none}
+  .disc .top{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted-foreground)}
+  .srcchip{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--muted-foreground)}
+  /* artifacts */
+  .artcard{border:1px solid var(--border);border-radius:12px;padding:10px;font-size:12px;display:flex;gap:10px;align-items:center}
+  .artthumb{width:46px;height:34px;border-radius:7px;background:var(--card-2);border:1px solid var(--border);flex:none}
+
+  .legend{max-width:1480px;margin:18px auto 48px;padding:0 18px}
+  .legend .card{padding:16px 18px}
+  .legend h4{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .maptbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .maptbl th,.maptbl td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  .maptbl th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);font-weight:500}
+  .maptbl td.h{color:var(--foreground)}
+  .legend code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <span style="display:inline-flex;align-items:center;gap:7px;"><span class="pulse"></span> <b>Issue Cockpit — v4.</b></span>
+  <span class="muted"> The cockpit shows the new <b style="color:var(--foreground)">Code</b> group: a changed-files tree (per-file +/−, expand → diff). The header's <b style="color:var(--foreground)">+5039 −42 · 61 files</b> is the click-in. Below the cockpit, every other detail group is rendered with its real content so you can see &amp; reach all the old-tab data. Full no-loss map at the bottom.</span>
+</div>
+
+<div class="screen-label">Cockpit · Code group selected <span class="ln"></span></div>
+<div class="app">
+  <div class="topbar"><span class="wordmark">Overdeck</span><span class="navitem">Command Deck</span><span class="navitem active">Issues</span><span class="navitem">Pipeline</span><span class="navitem">Agents</span><span class="spacer"></span><span class="muted">edward.becker</span></div>
+
+  <div class="card ihead">
+    <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+    <div class="htop">
+      <div class="titleblock"><div class="titlerow"><span class="iid">PAN-1866</span><h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1><span class="pill bad">⛔ Blocked</span></div></div>
+      <div class="hfacts">
+        <div class="hf"><span class="k">Branch</span><span class="v mono">feature/pan-1866</span></div>
+        <div class="hf"><span class="k">PR / CI</span><span class="v">#1975 · 4/5</span></div>
+        <div class="hf diff" title="Open changed files"><span class="k">Diff</span><span class="v"><span class="add">+5039</span> <span class="del">−42</span> · 61 files</span></div>
+        <div class="hf"><span class="k">Cost</span><span class="v cost">$67.72</span></div>
+        <div class="hactions"><button class="btn disabled ghostbad">⛔ Merge</button><button class="btn">⌘ Actions ▾</button></div>
+      </div>
+    </div>
+    <div class="stepper">
+      <div class="step done"><div class="bar"></div><div class="lbl">Plan</div></div>
+      <div class="step active"><div class="bar"></div><div class="lbl">Work</div></div>
+      <div class="step blocked"><div class="bar"></div><div class="lbl">Review</div></div>
+      <div class="step"><div class="bar"></div><div class="lbl">Test</div></div>
+      <div class="step blocked"><div class="bar"></div><div class="lbl">CI/CD</div></div>
+      <div class="step"><div class="bar"></div><div class="lbl">Ship</div></div>
+      <div class="step"><div class="bar"></div><div class="lbl">Merge</div></div>
+    </div>
+  </div>
+
+  <div class="body">
+    <aside class="card lane">
+      <div class="lane-h">Agents <span class="n">4</span></div>
+      <div class="trow"><span class="car"></span><span class="ic work">▷</span><span class="nm">Work</span><span class="md">sonnet-4-6</span><span class="rt" style="color:var(--info-foreground)">running</span></div>
+      <div class="trow"><span class="car">▸</span><span class="ic review">◉</span><span class="nm">Review</span><span class="sub">4 reviewers · 1 changes</span><span class="rt">41m</span></div>
+      <div class="trow"><span class="car"></span><span class="rolebadge">T</span><span class="nm">Test</span><span class="md">idle</span></div>
+      <div class="trow"><span class="car"></span><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="md">opus</span></div>
+      <div class="drawer"><div class="drawer-h">▸ Stack <span class="sum">3 containers · 1 PR · 2 branches</span></div></div>
+    </aside>
+
+    <section class="center">
+      <div class="detwrap">
+        <div class="detnav">
+          <span class="t">Quality <span class="x">!</span></span>
+          <span class="t active">Code <span class="b"><span class="add">+5039</span> <span class="del">−42</span></span></span>
+          <span class="t">Plan <span class="b">19/20</span></span>
+          <span class="t">Timeline</span>
+          <span class="t">Discussion <span class="b">6</span></span>
+          <span class="t">Costs <span class="b">$67.72</span></span>
+          <span class="t">Artifacts <span class="b">2</span></span>
+        </div>
+        <div class="detbody">
+          <div class="codegrid">
+            <!-- changed-files tree -->
+            <div class="ftpanel">
+              <div class="fthead"><span>Changed files (61)</span> <span class="sum"><span class="add">+5039</span> <span class="del">−42</span></span><span class="acts"><button class="btn sm">Collapse all</button><button class="btn sm">View diff</button></span></div>
+              <div class="fttree">
+                <div class="ftrow dir"><span class="car">▾</span><span class="ico">📁</span><span class="nm">src/lib/sequencer</span><span class="cnt"><span class="add">+612</span> <span class="del">−4</span></span></div>
+                <div class="ftrow file ind1 sel"><span class="ico">TS</span><span class="nm">writeSequenceMd.ts</span><span class="cnt"><span class="add">+318</span> <span class="del">−0</span></span></div>
+                <div class="ftrow file ind1"><span class="ico">TS</span><span class="nm">parseSequenceMd.ts</span><span class="cnt"><span class="add">+204</span> <span class="del">−0</span></span></div>
+                <div class="ftrow file ind1"><span class="ico">TS</span><span class="nm">rank.ts</span><span class="cnt"><span class="add">+90</span> <span class="del">−4</span></span></div>
+                <div class="ftrow dir"><span class="car">▾</span><span class="ico">📁</span><span class="nm">src/lib/cloister/flywheel</span><span class="cnt"><span class="add">+86</span> <span class="del">−12</span></span></div>
+                <div class="ftrow file ind1"><span class="ico">TS</span><span class="nm">select.ts</span><span class="cnt"><span class="add">+74</span> <span class="del">−12</span></span></div>
+                <div class="ftrow dir"><span class="car">▾</span><span class="ico">📁</span><span class="nm">src/dashboard/server/routes</span><span class="cnt"><span class="add">+260</span> <span class="del">−6</span></span></div>
+                <div class="ftrow file ind1"><span class="ico">TS</span><span class="nm">backlog.ts</span><span class="cnt"><span class="add">+260</span> <span class="del">−6</span></span></div>
+                <div class="ftrow dir"><span class="car">▸</span><span class="ico">📁</span><span class="nm">src/dashboard/frontend/…/backlog</span><span class="cnt"><span class="add">+3210</span> <span class="del">−0</span></span></div>
+                <div class="ftrow dir"><span class="car">▸</span><span class="ico">📁</span><span class="nm">tests</span><span class="cnt"><span class="add">+540</span> <span class="del">−16</span></span></div>
+                <div class="ftrow file"><span class="ico" style="margin-left:11px">⚙</span><span class="nm">projects.yaml</span><span class="cnt"><span class="add">+18</span> <span class="del">−0</span></span></div>
+                <div class="ftrow file"><span class="ico" style="margin-left:11px">📦</span><span class="nm">package.json</span><span class="cnt"><span class="add">+2</span> <span class="del">−0</span></span></div>
+              </div>
+            </div>
+            <!-- selected file diff -->
+            <div class="diffpanel">
+              <div class="diffhead"><span class="ico">TS</span> <span class="mono">src/lib/sequencer/writeSequenceMd.ts</span><span class="cnt"><span class="add">+318</span> <span class="del">−0</span></span></div>
+              <div class="difflines">
+                <div class="dl hunk"><span class="gut"></span><span class="tx">@@ -0,0 +1,18 @@ new file</span></div>
+                <div class="dl add"><span class="gut">1</span><span class="tx">+export function writeSequenceMd(plan: SequencePlan): string {</span></div>
+                <div class="dl add"><span class="gut">2</span><span class="tx">+  const rows = plan.items.map((it, i) =&gt;</span></div>
+                <div class="dl add"><span class="gut">3</span><span class="tx">+    `| ${i + 1} | ${it.id} | ${it.score.toFixed(2)} | ${it.title} |`)</span></div>
+                <div class="dl add"><span class="gut">4</span><span class="tx">+  const json = JSON.stringify(plan, null, 2)</span></div>
+                <div class="dl add"><span class="gut">5</span><span class="tx">+  return [TABLE_HEAD, ...rows, '', fence(json)].join('\n')</span></div>
+                <div class="dl add"><span class="gut">6</span><span class="tx">+}</span></div>
+                <div class="dl"><span class="gut">7</span><span class="tx"> </span></div>
+                <div class="dl hunk"><span class="gut"></span><span class="tx">@@ rationale fence guard @@</span></div>
+                <div class="dl add"><span class="gut">8</span><span class="tx">+function fence(body: string) {</span></div>
+                <div class="dl add"><span class="gut">9</span><span class="tx">+  const ticks = longestBacktickRun(body) + 1</span></div>
+                <div class="dl add"><span class="gut">10</span><span class="tx">+  return '`'.repeat(Math.max(3, ticks)) + 'json\n' + body</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PR + CI rollup folded into Code -->
+          <div class="ci">
+            <h4 class="sec" style="margin-top:6px;">Pull request #1975 · mergeable · <span class="mono" style="text-transform:none">feature/pan-1866 → main</span></h4>
+            <div class="cirow"><span class="m ok">✓</span> lint <span class="st">success</span></div>
+            <div class="cirow"><span class="m ok">✓</span> typecheck <span class="st">success</span></div>
+            <div class="cirow"><span class="m ok">✓</span> build <span class="st">success</span></div>
+            <div class="cirow"><span class="m ok">✓</span> unit (root) <span class="st">success</span></div>
+            <div class="cirow"><span class="m bad">✕</span> unit (frontend) <span class="st">failed · 1 spec</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="card" style="border-radius:20px;overflow:hidden;position:sticky;top:12px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)"><span style="font-size:13px">Beads</span><span style="margin-left:auto;font-size:11px;color:var(--muted-foreground)">0 · 1 · 19</span></div>
+      <div style="padding:12px 14px 8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted-foreground);margin-bottom:6px"><span>Plan progress</span><span><b style="color:var(--foreground)">19</b> / 20 · 95%</span></div><div style="height:8px;border-radius:99px;background:var(--accent);overflow:hidden;display:flex"><div style="width:95%;background:var(--success)"></div><div style="width:5%;background:var(--info)"></div></div></div>
+      <div style="padding:8px 14px 16px;font-size:12px;color:var(--muted-foreground)">19 completed · 1 working now · 0 upcoming <div style="margin-top:8px;color:var(--info-foreground)">● work · sonnet-4-6 — gate sequencer behind FR-17 (1/3 AC)</div></div>
+    </aside>
+  </div>
+</div>
+
+<!-- detail groups gallery: render the REAL content of every group -->
+<div class="screen-label">Every detail group — full content (this is what each tab shows; reachable from the cockpit detail-nav) <span class="ln"></span></div>
+<div class="gallery">
+
+  <!-- QUALITY -->
+  <div class="gpanel">
+    <div class="gh">Quality <span class="tag">Review · Test · Verification · Specialists</span></div>
+    <div class="gb">
+      <h4 class="sec">Review findings (1 blocker)</h4>
+      <div class="kv"><span><span class="del">●</span> Flywheel ignores FR-17 human gate</span><span class="muted mono">select.ts:212</span></div>
+      <div class="kv"><span><span style="color:var(--warning-foreground)">●</span> Rationale fence overflow (non-blocking)</span><span class="muted mono">writeSequenceMd.ts:88</span></div>
+      <h4 class="sec" style="margin-top:14px;">Verification gates · Specialists</h4>
+      <div class="kv"><span class="muted">Typecheck / Lint</span><span class="add">passed</span></div>
+      <div class="kv"><span class="muted">Tests / UAT</span><span class="muted">pending</span></div>
+      <div class="kv"><span class="muted">Convoy</span><span>Co ✓ · Se ✓ · Pe ✓ · <span class="del">Re ✕</span> · Sy</span></div>
+      <div class="kv"><span class="muted">Verification cycles</span><span>0 / 3</span></div>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div class="gpanel">
+    <div class="gh">Plan <span class="tag">vBRIEF List · DAG · Raw + PRD + STATE</span></div>
+    <div class="gb">
+      <div style="display:flex;gap:6px;margin-bottom:8px"><span class="btn sm" style="background:var(--accent)">List</span><span class="btn sm">DAG</span><span class="btn sm">Raw</span><span class="btn sm">PRD</span><span class="btn sm">STATE</span></div>
+      <div class="pitem"><span class="n">✓</span><div><div>Define sequence.md JSON schema + TS types</div><div class="frtag">FR-1 · medium</div></div></div>
+      <div class="pitem"><span class="n">✓</span><div><div>Implement writeSequenceMd / parseSequenceMd</div><div class="frtag">FR-2 FR-3 · medium</div></div></div>
+      <div class="pitem"><span class="n open">○</span><div><div>Gate sequencer selection behind FR-17 approval</div><div class="frtag">FR-17 · expert · in progress</div></div></div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="gpanel">
+    <div class="gh">Timeline <span class="tag">Activity + History merged</span></div>
+    <div class="gb">
+      <div class="tl">
+        <div class="tlrow"><span class="d info"></span>Work resumed — addressing review <span class="w">42s ago</span></div>
+        <div class="tlrow"><span class="d bad"></span>Review → BLOCKED (FR-17 regression) <span class="w">41m ago</span></div>
+        <div class="tlrow"><span class="d rev"></span>Review convoy started · 4 reviewers <span class="w">1h ago</span></div>
+        <div class="tlrow"><span class="d ok"></span>Work done → submitted PR #1975 <span class="w">1h ago</span></div>
+        <div class="tlrow"><span class="d"></span>19th bead closed · writeSequenceMd <span class="w">1h ago</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCUSSION -->
+  <div class="gpanel">
+    <div class="gh">Discussion <span class="tag">Linear · PR · review · inline</span></div>
+    <div class="gb">
+      <div class="disc"><div class="top"><span class="srcchip">review</span> requirements-reviewer <span style="margin-left:auto">41m</span></div><div style="margin-top:4px">FR-17 requires a human approval before any interactive issue is auto-selected. Current code path bypasses it.</div></div>
+      <div class="disc"><div class="top"><span class="srcchip">inline</span> on <span class="mono" style="font-size:11px">select.ts:212</span> <span style="margin-left:auto">41m</span></div><div style="margin-top:4px">This branch should check <span class="mono">requiresHumanApproval</span>.</div></div>
+      <div class="disc"><div class="top"><span class="srcchip">linear</span> edward.becker <span style="margin-left:auto">2d</span></div><div style="margin-top:4px">Let's make the markdown the source of truth, reproducible across runs.</div></div>
+    </div>
+  </div>
+
+  <!-- COSTS -->
+  <div class="gpanel">
+    <div class="gh">Costs <span class="tag">by stage · by model</span></div>
+    <div class="gb">
+      <div style="font-size:20px;color:var(--signal-cost-foreground);font-variant-numeric:tabular-nums">$67.72 <span style="font-size:11px;color:var(--muted-foreground)">· 4.1M tokens · 6 sessions</span></div>
+      <h4 class="sec" style="margin-top:12px;">By stage</h4>
+      <div class="costrow"><span class="muted">Work</span><span class="bar"><span class="f" style="width:74%"></span></span><span class="amt">$50.10</span></div>
+      <div class="costrow"><span class="muted">Review</span><span class="bar"><span class="f" style="width:18%"></span></span><span class="amt">$12.20</span></div>
+      <div class="costrow"><span class="muted">Plan</span><span class="bar"><span class="f" style="width:8%"></span></span><span class="amt">$5.42</span></div>
+      <h4 class="sec" style="margin-top:10px;">By model</h4>
+      <div class="costrow"><span class="muted">sonnet-4-6</span><span class="bar"><span class="f" style="width:60%"></span></span><span class="amt">$40.6</span></div>
+      <div class="costrow"><span class="muted">gpt-5.5</span><span class="bar"><span class="f" style="width:25%"></span></span><span class="amt">$16.9</span></div>
+      <div class="costrow"><span class="muted">opus</span><span class="bar"><span class="f" style="width:15%"></span></span><span class="amt">$10.2</span></div>
+    </div>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="gpanel">
+    <div class="gh">Artifacts <span class="tag">shown only when any exist</span></div>
+    <div class="gb" style="display:flex;flex-direction:column;gap:8px">
+      <div class="artcard"><div class="artthumb"></div><div><div>Sequencer rationale — sample render</div><div class="muted" style="font-size:11px;margin-top:2px">work · sonnet-4-6 · Jun 18</div></div><span class="srcchip" style="margin-left:auto;color:var(--success-foreground);border-color:color-mix(in srgb,var(--success) 32%,transparent)">published</span></div>
+      <div class="artcard"><div class="artthumb"></div><div><div>backlog DAG preview</div><div class="muted" style="font-size:11px;margin-top:2px">work · sonnet-4-6 · Jun 17</div></div><span class="srcchip" style="margin-left:auto">unshared</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- no-loss map -->
+<div class="legend">
+  <div class="card">
+    <h4>No-loss map — all 15 old tabs + affordances, and how you reach each now</h4>
+    <table class="maptbl">
+      <thead><tr><th style="width:160px;">Old tab / affordance</th><th>What it showed</th><th style="width:230px;">Where it is now</th></tr></thead>
+      <tbody>
+        <tr><td class="h">Overview</td><td>blocker, now/issue facts</td><td>Default center (blocker spotlight) + header stepper/gates</td></tr>
+        <tr><td class="h">Review</td><td>4 gate steps, blocking finding, specialists grid</td><td><b>Quality</b> group — findings + specialists convoy</td></tr>
+        <tr><td class="h">Test</td><td>test/verification status table, notes</td><td><b>Quality</b> group — Verification gates + Test/merge</td></tr>
+        <tr><td class="h">PR &amp; CI</td><td>PR header, check-runs list, summary</td><td><b>Code</b> group — PR line + CI rollup</td></tr>
+        <tr><td class="h">Diff</td><td>files list, unified diff viewer</td><td><b>Code</b> group — changed-files tree + per-file diff (+ header Diff click-in)</td></tr>
+        <tr><td class="h">Files</td><td>whole-workspace file browser</td><td>Opens as a workspace <b>pane</b> (Files ↗) — distinct from the diff tree</td></tr>
+        <tr><td class="h">Conversation</td><td>agent transcript + composer</td><td>Select an agent in the tree → center becomes the conversation</td></tr>
+        <tr><td class="h">Terminal</td><td>live tmux</td><td>Conversation pane's <b>Terminal</b> toggle / terminal drawer</td></tr>
+        <tr><td class="h">PRD / Plan</td><td>vBRIEF List/DAG/Raw, PRD, STATE</td><td><b>Plan</b> group</td></tr>
+        <tr><td class="h">Beads</td><td>open/closed tasks, AC, graph</td><td>Persistent right <b>rail</b> (done/working/upcoming + progress)</td></tr>
+        <tr><td class="h">Discussion</td><td>Linear/PR/review/inline comments</td><td><b>Discussion</b> group</td></tr>
+        <tr><td class="h">Costs</td><td>total, by-stage, by-model</td><td>Header cost + <b>Costs</b> group (bars)</td></tr>
+        <tr><td class="h">Activity</td><td>time-bucketed observations</td><td><b>Timeline</b> group (merged with History)</td></tr>
+        <tr><td class="h">History</td><td>status-change log</td><td><b>Timeline</b> group (merged with Activity)</td></tr>
+        <tr><td class="h">Artifacts</td><td>published artifact cards</td><td><b>Artifacts</b> group (appears only when any exist)</td></tr>
+        <tr><td class="h">Actions menu</td><td>plan/start/review/tell/wipe/pause…</td><td><code>⌘ Actions ▾</code> in the header (unchanged)</td></tr>
+        <tr><td class="h">Resources</td><td>containers cpu/mem, branches, PRs</td><td>Left lane <b>Stack</b> drawer (collapsible)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>

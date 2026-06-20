@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Beads rail — focused spec (item #1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --warning-foreground:#b45309; --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--info);position:relative;display:inline-block}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid color-mix(in srgb,var(--info) 60%,transparent);animation:ring 1.6s ease-out infinite}
+  @keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+
+  .wrap{max-width:1180px;margin:24px auto;padding:0 20px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:20px}
+  .row{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+  .col{display:flex;flex-direction:column;gap:8px}
+  .statelabel{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground)}
+
+  /* the rail */
+  .beads{width:300px;border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden}
+  .beads-h{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .beads-h .t{font-size:13px}
+  .beads-h .counts{margin-left:auto;display:flex;gap:9px;font-size:11px;color:var(--muted-foreground);align-items:center}
+  .count{display:inline-flex;align-items:center;gap:5px} .count .d{width:7px;height:7px;border-radius:50%}
+  .count .d.open{background:var(--muted-foreground)} .count .d.active{background:var(--info)} .count .d.done{background:var(--success)}
+  .beads-h .ic{width:24px;height:24px;border-radius:7px;border:1px solid var(--border);display:grid;place-items:center;color:var(--muted-foreground);font-size:11px;cursor:pointer}
+  .progresswrap{padding:11px 14px 7px}
+  .ptop{display:flex;justify-content:space-between;font-size:11px;color:var(--muted-foreground);margin-bottom:6px} .ptop b{color:var(--foreground);font-weight:500}
+  .track{height:8px;border-radius:99px;background:var(--accent);overflow:hidden;display:flex} .track .fd{background:var(--success)} .track .fa{background:var(--info)}
+  .rail{padding:2px 10px 14px}
+  .group-h{display:flex;align-items:center;gap:8px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);padding:11px 6px 5px;cursor:pointer} .group-h .car{font-size:9px} .group-h .line{flex:1;height:1px;background:var(--border)}
+  .spine{position:relative;padding-left:24px} .spine::before{content:"";position:absolute;left:10px;top:6px;bottom:6px;width:2px;background:var(--border);border-radius:2px}
+  .bead{position:relative;margin:5px 0;padding:8px 9px;border-radius:11px;border:1px solid transparent;cursor:pointer} .bead:hover{background:var(--accent)}
+  .bead .node{position:absolute;left:-19px;top:11px;width:14px;height:14px;border-radius:50%;background:var(--card);border:2px solid var(--muted-foreground);display:grid;place-items:center;font-size:9px;color:#fff}
+  .bead .ttl{font-size:12px;line-height:1.35}
+  .bead .meta{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .bdg{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:var(--radius-sm);font-size:10px;border:1px solid var(--border);color:var(--muted-foreground)}
+  .blocked{font-size:10px;color:var(--muted-foreground);display:flex;align-items:center;gap:4px;margin-top:5px}
+  .bead.done .ttl{color:var(--muted-foreground)} .bead.done .node{background:var(--success);border-color:var(--success)}
+  .bead.open:hover{background:var(--accent)}
+  .bead.active{border-color:color-mix(in srgb,var(--info) 38%,transparent);background:color-mix(in srgb,var(--info) 7%,var(--card));box-shadow:0 8px 24px -16px color-mix(in srgb,var(--info) 70%,transparent);padding:11px;margin:9px 0}
+  .bead.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--info)}
+  .bead.active .node{border-color:var(--info);background:var(--card)}
+  .working-tag{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--info-foreground);text-transform:uppercase;letter-spacing:.06em}
+  .agent-line{margin-top:6px;font-size:11px;color:var(--muted-foreground)}
+  .bdg.ac{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .more{text-align:center;font-size:11px;color:var(--muted-foreground);padding:7px;border:1px dashed var(--border);border-radius:10px;margin:6px 4px;cursor:pointer}
+  .empty{padding:26px 16px;text-align:center;color:var(--muted-foreground);font-size:12px}
+
+  .notes{margin-top:8px;border:1px solid var(--border);border-radius:14px;padding:14px 16px;max-width:520px;background:var(--card)}
+  .notes h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .notes li{font-size:12.5px;margin:5px 0} .notes code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+  .q{border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px;max-width:520px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)}
+  .q li{font-size:12.5px;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Beads rail — item #1 spec</h1>
+  <div class="sub">Replaces the <code style="font-family:var(--mono)">Beads</code> tab with a persistent right column. All data already exists at <code style="font-family:var(--mono)">/api/issues/:id/beads</code> — incl. <code style="font-family:var(--mono)">in_progress</code> + <code style="font-family:var(--mono)">startedAt</code>. Difficulty comes from labels.</div>
+
+  <div class="row">
+    <!-- STATE A: active (in-progress bead present) -->
+    <div class="col">
+      <div class="statelabel">A · active issue (one bead in&nbsp;progress)</div>
+      <div class="beads">
+        <div class="beads-h"><span class="t">Beads</span><span class="counts"><span class="count"><span class="d open"></span>6</span><span class="count"><span class="d active"></span>1</span><span class="count"><span class="d done"></span>13</span><span class="ic" title="Graph / list">⌥</span><span class="ic" title="Refresh">⟳</span></span></div>
+        <div class="progresswrap"><div class="ptop"><span>Plan progress</span><span><b>13</b> / 20 · 65%</span></div><div class="track"><div class="fd" style="width:65%"></div><div class="fa" style="width:5%"></div></div></div>
+        <div class="rail">
+          <div class="group-h"><span class="car">▾</span> 13 completed <span class="line"></span></div>
+          <div class="spine">
+            <div class="bead done"><div class="node">✓</div><div class="ttl">Register the 'sequencer' role in config</div><div class="meta"><span class="bdg">simple</span></div></div>
+            <div class="bead done"><div class="node">✓</div><div class="ttl">Implement parseSequenceMd (validate fenced JSON)</div><div class="meta"><span class="bdg">medium</span></div></div>
+            <div class="more">↑ show 11 earlier completed</div>
+
+            <div class="group-h" style="color:var(--info-foreground)">working now <span class="line" style="background:color-mix(in srgb,var(--info) 32%,transparent)"></span></div>
+            <div class="bead active">
+              <div class="node"><span class="pulse" style="width:7px;height:7px"></span></div>
+              <div class="working-tag"><span class="pulse" style="width:7px;height:7px"></span> in&nbsp;progress</div>
+              <div class="ttl" style="margin-top:6px">Implement writeSequenceMd (render table + tiered rationale + JSON)</div>
+              <div class="agent-line">started 11 min ago · <span class="mono">started_at</span></div>
+              <div class="meta"><span class="bdg">expert</span><span class="bdg ac">3/7 AC</span></div>
+            </div>
+
+            <div class="group-h"><span class="car">▾</span> 6 upcoming <span class="line"></span></div>
+            <div class="bead open"><div class="node"></div><div class="ttl">Rank backlog into a DAG (topological + scoring)</div><div class="meta"><span class="bdg">medium</span></div></div>
+            <div class="bead open"><div class="node"></div><div class="ttl">Wire the GET /api/backlog route</div><div class="meta"><span class="bdg">medium</span></div></div>
+            <div class="bead open"><div class="node"></div><div class="ttl">Cut the app over to the fresh overdeck.db</div><div class="meta"><span class="bdg">expert</span></div><div class="blocked">⤷ blocked by 4 upstream beads</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATE B: all complete -->
+    <div class="col">
+      <div class="statelabel">B · all complete</div>
+      <div class="beads">
+        <div class="beads-h"><span class="t">Beads</span><span class="counts"><span class="count"><span class="d open"></span>0</span><span class="count"><span class="d done"></span>20</span><span class="ic">⌥</span><span class="ic">⟳</span></span></div>
+        <div class="progresswrap"><div class="ptop"><span>Plan progress</span><span><b>20</b> / 20 · 100%</span></div><div class="track"><div class="fd" style="width:100%"></div></div></div>
+        <div class="rail">
+          <div class="group-h"><span class="car">▸</span> 20 completed <span class="line"></span></div>
+          <div class="spine">
+            <div class="bead done"><div class="node">✓</div><div class="ttl">Gate sequencer selection behind FR-17 approval</div><div class="meta"><span class="bdg">expert</span></div></div>
+            <div class="bead done"><div class="node">✓</div><div class="ttl">Implement writeSequenceMd</div><div class="meta"><span class="bdg">medium</span></div></div>
+            <div class="more">↑ show 18 earlier completed</div>
+          </div>
+          <div class="empty" style="padding-top:10px">✓ All planned beads complete</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATE C: no beads -->
+    <div class="col">
+      <div class="statelabel">C · no beads yet</div>
+      <div class="beads">
+        <div class="beads-h"><span class="t">Beads</span><span class="counts muted">—</span></div>
+        <div class="empty">No beads yet.<br><span class="muted">Planning hasn't created tasks for this issue.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>What's in v1 (uses existing data only)</h3>
+    <ul>
+      <li><b>Groups:</b> completed (collapsed, "show N earlier") · <b>working now</b> = beads with <code>status: in_progress</code> (blue, pulse, <code>started_at</code> age) · upcoming = <code>open</code>, with <code>blocked by N</code> from <code>blockedBy[]</code>.</li>
+      <li><b>Progress bar:</b> closed / total (+ a thin blue sliver for in-progress).</li>
+      <li><b>Difficulty badge</b> parsed from <code>labels</code> (e.g. <code>difficulty:expert</code>); neutral (taxonomy).</li>
+      <li><b>Header counts:</b> open · in-progress · closed dots + refresh.</li>
+      <li><b>Fixes a latent bug:</b> today an <code>in_progress</code> bead is invisible (frontend filters only <code>open</code>/<code>closed</code>).</li>
+    </ul>
+  </div>
+
+  <div class="q">
+    <h3>Decisions to confirm before I implement</h3>
+    <ul>
+      <li><b>1. The old Beads tab also had a List/Graph (DAG) view + per-bead detail (deps, ACs).</b> The rail is the at-a-glance. Keep the DAG + per-bead detail reachable via the <code>⌥</code> toggle (opens the full graph) and click-a-bead → detail? (No-loss.)</li>
+      <li><b>2. AC count (<code>3/7 AC</code>)</b> isn't in beads data — it'd come from cross-referencing the vBRIEF plan item. Include in v1, or defer to a later item?</li>
+      <li><b>3. Width</b> ~300px, always-on right column. OK, or narrower?</li>
+      <li><b>4. "working now" agent line</b> — show just <code>started_at</code> age in v1 (linking the bead to the specific work agent/model needs an activity cross-ref). OK to defer the agent name?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue Cockpit — full rethink (Opus)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500&display=swap" rel="stylesheet" />
+<style>
+  /* ── Real dashboard tokens (copied from src/dashboard/frontend/src/index.css, light block) ── */
+  :root {
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f8fa;
+    --popover: #ffffff;
+
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --accent: color-mix(in srgb, black 4%, transparent);
+
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --info: #3b82f6;            /* machine working */
+    --info-foreground: #1d4ed8;
+    --success: #10b981;         /* outcome: done */
+    --success-foreground: #047857;
+    --warning: #f59e0b;         /* a human must act */
+    --warning-foreground: #b45309;
+    --signal-review: #a855f7;   /* specialist verb */
+    --signal-review-foreground: #7e22ce;
+    --signal-cost: #06b6d4;     /* money */
+    --signal-cost-foreground: #0e7490;
+
+    --mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 82% -12%, color-mix(in srgb, var(--destructive) 5%, transparent), transparent),
+      var(--background);
+    color: var(--foreground);
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .wordmark { font-family: "Space Grotesk", sans-serif; font-weight: 500; letter-spacing: -0.01em; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted-foreground); }
+
+  /* ── Caption strip ── */
+  .caption {
+    max-width: 1460px; margin: 18px auto 0; padding: 12px 18px;
+    border: 1px dashed var(--border); border-radius: 14px;
+    background: color-mix(in srgb, var(--destructive) 4%, var(--card));
+    color: var(--foreground); font-size: 12.5px;
+  }
+  .caption b { font-weight: 500; }
+  .caption .chip { display:inline-flex; align-items:center; gap:6px; }
+  .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--info); position: relative; display:inline-block; }
+  .pulse-dot::after {
+    content:""; position:absolute; inset:-4px; border-radius:50%;
+    border: 2px solid color-mix(in srgb, var(--info) 60%, transparent);
+    animation: ring 1.6s ease-out infinite;
+  }
+  @keyframes ring { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  /* ── App shell ── */
+  .app { max-width: 1460px; margin: 14px auto 40px; padding: 0 18px; }
+  .topbar {
+    display:flex; align-items:center; gap:14px; padding: 8px 4px 16px;
+    color: var(--muted-foreground); font-size: 12px;
+  }
+  .topbar .wordmark { color: var(--foreground); font-size: 15px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .navitem { padding: 4px 8px; border-radius: 8px; }
+  .topbar .navitem.active { background: var(--accent); color: var(--foreground); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; }
+
+  /* ── Issue header ── */
+  .ihead { padding: 15px 18px; border-radius: 22px; }
+  .crumb { font-size: 11px; color: color-mix(in srgb, var(--muted-foreground) 80%, transparent); }
+  .crumb b { color: var(--muted-foreground); font-weight: 500; }
+  .titlerow { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:6px; }
+  .iid { font-family: var(--mono); font-size: 13px; color: var(--foreground); }
+  .ititle { font-size: 16px; margin: 0; line-height: 1.3; max-width: 820px; font-weight: 500; }
+  .sub { margin-top: 3px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); }
+  .headtop { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .headstats { margin-left:auto; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
+
+  .stat { border:1px solid var(--border); border-radius: 12px; padding: 6px 10px; min-width: 62px; text-align:right; }
+  .stat .k { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+  .stat .v { font-size: 12px; margin-top: 2px; }
+  .stat .v.cost { color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; }
+
+  .btn { border:1px solid var(--border); background: var(--card); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight:500; color: var(--foreground); cursor: pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn.disabled { color: var(--muted-foreground); background: color-mix(in srgb, var(--muted) 40%, var(--card)); cursor: not-allowed; }
+  .btn .blk { color: var(--destructive-foreground); }
+
+  /* phase pill — amber = a human must act (In Review) ; red = blocked/action required */
+  .pill { display:inline-flex; align-items:center; gap:6px; height: 22px; padding: 0 9px; border-radius: var(--radius-sm); font-size: 11px; font-weight:500; }
+  .pill.bad { background: color-mix(in srgb, var(--destructive) 8%, transparent); border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent); color: var(--destructive-foreground); }
+
+  /* pipeline bar */
+  .pipeline { margin-top: 14px; display:flex; gap:6px; }
+  .phase { flex:1; }
+  .phase .bar { height: 6px; border-radius: 99px; background: var(--accent); }
+  .phase.done .bar { background: var(--success); }
+  .phase.active .bar { background: var(--info); }
+  .phase.fail .bar { background: var(--destructive); }
+  .phase .lbl { margin-top: 5px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); text-align:center; }
+  .phase.active .lbl { color: var(--info-foreground); }
+  .phase.done .lbl { color: var(--success-foreground); }
+  .phase.fail .lbl { color: var(--destructive-foreground); }
+
+  .gates { margin-top: 12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .gate { display:inline-flex; align-items:center; gap:6px; font-size: 11px; color: var(--muted-foreground); border:1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+  .gate .sq { width:8px;height:8px;border-radius:2px;background:var(--muted-foreground); }
+  .gate .sq.ok { background: var(--success); }
+  .gate .sq.bad { background: var(--destructive); }
+  .gate b { color: var(--foreground); font-weight:500; }
+
+  /* ── Body 3-column grid ── */
+  .body { display:grid; grid-template-columns: 248px minmax(0,1fr) 300px; gap: 14px; align-items: start; margin-top: 14px; }
+
+  /* LEFT lane: tree + tools */
+  .lane { padding: 10px; border-radius: 20px; background: color-mix(in srgb, var(--card-2) 70%, var(--card)); position: sticky; top: 14px; }
+  .lane-h { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 6px 8px 6px; display:flex; align-items:center; gap:6px; }
+  .lane-h .line { flex:1; height:1px; background: var(--border); }
+  .tree-row { display:flex; align-items:center; gap:8px; padding: 7px 8px; border-radius: 10px; font-size: 12.5px; cursor:pointer; }
+  .tree-row.sel { background: var(--accent); }
+  .tree-row.indent { margin-left: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); flex: none; }
+  .dot.info { background: var(--info); }
+  .dot.success { background: var(--success); }
+  .dot.bad { background: var(--destructive); }
+  .tree-row .small { font-size: 10px; color: var(--muted-foreground); margin-left:auto; }
+  .tool { display:flex; align-items:center; gap:9px; padding: 8px; border-radius: 10px; font-size: 12.5px; cursor:pointer; color: var(--foreground); }
+  .tool:hover { background: var(--accent); }
+  .tool .ic { width:16px; text-align:center; color: var(--muted-foreground); }
+  .tool .arr { margin-left:auto; color: var(--muted-foreground); font-size: 11px; }
+
+  /* CENTER */
+  .center { display:flex; flex-direction:column; gap: 14px; }
+
+  /* blocker spotlight — red = action required */
+  .spotlight { border:1px solid color-mix(in srgb, var(--destructive) 34%, transparent); background: color-mix(in srgb, var(--destructive) 6%, var(--card)); border-radius: 18px; padding: 14px 16px; }
+  .spotlight .lead { display:flex; align-items:center; gap:8px; font-size: 13px; color: var(--destructive-foreground); }
+  .spotlight .desc { margin-top: 6px; font-size: 12.5px; color: var(--foreground); }
+  .spotlight .acts { margin-top: 11px; display:flex; flex-wrap:wrap; gap:8px; }
+  .spotlight .acts .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+
+  .twoup { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .panel { border:1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--card); }
+  .panel .ph { display:flex; align-items:center; justify-content:space-between; margin: 0 0 8px; }
+  .panel h3 { margin: 0; font-size: 11px; font-weight:500; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+  .panel .ph .tag { font-size: 10px; }
+  .kv { display:flex; justify-content:space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .kv:last-child { border-bottom: none; }
+  .kv .muted { color: var(--muted-foreground); }
+  .kv .bad { color: var(--destructive-foreground); }
+  .kv .pos { color: var(--success-foreground); }
+  .kv .neg { color: var(--destructive-foreground); }
+
+  /* details switcher — secondary, demoted below the synthesis */
+  .details { border-radius: 18px; }
+  .det-head { display:flex; align-items:center; gap:8px; padding: 4px 2px 10px; }
+  .det-head .lab { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+  .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg .s { padding: 6px 11px; border-radius: 9px; font-size: 12px; color: var(--muted-foreground); cursor:pointer; border:1px solid transparent; display:inline-flex; align-items:center; gap:6px; }
+  .seg .s:hover { background: var(--accent); }
+  .seg .s.active { background: var(--card); border-color: var(--border); color: var(--foreground); }
+  .seg .s .n { font-size: 10px; color: var(--muted-foreground); }
+  .seg .s .x { color: var(--destructive-foreground); }
+  .det-body { border:1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--card); }
+  .finding { display:flex; gap:10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .finding:last-child { border-bottom:none; }
+  .finding .sev { width:8px;height:8px;border-radius:2px;margin-top:5px;flex:none;background:var(--destructive); }
+  .finding .sev.warn { background: var(--warning); }
+  .finding .ftitle { font-size: 12.5px; }
+  .finding .floc { font-size: 11px; color: var(--muted-foreground); margin-top:3px; }
+  .finding .floc .mono { color: var(--muted-foreground); }
+
+  /* RIGHT: Beads rail */
+  .beads { padding: 0; border-radius: 20px; overflow: hidden; position: sticky; top: 14px; }
+  .beads-h { display:flex; align-items:center; gap:10px; padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  .beads-h .t { font-size: 13px; }
+  .beads-h .counts { margin-left:auto; display:flex; gap:10px; font-size: 11px; color: var(--muted-foreground); align-items:center; }
+  .count { display:inline-flex; align-items:center; gap:5px; }
+  .count .d { width:7px; height:7px; border-radius:50%; }
+  .count .d.open { background: var(--muted-foreground); }
+  .count .d.active { background: var(--info); }
+  .count .d.done { background: var(--success); }
+
+  .progresswrap { padding: 12px 14px 6px; }
+  .progresswrap .ptop { display:flex; justify-content:space-between; font-size: 11px; color: var(--muted-foreground); margin-bottom:6px; }
+  .progresswrap .ptop b { color: var(--foreground); font-weight:500; }
+  .track { height: 8px; border-radius: 99px; background: var(--accent); overflow:hidden; display:flex; }
+  .track .fill-done { background: var(--success); }
+  .track .fill-active { background: var(--info); }
+
+  .rail { padding: 4px 10px 14px; position: relative; }
+  .group-h { display:flex; align-items:center; gap:8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 12px 6px 6px; }
+  .group-h .line { flex:1; height:1px; background: var(--border); }
+  .spine { position: relative; padding-left: 24px; }
+  .spine::before { content:""; position:absolute; left: 10px; top: 6px; bottom: 6px; width: 2px; background: var(--border); border-radius: 2px; }
+  .bead { position: relative; margin: 5px 0; padding: 8px 9px; border-radius: 11px; border: 1px solid transparent; }
+  .bead .node { position:absolute; left: -19px; top: 11px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 2px solid var(--muted-foreground); display:grid; place-items:center; font-size:9px; color:#fff; }
+  .bead .ttl { font-size: 12px; line-height: 1.35; }
+  .bead .meta { margin-top: 6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .bead.done .ttl { color: var(--muted-foreground); }
+  .bead.done .node { background: var(--success); border-color: var(--success); }
+  .bead.open:hover { background: var(--accent); }
+  .bead.active {
+    border-color: color-mix(in srgb, var(--info) 38%, transparent);
+    background: color-mix(in srgb, var(--info) 7%, var(--card));
+    box-shadow: 0 8px 24px -16px color-mix(in srgb, var(--info) 70%, transparent);
+    padding: 11px; margin: 9px 0;
+  }
+  .bead.active::before { content:""; position:absolute; left:0; top:9px; bottom:9px; width:3px; border-radius:3px; background: var(--info); }
+  .bead.active .node { border-color: var(--info); background: var(--card); }
+  .working-tag { display:inline-flex; align-items:center; gap:6px; font-size: 10px; font-weight:500; color: var(--info-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+  .agent-line { margin-top: 6px; font-size: 11px; color: var(--muted-foreground); display:flex; align-items:center; gap:6px; }
+  .bdg { display:inline-flex; align-items:center; height: 18px; padding: 0 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight:500; border:1px solid var(--border); color: var(--muted-foreground); background: transparent; }
+  .bdg.ac { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+  .more { text-align:center; font-size: 11px; color: var(--muted-foreground); padding: 7px; border:1px dashed var(--border); border-radius: 10px; margin: 6px 4px; cursor:pointer; }
+
+  /* ── No-loss map legend ── */
+  .legend { margin: 22px auto 40px; max-width: 1460px; padding: 0 18px; }
+  .legend .card { padding: 16px 18px; }
+  .legend h4 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+  .maptbl { width:100%; border-collapse: collapse; font-size: 12.5px; }
+  .maptbl th, .maptbl td { text-align:left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .maptbl th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); font-weight:500; }
+  .maptbl td.where { color: var(--foreground); }
+  .maptbl .tier { display:inline-block; font-size:10px; padding:1px 6px; border-radius:5px; border:1px solid var(--border); color: var(--muted-foreground); }
+  .legend code { font-family: var(--mono); font-size: 11.5px; background: var(--accent); padding: 1px 5px; border-radius: 5px; }
+  .swatch { display:inline-block; width: 10px; height:10px; border-radius: 3px; vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+    <span class="chip"><span class="pulse-dot"></span> <b>Issue Cockpit — full rethink.</b></span>
+    <span class="muted">Three durable columns: <b style="color:var(--foreground)">tree + tools</b> (navigate) · <b style="color:var(--foreground)">synthesis</b> (understand) · <b style="color:var(--foreground)">beads rail</b> (progress). The flat 15-tab strip → a default synthesis you read with zero clicks + a slim demoted <i>Details</i> switcher + on-demand tool panes. No-loss map at the bottom.</span>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- top bar -->
+  <div class="topbar">
+    <span class="wordmark">Overdeck</span>
+    <span class="navitem">Command Deck</span>
+    <span class="navitem active">Issues</span>
+    <span class="navitem">Pipeline</span>
+    <span class="navitem">Agents</span>
+    <span class="spacer"></span>
+    <span class="muted">edward.becker</span>
+  </div>
+
+  <!-- ░░ TIER 1: header — status answer, always on top ░░ -->
+  <div class="card ihead">
+    <div class="headtop">
+      <div style="min-width:0;">
+        <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+        <div class="titlerow">
+          <span class="iid">PAN-1866</span>
+          <h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1>
+          <span class="pill bad">⛔ Blocked</span>
+        </div>
+        <div class="sub">Issue Cockpit</div>
+      </div>
+      <div class="headstats">
+        <div class="stat"><div class="k">Branch</div><div class="v mono">feature/pan-1866</div></div>
+        <div class="stat"><div class="k">PR / CI</div><div class="v">#1975 · 4/5 ✓</div></div>
+        <div class="stat"><div class="k">Cost</div><div class="v cost">$61.84</div></div>
+        <button class="btn disabled" title="Merge gated: blocked by review">⛔ <span class="blk">Merge — blocked by review</span></button>
+        <button class="btn">⌘ Actions ▾</button>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="phase done"><div class="bar"></div><div class="lbl">Plan</div></div>
+      <div class="phase active"><div class="bar"></div><div class="lbl">Work</div></div>
+      <div class="phase fail"><div class="bar"></div><div class="lbl">Review</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Test</div></div>
+      <div class="phase fail"><div class="bar"></div><div class="lbl">CI/CD</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Ship</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Merge</div></div>
+    </div>
+
+    <div class="gates">
+      <span class="gate"><span class="sq bad"></span> Review <b>blocked</b></span>
+      <span class="gate"><span class="sq"></span> Test <b>pending</b></span>
+      <span class="gate"><span class="sq"></span> Verification <b>pending</b></span>
+      <span class="gate"><span class="sq bad"></span> CI <b>4/5</b></span>
+      <span class="gate"><span class="sq ok"></span> PR <b>mergeable</b></span>
+      <span class="gate"><span class="sq bad"></span> Merge-ready <b>no</b></span>
+    </div>
+  </div>
+
+  <!-- ░░ 3-column body ░░ -->
+  <div class="body">
+
+    <!-- LEFT: tree (navigate) + tools (on-demand) -->
+    <aside class="card lane">
+      <div class="lane-h">Issue tree <span class="line"></span></div>
+      <div class="tree-row sel"><span class="dot bad"></span> PAN-1866 <span class="small">blocked</span></div>
+      <div class="tree-row indent"><span class="dot success"></span> planning <span class="small mono">opus</span></div>
+      <div class="tree-row indent"><span class="dot info"></span> work <span class="small mono">sonnet-4-6</span></div>
+      <div class="tree-row indent"><span class="dot bad"></span> review <span class="small mono">gpt-5.5</span></div>
+      <div class="tree-row indent"><span class="dot"></span> test <span class="small">idle</span></div>
+
+      <div class="lane-h" style="margin-top:8px;">Open <span class="line"></span></div>
+      <div class="tool"><span class="ic">💬</span> Conversation <span class="arr">↗</span></div>
+      <div class="tool"><span class="ic">±</span> Diff <span class="arr">↗</span></div>
+      <div class="tool"><span class="ic">▤</span> Files <span class="arr">↗</span></div>
+      <div class="tool"><span class="ic">▣</span> Terminal <span class="arr">↘</span></div>
+    </aside>
+
+    <!-- CENTER: synthesis first, details demoted -->
+    <section class="center">
+
+      <!-- TIER 1 (cont): the blocker — what you must act on -->
+      <div class="spotlight">
+        <div class="lead">⚠ Review blocked — action required</div>
+        <div class="desc">Flywheel auto-picks interactive planning issues despite the FR-17 human gate. The reviewer flagged it as a correctness regression.</div>
+        <div class="acts">
+          <button class="btn primary">Restart review</button>
+          <button class="btn">Tell agent</button>
+          <button class="btn">View PR</button>
+        </div>
+      </div>
+
+      <!-- TIER 1 (cont): Now / Issue at a glance -->
+      <div class="twoup">
+        <div class="panel">
+          <div class="ph"><h3>Now</h3><span class="pill bad tag">Review (failed)</span></div>
+          <div class="kv"><span class="muted">Active agent</span><span class="mono">work · sonnet-4-6</span></div>
+          <div class="kv"><span class="muted">Phase</span><span>Review — failed</span></div>
+          <div class="kv"><span class="muted">Review</span><span class="bad">blocked</span></div>
+          <div class="kv"><span class="muted">Last activity</span><span class="muted">7s ago</span></div>
+          <div class="kv"><span class="muted">Next action</span><span>work agent fixes → re-review</span></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h3>Issue</h3></div>
+          <div class="kv"><span class="muted">Pull request</span><span>#1975 · mergeable</span></div>
+          <div class="kv"><span class="muted">CI checks</span><span>4/5 passed</span></div>
+          <div class="kv"><span class="muted">Diff</span><span><span class="pos">+5039</span> <span class="neg">−42</span> · 61 files</span></div>
+          <div class="kv"><span class="muted">Verification</span><span class="muted">pending</span></div>
+          <div class="kv"><span class="muted">Merge-ready</span><span class="bad">no</span></div>
+        </div>
+      </div>
+
+      <!-- TIER 3: details — demoted, one click, content fills below -->
+      <div class="details">
+        <div class="det-head">
+          <span class="lab">Details</span>
+        </div>
+        <div class="seg">
+          <span class="s active">Review <span class="x">!</span></span>
+          <span class="s">Test</span>
+          <span class="s">PR &amp; CI <span class="n">4/5</span></span>
+          <span class="s">Plan</span>
+          <span class="s">Timeline</span>
+          <span class="s">Discussion</span>
+          <span class="s">Costs</span>
+        </div>
+        <div class="det-body" style="margin-top:10px;">
+          <div class="ph" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <h3 style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted-foreground);">Review · 1 blocker · quick review (gpt-5.5)</h3>
+            <span class="muted" style="font-size:11px;">View full report →</span>
+          </div>
+          <div class="finding">
+            <span class="sev"></span>
+            <div>
+              <div class="ftitle">Flywheel selects interactive planning issues despite the FR-17 human-approval gate</div>
+              <div class="floc"><span class="mono">src/lib/cloister/flywheel/select.ts:212</span> · correctness</div>
+            </div>
+          </div>
+          <div class="finding">
+            <span class="sev warn"></span>
+            <div>
+              <div class="ftitle">Sequencer rationale block can exceed the markdown fence on very large backlogs</div>
+              <div class="floc"><span class="mono">src/lib/sequencer/writeSequenceMd.ts:88</span> · robustness · non-blocking</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Beads rail — progress, prominent & persistent -->
+    <aside class="card beads">
+      <div class="beads-h">
+        <span class="t">Beads</span>
+        <span class="counts">
+          <span class="count"><span class="d open"></span>0</span>
+          <span class="count"><span class="d active"></span>1</span>
+          <span class="count"><span class="d done"></span>19</span>
+        </span>
+      </div>
+
+      <div class="progresswrap">
+        <div class="ptop"><span>Plan progress</span><span><b>19</b> / 20 done · 95%</span></div>
+        <div class="track">
+          <div class="fill-done" style="width:95%"></div>
+          <div class="fill-active" style="width:5%"></div>
+        </div>
+      </div>
+
+      <div class="rail">
+        <div class="group-h">19 completed <span class="line"></span></div>
+        <div class="spine">
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Implement writeSequenceMd (render table + tiered rationale + JSON, auto-commit)</div><div class="meta"><span class="bdg">medium</span></div></div>
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Implement parseSequenceMd (extract + validate fenced JSON block)</div><div class="meta"><span class="bdg">medium</span></div></div>
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Register the 'sequencer' role in config (role union + defaults)</div><div class="meta"><span class="bdg">simple</span></div></div>
+          <div class="more">↑ show 16 earlier completed beads</div>
+
+          <div class="group-h" style="color:var(--info-foreground)">working now <span class="line" style="background:color-mix(in srgb, var(--info) 32%, transparent)"></span></div>
+          <div class="bead active">
+            <div class="node"><span class="pulse-dot" style="width:7px;height:7px"></span></div>
+            <div class="working-tag"><span class="pulse-dot" style="width:7px;height:7px"></span> Agent working</div>
+            <div class="ttl" style="margin-top:6px;">Address review: gate sequencer selection behind the FR-17 human approval</div>
+            <div class="agent-line"><span class="mono" style="color:var(--info-foreground)">work · sonnet-4-6</span> · started 7s ago</div>
+            <div class="meta"><span class="bdg">expert</span><span class="bdg ac">1/3 AC</span></div>
+          </div>
+
+          <div class="group-h">0 upcoming <span class="line"></span></div>
+          <div class="more" style="cursor:default;">all planned beads complete — only the review fix remains</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- ░░ no-loss map: every old surface has a home ░░ -->
+<div class="legend">
+  <div class="card">
+    <h4>No-loss map — where each of the 15 old tabs &amp; affordances now lives</h4>
+    <table class="maptbl">
+      <thead><tr><th style="width:150px;">Old tab / surface</th><th style="width:120px;">Tier</th><th>New home</th></tr></thead>
+      <tbody>
+        <tr><td>Overview</td><td><span class="tier">1 · always</span></td><td class="where">Becomes the default center — no click. Blocker spotlight + Now / Issue cards.</td></tr>
+        <tr><td>Beads</td><td><span class="tier">1 · always</span></td><td class="where">Persistent right rail with done / working-now / upcoming + a progress bar. Removed from the tab strip.</td></tr>
+        <tr><td>(agent sessions)</td><td><span class="tier">1 · always</span></td><td class="where">Left "Issue tree" lane — kept as-is. Click a session → opens its terminal/conversation.</td></tr>
+        <tr><td>Review · Artifacts</td><td><span class="tier">3 · 1 click</span></td><td class="where">Details ▸ Review (artifacts fold in as "full report →"). Auto-selected when blocked.</td></tr>
+        <tr><td>Test</td><td><span class="tier">3 · 1 click</span></td><td class="where">Details ▸ Test.</td></tr>
+        <tr><td>PR &amp; CI</td><td><span class="tier">3 · 1 click</span></td><td class="where">Top-line in the Issue card + header; full check list in Details ▸ PR &amp; CI.</td></tr>
+        <tr><td>PRD / Plan</td><td><span class="tier">3 · 1 click</span></td><td class="where">Details ▸ Plan (vBRIEF + PRD + STATE).</td></tr>
+        <tr><td>Activity · History</td><td><span class="tier">3 · 1 click</span></td><td class="where">Merged into Details ▸ Timeline (both are chronological logs).</td></tr>
+        <tr><td>Discussion</td><td><span class="tier">3 · 1 click</span></td><td class="where">Details ▸ Discussion.</td></tr>
+        <tr><td>Costs</td><td><span class="tier">3 · 1 click</span></td><td class="where">Top-line cost in header; breakdown in Details ▸ Costs.</td></tr>
+        <tr><td>Conversation · Diff · Files · Terminal</td><td><span class="tier">4 · on demand</span></td><td class="where">Tools — open as workspace panes / the terminal drawer from the left lane, not parked as 4 of 15 tabs. (Already wired via <code>onOpenPane</code>.)</td></tr>
+      </tbody>
+    </table>
+    <h4 style="margin-top:16px;">Color discipline (per <code>design/style-guide/STYLE-GUIDE.md</code>)</h4>
+    <div style="font-size:12.5px;line-height:1.7;">
+      <span class="swatch" style="background:var(--destructive)"></span><b>red</b> = action required (blocked, failed gate) ·
+      <span class="swatch" style="background:var(--info)"></span><b>blue</b> = a machine is working (active bead, running agent) ·
+      <span class="swatch" style="background:var(--success)"></span><b>emerald</b> = outcome (done beads, passing gates) ·
+      <span class="swatch" style="background:var(--signal-cost)"></span><b>cyan</b> = money ·
+      <span class="swatch" style="background:var(--muted-foreground)"></span><b>neutral</b> = everything else (taxonomy, idle, labels).
+      One colored signal per row · DM Sans 500 · mono only for IDs / branch / model · <code>rounded-sm</code> badges, no pills.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

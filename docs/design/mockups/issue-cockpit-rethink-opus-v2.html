@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue Cockpit — rethink v2 (Opus) — agents + live work + beads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f8fa;
+    --accent: color-mix(in srgb, black 4%, transparent);
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --info: #3b82f6;            /* machine working */
+    --info-foreground: #1d4ed8;
+    --success: #10b981;         /* outcome */
+    --success-foreground: #047857;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --signal-review: #a855f7;
+    --signal-review-foreground: #7e22ce;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #0e7490;
+    --mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 84% -12%, color-mix(in srgb, var(--destructive) 5%, transparent), transparent), var(--background);
+    color: var(--foreground); font-family: "DM Sans", system-ui, sans-serif; font-weight: 500;
+    font-size: 13px; line-height: 1.4; -webkit-font-smoothing: antialiased; min-height: 100vh;
+  }
+  .wordmark { font-family: "Space Grotesk", sans-serif; font-weight: 500; letter-spacing: -0.01em; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted-foreground); }
+
+  .caption { max-width: 1460px; margin: 18px auto 0; padding: 12px 18px; border: 1px dashed var(--border); border-radius: 14px; background: color-mix(in srgb, var(--info) 4%, var(--card)); font-size: 12.5px; }
+  .caption b { font-weight: 500; }
+  .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--info); position: relative; display:inline-block; }
+  .pulse-dot::after { content:""; position:absolute; inset:-4px; border-radius:50%; border: 2px solid color-mix(in srgb, var(--info) 60%, transparent); animation: ring 1.6s ease-out infinite; }
+  @keyframes ring { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  .app { max-width: 1460px; margin: 14px auto 40px; padding: 0 18px; }
+  .topbar { display:flex; align-items:center; gap:14px; padding: 8px 4px 16px; color: var(--muted-foreground); font-size: 12px; }
+  .topbar .wordmark { color: var(--foreground); font-size: 15px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .navitem { padding: 4px 8px; border-radius: 8px; }
+  .topbar .navitem.active { background: var(--accent); color: var(--foreground); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; }
+
+  /* header */
+  .ihead { padding: 15px 18px; border-radius: 22px; }
+  .crumb { font-size: 11px; color: color-mix(in srgb, var(--muted-foreground) 80%, transparent); }
+  .crumb b { color: var(--muted-foreground); font-weight: 500; }
+  .titlerow { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:6px; }
+  .iid { font-family: var(--mono); font-size: 13px; }
+  .ititle { font-size: 16px; margin: 0; line-height: 1.3; max-width: 820px; font-weight: 500; }
+  .headtop { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .headstats { margin-left:auto; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
+  .stat { border:1px solid var(--border); border-radius: 12px; padding: 6px 10px; min-width: 62px; text-align:right; }
+  .stat .k { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+  .stat .v { font-size: 12px; margin-top: 2px; }
+  .stat .v.cost { color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; }
+  .btn { border:1px solid var(--border); background: var(--card); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight:500; color: var(--foreground); cursor: pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn.disabled { color: var(--muted-foreground); background: color-mix(in srgb, var(--muted) 40%, var(--card)); cursor: not-allowed; }
+  .btn .blk { color: var(--destructive-foreground); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+  .pill { display:inline-flex; align-items:center; gap:6px; height: 22px; padding: 0 9px; border-radius: var(--radius-sm); font-size: 11px; font-weight:500; }
+  .pill.bad { background: color-mix(in srgb, var(--destructive) 8%, transparent); border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent); color: var(--destructive-foreground); }
+
+  .pipeline { margin-top: 14px; display:flex; gap:6px; }
+  .phase { flex:1; }
+  .phase .bar { height: 6px; border-radius: 99px; background: var(--accent); }
+  .phase.done .bar { background: var(--success); }
+  .phase.active .bar { background: var(--info); }
+  .phase.fail .bar { background: var(--destructive); }
+  .phase .lbl { margin-top: 5px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); text-align:center; }
+  .phase.active .lbl { color: var(--info-foreground); }
+  .phase.done .lbl { color: var(--success-foreground); }
+  .phase.fail .lbl { color: var(--destructive-foreground); }
+  .gates { margin-top: 12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .gate { display:inline-flex; align-items:center; gap:6px; font-size: 11px; color: var(--muted-foreground); border:1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+  .gate .sq { width:8px;height:8px;border-radius:2px;background:var(--muted-foreground); }
+  .gate .sq.ok { background: var(--success); }
+  .gate .sq.bad { background: var(--destructive); }
+  .gate b { color: var(--foreground); font-weight:500; }
+
+  /* body grid: Agents | Live work | Beads */
+  .body { display:grid; grid-template-columns: 224px minmax(0,1fr) 304px; gap: 14px; align-items: start; margin-top: 14px; }
+
+  /* LEFT: Agents + Stack drawer */
+  .lane { padding: 8px; border-radius: 20px; background: color-mix(in srgb, var(--card-2) 70%, var(--card)); position: sticky; top: 14px; }
+  .lane-h { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 8px 8px 6px; display:flex; align-items:center; gap:6px; }
+  .lane-h .n { margin-left:auto; color: var(--muted-foreground); }
+  .agent { display:flex; align-items:center; gap:9px; padding: 9px 9px; border-radius: 11px; cursor:pointer; border:1px solid transparent; }
+  .agent:hover { background: var(--accent); }
+  .agent.sel { background: var(--card); border-color: var(--border); }
+  .agent .dot { width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);flex:none; position:relative; }
+  .agent .dot.info { background: var(--info); }
+  .agent .dot.bad { background: var(--destructive); }
+  .agent .dot.done { background: var(--success); }
+  .agent .nm { font-size: 13px; }
+  .agent .md { display:block; font-size: 10.5px; color: var(--muted-foreground); margin-top:1px; font-family: var(--mono); }
+  .agent .rt { margin-left:auto; text-align:right; font-size: 10px; color: var(--muted-foreground); }
+  .agent .rt .st { display:block; }
+
+  .drawer { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .drawer-h { display:flex; align-items:center; gap:8px; padding: 8px; font-size: 11px; color: var(--muted-foreground); cursor:pointer; border-radius: 10px; }
+  .drawer-h:hover { background: var(--accent); }
+  .drawer-h .car { font-size: 10px; }
+  .drawer-h .sum { margin-left:auto; font-size: 10px; }
+  .res { padding: 2px 4px 4px; }
+  .res-row { display:flex; align-items:center; gap:8px; padding: 5px 6px; font-size: 11.5px; border-radius: 8px; }
+  .res-row .ic { width:14px; text-align:center; color: var(--muted-foreground); }
+  .res-row .met { margin-left:auto; font-size: 10px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .res-row .dot { width:6px;height:6px;border-radius:50%;background:var(--success); flex:none; }
+  .res-sub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); padding: 8px 6px 2px; }
+
+  /* CENTER */
+  .center { display:flex; flex-direction:column; gap: 14px; }
+  .spotlight { border:1px solid color-mix(in srgb, var(--destructive) 34%, transparent); background: color-mix(in srgb, var(--destructive) 6%, var(--card)); border-radius: 18px; padding: 14px 16px; }
+  .spotlight .lead { display:flex; align-items:center; gap:8px; font-size: 13px; color: var(--destructive-foreground); }
+  .spotlight .desc { margin-top: 6px; font-size: 12.5px; }
+  .spotlight .acts { margin-top: 11px; display:flex; flex-wrap:wrap; gap:8px; }
+
+  /* live work feed (the star) */
+  .live { border:1px solid var(--border); border-radius: 18px; background: var(--card); overflow:hidden; }
+  .live-h { display:flex; align-items:center; gap:10px; padding: 13px 16px; border-bottom:1px solid var(--border); }
+  .live-h .who { display:flex; align-items:center; gap:8px; font-size: 13px; }
+  .live-h .who .mono { color: var(--info-foreground); font-size: 12px; }
+  .live-h .spacer { flex:1; }
+  .live-h .open { font-size: 11px; color: var(--muted-foreground); cursor:pointer; }
+  .feed { padding: 6px 16px 14px; position: relative; }
+  .ev { display:flex; gap:11px; padding: 9px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  .ev:last-child { border-bottom:none; }
+  .ev .tnode { position:relative; width: 10px; flex:none; }
+  .ev .tnode .d { position:absolute; left:1px; top:5px; width:8px;height:8px;border-radius:50%; background: var(--muted-foreground); }
+  .ev .tnode .d.commit { background: var(--success); }
+  .ev .tnode .d.run { background: var(--info); }
+  .ev .tnode .d.bad { background: var(--destructive); }
+  .ev .body-t { flex:1; min-width:0; }
+  .ev .t1 { font-size: 12.5px; }
+  .ev .t1 .mono { color: var(--foreground); }
+  .ev .t2 { font-size: 11px; color: var(--muted-foreground); margin-top:2px; }
+  .ev .when { font-size: 10.5px; color: var(--muted-foreground); white-space:nowrap; }
+  .ev.live-now .t1 { color: var(--foreground); }
+
+  /* facts strip */
+  .facts { display:flex; flex-wrap:wrap; gap:8px; }
+  .fact { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border); border-radius: 10px; padding: 7px 11px; font-size: 12px; background: var(--card); }
+  .fact .k { color: var(--muted-foreground); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .fact .pos { color: var(--success-foreground); }
+  .fact .neg { color: var(--destructive-foreground); }
+
+  /* jump-to deep links (replaces the tab strip) */
+  .jump { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding: 2px; }
+  .jump .lab { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); margin-right:2px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--foreground); cursor:pointer; background: var(--card); }
+  .chip:hover { background: var(--accent); }
+  .chip .x { color: var(--destructive-foreground); }
+  .chip .n { color: var(--muted-foreground); font-size: 10px; }
+  .chip.tool { color: var(--muted-foreground); }
+
+  /* RIGHT beads rail */
+  .beads { padding: 0; border-radius: 20px; overflow: hidden; position: sticky; top: 14px; }
+  .beads-h { display:flex; align-items:center; gap:10px; padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  .beads-h .t { font-size: 13px; }
+  .beads-h .counts { margin-left:auto; display:flex; gap:10px; font-size: 11px; color: var(--muted-foreground); align-items:center; }
+  .count { display:inline-flex; align-items:center; gap:5px; }
+  .count .d { width:7px; height:7px; border-radius:50%; }
+  .count .d.open { background: var(--muted-foreground); }
+  .count .d.active { background: var(--info); }
+  .count .d.done { background: var(--success); }
+  .progresswrap { padding: 12px 14px 8px; }
+  .progresswrap .ptop { display:flex; justify-content:space-between; font-size: 11px; color: var(--muted-foreground); margin-bottom:6px; }
+  .progresswrap .ptop b { color: var(--foreground); font-weight:500; }
+  .track { height: 8px; border-radius: 99px; background: var(--accent); overflow:hidden; display:flex; }
+  .track .fill-done { background: var(--success); }
+  .track .fill-active { background: var(--info); }
+  .rail { padding: 2px 10px 14px; position: relative; }
+  .group-h { display:flex; align-items:center; gap:8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 12px 6px 6px; }
+  .group-h .line { flex:1; height:1px; background: var(--border); }
+  .spine { position: relative; padding-left: 24px; }
+  .spine::before { content:""; position:absolute; left: 10px; top: 6px; bottom: 6px; width: 2px; background: var(--border); border-radius: 2px; }
+  .bead { position: relative; margin: 5px 0; padding: 8px 9px; border-radius: 11px; border: 1px solid transparent; }
+  .bead .node { position:absolute; left: -19px; top: 11px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 2px solid var(--muted-foreground); display:grid; place-items:center; font-size:9px; color:#fff; }
+  .bead .ttl { font-size: 12px; line-height: 1.35; }
+  .bead .meta { margin-top: 6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .bead.done .ttl { color: var(--muted-foreground); }
+  .bead.done .node { background: var(--success); border-color: var(--success); }
+  .bead.open:hover { background: var(--accent); }
+  .bead.active { border-color: color-mix(in srgb, var(--info) 38%, transparent); background: color-mix(in srgb, var(--info) 7%, var(--card)); box-shadow: 0 8px 24px -16px color-mix(in srgb, var(--info) 70%, transparent); padding: 11px; margin: 9px 0; }
+  .bead.active::before { content:""; position:absolute; left:0; top:9px; bottom:9px; width:3px; border-radius:3px; background: var(--info); }
+  .bead.active .node { border-color: var(--info); background: var(--card); }
+  .working-tag { display:inline-flex; align-items:center; gap:6px; font-size: 10px; font-weight:500; color: var(--info-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+  .agent-line { margin-top: 6px; font-size: 11px; color: var(--muted-foreground); display:flex; align-items:center; gap:6px; }
+  .bdg { display:inline-flex; align-items:center; height: 18px; padding: 0 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight:500; border:1px solid var(--border); color: var(--muted-foreground); background: transparent; }
+  .bdg.ac { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+  .more { text-align:center; font-size: 11px; color: var(--muted-foreground); padding: 7px; border:1px dashed var(--border); border-radius: 10px; margin: 6px 4px; cursor:pointer; }
+
+  /* notes */
+  .legend { margin: 22px auto 40px; max-width: 1460px; padding: 0 18px; }
+  .legend .card { padding: 16px 18px; }
+  .legend h4 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+  .legend .cols { display:grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .legend ul { margin: 0; padding-left: 18px; }
+  .legend li { margin: 5px 0; font-size: 12.5px; }
+  .legend code { font-family: var(--mono); font-size: 11.5px; background: var(--accent); padding: 1px 5px; border-radius: 5px; }
+  .swatch { display:inline-block; width: 10px; height:10px; border-radius: 3px; vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+    <span style="display:inline-flex;align-items:center;gap:6px;"><span class="pulse-dot"></span> <b>Issue Cockpit — rethink v2 (much further).</b></span>
+    <span class="muted">Tree gutted to clean <b style="color:var(--foreground)">Agents</b> rows (plumbing folded into one quiet Stack drawer). NOW/ISSUE key-value cards replaced by a <b style="color:var(--foreground)">live work feed</b> (what the agent is doing, right now). The tab strip → quiet <b style="color:var(--foreground)">Jump-to</b> deep-links. Beads rail unchanged.</span>
+  </div>
+</div>
+
+<div class="app">
+
+  <div class="topbar">
+    <span class="wordmark">Overdeck</span>
+    <span class="navitem">Command Deck</span>
+    <span class="navitem active">Issues</span>
+    <span class="navitem">Pipeline</span>
+    <span class="navitem">Agents</span>
+    <span class="spacer"></span>
+    <span class="muted">edward.becker</span>
+  </div>
+
+  <!-- HEADER -->
+  <div class="card ihead">
+    <div class="headtop">
+      <div style="min-width:0;">
+        <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+        <div class="titlerow">
+          <span class="iid">PAN-1866</span>
+          <h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1>
+          <span class="pill bad">⛔ Blocked</span>
+        </div>
+      </div>
+      <div class="headstats">
+        <div class="stat"><div class="k">Branch</div><div class="v mono">feature/pan-1866</div></div>
+        <div class="stat"><div class="k">PR / CI</div><div class="v">#1975 · 4/5 ✓</div></div>
+        <div class="stat"><div class="k">Cost</div><div class="v cost">$65.00</div></div>
+        <button class="btn disabled" title="Merge gated: blocked by review">⛔ <span class="blk">Merge — blocked by review</span></button>
+        <button class="btn">⌘ Actions ▾</button>
+      </div>
+    </div>
+    <div class="pipeline">
+      <div class="phase done"><div class="bar"></div><div class="lbl">Plan</div></div>
+      <div class="phase active"><div class="bar"></div><div class="lbl">Work</div></div>
+      <div class="phase fail"><div class="bar"></div><div class="lbl">Review</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Test</div></div>
+      <div class="phase fail"><div class="bar"></div><div class="lbl">CI/CD</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Ship</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Merge</div></div>
+    </div>
+    <div class="gates">
+      <span class="gate"><span class="sq bad"></span> Review <b>blocked</b></span>
+      <span class="gate"><span class="sq"></span> Test <b>pending</b></span>
+      <span class="gate"><span class="sq"></span> Verification <b>pending</b></span>
+      <span class="gate"><span class="sq bad"></span> CI <b>4/5</b></span>
+      <span class="gate"><span class="sq ok"></span> PR <b>mergeable</b></span>
+      <span class="gate"><span class="sq bad"></span> Merge-ready <b>no</b></span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- LEFT: Agents (clean) + Stack drawer -->
+    <aside class="card lane">
+      <div class="lane-h">Agents <span class="n">4</span></div>
+
+      <div class="agent sel">
+        <span class="dot info"></span>
+        <div><span class="nm">Work</span><span class="md">sonnet-4-6</span></div>
+        <div class="rt"><span class="st" style="color:var(--info-foreground)">running</span>42s · 21h</div>
+      </div>
+      <div class="agent">
+        <span class="dot bad"></span>
+        <div><span class="nm">Review</span><span class="md">gpt-5.5</span></div>
+        <div class="rt"><span class="st" style="color:var(--destructive-foreground)">blocked</span>41m ago</div>
+      </div>
+      <div class="agent">
+        <span class="dot"></span>
+        <div><span class="nm">Test</span><span class="md">idle</span></div>
+        <div class="rt"><span class="st">not run</span></div>
+      </div>
+      <div class="agent">
+        <span class="dot done"></span>
+        <div><span class="nm">Plan</span><span class="md">opus</span></div>
+        <div class="rt"><span class="st" style="color:var(--success-foreground)">done</span>2d ago</div>
+      </div>
+
+      <!-- Stack drawer: all the old chip-plumbing, demoted & collapsible -->
+      <div class="drawer">
+        <div class="drawer-h"><span class="car">▾</span> Stack <span class="sum">3 containers · 1 PR · 2 branches</span></div>
+        <div class="res">
+          <div class="res-sub">Containers</div>
+          <div class="res-row"><span class="dot"></span> dev <span class="met">0% · 0KB</span></div>
+          <div class="res-row"><span class="dot"></span> frontend <span class="met">0% · 0KB</span></div>
+          <div class="res-row"><span class="dot"></span> server <span class="met">0% · 0KB</span></div>
+          <div class="res-sub">Code</div>
+          <div class="res-row"><span class="ic">⎇</span> <span class="mono" style="font-size:11px">feature/pan-1866</span> <span class="met">local</span></div>
+          <div class="res-row"><span class="ic">⎇</span> <span class="mono" style="font-size:11px">origin/…1866</span> <span class="met">remote</span></div>
+          <div class="res-row"><span class="ic">⇄</span> PR <span class="mono" style="font-size:11px">#1975</span> <span class="met">open</span></div>
+          <div class="res-sub">Artifacts</div>
+          <div class="res-row"><span class="ic">▤</span> vBRIEF · beads · tmux <span class="met">ready</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: blocker → live work feed → facts → jump-to -->
+    <section class="center">
+
+      <div class="spotlight">
+        <div class="lead">⚠ Review blocked — action required</div>
+        <div class="desc">Flywheel auto-picks interactive planning issues despite the FR-17 human gate. Reviewer flagged it as a correctness regression.</div>
+        <div class="acts">
+          <button class="btn primary">Restart review</button>
+          <button class="btn">Tell agent</button>
+          <button class="btn">View PR</button>
+        </div>
+      </div>
+
+      <div class="live">
+        <div class="live-h">
+          <span class="who"><span class="pulse-dot" style="width:8px;height:8px"></span> Live — <span class="mono">work · sonnet-4-6</span></span>
+          <span class="spacer"></span>
+          <span class="open">Open terminal ↗ · Full activity →</span>
+        </div>
+        <div class="feed">
+          <div class="ev live-now">
+            <div class="tnode"><span class="d run"></span></div>
+            <div class="body-t"><div class="t1">Editing <span class="mono">src/lib/cloister/flywheel/select.ts</span> — gating sequencer pick behind FR-17</div><div class="t2">working on bead · address-review-fr17 · 1/3 acceptance criteria</div></div>
+            <div class="when">now</div>
+          </div>
+          <div class="ev">
+            <div class="tnode"><span class="d run"></span></div>
+            <div class="body-t"><div class="t1">Ran <span class="mono">npm run typecheck</span> — passed</div></div>
+            <div class="when">2m ago</div>
+          </div>
+          <div class="ev">
+            <div class="tnode"><span class="d commit"></span></div>
+            <div class="body-t"><div class="t1">Committed <span class="mono">a3f9c1</span> — “guard interactive issues in selectNextWork”</div><div class="t2">4 files · +118 −12</div></div>
+            <div class="when">7m ago</div>
+          </div>
+          <div class="ev">
+            <div class="tnode"><span class="d bad"></span></div>
+            <div class="body-t"><div class="t1" style="color:var(--destructive-foreground)">Review returned BLOCKED — FR-17 human-gate regression</div><div class="t2">quick review · gpt-5.5 · 1 blocker, 1 non-blocking</div></div>
+            <div class="when">41m ago</div>
+          </div>
+          <div class="ev">
+            <div class="tnode"><span class="d commit"></span></div>
+            <div class="body-t"><div class="t1">Closed 19th bead — <span class="mono">writeSequenceMd</span> render + auto-commit</div></div>
+            <div class="when">1h ago</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- only the facts the header doesn't already show -->
+      <div class="facts">
+        <span class="fact"><span class="k">Diff</span> <span class="pos">+5039</span> <span class="neg">−42</span> · 61 files</span>
+        <span class="fact"><span class="k">Verification</span> <span class="muted">pending</span></span>
+        <span class="fact"><span class="k">Next</span> work agent fixes → re-review</span>
+        <span class="fact"><span class="k">Opened</span> Jun 14 · P2 · epic</span>
+      </div>
+
+      <!-- jump-to: the old tab strip, demoted to quiet deep links -->
+      <div class="jump">
+        <span class="lab">Jump to</span>
+        <span class="chip">Review <span class="x">!</span></span>
+        <span class="chip">Test</span>
+        <span class="chip">PR &amp; CI <span class="n">4/5</span></span>
+        <span class="chip">Plan</span>
+        <span class="chip">Timeline</span>
+        <span class="chip">Discussion</span>
+        <span class="chip">Costs</span>
+        <span class="chip tool">Diff ↗</span>
+        <span class="chip tool">Files ↗</span>
+      </div>
+    </section>
+
+    <!-- RIGHT: Beads rail -->
+    <aside class="card beads">
+      <div class="beads-h">
+        <span class="t">Beads</span>
+        <span class="counts">
+          <span class="count"><span class="d open"></span>0</span>
+          <span class="count"><span class="d active"></span>1</span>
+          <span class="count"><span class="d done"></span>19</span>
+        </span>
+      </div>
+      <div class="progresswrap">
+        <div class="ptop"><span>Plan progress</span><span><b>19</b> / 20 · 95%</span></div>
+        <div class="track"><div class="fill-done" style="width:95%"></div><div class="fill-active" style="width:5%"></div></div>
+      </div>
+      <div class="rail">
+        <div class="group-h">19 completed <span class="line"></span></div>
+        <div class="spine">
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Implement writeSequenceMd (render table + tiered rationale + JSON)</div><div class="meta"><span class="bdg">medium</span></div></div>
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Implement parseSequenceMd (extract + validate fenced JSON)</div><div class="meta"><span class="bdg">medium</span></div></div>
+          <div class="bead done"><div class="node">✓</div><div class="ttl">Register the 'sequencer' role in config</div><div class="meta"><span class="bdg">simple</span></div></div>
+          <div class="more">↑ show 16 earlier completed beads</div>
+
+          <div class="group-h" style="color:var(--info-foreground)">working now <span class="line" style="background:color-mix(in srgb, var(--info) 32%, transparent)"></span></div>
+          <div class="bead active">
+            <div class="node"><span class="pulse-dot" style="width:7px;height:7px"></span></div>
+            <div class="working-tag"><span class="pulse-dot" style="width:7px;height:7px"></span> Agent working</div>
+            <div class="ttl" style="margin-top:6px;">Address review: gate sequencer selection behind the FR-17 human approval</div>
+            <div class="agent-line"><span class="mono" style="color:var(--info-foreground)">work · sonnet-4-6</span> · started 42s ago</div>
+            <div class="meta"><span class="bdg">expert</span><span class="bdg ac">1/3 AC</span></div>
+          </div>
+
+          <div class="group-h">0 upcoming <span class="line"></span></div>
+          <div class="more" style="cursor:default;">all planned beads complete — only the review fix remains</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- notes -->
+<div class="legend">
+  <div class="card">
+    <h4>What got moved (and where every old datum lives now)</h4>
+    <div class="cols">
+      <ul>
+        <li><b>Tree → Agents.</b> One clean row per role: <code>dot · role · model · timer</code>. Click a row → its live feed fills the center (and "Open terminal ↗" launches the pane). The <code>All / Alive / Failed</code> filter is dropped — pointless inside a single issue.</li>
+        <li><b>The chip plumbing is demoted.</b> <code>workspace · branch local/remote · tmux · vBRIEF · beads · stack · containers · PR · branches</code> all fold into the collapsible <b>Stack drawer</b> at the bottom of the Agents column. Present when you need it, silent when you don't.</li>
+        <li><b>NOW / ISSUE cards deleted.</b> Phase, Review, PR, CI, Merge-ready were duplicates of the header gates — gone. What survives that the header <i>doesn't</i> show (Diff size, Verification, Next action, Opened/priority) is now one compact <b>facts strip</b>.</li>
+      </ul>
+      <ul>
+        <li><b>The center now leads with live work.</b> The <b>Live feed</b> (promoted from the buried Activity tab) answers "what is the agent doing right now" in motion — edits, runs, commits, the review verdict — newest first.</li>
+        <li><b>Tab strip → "Jump to" deep-links.</b> Review / Test / PR&amp;CI / Plan / Timeline (Activity+History) / Discussion / Costs as quiet chips; Diff / Files / Terminal open as panes (<code>↗</code>). The page no longer opens with a 15-wide menu.</li>
+        <li><b>Beads rail unchanged</b> — done / working-now / upcoming + a progress bar, the prominent vertical progress column.</li>
+      </ul>
+    </div>
+    <h4 style="margin-top:16px;">Color discipline</h4>
+    <div style="font-size:12.5px;line-height:1.7;">
+      <span class="swatch" style="background:var(--destructive)"></span><b>red</b> = action required ·
+      <span class="swatch" style="background:var(--info)"></span><b>blue</b> = a machine is working (running agent, active bead, live feed) ·
+      <span class="swatch" style="background:var(--success)"></span><b>emerald</b> = outcome (done) ·
+      <span class="swatch" style="background:var(--signal-cost)"></span><b>cyan</b> = money ·
+      <span class="swatch" style="background:var(--muted-foreground)"></span><b>neutral</b> = everything else. One signal per row · DM Sans 500 · mono only for IDs / branch / model / paths.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
