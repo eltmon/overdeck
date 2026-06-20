@@ -26,6 +26,43 @@
   gap: 14px;
 }
 
+/* Header top row. Stacks (title row, then metadata row) until the pane is wide
+ * enough to hold the title beside the Branch/PR/Cost/Merge cluster. Without this,
+ * a single flex-wrap row let the content-sized metadata cluster claim nearly the
+ * whole narrow pane, collapsing the flex-basis-0 title block to a few px and
+ * wrapping the title one word per line. Pane-width driven (not viewport) to match
+ * the cockpit's container-query layout. */
+.headerTop {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.headerTitle {
+  min-width: 0;
+}
+
+.headerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+@container (min-width: 820px) {
+  .headerTop {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .headerTitle {
+    flex: 1 1 0%;
+  }
+  .headerMeta {
+    justify-content: flex-end;
+  }
+}
+
 .missionBody {
   display: grid;
   grid-template-columns: 1fr;
@@ -35,6 +72,14 @@
 
 @container (min-width: 980px) {
   .missionBody {
-    grid-template-columns: minmax(280px, 344px) minmax(0, 1fr);
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+}
+
+/* Wide panes get the persistent beads rail as a third column (PAN-1991 item #1).
+ * Below this the rail stacks full-width under the main panel. */
+@container (min-width: 1320px) {
+  .missionBody {
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) 300px;
   }
 }

@@ -1,0 +1,130 @@
+/* Beads rail (PAN-1991 item #1) — persistent at-a-glance progress column.
+ * Colors follow the PAN-1148 law: emerald = done, blue = a machine is working,
+ * neutral = rest. Difficulty labels are taxonomy → neutral. */
+
+.rail {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card);
+  overflow: hidden;
+  position: sticky;
+  top: 14px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.title { font-size: 13px; }
+.counts { margin-left: auto; display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--muted-foreground); }
+.count { display: inline-flex; align-items: center; gap: 5px; }
+.cdot { width: 7px; height: 7px; border-radius: 50%; }
+.cdot.open { background: var(--muted-foreground); }
+.cdot.active { background: var(--info); }
+.cdot.done { background: var(--success); }
+.muted { color: var(--muted-foreground); }
+.iconBtn {
+  width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--card); color: var(--muted-foreground); cursor: pointer;
+  display: grid; place-items: center; font-size: 11px;
+}
+.iconBtn:hover { background: var(--accent); }
+.iconBtn:disabled { opacity: 0.5; cursor: default; }
+
+.progressWrap { padding: 12px 14px 8px; }
+.progressTop { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted-foreground); margin-bottom: 6px; }
+.progressTop b { color: var(--foreground); font-weight: 500; }
+.track { height: 8px; border-radius: 99px; background: var(--accent); overflow: hidden; display: flex; }
+.fillDone { background: var(--success); }
+.fillActive { background: var(--info); }
+
+.empty { padding: 24px 16px; text-align: center; color: var(--muted-foreground); font-size: 12px; }
+.empty .muted { display: block; margin-top: 4px; }
+
+.body { padding: 2px 10px 14px; }
+.groupHeader {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted-foreground); padding: 12px 6px 6px;
+}
+.groupHeaderActive { color: var(--info-foreground); }
+
+.spine { position: relative; padding-left: 24px; }
+.spine::before {
+  content: ""; position: absolute; left: 11px; top: 6px; bottom: 6px;
+  width: 2px; background: var(--border); border-radius: 2px;
+}
+
+/* a bead row is a button (whole row clickable → full panel) */
+.bead {
+  position: relative; display: block; width: 100%; text-align: left;
+  margin: 5px 0; padding: 8px 9px; border-radius: 12px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  font: inherit; color: inherit;
+}
+.node {
+  position: absolute; left: -20px; top: 11px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--card); border: 2px solid var(--muted-foreground);
+  display: grid; place-items: center; font-size: 9px; color: #fff;
+}
+.beadTitle { display: block; font-size: 12px; line-height: 1.35; }
+.meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.badge {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px;
+  border-radius: var(--radius-sm); font-size: 10px; font-weight: 500;
+  border: 1px solid var(--border); color: var(--muted-foreground);
+}
+
+.blocked { margin-top: 5px; font-size: 10px; color: var(--muted-foreground); }
+
+/* done */
+.beadDone .beadTitle { color: var(--muted-foreground); }
+.beadDone .node { background: var(--success); border-color: var(--success); }
+
+/* upcoming */
+.beadOpen:hover { background: var(--accent); }
+
+/* working now — blue = a machine is working */
+.beadActive {
+  border-color: color-mix(in srgb, var(--info) 38%, transparent);
+  background: color-mix(in srgb, var(--info) 7%, var(--card));
+  box-shadow: 0 8px 24px -16px color-mix(in srgb, var(--info) 70%, transparent);
+  padding: 11px; margin: 9px 0;
+}
+.beadActive::before {
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px;
+  width: 3px; border-radius: 3px; background: var(--info);
+}
+.beadActive .node { border-color: var(--info); background: var(--card); }
+.workingTag {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 10px;
+  font-weight: 500; color: var(--info-foreground);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.agentLine { display: block; margin-top: 6px; font-size: 11px; color: var(--muted-foreground); }
+
+.pulse {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--info);
+  position: relative; display: inline-block;
+}
+.pulse::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--info) 60%, transparent);
+  animation: beadsRailRing 1.6s ease-out infinite;
+}
+@keyframes beadsRailRing {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+.more {
+  display: block; width: calc(100% - 8px); text-align: center; font-size: 11px;
+  color: var(--muted-foreground); padding: 7px; border: 1px dashed var(--border);
+  border-radius: 10px; margin: 6px 4px; background: transparent; cursor: pointer; font: inherit;
+}
+.more:hover { background: var(--accent); }
+
+.allDone { text-align: center; font-size: 11px; color: var(--success-foreground); padding: 10px 8px 4px; }

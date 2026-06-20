@@ -28,6 +28,7 @@ import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import type { PaneType } from '../../../lib/panesStore'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
+import { BeadsRail } from './BeadsRail'
 import { ReviewVerificationCard } from './ReviewVerificationCard'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
@@ -80,7 +81,9 @@ const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'files', label: 'Files' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'plan', label: 'PRD / Plan' },
-  { id: 'beads', label: 'Beads' },
+  // Beads moved to the persistent BeadsRail (PAN-1991 item #1). The `beads`
+  // render branch below is kept — the rail's "open full" opens it for the
+  // list/graph (DAG) + per-bead detail — but it is no longer a visible tab.
   { id: 'discussion', label: 'Discussion' },
   { id: 'costs', label: 'Costs' },
   { id: 'activity', label: 'Activity' },
@@ -1054,8 +1057,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   return (
     <div className={styles.missionWrap}>
       <header className="rounded-[22px] border border-border bg-card p-4">
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="min-w-0 flex-1">
+        <div className={styles.headerTop}>
+          <div className={styles.headerTitle}>
             <div className="text-[11px] text-muted-foreground/70">
               {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}Issues
             </div>
@@ -1066,7 +1069,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             </div>
             <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">Issue Cockpit · Mission Control</div>
           </div>
-          <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+          <div className={styles.headerMeta}>
             <HeaderStat label="Branch" value={<span className="font-mono">{branch}</span>} />
             <HeaderStat
               label="PR / CI"
@@ -1147,6 +1150,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'history' && <StatusHistoryTab issueId={issueId} />}
           </div>
         </main>
+        <BeadsRail issueId={issueId} onOpenFull={() => selectTab('beads')} />
       </div>
     </div>
   )
