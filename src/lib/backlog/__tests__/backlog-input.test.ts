@@ -87,6 +87,27 @@ describe('collectOpenBacklog', () => {
     expect(result.manifest[0].ready).toBe(true);
   });
 
+  it('ready=false when specs dir does not exist', async () => {
+    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
+    expect(result.manifest[0].ready).toBe(false);
+  });
+
+  it('ready=false when specs dir exists but no spec for this issue', async () => {
+    const specsDir = join(tmpDir, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    writeFileSync(join(specsDir, '2026-01-01-PAN-99-some-other.vbrief.json'), '{}');
+    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
+    expect(result.manifest[0].ready).toBe(false);
+  });
+
+  it('ready=true when a spec file for this specific issue exists', async () => {
+    const specsDir = join(tmpDir, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
+    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
+    expect(result.manifest[0].ready).toBe(true);
+  });
+
   it('returns a batched body accessor (not a single concatenation)', async () => {
     const issues = Array.from({ length: 10 }, (_, i) =>
       makeIssue({ id: String(i), ref: `PAN-${i + 1}`, description: `Body ${i + 1}` })

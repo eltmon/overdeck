@@ -100,9 +100,24 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 - Keep operator-sourced edges verbatim. Re-derive github-ref edges. Recompute ai-inferred edges as advisory with a confidence value 0.0–1.0.
 - Stamp pass="${pass}" and generatedAt=<current ISO timestamp> in the output JSON.
 
+## Reading issue bodies
+
+Fetch issue bodies in batches of ${batchSize} using the GitHub CLI:
+  gh issue view <NUMBER> --json number,title,body
+
+Derive NUMBER from the manifest id (e.g. PAN-42 → 42). Do NOT fetch all bodies at once; read one batch, update your running shortlist, then the next.
+
 ## Output
 
-After completing your analysis, write the result by calling writeSequenceMd(projectRoot, doc) from src/lib/backlog/sequence-io.ts, or run: pan backlog write-sequence --project-root ${projectRoot}
+After completing your analysis, write the result to ${projectRoot}/.pan/backlog/sequence.md.
+
+The file format is: a human-readable markdown table section, then a machine-readable fenced JSON block marked with:
+  <!-- machine-readable; do not hand-edit below this line -->
+  \`\`\`json
+  <SequenceDoc JSON>
+  \`\`\`
+
+Use the Write tool to write the complete file in this format.
 
 Do not ask for operator input. If an issue is ambiguous, assign condition=needs-refinement and move on.
 `;
@@ -121,10 +136,5 @@ ${priorContext}
 ## Backlog manifest (${manifest.length} open issues, ${bodies.count} bodies available in ${Math.ceil(bodies.count / batchSize)} batches of ${batchSize})
 
 ${manifestJson}
-
-## Batched body access
-
-Read bodies via: \`pan backlog bodies --project-root ${projectRoot} --batch <N> --batch-size ${batchSize}\`
-or the equivalent API call. Do NOT concatenate all bodies. Process one batch at a time.
 ${commonRules}`;
 }

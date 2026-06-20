@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import type { Issue } from '../tracker/interface.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { parseSequenceMd } from './sequence-io.js';
@@ -42,6 +42,17 @@ export async function collectOpenBacklog(
 
   const openIssues = issues.filter((issue) => !CLOSED_STATES.has(issue.state));
 
+  // Build a per-issue spec lookup set once — checking a directory existence per issue
+  // would mark every issue as ready as soon as any spec exists.
+  const specsDir = join(projectRoot, '.pan', 'specs');
+  const issuesWithSpecs = new Set<string>();
+  if (!opts?.hasSpecFn && existsSync(specsDir)) {
+    for (const f of readdirSync(specsDir)) {
+      const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+      if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
+    }
+  }
+
   const manifest: BacklogManifestEntry[] = openIssues.map((issue) => {
     const reviewStatus = getReviewStatusSync(issue.ref);
     const inPipeline =
@@ -53,7 +64,7 @@ export async function collectOpenBacklog(
 
     const ready = opts?.hasSpecFn
       ? opts.hasSpecFn(issue.ref)
-      : existsSync(join(projectRoot, '.pan', 'specs'));
+      : issuesWithSpecs.has(issue.ref.toUpperCase());
 
     const createdMs = issue.createdAt ? new Date(issue.createdAt).getTime() : now;
 

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ListOrdered, GitFork, RefreshCw, Filter } from 'lucide-react';
+import { ListOrdered, GitFork, RefreshCw, Filter, Play } from 'lucide-react';
 import { BacklogDAG } from '../components/backlog/BacklogDAG';
 
 interface SequenceNode {
@@ -16,6 +16,8 @@ interface SequenceNode {
   gate: string;
   planning: string;
   inPipeline: boolean;
+  hasPrd: boolean;
+  ready: boolean;
 }
 
 interface SequenceEdge {
@@ -84,6 +86,9 @@ export function BacklogSequencerPage() {
   const [readyOnly, setReadyOnly] = useState(false);
   const [showStale, setShowStale] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [spawning, setSpawning] = useState(false);
+  const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('auto');
+  const [showPassPicker, setShowPassPicker] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery<SequenceResponse>({
     queryKey: ['backlog-sequence'],
@@ -132,6 +137,22 @@ export function BacklogSequencerPage() {
   }, [data, filteredNodes]);
 
   const collapsedCount = filteredNodes.length - dagData.nodes.length;
+
+  async function handleRunPass() {
+    if (spawning) return;
+    setSpawning(true);
+    setShowPassPicker(false);
+    try {
+      await fetch('/api/backlog/sequence/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pass: spawnPass }),
+      });
+      setTimeout(() => refetch(), 2000);
+    } finally {
+      setSpawning(false);
+    }
+  }
 
   async function handleDraftPrd(issueId: string) {
     const num = issueId.replace(/^[A-Z]+-/, '');
@@ -205,9 +226,40 @@ export function BacklogSequencerPage() {
           </button>
         )}
 
+        {/* Run pass button */}
+        <div className="relative ml-auto flex items-center gap-1">
+          <button
+            onClick={handleRunPass}
+            disabled={spawning}
+            className="px-2 py-1 text-xs flex items-center gap-1 rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50"
+            title={`Run ${spawnPass} pass`}
+          >
+            <Play className="w-3 h-3" />
+            {spawning ? 'Spawning…' : `Run ${spawnPass}`}
+          </button>
+          <button
+            onClick={() => setShowPassPicker((p) => !p)}
+            className="px-1 py-1 text-xs rounded border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]"
+            title="Select pass type"
+          >▾</button>
+          {showPassPicker && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-[var(--color-surface)] border border-[var(--color-border)] rounded shadow-lg text-xs">
+              {(['auto', 'creation', 'incremental', 'review'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => { setSpawnPass(p); setShowPassPicker(false); }}
+                  className={`block w-full text-left px-3 py-1.5 hover:bg-[var(--color-surface-hover)] ${spawnPass === p ? 'text-[var(--color-accent)]' : 'text-[var(--color-fg)]'}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={() => refetch()}
-          className="ml-auto p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+          className="p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
           title="Refresh"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -303,7 +355,15 @@ export function BacklogSequencerPage() {
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-[var(--color-fg-muted)]">
             <ListOrdered className="w-8 h-8 opacity-40" />
             <p className="text-sm">No backlog sequence yet.</p>
-            <p className="text-xs">Run a sequencer pass to rank the open backlog.</p>
+            <p className="text-xs">Run a creation pass to rank the open backlog.</p>
+            <button
+              onClick={() => { setSpawnPass('creation'); void handleRunPass(); }}
+              disabled={spawning}
+              className="px-3 py-1.5 text-xs rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50 flex items-center gap-1"
+            >
+              <Play className="w-3 h-3" />
+              {spawning ? 'Spawning…' : 'Run creation pass'}
+            </button>
           </div>
         )}
 
@@ -347,6 +407,12 @@ export function BacklogSequencerPage() {
                         )}
                         {isRefine && (
                           <span className="ml-1 text-[9px] text-yellow-400 align-top">⚠</span>
+                        )}
+                        {node.hasPrd && (
+                          <span className="ml-1 text-[9px] text-blue-400 align-top" title="Has PRD">P</span>
+                        )}
+                        {node.ready && (
+                          <span className="ml-1 text-[9px] text-emerald-400 align-top" title="Has spec — ready for work">✓</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-center">

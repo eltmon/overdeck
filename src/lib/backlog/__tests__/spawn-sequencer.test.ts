@@ -73,4 +73,17 @@ describe('spawnSequencerAgent', () => {
     expect(prompt).toContain('PAN-1');
     expect(prompt).toContain('Test');
   });
+
+  it('passes provided issues to collectOpenBacklog instead of an empty array', async () => {
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const issues = [
+      { id: '42', ref: 'PAN-42', title: 'Real Issue', description: 'body', state: 'open', labels: [], tracker: 'github', url: '' },
+    ] as Parameters<typeof spawnSequencerAgent>[1]['issues'];
+    await spawnSequencerAgent('creation', { projectRoot: '/tmp/proj', issues });
+    const { collectOpenBacklog } = await import('../backlog-input.js');
+    expect(collectOpenBacklog).toHaveBeenCalledWith(
+      '/tmp/proj',
+      issues,
+    );
+  });
 });

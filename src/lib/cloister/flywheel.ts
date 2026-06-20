@@ -80,14 +80,27 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
         const md = readFileSync(seqPath, 'utf-8');
         const parsed = parseSequenceMd(md);
         if (parsed.ok) {
+          // Build issue→labels map from the shared issue service (lazy-require avoids
+          // circular module load during CLI startup).
+          const issueLabelsLookup = (issueId: string): string[] => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
+                typeof import('../../dashboard/server/services/issue-service-singleton.js');
+              const issue = (getSharedIssueService().getIssues() as Array<{ ref: string; labels?: string[] }>)
+                .find((i) => i.ref === issueId);
+              return issue?.labels ?? [];
+            } catch { return []; }
+          };
+
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes);
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup });
           const nextLine = nextPick
-            ? `Next eligible pick from sequence: ${nextPick.issueId} (rank ${nextPick.rank})`
-            : 'No eligible issue found in sequence';
-          sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked, use this order for pickup when auto_pickup_backlog=true):\n${top10.join('\n')}\n${nextLine}`;
+            ? `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`
+            : 'No eligible issue found in sequence — fall back to normal priority';
+          sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked):\n${top10.join('\n')}\n${nextLine}\n\nIMPORTANT: auto_pickup_backlog=true. You MUST pick the "MUST start next" issue above as your next startup target. Do NOT apply your own P0-P3/oldest-first ranking while a sequence is available.`;
         }
       } catch {
         // sequence.md exists but couldn't be parsed — skip enrichment

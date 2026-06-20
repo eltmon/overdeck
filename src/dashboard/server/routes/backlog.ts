@@ -2,7 +2,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
@@ -11,6 +11,7 @@ import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
+import type { Issue } from '../../../lib/tracker/interface.js';
 
 const execAsync = promisify(exec);
 
@@ -43,15 +44,34 @@ const getBacklogSequenceRoute = HttpRouter.add(
           const md = readFileSync(seqPath, 'utf-8');
           const parsed = parseSequenceMd(md);
           if (parsed.ok) {
+            // Build per-issue hasPrd and ready lookup sets once
+            const draftsDir = join(projectRoot, '.pan', 'drafts');
+            const prdFiles = existsSync(draftsDir)
+              ? new Set(readdirSync(draftsDir).map((f) => f.replace(/\.md$/, '').toUpperCase()))
+              : new Set<string>();
+
+            const specsDir = join(projectRoot, '.pan', 'specs');
+            const specIssues = new Set<string>();
+            if (existsSync(specsDir)) {
+              for (const f of readdirSync(specsDir)) {
+                // spec filename: <YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json
+                const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+                if (match) specIssues.add(match[1]!.toUpperCase());
+              }
+            }
+
             edges = parsed.doc.edges.map((e) => ({
               from: e.from,
               to: e.to,
               type: e.type,
             }));
             nodes = parsed.doc.nodes.map((n) => {
-              const reviewStatus = getReviewStatusSync(n.issue.toUpperCase());
+              const issueUpper = n.issue.toUpperCase();
+              const reviewStatus = getReviewStatusSync(issueUpper);
               const inPipeline =
                 reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+              const hasPrd = prdFiles.has(issueUpper);
+              const ready = specIssues.has(issueUpper);
               return {
                 issueId: n.issue,
                 rank: n.rank,
@@ -65,6 +85,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
                 planning: n.planning,
                 ...(n.rationale ? { rationale: n.rationale } : {}),
                 inPipeline,
+                hasPrd,
+                ready,
               };
             });
           }
@@ -93,7 +115,11 @@ const postBacklogRegenerateRoute = HttpRouter.add(
         : 'auto';
 
     return yield* Effect.promise(async () => {
-      const agent = await spawnSequencerAgent(pass, { projectRoot });
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getSharedIssueService } = require('../services/issue-service-singleton.js') as
+        typeof import('../services/issue-service-singleton.js');
+      const issues = getSharedIssueService().getIssues() as Issue[];
+      const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
       return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
     });
   })),
