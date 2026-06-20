@@ -207,7 +207,7 @@ function cleanIssues(issues: unknown[]): unknown[] {
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike"]);
+const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
 type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
 type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
@@ -554,7 +554,7 @@ export const ReadModelServiceLive = Layer.effect(
       };
 
       console.log(
-        `[ReadModel] Bootstrapped from the Overdeck database: ` +
+        `[ReadModel] Bootstrapped from local database: ` +
         `${Object.keys(agentsById).length} agents, ` +
         `${Object.keys(result.reviewStatusByIssueId).length} review statuses, ` +
         `${result.issuesEnumerated} in-flight issue(s), seq=${sequence}`,
@@ -718,6 +718,11 @@ export const ReadModelServiceLive = Layer.effect(
               } as any);
             }
           } catch { /* event store not ready yet */ }
+
+          // PAN-1866: debounced incremental sequencer pass on every backlog delta
+          import('../../lib/backlog/backlog-auto-trigger.js').then(({ triggerDebouncedIncrementalPass }) => {
+            triggerDebouncedIncrementalPass(process.cwd());
+          }).catch(() => {});
         });
       } catch {
         console.warn('[ReadModel] IssueDataService not available at bootstrap, starting with empty issues');

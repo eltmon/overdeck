@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
+import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, ListOrdered, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { PROVIDER_BRANDS } from '../shared/branding';
 
-type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
+type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
 type Harness = 'claude-code' | 'pi' | 'codex';
@@ -145,6 +145,13 @@ const ROLES: RoleDefinition[] = [
     icon: InfinityIcon,
     description: 'Runs the singleton Fix-All Flywheel orchestrator.',
     defaultModel: 'claude-opus-4-8',
+  },
+  {
+    id: 'sequencer',
+    name: 'Sequencer',
+    icon: ListOrdered,
+    description: 'Ranks the whole open backlog into a reproducible DAG.',
+    defaultModel: 'workhorse:expensive',
   },
 ];
 

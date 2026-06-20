@@ -47,6 +47,9 @@ export interface Issue {
   /** Labels/tags */
   labels: string[];
 
+  /** Author/creator username */
+  author?: string;
+
   /** Assignee username/name */
   assignee?: string;
 

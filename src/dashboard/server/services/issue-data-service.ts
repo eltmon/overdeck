@@ -906,6 +906,7 @@ export class IssueDataService {
           identifier,
           title: issue.title,
           description: issue.body || '',
+          author: issue.user?.login || '',
           status: canonicalStatus === 'todo' ? 'Todo' :
                   canonicalStatus === 'in_progress' ? 'In Progress' :
                   canonicalStatus === 'in_review' ? 'In Review' :

@@ -379,7 +379,7 @@ export const MemoryResolverLive = Layer.effect(
               AND project_id = ?
               ${identityClause.sql}
               AND (? = 1 OR (entry_date || 'T' || entry_time) > COALESCE((
-                SELECT MAX(from_timestamp)
+                SELECT REPLACE(datetime(MAX(from_timestamp) / 1000, 'unixepoch'), ' ', 'T')
                 FROM reset_markers
                 WHERE (scope = 'project' AND scope_id = memory_fts.project_id)
                    OR (scope = 'workspace' AND scope_id = memory_fts.workspace_id)
@@ -603,9 +603,9 @@ function makeInsertResetMarkerStatement(marker: ResetMarker): FtsStatement {
     params: [
       marker.scope,
       marker.scopeId,
-      marker.fromTimestamp,
+      new Date(marker.fromTimestamp).getTime(),
       marker.reason,
-      marker.createdAt,
+      new Date(marker.createdAt).getTime(),
     ],
   }
 }

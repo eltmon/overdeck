@@ -27,6 +27,53 @@ vi.mock('../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
 }));
 
+// ─── In-memory journal for review-status-record-sync ─────────────────────────
+// Captures writes from updateIssueRecordForReviewStatusSync synchronously so
+// enrichReviewNotesFromRecordSync/readJournalStatusSync can return them without
+// async file I/O. This avoids the race with afterEach cleanup that deletes testRepoDir
+// before the fire-and-forget async write completes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const inMemoryJournal = new Map<string, Record<string, any>>();
+
+vi.mock('../../src/lib/overdeck/review-status-record-sync.js', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateIssueRecordForReviewStatusSync: (issueId: string, status: Record<string, any>) => {
+    inMemoryJournal.set(issueId.toUpperCase(), status);
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  enrichReviewNotesFromRecordSync: (issueId: string, status: Record<string, any>) => {
+    const written = inMemoryJournal.get(issueId.toUpperCase());
+    if (!written) return status;
+    return {
+      ...status,
+      reviewNotes: written['reviewNotes'] ?? status['reviewNotes'],
+      testNotes: written['testNotes'] ?? status['testNotes'],
+      verificationNotes: written['verificationNotes'] ?? status['verificationNotes'],
+      mergeNotes: written['mergeNotes'] ?? status['mergeNotes'],
+      inspectNotes: written['inspectNotes'] ?? status['inspectNotes'],
+      reviewRequestedAt: written['reviewRequestedAt'] ?? status['reviewRequestedAt'],
+    };
+  },
+  readJournalStatusSync: (issueId: string) => {
+    const written = inMemoryJournal.get(issueId.toUpperCase());
+    if (!written) return null;
+    return {
+      updatedAt: (written['updatedAt'] as string) ?? new Date().toISOString(),
+      durable: {
+        reviewStatus: written['reviewStatus'],
+        testStatus: written['testStatus'],
+        verificationStatus: written['verificationStatus'],
+        verificationNotes: written['verificationNotes'],
+        reviewNotes: written['reviewNotes'],
+        testNotes: written['testNotes'],
+        mergeNotes: written['mergeNotes'],
+        inspectNotes: written['inspectNotes'],
+        reviewRequestedAt: written['reviewRequestedAt'],
+      },
+    };
+  },
+}));
+
 // ─── Mock exec for deacon's git calls ─────────────────────────────────────────
 
 const mockExecCallback = vi.fn();
@@ -57,10 +104,12 @@ vi.mock('child_process', async (importOriginal) => {
 // ─── Stub modules that deacon and done.ts import ──────────────────────────────
 
 const mockResolveProject = vi.fn();
+const mockGetProjectSync = vi.fn();
 
 vi.mock('../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProject(...args),
   resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProject(...args),
+  getProjectSync: (...args: unknown[]) => mockGetProjectSync(...args),
 }));
 
 vi.mock('../../src/lib/activity-logger.js', () => ({
@@ -179,6 +228,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     testDb.pragma('foreign_keys = ON');
     initSchema(testDb);
     vi.clearAllMocks();
+    inMemoryJournal.clear();
     mockExecHeadSha = 'newsha99';
     mockOldTreeSha = 'old-tree';
     mockNewTreeSha = 'new-tree';
@@ -285,15 +335,6 @@ describe('PAN-1215 post-review-rebase scenario', () => {
       testStatus: 'pending',
       verificationStatus: 'failed',
       readyForMerge: false,
-    });
-
-    // Point the project resolver at the real test repo so getWorkspaceGitInfo works
-    mockResolveProject.mockReturnValue({ projectPath: testRepoDir });
-    vi.mocked(existsSync).mockImplementation((p) => {
-      if (typeof p === 'string' && p.includes('feature-pan-1215-c')) {
-        return true;
-      }
-      return true;
     });
 
     await doneCommand('review', 'pan-1215-c', { status: 'passed' });

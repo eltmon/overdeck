@@ -67,6 +67,7 @@ import { terminalsRouteLayer } from './routes/terminals.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
 import { artifactsRouteLayer } from './routes/artifacts.js';
+import { backlogRouteLayer } from './routes/backlog.js';
 import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { fsRouteLayer } from './routes/fs.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
@@ -334,6 +335,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   artifactsRouteLayer,
   featureRegistryRouteLayer,
   fsRouteLayer,
+  backlogRouteLayer,
   staticRouteLayer,
 );
 

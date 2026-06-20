@@ -130,6 +130,36 @@ describe('GitHubTracker', () => {
       });
     });
 
+    it('normalizes author from user.login (FR-14 author-auth fix)', async () => {
+      const { Octokit } = await import('@octokit/rest');
+      const mockOctokit = new Octokit();
+
+      const mockIssues = [
+        {
+          id: 200,
+          number: 10,
+          title: 'Owner-authored unassigned issue',
+          body: '',
+          state: 'open',
+          labels: [],
+          assignee: null,
+          user: { login: 'eltmon' },
+          html_url: 'https://github.com/owner/repo/issues/10',
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      (mockOctokit.issues.listForRepo as any).mockResolvedValue({ data: mockIssues });
+
+      const tracker: any = wrap(new GitHubTracker('token', 'owner', 'repo'));
+      (tracker as any).octokit = mockOctokit;
+
+      const issues = await tracker.listIssues();
+      expect(issues[0].author).toBe('eltmon');
+      expect(issues[0].assignee).toBeUndefined();
+    });
+
     it('should apply filters correctly', async () => {
       const { Octokit } = await import('@octokit/rest');
       const mockOctokit = new Octokit();

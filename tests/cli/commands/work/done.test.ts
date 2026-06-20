@@ -128,6 +128,11 @@ vi.mock('ora', () => ({
   }),
 }));
 
+// Prevent real git I/O in beads-restore so fake timers work correctly (line 710 in done.ts)
+vi.mock('../../../../src/lib/bd-mutex.js', () => ({
+  restoreTrackedBeadsExport: vi.fn(() => Effect.succeed(undefined)),
+}));
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -193,9 +198,17 @@ describe('doneCommand --force bypass', () => {
     mkdirSync(join(tempDir, '.git'));
 
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, opts?: RequestInit) => ({
+      status: 200, ok: true,
+      json: async () => (opts?.method === 'POST' ? { success: true, queued: true } : {}),
+    })));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
     rmSync(tempDir, { recursive: true, force: true });
     exitSpy.mockRestore();
   });
@@ -226,7 +239,16 @@ describe('doneCommand --force bypass', () => {
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
     // This will proceed past pre-flight. It may fail at review artifacts (mocked to resolve),
     // but process.exit(1) should NOT be called by the pre-flight block.
-    await doneCommand('pan-714', { force: true });
+    const donePromise = doneCommand('pan-714', { force: true });
+    // Advance timers in a loop: doneCommand schedules the done.ts line-710 cleanup
+    // timer late (after ~30 awaits), so vi.runAllTimersAsync() returns before it
+    // is scheduled. Keep advancing until the promise resolves.
+    let resolved = false;
+    donePromise.finally(() => { resolved = true; });
+    while (!resolved) {
+      await vi.advanceTimersByTimeAsync(2000);
+    }
+    await donePromise;
 
     // process.exit should not have been called with 1 from pre-flight
     const exitCalls = exitSpy.mock.calls;
@@ -250,9 +272,17 @@ describe('doneCommand shadow mode', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-done-shadow-'));
     mkdirSync(join(tempDir, '.git'));
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, opts?: RequestInit) => ({
+      status: 200, ok: true,
+      json: async () => (opts?.method === 'POST' ? { success: true, queued: true } : {}),
+    })));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
     rmSync(tempDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
@@ -272,7 +302,11 @@ describe('doneCommand shadow mode', () => {
     mockUpdateShadowState.mockResolvedValue(undefined);
 
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714');
+    const donePromise = doneCommand('PAN-714');
+    let resolved1 = false;
+    donePromise.finally(() => { resolved1 = true; });
+    while (!resolved1) { await vi.advanceTimersByTimeAsync(2000); }
+    await donePromise;
 
     expect(mockUpdateShadowState).toHaveBeenCalledWith('PAN-714', 'in_review', 'pan done');
   });
@@ -293,9 +327,15 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-done-dash-'));
     mkdirSync(join(tempDir, '.git'));
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Simulate dashboard being unreachable without real network I/O
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
     rmSync(tempDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
@@ -307,14 +347,19 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
     });
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
-    // getDashboardApiUrl returning something that won't respond is fine because
-    // checkDashboard uses http.request with error handler that resolves(false).
     mockGetDashboardApiUrl.mockReturnValue('http://localhost:19999');
 
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
 
-    // Should not throw — dashboard unreachable is handled gracefully
-    await expect(doneCommand('PAN-714', { force: true })).resolves.not.toThrow();
+    // Should not throw — dashboard unreachable is handled gracefully; advance
+    // fake timers past all 10 retry-backoff delays (max ~47s total) then the
+    // 1s cleanup timer (line 710), using a loop since the cleanup timer is
+    // scheduled after many async hops.
+    const donePromise = doneCommand('PAN-714', { force: true });
+    let resolved2 = false;
+    donePromise.finally(() => { resolved2 = true; });
+    while (!resolved2) { await vi.advanceTimersByTimeAsync(2000); }
+    await expect(donePromise).resolves.not.toThrow();
   });
 
   it('does not skip review when stored merged status is stale', async () => {
@@ -339,7 +384,11 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
     mockGetDashboardApiUrl.mockReturnValue('http://localhost:19999');
 
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714', { force: true });
+    const donePromise = doneCommand('PAN-714', { force: true });
+    let resolved3 = false;
+    donePromise.finally(() => { resolved3 = true; });
+    while (!resolved3) { await vi.advanceTimersByTimeAsync(2000); }
+    await donePromise;
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-714', expect.objectContaining({
       reviewStatus: 'pending',
@@ -366,9 +415,17 @@ describe('doneCommand preflight failure paths', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-done-preflight-'));
     mkdirSync(join(tempDir, '.git'));
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, opts?: RequestInit) => ({
+      status: 200, ok: true,
+      json: async () => (opts?.method === 'POST' ? { success: true, queued: true } : {}),
+    })));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
     rmSync(tempDir, { recursive: true, force: true });
     exitSpy.mockRestore();
   });
@@ -450,7 +507,11 @@ describe('doneCommand preflight failure paths', () => {
     });
 
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714');
+    const donePromise = doneCommand('PAN-714');
+    let resolved4 = false;
+    donePromise.finally(() => { resolved4 = true; });
+    while (!resolved4) { await vi.advanceTimersByTimeAsync(2000); }
+    await donePromise;
 
     // Pre-flight must NOT block on the stale spec.vbrief.json
     expect(exitSpy).not.toHaveBeenCalledWith(1);
@@ -484,7 +545,11 @@ describe('doneCommand preflight failure paths', () => {
     });
 
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714');
+    const donePromise = doneCommand('PAN-714');
+    let resolved5 = false;
+    donePromise.finally(() => { resolved5 = true; });
+    while (!resolved5) { await vi.advanceTimersByTimeAsync(2000); }
+    await donePromise;
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);

@@ -5,6 +5,7 @@ import {
   ensureOverdeckTmuxServerSync,
   ensureOverdeckTmuxServerAsync,
   findManagedServerPidSync,
+  _resetWarnedManagedServerDirtyForTest,
 } from '../tmux.js';
 
 const execFileSyncMock = vi.hoisted(() => vi.fn());
@@ -59,6 +60,7 @@ describe('ensureOverdeckTmuxServerSync', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetWarnedManagedServerDirtyForTest();
     process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
     serverAlive = false;
     systemdAvailable = true;
