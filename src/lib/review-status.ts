@@ -15,7 +15,7 @@ import {
   setAutoMerge as dbSetAutoMerge,
 } from './overdeck/review-status-sync.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { updateIssueRecordForReviewStatusSync } from './overdeck/review-status-record-sync.js';
+import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync } from './overdeck/review-status-record-sync.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -465,7 +465,11 @@ export function setReviewStatusSync(
 }
 
 export function getReviewStatusSync(issueId: string): ReviewStatus | null {
-  return getReviewStatusFromDbSync(issueId) ?? null;
+  const status = getReviewStatusFromDbSync(issueId);
+  if (!status) return null;
+  // PAN-1988: the DB holds queryable status flags; feedback TEXT is sourced from the
+  // durable per-issue journal. Overlay the notes from the record so readers are transparent.
+  return enrichReviewNotesFromRecordSync(issueId, status);
 }
 
 
