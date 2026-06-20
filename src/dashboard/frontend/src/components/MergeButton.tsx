@@ -7,11 +7,15 @@ interface MergeButtonProps {
   issueId: string;
   reviewStatus?: { readyForMerge?: boolean; mergeStatus?: string };
   variant: 'card' | 'inspector';
+  /** Inspector-variant accent. 'success' (green, default) preserves existing
+   * call sites; 'primary' (blue) marks it as the page's primary CTA — used by
+   * the cockpit header restyle (PAN-1991 #3). */
+  tone?: 'success' | 'primary';
   issueState?: string;
   onClick?: (e: React.MouseEvent) => void;
 }
 
-export function MergeButton({ issueId, reviewStatus, variant, issueState, onClick }: MergeButtonProps) {
+export function MergeButton({ issueId, reviewStatus, variant, tone = 'success', issueState, onClick }: MergeButtonProps) {
   const showAlert = useAlert();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -82,7 +86,9 @@ export function MergeButton({ issueId, reviewStatus, variant, issueState, onClic
         className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-medium ${
           isMergeStuck
             ? 'bg-warning text-warning-foreground hover:bg-warning/90'
-            : 'bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50'
+            : tone === 'primary'
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
+              : 'bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50'
         }`}
         title={isMergeStuck ? 'Merge appears stuck — click to retry' : undefined}
       >

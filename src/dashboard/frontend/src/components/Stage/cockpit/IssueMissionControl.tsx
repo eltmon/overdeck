@@ -323,9 +323,9 @@ function computeGates(
 
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-right">
+    <div className="flex flex-col gap-px text-right">
       <div className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
-      <div className="text-[11px] font-semibold text-foreground">{value}</div>
+      <div className="text-[11.5px] text-foreground">{value}</div>
     </div>
   )
 }
@@ -333,13 +333,13 @@ function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
 function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | undefined }) {
   if (rs?.mergeStatus === 'merged') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border badge-border-success badge-bg-success px-3 py-2 text-[12px] font-semibold text-success-foreground">
+      <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border badge-border-success badge-bg-success px-3 py-2 text-[12px] font-medium text-success-foreground">
         ✓ Merged
       </span>
     )
   }
   if (rs?.readyForMerge) {
-    return <MergeButton issueId={issueId} reviewStatus={rs} variant="inspector" />
+    return <MergeButton issueId={issueId} reviewStatus={rs} variant="inspector" tone="primary" />
   }
   const reason = mergeBlockReason(rs)
   return (
@@ -347,7 +347,7 @@ function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | und
       type="button"
       disabled
       title={`Merge gated: ${reason}`}
-      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/40 px-3 py-2 text-[12px] font-semibold text-muted-foreground opacity-80"
+      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/40 px-3 py-2 text-[12px] font-medium text-muted-foreground opacity-80"
     >
       ⛔ Merge — {reason}
     </button>
@@ -1058,26 +1058,32 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}Issues
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[13px] font-semibold text-foreground">{issueId}</span>
-              <h1 className="min-w-0 max-w-full break-words text-[16px] font-semibold leading-snug text-foreground">{title}</h1>
+              <span className="font-mono text-[13px] font-medium text-foreground">{issueId}</span>
+              <h1 className="min-w-0 max-w-full break-words text-[16px] font-medium leading-snug text-foreground">{title}</h1>
               <CockpitPill tone={statusToTone(phase)}>{phase}</CockpitPill>
             </div>
-            <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">Issue Cockpit · Mission Control</div>
           </div>
           <div className={styles.headerMeta}>
-            <HeaderStat label="Branch" value={<span className="font-mono">{branch}</span>} />
-            <HeaderStat
-              label="PR / CI"
-              value={pr.data?.pr
-                ? `#${pr.data.pr.number}${checks.data?.summary.total ? ` · ${checks.data.summary.passed}/${checks.data.summary.total} ✓` : ''}`
-                : 'no PR'}
-            />
-            <HeaderStat label="Cost" value={cost > 0 ? `$${cost.toFixed(2)}` : '—'} />
-            <MergeCta issueId={issueId} rs={review.data} />
-            <IssueActionMegaMenu issueId={issueId} />
+            <div className="flex items-start gap-4">
+              <HeaderStat label="Branch" value={<span className="font-mono">{branch}</span>} />
+              <HeaderStat
+                label="PR / CI"
+                value={pr.data?.pr
+                  ? `#${pr.data.pr.number}${checks.data?.summary.total ? ` · ${checks.data.summary.passed}/${checks.data.summary.total}` : ''}`
+                  : 'no PR'}
+              />
+              <HeaderStat
+                label="Cost"
+                value={<span className="text-signal-cost-foreground tabular-nums">{cost > 0 ? `$${cost.toFixed(2)}` : '—'}</span>}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <MergeCta issueId={issueId} rs={review.data} />
+              <IssueActionMegaMenu issueId={issueId} />
+            </div>
           </div>
         </div>
-        <div className="mt-4"><PipelineProgressBar issueId={issueId} /></div>
+        <div className="mt-4 border-t border-border pt-4"><PipelineProgressBar issueId={issueId} /></div>
         <div className="mt-3"><GatesRow issueId={issueId} /></div>
       </header>
 
