@@ -155,7 +155,7 @@ const postBacklogGateRoute = HttpRouter.add(
       if (!node) throw new Error(`issue ${issueId} not found in sequence`);
 
       node.gate = gate as 'auto' | 'ready' | 'blocked';
-      writeSequenceMd(projectRoot, doc);
+      writeSequenceMd(projectRoot, doc, { operatorEdit: true });
 
       if (gate === 'blocked') {
         await applyIssueParkedLabel(issueId);
@@ -197,7 +197,7 @@ const postBacklogPlanningRoute = HttpRouter.add(
       if (!node) throw new Error(`issue ${issueId} not found in sequence`);
 
       node.planning = planning as 'skip' | 'auto' | 'interactive';
-      writeSequenceMd(projectRoot, doc);
+      writeSequenceMd(projectRoot, doc, { operatorEdit: true });
 
       return jsonResponse({ status: 'ok', issueId, planning });
     });

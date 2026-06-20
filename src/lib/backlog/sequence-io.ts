@@ -49,22 +49,38 @@ function renderRationaleSection(nodes: SequenceNode[]): string {
   return lines.join('\n');
 }
 
+export interface WriteSequenceMdOpts {
+  /**
+   * Set to true when the caller is an operator-facing route that has already
+   * applied the intended field value to the doc. Skips the prior-file
+   * preservation step so operators can reset gate/planning back to 'auto'.
+   *
+   * When false/absent (AI resequence path), prior non-'auto' operator fields
+   * and in-pipeline ranks are carried forward from the on-disk file (FR-13,
+   * FR-15, FR-16, FR-17).
+   */
+  operatorEdit?: boolean;
+}
+
 /**
  * Write sequence.md, merging operator-owned state from the prior file.
  *
- * Merge rules (FR-13, FR-15, FR-16, FR-17):
+ * Merge rules for AI resequence (operatorEdit absent/false):
  * - gate !== 'auto' in prior → carry forward (operator-set)
  * - planning !== 'auto' in prior → carry forward (operator-set)
  * - in-pipeline issues (live workspace or non-pending review) → carry forward rank/why/rationale
  * - edges with source === 'operator' in prior → always preserved verbatim
+ *
+ * For explicit operator edits (operatorEdit: true), the doc already contains
+ * the correct operator-intended value; prior-preservation is skipped entirely.
  */
-export function writeSequenceMd(projectRoot: string, doc: SequenceDoc): void {
+export function writeSequenceMd(projectRoot: string, doc: SequenceDoc, opts?: WriteSequenceMdOpts): void {
   const outPath = join(projectRoot, SEQUENCE_REL_PATH);
 
-  // Load prior sequence for merge-preservation
+  // Load prior sequence for merge-preservation (AI resequence path only)
   let priorNodeMap = new Map<string, SequenceNode>();
   let priorOperatorEdges: SequenceEdge[] = [];
-  if (existsSync(outPath)) {
+  if (!opts?.operatorEdit && existsSync(outPath)) {
     const priorText = readFileSync(outPath, 'utf-8');
     const prior = parseSequenceMd(priorText);
     if (prior.ok) {

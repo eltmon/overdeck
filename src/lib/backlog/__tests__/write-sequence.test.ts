@@ -219,3 +219,68 @@ describe('writeSequenceMd – merge-preservation (FR-13, FR-15, FR-16, FR-17)', 
     expect(result.doc.edges.some((e) => e.from === 'PAN-2' && e.source === 'ai-inferred')).toBe(false);
   });
 });
+
+describe('writeSequenceMd – operatorEdit mode resets gate/planning (FR-15/FR-17)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'sequence-reset-test-'));
+    vi.mocked(getReviewStatusSync).mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  function makeNode(issue: string, gate: 'auto' | 'ready' | 'blocked', planning: 'auto' | 'skip' | 'interactive') {
+    return { issue, rank: 1, size: 'S' as const, importance: 'medium' as const, score: 50, condition: 'ok' as const, dependsOn: [], why: 'Why.', gate, planning };
+  }
+
+  function makeDoc(gate: 'auto' | 'ready' | 'blocked', planning: 'auto' | 'skip' | 'interactive'): SequenceDoc {
+    return { ...SAMPLE_DOC, nodes: [makeNode('PAN-1', gate, planning)] };
+  }
+
+  it('resets blocked -> auto when operatorEdit: true', () => {
+    writeSequenceMd(tmpDir, makeDoc('blocked', 'auto'));
+    writeSequenceMd(tmpDir, makeDoc('auto', 'auto'), { operatorEdit: true });
+    const result = parseSequenceMd(readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8'));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.doc.nodes[0].gate).toBe('auto');
+  });
+
+  it('resets ready -> auto when operatorEdit: true', () => {
+    writeSequenceMd(tmpDir, makeDoc('ready', 'auto'));
+    writeSequenceMd(tmpDir, makeDoc('auto', 'auto'), { operatorEdit: true });
+    const result = parseSequenceMd(readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8'));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.doc.nodes[0].gate).toBe('auto');
+  });
+
+  it('resets interactive -> auto when operatorEdit: true', () => {
+    writeSequenceMd(tmpDir, makeDoc('auto', 'interactive'));
+    writeSequenceMd(tmpDir, makeDoc('auto', 'auto'), { operatorEdit: true });
+    const result = parseSequenceMd(readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8'));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.doc.nodes[0].planning).toBe('auto');
+  });
+
+  it('resets skip -> auto when operatorEdit: true', () => {
+    writeSequenceMd(tmpDir, makeDoc('auto', 'skip'));
+    writeSequenceMd(tmpDir, makeDoc('auto', 'auto'), { operatorEdit: true });
+    const result = parseSequenceMd(readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8'));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.doc.nodes[0].planning).toBe('auto');
+  });
+
+  it('AI re-sequence (no operatorEdit) still preserves prior non-auto gate/planning', () => {
+    writeSequenceMd(tmpDir, makeDoc('blocked', 'interactive'));
+    writeSequenceMd(tmpDir, makeDoc('auto', 'auto')); // no operatorEdit flag
+    const result = parseSequenceMd(readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8'));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.doc.nodes[0].gate).toBe('blocked');
+      expect(result.doc.nodes[0].planning).toBe('interactive');
+    }
+  });
+});
