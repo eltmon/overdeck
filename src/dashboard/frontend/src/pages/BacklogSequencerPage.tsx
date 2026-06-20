@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListOrdered, GitFork, RefreshCw, Filter, Play } from 'lucide-react';
 import { BacklogDAG } from '../components/backlog/BacklogDAG';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface SequenceNode {
   issueId: string;
@@ -145,7 +146,7 @@ export function BacklogSequencerPage() {
     try {
       await fetch('/api/backlog/sequence/regenerate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ pass: spawnPass }),
       });
       setTimeout(() => refetch(), 2000);

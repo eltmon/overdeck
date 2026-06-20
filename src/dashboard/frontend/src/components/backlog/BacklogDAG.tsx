@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactFlow, {
   type Node,
@@ -411,7 +412,7 @@ export function BacklogDAG({ data, className }: BacklogDAGProps) {
   async function handleGateChange(issueId: string, gate: string) {
     await fetch('/api/backlog/sequence/gate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await dashboardMutationJsonHeaders(),
       body: JSON.stringify({ issueId, gate }),
     });
     queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
@@ -420,7 +421,7 @@ export function BacklogDAG({ data, className }: BacklogDAGProps) {
   async function handlePlanningChange(issueId: string, planning: string) {
     await fetch('/api/backlog/sequence/planning', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await dashboardMutationJsonHeaders(),
       body: JSON.stringify({ issueId, planning }),
     });
     queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });

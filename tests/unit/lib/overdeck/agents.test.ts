@@ -333,6 +333,24 @@ describe('AC1 — AgentsResolver reads from agents table (no state.json scan)', 
   it('AgentsResolver service key differs from AgentWriter', () => {
     expect(AgentsResolver.key).not.toBe(AgentWriter.key);
   });
+
+  it('list({}) decodes a sequencer-role row without crashing the resolver', async () => {
+    const { fdb, dbLayer } = makeFakeDb();
+    const { tmuxLayer } = makeFakeTmux();
+    fdb.agentRows.push(makeAgentRow('agent-pan-seq', { role: 'sequencer' }));
+
+    const layer = AgentsResolverLive.pipe(
+      Layer.provide(dbLayer),
+      Layer.provide(tmuxLayer),
+    );
+
+    const result = await Effect.runPromise(
+      AgentsResolver.use((r) => r.list({})).pipe(Effect.provide(layer)),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.role).toBe('sequencer');
+  });
 });
 
 // ── AC2: switchModel — source-first ordering ──────────────────────────────────

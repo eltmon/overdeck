@@ -7,6 +7,7 @@ import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
@@ -105,6 +106,9 @@ const postBacklogRegenerateRoute = HttpRouter.add(
   'POST',
   '/api/backlog/sequence/regenerate',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const body = yield* readJsonBody;
     const projectRoot = process.cwd();
     const passRaw = body['pass'];
@@ -131,6 +135,9 @@ const postBacklogGateRoute = HttpRouter.add(
   'POST',
   '/api/backlog/sequence/gate',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const body = yield* readJsonBody;
     const issueId = String(body['issueId'] ?? '');
     const gate = String(body['gate'] ?? '');
@@ -176,6 +183,9 @@ const postBacklogPlanningRoute = HttpRouter.add(
   'POST',
   '/api/backlog/sequence/planning',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const body = yield* readJsonBody;
     const issueId = String(body['issueId'] ?? '');
     const planning = String(body['planning'] ?? '');

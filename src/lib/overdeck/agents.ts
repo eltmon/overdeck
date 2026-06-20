@@ -57,7 +57,7 @@ export type AgentId = typeof AgentId.Type;
 // Must match VALID_ROLES_SYNC (and the roles actually written to the agents
 // table). PAN-1979: a too-narrow Role enum crashed the AgentsResolver list
 // decode on real `strike`/`flywheel` rows, taking down dashboard boot.
-export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike']);
+export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer']);
 export type Role = typeof Role.Type;
 
 export const Status = Schema.Literals(['starting', 'running', 'idle', 'stopped', 'crashed']);
