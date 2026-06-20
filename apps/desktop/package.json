@@ -9,7 +9,7 @@
     "url": "https://github.com/eltmon/overdeck.git"
   },
   "bin": {
-    "overdeck": "./bin/overdeck.mjs"
+    "overdeck-desktop": "./bin/overdeck.mjs"
   },
   "files": [
     "bin",

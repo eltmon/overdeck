@@ -27,11 +27,13 @@ describe("package.json", () => {
     expect(pkg.name).toBe("@overdeck/desktop");
   });
 
-  it("has a bin entry pointing to bin/overdeck.mjs", () => {
+  it("has an overdeck-desktop bin entry pointing to bin/overdeck.mjs", () => {
     const pkg = readPkg();
     const bin = pkg.bin as Record<string, string> | undefined;
     expect(bin).toBeDefined();
-    expect(bin?.["overdeck"]).toBe("./bin/overdeck.mjs");
+    // The GUI shell's bin is `overdeck-desktop`; the plain `overdeck` command
+    // is owned by @overdeck/core so the two never collide on a global install.
+    expect(bin?.["overdeck-desktop"]).toBe("./bin/overdeck.mjs");
   });
 
   it("includes bin, dist-electron, server, and resources in files", () => {

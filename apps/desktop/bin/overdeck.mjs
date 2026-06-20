@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * overdeck launcher — invoked via `npx @overdeck/desktop` or `overdeck` after installing `@overdeck/desktop` globally.
+ * overdeck desktop launcher — invoked via `npx @overdeck/desktop` (or the
+ * `overdeck-desktop` bin after a global install of @overdeck/desktop). The plain
+ * `overdeck` command belongs to the @overdeck/core engine, not this GUI shell.
  *
  * Responsibilities:
  *   1. Verify Node 22+ is running (Electron bundles Node 22).
