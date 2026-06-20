@@ -97,7 +97,7 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 
 Overdeck auto-recovers stopped work agents, but operators can deliberately gate that behavior:
 
-- `pan dev --no-resume` and `pan up --no-resume` start the dashboard with boot-scoped no-resume mode. Orphan recovery and stopped-agent auto-resume stay disabled until the dashboard is restarted without `--no-resume`.
+- `overdeck dev --no-resume` and `overdeck up --no-resume` start the dashboard with boot-scoped no-resume mode. Orphan recovery and stopped-agent auto-resume stay disabled until the dashboard is restarted without `--no-resume`.
 - `pan pause <id> [--reason <text>]` persists a per-agent pause gate and stops the agent if it is running. `pan unpause <id>` clears the gate without spawning; `pan start <id> --force` clears it and starts immediately.
 - If an agent repeatedly crashes or fails to resume, Deacon marks it `troubled` and backs off instead of looping forever. Investigate the root cause, then run `pan untroubled <id>` to clear the troubled gate and failure counters. Run `pan start <id>` only after the issue is safe to retry.
 
@@ -116,7 +116,7 @@ These controls are visible in the dashboard through top-level no-resume warnings
 | **Specialist Pipeline** | Five agents handle code review, testing, inspection, UAT, and merge automatically — you just click Merge |
 | **Cloister** | Lifecycle manager that routes models, detects stuck agents, tracks costs, and orchestrates specialist handoffs |
 | **PRD-Driven Workflow** | Opus writes a detailed plan before any code is written — agents can't start without one |
-| **70+ Universal Skills** | Pre-built skills synced on every `pan up` — one SKILL.md works across Claude Code, Codex, Cursor, and Gemini CLI |
+| **70+ Universal Skills** | Pre-built skills synced on every `overdeck up` — one SKILL.md works across Claude Code, Codex, Cursor, and Gemini CLI |
 | **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all visible in one unified kanban board |
 | **Workspaces** | Isolated git worktrees per issue with optional Docker environments, local or remote via Fly.io |
 | **Convoys** | Run parallel agents on related issues with automatic result synthesis |

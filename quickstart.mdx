@@ -51,9 +51,11 @@ For terminals, scripts, and CI where you don't need the GUI:
 
 ```bash
 npm install -g @overdeck/core
-pan up        # start dashboard server
-pan work PAN-123   # spawn agent for an issue
+overdeck up        # start dashboard server
+overdeck work PAN-123   # spawn agent for an issue
 ```
+
+**`pan` is a built-in short alias for `overdeck`** — every `overdeck <verb>` also works as `pan <verb>` (same binary). Use whichever you like; `pan` is handy for headless, CI, and existing muscle memory.
 
 ## Power-User Path: Install Everything Up Front
 
@@ -61,9 +63,9 @@ If you prefer to set up all tools at once (useful for shared dev machines or CI 
 
 ```bash
 npm install -g @overdeck/core
-pan install   # installs tmux, ttyd, mkcert, gh, glab, beads, claudish, ox
-pan sync      # sync skills/agents/rules to ~/.overdeck/
-pan up        # start Traefik + dashboard
+overdeck install   # installs tmux, ttyd, mkcert, gh, glab, beads, claudish, ox
+overdeck sync      # sync skills/agents/rules to ~/.overdeck/
+overdeck up        # start Traefik + dashboard
 ```
 
 ## Direct Desktop Downloads
@@ -76,4 +78,4 @@ Prefer a standalone app? Download the latest release for your platform:
 
 ## Architecture at a Glance
 
-Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core`, use `@overdeck/desktop` for the packaged desktop app, and keep `pan` for headless and CI.
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core` or the `overdeck` command (`pan` is its short alias); use `@overdeck/desktop` for the packaged desktop app.
