@@ -1,12 +1,12 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
+import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
 import { applyIssueParkedLabel } from '../../../lib/backlog/label-ops.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot } from '../../../lib/database/backlog-sequence-db.js';
@@ -42,7 +42,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
           return jsonResponse({ nodes: [], edges: [] });
         }
 
-        // Enrich cached rows with live per-issue status (not stored in the cache)
+        // Enrich cached rows with live per-issue status (not stored in the cache).
+        // Mirrors the join logic in src/lib/backlog/backlog-input.ts for consistency.
         const draftsDir = join(projectRoot, '.pan', 'drafts');
         const prdFiles = existsSync(draftsDir)
           ? new Set(readdirSync(draftsDir).map((f) => f.replace(/\.md$/, '').toUpperCase()))
@@ -57,13 +58,27 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         }
 
+        const workspacesDir = join(projectRoot, 'workspaces');
+        const issuesWithBeads = new Set<string>();
+        if (existsSync(workspacesDir)) {
+          for (const dir of readdirSync(workspacesDir)) {
+            const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
+            if (match) {
+              if (existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
+                issuesWithBeads.add(match[1]!.toUpperCase());
+              }
+            }
+          }
+        }
+
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
           const reviewStatus = getReviewStatusSync(issueUpper);
           const inPipeline =
-            reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+            (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
+            existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
-          const ready = specIssues.has(issueUpper);
+          const ready = specIssues.has(issueUpper) && issuesWithBeads.has(issueUpper);
           return {
             issueId: r.issueId,
             rank: r.rank,
