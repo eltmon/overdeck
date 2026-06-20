@@ -850,7 +850,7 @@ program
 
     if (!isProduction && !isDevelopment) {
       console.error(chalk.red('Error: Dashboard not found'));
-      console.error(chalk.dim('This may be a corrupted installation. Try reinstalling @overdeck/cli.'));
+      console.error(chalk.dim('This may be a corrupted installation. Try reinstalling @overdeck/core.'));
       process.exit(1);
     }
 

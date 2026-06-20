@@ -4,7 +4,7 @@
 
 **The IDE for the agent era**
 
-[![npm version](https://img.shields.io/npm/v/%40panctl%2Fcli.svg)](https://www.npmjs.com/package/@overdeck/cli)
+[![npm version](https://img.shields.io/npm/v/%40panctl%2Fcli.svg)](https://www.npmjs.com/package/@overdeck/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/overdeck/pulls)
@@ -26,10 +26,10 @@ IDEs were built for humans who type code. Overdeck is built for humans who **dir
 ## Quick Start
 
 ```bash
-npx @overdeck/cli
+npx @overdeck/core
 ```
 
-No install step required. `npx @overdeck/cli` starts Command Deck and opens the dashboard in your browser. Use `overdeck` or `pan` after `npm install -g @overdeck/cli`. The packaged desktop app is published separately as `@overdeck/desktop`.
+No install step required. `npx @overdeck/core` starts Command Deck and opens the dashboard in your browser. Use `overdeck` or `pan` after `npm install -g @overdeck/core`. The packaged desktop app is published separately as `@overdeck/desktop`.
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
@@ -127,7 +127,7 @@ These controls are visible in the dashboard through top-level no-resume warnings
 
 ## Architecture at a Glance
 
-Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/cli`; keep `pan` for headless and CI, or use `@overdeck/desktop` for the packaged desktop app.
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core`; keep `pan` for headless and CI, or use `@overdeck/desktop` for the packaged desktop app.
 
 ---
 
@@ -222,5 +222,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="https://overdeck.ai">Documentation</a></p>
+<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/core">npm</a> · <a href="https://overdeck.ai">Documentation</a></p>
 </div>

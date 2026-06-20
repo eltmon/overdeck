@@ -16,10 +16,10 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 ## One Command
 
 ```bash
-npx @overdeck/cli
+npx @overdeck/core
 ```
 
-That's it. `npx @overdeck/cli` starts Command Deck and opens the dashboard in your browser. No global install step required.
+That's it. `npx @overdeck/core` starts Command Deck and opens the dashboard in your browser. No global install step required.
 
 Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them.
 
@@ -50,7 +50,7 @@ Work at whatever level of involvement you want. Pair-program hands-on with a sin
 For terminals, scripts, and CI where you don't need the GUI:
 
 ```bash
-npm install -g @overdeck/cli
+npm install -g @overdeck/core
 pan up        # start dashboard server
 pan work PAN-123   # spawn agent for an issue
 ```
@@ -60,7 +60,7 @@ pan work PAN-123   # spawn agent for an issue
 If you prefer to set up all tools at once (useful for shared dev machines or CI images):
 
 ```bash
-npm install -g @overdeck/cli
+npm install -g @overdeck/core
 pan install   # installs tmux, ttyd, mkcert, gh, glab, beads, claudish, ox
 pan sync      # sync skills/agents/rules to ~/.overdeck/
 pan up        # start Traefik + dashboard
@@ -76,4 +76,4 @@ Prefer a standalone app? Download the latest release for your platform:
 
 ## Architecture at a Glance
 
-Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/cli`, use `@overdeck/desktop` for the packaged desktop app, and keep `pan` for headless and CI.
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/core`, use `@overdeck/desktop` for the packaged desktop app, and keep `pan` for headless and CI.

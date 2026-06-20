@@ -186,7 +186,7 @@ pan skills
 
 ```bash
 # 1. Update package
-npm update -g @overdeck/cli
+npm update -g @overdeck/core
 
 # 2. Re-run init to get new bundled skills
 pan init

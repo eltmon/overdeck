@@ -26,7 +26,7 @@ Pick the register that fits the surface:
 | Logo lockup | *The IDE for the agent era* |
 | Sub-head | *Watch agents code, review their diffs live, and ship — without leaving the conversation.* |
 | Category | *A live development environment for directing AI coding agents.* |
-| Tweet bio | *Command Deck: spawn agents, watch them work, stay in control. `npx @overdeck/cli`* |
+| Tweet bio | *Command Deck: spawn agents, watch them work, stay in control. `npx @overdeck/core`* |
 
 ---
 
@@ -338,7 +338,7 @@ pipeline, the gates, the routing, and the autonomy loop. Use these head-to-heads
 | **Devin / Cognition** ($1B raise at ~$26B, May 2026): autonomous cloud engineer, usage tiers up to $500/mo | Autonomy that's **yours**: open source, local-first, BYO models and subscriptions, full per-issue cost visibility |
 | **GitHub Agent HQ / Copilot mission control**: agent orchestration bundled into the Copilot seat | Tracker-agnostic (GitHub, Linear, GitLab, Rally), model-agnostic (six providers), and policy-deep — capability routing, quality gates, budgets, and brakes, not just spawning |
 | **Subspace**: a multi-agent workspace with shared cross-agent memory | A **pipeline**, not just a desk: immutable plans, quality gates, a merge train, and a flywheel that drains the backlog on its own |
-| **Factory / Blitzy** ($1.5B / $1.4B valuations, 2026): enterprise sales-led autonomous delivery | The same end-to-end ambition, installable today with `npx @overdeck/cli` — no sales call, no cloud commitment |
+| **Factory / Blitzy** ($1.5B / $1.4B valuations, 2026): enterprise sales-led autonomous delivery | The same end-to-end ambition, installable today with `npx @overdeck/core` — no sales call, no cloud commitment |
 
 Three claims in this category that, as of mid-2026, **nobody else can make together**:
 1. **Automated browser UAT as a pipeline gate** — agents verify acceptance criteria in a
@@ -407,7 +407,7 @@ to explore alternatives — all without losing context. When implementation look
 specialist agents handle code review, testing, inspection, browser UAT, and merge, so you
 ship without ever switching to a separate CI tab. Overdeck is open source (MIT),
 local-first, and model-agnostic, with capability-based routing across Anthropic, OpenAI,
-Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
+Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/core`.
 
 ---
 
@@ -425,7 +425,7 @@ Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
 - Pair-program with a fleet of agents, then let the pipeline ship while you move on.
 
 **Calls to action**
-- `npx @overdeck/cli` — no install step.
+- `npx @overdeck/core` — no install step.
 - Open Command Deck in your browser in 30 seconds.
 - Read the docs → overdeck.ai
 - Star it on GitHub.
@@ -435,7 +435,7 @@ Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
 ## 12. Social snippets (ready to post)
 
 **X / Twitter (≤280)**
-- IDEs were built for people who type code. Overdeck is built for people who *direct* it. Spawn agents, watch every diff land live, hot-swap models mid-task, then let the pipeline review + test + merge. `npx @overdeck/cli` ⌁ open source.
+- IDEs were built for people who type code. Overdeck is built for people who *direct* it. Spawn agents, watch every diff land live, hot-swap models mid-task, then let the pipeline review + test + merge. `npx @overdeck/core` ⌁ open source.
 - Stop babysitting one agent in a terminal. Command Deck gives you a live cockpit: inline diffs, model hot-swap, conversation forking, checkpoints, and an automated review→test→merge pipeline. The IDE for the agent era.
 - New: fork a conversation to try a different approach, keep the original, compare both. Because "undo" should work on agents too. 🧵
 
@@ -476,7 +476,7 @@ Local-first. The dashboard, database, orchestration, and git worktrees run on yo
 Agent workspaces can optionally offload to Fly.io when you want the RAM/CPU/disk elsewhere.
 
 **Q: How do I start?**
-`npx @overdeck/cli`. No install step — it starts Command Deck and opens the dashboard in your
+`npx @overdeck/core`. No install step — it starts Command Deck and opens the dashboard in your
 browser.
 
 ---
@@ -484,9 +484,9 @@ browser.
 ## 14. Quick links
 
 - **Site:** https://overdeck.ai
-- **npm:** https://www.npmjs.com/package/@overdeck/cli
+- **npm:** https://www.npmjs.com/package/@overdeck/core
 - **GitHub:** https://github.com/eltmon/overdeck
-- **Install:** `npx @overdeck/cli`
+- **Install:** `npx @overdeck/core`
 - **Desktop app:** `@overdeck/desktop`
 
 ---
