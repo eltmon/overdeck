@@ -102,17 +102,17 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T14:39:47.721Z",
+  "updated": "2026-06-20T15:16:52.178Z",
   "pipeline": {
     "issueId": "PAN-1866",
-    "reviewStatus": "blocked",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T14:39:46.060Z",
-    "reviewNotes": "sequence pickup bypasses Flywheel author/assignee safety gate",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (12457ms):\n\nship\" | \"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\n  Type '\"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\nsrc/components/Agents/FleetAgentsView.tsx(291,27): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/Agents/FleetAgentsView.tsx(291,54): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/primitives/AgentCard.tsx(47,3): error TS1360: Type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' does not satisfy the expected type 'Record<AgentCardRole, string>'.\n  Property 'sequencer' is missing in type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' but required in type 'Record<AgentCardRole, string>'.\nsrc/components/primitives/AgentCard.tsx(66,28): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n  Property 'sequencer' does not exist on type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n",
+    "updatedAt": "2026-06-20T15:16:52.167Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (89466ms):\n\n/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > tallies dry runs without writing\nAssertionError: expected { issueId: 'PAN-1922', …(4) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"issueId\": \"PAN-1922\",\n  \"readyForMerge\": true,\n  \"reviewStatus\": \"passed\",\n  \"testStatus\": \"passed\",\n  \"updatedAt\": \"2026-06-15T00:00:00.000Z\",\n}\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:310:45\n    309|\n    310|     expect(result.restored).toBe(1);\n    311|     expect(getReviewStatusFromDbSync('PAN-1922')).toBeNull();\n       |        ^\n    312|   });\n    313|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > inherits host override from the completed work agent for synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:118:28\n    116|     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));\n    117|     mocks.getReviewStatus.mockReturnValue(undefined);\n    118|     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefin…\n       |                            ^\n    119|     mocks.formatTier1Summary.mockReturnValue('shared review context');\n    120|     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > threads explicit model and harness overrides to synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:141:28\n    142|   });\n    143|\n    144|   it('threads explicit model and harness overrides to synthesis and re…\n       |              ^\n    145|     const result = await Effect.runPromise(spawnReviewRoleForIssue({\n    146|       issueId: 'PAN-1194',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/19]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
     "reviewedAtCommit": "5cc2b088a35f215cfeac1ac9e0b2e2d45bf6bdc9"
   },
@@ -145,10 +145,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 580,
-            "output": 209967,
-            "cacheRead": 64941755,
-            "cacheWrite": 1183238
+            "input": 737,
+            "output": 258639,
+            "cacheRead": 83000461,
+            "cacheWrite": 1598652
           }
         }
       },
@@ -166,15 +166,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 594,
-          "output": 219981,
-          "cacheRead": 66010312,
-          "cacheWrite": 1286825
+          "input": 751,
+          "output": 268653,
+          "cacheRead": 84069018,
+          "cacheWrite": 1702239
         }
       },
       "costAtCloseOut": {
-        "usd": 39.53770924,
-        "pricingAsOf": "2026-06-20T14:39:46.078Z"
+        "usd": 47.24367524,
+        "pricingAsOf": "2026-06-20T15:16:52.178Z"
       }
     },
     "merges": [
