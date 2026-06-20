@@ -414,12 +414,16 @@ function getSessionStatusTitle({
 
 function RestartModelSubmenu({
   defaultModel,
+  currentHarness,
+  currentModel,
   groups,
   harnessPolicy,
   label,
   onRestart,
 }: {
   defaultModel: string | null;
+  currentHarness?: string | null;
+  currentModel?: string | null;
   groups: ModelGroup[];
   harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
@@ -428,15 +432,24 @@ function RestartModelSubmenu({
   const defaultLabel = defaultModel
     ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
     : 'default';
+  // PAN-1985: render the trigger as just the action ("Restart All") and put
+  // the current harness+model as a non-clickable status row at the top of
+  // the submenu. The previous "(gpt-5.5)" suffix on the trigger read as
+  // "restart with gpt-5.5" — ambiguous and easy to misread.
+  const currentSummary = currentHarness && currentModel
+    ? `${currentHarness} + ${currentModel}`
+    : currentHarness ?? currentModel ?? null;
 
   return (
     <ContextMenuSub>
-      <ContextMenuSubTrigger>
-        {label ? `${label} (${defaultLabel})` : `Restart (${defaultLabel})`}
-      </ContextMenuSubTrigger>
+      <ContextMenuSubTrigger>{label ?? 'Restart'}</ContextMenuSubTrigger>
       <ContextMenuSubContent>
+        {currentSummary ? (
+          <ContextMenuLabel>Currently: {currentSummary}</ContextMenuLabel>
+        ) : null}
         <ContextMenuItem onSelect={() => onRestart()}>
-          <span className="flex-1">Default role config ({defaultLabel})</span>
+          <span className="flex-1">Default role config</span>
+          <span className="ml-2 shrink-0 text-[10px] opacity-50">uses {defaultLabel}</span>
         </ContextMenuItem>
         <ContextMenuSeparator />
         {HARNESS_OPTIONS.map((harness) => (
@@ -444,7 +457,8 @@ function RestartModelSubmenu({
             <ContextMenuSubTrigger>{harness.label}</ContextMenuSubTrigger>
             <ContextMenuSubContent>
               <ContextMenuItem onSelect={() => onRestart(undefined, harness.id)}>
-                <span className="flex-1">Default model ({defaultLabel})</span>
+                <span className="flex-1">Default model</span>
+                <span className="ml-2 shrink-0 text-[10px] opacity-50">uses {defaultLabel}</span>
               </ContextMenuItem>
               {groups.map((group) => (
                 <div key={`${harness.id}-${group.provider}`}>
@@ -676,6 +690,8 @@ export function SessionNode({
         {canRestart && (
           <RestartModelSubmenu
             defaultModel={defaultModel}
+            currentHarness={session.harness ?? null}
+            currentModel={session.model}
             groups={groups}
             harnessPolicy={harnessPolicy}
             label={restartLabel}

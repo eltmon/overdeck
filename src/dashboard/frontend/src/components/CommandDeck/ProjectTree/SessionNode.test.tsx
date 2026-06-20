@@ -317,7 +317,7 @@ describe('SessionNode', () => {
       </div>,
     );
 
-    expect(screen.getAllByText('Restart review (opus-4-7)')).toHaveLength(2);
+    expect(screen.getAllByText('Restart review')).toHaveLength(2);
   });
 
   it('keeps the review coordinator restart label as Restart all', () => {
@@ -333,7 +333,7 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('Restart all (sonnet-4-6)')).toBeInTheDocument();
+    expect(screen.getByText('Restart all')).toBeInTheDocument();
   });
 
   it('uses Start for ended test and ship nodes and Restart for live test and ship nodes', () => {
@@ -380,8 +380,8 @@ describe('SessionNode', () => {
       </div>,
     );
 
-    expect(screen.getAllByText('Start (sonnet-4-6)')).toHaveLength(2);
-    expect(screen.getAllByText('Restart (sonnet-4-6)')).toHaveLength(2);
+    expect(screen.getAllByText('Start')).toHaveLength(2);
+    expect(screen.getAllByText('Restart')).toHaveLength(2);
   });
 
   it('renders a strike node with label, purpose tooltip, model, and restart affordance', () => {
@@ -409,6 +409,9 @@ describe('SessionNode', () => {
       'Drop-in implement-and-merge agent for this issue. Model: opus-4-8. Session: strike-pan-1835. Last heard: 5m ago.',
     );
     expect(screen.getByText('opus-4-8')).toBeInTheDocument();
-    expect(screen.getByText('Restart (opus-4-8)')).toBeInTheDocument();
+    // PAN-1985: the trigger label no longer appends the model suffix (it
+    // was misleading). The model is now shown inside the submenu as a
+    // 'Currently: ...' status label.
+    expect(screen.getByText('Restart')).toBeInTheDocument();
   });
 });
