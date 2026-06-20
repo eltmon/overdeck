@@ -116,6 +116,24 @@ function readStoredSessionId(agentId: string): string | null {
   }
 }
 
+/**
+ * PAN-1988: resolve the REAL pi session id from the freshest session JSONL. The `session.id` file
+ * holds a spawn-time placeholder for non-claude harnesses (or can be missing), so resuming from it
+ * makes pi drift into a fresh session and lose conversation history — the same bug fixed for codex's
+ * rollout. The session JSONL always carries the real id (`parsed.sessionId`). Returns null when
+ * there is no prior session on disk. Picks the freshest by mtime, tolerating nested cwd subdirs.
+ */
+function resolveLatestPiSessionId(agentId: string): string | null {
+  const root = piSessionDirFor(agentId)
+  if (!existsSync(root)) return null
+  const files: { path: string; mtime: number }[] = []
+  walkJsonl(root, files)
+  if (files.length === 0) return null
+  files.sort((a, b) => b.mtime - a.mtime)
+  const parsed = parsePiSessionSync(files[0]!.path)
+  return parsed?.sessionId ?? null
+}
+
 export class PiRuntimeSync implements AgentRuntimeSync {
   readonly name = 'pi' as const
 
@@ -327,10 +345,14 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     // present) we fall back to a fresh session and warn so the dashboard
     // can surface the divergence. On a first-ever spawn — sessions/ is
     // empty — we stay silent.
-    const resumeSessionId = readStoredSessionId(agentId) ?? undefined
+    // PAN-1988: resume from the stored `session.id` when present, else recover the REAL session id
+    // from the freshest session JSONL rather than spawning fresh and losing history (the old AC3
+    // behavior threw the session away whenever the stored id was a spawn-time placeholder or
+    // missing). Only when neither yields an id do we start fresh.
+    const resumeSessionId = readStoredSessionId(agentId) ?? resolveLatestPiSessionId(agentId) ?? undefined
     if (!resumeSessionId && hadPriorSpawn) {
       console.warn(
-        `[pi-runtime] ${agentId}: prior session.jsonl exists but session.id is missing — spawning a fresh Pi session`,
+        `[pi-runtime] ${agentId}: prior session.jsonl exists but no resumable session id found — spawning a fresh Pi session`,
       )
     }
 

@@ -255,11 +255,12 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     expect(launcher).toMatch(/--session\s+'?sess-stored-7777'?/)
   })
 
-  it('AC3: omits --session and warns when sessions/*.jsonl exists but session.id is missing', async () => {
+  it('AC3: goes fresh and warns only when NEITHER session.id NOR a parseable session id exists', async () => {
     const agentId = 'agent-resume-2'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
+    // A session-root line with NO id — unparseable, so there is genuinely nothing to resume.
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
     // session.id intentionally absent
     preCreateReady(agentId)
@@ -276,7 +277,32 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     expect(launcher).not.toMatch(/--session\s+\S/)
 
     const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(warned).toMatch(/session\.id is missing/)
+    expect(warned).toMatch(/no resumable session id/)
+  })
+
+  it('PAN-1988: recovers the real session id from the freshest JSONL when session.id is absent', async () => {
+    const agentId = 'agent-resume-jsonl'
+    const dir = join(h.home, '.overdeck', 'agents', agentId)
+    const sessionsDir = join(dir, 'sessions')
+    mkdirSync(sessionsDir, { recursive: true })
+    // session.id is absent (it is only written on suspend), but the session JSONL carries the real
+    // id as its session-root `id` — resume from THAT instead of throwing the session away.
+    writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session","id":"real-pi-sess-9999"}\n')
+    preCreateReady(agentId)
+
+    const r = new PiRuntimeSync()
+    await r.spawnAgent({
+      agentId,
+      workspace: h.home,
+      model: 'claude-sonnet-4-6',
+      piExtensionPath: '/tmp/fake-extension/dist/index.js',
+    } as any)
+
+    const launcher = require('node:fs').readFileSync(join(dir, 'pi-launcher.sh'), 'utf-8')
+    expect(launcher).toMatch(/--session\s+'?real-pi-sess-9999'?/)
+
+    const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(warned).not.toMatch(/no resumable session id/)
   })
 
   it('first-ever spawn (no prior sessions/*.jsonl, no session.id) does NOT warn — clean path', async () => {
