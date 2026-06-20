@@ -4,7 +4,7 @@
  * No chalk, no console, no execSync. Import and use from API routes or CLI.
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readlinkSync, readdirSync, renameSync, statSync, symlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 import {
@@ -59,14 +59,10 @@ export function installGitHooksInDir(gitDir: string): number {
 
       if (existsSync(target)) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const { readlinkSync } = require('fs') as typeof import('fs');
           if (readlinkSync(target) === source) continue;
         } catch {
           // not a symlink — fall through to backup
         }
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { renameSync } = require('fs') as typeof import('fs');
         renameSync(target, `${target}.backup`);
       }
 
