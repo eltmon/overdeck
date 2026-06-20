@@ -92,6 +92,8 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { deleteWorkspace: true };
     case 'cancel':
       return { wipeWorkspace: true };
+    case 'completeWorkReset':
+      return { spawn: false };
     case 'inspectBead':
       return { deep: false };
     case 'doneWork':
@@ -116,6 +118,8 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'resumeSession':
     case 'resetSession':
       return 'This action requires a stopped agent with a resumable session.';
+    case 'completeWorkReset':
+      return 'This action requires an existing work agent with a workspace.';
     case 'requestReview':
       return 'Review can be requested after workspace work is idle and not already in review.';
     case 'restartReview':
@@ -189,6 +193,8 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'restartFromPlan':
     case 'restartAgent':
       return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
+    case 'completeWorkReset':
+      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, vBRIEF, beads, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     case 'purgeReview':
       return `Complete review reset for ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:

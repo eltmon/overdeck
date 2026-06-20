@@ -56,6 +56,7 @@ export type IssueActionKey =
   | 'createWorkspace'
   | 'copySettings'
   | 'resetSession'
+  | 'completeWorkReset'
   | 'restartFromPlan'
   | 'restartAgent'
   | 'reviewTest';
@@ -247,6 +248,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'createWorkspace', label: 'Create workspace', panVerb: null, endpoint: '/api/workspaces', enabledWhen: (state) => !hasWorkspace(state), phasePrimary: [], kind: 'dialog', group: 'workspace' },
   { key: 'copySettings', label: 'Copy settings', panVerb: null, endpoint: '/api/issues/:id/copy-settings', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'dialog', group: 'workspace' },
   { key: 'resetSession', label: 'Reset session', panVerb: null, endpoint: '/api/agents/:agentId/reset-session', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'destructive', group: 'agent' },
+  { key: 'completeWorkReset', label: 'Complete work reset', panVerb: null, endpoint: '/api/agents/:agentId/restart-fresh', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'restartFromPlan', label: 'Restart from plan', panVerb: null, endpoint: '/api/agents', enabledWhen: (state) => state.hasPlan && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'restartAgent', label: 'Restart agent', panVerb: null, endpoint: '/api/agents/:agentId/restart', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'agent' },
   { key: 'reviewTest', label: 'Review & test', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'dialog', group: 'preserved' },
