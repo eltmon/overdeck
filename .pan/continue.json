@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1866",
   "created": "2026-06-19T18:48:04.302Z",
-  "updated": "2026-06-20T16:40:40.384Z",
+  "updated": "2026-06-20T16:53:08.653Z",
   "gitState": {
     "branch": "feature/pan-1866",
     "sha": "36308d7cea",
@@ -179,6 +179,11 @@
     },
     {
       "timestamp": "2026-06-20T16:40:40.380Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-20T16:53:08.650Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     }
