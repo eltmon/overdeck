@@ -156,21 +156,20 @@ export function BacklogSequencerPage() {
   }
 
   async function handleDraftPrd(issueId: string) {
-    const num = issueId.replace(/^[A-Z]+-/, '');
-    if (/^\d+$/.test(num)) {
-      await fetch(`/api/workspaces/${issueId}/plan`, { method: 'POST' }).catch(() => {});
-    }
+    await fetch(`/api/issues/${issueId}/start-planning`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }).catch(() => {});
   }
 
   async function handleCloseIssue(issueId: string) {
-    const num = issueId.replace(/^[A-Z]+-/, '');
-    if (/^\d+$/.test(num)) {
-      const body = JSON.stringify({ state: 'closed', reason: 'not_planned' });
-      await fetch(`/api/issues/${issueId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      }).catch(() => {});
+    const res = await fetch(`/api/issues/${issueId}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }).catch(() => null);
+    if (res?.ok) {
       queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
     }
   }

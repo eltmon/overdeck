@@ -109,6 +109,7 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
 
           const projectRoot = process.cwd();
           const specsDir = join(projectRoot, '.pan', 'specs');
+          const workspacesDir = join(projectRoot, 'workspaces');
           const issuesWithSpecs = new Set<string>();
           if (existsSync(specsDir)) {
             for (const f of readdirSync(specsDir)) {
@@ -118,14 +119,20 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
           }
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
-            if (issuesWithSpecs.has(id)) return true;
+            // ready = spec AND beads exist in the workspace
+            if (issuesWithSpecs.has(id) &&
+                existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`, '.beads', 'issues.jsonl'))) {
+              return true;
+            }
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
           };
+          const isInPipeline = (issueId: string): boolean =>
+            existsSync(join(workspacesDir, `feature-${issueId.toLowerCase()}`));
 
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd });
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline });
           const nextLine = nextPick
             ? `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`
             : 'No eligible issue found in sequence — fall back to normal priority';

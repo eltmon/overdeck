@@ -73,6 +73,13 @@ describe('collectOpenBacklog', () => {
     expect(result.manifest[0].inPipeline).toBe(true);
   });
 
+  it('sets inPipeline=true when workspace dir exists (no review status needed)', async () => {
+    vi.mocked(getReviewStatusSync).mockReturnValue(null);
+    mkdirSync(join(tmpDir, 'workspaces', 'feature-pan-1'), { recursive: true });
+    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
+    expect(result.manifest[0].inPipeline).toBe(true);
+  });
+
   it('sets hasPrd from injected hasPrdFn', async () => {
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })], {
       hasPrdFn: (id) => id === 'PAN-1',
@@ -100,10 +107,21 @@ describe('collectOpenBacklog', () => {
     expect(result.manifest[0].ready).toBe(false);
   });
 
-  it('ready=true when a spec file for this specific issue exists', async () => {
+  it('ready=false when spec exists but workspace beads are missing', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
+    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
+    expect(result.manifest[0].ready).toBe(false);
+  });
+
+  it('ready=true when spec and workspace beads both exist', async () => {
+    const specsDir = join(tmpDir, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
+    const beadsDir = join(tmpDir, 'workspaces', 'feature-pan-1', '.beads');
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(join(beadsDir, 'issues.jsonl'), '');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].ready).toBe(true);
   });

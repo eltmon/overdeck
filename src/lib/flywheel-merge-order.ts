@@ -271,13 +271,19 @@ export function pickFromSequence(
      *  or a PRD draft (hasPrd). When absent every issue passes (backward-compatible
      *  default). */
     isReadyOrHasPrd?: (issueId: string) => boolean;
+    /** Supplement the built-in review-status inPipeline check with live workspace/agent
+     *  state. Return true to treat an issue as in-pipeline and skip it. When absent only
+     *  review_status is checked (backward-compatible default). */
+    isInPipeline?: (issueId: string) => boolean;
   },
 ): SequencePickResult | null {
   const sorted = [...nodes].sort((a, b) => a.rank - b.rank);
   for (const node of sorted) {
     if (node.gate === 'blocked') continue;
     const reviewStatus = getReviewStatusSync(node.issue.toUpperCase());
-    const inPipeline = reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+    const inPipeline =
+      (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
+      (opts?.isInPipeline?.(node.issue) ?? false);
     if (inPipeline) continue;
     if (opts?.excludeIssueIds?.has(node.issue)) continue;
     const labels = opts?.issueLabels?.(node.issue) ?? [];

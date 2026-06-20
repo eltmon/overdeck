@@ -42,21 +42,35 @@ export async function collectOpenBacklog(
 
   const openIssues = issues.filter((issue) => !CLOSED_STATES.has(issue.state));
 
-  // Build a per-issue spec lookup set once — checking a directory existence per issue
-  // would mark every issue as ready as soon as any spec exists.
+  // Build per-issue lookup sets once (filesystem scans are cheap when batched).
   const specsDir = join(projectRoot, '.pan', 'specs');
+  const workspacesDir = join(projectRoot, 'workspaces');
   const issuesWithSpecs = new Set<string>();
-  if (!opts?.hasSpecFn && existsSync(specsDir)) {
-    for (const f of readdirSync(specsDir)) {
-      const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
-      if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
+  const issuesWithBeads = new Set<string>();
+  if (!opts?.hasSpecFn) {
+    if (existsSync(specsDir)) {
+      for (const f of readdirSync(specsDir)) {
+        const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+        if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
+      }
+    }
+    if (existsSync(workspacesDir)) {
+      for (const dir of readdirSync(workspacesDir)) {
+        const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
+        if (match) {
+          if (existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
+            issuesWithBeads.add(match[1]!.toUpperCase());
+          }
+        }
+      }
     }
   }
 
   const manifest: BacklogManifestEntry[] = openIssues.map((issue) => {
     const reviewStatus = getReviewStatusSync(issue.ref);
     const inPipeline =
-      reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+      (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
+      existsSync(join(workspacesDir, `feature-${issue.ref.toLowerCase()}`));
 
     const hasPrd = opts?.hasPrdFn
       ? opts.hasPrdFn(issue.ref)
@@ -64,7 +78,8 @@ export async function collectOpenBacklog(
 
     const ready = opts?.hasSpecFn
       ? opts.hasSpecFn(issue.ref)
-      : issuesWithSpecs.has(issue.ref.toUpperCase());
+      : (issuesWithSpecs.has(issue.ref.toUpperCase()) &&
+         issuesWithBeads.has(issue.ref.toUpperCase()));
 
     const createdMs = issue.createdAt ? new Date(issue.createdAt).getTime() : now;
 

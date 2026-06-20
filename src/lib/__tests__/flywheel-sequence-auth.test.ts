@@ -62,6 +62,35 @@ describe('pickFromSequence – ready-or-PRD eligibility gate (FR-14)', () => {
   });
 });
 
+describe('pickFromSequence – isInPipeline live-workspace gate', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('skips rank-1 when isInPipeline returns true, picks rank-2', () => {
+    const nodes = [
+      makeNode('PAN-LIVE', 1),
+      makeNode('PAN-IDLE', 2),
+    ];
+    const result = pickFromSequence(nodes, {
+      isInPipeline: (id) => id === 'PAN-LIVE',
+    });
+    expect(result?.issueId).toBe('PAN-IDLE');
+  });
+
+  it('returns null when all issues are in-pipeline', () => {
+    const nodes = [makeNode('PAN-1', 1), makeNode('PAN-2', 2)];
+    const result = pickFromSequence(nodes, {
+      isInPipeline: () => true,
+    });
+    expect(result).toBeNull();
+  });
+
+  it('backwards-compatible: no isInPipeline option selects rank-1', () => {
+    const nodes = [makeNode('PAN-1', 1), makeNode('PAN-2', 2)];
+    const result = pickFromSequence(nodes);
+    expect(result?.issueId).toBe('PAN-1');
+  });
+});
+
 describe('pickFromSequence – author/assignee safety gate', () => {
   beforeEach(() => vi.clearAllMocks());
 
