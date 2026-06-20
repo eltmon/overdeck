@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "true",
+  "buildCommand": "cp scripts/install.sh site/install",
+  "outputDirectory": "site",
+  "headers": [
+    {
+      "source": "/install",
+      "headers": [
+        { "key": "content-type", "value": "text/plain; charset=utf-8" }
+      ]
+    }
+  ]
+}

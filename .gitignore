@@ -191,3 +191,6 @@ __pycache__/
 
 # Pre-launch sensitive marketing strategy (rebrand candidates, fundraising) — keep local
 /docs/marketing/private/
+
+# Generated at Vercel build by vercel.json (cp scripts/install.sh → site/install)
+/site/install
