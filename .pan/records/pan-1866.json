@@ -102,16 +102,16 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T14:35:40.466Z",
+  "updated": "2026-06-20T14:39:47.721Z",
   "pipeline": {
     "issueId": "PAN-1866",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T14:35:40.417Z",
-    "reviewNotes": "Verification failed at frontend-typecheck",
+    "updatedAt": "2026-06-20T14:39:46.060Z",
+    "reviewNotes": "sequence pickup bypasses Flywheel author/assignee safety gate",
     "verificationNotes": "Verification FAILED at frontend-typecheck (12457ms):\n\nship\" | \"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\n  Type '\"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\nsrc/components/Agents/FleetAgentsView.tsx(291,27): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/Agents/FleetAgentsView.tsx(291,54): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/primitives/AgentCard.tsx(47,3): error TS1360: Type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' does not satisfy the expected type 'Record<AgentCardRole, string>'.\n  Property 'sequencer' is missing in type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' but required in type 'Record<AgentCardRole, string>'.\nsrc/components/primitives/AgentCard.tsx(66,28): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n  Property 'sequencer' does not exist on type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
     "reviewedAtCommit": "5cc2b088a35f215cfeac1ac9e0b2e2d45bf6bdc9"
@@ -145,10 +145,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 563,
-            "output": 207639,
-            "cacheRead": 63194360,
-            "cacheWrite": 1176868
+            "input": 580,
+            "output": 209967,
+            "cacheRead": 64941755,
+            "cacheWrite": 1183238
           }
         }
       },
@@ -166,15 +166,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 577,
-          "output": 217653,
-          "cacheRead": 64262917,
-          "cacheWrite": 1280455
+          "input": 594,
+          "output": 219981,
+          "cacheRead": 66010312,
+          "cacheWrite": 1286825
         }
       },
       "costAtCloseOut": {
-        "usd": 38.95463324,
-        "pricingAsOf": "2026-06-20T14:35:40.465Z"
+        "usd": 39.53770924,
+        "pricingAsOf": "2026-06-20T14:39:46.078Z"
       }
     },
     "merges": [
@@ -182,8 +182,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "backlog-operator-gate-ui": "completed",
     "backlog-operator-gate-ui.ac1": "completed",
