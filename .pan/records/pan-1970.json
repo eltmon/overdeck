@@ -46,6 +46,11 @@
       "id": "D9",
       "summary": "'Add existing' accepts any folder (git repo or not) — registration does not require .git; git hooks install only when .git is present (preserves projectAddCommand behavior today). No-loss refactor: `pan project add` keeps identical resulting projects.yaml entry + console next-steps output.",
       "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "`git init` in the dashboard New Project flow is a confirmed, safety-gated operation: before it can run, the UI must show the exact target directory and consequences, and the server must reject symlinks, files, non-empty directories, existing Git repositories, and canonical targets outside home.",
+      "recordedAt": "2026-06-19T23:15:00.000Z"
     }
   ],
   "hazards": [
@@ -83,6 +88,11 @@
       "id": "H7",
       "summary": "preTrustDirectory has both preTrustDirectorySync (workspace-manager.ts:1100) and preTrustDirectory (1581) exports; projectAddCommand dynamically imports preTrustDirectory.",
       "mitigation": "Helper calls the SAME symbol projectAddCommand uses today (preTrustDirectory). Verify the export at implementation time; keep the existing non-fatal try/catch around it."
+    },
+    {
+      "id": "H8",
+      "summary": "Unsafe git initialization — plain `git init` mutates repository metadata and can be harmful if it runs in an unintended directory, existing repository, symlink-resolved escape, file path, or non-empty target.",
+      "mitigation": "Treat `git init` as a potentially dangerous filesystem write. Add backend tests proving it never runs for symlink escapes, files, non-empty targets, or existing Git repositories (`.git` directory or `.git` file), and add frontend tests proving the POST is sent only after a confirmation dialog that displays the exact target directory, parent, derived key, and consequences."
     }
   ],
   "resumePoint": null,
@@ -97,7 +107,7 @@
   ],
   "feedback": [],
   "created": "2026-06-19T17:59:04.545Z",
-  "updated": "2026-06-19T20:17:15.940Z",
+  "updated": "2026-06-20T00:00:12.237Z",
   "pipeline": {
     "issueId": "PAN-1970",
     "reviewStatus": "blocked",
@@ -106,11 +116,11 @@
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-19T20:17:14.207Z",
-    "reviewNotes": "server-side home-directory boundary can be bypassed",
+    "updatedAt": "2026-06-20T00:00:10.261Z",
+    "reviewNotes": "mode='new' can run git init outside home via symlink target",
     "inspectNotes": "Inspection error for bead workspace-lvoqt: tmux session inspect-pan-1970-workspace-lvoqt exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1974",
-    "lastVerifiedCommit": "177f49b0231f3a7dfb56e622978b0b2e0ec12872"
+    "lastVerifiedCommit": "d00351f04ec656d6c04fac420441c7a02c775cbd"
   },
   "closeOut": {
     "usage": {
@@ -125,10 +135,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 421,
-            "output": 165553,
-            "cacheRead": 51598771,
-            "cacheWrite": 751902
+            "input": 489,
+            "output": 252361,
+            "cacheRead": 59992498,
+            "cacheWrite": 892425
           }
         }
       },
@@ -140,15 +150,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 421,
-          "output": 165553,
-          "cacheRead": 51598771,
-          "cacheWrite": 751902
+          "input": 489,
+          "output": 252361,
+          "cacheRead": 59992498,
+          "cacheWrite": 892425
         }
       },
       "costAtCloseOut": {
-        "usd": 20.930128,
-        "pricingAsOf": "2026-06-19T20:17:14.234Z"
+        "usd": 25.277529,
+        "pricingAsOf": "2026-06-20T00:00:10.288Z"
       }
     },
     "merges": [

@@ -36,7 +36,7 @@
     ],
     "narratives": {
       "Problem": "Projects can only be registered via `pan project add <existing-path>` in a terminal (src/cli/commands/project.ts:85). That command requires the path to already exist and does not run `git init`. There is no dashboard endpoint to register a project, no server-side folder browser, and no 'create folder + git init' path. A brand-new user has no UI way to get their first project in.",
-      "Proposal": "Add a minimal dashboard 'New Project' flow with two modes. (1) Backend: factor the registration core out of projectAddCommand into a server-safe helper (src/lib/project-registration.ts) and add POST /api/projects (mode 'existing' | 'new') in the existing routes/projects.ts — 'new' mode does mkdir + async git init before registering. Add a home-clamped GET /api/fs/list-dirs folder browser in a new routes/fs.ts. (2) Frontend: a folder-picker subcomponent, a New Project modal (Add existing | New project toggle, name + parent-folder picker, live path preview, Start -> POST), and wiring of onNewProject() from the sidebar + Home that refetches the project lists and selects the new project. Register only via the single write door (registerProjectSync); git init is async only (PAN-70); the folder browser is clamped to the user's home.",
+      "Proposal": "Add a minimal dashboard 'New Project' flow with two modes. (1) Backend: factor the registration core out of projectAddCommand into a server-safe helper (src/lib/project-registration.ts) and add POST /api/projects (mode 'existing' | 'new') in the existing routes/projects.ts — 'new' mode resolves and validates the final target, rejects symlinks/files/non-empty directories/existing repos/home escapes, then does mkdir + async git init before registering. Add a home-clamped GET /api/fs/list-dirs folder browser in a new routes/fs.ts. (2) Frontend: a folder-picker subcomponent, a New Project modal (Add existing | New project toggle, name + parent-folder picker, live path preview, Start -> confirmation -> POST), and wiring of onNewProject() from the sidebar + Home that refetches the project lists and selects the new project. Register only via the single write door (registerProjectSync); git init is async only (PAN-70), requires explicit user confirmation showing the exact canonical target directory, and must never run in an existing repo or symlink-resolved escape; the folder browser is clamped to the user's home.",
       "NonGoals": "- Setup Agent, templates/archetypes, SetupRpcGroup, or `pan setup` (those are #654 / the full wizard).\n- Clone from GitHub/GitLab (a later release).\n- Tracker config, quality gates, or workspace-build config in the wizard — use minimal defaults, editable later in projects.yaml.\n- Browsing the filesystem outside the user's home directory (the folder browser is home-clamped).\n- Polyrepo detection/configuration UI — the CLI's polyrepo next-steps output stays CLI-only; the modal registers a single folder with minimal defaults.\n- Changing any `pan project add` CLI flag, help string, or output (the refactor is behavior-preserving / no-loss)."
     },
     "autoDecisions": [
@@ -55,6 +55,10 @@
       {
         "summary": "'new' mode rejects (dup key, non-empty target) BEFORE any mkdir/git init.",
         "rationale": "Guarantees no partial write (AC-3): the only filesystem mutations happen after all validation passes."
+      },
+      {
+        "summary": "`git init` is treated as a potentially dangerous filesystem write: before it runs, the server must validate the final canonical target itself and the UI must show a confirmation dialog with the exact target.",
+        "rationale": "Plain git init is usually idempotent in an existing repo, but it still mutates repository metadata. The feature must never run it in the wrong directory, through a symlink escape, in an existing repo, or without explicit user confirmation."
       },
       {
         "summary": "POST /api/projects added to existing routes/projects.ts; GET /api/fs/list-dirs added as new routes/fs.ts merged into server.ts makeRoutesLayer.",
@@ -216,11 +220,12 @@
           "traces": [
             "FR-1",
             "FR-3",
+            "FR-6",
             "NFR-1"
           ]
         },
         "narrative": {
-          "Action": "Extend the POST /api/projects handler with mode='new'. For body { mode:'new', parentDir, name }: derive key from name; dup-check and reject (409) BEFORE any fs change; compute target = join(parentDir, slug(name)); if target exists and is non-empty, reject (409) with no fs change; otherwise `mkdir -p` target (async fs/promises mkdir recursive) and run `git init` ASYNCHRONOUSLY via `execAsync = promisify(exec)` (like routes/resources.ts:29) or spawn — NEVER execSync (PAN-70); then call registerProjectFromPath({ path: target, name }) and return { key, name, path: target }. Sequencing per D3 guarantees no partial write (AC-3)."
+          "Action": "Extend the POST /api/projects handler with mode='new'. For body { mode:'new', parentDir, name }: derive key from name; dup-check and reject (409) BEFORE any fs change; resolve/canonicalize parentDir and compute target = join(canonicalParent, slug(name)); inspect the target itself before any write. If target exists, use lstat/stat/realpath as appropriate and reject symlinks, files, non-empty directories, existing Git repositories (`.git` directory or `.git` file), and any canonical target outside the user's home. If target is missing, create it under the canonical parent, then canonicalize the created directory and re-check the home boundary before `git init`. Only after those checks may the route run `git init` ASYNCHRONOUSLY via `execAsync = promisify(exec)` (like routes/resources.ts:29) or spawn — NEVER execSync (PAN-70); then call registerProjectFromPath({ path: canonicalTarget, name }) and return { key, name, path: canonicalTarget }. Sequencing per D3 plus the git-init safety decision guarantees no partial write and no git init in a dangerous location."
         },
         "items": [
           {
@@ -258,6 +263,14 @@
           {
             "id": "api-projects-new.ac5",
             "title": "A route test covers new-mode success (folder + .git + registered), non-empty-target -> 409 (no fs/registry change), and dup-key -> 409; and asserts no new `execSync` import was added to the route.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-new.ac6",
+            "title": "Route tests prove `git init` never runs when the target is a symlink to outside home, an existing Git repository (`.git` directory or `.git` file), a regular file, or a non-empty directory; each case returns a clear error with no `.git` creation and no projects.yaml mutation.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -393,11 +406,12 @@
           "inspectionDepth": "fast",
           "traces": [
             "FR-4",
-            "FR-5"
+            "FR-5",
+            "FR-6"
           ]
         },
         "narrative": {
-          "Action": "Build the NewProjectModal component using the CSS-module overlay/dialog pattern (matching ForkModal + command-deck.module.css: .forkHelpOverlay/.forkHelpDialog/.forkHeader/.forkFooter). It has a top toggle 'Add existing | New project'. Add existing: embeds the FolderPicker; Start -> POST /api/projects { mode:'existing', path } via fetchWithTimeout. New project: a name field + a parent-folder picker (default parent ~/Overdeck/) + a live preview rendering `<parent>/<slug(name)>` that updates as the name changes; Start -> POST { mode:'new', parentDir, name }. On a non-OK response, surface the server error message inline and keep the modal open. Expose props for isOpen/onClose and an onCreated(project) callback (used by the wiring bead). Co-locate a Vitest test."
+          "Action": "Build the NewProjectModal component using the CSS-module overlay/dialog pattern (matching ForkModal + command-deck.module.css: .forkHelpOverlay/.forkHelpDialog/.forkHeader/.forkFooter). It has a top toggle 'Add existing | New project'. Add existing: embeds the FolderPicker; Start -> POST /api/projects { mode:'existing', path } via fetchWithTimeout. New project: a name field + a parent-folder picker (default parent ~/Overdeck/) + a live preview rendering `<parent>/<slug(name)>` that updates as the name changes; Start opens a confirmation dialog before the POST. The confirmation must show the exact target directory that will be passed to the server for git initialization, the selected parent directory, the derived project key, and plain text that Overdeck will create the folder if needed, run `git init` in that directory, and then register the project. Only the confirmation action sends POST { mode:'new', parentDir, name }; cancel returns to the modal without sending. On a non-OK response, surface the server error message inline and keep the modal open. Expose props for isOpen/onClose and an onCreated(project) callback (used by the wiring bead). Co-locate a Vitest test."
         },
         "items": [
           {
@@ -435,6 +449,14 @@
           {
             "id": "new-project-modal.ac5",
             "title": "A co-located Vitest test (mocked fetch) covers toggle switching, the new-mode slug preview, and the correct POST body per mode.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-modal.ac6",
+            "title": "In New project mode, clicking Start opens a confirmation dialog that displays the exact target directory, parent directory, derived project key, and git-init/register consequences; cancel sends no request, and confirm sends the POST.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
