@@ -27,6 +27,7 @@ import {
   ProcessTimeoutError,
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
+import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
@@ -2427,6 +2428,12 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
           workspace,
           branch: `feature/${issueLower}`,
         }));
+        recordDeaconNudge({
+          patrol: 'checkMissingReviewStatuses',
+          issueId,
+          action: 'auto-triggered review (missing status entry)',
+          reason: 'work agent has a completion marker but no review was dispatched — the reactive work→review handoff (work.completed → in_review) never created/dispatched review',
+        });
         actions.push(`Auto-triggered review for ${issueId} (missing status entry)`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -2548,6 +2555,19 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
           prompt: buildTestRolePrompt({ issueId, workspace, branch }),
         });
         setReviewStatusSync(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
+        recordDeaconNudge({
+          patrol: 'checkPendingTestDispatch',
+          issueId,
+          action: `dispatched test role ${run.id} (retry ${retryCount + 1})`,
+          reason: 'review=passed + test=pending, but the reactive review→test handoff (review.approved → testing) never fired — the deacon had to dispatch test',
+          state: {
+            reviewStatus: status.reviewStatus,
+            testStatus: status.testStatus,
+            retryCount,
+            reviewedAtCommit: status.reviewedAtCommit,
+            lastVerifiedCommit: status.lastVerifiedCommit,
+          },
+        });
         actions.push(`Dispatched test role ${run.id} for ${issueId} (retry ${retryCount + 1})`);
         console.log(`[deacon] Dispatched test role for ${issueId} (retry ${retryCount + 1})`);
       } catch (err) {

@@ -33,7 +33,8 @@ vi.mock('../overdeck/review-status-record-sync.js', () => ({
   enrichReviewNotesFromRecordSync: journal.enrichReviewNotesFromRecordSync,
   updateIssueRecordForReviewStatusSync: journal.updateIssueRecordForReviewStatusSync,
 }));
-vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+const notifier = vi.hoisted(() => ({ notify: vi.fn() }));
+vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: notifier.notify }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
@@ -98,6 +99,34 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
 
     expect(feedback.deliver).toHaveBeenCalledTimes(1);
     expect(feedback.deliver.mock.calls[0][0]).toMatchObject({ issueId: 'PAN-1866', verdict: 'blocked', notes: 'empty-backlog spawn' });
+  });
+
+  it('emits review.approved when reconciling a NEW passed verdict — host-owned review→test handoff (PAN-1988)', () => {
+    // A sandboxed codex/pi review agent recorded `passed` to the journal but could not emit the
+    // lifecycle event. The host reconcile MUST re-emit review.approved so reactive Cloister
+    // dispatches the test role — otherwise the issue strands at review=passed/test=pending until the
+    // (possibly frozen) deacon nudges it. This is the exact bug that stranded PAN-1866.
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'reviewing', testStatus: 'pending', updatedAt: '2026-06-20T07:00:00.000Z' }));
+    journal.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-06-20T07:22:21.788Z',
+      durable: { reviewStatus: 'passed', testStatus: 'pending' },
+    });
+
+    getReviewStatusSync('PAN-1866');
+
+    expect(notifier.notify).toHaveBeenCalledWith({ type: 'review.approved', issueId: 'PAN-1866' });
+  });
+
+  it('does NOT emit review.approved when the verdict was already passed (no transition)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'passed', testStatus: 'pending', updatedAt: '2026-06-20T07:00:00.000Z' }));
+    journal.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-06-20T07:30:00.000Z',
+      durable: { reviewStatus: 'passed', testStatus: 'pending' },
+    });
+
+    getReviewStatusSync('PAN-1866');
+
+    expect(notifier.notify).not.toHaveBeenCalledWith({ type: 'review.approved', issueId: 'PAN-1866' });
   });
 
   it('does NOT re-deliver feedback when the verdict was already blocked (no transition)', async () => {

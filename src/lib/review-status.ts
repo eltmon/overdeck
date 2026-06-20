@@ -626,6 +626,26 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
     if (nowBlocked && !wasBlocked) {
       void deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
     }
+
+    // PAN-1988 — host-owned review→test and test→ship HANDOFF. setReviewStatusSync emits these
+    // lifecycle events on the write path, but a sandboxed agent (codex/pi) records its verdict to
+    // the JOURNAL only and the host picks it up HERE via reconcile — which bypasses
+    // setReviewStatusSync. Without re-emitting, a passed verdict strands at review=passed/test=pending
+    // (and a passed test strands before ship) until the deacon patrol nudges it — and the deacon may
+    // be frozen. Re-emit the same transitions the write path would, so reactive Cloister advances.
+    const wasReviewPassed = dbStatus?.reviewStatus === 'passed';
+    const nowReviewPassed = reconciled.reviewStatus === 'passed';
+    if (nowReviewPassed && !wasReviewPassed && reconciled.testStatus === 'pending') {
+      console.log(`[review-status] reconcile: review.approved for ${issueId} (host-owned handoff — sandboxed agent verdict from journal)`);
+      void emitReactiveLifecycleEvent('review.approved', issueId);
+    }
+    const wasTestPassed = dbStatus?.testStatus === 'passed';
+    const nowTestPassed = reconciled.testStatus === 'passed';
+    if (nowTestPassed && !wasTestPassed) {
+      console.log(`[review-status] reconcile: test.passed for ${issueId} (host-owned handoff — sandboxed agent verdict from journal)`);
+      void emitReactiveLifecycleEvent('test.passed', issueId);
+    }
+
     maybeAutoDispatchReviewHostSide(issueId, reconciled);
     return reconciled;
   }
