@@ -70,16 +70,13 @@
   align-items: start;
 }
 
-@container (min-width: 980px) {
+/* Tree | main | beads rail (PAN-1991 item #1). The cockpit pane is ~1000-1040px
+ * in the common Command-Deck layout, so the three-column threshold sits well
+ * below that — otherwise the rail (the third grid child) wraps under the tree
+ * instead of sitting on the right. Narrower panes (<840px, e.g. a split) drop to
+ * a single stacked column. */
+@container (min-width: 840px) {
   .missionBody {
-    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  }
-}
-
-/* Wide panes get the persistent beads rail as a third column (PAN-1991 item #1).
- * Below this the rail stacks full-width under the main panel. */
-@container (min-width: 1320px) {
-  .missionBody {
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(210px, 264px) minmax(0, 1fr) 256px;
   }
 }
