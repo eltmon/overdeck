@@ -4803,6 +4803,16 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     logAgentLifecycleSync(normalizedId, `compact recovery: respawning fresh session (seed=${seedResult.summarized ? 'summary' : 'reseed-only'})`);
   }
 
+  // PAN-2009: capture whether the Pi process is actually alive BEFORE we kill any
+  // zombie session below. A DEAD pi process cannot be resumed by session id —
+  // `pi --resume` against a cleaned-up session never writes ready.json (the "did
+  // not become ready within 30s" hang) — and there is no live transcript to
+  // protect, so it must be fresh-launched (recovery, not rotation). A live
+  // (suspended) pi process stays on the normal resume path.
+  const piProcessWasAlive = agentState.harness === 'pi'
+    ? await hasAgentRuntimeInSession(normalizedId, 'pi')
+    : false;
+
   // Kill any zombie tmux session (crashed agent left behind)
   if (await Effect.runPromise(sessionExists(normalizedId))) {
     try {
@@ -4866,7 +4876,18 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // never reuse a session across a harness change.
       resumeDriftReasons.push(`legacy harness ${priorHarness}→${effectiveHarness} (PAN-1797 re-default)`);
     }
-    const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
+    // PAN-2009: a dead Pi process is fresh-launchable recovery — force a fresh
+    // session (no `pi --resume`, which would hang waiting for ready.json) instead
+    // of a doomed resume-by-id. This is NOT session rotation (no live session or
+    // transcript exists to protect), so it is exempt from the PAN-1980 refusal
+    // below — it adds no compact seed and no drift reason. Live (suspended) pi and
+    // compact/drift resumes are unaffected.
+    const piDeadRecovery = effectiveHarness === 'pi' && !piProcessWasAlive
+      && !compactSeed && resumeDriftReasons.length === 0;
+    if (piDeadRecovery) {
+      logAgentLifecycleSync(normalizedId, 'resumeAgent: dead Pi process — fresh-launching for recovery instead of pi --resume (PAN-2009)');
+    }
+    const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0 && !piDeadRecovery;
     // PAN-1980: refuse to rotate to a new session. A resume that would need a
     // fresh session — compact/overflow recovery or model/harness drift — now
     // errors and stops instead of starting a new transcript.
