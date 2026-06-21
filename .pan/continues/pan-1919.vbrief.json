@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-21T06:12:37.033Z",
+  "updated": "2026-06-21T06:18:43.762Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -141,6 +141,21 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-21T06:12:37.033Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-21T06:17:19.806Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T06:18Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-21T06:18:19.161Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T06:18:43.762Z"
     }
   ],
   "feedback": [
@@ -148,8 +163,8 @@
       "seq": 2,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-06-21T06:12:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1919\n\nactive work-agent prompt still mandates .pan/continue.json progress writes\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1919 -m \"Fixed review issues\"`"
+      "timestamp": "2026-06-21T06:18:19Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1919\n\nwork prompt points agents to project-root record and direct JSON edits\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1919 -m \"Fixed review issues\"`"
     }
   ]
 }
