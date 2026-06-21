@@ -20,22 +20,22 @@ type ImportanceFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type ConditionFilter = 'all' | 'ok' | 'needs-refinement' | 'stale';
 
 const CONDITION_BADGE_CLASS: Record<string, string> = {
-  ok:                'bg-green-900/40 text-green-400',
-  'needs-refinement': 'bg-yellow-900/40 text-yellow-400',
-  stale:             'bg-gray-700 text-gray-400 line-through opacity-60',
+  ok:                  'border border-[color-mix(in_srgb,var(--success)_32%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success-foreground)]',
+  'needs-refinement':  'border border-[color-mix(in_srgb,var(--warning)_36%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning-foreground)]',
+  stale:               'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)] line-through opacity-70',
 };
 
 const GATE_BADGE_CLASS: Record<string, string> = {
-  ready:   'bg-green-900/40 text-green-400',
-  blocked: 'bg-red-900/40 text-red-400',
-  auto:    'bg-gray-700 text-gray-400',
+  ready:   'border border-[color-mix(in_srgb,var(--success)_32%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success-foreground)]',
+  blocked: 'border border-[color-mix(in_srgb,var(--destructive)_32%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] text-[var(--destructive-foreground)]',
+  auto:    'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]',
 };
 
 const IMPORTANCE_DOT: Record<string, string> = {
-  critical: 'bg-red-500',
-  high:     'bg-orange-500',
-  medium:   'bg-gray-500',
-  low:      'bg-gray-700',
+  critical: 'bg-[var(--destructive)]',
+  high:     'bg-[var(--warning)]',
+  medium:   'bg-[var(--color-neutral-400)]',
+  low:      'bg-[var(--muted-foreground)] opacity-60',
 };
 
 const TIER_LABEL: Record<string, string> = {
@@ -45,17 +45,16 @@ const TIER_LABEL: Record<string, string> = {
   someday: 'Someday',
 };
 const TIER_CLASS: Record<string, string> = {
-  now:     'bg-blue-900/40 text-blue-400',
-  next:    'bg-purple-900/40 text-purple-400',
-  later:   'bg-gray-700 text-gray-400',
-  someday: 'bg-gray-800 text-gray-500',
+  now:     'border border-[color-mix(in_srgb,var(--destructive)_34%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] text-[var(--destructive-foreground)]',
+  next:    'border border-[color-mix(in_srgb,var(--warning)_34%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] text-[var(--warning-foreground)]',
+  later:   'border border-[color-mix(in_srgb,var(--info)_30%,transparent)] bg-[color-mix(in_srgb,var(--info)_9%,transparent)] text-[var(--info-foreground)]',
+  someday: 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]',
 };
 
 function scoreTier(rank: number, total: number): string {
-  const pct = rank / Math.max(total, 1);
-  if (pct <= 0.1) return 'now';
-  if (pct <= 0.3) return 'next';
-  if (pct <= 0.6) return 'later';
+  if (rank <= Math.min(14, total)) return 'now';
+  if (rank <= Math.min(52, total)) return 'next';
+  if (rank <= Math.min(148, total)) return 'later';
   return 'someday';
 }
 
@@ -63,19 +62,20 @@ const DAG_NODE_BUDGET = 150;
 
 export function BacklogSequencerPage() {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<View>('list');
+  const [view, setView] = useState<View>('dag');
   const [importanceFilter, setImportanceFilter] = useState<ImportanceFilter>('all');
   const [conditionFilter, setConditionFilter] = useState<ConditionFilter>('all');
   const [inPipelineOnly, setInPipelineOnly] = useState(false);
   const [readyOnly, setReadyOnly] = useState(false);
   const [showStale, setShowStale] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [spawning, setSpawning] = useState(false);
   const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('incremental');
   const [showPassPicker, setShowPassPicker] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
-  const [tierFilter, setTierFilter] = useState<string | null>(null);
+  const [tierFilter, setTierFilter] = useState<string | null>('now');
   const [searchQuery, setSearchQuery] = useState('');
+  const [hasPrdOnly, setHasPrdOnly] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SequenceNode | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<SequenceResponse>({
@@ -113,19 +113,26 @@ export function BacklogSequencerPage() {
       if (conditionFilter !== 'all' && n.condition !== conditionFilter) return false;
       if (inPipelineOnly && !n.inPipeline) return false;
       if (readyOnly && n.gate !== 'ready') return false;
+      if (hasPrdOnly && !n.hasPrd) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (!n.issueId.toLowerCase().includes(q) && !n.why.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [allNodes, importanceFilter, conditionFilter, inPipelineOnly, readyOnly, tierFilter, searchQuery]);
+  }, [allNodes, importanceFilter, conditionFilter, inPipelineOnly, readyOnly, hasPrdOnly, tierFilter, searchQuery]);
 
   // For DAG view: top-tier + neighbors + in-pipeline when too large
   const dagData = useMemo((): SequenceResponse => {
     if (!data) return { nodes: [], edges: [] };
     const total = filteredNodes.length;
-    if (total <= DAG_NODE_BUDGET) return { nodes: filteredNodes, edges: data.edges };
+    if (total <= DAG_NODE_BUDGET) {
+      const visible = new Set(filteredNodes.map((n) => n.issueId));
+      return {
+        nodes: filteredNodes,
+        edges: data.edges.filter((e) => visible.has(e.from) && visible.has(e.to)),
+      };
+    }
     // Top 10% + in-pipeline + neighbors via dependsOn
     const topN = Math.max(Math.floor(total * 0.1), 20);
     const topSet = new Set(filteredNodes.slice(0, topN).map((n) => n.issueId));
@@ -220,27 +227,36 @@ export function BacklogSequencerPage() {
     GATE_BADGE_CLASS[gate] ?? 'bg-gray-700 text-gray-400';
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[var(--color-bg)]">
+    <div className="flex flex-col h-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-fg)]">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--color-border)] shrink-0 flex-wrap">
-        <ListOrdered className="w-4 h-4 text-[var(--color-accent)]" />
-        <span className="font-semibold text-[var(--color-fg)] text-sm">Backlog Sequencer</span>
-        {allNodes.length > 0 && (
-          <span className="text-xs text-[var(--color-fg-muted)]">{allNodes.length} issues</span>
-        )}
+      <div className="flex items-start gap-4 px-6 py-4 border-b border-[var(--color-border)] shrink-0 flex-wrap bg-[var(--color-bg)]">
+        <div className="min-w-[280px] flex-1">
+          <div className="flex items-center gap-2">
+            <ListOrdered className="w-4 h-4 text-[var(--color-accent)]" />
+            <h1 className="font-display text-[22px] leading-tight font-semibold tracking-normal text-[var(--color-fg)]">
+              Backlog Sequencer
+              {allNodes.length > 0 && (
+                <span className="ml-2 font-mono text-sm font-normal text-[var(--color-fg-muted)]">· {allNodes.length} open</span>
+              )}
+            </h1>
+          </div>
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-[var(--color-fg-muted)]">
+            Ranked backlog flow with active-tier graphing, dependency context, and operator gates for pickup and planning.
+          </p>
+        </div>
 
         {/* View toggle */}
-        <div className="flex rounded overflow-hidden border border-[var(--color-border)]">
+        <div className="flex rounded-md overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)]">
           <button
             onClick={() => setView('list')}
-            className={`px-2 py-1 text-xs flex items-center gap-1 ${view === 'list' ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'list' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
           >
             <ListOrdered className="w-3 h-3" />
             List
           </button>
           <button
             onClick={() => setView('dag')}
-            className={`px-2 py-1 text-xs flex items-center gap-1 ${view === 'dag' ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'dag' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
           >
             <GitFork className="w-3 h-3" />
             DAG
@@ -250,7 +266,7 @@ export function BacklogSequencerPage() {
         {/* Filter toggle */}
         <button
           onClick={() => setShowFilters((p) => !p)}
-          className={`px-2 py-1 text-xs flex items-center gap-1 rounded border ${showFilters ? 'border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+          className={`px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border ${showFilters ? 'border-[var(--color-accent)] text-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)]' : 'border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
         >
           <Filter className="w-3 h-3" />
           Filters {filteredNodes.length !== allNodes.length && `(${filteredNodes.length})`}
@@ -260,7 +276,7 @@ export function BacklogSequencerPage() {
         {staleNodes.length > 0 && (
           <button
             onClick={() => setShowStale((p) => !p)}
-            className={`px-2 py-1 text-xs rounded border ${showStale ? 'border-yellow-500 text-yellow-400' : 'border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs rounded-md border ${showStale ? 'border-[var(--warning)] text-[var(--warning-foreground)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' : 'border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
           >
             ⊘ {staleNodes.length} stale
           </button>
@@ -271,7 +287,7 @@ export function BacklogSequencerPage() {
           <button
             onClick={handleRunPass}
             disabled={spawning}
-            className="px-2 py-1 text-xs flex items-center gap-1 rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] disabled:opacity-50"
             title={`Run ${spawnPass} pass`}
           >
             <Play className="w-3 h-3" />
@@ -279,7 +295,7 @@ export function BacklogSequencerPage() {
           </button>
           <button
             onClick={() => setShowPassPicker((p) => !p)}
-            className="px-1 py-1 text-xs rounded border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]"
+            className="px-2 py-1.5 text-xs rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]"
             title="Select pass type"
           >▾</button>
           {showPassPicker && (
@@ -299,7 +315,7 @@ export function BacklogSequencerPage() {
 
         <button
           onClick={() => refetch()}
-          className="p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+          className="p-2 rounded-md hover:bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
           title="Refresh"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -322,14 +338,14 @@ export function BacklogSequencerPage() {
 
       {/* Filter bar */}
       {showFilters && (
-        <div className="flex flex-wrap gap-3 px-5 py-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs shrink-0">
+        <div className="flex flex-wrap gap-3 px-6 py-3 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs shrink-0">
           <div className="flex items-center gap-1">
             <span className="text-[var(--color-fg-muted)]">Importance:</span>
             {(['all', 'critical', 'high', 'medium', 'low'] as ImportanceFilter[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setImportanceFilter(v)}
-                className={`px-2 py-0.5 rounded ${importanceFilter === v ? 'bg-[var(--color-accent)] text-white' : 'bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)]'}`}
+                className={`px-2 py-0.5 rounded-md border ${importanceFilter === v ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
               >
                 {v === 'all' ? 'All' : v}
               </button>
@@ -341,7 +357,7 @@ export function BacklogSequencerPage() {
               <button
                 key={v}
                 onClick={() => setConditionFilter(v)}
-                className={`px-2 py-0.5 rounded ${conditionFilter === v ? 'bg-[var(--color-accent)] text-white' : 'bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)]'}`}
+                className={`px-2 py-0.5 rounded-md border ${conditionFilter === v ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
               >
                 {v === 'all' ? 'All' : v}
               </button>
@@ -354,6 +370,10 @@ export function BacklogSequencerPage() {
           <label className="flex items-center gap-1 cursor-pointer">
             <input type="checkbox" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
             <span className="text-[var(--color-fg-muted)]">Ready only</span>
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" checked={hasPrdOnly} onChange={(e) => setHasPrdOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
+            <span className="text-[var(--color-fg-muted)]">Has PRD</span>
           </label>
           <div className="ml-auto">
             <input
@@ -404,7 +424,7 @@ export function BacklogSequencerPage() {
 
       {/* Segment pills */}
       {allNodes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-5 py-2 border-b border-[var(--color-border)] shrink-0">
+        <div className="flex flex-wrap gap-2 px-6 py-2.5 border-b border-[var(--color-border)] shrink-0">
           <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-fg-muted)]">
             <b className="text-[var(--color-fg)] font-semibold font-mono">{allNodes.length}</b> open issues
           </span>
@@ -423,8 +443,8 @@ export function BacklogSequencerPage() {
             Ready <b className="font-mono font-semibold text-[var(--color-fg)]">{readyCount}</b>
           </button>
           <button
-            onClick={() => setConditionFilter((p) => (p === 'ok' ? 'all' : 'ok'))}
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[var(--color-border)]/80`}
+            onClick={() => setHasPrdOnly((p) => !p)}
+            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${hasPrdOnly ? 'border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] text-[var(--color-accent)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[var(--color-border)]/80'}`}
           >
             <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
             Has PRD <b className="font-mono font-semibold text-[var(--color-fg)]">{hasPrdCount}</b>
@@ -459,7 +479,7 @@ export function BacklogSequencerPage() {
 
       {/* Tier ribbon */}
       {allNodes.length > 0 && (
-        <div className="flex gap-2 px-5 py-2 border-b border-[var(--color-border)] shrink-0">
+        <div className="flex gap-2 px-6 py-3 border-b border-[var(--color-border)] shrink-0">
           {([
             { key: 'now',     emoji: '🔴', label: 'Now',     count: tierCounts.now,     sub: 'act on these first',  accent: 'border-l-red-500',    ring: 'ring-red-500/50' },
             { key: 'next',    emoji: '🟠', label: 'Next',    count: tierCounts.next,    sub: 'queued behind Now',   accent: 'border-l-orange-500', ring: 'ring-orange-500/50' },
@@ -469,7 +489,7 @@ export function BacklogSequencerPage() {
             <button
               key={t.key}
               onClick={() => setTierFilter((p) => (p === t.key ? null : t.key))}
-              className={`flex-1 flex flex-col gap-0.5 px-3 py-2 border border-l-4 ${t.accent} rounded-lg bg-[var(--color-surface)] text-left hover:bg-[var(--color-surface-hover)] transition-colors ${tierFilter === t.key ? `ring-1 ${t.ring} border-[var(--color-border)]` : 'border-[var(--color-border)]'}`}
+              className={`flex-1 min-w-[140px] flex flex-col gap-0.5 px-3.5 py-2.5 border border-l-4 ${t.accent} rounded-lg bg-[var(--color-surface)] text-left hover:bg-[var(--color-surface-hover)] transition-colors shadow-sm ${tierFilter === t.key ? `ring-1 ${t.ring} border-[var(--color-border)]` : 'border-[var(--color-border)]'}`}
             >
               <span className="text-xs text-[var(--color-fg)]">{t.emoji} {t.label}</span>
               <span className="font-mono text-lg font-semibold text-[var(--color-fg)] leading-tight">{t.count}</span>
@@ -572,7 +592,7 @@ export function BacklogSequencerPage() {
                           )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TIER_CLASS[tier] ?? 'bg-gray-700 text-gray-400'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TIER_CLASS[tier] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]'}`}>
                             {TIER_LABEL[tier]}
                           </span>
                         </td>

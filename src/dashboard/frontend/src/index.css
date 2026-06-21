@@ -56,6 +56,21 @@
   --signal-review-foreground: #7e22ce;
   --signal-cost: #06b6d4;
   --signal-cost-foreground: #0e7490;
+
+  /* Legacy dashboard aliases still used by a few surfaces. Keep them mapped to
+     semantic tokens so light mode does not fall back to invalid CSS values. */
+  --color-bg: var(--background);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-surface: var(--card);
+  --color-surface-hover: var(--accent);
+  --color-border: var(--border);
+  --color-accent: var(--primary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-white: #ffffff;
+  --color-neutral-400: #9ca3af;
+  --color-warning: var(--warning);
 }
 
 /* ─── Dark mode ─── */
@@ -101,6 +116,19 @@
   --signal-review-foreground: #c084fc;
   --signal-cost: #06b6d4;
   --signal-cost-foreground: #22d3ee;
+
+  --color-bg: var(--background);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-surface: var(--card);
+  --color-surface-hover: var(--accent);
+  --color-border: var(--border);
+  --color-accent: var(--primary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-white: #ffffff;
+  --color-neutral-400: #9ca3af;
+  --color-warning: var(--warning);
 }
 
 @layer base {

@@ -1702,7 +1702,7 @@ export default function App() {
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
             this global feed, so don't double it up there. */}
-        {isSessionFeedSidebarOpen && activeTab !== 'command-deck' && (
+        {isSessionFeedSidebarOpen && !['command-deck', 'backlog'].includes(activeTab) && (
           <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
         )}
         </div>

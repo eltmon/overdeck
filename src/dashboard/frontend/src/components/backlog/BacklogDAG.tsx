@@ -76,6 +76,17 @@ const CONDITION_STYLE: Record<string, { color: string; label: string }> = {
 // ── dagre layout ──
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
+  if (nodes.length > 1 && edges.length < nodes.length * 0.75) {
+    const cols = Math.min(5, Math.ceil(Math.sqrt(nodes.length * 1.4)));
+    const xGap = 265;
+    const yGap = 120;
+    return nodes.map((n, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      return { ...n, position: { x: col * xGap, y: row * yGap } };
+    });
+  }
+
   const g = new dagre.graphlib.Graph();
   g.setGraph({ rankdir: 'TB', nodesep: 50, ranksep: 80 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -129,6 +140,7 @@ function IssueNode({ data }: { data: IssueNodeData }) {
         boxSizing: 'border-box',
         opacity: isStale ? 0.55 : 1,
         textDecoration: isStale ? 'line-through' : undefined,
+        boxShadow: '0 1px 2px rgba(15,23,42,0.08)',
       }}
     >
       {/* Top row: rank badge + issueId + size */}
@@ -136,8 +148,9 @@ function IssueNode({ data }: { data: IssueNodeData }) {
         <span style={{
           fontFamily: 'monospace',
           fontSize: 9,
-          background: 'var(--color-accent)',
-          color: 'var(--color-fg-muted)',
+          background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+          color: 'var(--color-fg)',
+          border: '1px solid color-mix(in srgb, var(--color-accent) 18%, transparent)',
           borderRadius: 3,
           padding: '1px 4px',
           flexShrink: 0,
@@ -485,6 +498,7 @@ export function BacklogDAG({
           50% { box-shadow: 0 0 16px rgba(59,130,246,0.8); }
         }
         .plan-glow { animation: plan-glow 2s ease-in-out infinite; }
+        .react-flow { background: var(--color-bg); }
         .react-flow__controls-button { background: var(--color-surface) !important; border-color: var(--color-border) !important; color: var(--color-fg) !important; }
         .react-flow__controls-button svg { fill: var(--color-fg) !important; }
         .react-flow__controls-button:hover { background: var(--color-surface-hover) !important; }
@@ -506,7 +520,7 @@ export function BacklogDAG({
           <Controls />
         </ReactFlow>
       </div>
-      {selectedNode && (
+      {selectedNode && !isControlled && (
         <RationaleSidePanel
           node={selectedNode}
           onClose={handleClose}
