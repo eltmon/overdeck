@@ -2,8 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentState } from '../agents.js';
 import { spawnRun, determineModel } from '../agents.js';
-import { collectOpenBacklog } from './backlog-input.js';
-import type { Issue } from '../tracker/interface.js';
+import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
 import type { CollectOpenBacklogResult } from './backlog-input.js';
 
@@ -15,7 +14,12 @@ export type SpawnSequencerOptions = {
   model?: string;
   workspace?: string;
   batchSize?: number;
-  issues?: Issue[];
+  /**
+   * Raw dashboard read-model issues (from `getSharedIssueService().getIssues()`).
+   * Normalized to tracker `Issue` objects via {@link normalizeBacklogIssues}
+   * before ranking — callers must NOT pre-cast to `Issue[]` (the shapes differ).
+   */
+  issues?: ReadonlyArray<Record<string, unknown>>;
 };
 
 export async function spawnSequencerAgent(
@@ -30,17 +34,21 @@ export async function spawnSequencerAgent(
   const resolvedPass: PassMode =
     pass !== 'auto' ? pass : existsSync(seqPath) ? 'incremental' : 'creation';
 
-  let issues = opts.issues;
-  if (!issues) {
+  let rawIssues = opts.issues;
+  if (!rawIssues) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
         typeof import('../../dashboard/server/services/issue-service-singleton.js');
-      issues = getSharedIssueService().getIssues() as Issue[];
+      rawIssues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
     } catch {
-      issues = [];
+      rawIssues = [];
     }
   }
+  // Dashboard read-model issues key the human ref as `identifier` (not `ref`)
+  // and carry canonical statuses; normalize to tracker `Issue` objects so the
+  // backlog ranking pipeline can read `issue.ref`/`issue.state` (PAN-1866 fix).
+  const issues = normalizeBacklogIssues(rawIssues);
   const input = await collectOpenBacklog(projectRoot, issues);
   const model = determineModel({ role: 'sequencer', model: opts.model });
   const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });

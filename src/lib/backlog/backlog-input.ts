@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import type { Issue } from '../tracker/interface.js';
+import type { Issue, IssueState, TrackerType } from '../tracker/interface.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { parseSequenceMd } from './sequence-io.js';
 import type { SequenceDoc } from './types.js';
@@ -30,6 +30,58 @@ export type CollectOpenBacklogResult = {
 
 const SEQUENCE_MD_PATH = '.pan/backlog/sequence.md';
 const CLOSED_STATES = new Set(['closed', 'cancelled']);
+
+/**
+ * Map a dashboard canonical status (or a raw tracker status) onto the
+ * tracker-library {@link IssueState} union that {@link collectOpenBacklog}
+ * expects. Dashboard read-model issues carry `canonicalStatus`/`state` values
+ * like `done`/`canceled`/`verifying_on_main`; the backlog library only knows
+ * `open`/`in_progress`/`in_review`/`closed`.
+ */
+function canonicalToIssueState(raw: string): IssueState {
+  const c = raw.toLowerCase();
+  if (['done', 'closed', 'completed', 'canceled', 'cancelled', 'duplicate', 'wontfix'].includes(c)) return 'closed';
+  if (['in_review', 'in review', 'review', 'qa', 'testing'].includes(c)) return 'in_review';
+  if (['in_progress', 'in progress', 'started', 'active', 'verifying', 'verifying_on_main', 'verifying on main'].includes(c)) return 'in_progress';
+  return 'open'; // backlog, todo, ready, triage, unknown, ''
+}
+
+/**
+ * Adapt the dashboard read-model issue objects returned by
+ * `getSharedIssueService().getIssues()` into tracker-library {@link Issue}
+ * objects. The two shapes diverge: the dashboard keys the human ref as
+ * `identifier` (e.g. "PAN-302") with no `ref` field, and its `state` is a
+ * canonical dashboard status, not an {@link IssueState}. Feeding the raw
+ * dashboard objects straight into {@link collectOpenBacklog} made
+ * `getReviewStatusSync(issue.ref)` receive `undefined` and crash on
+ * `undefined.toUpperCase()` — so every sequencer pass died before spawning.
+ *
+ * Issues without a usable human ref are dropped (they cannot be ranked).
+ */
+export function normalizeBacklogIssues(
+  raw: ReadonlyArray<Record<string, unknown>>,
+): Issue[] {
+  const out: Issue[] = [];
+  for (const r of raw) {
+    const ref = String(r['identifier'] ?? r['ref'] ?? '').trim();
+    if (!ref) continue;
+    const stateRaw = String(r['canonicalStatus'] ?? r['state'] ?? r['status'] ?? '');
+    out.push({
+      id: String(r['id'] ?? ref),
+      ref,
+      title: String(r['title'] ?? ''),
+      description: String(r['description'] ?? ''),
+      state: canonicalToIssueState(stateRaw),
+      labels: Array.isArray(r['labels']) ? (r['labels'] as string[]) : [],
+      url: String(r['url'] ?? ''),
+      tracker: (typeof r['source'] === 'string' ? r['source'] : 'github') as TrackerType,
+      priority: typeof r['priority'] === 'number' ? r['priority'] : undefined,
+      createdAt: String(r['createdAt'] ?? ''),
+      updatedAt: String(r['updatedAt'] ?? ''),
+    });
+  }
+  return out;
+}
 
 export async function collectOpenBacklog(
   projectRoot: string,

@@ -90,6 +90,7 @@ export function BacklogSequencerPage() {
   const [spawning, setSpawning] = useState(false);
   const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('auto');
   const [showPassPicker, setShowPassPicker] = useState(false);
+  const [spawnError, setSpawnError] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<SequenceResponse>({
     queryKey: ['backlog-sequence'],
@@ -142,14 +143,21 @@ export function BacklogSequencerPage() {
   async function handleRunPass() {
     if (spawning) return;
     setSpawning(true);
+    setSpawnError(null);
     setShowPassPicker(false);
     try {
-      await fetch('/api/backlog/sequence/regenerate', {
+      const res = await fetch('/api/backlog/sequence/regenerate', {
         method: 'POST',
         headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ pass: spawnPass }),
       });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+      }
       setTimeout(() => refetch(), 2000);
+    } catch (err) {
+      setSpawnError(err instanceof Error ? err.message : String(err));
     } finally {
       setSpawning(false);
     }
@@ -265,6 +273,20 @@ export function BacklogSequencerPage() {
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Spawn error banner */}
+      {spawnError && (
+        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-red-900/20 border-b border-red-900/40 text-xs">
+          <span className="text-red-400 font-semibold">Run pass failed</span>
+          <span className="text-red-300 truncate flex-1">{spawnError}</span>
+          <button
+            onClick={() => setSpawnError(null)}
+            className="px-2 py-0.5 rounded bg-red-900/40 text-red-400 hover:bg-red-800/60 shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Filter bar */}
       {showFilters && (

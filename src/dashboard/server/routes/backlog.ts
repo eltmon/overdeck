@@ -12,7 +12,6 @@ import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
-import type { Issue } from '../../../lib/tracker/interface.js';
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -125,7 +124,9 @@ const postBacklogRegenerateRoute = HttpRouter.add(
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getSharedIssueService } = require('../services/issue-service-singleton.js') as
         typeof import('../services/issue-service-singleton.js');
-      const issues = getSharedIssueService().getIssues() as Issue[];
+      // Raw dashboard read-model issues — spawnSequencerAgent normalizes them
+      // into tracker `Issue` objects (their human ref is `identifier`, not `ref`).
+      const issues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
       const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
       return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
     });
