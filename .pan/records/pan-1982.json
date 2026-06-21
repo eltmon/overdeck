@@ -1,0 +1,30 @@
+{
+  "issueId": "PAN-1982",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-06-20T23:01:42.663Z",
+  "updated": "2026-06-20T23:01:58.646Z",
+  "pipeline": {
+    "issueId": "PAN-1982",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-20T23:01:58.633Z",
+    "testNotes": "Skipped: issue is already merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-06-20T23:01:58.646Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-4-8"
+}
