@@ -2794,11 +2794,11 @@ const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
 /** Safe fallback when a work agent's resolved model is work-broken. */
 const WORK_AGENT_FALLBACK_MODEL = 'claude-sonnet-4-6';
 
-export function determineModel(options: { model?: string; role?: Role } = {}): string {
+export function determineModel(options: { model?: string; role?: Role; spawnKey?: string } = {}): string {
   const modelOverride = normalizeModelOverrideSync(options.model);
   const resolved = modelOverride
     ? modelOverride
-    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config, options.spawnKey));
 
   // Work-agent safety net: a config pin (or smart-selection) must not spawn a
   // work agent on a model that is known to wedge for the work role. Fall back
@@ -3311,7 +3311,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
-  const selectedModel = determineModel({ model: options.model, role });
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${issueId}` });
 
   if (role === 'work') {
     return spawnAgent({

@@ -2981,6 +2981,7 @@ const postAgentsRoute = HttpRouter.add(
       spawnModel = determineModel({
         model: (body as any).model,
         role,
+        spawnKey: `${role}:${issueId}`,
       });
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
