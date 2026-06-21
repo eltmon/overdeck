@@ -30,6 +30,13 @@ import type { VBriefDocument } from './types.js';
 import { findSpecByIssue, getProjectPanPaths, updateSpecStatus, writeSpecForIssue } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import { getContinueFilePath, getContinuesDir } from '../pan-dir/continues.js';
+import {
+  appendFeedbackEntrySync as appendFeedbackEntryToRecord,
+  appendSessionEntrySync as appendSessionEntryToRecord,
+  clearRecordFeedbackSync,
+  readRecordContinueViewSync,
+} from '../pan-dir/record.js';
+import type { ProjectConfig } from '../projects.js';
 import { FsError } from '../errors.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
@@ -483,42 +490,46 @@ export function readContinueStateForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  try {
-    return readContinueStateSync(projectRoot, issueId);
-  } catch {
-    return null;
-  }
+  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
+  // Cast: RecordContinueView is a structural subset of ContinueState — callers only access feedback/decisions/etc.
+  return readRecordContinueViewSync(project, issueId) as unknown as ContinueState | null;
 }
 
 export function writeContinueStateForIssue(
-  projectRoot: string,
-  issueId: string,
-  state: ContinueState,
+  _projectRoot: string,
+  _issueId: string,
+  _state: ContinueState,
 ): void {
-  writeContinueStateSync(projectRoot, issueId, state);
+  // PAN-1919: continue writes go to the per-issue record. No direct continue writes.
 }
 
 export function appendContinueSessionEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
-): ContinueState {
-  return appendSessionEntrySync(projectRoot, issueId, entry);
+): void {
+  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
+  appendSessionEntryToRecord(project, issueId, {
+    ...entry,
+    timestamp: entry.timestamp ?? new Date().toISOString(),
+  });
 }
 
 export function appendFeedbackEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
-): ContinueState {
-  return appendFeedbackEntrySync(projectRoot, issueId, entry);
+): void {
+  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
+  appendFeedbackEntryToRecord(project, issueId, entry);
 }
 
 export function clearFeedbackForIssue(
   projectRoot: string,
   issueId: string,
-): ContinueState | null {
-  return clearFeedbackSync(projectRoot, issueId);
+): void {
+  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
+  clearRecordFeedbackSync(project, issueId);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

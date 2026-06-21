@@ -122,7 +122,6 @@ CONTINUE_EXCLUDES=(
   ':!src/lib/pan-dir/continues.ts'
   ':!src/lib/vbrief/io.ts'
   ':!src/lib/vbrief/continue-state.ts'
-  ':!src/lib/vbrief/lifecycle-io.ts'
   ':!src/lib/vbrief/dag.ts'
   ':!src/lib/planning/spawn-planning-session.ts'
   ':!src/lib/cloister/feedback-writer.ts'

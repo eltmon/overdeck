@@ -490,6 +490,43 @@ export function readRecordContinueViewSync(
   };
 }
 
+// ─── Continue mutation helpers (sync) ────────────────────────────────────────
+
+/** Append a session-history entry to the per-issue record (sync). */
+export function appendSessionEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueSessionEntry,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.sessionHistory = [...(record.sessionHistory ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Append a feedback entry to the per-issue record (sync). */
+export function appendFeedbackEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [...(record.feedback ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Clear all feedback entries in the per-issue record (sync). */
+export function clearRecordFeedbackSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
 // ─── Continue field setters ───────────────────────────────────────────────────
 
 /** Write decisions into the per-issue record (sync). */
