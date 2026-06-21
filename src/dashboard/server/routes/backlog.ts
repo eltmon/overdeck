@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
@@ -20,6 +20,9 @@ import {
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
+import { listRunningAgentsSync, getAgentStateSync } from '../../../lib/agents.js';
+import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
+import { resolvePiSessionPath } from './jsonl-resolver.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 
@@ -392,6 +395,65 @@ const postBacklogClearRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/backlog/sequencer-status — live pass progress ────────────
+// The sequencer is a single LLM pass with no per-issue telemetry, so "processed" is a
+// best-effort count of distinct issue ids the agent has emitted in its OUTPUT (assistant
+// messages) so far — the input manifest (which lists all ids) is excluded. total = the
+// manifest the pass is ranking. Lets the UI show a live "ranking X of Y" indicator.
+
+const getSequencerStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/backlog/sequencer-status',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      const projectRoot = process.cwd();
+      // The one-shot sequencer session lingers after it finishes, so "alive" alone
+      // would falsely read as running. A pass is done once it writes a fresh
+      // sequence.md (mtime >= startedAt) — until then it's actively generating.
+      const alive = listRunningAgentsSync().some((a) => a.id === SEQUENCER_AGENT_ID && a.tmuxActive);
+      const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
+      const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+      let freshSequence = false;
+      if (alive && startedAt && existsSync(seqPath)) {
+        try { freshSequence = statSync(seqPath).mtimeMs >= new Date(startedAt).getTime(); } catch { /* stat failed */ }
+      }
+      const running = alive && !freshSequence;
+
+      let total = 0;
+      const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');
+      if (existsSync(manifestPath)) {
+        try {
+          const m = JSON.parse(readFileSync(manifestPath, 'utf-8')) as unknown;
+          const arr = Array.isArray(m) ? m : ((m as { issues?: unknown[]; nodes?: unknown[] })?.issues ?? (m as { nodes?: unknown[] })?.nodes ?? []);
+          total = Array.isArray(arr) ? arr.length : 0;
+        } catch { /* manifest unreadable */ }
+      }
+
+      let processed = 0;
+      if (running) {
+        try {
+          const tx = await resolvePiSessionPath(SEQUENCER_AGENT_ID);
+          if (tx && existsSync(tx)) {
+            const ids = new Set<string>();
+            for (const line of readFileSync(tx, 'utf-8').split('\n')) {
+              if (!line) continue;
+              try {
+                const j = JSON.parse(line) as { message?: { role?: string; content?: unknown } };
+                if (j.message?.role !== 'assistant') continue;
+                const c = typeof j.message.content === 'string' ? j.message.content : JSON.stringify(j.message.content);
+                for (const id of c.match(/[A-Z]{2,}-\d+/g) ?? []) ids.add(id);
+              } catch { /* skip non-JSON line */ }
+            }
+            processed = total > 0 ? Math.min(ids.size, total) : ids.size;
+          }
+        } catch { /* transcript not resolvable — leave processed at 0 */ }
+      }
+
+      return jsonResponse({ running, total, processed, startedAt });
+    });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const backlogRouteLayer = Layer.mergeAll(
@@ -402,6 +464,7 @@ export const backlogRouteLayer = Layer.mergeAll(
   getBacklogForecastRoute,
   postBacklogLabelsRoute,
   postBacklogClearRoute,
+  getSequencerStatusRoute,
 );
 
 export default backlogRouteLayer;

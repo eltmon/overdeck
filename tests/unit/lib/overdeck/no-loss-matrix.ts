@@ -638,6 +638,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/backlog/forecast',                  kind: 'http', disposition: 'AGGREGATE',  door: 'backlog route computes the pickup forecast (waves/lanes/cohort/stats) from the shared src/lib/backlog/pickup.ts module via buildClassifyLookups (PAN-2005)' },
   { surface: 'POST /api/backlog/sequence/labels',          kind: 'http', disposition: 'WRITE',      door: 'backlog route toggles ready/parked/blocks-main labels via label-ops editor write-door (PAN-2006)' },
   { surface: 'POST /api/backlog/sequence/clear',           kind: 'http', disposition: 'DELETE',     door: 'backlog route deletes sequence.md + clears the disposable backlog_sequence cache via clearBacklogSequence (PAN-2005)' },
+  { surface: 'GET /api/backlog/sequencer-status',          kind: 'http', disposition: 'READ',       door: 'backlog route reports live sequencer pass progress (running/total/processed) from listRunningAgentsSync + manifest + transcript (PAN-2005)' },
 
   // Pre-existing routes discovered during PAN-1866 audit (were missing from matrix)
   { surface: 'POST /api/agents/:id/restart-fresh',         kind: 'http', disposition: 'WRITE',      door: 'agents route wipes work-agent state and re-spawns on new harness/model; deliberate operator override for harness switch' },

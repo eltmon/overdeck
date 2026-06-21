@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListOrdered, GitFork, RefreshCw, Filter, Play, Trash2 } from 'lucide-react';
 import { BacklogDAG, RationaleSidePanel, type SequenceNode } from '../components/backlog/BacklogDAG';
@@ -89,6 +89,31 @@ export function BacklogSequencerPage() {
     },
     refetchInterval: 60_000,
   });
+
+  // Live sequencer-pass progress (PAN-2005). Polls every 3s; the sequence query is
+  // refetched when a pass finishes so the new ranking appears without a manual refresh.
+  const { data: seqStatus } = useQuery<{ running: boolean; total: number; processed: number; startedAt: string | null }>({
+    queryKey: ['sequencer-status'],
+    queryFn: async () => {
+      const res = await fetch('/api/backlog/sequencer-status');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 3000,
+  });
+  const seqRunning = seqStatus?.running ?? false;
+  const prevSeqRunning = useRef(false);
+  useEffect(() => {
+    if (prevSeqRunning.current && !seqRunning) refetch();
+    prevSeqRunning.current = seqRunning;
+  }, [seqRunning, refetch]);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!seqRunning) return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [seqRunning]);
+  const seqElapsed = seqStatus?.startedAt ? Math.max(0, Math.floor((nowTs - new Date(seqStatus.startedAt).getTime()) / 1000)) : 0;
 
   const allNodes = data?.nodes ?? [];
   const staleNodes = useMemo(() => allNodes.filter((n) => n.condition === 'stale'), [allNodes]);
@@ -320,7 +345,7 @@ export function BacklogSequencerPage() {
         <div className="relative ml-auto flex items-center gap-1">
           <button
             onClick={handleClearSequence}
-            disabled={clearing || spawning}
+            disabled={clearing || spawning || seqRunning}
             className="px-2.5 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:text-[var(--destructive)] hover:border-[color-mix(in_srgb,var(--destructive)_40%,transparent)] disabled:opacity-50"
             title="Delete the backlog sequencing (sequence.md + cache). Re-sequence regenerates it."
           >
@@ -329,12 +354,12 @@ export function BacklogSequencerPage() {
           </button>
           <button
             onClick={handleRunPass}
-            disabled={spawning}
+            disabled={spawning || seqRunning}
             className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] disabled:opacity-50"
             title={`Run ${spawnPass} pass`}
           >
             <Play className="w-3 h-3" />
-            {spawning ? 'Sequencing…' : 'Re-sequence'}
+            {spawning || seqRunning ? 'Sequencing…' : 'Re-sequence'}
           </button>
           <button
             onClick={() => setShowPassPicker((p) => !p)}
@@ -364,6 +389,21 @@ export function BacklogSequencerPage() {
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Sequencer pass in-progress banner */}
+      {seqRunning && (
+        <div className="shrink-0 flex items-center gap-2 px-5 py-2 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--info)_28%,transparent)] text-xs">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--info-foreground)]" />
+          <span className="text-[var(--info-foreground)] font-semibold">Sequencing pass running</span>
+          <span className="text-[var(--color-fg)]">
+            ranked <b className="font-mono">{seqStatus?.processed ?? 0}</b> / <b className="font-mono">{seqStatus?.total ?? '…'}</b> issues
+          </span>
+          <span className="text-[var(--color-fg-muted)] tabular-nums">
+            · {Math.floor(seqElapsed / 60)}m {String(seqElapsed % 60).padStart(2, '0')}s
+          </span>
+          <span className="ml-auto text-[var(--color-fg-muted)]">the new sequence appears automatically when it finishes</span>
+        </div>
+      )}
 
       {/* Spawn error banner */}
       {spawnError && (
