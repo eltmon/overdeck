@@ -68,7 +68,7 @@ export function notifyPipelineSync(event: PipelineEvent): void {
     ? { type: 'status_changed', issueId: event.issueId }
     : event;
 
-  const baseUrl = process.env.DASHBOARD_URL || 'http://localhost:3011';
+  const baseUrl = process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011';
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 1000);
   void fetch(`${baseUrl}/api/internal/pipeline/notify`, {

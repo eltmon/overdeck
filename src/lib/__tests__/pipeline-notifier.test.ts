@@ -8,10 +8,14 @@ vi.mock('../internal-token.js', () => ({
 
 const originalFetch = globalThis.fetch;
 const originalDashboardUrl = process.env.DASHBOARD_URL;
+const originalOverdeckDashboardUrl = process.env.OVERDECK_DASHBOARD_URL;
 const originalNodeEnv = process.env.NODE_ENV;
 
 beforeEach(() => {
   vi.resetModules();
+  // OVERDECK_DASHBOARD_URL now takes precedence over DASHBOARD_URL; clear it so
+  // this test's DASHBOARD_URL is honored regardless of the ambient agent env.
+  delete process.env.OVERDECK_DASHBOARD_URL;
   process.env.DASHBOARD_URL = 'http://dashboard.test';
   process.env.NODE_ENV = 'development';
   globalThis.fetch = vi.fn(async () => ({ ok: true })) as unknown as typeof fetch;
@@ -19,6 +23,11 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalOverdeckDashboardUrl === undefined) {
+    delete process.env.OVERDECK_DASHBOARD_URL;
+  } else {
+    process.env.OVERDECK_DASHBOARD_URL = originalOverdeckDashboardUrl;
+  }
   if (originalDashboardUrl === undefined) {
     delete process.env.DASHBOARD_URL;
   } else {

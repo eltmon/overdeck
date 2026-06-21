@@ -13,7 +13,7 @@ import { clearTestVerdictArtifact } from './test-verdict.js';
 
 function dashboardApiUrl(): string {
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-  return process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+  return process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
 }
 
 export function buildTestRolePrompt(options: {

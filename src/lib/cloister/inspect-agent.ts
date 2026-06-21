@@ -114,7 +114,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
   const diffBase = await Effect.runPromise(getDiffBase(context.projectKey, context.issueId, context.workspace));
   const diffStats = await Effect.runPromise(getDiffStats(context.workspace, diffBase));
 
-  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+  const apiUrl = process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
   const prompt = template
     .replace(/\{\{apiUrl\}\}/g, apiUrl)

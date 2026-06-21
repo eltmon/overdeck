@@ -26,6 +26,7 @@ import { completePlanningArtifacts, completePlanningAutoSpawn } from '../issues.
 
 let testDir: string;
 let oldDashboardUrl: string | undefined;
+let oldOverdeckDashboardUrl: string | undefined;
 let oldOverdeckHome: string | undefined;
 
 function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'draft'): VBriefDocument {
@@ -153,7 +154,10 @@ function readJson<T>(path: string): T {
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'auto-promote-chain-'));
   oldDashboardUrl = process.env.DASHBOARD_URL;
+  oldOverdeckDashboardUrl = process.env.OVERDECK_DASHBOARD_URL;
   oldOverdeckHome = process.env.OVERDECK_HOME;
+  // OVERDECK_DASHBOARD_URL now wins over DASHBOARD_URL — clear it for determinism.
+  delete process.env.OVERDECK_DASHBOARD_URL;
   process.env.DASHBOARD_URL = 'http://dashboard.test';
   mocks.createBeadsFromVBrief.mockReset();
   mocks.emitActivityEntrySync.mockReset();
@@ -165,6 +169,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   if (oldDashboardUrl === undefined) delete process.env.DASHBOARD_URL;
   else process.env.DASHBOARD_URL = oldDashboardUrl;
+  if (oldOverdeckDashboardUrl === undefined) delete process.env.OVERDECK_DASHBOARD_URL;
+  else process.env.OVERDECK_DASHBOARD_URL = oldOverdeckDashboardUrl;
   if (oldOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = oldOverdeckHome;
   if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });

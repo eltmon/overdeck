@@ -234,7 +234,7 @@ export function getBridgeLogPath(agentId: string): string {
 }
 
 function getDashboardBaseUrl(): string {
-  return process.env.DASHBOARD_URL || 'http://localhost:3011';
+  return process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011';
 }
 
 function constantTimeHeaderMatch(provided: string | null, expected: string): boolean {

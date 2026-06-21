@@ -19,6 +19,7 @@ vi.mock('../../../lib/vbrief/beads.js', async (importOriginal) => {
 
 let TEST_DIR: string;
 let OLD_DASHBOARD_URL: string | undefined;
+let OLD_OVERDECK_DASHBOARD_URL: string | undefined;
 
 function makePlanDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocument {
   return {
@@ -67,6 +68,9 @@ function readDoc(path: string): VBriefDocument {
 beforeEach(() => {
   TEST_DIR = mkdtempSync(join(tmpdir(), 'plan-finalize-'));
   OLD_DASHBOARD_URL = process.env.DASHBOARD_URL;
+  OLD_OVERDECK_DASHBOARD_URL = process.env.OVERDECK_DASHBOARD_URL;
+  // OVERDECK_DASHBOARD_URL now wins over DASHBOARD_URL — clear it for determinism.
+  delete process.env.OVERDECK_DASHBOARD_URL;
   process.env.DASHBOARD_URL = 'http://dashboard.test';
 });
 
@@ -75,6 +79,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   if (OLD_DASHBOARD_URL === undefined) delete process.env.DASHBOARD_URL;
   else process.env.DASHBOARD_URL = OLD_DASHBOARD_URL;
+  if (OLD_OVERDECK_DASHBOARD_URL === undefined) delete process.env.OVERDECK_DASHBOARD_URL;
+  else process.env.OVERDECK_DASHBOARD_URL = OLD_OVERDECK_DASHBOARD_URL;
   if (existsSync(TEST_DIR)) {
     rmSync(TEST_DIR, { recursive: true, force: true });
   }
