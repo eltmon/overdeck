@@ -171,10 +171,14 @@ describe('SessionFeedSidebar', () => {
 
     const section = screen.getByText('Just Now').closest('section');
     expect(section).not.toBeNull();
-    expect(within(section as HTMLElement).getAllByRole('button').map((button) => button.textContent)).toEqual([
+    const entries = within(section as HTMLElement).getAllByRole('button');
+    expect(entries.map((button) => button.textContent)).toEqual([
       'Newer activityfeature-pan-1389 · PAN-1389·1m agoMemory',
       'Older activityfeature-pan-1389 · PAN-1389·3m agoMemory',
     ]);
+    const badgeRow = within(entries[0]).getByTestId('notification-class-memory').parentElement;
+    expect(badgeRow).toHaveTextContent('feature-pan-1389 · PAN-1389');
+    expect(badgeRow).toHaveTextContent('1m ago');
   });
 
   it('renders activity entries from recentActivity even when memory observations are empty (PAN-1507)', () => {
