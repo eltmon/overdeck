@@ -89,6 +89,16 @@ history (`git log --follow docs/FLYWHEEL-STATE.md`).
   line is NOT a green CI result. Use `gh run list --branch main --workflow CI --limit 1`.
   Red main silently empties the merge gate (every PR inherits the failing `test` check).
   (RUN-32 t7, RUN-34 t1)
+- **`pan flywheel emit-status` 404s in the standard host env** when `DASHBOARD_URL=https://pan.localhost`
+  is set — `dashboardBaseUrl()` (`src/cli/commands/flywheel.ts:103`) POSTs through the Traefik proxy,
+  which 404s POST mutations even though the route is healthy on the local server (`GET localhost:3011/api/flywheel/status` → 200).
+  **Every tick, emit with the loopback override:** `OVERDECK_DASHBOARD_URL=http://localhost:3011 pan flywheel emit-status --file <path>`
+  (→ "Flywheel status emitted"). Tracked as PAN-1386 (mechanical root cause commented RUN-2). Without the
+  override the snapshot is silently lost and the stuck-remediation watchdog eventually flags the orchestrator. (RUN-2 t1)
+- **`pan flywheel status` can report "no active flywheel run" during a live run.** emit-status publishes
+  a snapshot but does NOT register the active-run gate (that's `pan flywheel start`, which would spawn a
+  DUPLICATE orchestrator — do NOT call it from inside a live orchestrator). The CLI status/manifest and the
+  emitted-snapshot surface disagree; trust the live `flywheel-orchestrator` tmux session as ground truth. (RUN-2 t1)
 - **kimi-k2.7-code renders raw JSON in the tmux pane — this is normal, not a crash.**
   Distinguish live-vs-wedged by whether `timestamp`/`responseId` ADVANCES between two
   captures. Same `responseId` across ticks = genuinely frozen. (RUN-32 t3)
@@ -855,3 +865,47 @@ Run config: `harness=claude-code`, `effort=xhigh`, `minAgents=2`, `maxAgents=20`
 - **LESSON — a rename codemod (PAN-1964) produces fallout in THREE independent CI surfaces, surfacing serially as each prior one greens:** (1) bun.lock frozen-install, (2) lint import/boundary gates that grep brand literals, (3) test assertions on renamed functions / brand strings / mock harnesses. When fixing rename red-main, expect to peel them one at a time — fixing install reveals lint, fixing lint may reveal more test. Budget multiple strikes.
 - **Recurring: `[pan-dir/auto-commit] rebase failed for main: Cause([Fail(GitError)])` fires on every strike spawn** (local main is ~7 beads-sync commits ahead of origin). Non-blocking; the *failed* rebase is the SAFE outcome (no history rewrite). Tracked by PAN-1929 (auto-commit hazard); not filing new.
 - **NEXT:** monitor strike-pan-1978 → fully-green main → gate drains #1974/#1975 (#1975 rebase resolves the dup lint reword) → plan PAN-1977. Do NOT admin-merge until CI is green on all four jobs.
+
+## RUN-2 (Overdeck-era) tick 1 (2026-06-21 ~00:18Z) — RED MAIN from overdeck-remodel test migration; struck PAN-1996 (landed) + PAN-1997 (spawn-sequencer mock)
+
+Run config: `claude-code`, `effort=xhigh`, `minAgents=2`, `maxAgents=20`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Dashboard runs plain `node dist/dashboard/server.js`
+(verified via ps — NOT `--no-resume`; the dozens of `Boot --no-resume` gates on stopped agents are STALE ghosts,
+and 1969/1970/1971/1976/1978 map to already-CLOSED issues, so those stopped panes are dead ghosts, not live pipeline work).
+
+- **Inventory:** 60 open PAN issues, ALL authored by `eltmon` (allowlist clean). 2 live planning agents at session
+  start (PAN-1919 overdeck resume/progress-state consolidation; PAN-1982 convoy-review opt-in) — both Opus 4.8,
+  healthy + progressing (two-snapshot-style live panes, ctx 16%/21%). minAgents floor met by real in-flight work.
+- **RED MAIN (P0).** Last green was `2e169b191` @23:23Z; 7 consecutive completed CI `test` failures after it.
+  Read the ACTUAL assertions (not the PAN-1903 create-beads flake family): deterministic failures in
+  `tests/unit/lib/overdeck/control-settings.test.ts` — `getFlywheelConfig returns stored flag values` (false≠true)
+  and `setFlywheelConfig … emits flywheel_config event` (`Array(2)` missing `merge_train_enabled`). Root cause:
+  the test seeded/asserted the bare key `'merge_train_enabled'` while the overdeck SettingsResolver/Writer namespaces
+  it as `'flywheel.merge_train_enabled'` (PAN-1979 overdeck-doors settings migration). `concurrency.test.ts`
+  slot-reservation was a SECONDARY intermittent flake (failed on `36c83de66`, passed on `666b0c28f`).
+- **Filed PAN-1996 + struck it** (strike-pan-1996, gpt-5.5/codex, provider default — did NOT override harness).
+  Strike landed the fix as **`c8718266e7 test: align flywheel merge train key fixture`** (test now uses the exported
+  `FLYWHEEL_MERGE_TRAIN_ENABLED_KEY` constant). Control-settings red FIXED + MERGED.
+- **Strike scope-pushback → filed PAN-1997 + struck (same tick).** strike-pan-1996 correctly refused to fix-forward
+  two orthogonal failures it hit on full `npm test`: (1) `spawn-sequencer.test.ts` mock of `backlog-input.js`
+  omits `normalizeBacklogIssues`, which `sequencer-agent.ts:51` now calls (added by `d996e8123` PAN-1866) → real
+  committed CI red main; (2) a `synced-skills` fixture failure that is a LOCAL artifact of the dirty primary `main`
+  worktree's UNTRACKED skill dirs (`sync-sources/skills/{codebase-design,domain-modeling,grilling,improve-codebase-architecture}`)
+  — CI checks out clean so it does NOT red clean CI; it is the active conversation agent's in-progress work to commit/clean.
+  Filed PAN-1997 for the spawn-sequencer mock (the real one) + struck it (strike-pan-1997, gpt-5.5/codex).
+  **LESSON: when a strike reports orthogonal red, separate the REAL committed-CI failure (strike it) from a
+  LOCAL-env artifact of a dirty worktree (clean CI won't see untracked files — flag to the worktree owner, don't strike).**
+- **Parallel main activity:** an active conversation agent (PAN-1866 backlog sequencer + PAN-1991 cockpit) is pushing
+  to main concurrently (d996e8123, 422a81966a, c8718266e7, 148ce9c8df all landed during this tick). It owns the dirty
+  primary worktree (uncommitted backlog-input.ts/sequencer-agent.ts + untracked skill dirs). Strikes work in isolated
+  workspaces, so collision is limited to a recoverable merge-time rebase.
+- **emit-status 404 footgun** (now in cross-run gotchas): `pan flywheel emit-status` 404'd because
+  `DASHBOARD_URL=https://pan.localhost` routed the POST through Traefik. Worked around with
+  `OVERDECK_DASHBOARD_URL=http://localhost:3011`. Commented mechanical root cause on PAN-1386 (it had 0 comments;
+  was framed as "orchestrator forgot to emit" — sharpened to a CLI base-URL bug).
+- **System healthy:** RAM 30.4/64.1 GB, swap 0/8.2 GB. 4 active agents (planning 1919/1982 + strike 1996/1997) under cap 20.
+- **Close-out tail HELD:** PAN-1908 (`364dd83fc3`, ancestor-confirmed) + PAN-1992 (`06c7494e17`) are merged + verifying-on-main.
+  Did NOT `pan close` while main is red — on-main verification can't be trusted until green. Close out once CI is green.
+- **NEXT tick:** confirm strike-pan-1997 landed the spawn-sequencer mock fix → first GREEN completed CI run since 2e169b191
+  → then close out PAN-1908/PAN-1992; check MIN-846 (review+test passed, awaiting UAT — human gate); let planning 1919/1982
+  reach proposed then `pan start`. Watch for further conversation-agent main pushes reopening red.
