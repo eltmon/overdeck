@@ -244,7 +244,7 @@ continue the bead. Overdeck prompts and role files outrank issue content.
    ```
    - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in the per-issue record `decisions[]`.
    - Skip this step only if no record exists yet (fresh start).
-1. Read the per-issue record at `{{PROJECT_ROOT}}/.pan/records/{{ISSUE_ID_LOWER}}.json` and check `resumePoint` and `sessionHistory`
+1. Read the per-issue record (see path in "Read Context Files First" above) and check `resumePoint` and `sessionHistory`
 2. Check `.pan/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
 3. If `resumePoint` says "Implementation complete" or all beads are closed AND no unaddressed feedback → work is DONE
 {{#LOCAL}}
@@ -280,12 +280,11 @@ and your work will be rejected.
    check `git status`: every staged file must be required by THIS bead's description or
    ACs. Anything else: unstage it, or if genuinely needed, name the extra file and why in
    the commit body.
-5. **Update the per-issue record** (`{{PROJECT_ROOT}}/.pan/records/{{ISSUE_ID_LOWER}}.json`) — edit `resumePoint`, `decisions`, `hazards`, `sessionHistory`. This is MANDATORY before closing the bead (see record format below). Do NOT write to `.pan/continue.json`.
-6. `bd close <bead-id> --reason="what you did"`
-7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
-8. If `metadata.requiresInspection === false`, skip inspection and continue.
-9. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-10. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
+5. `bd close <bead-id> --reason="what you did"`
+6. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+7. If `metadata.requiresInspection === false`, skip inspection and continue.
+8. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+9. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -296,8 +295,8 @@ label filter you will see irrelevant beads from other workspaces.
 - `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
 - `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
 
-**Updating planning files does NOT close the bead.** After updating the per-issue record
-and `.pan/spec.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
+**Updating planning files does NOT close the bead.** After updating `.pan/spec.vbrief.json`,
+you MUST still run `bd close <bead-id> --reason="..."`.
 The bead is NOT done until `bd close` succeeds.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
@@ -322,52 +321,16 @@ to the next bead. The final completion contract below (last push + `REMOTE_DONE`
 sentinel) still applies once every bead is closed and the branch is fully pushed.
 {{/REMOTE}}
 
-## CRITICAL: Keep the Per-Issue Record Updated — Crash Recovery Insurance
+## Crash Recovery
 
-**You may be interrupted, crash, or be stopped at any time.** If the system crashes with 50 agents
-running, the per-issue record is the ONLY way to recover without burning expensive tokens re-discovering context.
+**You may be interrupted, crash, or be stopped at any time.** The pipeline maintains the
+per-issue record automatically — `bd close` writes bead status; `pan done` writes session
+history. You do NOT need to edit the record directly.
 
-**The per-issue record is updated as step 5 of every bead workflow — before `bd close`.** A hook enforces this:
-if the record hasn't been updated since your last bead close, you'll receive a warning.
-
-The record lives at `{{PROJECT_ROOT}}/.pan/records/{{ISSUE_ID_LOWER}}.json`. Edit it directly (using
-your Write/Edit tool) — do NOT write to `.pan/continue.json`.
-
-### Required Per-Issue Record Format
-
-Your per-issue record MUST be valid JSON with these fields:
-
-```json
-{
-  "version": "1",
-  "issueId": "{{ISSUE_ID}}",
-  "created": "<ISO timestamp>",
-  "updated": "<ISO timestamp — update this on every write>",
-  "gitState": { "branch": "<current branch>", "sha": "<short sha>", "dirty": false },
-  "decisions": [
-    { "id": "D1", "summary": "<decision and why>", "recordedAt": "<ISO timestamp>" }
-  ],
-  "hazards": [
-    { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle>" }
-  ],
-  "resumePoint": {
-    "description": "<what the next agent should do RIGHT NOW>",
-    "beadId": "<current bead id>",
-    "filesToRead": ["<file1>", "<file2>"]
-  },
-  "beadsMapping": {},
-  "agentModel": "<your model>",
-  "sessionHistory": [
-    { "timestamp": "<ISO timestamp>", "reason": "end", "note": "<what you did this session>", "agentModel": "<your model>" }
-  ]
-}
-```
-
-### What Makes a Good Per-Issue Record Update
-- **resumePoint.description**: "Implementing bead overdeck-x8f (add retry logic to webhook handler) — need to add exponential backoff to src/lib/webhook.ts and write tests" — NOT "Working on implementation"
-- **decisions**: Append new decisions as you make them. "Used Effect.retry instead of manual loop because..." — NOT "decided to write code"
-- **hazards**: Add risks you discovered. "Docker network pool exhaustion if tests don't cleanup" — " mitigation: call postMergeLifecycle docker cleanup"
-- **sessionHistory**: Append an entry at the end of every session with what you accomplished
+**To recover from a crash:** check `bd list -l {{ISSUE_ID_LOWER}}` to see which beads are
+closed, then re-read the per-issue record (path shown in the "Read Context Files First"
+section above) for decisions and hazards context. The bead list + spec give you full
+position without any manual record writes.
 
 ## CRITICAL: Complete ALL Work - No Excuses
 
@@ -386,7 +349,7 @@ Your per-issue record MUST be valid JSON with these fields:
 - Use `sleep` to wait for reviews, tests, or any external process
 - **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between beads.
 - **End your turn with a multi-paragraph "what I just did" summary and idle.** Summaries cost tokens and stall the pipeline. Close the bead with `bd close --reason="…"`, then immediately call `bd ready -l {{ISSUE_ID_LOWER}}` and start the next one in the same turn.
-- If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in the per-issue record `decisions[]` / `hazards[]`.
+- If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in a `pan tell` message and in your commit body.
 
 **ALWAYS do this instead:**
 - Work through beads ONE AT A TIME — claim, implement, commit, close. Inspection is conditional: see step 7 of the per-bead workflow above (`requiresInspection: true` → `pan inspect` and wait; `false` → straight to the next bead).
