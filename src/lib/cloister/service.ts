@@ -66,6 +66,7 @@ import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
+import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
 import { sessionExists, killSession } from '../tmux.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -1359,8 +1360,37 @@ export class CloisterService {
     // crash/troubled counters and schedules a doomed restart.
     const skipReason = nonRestartableReason(agentState.role, agentState.sessionId);
     if (skipReason) {
-      console.log(`🔔 Agent ${agentId} ${skipReason}; skipping restart`);
-      return;
+      // PAN-2007: a one-shot review/test session that vanished BEFORE recording a
+      // terminal verdict died prematurely — e.g. before it could run
+      // `pan specialists done`. Masking that as a normal "one-shot completion" and
+      // skipping restart strands the issue at reviewStatus=reviewing forever (the
+      // exact PAN-1832 symptom). Recover it instead: resume so it can finish and
+      // signal. Only a terminal verdict (or a missing session) is a genuine
+      // non-restartable completion.
+      let recoverUnfinishedOneShot = false;
+      if (ONE_SHOT_ROLES.has(agentState.role) && agentState.sessionId && agentState.issueId) {
+        try {
+          const { getReviewStatusSync } = await import('../review-status.js');
+          const status = getReviewStatusSync(agentState.issueId);
+          const verdictTerminal = status
+            ? isRoleTerminal(agentState.role as AdvancingRole, {
+                reviewStatus: status.reviewStatus,
+                testStatus: status.testStatus,
+                readyForMerge: status.readyForMerge,
+                mergeStatus: status.mergeStatus,
+              })
+            : false;
+          recoverUnfinishedOneShot = !verdictTerminal;
+        } catch {
+          recoverUnfinishedOneShot = false;
+        }
+      }
+      if (!recoverUnfinishedOneShot) {
+        console.log(`🔔 Agent ${agentId} ${skipReason}; skipping restart`);
+        return;
+      }
+      console.log(`🔔 Agent ${agentId} (${agentState.role}) vanished before a terminal verdict — recovering instead of treating as a one-shot completion (PAN-2007)`);
+      // fall through to the restart/resume path below
     }
 
     // Record death timestamp for mass death detection

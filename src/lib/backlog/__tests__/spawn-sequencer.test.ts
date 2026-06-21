@@ -67,12 +67,17 @@ describe('spawnSequencerAgent', () => {
     );
   });
 
-  it('prompt contains backlog input from collectOpenBacklog', async () => {
+  it('prompt references the backlog manifest built from collectOpenBacklog', async () => {
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     await spawnSequencerAgent('creation', { projectRoot: '/tmp/proj', projectKey: 'overdeck' });
+    const { collectOpenBacklog } = await import('../backlog-input.js');
+    expect(collectOpenBacklog).toHaveBeenCalled();
     const prompt = (spawnRun as ReturnType<typeof vi.fn>).mock.calls[0][2].prompt as string;
-    expect(prompt).toContain('PAN-1');
-    expect(prompt).toContain('Test');
+    // PAN-1866: the backlog is written to .pan/backlog/manifest.json and the
+    // prompt references it by count + instructs reading bodies via `gh issue view`,
+    // rather than inlining issue IDs/titles into the prompt.
+    expect(prompt).toContain('Backlog manifest (1 open issue');
+    expect(prompt).toContain('gh issue view');
   });
 
   it('passes provided issues to collectOpenBacklog instead of an empty array', async () => {

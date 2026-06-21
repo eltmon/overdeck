@@ -515,10 +515,15 @@ export async function fetchActivityDataWithContext(
           ? (ss.status === 'running' ? 'active' : 'idle')
           : 'ended';
         const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
+        // PAN-1832: surface the ACTUAL review agent's model/harness (e.g. after a
+        // restart onto pi/glm-5.2) instead of a hardcoded 'specialist' label that
+        // the frontend then back-fills with the role-default model (gpt-5.5).
+        const orchestratorState = getAgentStateSync(orchestratorSessionName);
         sections.push({
           type: 'review',
           sessionId: orchestratorSessionName,
-          model: 'specialist',
+          model: orchestratorState?.model || 'specialist',
+          harness: orchestratorState?.harness,
           startedAt: ss.startedAt,
           endedAt: ss.endedAt,
           duration: ss.startedAt && ss.endedAt
@@ -583,11 +588,15 @@ export async function fetchActivityDataWithContext(
         ? (ss.status === 'running' ? 'active' : 'idle')
         : specialistIsZombie ? 'idle' : 'ended';
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
+      // PAN-1832: surface the actual test/ship agent model + harness rather than
+      // a hardcoded 'specialist' label the frontend back-fills with role defaults.
+      const specialistState = getAgentStateSync(specialistSessionId);
 
       sections.push({
         type: nodeType,
         sessionId: specialistSessionId,
-        model: 'specialist',
+        model: specialistState?.model || 'specialist',
+        harness: specialistState?.harness,
         startedAt: ss.startedAt,
         duration,
         status: (specialistIsLive && !specialistIsZombie) ? 'running' : ss.status,

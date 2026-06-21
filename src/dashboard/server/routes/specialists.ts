@@ -438,11 +438,19 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
         // PAN-846: Kill the specialist tmux session so it doesn't leak RAM.
         // The session has completed its work; next dispatch spawns fresh.
-        try {
-          await Effect.runPromise(killSession(tmuxSession));
-          console.log(`[specialists/done] Killed specialist session ${tmuxSession}`);
-        } catch (err) {
-          console.log(`[specialists/done] Session ${tmuxSession} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+        // PAN-2007: operator-requested temporary keep-alive — record the verdict
+        // (already done above via setReviewStatusBase) but leave the session
+        // running so the operator can inspect it. Re-enable by flipping the flag.
+        const { KEEP_SPECIALIST_SESSIONS_ALIVE } = await import('../../../lib/cloister/reap-terminal-sessions.js');
+        if (KEEP_SPECIALIST_SESSIONS_ALIVE) {
+          console.log(`[specialists/done] PAN-2007 keep-alive: verdict recorded, leaving ${tmuxSession} running`);
+        } else {
+          try {
+            await Effect.runPromise(killSession(tmuxSession));
+            console.log(`[specialists/done] Killed specialist session ${tmuxSession}`);
+          } catch (err) {
+            console.log(`[specialists/done] Session ${tmuxSession} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
 
         // Clear write-scope lock so the next specialist can claim the workspace
