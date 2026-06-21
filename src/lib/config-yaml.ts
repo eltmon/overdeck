@@ -533,6 +533,8 @@ function cloneRoles(roles: RolesConfig): RolesConfig {
   for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfig]>) {
     cloned[role] = {
       ...roleConfig,
+      // Shallow-clone the distribution array so later mutations can't alias the cloned config.
+      model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
       sub: roleConfig.sub ? { ...roleConfig.sub } : undefined,
     };
   }
@@ -1773,6 +1775,20 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
 }
 
 function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
+  if (Array.isArray(roleConfig.model)) {
+    if (roleConfig.model.length === 0) {
+      throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
+    }
+    for (let i = 0; i < roleConfig.model.length; i++) {
+      const entry = roleConfig.model[i];
+      if (!entry.model || typeof entry.model !== 'string') {
+        throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
+      }
+      if (!Number.isInteger(entry.weight) || entry.weight <= 0) {
+        throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
+      }
+    }
+  }
   if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi' && roleConfig.harness !== 'codex') {
     throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
   }
@@ -1810,7 +1826,12 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
     validateRoleFields(role, roleConfig);
-    if (roleConfig.model && !Array.isArray(roleConfig.model)) {
+    if (Array.isArray(roleConfig.model)) {
+      // Validate each distribution entry's model ref is resolvable.
+      for (let i = 0; i < roleConfig.model.length; i++) {
+        derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
+      }
+    } else if (roleConfig.model) {
       const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
       if (roleConfig.effort !== undefined) {
         const supported = getModelEffortLevelsSync(resolvedModel);

@@ -4,6 +4,7 @@ import {
   pickWeightedModelRef,
   representativeModelRef,
   resolveModel,
+  mergeConfigs,
 } from '../../src/lib/config-yaml.js';
 
 describe('fnv1a32', () => {
@@ -182,5 +183,80 @@ describe('resolveModel with distribution (RoleModelRef array)', () => {
   it('default model resolves when no role config is set', () => {
     const result = resolveModel('plan', undefined, { workhorses });
     expect(result).toBe('claude-opus-4-8'); // workhorse:expensive
+  });
+});
+
+describe('config-load-validation: distribution form', () => {
+  it('accepts a valid distribution and resolveModel returns a sampled model', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        work: {
+          model: [
+            { model: 'claude-opus-4-8', weight: 70 },
+            { model: 'claude-sonnet-4-6', weight: 30 },
+          ],
+        },
+      },
+    });
+    const result = resolveModel('work', undefined, config, 'spawn-key-1');
+    expect(['claude-opus-4-8', 'claude-sonnet-4-6']).toContain(result);
+  });
+
+  it('rejects an empty distribution array', () => {
+    expect(() =>
+      mergeConfigs({
+        roles: { work: { model: [] as unknown as [{ model: string; weight: number }] } },
+      }),
+    ).toThrow(/roles\.work\.model distribution must be a non-empty array/);
+  });
+
+  it('rejects a distribution entry with weight 0', () => {
+    expect(() =>
+      mergeConfigs({
+        roles: { work: { model: [{ model: 'claude-opus-4-8', weight: 0 }] } },
+      }),
+    ).toThrow(/roles\.work\.model\[0\]\.weight must be a positive integer/);
+  });
+
+  it('rejects a distribution entry with negative weight', () => {
+    expect(() =>
+      mergeConfigs({
+        roles: { work: { model: [{ model: 'claude-opus-4-8', weight: -1 }] } },
+      }),
+    ).toThrow(/roles\.work\.model\[0\]\.weight must be a positive integer/);
+  });
+
+  it('rejects a distribution entry with non-integer weight', () => {
+    expect(() =>
+      mergeConfigs({
+        roles: { work: { model: [{ model: 'claude-opus-4-8', weight: 1.5 }] } },
+      }),
+    ).toThrow(/roles\.work\.model\[0\]\.weight must be a positive integer/);
+  });
+
+  it('scalar role model still loads and resolves unchanged', () => {
+    const { config } = mergeConfigs({
+      roles: { work: { model: 'claude-sonnet-4-6' } },
+    });
+    expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-4-6');
+  });
+
+  it('merging a distribution layer over a scalar base replaces model wholesale', () => {
+    // mergeConfigs iterates in reverse: first arg = highest precedence.
+    // Distribution is the higher-precedence (project) layer; scalar is the base (global) layer.
+    const { config } = mergeConfigs(
+      {
+        roles: {
+          work: {
+            model: [
+              { model: 'claude-opus-4-8', weight: 50 },
+              { model: 'claude-haiku-4-5', weight: 50 },
+            ],
+          },
+        },
+      },
+      { roles: { work: { model: 'claude-sonnet-4-6' } } },
+    );
+    expect(Array.isArray(config.roles?.work?.model)).toBe(true);
   });
 });
