@@ -19,7 +19,6 @@
 #   - src/lib/pan-dir/feedback.ts, sessions.ts
 #   - src/lib/vbrief/io.ts, continue-state.ts, lifecycle-io.ts
 #   - src/lib/cloister/feedback-writer.ts
-#   - src/dashboard/server/routes/agents.ts
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -120,7 +119,6 @@ CONTINUE_EXCLUDES=(
   ':!src/lib/vbrief/io.ts'
   ':!src/lib/vbrief/continue-state.ts'
   ':!src/lib/cloister/feedback-writer.ts'
-  ':!src/dashboard/server/routes/agents.ts'
   ':!src/**/__tests__/*'
   ':!*.md'
 )
