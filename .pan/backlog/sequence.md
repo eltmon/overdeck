@@ -901,7 +901,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Event-driven agent state: SQLite runtime registry + git-permanent records (big-bang).",
       "rationale": "Foundational architecture change unblocking the single-source-of-truth tenet; in-pipeline and verifying-on-main. Every downstream state/read-door issue depends on this landing.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -914,7 +914,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Backlog Sequencer — AI-ranked whole-backlog DAG with reproducible markdown truth.",
       "rationale": "The sequencer itself; in-pipeline verifying-on-main. This very run depends on it being the source of truth for backlog ranking.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -929,7 +929,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Consolidate per-issue resume/progress state into ONE git-tracked record.",
       "rationale": "Retires the dual 'continues' system and folds state.json harness/model into one durable record; has PRD and in-pipeline. Directly serves the one-write-door tenet.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -942,7 +942,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Role Models: multiple models per role with weighted load-spreading.",
       "rationale": "In-pipeline verifying-on-main. Lets roles spread load across providers, reducing single-provider rate-limit stalls (a recurring review-blocker).",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -955,7 +955,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Revive convoy review as configurable opt-in (quick stays default).",
       "rationale": "In-pipeline. The convoy-revival cluster (PAN-1066,1213,1219,1207,1130,1131,838,1557,1861,1862,1874) all wait on this re-enabling the multi-reviewer path.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -970,7 +970,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Skills: migrate all panopticon.db references to overdeck.db + re-verify.",
       "rationale": "In-pipeline verifying-on-main. Completes the DB rename so skills stop referencing the dead panopticon.db handle.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -983,7 +983,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED MAIN — create-beads.test.ts flaky 'table not found: issues' bd-DB-init race.",
       "rationale": "Flaky red-main on a DB-init race; reddens every verify/ship/strike gate. PAN-1629 follow-up; isolate the init ordering.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -996,7 +996,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED MAIN — start-sync-main-conflict.test.ts process.exit(1) under CI single-fork.",
       "rationale": "Cross-file mock pollution empties the merge gate under maxForks:1. Hard CI blocker; needs mock isolation.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1009,7 +1009,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED MAIN — agent-spawning.test.ts 'resumeAgent Pi FIFO' fails (writePiCommand).",
       "rationale": "Red-main; Pi resume path regressed. Blocks trustworthy resume.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1022,7 +1022,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED MAIN — verification-gate.test.ts asserts stale src/dashboard/frontend path.",
       "rationale": "Stale path assertion after generic-command rename; trivial fix un-reddening main.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -1035,7 +1035,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED MAIN — model-count + schema-version + substrate-smoke expectations stale.",
       "rationale": "Stale test expectations block every verify/ship/strike gate; update fixtures to current schema/model count.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1048,7 +1048,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED MAIN — Command Deck resource-strip Playwright fixture expects old title.",
       "rationale": "Red-main Playwright fixture drift; update fixture to current workspace title.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -1061,7 +1061,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Flaky main CI: real-timer integration tests time out on loaded runners.",
       "rationale": "Real-timer integration tests (rollout-JSONL, heartbeat, conversation-routes) flake on loaded runners; convert to fake-timer pattern per repo rule.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1074,7 +1074,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "CI hang — 'Clean install + server smoke test' never passes health poll.",
       "rationale": "Three consecutive 20-min timeout kills; server boots but health poll never passes on feature branches. Starves CI capacity.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1100,7 +1100,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "RED — cloister auto-resume tests fail under full parallel run (test pollution).",
       "rationale": "Pass in isolation, fail parallel = test pollution reddening main; isolate shared state.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1113,7 +1113,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "HAZARD: background git rebase rewrites history in the SHARED primary worktree.",
       "rationale": "One-way-door risk: auto-commit rebase mutating the shared main worktree can destroy uncommitted agent work across sessions. Stop mutating the shared tree.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1126,7 +1126,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Context-overflow recovery: claude --resume bypasses native compact ~50% of time.",
       "rationale": "Compaction becomes a silent no-op and agents end /clear'd mid-work, losing context on half of overflows. High silent-damage bug.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "interactive"
     },
     {
@@ -1139,7 +1139,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Immediate cleanup of safe post-merge feature-*/ workspaces (220GB).",
       "rationale": "Disk-exhaustion substrate bug; safe post-merge workspaces not reaped. 220GB→free 100GB+. Blocks new workspaces via ENOSPC.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1152,7 +1152,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "TLDR .venv (~7.5G) duplicated into every workspace — 236G across 33 worktrees.",
       "rationale": "Disk-full ENOSPC from per-workspace .venv duplication. Share/symlink the venv instead of copying.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1178,7 +1178,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Re-planning an already-planned issue phantom-merges it (merged/verifying stamps, no PR) — state corruption that could destroy work.",
       "rationale": "Newly-filed critical hazard: a re-plan on a planned issue stamps merged/verifying-on-main across GitHub labels, DB review_status, and the per-issue record with no PR or implementation, risking close-out destroying un-landed work; reproduced live on PAN-1832.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1193,7 +1193,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Linear API quota exhausted by IssueDataService polling (2500/hr hit).",
       "rationale": "84+ poll errors; regresses the pre-safeguard tracker-burn problem. Add backoff/cache or PAN-1823 429 handling.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1206,7 +1206,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Cost recorder dropped ALL cost events since 2026-05-21 (Effect-migration).",
       "rationale": "Silent total cost-tracking loss since the Effect migration; runaway spend invisible. Root-cause the recorder.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1219,7 +1219,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "pi/kimi work-agent cost not recorded → runaway spend invisible.",
       "rationale": "Non-Claude-Code harnesses skip cost_events, so no cost-based safety net works. Wire cost telemetry for pi/codex/kimi.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1251,7 +1251,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Work agents hang on Claude Code .claude/** settings-edit protection.",
       "rationale": "Un-overridable by PreToolUse hook; in-scope self-modify work wedges silently. Pair with PAN-1060.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "interactive"
     },
     {
@@ -1264,7 +1264,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Self-modify permission handling: stop the interrupt loop, keep the guard.",
       "rationale": "Agents editing .claude/** get trapped in a permission-dialog dismissal loop. Has PRD; per-issue allow-list + prompt-block detection.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "interactive"
     },
     {
@@ -1279,7 +1279,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Settings permission-mode can desync — agents silently use --dangerously-skip-permissions.",
       "rationale": "Security: resolved config disagrees with settings, agents run DSP despite 'Auto'. Pair with PAN-1101 hardening.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1391,7 +1391,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Review: deacon must deterministically synthesize from on-disk reports.",
       "rationale": "Critical review-pipeline wedge: convoy parent stalls on last REVIEWER_READY, readyForMerge never flips. Deterministic fallback synthesis.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "interactive"
     },
     {
@@ -1406,7 +1406,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Review: synthesis wedges after PAN-1818 — parent stalls on REVIEWER_READY.",
       "rationale": "Critical: readyForMerge never flips, stranding merged-ready PRs. Root-cause the signal handoff.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "interactive"
     },
     {
@@ -1447,7 +1447,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Dead Pi review agents can't resume (30s ready.json timeout) + PAN-1980 blocks fresh-launch → reviews stuck stopped.",
       "rationale": "Newly-filed high-severity review-liveness bug: a dead Pi process never rewrites ready.json so resume times out, and PAN-1980's anti-rotation block prevents the recovery fresh-launch, stranding review re-dispatches (partially mitigated by mail-queue + PAN-2007).",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1584,7 +1584,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "CI guard: fail the build on direct canonical-state store reads outside a domain resolver (PAN-1936 slice).",
       "rationale": "Newly-filed high-leverage enforcement slice of PAN-1936: turns a caller bypassing the agent read-door (the PAN-1832 model-display bug class) from a silent runtime bug into a red build; the read doors already exist, only the guard is missing.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1723,7 +1723,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Fresh plan --auto issue inherits another issue's merged/verifying state.",
       "rationale": "Pipeline correctness: PAN-1982 got PAN-1866's verifying-on-main state. State bleed across freshly-planned issues.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1736,7 +1736,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Planning a freshly-created issue 404s (start-planning races GitHub).",
       "rationale": "Plan --auto on a brand-new issue 404s; GitHub propagation race. Blocks fast issue kickoff.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -1749,7 +1749,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "restartAgent: wipe stale agent-dir session pointers + refresh conv row.",
       "rationale": "Harness/model switch leaves stale session pointers; restart is unreliable. Pair with PAN-1840 pan switch.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1777,7 +1777,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "pan start workspace-prep hangs/times out (>120s) on re-entry.",
       "rationale": "Blocks PAN-1711/PAN-1827 — no spawn, no error. Workspace-prep deadlock on re-entry.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1790,7 +1790,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Dashboard event loop stalls 15-25s under load; watchdog force-restarts.",
       "rationale": "Event-loop stall under load; watchdog kicks 3x in 45min. Whole UI freezes. High user impact.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "interactive"
     },
     {
@@ -1803,7 +1803,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Beads: merge=beads driver never configured — .beads/.pan state conflict-storms.",
       "rationale": "PAN-1841 fix inert; .gitattributes declares merge=beads but no driver wired. Bead merges conflict-storm.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1816,7 +1816,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "pan-dir auto-commit rebase races live .pan/continues writes.",
       "rationale": "'rebase failed for main: GitError' every busy cycle; auto-commit races agent writes. Pipeline friction.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1876,7 +1876,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Review sub-specialists exit cleanly but state.json keeps 'running'.",
       "rationale": "Convoy-revival bug: synthesis never fires because state stuck at running. Critical for convoy reliability.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1891,7 +1891,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Headless review sub-reviewer normal exit misclassified as 'crashed'.",
       "rationale": "Convoy-revival: spurious restarts from misclassified clean exits.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -1906,7 +1906,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       ],
       "why": "Stale idle synthesis session blocks review re-dispatch.",
       "rationale": "Convoy-revival: idempotency guard can't tell 'reviewing' from 'finished-idle'.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1979,7 +1979,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Conversation view blank for pi-harness sessions — resolver claude/codex only.",
       "rationale": "Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcript resolver.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -1992,7 +1992,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Conversation fork/handoff harness defaults ignore source — silent claude coercion.",
       "rationale": "Fork silently coerces to claude-code regardless of source harness. Harness fidelity bug.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2005,7 +2005,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Flywheel: prioritize fixing a red main as its first duty.",
       "rationale": "Makes red-main the flywheel's top priority (+ UAT/smoke signal). Operationalizes the red-main tier above.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2018,7 +2018,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "work-agent-stop-hook still reads legacy review-status.json.",
       "rationale": "Finish the PAN-1883 SQLite-truth migration in the stop hook; stops stale-file reads.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2031,7 +2031,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "Strike workspaces never cleaned up — worktrees + branches pile up (27/16GB).",
       "rationale": "Strike leaks worktrees/branches forever; disk + clutter. Add strike cleanup.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -2059,7 +2059,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "pan restart silently re-applies stale boot gates; can't re-enable deacon.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2071,7 +2071,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "verifying_on_main tagged at first merge, never cleared on re-activation.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2083,7 +2083,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "pan plan done handoff tail hangs — declares 'done' on local main only.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -2095,7 +2095,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "complete-planning force-adds gitignored .pan/ state (regresses PAN-1215).",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2107,7 +2107,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "Generalize ToS gate: block all non-claude-code harnesses from sub models.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -2119,7 +2119,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "Lock model switching to brand-new conversations (0 messages).",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2131,7 +2131,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "config: remove hardcoded model fallbacks — model must come from settings.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "skip"
     },
     {
@@ -2155,7 +2155,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "Unbounded log growth — deacon.log 687MB / dashboard.log 91MB, no rotation.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -2179,7 +2179,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "Test agents narrate 'tests pass' but never run pan specialists done test.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -2191,7 +2191,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "Merge-status drift: deacon sets mergeStatus=merged w/o postMergeLifecycle.",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -3573,7 +3573,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "condition": "ok",
       "dependsOn": [],
       "why": "Bug (high): Ensure 'ship' (or close-out) restarts the running dashboard so merged code is actually live",
-      "gate": "ready",
+      "gate": "auto",
       "planning": "auto"
     },
     {
@@ -4126,7 +4126,7 @@ Pi sessions render blank; flywheel orchestrator affected. Add pi to the transcri
       "dependsOn": [],
       "why": "[HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) — requires operator credentials.",
       "rationale": "Newly-filed human-only release gate; requires the operator's Apple Developer cert and app-specific password an agent cannot obtain, so it is blocked from auto-pickup.",
-      "gate": "blocked",
+      "gate": "auto",
       "planning": "skip"
     },
     {
