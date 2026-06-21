@@ -1,0 +1,35 @@
+{
+  "version": "1",
+  "issueId": "PAN-1224",
+  "created": "2026-06-21T04:18:44.462Z",
+  "updated": "2026-06-21T04:27:06.000Z",
+  "gitState": { "branch": "feature/pan-1224", "sha": "3f3d26c8d", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Re-scoped to Q3 build-failure surfacing ONLY. Core rebuild+restart on merge is already shipped (PAN-444 added deploy step 0 to postMergeLifecycle; PAN-1723/1763/1764 hardened scripts/post-merge-deploy.sh). Operator chose this over close-as-done and over broader hardening.", "recordedAt": "2026-06-21T04:27:06.000Z" },
+    { "id": "D2", "summary": "Signal a failed deploy via a dedicated file marker ~/.overdeck/dashboard-stale.json + a dashboard-side poller. The deploy script is a detached bash process that cannot reach the in-process event store (and may be failing to restart the very server that would emit), so a domain event from the script is impossible. Do NOT overload restart-status.json (single-slot, overwritten on next restart = wrong lifetime).", "recordedAt": "2026-06-21T04:27:06.000Z" },
+    { "id": "D3", "summary": "Write the stale marker ONLY for pre-dist-swap failures (git fetch, worktree-add, npm run build). Post-swap failures (health-check timeout at post-merge-deploy.sh:186) mean the fresh dist is already on disk and the server just didn't start — that is the existing backend-offline red banner's job, not a 'stale code' signal.", "recordedAt": "2026-06-21T04:27:06.000Z" },
+    { "id": "D4", "summary": "Two clear paths: (a) deploy-script success deletes the marker (rm -f before exit 0); (b) `pan reload` success clears it via clearDashboardStaleMarker() funnelled through recordReloadStatus(...,true) in reload.ts (covers both the pan-dev SIGUSR2 path and the detached-production path). `pan restart` does NOT clear it — it does not rebuild, so it does not fix staleness.", "recordedAt": "2026-06-21T04:27:06.000Z" },
+    { "id": "D5", "summary": "Deliver BOTH surfaces the operator asked for: an error-level activity-feed entry (deduped by marker timestamp via a new stale-deploy-watcher, mirroring restart-announcer) AND a persistent top banner that stays until the marker clears (frontend hook polling GET /api/dashboard/stale + StaleDashboardBanner).", "recordedAt": "2026-06-21T04:27:06.000Z" },
+    { "id": "D6", "summary": "Single source of truth for the marker: one server-lib module src/lib/dashboard-stale-marker.ts owns the TypeScript DashboardStaleMarker type + read/clear/write helpers; the bash writer, the endpoint, the watcher, and pan reload all conform to it. This is the inspection-foundation bead.", "recordedAt": "2026-06-21T04:27:06.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "Marker schema drift between the bash writer (Bead 2) and the TS reader (Bead 1). The script writes JSON by hand; field names must match DashboardStaleMarker exactly.", "mitigation": "Bead 1 is the canonical schema and is requiresInspection:true. The PRD pins the exact field names (issueId, reason, stage, error, logFile, timestamp). Bead 1's reader validates defensively and returns null on any mismatch (mirror readRestartStatus), so a drift degrades to 'not stale', never a crash." },
+    { "id": "H2", "summary": "Activity-feed spam: the watcher could re-emit the same failure on every poll.", "mitigation": "Dedupe by marker.timestamp persisted in control-settings (stale_deploy_watcher.last_announced_ts), exactly as restart-announcer dedupes by restart-status.ts. Unit-test the 'same ts emits nothing on second pass' case." },
+    { "id": "H3", "summary": "Banner never clears if a clear path is missed — operator stares at a stale banner after they fixed it.", "mitigation": "Two explicit clear paths (D4) plus the marker self-clears the endpoint (returns {stale:false} once the file is gone). pan restart intentionally does not clear; document that the remedy is pan reload." },
+    { "id": "H4", "summary": "execSync / sync-fs creeping into server-reachable code (endpoint, watcher) freezes the event loop (PAN-70).", "mitigation": "All marker reads/writes use async fs/promises; watcher uses unref()ed setTimeout. No execSync anywhere on the server path. Restated in the PRD's repo-rules section." },
+    { "id": "H5", "summary": "Watcher test flakiness from real timers (CLAUDE.md fake-timers rule).", "mitigation": "Export a single-pass announceNewStaleDeploy(deps) with injectable read/emit/getLast/setLast (mirror announceNewRestart) and drive it directly in the test; for the timer loop use vi.useFakeTimers()+advanceTimersByTimeAsync." },
+    { "id": "H6", "summary": "Health-check-timeout path: if the new server eventually boots on fresh dist, a marker written there would be a false 'stale' signal.", "mitigation": "D3 — do NOT write the marker on the post-swap health-check-timeout path at all. Only pre-swap failures (fetch/worktree/build) write it." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session for PAN-1224. Discovery found the issue's core ask (rebuild+restart dashboard on merge) is ALREADY shipped via PAN-444 + PAN-1723/1763/1764. Re-scoped (operator-approved) to the one unaddressed slice: surface a FAILED post-merge build/deploy loudly (activity-feed error + persistent 'stale code' banner) instead of silently leaving the operator on old code. 6 beads.",
+      "timestamp": "2026-06-21T04:27:06.000Z",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}

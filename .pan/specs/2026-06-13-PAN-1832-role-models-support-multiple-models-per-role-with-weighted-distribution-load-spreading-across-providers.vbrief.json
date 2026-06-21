@@ -4,7 +4,7 @@
     "created": "2026-06-21T00:26:03.673Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1832: Role Models — support multiple models per role with weighted distribution (load-spreading across providers)",
-    "updated": "2026-06-21T04:06:15.539Z"
+    "updated": "2026-06-21T04:06:46.772Z"
   },
   "plan": {
     "id": "pan-1832",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "43f78b87-0783-467b-94a2-efaf14b310c8",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 6,
     "created": "2026-06-21T00:26:03.673Z",
-    "updated": "2026-06-21T04:06:15.539Z",
+    "updated": "2026-06-21T04:06:46.772Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1832",

@@ -1,25 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListOrdered, GitFork, RefreshCw, Filter, Play } from 'lucide-react';
-import { BacklogDAG } from '../components/backlog/BacklogDAG';
+import { BacklogDAG, RationaleSidePanel, type SequenceNode } from '../components/backlog/BacklogDAG';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
-
-interface SequenceNode {
-  issueId: string;
-  rank: number;
-  size: string;
-  importance: string;
-  score: number;
-  condition: string;
-  dependsOn: string[];
-  why: string;
-  rationale?: string;
-  gate: string;
-  planning: string;
-  inPipeline: boolean;
-  hasPrd: boolean;
-  ready: boolean;
-}
 
 interface SequenceEdge {
   from: string;
@@ -88,9 +71,12 @@ export function BacklogSequencerPage() {
   const [showStale, setShowStale] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [spawning, setSpawning] = useState(false);
-  const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('auto');
+  const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('incremental');
   const [showPassPicker, setShowPassPicker] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
+  const [tierFilter, setTierFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedNode, setSelectedNode] = useState<SequenceNode | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<SequenceResponse>({
     queryKey: ['backlog-sequence'],
@@ -106,15 +92,34 @@ export function BacklogSequencerPage() {
   const staleNodes = useMemo(() => allNodes.filter((n) => n.condition === 'stale'), [allNodes]);
   const refineNodes = useMemo(() => allNodes.filter((n) => n.condition === 'needs-refinement'), [allNodes]);
 
+  const tierCounts = useMemo(() => {
+    const total = allNodes.length;
+    const counts = { now: 0, next: 0, later: 0, someday: 0 };
+    allNodes.forEach((n) => {
+      const t = scoreTier(n.rank, total) as keyof typeof counts;
+      counts[t]++;
+    });
+    return counts;
+  }, [allNodes]);
+
+  const inPipelineCount = useMemo(() => allNodes.filter((n) => n.inPipeline).length, [allNodes]);
+  const readyCount = useMemo(() => allNodes.filter((n) => n.ready).length, [allNodes]);
+  const hasPrdCount = useMemo(() => allNodes.filter((n) => n.hasPrd).length, [allNodes]);
+
   const filteredNodes = useMemo(() => {
     return allNodes.filter((n) => {
+      if (tierFilter && scoreTier(n.rank, allNodes.length) !== tierFilter) return false;
       if (importanceFilter !== 'all' && n.importance !== importanceFilter) return false;
       if (conditionFilter !== 'all' && n.condition !== conditionFilter) return false;
       if (inPipelineOnly && !n.inPipeline) return false;
       if (readyOnly && n.gate !== 'ready') return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!n.issueId.toLowerCase().includes(q) && !n.why.toLowerCase().includes(q)) return false;
+      }
       return true;
     });
-  }, [allNodes, importanceFilter, conditionFilter, inPipelineOnly, readyOnly]);
+  }, [allNodes, importanceFilter, conditionFilter, inPipelineOnly, readyOnly, tierFilter, searchQuery]);
 
   // For DAG view: top-tier + neighbors + in-pipeline when too large
   const dagData = useMemo((): SequenceResponse => {
@@ -191,6 +196,24 @@ export function BacklogSequencerPage() {
     }
   }
 
+  async function handleGateChange(issueId: string, gate: string) {
+    await fetch('/api/backlog/sequence/gate', {
+      method: 'POST',
+      headers: await dashboardMutationJsonHeaders(),
+      body: JSON.stringify({ issueId, gate }),
+    });
+    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
+  }
+
+  async function handlePlanningChange(issueId: string, planning: string) {
+    await fetch('/api/backlog/sequence/planning', {
+      method: 'POST',
+      headers: await dashboardMutationJsonHeaders(),
+      body: JSON.stringify({ issueId, planning }),
+    });
+    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
+  }
+
   const conditionBadge = (condition: string) =>
     CONDITION_BADGE_CLASS[condition] ?? 'bg-gray-700 text-gray-400';
   const gateBadge = (gate: string) =>
@@ -201,7 +224,7 @@ export function BacklogSequencerPage() {
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--color-border)] shrink-0 flex-wrap">
         <ListOrdered className="w-4 h-4 text-[var(--color-accent)]" />
-        <span className="font-semibold text-[var(--color-fg)] text-sm">Backlog Sequence</span>
+        <span className="font-semibold text-[var(--color-fg)] text-sm">Backlog Sequencer</span>
         {allNodes.length > 0 && (
           <span className="text-xs text-[var(--color-fg-muted)]">{allNodes.length} issues</span>
         )}
@@ -252,7 +275,7 @@ export function BacklogSequencerPage() {
             title={`Run ${spawnPass} pass`}
           >
             <Play className="w-3 h-3" />
-            {spawning ? 'Spawning…' : `Run ${spawnPass}`}
+            {spawning ? 'Sequencing…' : 'Re-sequence'}
           </button>
           <button
             onClick={() => setShowPassPicker((p) => !p)}
@@ -332,6 +355,15 @@ export function BacklogSequencerPage() {
             <input type="checkbox" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
             <span className="text-[var(--color-fg-muted)]">Ready only</span>
           </label>
+          <div className="ml-auto">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="filter by id / title…"
+              className="h-6 px-2 rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-fg-muted)] text-xs placeholder:text-[var(--color-fg-muted)]/50 focus:outline-none focus:border-[var(--color-accent)] min-w-[180px]"
+            />
+          </div>
         </div>
       )}
 
@@ -370,126 +402,237 @@ export function BacklogSequencerPage() {
         </div>
       )}
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {isLoading && (
-          <div className="flex items-center justify-center h-32 text-[var(--color-fg-muted)] text-sm">
-            Loading sequence…
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center justify-center h-32 text-red-400 text-sm">
-            {String(error)}
-          </div>
-        )}
-        {!isLoading && !error && allNodes.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-48 gap-3 text-[var(--color-fg-muted)]">
-            <ListOrdered className="w-8 h-8 opacity-40" />
-            <p className="text-sm">No backlog sequence yet.</p>
-            <p className="text-xs">Run a creation pass to rank the open backlog.</p>
+      {/* Segment pills */}
+      {allNodes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-5 py-2 border-b border-[var(--color-border)] shrink-0">
+          <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-fg-muted)]">
+            <b className="text-[var(--color-fg)] font-semibold font-mono">{allNodes.length}</b> open issues
+          </span>
+          <button
+            onClick={() => setInPipelineOnly((p) => !p)}
+            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${inPipelineOnly ? 'border-blue-500/60 bg-blue-900/20 text-blue-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-blue-500/40'}`}
+          >
+            <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+            In pipeline <b className="font-mono font-semibold text-[var(--color-fg)]">{inPipelineCount}</b>
+          </button>
+          <button
+            onClick={() => setReadyOnly((p) => !p)}
+            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${readyOnly ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-emerald-500/40'}`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            Ready <b className="font-mono font-semibold text-[var(--color-fg)]">{readyCount}</b>
+          </button>
+          <button
+            onClick={() => setConditionFilter((p) => (p === 'ok' ? 'all' : 'ok'))}
+            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[var(--color-border)]/80`}
+          >
+            <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+            Has PRD <b className="font-mono font-semibold text-[var(--color-fg)]">{hasPrdCount}</b>
+          </button>
+          {refineNodes.length > 0 && (
             <button
-              onClick={() => { setSpawnPass('creation'); void handleRunPass(); }}
-              disabled={spawning}
-              className="px-3 py-1.5 text-xs rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50 flex items-center gap-1"
+              onClick={() => setConditionFilter((p) => (p === 'needs-refinement' ? 'all' : 'needs-refinement'))}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${conditionFilter === 'needs-refinement' ? 'border-yellow-500/60 bg-yellow-900/20 text-yellow-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-yellow-500/40'}`}
             >
-              <Play className="w-3 h-3" />
-              {spawning ? 'Spawning…' : 'Run creation pass'}
+              <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+              ⚠ Needs refinement <b className="font-mono font-semibold text-[var(--color-fg)]">{refineNodes.length}</b>
             </button>
-          </div>
-        )}
+          )}
+          {staleNodes.length > 0 && (
+            <button
+              onClick={() => setConditionFilter((p) => (p === 'stale' ? 'all' : 'stale'))}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${conditionFilter === 'stale' ? 'border-gray-400/60 bg-gray-800 text-gray-300' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-gray-500/40'}`}
+            >
+              <span className="w-2 h-2 rounded-full bg-gray-500 opacity-50 shrink-0" />
+              ⊘ Stale candidates <b className="font-mono font-semibold text-[var(--color-fg)]">{staleNodes.length}</b>
+            </button>
+          )}
+          <button
+            onClick={() => setTierFilter((p) => (p === 'now' ? null : 'now'))}
+            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${tierFilter === 'now' ? 'border-red-500/60 bg-red-900/20 text-red-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-red-500/40'}`}
+          >
+            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+            Tier 1 · Now <b className="font-mono font-semibold text-[var(--color-fg)]">{tierCounts.now}</b>
+          </button>
+        </div>
+      )}
 
-        {/* List view */}
-        {!isLoading && !error && allNodes.length > 0 && view === 'list' && (
-          <div className="overflow-y-auto h-full">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-                <tr className="text-[var(--color-fg-muted)]">
-                  <th className="text-right px-3 py-2 font-medium w-8">#</th>
-                  <th className="text-left px-2 py-2 font-medium w-6">●</th>
-                  <th className="text-left px-2 py-2 font-medium w-28">Issue</th>
-                  <th className="text-center px-2 py-2 font-medium w-16">Tier</th>
-                  <th className="text-left px-2 py-2 font-medium">Why</th>
-                  <th className="text-center px-2 py-2 font-medium w-14">Size</th>
-                  <th className="text-center px-2 py-2 font-medium w-24">Condition</th>
-                  <th className="text-center px-2 py-2 font-medium w-20">Gate</th>
-                  <th className="text-center px-2 py-2 font-medium w-14">Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredNodes.map((node) => {
-                  const tier = scoreTier(node.rank, allNodes.length);
-                  const isStale = node.condition === 'stale';
-                  const isRefine = node.condition === 'needs-refinement';
-                  return (
-                    <tr
-                      key={node.issueId}
-                      className={`border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-hover)] transition-colors ${isStale ? 'opacity-50' : ''}`}
-                    >
-                      <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
-                        {node.rank}
-                      </td>
-                      <td className="px-2 py-2">
-                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-gray-700'}`} />
-                      </td>
-                      <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
-                        {node.issueId}
-                        {node.inPipeline && (
-                          <span className="ml-1 text-[9px] text-green-400 align-top">▶</span>
-                        )}
-                        {isRefine && (
-                          <span className="ml-1 text-[9px] text-yellow-400 align-top">⚠</span>
-                        )}
-                        {node.hasPrd && (
-                          <span className="ml-1 text-[9px] text-blue-400 align-top" title="Has PRD">P</span>
-                        )}
-                        {node.ready && (
-                          <span className="ml-1 text-[9px] text-emerald-400 align-top" title="Has spec — ready for work">✓</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TIER_CLASS[tier] ?? 'bg-gray-700 text-gray-400'}`}>
-                          {TIER_LABEL[tier]}
-                        </span>
-                      </td>
-                      <td className={`px-2 py-2 text-[var(--color-fg-muted)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
-                        {node.why}
-                      </td>
-                      <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
-                        {node.size}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}>
-                          {node.condition === 'needs-refinement' ? '⚠ refine' : node.condition === 'stale' ? '⊘ stale' : node.condition}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
-                          {node.gate === 'ready' ? '📌' : node.gate === 'blocked' ? '⛔' : node.gate}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
-                        {node.score}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* Tier ribbon */}
+      {allNodes.length > 0 && (
+        <div className="flex gap-2 px-5 py-2 border-b border-[var(--color-border)] shrink-0">
+          {([
+            { key: 'now',     emoji: '🔴', label: 'Now',     count: tierCounts.now,     sub: 'act on these first',  accent: 'border-l-red-500',    ring: 'ring-red-500/50' },
+            { key: 'next',    emoji: '🟠', label: 'Next',    count: tierCounts.next,    sub: 'queued behind Now',   accent: 'border-l-orange-500', ring: 'ring-orange-500/50' },
+            { key: 'later',   emoji: '🔵', label: 'Later',   count: tierCounts.later,   sub: 'planned horizon',     accent: 'border-l-blue-400',   ring: 'ring-blue-400/50' },
+            { key: 'someday', emoji: '⚪', label: 'Someday', count: tierCounts.someday, sub: 'long tail',           accent: 'border-l-gray-600',   ring: 'ring-gray-500/50' },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTierFilter((p) => (p === t.key ? null : t.key))}
+              className={`flex-1 flex flex-col gap-0.5 px-3 py-2 border border-l-4 ${t.accent} rounded-lg bg-[var(--color-surface)] text-left hover:bg-[var(--color-surface-hover)] transition-colors ${tierFilter === t.key ? `ring-1 ${t.ring} border-[var(--color-border)]` : 'border-[var(--color-border)]'}`}
+            >
+              <span className="text-xs text-[var(--color-fg)]">{t.emoji} {t.label}</span>
+              <span className="font-mono text-lg font-semibold text-[var(--color-fg)] leading-tight">{t.count}</span>
+              <span className="text-[10px] text-[var(--color-fg-muted)]">{t.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
-        {/* DAG view */}
-        {!isLoading && !error && allNodes.length > 0 && view === 'dag' && data && (
-          <div className="h-full flex flex-col">
-            {collapsedCount > 0 && (
-              <div className="shrink-0 text-xs text-center py-1 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)]">
-                Showing {dagData.nodes.length} of {filteredNodes.length} issues (top tier + neighbors); {collapsedCount} collapsed
-              </div>
-            )}
-            <div className="flex-1">
-              <BacklogDAG data={dagData} className="w-full h-full" />
+      {/* Focus note */}
+      {tierFilter && allNodes.length > 0 && (
+        <div className="flex items-center gap-2 px-5 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0 text-xs text-[var(--color-fg-muted)]">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-widest bg-[var(--color-accent)] text-[var(--color-fg)]">
+            Showing {TIER_LABEL[tierFilter]}
+          </span>
+          <span>
+            {filteredNodes.length} of {allNodes.length} issues{view === 'dag' ? ' rendered as a graph' : ''} — click the tier again to show all
+          </span>
+        </div>
+      )}
+
+      {/* Content — flex row: main area + optional detail panel */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Main area */}
+        <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          {isLoading && (
+            <div className="flex items-center justify-center h-32 text-[var(--color-fg-muted)] text-sm">
+              Loading sequence…
             </div>
-          </div>
+          )}
+          {error && (
+            <div className="flex items-center justify-center h-32 text-red-400 text-sm">
+              {String(error)}
+            </div>
+          )}
+          {!isLoading && !error && allNodes.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-48 gap-3 text-[var(--color-fg-muted)]">
+              <ListOrdered className="w-8 h-8 opacity-40" />
+              <p className="text-sm">No backlog sequence yet.</p>
+              <p className="text-xs">Run a creation pass to rank the open backlog.</p>
+              <button
+                onClick={() => { setSpawnPass('creation'); void handleRunPass(); }}
+                disabled={spawning}
+                className="px-3 py-1.5 text-xs rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50 flex items-center gap-1"
+              >
+                <Play className="w-3 h-3" />
+                {spawning ? 'Spawning…' : 'Run creation pass'}
+              </button>
+            </div>
+          )}
+
+          {/* List view */}
+          {!isLoading && !error && allNodes.length > 0 && view === 'list' && (
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
+                  <tr className="text-[var(--color-fg-muted)]">
+                    <th className="text-right px-3 py-2 font-medium w-8">#</th>
+                    <th className="text-left px-2 py-2 font-medium w-6">●</th>
+                    <th className="text-left px-2 py-2 font-medium w-28">Issue</th>
+                    <th className="text-center px-2 py-2 font-medium w-16">Tier</th>
+                    <th className="text-left px-2 py-2 font-medium">Why</th>
+                    <th className="text-center px-2 py-2 font-medium w-14">Size</th>
+                    <th className="text-center px-2 py-2 font-medium w-24">Condition</th>
+                    <th className="text-center px-2 py-2 font-medium w-20">Gate</th>
+                    <th className="text-center px-2 py-2 font-medium w-14">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredNodes.map((node) => {
+                    const tier = scoreTier(node.rank, allNodes.length);
+                    const isStale = node.condition === 'stale';
+                    const isRefine = node.condition === 'needs-refinement';
+                    const isSelected = selectedNode?.issueId === node.issueId;
+                    return (
+                      <tr
+                        key={node.issueId}
+                        onClick={() => setSelectedNode((p) => (p?.issueId === node.issueId ? null : node))}
+                        className={`border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${isSelected ? 'bg-[var(--color-surface)] ring-inset ring-1 ring-[var(--color-accent)]' : ''}`}
+                      >
+                        <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
+                          {node.rank}
+                        </td>
+                        <td className="px-2 py-2">
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-gray-700'}`} />
+                        </td>
+                        <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
+                          {node.issueId}
+                          {node.inPipeline && (
+                            <span className="ml-1 text-[9px] text-green-400 align-top">▶</span>
+                          )}
+                          {isRefine && (
+                            <span className="ml-1 text-[9px] text-yellow-400 align-top">⚠</span>
+                          )}
+                          {node.hasPrd && (
+                            <span className="ml-1 text-[9px] text-blue-400 align-top" title="Has PRD">P</span>
+                          )}
+                          {node.ready && (
+                            <span className="ml-1 text-[9px] text-emerald-400 align-top" title="Has spec — ready for work">✓</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TIER_CLASS[tier] ?? 'bg-gray-700 text-gray-400'}`}>
+                            {TIER_LABEL[tier]}
+                          </span>
+                        </td>
+                        <td className={`px-2 py-2 text-[var(--color-fg-muted)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
+                          {node.why}
+                        </td>
+                        <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
+                          {node.size}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}>
+                            {node.condition === 'needs-refinement' ? '⚠ refine' : node.condition === 'stale' ? '⊘ stale' : node.condition}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
+                            {node.gate === 'ready' ? '📌' : node.gate === 'blocked' ? '⛔' : node.gate}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
+                          {node.score}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* DAG view */}
+          {!isLoading && !error && allNodes.length > 0 && view === 'dag' && data && (
+            <div className="flex-1 flex flex-col min-h-0">
+              {collapsedCount > 0 && (
+                <div className="shrink-0 text-xs text-center py-1 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)]">
+                  Showing {dagData.nodes.length} of {filteredNodes.length} issues (top tier + neighbors); {collapsedCount} collapsed
+                </div>
+              )}
+              <div className="flex-1 min-h-0">
+                <BacklogDAG
+                  data={dagData}
+                  className="w-full h-full"
+                  selectedNodeId={selectedNode?.issueId}
+                  onSelectNode={(n) => setSelectedNode(n)}
+                  onGateChange={handleGateChange}
+                  onPlanningChange={handlePlanningChange}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Detail panel */}
+        {selectedNode && (
+          <RationaleSidePanel
+            node={selectedNode}
+            onClose={() => setSelectedNode(null)}
+            onGateChange={handleGateChange}
+            onPlanningChange={handlePlanningChange}
+          />
         )}
       </div>
     </div>

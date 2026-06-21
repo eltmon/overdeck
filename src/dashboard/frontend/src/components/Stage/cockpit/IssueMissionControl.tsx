@@ -30,7 +30,6 @@ import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
 import { BeadsRail } from './BeadsRail'
-import { ReviewVerificationCard } from './ReviewVerificationCard'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
@@ -51,20 +50,16 @@ export interface IssueMissionControlProps {
 
 type MissionTab =
   | 'overview'
-  | 'review'
-  | 'test'
-  | 'ci'
-  | 'conversation'
-  | 'diff'
-  | 'files'
-  | 'terminal'
+  | 'code'        // PAN-1991 #6: PR + CI checks + diff/changed-files
   | 'plan'
-  | 'beads'
+  | 'timeline'    // PAN-1991 #6: Activity + History merged
   | 'discussion'
   | 'costs'
-  | 'activity'
   | 'artifacts'
-  | 'history'
+  | 'conversation' // tool — relocates to a pane in #10
+  | 'files'        // tool — #10
+  | 'terminal'     // tool — #10
+  | 'beads'        // not a visible tab; reachable from the rail's "open full"
 
 type PipelineState = 'done' | 'active' | 'fail' | 'todo'
 
@@ -72,24 +67,22 @@ type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'm
 
 type IssueTreeContext = 'issue'
 
+// PAN-1991 #6: deep-content groups only. Status that the header gates, the
+// Agents lane, and the beads rail already show is NOT repeated here. Review/Test
+// status live in the lane + gates; review findings are reached by selecting the
+// Review agent. PR&CI + Diff merge into Code; Activity + History into Timeline.
+// Beads is the rail (#1). Conversation/Files/Terminal are tools → panes in #10.
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
-  { id: 'review', label: 'Review' },
-  { id: 'test', label: 'Test' },
-  { id: 'ci', label: 'PR & CI' },
-  { id: 'conversation', label: 'Conversation' },
-  { id: 'diff', label: 'Diff' },
-  { id: 'files', label: 'Files' },
-  { id: 'terminal', label: 'Terminal' },
+  { id: 'code', label: 'Code' },
   { id: 'plan', label: 'PRD / Plan' },
-  // Beads moved to the persistent BeadsRail (PAN-1991 item #1). The `beads`
-  // render branch below is kept — the rail's "open full" opens it for the
-  // list/graph (DAG) + per-bead detail — but it is no longer a visible tab.
+  { id: 'timeline', label: 'Timeline' },
   { id: 'discussion', label: 'Discussion' },
   { id: 'costs', label: 'Costs' },
-  { id: 'activity', label: 'Activity' },
   { id: 'artifacts', label: 'Artifacts' },
-  { id: 'history', label: 'History' },
+  { id: 'conversation', label: 'Conversation' },
+  { id: 'files', label: 'Files' },
+  { id: 'terminal', label: 'Terminal' },
 ]
 
 const GROUP_LABELS: Record<IssueActionGroup, string> = {
@@ -872,41 +865,6 @@ function GitHubCiPanel({ issueId }: { issueId: string }) {
   )
 }
 
-function TestPanel({ issueId }: { issueId: string }) {
-  const review = useReviewStatusQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const actions = useIssueActions(issueId)
-  const rs = review.data
-  const testSection = activity.data?.sections.find((section) => section.type === 'test')
-  const reviewTest = actions.all.find((view) => view.action.key === 'reviewTest' && view.enabled)
-  const recover = actions.all.find((view) => view.action.key === 'recoverReview' && view.enabled)
-  const actionButtons = [reviewTest, recover].filter((view): view is IssueActionView => Boolean(view))
-  const tone = statusToTone(rs?.testStatus)
-
-  return (
-    <CockpitCard tone={tone} title="Test & Verification" right={<CockpitPill tone={tone}>{rs?.testStatus ?? 'pending'}</CockpitPill>}>
-      <div className="space-y-2 text-[12px]">
-        <div className="flex justify-between gap-4 border-b border-border pb-2"><span className="text-muted-foreground">Pipeline test</span><span>{rs?.testStatus ?? 'pending'}</span></div>
-        <div className="flex justify-between gap-4 border-b border-border pb-2"><span className="text-muted-foreground">Verification gate</span><span>{rs?.verificationStatus ?? 'pending'}</span></div>
-        <div className="flex justify-between gap-4 border-b border-border pb-2"><span className="text-muted-foreground">Verification cycles</span><span>{rs?.verificationCycleCount ?? 0}{rs?.verificationMaxCycles ? `/${rs.verificationMaxCycles}` : ''}</span></div>
-        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Test agent</span><span className="font-mono text-[11px]">{testSection ? `${testSection.sessionId} · ${testSection.status}` : 'not dispatched'}</span></div>
-      </div>
-      {rs?.testNotes && <div className="mt-3 rounded-[10px] border border-border bg-background/40 px-3 py-2 text-[12px] text-foreground/85">{rs.testNotes}</div>}
-      {!testSection && rs?.reviewStatus === 'blocked' && <div className="mt-3 text-[12px] text-muted-foreground">Test dispatch is gated behind the review verdict.</div>}
-      {actionButtons.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {actionButtons.map((view) => (
-            <button key={view.action.key} type="button" disabled={view.isPending} onClick={view.invoke} className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[12px] font-medium hover:bg-accent disabled:opacity-50">
-              {view.action.label}
-            </button>
-          ))}
-        </div>
-      )}
-      <IssueActionDialogHost issueId={issueId} actions={actions} />
-    </CockpitCard>
-  )
-}
-
 function MarkdownMissionTab({ issueId, field }: { issueId: string; field: 'prd' | 'state' }) {
   const planning = usePlanningQuery(issueId, { enabled: true })
   return <MarkdownTab body={planning.data?.[field]} isLoading={planning.isLoading} emptyLabel={`No ${field.toUpperCase()} document.`} />
@@ -1018,10 +976,8 @@ function ConversationTab({ launcher, agentDock, actionDock, timeline }: Pick<Iss
   )
 }
 
-function tabBadge(tab: MissionTab, rs: ReviewStatusData | undefined, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
-  if (tab === 'review' && (rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed')) return { label: '!', tone: 'destructive' }
-  if (tab === 'test' && rs?.testStatus && rs.testStatus !== 'pending') return { label: rs.testStatus === 'passed' ? '✓' : rs.testStatus === 'testing' ? '…' : '!', tone: statusToTone(rs.testStatus) }
-  if (tab === 'ci' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
+function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
+  if (tab === 'code' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
   return null
 }
 
@@ -1051,17 +1007,20 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setTreeContext(null)
     setActiveTab(null)
   }
-  // PAN-1991 #4: clicking a pipeline phase opens that phase's info.
+  // PAN-1991 #4/#6: clicking a pipeline phase opens that phase's info. Work/
+  // Review/Test open the agent's own conversation/findings (per #6, review
+  // findings live on the Review agent, not a status tab); CI/CD opens Code.
   const handlePhaseClick = (phase: PipelinePhaseKey) => {
-    if (phase === 'work') {
-      const workSession = treeSessions.find((s) => s.type === 'work')
-      if (workSession) { selectSessionFromTree(workSession); return }
-      selectTab('overview'); return
+    const openSession = (type: SessionNode['type']) => {
+      const session = treeSessions.find((s) => s.type === type)
+      if (session) { selectSessionFromTree(session); return true }
+      return false
     }
+    if (phase === 'work') { if (!openSession('work')) selectTab('overview'); return }
+    if (phase === 'review') { if (!openSession('review')) selectTab('overview'); return }
+    if (phase === 'test') { if (!openSession('test')) selectTab('overview'); return }
     if (phase === 'plan') { selectTab('plan'); return }
-    if (phase === 'review') { selectTab('review'); return }
-    if (phase === 'test') { selectTab('test'); return }
-    if (phase === 'ci') { selectTab('ci'); return }
+    if (phase === 'ci') { selectTab('code'); return }
     selectTab('overview') // ship / merge — until the Ship & Merge view (later item)
   }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
@@ -1118,12 +1077,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           selectedSessionId={selectedTreeSession?.sessionId ?? null}
           onSelectSession={selectSessionFromTree}
           onSessionsChange={recordTreeSessions}
-          onOpenVerification={() => selectTab('review')}
+          onOpenVerification={() => selectTab('overview')}
         />
         <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
           <nav className="flex flex-wrap gap-1 border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
             {TABS.map((tab) => {
-              const badge = tabBadge(tab.id, review.data, checks.data)
+              const badge = tabBadge(tab.id, checks.data)
               return (
                 <button
                   key={tab.id}
@@ -1157,20 +1116,32 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               />
             )}
             {activeTab === 'overview' && <OverviewTab issueId={issueId} />}
-            {activeTab === 'review' && <ReviewVerificationCard issueId={issueId} />}
-            {activeTab === 'test' && <TestPanel issueId={issueId} />}
-            {activeTab === 'ci' && <GitHubCiPanel issueId={issueId} />}
-            {activeTab === 'conversation' && <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />}
-            {activeTab === 'diff' && <PrDiffTab issueId={issueId} />}
-            {activeTab === 'files' && <OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} />}
-            {activeTab === 'terminal' && <OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} />}
+            {activeTab === 'code' && (
+              <div className="space-y-3.5">
+                <GitHubCiPanel issueId={issueId} />
+                <PrDiffTab issueId={issueId} />
+              </div>
+            )}
             {activeTab === 'plan' && <PlanMissionTab issueId={issueId} />}
-            {activeTab === 'beads' && <BeadsTab issueId={issueId} />}
+            {activeTab === 'timeline' && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Status history</h3>
+                  <StatusHistoryTab issueId={issueId} />
+                </div>
+                <div>
+                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Activity</h3>
+                  <ActivityTab issueId={issueId} />
+                </div>
+              </div>
+            )}
             {activeTab === 'discussion' && <DiscussionsTab issueId={issueId} />}
             {activeTab === 'costs' && <CostsTab issueId={issueId} />}
-            {activeTab === 'activity' && <ActivityTab issueId={issueId} />}
             {activeTab === 'artifacts' && <DrawerArtifactsPanel issueId={issueId} />}
-            {activeTab === 'history' && <StatusHistoryTab issueId={issueId} />}
+            {activeTab === 'conversation' && <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />}
+            {activeTab === 'files' && <OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} />}
+            {activeTab === 'terminal' && <OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} />}
+            {activeTab === 'beads' && <BeadsTab issueId={issueId} />}
           </div>
         </main>
         <BeadsRail issueId={issueId} onOpenFull={() => selectTab('beads')} />

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Detail groups — spec (item #6)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-review:#a855f7; --signal-review-foreground:#7e22ce; --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .add{color:var(--success-foreground)} .del{color:var(--destructive-foreground)}
+  .wrap{max-width:1120px;margin:26px auto;padding:0 22px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:8px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:20px 0 8px;display:flex;align-items:center;gap:8px}
+  .pill2{font-size:9px;border:1px solid var(--border);border-radius:5px;padding:1px 6px} .pill2.bad{color:var(--destructive-foreground)} .pill2.ok{color:var(--success-foreground)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+
+  /* tab strips */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .tab{padding:6px 11px;border-radius:8px;font-size:12px;color:var(--muted-foreground);white-space:nowrap;border:1px solid transparent}
+  .tab.active{background:var(--accent);color:var(--foreground)}
+  .tab .b{font-size:9.5px} .tab .x{color:var(--destructive-foreground)} .tab .b.add{color:var(--success-foreground)} .tab .b.del{color:var(--destructive-foreground)} .tab .b.cost{color:var(--signal-cost-foreground)}
+  .before .tab{font-size:11.5px;padding:5px 9px}
+
+  .body{padding:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media(max-width:980px){.grid2{grid-template-columns:1fr}}
+  h4.sec{margin:0 0 9px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);display:flex;align-items:center;gap:8px}
+  h4.sec .src{margin-left:auto;text-transform:none;letter-spacing:0;font-size:10px}
+  .finding{display:flex;gap:9px;padding:8px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)} .finding:last-child{border-bottom:none}
+  .sev{width:8px;height:8px;border-radius:2px;margin-top:5px;flex:none;background:var(--destructive)} .sev.warn{background:var(--warning)}
+  .ft{font-size:12.5px} .fl{font-size:11px;color:var(--muted-foreground);margin-top:2px}
+  .gaterow{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .gaterow:last-child{border-bottom:none}
+  .chk{display:inline-flex;align-items:center;gap:8px} .m{width:15px;height:15px;border-radius:50%;display:grid;place-items:center;font-size:8px;color:#fff} .m.ok{background:var(--success)} .m.run{background:var(--info)} .m.wait{background:transparent;border:1.5px solid var(--muted-foreground);color:var(--muted-foreground)}
+  .spec{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:12.5px;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)} .spec:last-child{border-bottom:none}
+  .role{width:19px;height:19px;border-radius:6px;display:grid;place-items:center;font-size:8.5px;border:1px solid var(--border);color:var(--muted-foreground);flex:none} .vt{margin-left:auto;font-size:11px} .vt.ok{color:var(--success-foreground)} .vt.bad{color:var(--destructive-foreground)}
+  .tl{position:relative;padding-left:17px} .tl::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--border)}
+  .tlrow{position:relative;padding:7px 0;font-size:12.5px;display:flex;gap:8px;align-items:baseline} .tlrow .d{position:absolute;left:-15px;top:9px;width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);border:2px solid var(--card)} .tlrow .d.bad{background:var(--destructive)} .tlrow .d.ok{background:var(--success)} .tlrow .d.info{background:var(--info)} .tlrow .d.rev{background:var(--signal-review)} .tlrow .w{margin-left:auto;font-size:10.5px;color:var(--muted-foreground);white-space:nowrap} .tlrow .src{font-size:9px;border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--muted-foreground)}
+  .cirow{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .cirow:last-child{border-bottom:none} .cirow .st{margin-left:auto;font-size:9.5px;text-transform:uppercase;color:var(--muted-foreground)}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .kv:last-child{border-bottom:none} .kv .muted{color:var(--muted-foreground)}
+
+  .legend{margin-top:22px;border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+  .legend h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .maptbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .maptbl th,.maptbl td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  .maptbl th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);font-weight:500}
+  .maptbl td.h{color:var(--foreground)}
+  .q{border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)} .q li{font-size:12.5px;margin:7px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Detail groups — item #6</h1>
+  <div class="sub">Collapse the flat tab strip into content-true groups by merging the panels that answer the same question. Overview stays first; tools (Conversation / Files / Terminal) leave the strip (item #10).</div>
+
+  <div class="lbl"><span class="pill2 bad">before</span> 14 flat tabs — every drill-down has equal weight, the strip wraps</div>
+  <div class="card before">
+    <div class="tabs">
+      <span class="tab active">Overview</span><span class="tab">Review</span><span class="tab">Test</span><span class="tab">PR &amp; CI</span><span class="tab">Conversation</span><span class="tab">Diff</span><span class="tab">Files</span><span class="tab">Terminal</span><span class="tab">PRD / Plan</span><span class="tab">Discussion</span><span class="tab">Costs</span><span class="tab">Activity</span><span class="tab">Artifacts</span><span class="tab">History</span>
+    </div>
+  </div>
+
+  <div class="lbl"><span class="pill2 ok">after</span> Overview + 7 groups — fewer, content-true, with at-a-glance badges</div>
+  <div class="card">
+    <div class="tabs">
+      <span class="tab">Overview</span>
+      <span class="tab active">Quality <span class="b x">!</span></span>
+      <span class="tab">Code <span class="b"><span class="add">+5039</span> <span class="del">−42</span></span></span>
+      <span class="tab">Plan <span class="b">19/20</span></span>
+      <span class="tab">Timeline</span>
+      <span class="tab">Discussion <span class="b">6</span></span>
+      <span class="tab">Costs <span class="b cost">$67.72</span></span>
+      <span class="tab">Artifacts <span class="b">2</span></span>
+    </div>
+    <!-- QUALITY content (the merge of Review + Test + Verification + Specialists) -->
+    <div class="body">
+      <div class="grid2">
+        <div>
+          <h4 class="sec">Review <span class="src">convoy · gpt-5.5 · blocked</span></h4>
+          <div class="finding"><span class="sev"></span><div><div class="ft">Flywheel ignores the FR-17 human-approval gate</div><div class="fl"><span class="mono">select.ts:212</span> · correctness · blocking</div></div></div>
+          <div class="finding"><span class="sev warn"></span><div><div class="ft">Rationale block can exceed the markdown fence</div><div class="fl"><span class="mono">writeSequenceMd.ts:88</span> · non-blocking</div></div></div>
+          <h4 class="sec" style="margin-top:14px">Specialists</h4>
+          <div class="spec"><span class="role">Co</span> Correctness <span class="vt ok">approved</span></div>
+          <div class="spec"><span class="role">Se</span> Security <span class="vt ok">approved</span></div>
+          <div class="spec"><span class="role">Pe</span> Performance <span class="vt ok">approved</span></div>
+          <div class="spec"><span class="role">Re</span> Requirements <span class="vt bad">changes requested</span></div>
+        </div>
+        <div>
+          <h4 class="sec">Verification gates <span class="src">build gate</span></h4>
+          <div class="gaterow"><span class="chk"><span class="m ok">✓</span> Typecheck</span><span class="muted">passed</span></div>
+          <div class="gaterow"><span class="chk"><span class="m ok">✓</span> Lint</span><span class="muted">passed</span></div>
+          <div class="gaterow"><span class="chk"><span class="m wait">○</span> Tests</span><span class="muted">pending</span></div>
+          <div class="gaterow"><span class="chk"><span class="m wait">○</span> Browser UAT</span><span class="muted">pending</span></div>
+          <h4 class="sec" style="margin-top:14px">Test &amp; merge</h4>
+          <div class="kv"><span class="muted">Pipeline test</span><span>pending — gated behind review</span></div>
+          <div class="kv"><span class="muted">Verification cycles</span><span>0 / 3</span></div>
+          <div class="kv"><span class="muted">Next action</span><span>work fixes → re-review</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lbl">after · <b style="color:var(--foreground)">Timeline</b> group — Activity + History interleaved into one feed</div>
+  <div class="card"><div class="body"><div class="tl">
+    <div class="tlrow"><span class="d info"></span><span>Editing <span class="mono">select.ts</span> — FR-17 gate</span><span class="src">activity</span><span class="w">now</span></div>
+    <div class="tlrow"><span class="d info"></span><span>Ran <span class="mono">npm run typecheck</span> — passed</span><span class="src">activity</span><span class="w">2m</span></div>
+    <div class="tlrow"><span class="d bad"></span><span>Review → <b class="del">BLOCKED</b> (FR-17 regression)</span><span class="src">history</span><span class="w">41m</span></div>
+    <div class="tlrow"><span class="d rev"></span><span>Review convoy started · 4 reviewers</span><span class="src">history</span><span class="w">1h</span></div>
+    <div class="tlrow"><span class="d ok"></span><span>Work submitted PR <span class="mono">#1975</span></span><span class="src">history</span><span class="w">1h</span></div>
+    <div class="tlrow"><span class="d"></span><span>Closed 19th bead · <span class="mono">writeSequenceMd</span></span><span class="src">activity</span><span class="w">1h</span></div>
+  </div></div></div>
+
+  <div class="lbl">after · <b style="color:var(--foreground)">Code</b> group — PR &amp; CI + the changed-files tree (#7) + diff</div>
+  <div class="card"><div class="body">
+    <h4 class="sec">Pull request <span class="src">#1975 · mergeable · feature/pan-1866 → main</span></h4>
+    <div class="cirow"><span class="m ok">✓</span> lint <span class="st">success</span></div>
+    <div class="cirow"><span class="m ok">✓</span> typecheck <span class="st">success</span></div>
+    <div class="cirow"><span class="m run">▷</span> unit (frontend) <span class="st">running</span></div>
+    <div style="margin-top:10px;font-size:11.5px;color:var(--muted-foreground);border:1px dashed var(--border);border-radius:10px;padding:9px;text-align:center">▦ changed-files tree + per-file diff lands as item #7</div>
+  </div></div>
+
+  <div class="legend">
+    <h3>No-loss map — 14 tabs → Overview + 7 groups</h3>
+    <table class="maptbl">
+      <thead><tr><th style="width:170px">Old tabs</th><th>New home</th></tr></thead>
+      <tbody>
+        <tr><td class="h">Overview</td><td>Overview (default view, item #9)</td></tr>
+        <tr><td class="h">Review · Test</td><td><b>Quality</b> — review findings + verification gates + specialists + test/merge</td></tr>
+        <tr><td class="h">PR &amp; CI · Diff</td><td><b>Code</b> — PR + CI checks + changed-files tree/diff (#7)</td></tr>
+        <tr><td class="h">PRD / Plan</td><td><b>Plan</b> — vBRIEF (List/DAG/Raw) + PRD + STATE</td></tr>
+        <tr><td class="h">Activity · History</td><td><b>Timeline</b> — one chronological feed (source-tagged)</td></tr>
+        <tr><td class="h">Discussion</td><td><b>Discussion</b></td></tr>
+        <tr><td class="h">Costs</td><td><b>Costs</b></td></tr>
+        <tr><td class="h">Artifacts</td><td><b>Artifacts</b> (shown only when any exist)</td></tr>
+        <tr><td class="h">Conversation</td><td>Select an agent in the tree → its conversation (item #2). The launch composition moves to Overview.</td></tr>
+        <tr><td class="h">Files · Terminal</td><td>Open as workspace panes / the terminal drawer (item #10)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="q">
+    <h3>Decisions before I build</h3>
+    <ul>
+      <li><b>1. The 8-entry nav</b> (Overview · Quality · Code · Plan · Timeline · Discussion · Costs · Artifacts) — good?</li>
+      <li><b>2. Quality = Review + Test + Verification + Specialists</b> in one view (two columns), and <b>Timeline = Activity + History</b> interleaved — good?</li>
+      <li><b>3. Conversation tab.</b> Today it's the issue's <i>launch</i> surface (start an agent + the timeline). With agent-select handling live conversations, I'll move that launcher into <b>Overview</b> and drop the Conversation tab. OK — or keep a "Launch" entry?</li>
+      <li><b>4. Code's diff</b> is a placeholder here — the real changed-files tree is <b>#7</b>, which I can do right after #6 (or fold into it). Keep them separate?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

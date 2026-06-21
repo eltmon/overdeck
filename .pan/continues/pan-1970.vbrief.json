@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1970",
   "created": "2026-06-19T17:59:04.370Z",
-  "updated": "2026-06-20T00:00:12.233Z",
+  "updated": "2026-06-20T23:35:13.634Z",
   "gitState": {
     "branch": "feature/pan-1970",
     "sha": "8aabbadb68",
@@ -146,6 +146,21 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-20T00:00:12.233Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-20T23:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-20T23:26:18.972Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-20T23:26:35.855Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-20T23:35Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-20T23:35:13.634Z"
     }
   ],
   "feedback": [
@@ -153,8 +168,15 @@
       "seq": 1,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-06-20T00:00:11Z",
+      "timestamp": "2026-06-20T23:26:18Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-1970\n\n# Review Synthesis — PAN-1970 — 2026-06-19T16:22:00-04:00\n\n## Verdict: CHANGES REQUESTED — server-side home-directory boundary can be bypassed\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/context.json\n- Branch: feature/pan-1970\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970\n- HEAD reviewed: 177f49b0231f3a7dfb56e622978b0b2e0ec12872\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/security.md | 2 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] Symlink bypass allows browsing directories outside home — `src/dashboard/server/routes/fs.ts:35`\n`GET /api/fs/list-dirs` performs the home clamp with lexical `resolve(normalize(rawPath))` string comparison against `homedir()`, then calls `readdir(target)`. A symlink inside the user's home that points outside home still passes the string-prefix check, and `readdir` follows the symlink. This violates the explicit home-clamp non-goal and can disclose directory names outside the allowed tree.\n\nFix by canonicalizing both the home root and requested path with `realpath` before the boundary check, rejecting missing/non-directory targets cleanly, and adding a regression test with a symlink under a temp home pointing outside that temp home.\n\n### [security] Project registration endpoint can write to and pre-trust arbitrary absolute paths — `src/dashboard/server/routes/projects.ts:635`\n`POST /api/projects` accepts any absolute `path` for `mode='existing'` and any absolute `parentDir` for `mode='new'`, without enforcing the folder browser's home-directory boundary. A direct dashboard API caller can register, create, `git init`, and pre-trust directories outside `$HOME` wherever the server process has permission.\n\nFix by moving canonical home-boundary validation into shared server-side validation used by both `GET /api/fs/list-dirs` and `POST /api/projects`. Existing projects should canonicalize and require the target directory to remain under canonical `$HOME`; new projects should canonicalize the parent and final target and reject symlink escapes before filesystem writes.\n\n### [correctness] Empty-slug project names register the parent directory under an empty key — `src/dashboard/server/routes/projects.ts:672`\nThe new-project route only checks `rawName.trim()`, then derives `key = slugify(name)` and `target = join(rawParent, slugify(name))`. Names such as `!!!` pass the required-name check but slugify to `\"\"`; `join(parentDir, \"\")` resolves to the parent directory, causing `git init` and registration to target the parent under an empty project key. `registerProjectFromPath` repeats the same empty-key behavior.\n\nFix by validating the derived slug/key before filesystem work and by rejecting empty derived keys in the shared registration core so both the dashboard route and refactored CLI cannot write invalid project registry entries.\n\n### [requirements] New Project mode lacks the required `~/Overdeck` default parent — `src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx:28`\nFR-4 and AC-1 require New Project mode to default the parent folder to `~/Overdeck`, preview `<parent>/<slug>`, and support the reference flow where entering `Bugs` creates `~/Overdeck/bugs`. The modal initializes `parentDir` to an empty string, renders `FolderPicker` without `initialPath`, suppresses the preview until a parent is manually selected, and disables Start while `parentDir` is empty.\n\nFix by initializing New Project mode with `~/Overdeck` as the concrete default parent, wiring that into the picker/preview state, and adding a modal test covering the default-parent flow.\n\n## Non-blocking Findings\n\n### [performance] Add a limit/pagination contract to folder browsing — `src/dashboard/server/routes/fs.ts:43`\n`GET /api/fs/list-dirs` scans, filters, sorts, returns, and renders every immediate child directory. This can become slow in very large home subdirectories. Consider a server-side limit with `truncated` metadata, cursor/search pagination, or a bounded UI rendering contract.\n\n### [performance] Avoid full-file TLDR log reads on each cost hook invocation — `sync-sources/hooks/record-cost-event.js:30339`\n`captureTldrMetricsSync()` uses byte checkpoints but still reads the whole TLDR log before slicing from the checkpoint. Long-lived workspaces with large TLDR logs will pay increasing hook cost. Consider reading only the delta from the checkpoint offset or rotating/compacting the TLDR metrics logs.\n\n### [requirements] Stub UI manifest finding is mitigated\nThe manifest flagged `const [pending, setPending] = useState(false)` as suspected tab/mode state. The requirements reviewer confirmed the actual mode state is `useState<Mode>('existing')`, `switchMode()` writes it, and both exposed modes submit real `/api/projects` requests.\n\n## Clean Sub-roles\nNone. All sub-roles reported either blocking or advisory findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1970 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-20T23:35:13Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1970 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/continue.json\n  - .pan/spec.vbrief.json\n  - src/dashboard/frontend/src/App.tsx\n  - src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx\n  - src/dashboard/frontend/src/components/CommandDeck/__tests__/NewProjectModal.test.tsx\n  - src/dashboard/frontend/src/pages/HomePage.tsx\n  - src/dashboard/server/routes/__tests__/projects-register.test.ts\n  - src/dashboard/server/routes/projects.ts\n  - src/dashboard/server/server.ts\n  - src/lib/project-registration.ts\n  - sync-sources/hooks/record-cost-event.js\n  - sync-sources/hooks/record-cost-event.js.map\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1970 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
     }
   ]
 }

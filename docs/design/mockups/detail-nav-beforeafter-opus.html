@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Detail nav — before / after (#6)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root{--background:#fff;--foreground:#1f2937;--card:#fff;--accent:color-mix(in srgb,black 4%,transparent);--muted-foreground:#6b7280;--border:color-mix(in srgb,black 8%,transparent);--destructive-foreground:#b91c1c;--success-foreground:#047857;--signal-cost-foreground:#0e7490;--mono:"DM Mono",monospace}
+  *{box-sizing:border-box}body{margin:0;background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:26px auto;padding:0 22px}
+  h1{font-size:16px;margin:0 0 16px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:18px 0 8px;display:flex;gap:8px;align-items:center}
+  .pill2{font-size:9px;border:1px solid var(--border);border-radius:5px;padding:1px 6px}.pill2.bad{color:var(--destructive-foreground)}.pill2.ok{color:var(--success-foreground)}
+  .strip{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 11px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+  .t{padding:6px 11px;border-radius:8px;font-size:12.5px;color:var(--muted-foreground);white-space:nowrap;border:1px solid transparent}
+  .t.active{background:var(--accent);color:var(--foreground)}
+  .t.gone{color:color-mix(in srgb,var(--muted-foreground) 55%,transparent);text-decoration:line-through}
+  .t .b{font-size:9.5px}.t .x{color:var(--destructive-foreground)}.t .add{color:var(--success-foreground)}.t .del{color:var(--destructive-foreground)}.t .cost{color:var(--signal-cost-foreground)}
+  .sep{width:1px;align-self:stretch;background:var(--border);margin:0 6px}
+  .toolnote{font-size:10px;color:var(--muted-foreground);margin-left:4px}
+  .moves{margin-top:22px;border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .moves h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .moves .row{display:grid;grid-template-columns:200px 1fr;gap:6px 14px;font-size:12.5px;padding:5px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
+  .moves .row:last-child{border-bottom:none}
+  .moves .from{color:var(--foreground)} .moves .to{color:var(--muted-foreground)}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style></head>
+<body><div class="wrap">
+  <h1>Detail nav — before / after (#6)</h1>
+
+  <div class="lbl"><span class="pill2 bad">before</span> 14 flat tabs</div>
+  <div class="strip">
+    <span class="t active">Overview</span><span class="t">Review</span><span class="t">Test</span><span class="t">PR &amp; CI</span><span class="t">Conversation</span><span class="t">Diff</span><span class="t">Files</span><span class="t">Terminal</span><span class="t">PRD / Plan</span><span class="t">Discussion</span><span class="t">Costs</span><span class="t">Activity</span><span class="t">Artifacts</span><span class="t">History</span>
+  </div>
+
+  <div class="lbl"><span class="pill2 ok">after</span> 7 deep-content groups + 3 tools (tools relocate to panes in #10)</div>
+  <div class="strip">
+    <span class="t">Overview</span>
+    <span class="t active">Code <span class="b"><span class="add">+5039</span> <span class="del">−42</span></span></span>
+    <span class="t">PRD / Plan</span>
+    <span class="t">Timeline</span>
+    <span class="t">Discussion</span>
+    <span class="t">Costs <span class="b cost">$67</span></span>
+    <span class="t">Artifacts</span>
+    <span class="sep"></span>
+    <span class="t">Conversation</span><span class="t">Files</span><span class="t">Terminal</span>
+    <span class="toolnote">← tools (→ #10)</span>
+  </div>
+
+  <div class="moves">
+    <h3>What actually moved (real moves only)</h3>
+    <div class="row"><span class="from">PR &amp; CI · Diff</span><span class="to">→ merged into <b>Code</b> (CI checks + changed-files/diff; #7 adds the file tree)</span></div>
+    <div class="row"><span class="from">Activity · History</span><span class="to">→ merged into <b>Timeline</b></span></div>
+    <div class="row"><span class="from">Review · Test</span><span class="to">→ removed as status tabs (status is already in the Agents lane + gates). Review <i>findings</i> open by clicking the Review agent in the lane.</span></div>
+    <div class="row"><span class="from">Beads</span><span class="to">→ the right rail (done in #1)</span></div>
+    <div class="row"><span class="from">Conversation · Files · Terminal</span><span class="to">→ kept for now; become panes/agent-select in #10</span></div>
+    <div class="row"><span class="from">Overview · Plan · Discussion · Costs · Artifacts</span><span class="to">→ unchanged (just fewer neighbors)</span></div>
+  </div>
+</div></body></html>
