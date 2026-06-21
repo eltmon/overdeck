@@ -576,6 +576,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'diff', label: 'Diff', icon: SplitSquareVertical },
   { id: 'desktop', label: 'Desktop App', icon: Monitor },
   { id: 'maintenance', label: 'Maintenance', icon: Wrench },
+  { id: 'experimental', label: 'Experimental', icon: Beaker },
 ];
 
 export function SettingsPage() {
@@ -1550,6 +1551,16 @@ export function SettingsPage() {
       experimental: {
         ...formData.experimental,
         claudeCodeChannels: enabled,
+      },
+    });
+  };
+
+  const handleExperimentalFeaturesToggle = (enabled: boolean) => {
+    applySettings({
+      ...formData,
+      experimental: {
+        ...formData.experimental,
+        experimentalFeatures: enabled,
       },
     });
   };
@@ -3994,6 +4005,30 @@ export function SettingsPage() {
           Research-preview features that may change or be removed without notice.
         </p>
         <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Experimental features</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Show experimental dashboard surfaces in the sidebar: Agents, AutoPreso, Resources, Activity, Sessions, Metrics, Costs, Health, Skills, and God View.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.experimental?.experimentalFeatures)}
+              aria-label="Show experimental dashboard features"
+              data-testid="experimental-features-toggle"
+              onClick={() => handleExperimentalFeaturesToggle(!formData.experimental?.experimentalFeatures)}
+              disabled={saveStatus === 'saving'}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                formData.experimental?.experimentalFeatures ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                formData.experimental?.experimentalFeatures ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
           <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
             <div className="min-w-0">
               <span className="text-sm font-medium text-foreground">RTK Bash compression</span>

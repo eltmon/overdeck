@@ -216,6 +216,8 @@ export interface ApiSettingsConfig {
     rally?: string;
   };
   experimental?: {
+    /** Show experimental dashboard surfaces in navigation and direct routes. */
+    experimentalFeatures?: boolean;
     /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
     /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
@@ -695,6 +697,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     },
     tracker_keys: config.trackerKeys,
     experimental: {
+      experimentalFeatures: config.experimental?.experimentalFeatures ?? false,
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
       claudeCodeChannelsMcp: config.experimental?.claudeCodeChannelsMcp ?? false,
       streamdownRenderer: config.experimental?.streamdownRenderer ?? false,
@@ -889,6 +892,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
       ? {
+          experimentalFeatures: settings.experimental.experimentalFeatures,
           claudeCodeChannels: settings.experimental.claudeCodeChannels,
           claudeCodeChannelsMcp: settings.experimental.claudeCodeChannelsMcp,
           streamdownRenderer: settings.experimental.streamdownRenderer,
@@ -1146,7 +1150,10 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (typeof settings.experimental !== 'object' || settings.experimental === null) {
       errors.push('experimental must be an object');
     } else {
-      const experimental = settings.experimental as { claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown; streamdownRenderer?: unknown; showHarnessModelPermutations?: unknown };
+      const experimental = settings.experimental as { experimentalFeatures?: unknown; claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown; streamdownRenderer?: unknown; showHarnessModelPermutations?: unknown };
+      if (experimental.experimentalFeatures !== undefined && typeof experimental.experimentalFeatures !== 'boolean') {
+        errors.push('experimental.experimentalFeatures must be a boolean');
+      }
       if (experimental.claudeCodeChannels !== undefined && typeof experimental.claudeCodeChannels !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
       }

@@ -13,6 +13,7 @@ import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
 import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
+import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
 import type { Issue, Agent } from '../types';
 import type { Tab } from './Header';
 
@@ -251,6 +252,20 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   });
   const flywheelRuns = Array.isArray(flywheelRunsRaw) ? flywheelRunsRaw : [];
   const hasActiveFlywheelRun = flywheelRuns.some((run) => run.status === 'running');
+  const { data: experimentalFeaturesEnabled = false } = useQuery({
+    queryKey: ['settings', 'experimental-features'],
+    queryFn: fetchExperimentalFeaturesEnabled,
+    staleTime: 30_000,
+  });
+  const visibleMoreGroups = useMemo(
+    () => MORE_GROUPS
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => experimentalFeaturesEnabled || !isExperimentalTab(item.id)),
+      }))
+      .filter((group) => group.items.length > 0),
+    [experimentalFeaturesEnabled],
+  );
 
   const rebuildMutation = useMutation({
     mutationFn: async () => {
@@ -471,7 +486,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                 <MoreHorizontal className="w-3 h-3" />
                 More
               </button>
-              {!moreCollapsed && MORE_GROUPS.map((group) => (
+              {!moreCollapsed && visibleMoreGroups.map((group) => (
                 <div key={group.label} className="mb-1">
                   <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70 mt-3 mb-1">
                     {group.label}
@@ -481,7 +496,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               ))}
             </div>
           ) : (
-            MORE_GROUPS.map((group) => (
+            visibleMoreGroups.map((group) => (
               <div key={group.label} className="mb-2">
                 <div className="h-px mx-2 bg-border my-2" />
                 {group.items.map(renderNavItem)}

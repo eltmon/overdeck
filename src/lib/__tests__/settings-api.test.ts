@@ -125,7 +125,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         rollupPendingThreshold: 4,
         sidebarRefreshIntervalMs: 10000,
       },
-      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: false, showHarnessModelPermutations: false },
+      experimental: { experimentalFeatures: false, claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: false, showHarnessModelPermutations: false },
       rtk: { enabled: false },
       claude: { permissionMode: 'auto' },
       tts: {
@@ -211,13 +211,15 @@ describe('loadSettingsApi', () => {
 
     expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(false);
     expect(loadSettingsApi().experimental?.showHarnessModelPermutations).toBe(false);
+    expect(loadSettingsApi().experimental?.experimentalFeatures).toBe(false);
 
     mockLoadConfig.mockReturnValue(baseConfig({
-      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: true, showHarnessModelPermutations: true },
+      experimental: { experimentalFeatures: true, claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: true, showHarnessModelPermutations: true },
     }));
 
     expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(true);
     expect(loadSettingsApi().experimental?.showHarnessModelPermutations).toBe(true);
+    expect(loadSettingsApi().experimental?.experimentalFeatures).toBe(true);
   });
 
   it('returns seeded workhorses and roles without legacy overrides', async () => {
@@ -570,6 +572,7 @@ describe('saveSettingsApi', () => {
       ...settings,
       experimental: {
         ...settings.experimental,
+        experimentalFeatures: true,
         streamdownRenderer: true,
         showHarnessModelPermutations: true,
       },
@@ -577,6 +580,7 @@ describe('saveSettingsApi', () => {
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('experimental:');
+    expect(written).toContain('experimentalFeatures: true');
     expect(written).toContain('streamdownRenderer: true');
     expect(written).toContain('showHarnessModelPermutations: true');
   });
@@ -862,6 +866,7 @@ describe('validateSettingsApi', () => {
       experimental: {
         claudeCodeChannels: 'yes',
         claudeCodeChannelsMcp: 'yes',
+        experimentalFeatures: 'yes',
         streamdownRenderer: 'yes',
         showHarnessModelPermutations: 'yes',
       } as never,
@@ -870,6 +875,7 @@ describe('validateSettingsApi', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('experimental.claudeCodeChannels must be a boolean');
     expect(result.errors).toContain('experimental.claudeCodeChannelsMcp must be a boolean');
+    expect(result.errors).toContain('experimental.experimentalFeatures must be a boolean');
     expect(result.errors).toContain('experimental.streamdownRenderer must be a boolean');
     expect(result.errors).toContain('experimental.showHarnessModelPermutations must be a boolean');
   });

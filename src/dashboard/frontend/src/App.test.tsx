@@ -369,6 +369,14 @@ describe('App primary routing', () => {
     renderApp();
     expect(screen.getByTestId('context-page')).toBeInTheDocument();
   });
+
+  it('redirects direct experimental routes to Home when experimental features are off', async () => {
+    window.history.replaceState(null, '', '/agents');
+    renderApp();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+  });
 });
 
 describe('App session feed sidebar', () => {

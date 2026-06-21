@@ -659,6 +659,8 @@ export interface YamlConfig {
  * existing default behaviour when the flag is off.
  */
 export interface ExperimentalConfig {
+  /** Show experimental dashboard surfaces in navigation and direct routes. */
+  experimentalFeatures?: boolean;
   /**
    * Use Claude Code Channels (research-preview MCP capability) for prompt delivery
    * to eligible work agents. When enabled, eligible agents receive prompts via a
@@ -919,6 +921,8 @@ export interface NormalizedConfig {
  * Normalized experimental flags — every flag has a concrete boolean value.
  */
 export interface NormalizedExperimentalConfig {
+  /** Whether experimental dashboard surfaces are visible. */
+  experimentalFeatures: boolean;
   /** Whether Claude Code Channels prompt delivery is enabled for eligible work agents. */
   claudeCodeChannels: boolean;
   /** Whether legacy Claude Code Channels MCP wiring is enabled for new spawns. */
@@ -1191,6 +1195,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     agentBlockCount: 10,
   },
   experimental: {
+    experimentalFeatures: false,
     claudeCodeChannels: false,
     claudeCodeChannelsMcp: false,
     streamdownRenderer: false,
@@ -1850,6 +1855,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
     },
     experimental: {
+      experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
       claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
       streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
@@ -2271,6 +2277,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
 
     if (config.experimental) {
+      if (typeof config.experimental.experimentalFeatures === 'boolean') {
+        result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
+      }
       if (typeof config.experimental.claudeCodeChannels === 'boolean') {
         result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
       }

@@ -63,6 +63,7 @@ import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
 import { usePanesStore } from './lib/panesStore';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
 import { fetchWithTimeout } from './lib/apiFetch';
+import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
 import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 import { ConversationPanel } from './components/chat/ConversationPanel';
@@ -661,6 +662,11 @@ export default function App() {
   });
 
   const showCliproxyBanner = cliproxyStatus && !cliproxyStatus.running;
+  const { data: experimentalFeaturesEnabled = false } = useQuery({
+    queryKey: ['settings', 'experimental-features'],
+    queryFn: fetchExperimentalFeaturesEnabled,
+    staleTime: 30_000,
+  });
 
   const restartCliproxyMutation = useMutation({
     mutationFn: restartCliproxy,
@@ -718,12 +724,19 @@ export default function App() {
 
   // URL-synced tab navigation
   const setActiveTab = useCallback((tab: Tab) => {
-    setActiveTabState(tab);
-    const path = TAB_PATHS[tab];
+    const nextTab = !experimentalFeaturesEnabled && isExperimentalTab(tab) ? 'home' : tab;
+    setActiveTabState(nextTab);
+    const path = TAB_PATHS[nextTab];
     if (window.location.pathname !== path) {
-      window.history.pushState({ tab }, '', path);
+      window.history.pushState({ tab: nextTab }, '', path);
     }
-  }, []);
+  }, [experimentalFeaturesEnabled]);
+
+  useEffect(() => {
+    if (!experimentalFeaturesEnabled && isExperimentalTab(activeTab)) {
+      setActiveTab('home');
+    }
+  }, [activeTab, experimentalFeaturesEnabled, setActiveTab]);
 
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;

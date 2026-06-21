@@ -187,6 +187,8 @@ export interface SettingsConfig {
     };
   };
   experimental?: {
+    /** Show experimental dashboard surfaces in navigation and direct routes. */
+    experimentalFeatures?: boolean;
     /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
     /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
