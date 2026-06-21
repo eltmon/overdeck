@@ -1074,6 +1074,13 @@ export class CloisterService {
       const now = Date.now();
 
       for (const health of needsAttention) {
+        // The sequencer is a long-lived singleton that is SUPPOSED to sit idle
+        // between ranking passes — "no progress in a while" is its normal resting
+        // state, not a stall. Never poke or kill it (it was spamming itself with
+        // "are you stuck?" nudges every cooldown). Health is still recorded above;
+        // only the attention/poke/kill action is skipped.
+        if (getAgentStateSync(health.agentId)?.role === 'sequencer') continue;
+
         const lastPoke = this.lastPokeTimestamps.get(health.agentId) ?? 0;
         const cooledDown = (now - lastPoke) >= pokeCooldownMs;
 
