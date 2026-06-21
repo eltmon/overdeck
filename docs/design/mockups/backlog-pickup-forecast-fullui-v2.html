@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pickup Forecast V2 — with pipeline-state controls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design/style-guide/mockups/_shared.css" />
+<style>
+  body { margin:0; font-family:"DM Sans",system-ui,sans-serif; background:color-mix(in srgb,var(--background) 80%,#000); color:var(--foreground); }
+  .stage { max-width:1500px; margin:0 auto; padding:24px 22px 90px; }
+  .caption { font-family:"Space Grotesk",sans-serif; font-size:13px; color:var(--muted-foreground); margin:26px 6px 8px; display:flex; gap:8px; align-items:center; }
+  .caption b { color:var(--foreground); font-weight:600; }
+  .caption .pin { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--info-foreground); border:1px solid color-mix(in srgb,var(--info) 30%,transparent); background:color-mix(in srgb,var(--info) 8%,transparent); border-radius:5px; padding:2px 7px; }
+  .vtag { font-size:10px; font-weight:700; color:var(--primary-foreground); background:color-mix(in srgb,var(--primary) 30%,transparent); border:1px solid color-mix(in srgb,var(--primary) 50%,transparent); border-radius:5px; padding:2px 7px; }
+
+  .frame { border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.4); background:var(--background); }
+  .app { display:flex; height:850px; }
+  .rail { width:52px; flex:0 0 auto; background:color-mix(in srgb,var(--background) 96%,#000); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding:12px 0; gap:6px; }
+  .rail .mark { color:var(--primary); margin-bottom:8px; }
+  .rail .nav { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); }
+  .rail .nav.active { background:var(--accent); color:var(--foreground); }
+  .rail svg { width:18px; height:18px; }
+
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .head { padding:15px 22px 11px; border-bottom:1px solid var(--border); }
+  .head .top { display:flex; align-items:flex-start; gap:14px; }
+  .head h1 { font-family:"Space Grotesk",sans-serif; font-size:20px; font-weight:600; margin:0; }
+  .head .sub { font-size:12px; color:var(--muted-foreground); margin-top:3px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .runchip { font-size:11px; color:var(--muted-foreground); border:1px solid var(--border); background:var(--card); border-radius:7px; padding:2px 8px; }
+  .runchip b { color:var(--foreground); font-family:"SF Mono",monospace; }
+  .head .controls { margin-left:auto; display:flex; align-items:center; gap:9px; }
+  .vtoggle { display:flex; border:1px solid var(--input); border-radius:9px; overflow:hidden; }
+  .vtoggle button { background:transparent; border:none; color:var(--muted-foreground); font:inherit; font-size:12px; font-weight:500; padding:7px 12px; cursor:pointer; }
+  .vtoggle button.on { background:var(--accent); color:var(--foreground); }
+  .agents { display:inline-flex; align-items:center; gap:6px; height:33px; padding:0 10px; border:1px solid var(--input); border-radius:9px; font-size:12px; color:var(--muted-foreground); }
+  .agents b { color:var(--foreground); font-family:"SF Mono",monospace; }
+  .btn-p { display:inline-flex; align-items:center; gap:6px; height:33px; padding:0 12px; border-radius:9px; border:1px solid color-mix(in srgb,var(--primary) 50%,transparent); background:color-mix(in srgb,var(--primary) 18%,transparent); color:var(--foreground); font-size:12px; font-weight:600; cursor:pointer; }
+
+  /* state filter / legend bar */
+  .filters { display:flex; gap:7px; align-items:center; padding:10px 22px; border-bottom:1px solid var(--border); flex-wrap:wrap; background:color-mix(in srgb,var(--background) 97%,#000); }
+  .filters .lbl { font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); margin-right:2px; }
+  .sf { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; padding:4px 9px; border-radius:7px; border:1px solid var(--border); background:var(--card); color:var(--muted-foreground); cursor:pointer; }
+  .sf .ct { font-family:"SF Mono",monospace; color:var(--foreground); }
+  .sf .d { width:8px; height:8px; border-radius:2px; }
+  .sf.on { border-color:color-mix(in srgb,var(--primary) 45%,transparent); }
+
+  .body { flex:1; display:flex; min-height:0; }
+  .forecast { flex:1; min-width:0; padding:16px 20px; overflow:auto; background:radial-gradient(circle at 1px 1px, color-mix(in srgb,var(--muted-foreground) 12%,transparent) 1px, transparent 0); background-size:22px 22px; }
+  .sub-tabs { display:flex; gap:6px; margin-bottom:14px; }
+  .sub-tabs button { background:transparent; border:1px solid var(--input); border-radius:8px; color:var(--muted-foreground); font:inherit; font-size:11px; font-weight:500; padding:5px 11px; cursor:pointer; }
+  .sub-tabs button.on { background:var(--accent); color:var(--foreground); }
+
+  .waves { display:flex; align-items:flex-start; gap:0; }
+  .wcol { width:206px; flex:0 0 auto; }
+  .wh { font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted-foreground); margin-bottom:9px; display:flex; gap:7px; align-items:center; }
+  .wh .c { font-family:"SF Mono",monospace; color:var(--foreground); font-weight:700; }
+  .wcol.now .wh { color:var(--info-foreground); }
+  .wstack { display:flex; flex-direction:column; gap:8px; }
+  .warr { width:36px; flex:0 0 auto; align-self:center; padding-top:54px; color:color-mix(in srgb,var(--muted-foreground) 70%,transparent); display:flex; justify-content:center; }
+  .warr svg{ width:24px; height:24px; }
+
+  .fc { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.3); position:relative; }
+  .fc:hover{ box-shadow:0 5px 16px rgba(0,0,0,.4); }
+  .fc.crit{--heat:var(--destructive);} .fc.high{--heat:var(--warning);} .fc.medium{--heat:color-mix(in srgb,var(--color-neutral-400) 80%,transparent);}
+  .fc.pipe{ box-shadow:0 0 0 1.5px var(--info),0 0 12px color-mix(in srgb,var(--info) 40%,transparent); animation:rp 2.6s ease-in-out infinite;}
+  @keyframes rp{0%,100%{box-shadow:0 0 0 1.5px var(--info),0 0 9px color-mix(in srgb,var(--info) 30%,transparent);}50%{box-shadow:0 0 0 1.5px var(--info),0 0 18px color-mix(in srgb,var(--info) 55%,transparent);}}
+  .fc.parked{ opacity:.6; border-style:dashed; }
+  .fc.vetoed{ opacity:.5; filter:grayscale(.5); border-style:dashed; }
+  .fc.blocksmain{ box-shadow:0 0 0 1.5px var(--destructive),0 0 12px color-mix(in srgb,var(--destructive) 35%,transparent); }
+  .fc .lock{ position:absolute; top:7px; right:7px; color:var(--muted-foreground); }
+  .fr1{ display:flex; align-items:center; gap:6px; }
+  .rk{ font-family:"SF Mono",monospace; font-size:10px; font-weight:600; background:var(--accent); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
+  .iid{ font-family:"SF Mono",monospace; font-size:10px; color:var(--muted-foreground); }
+  .sz{ margin-left:auto; font-size:8.5px; font-weight:600; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
+  .ftt{ font-size:11px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .chips{ display:flex; gap:4px; flex-wrap:wrap; }
+  .chip{ font-size:8.5px; font-weight:600; padding:1px 5px; border-radius:4px; border:1px solid; }
+  .chip.ready{ color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 32%,transparent); background:color-mix(in srgb,var(--success) 9%,transparent);}
+  .chip.planned{ color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 30%,transparent); background:color-mix(in srgb,var(--info) 8%,transparent);}
+  .chip.prd{ color:var(--muted-foreground); border-color:var(--border); background:var(--accent);}
+  .chip.parked{ color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 34%,transparent); background:color-mix(in srgb,var(--warning) 9%,transparent);}
+  .chip.vetoed{ color:var(--muted-foreground); border-color:var(--border); background:var(--accent);}
+  .chip.blocksmain{ color:var(--destructive-foreground); border-color:color-mix(in srgb,var(--destructive) 38%,transparent); background:color-mix(in srgb,var(--destructive) 9%,transparent);}
+  .chip.run{ color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 9%,transparent); display:inline-flex; gap:3px; align-items:center;}
+  .dot{ width:5px; height:5px; border-radius:50%; background:currentColor; animation:bl 1.4s infinite;} @keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
+
+  /* plan-next rail */
+  .planrail { width:330px; flex:0 0 auto; border-left:1px solid var(--border); background:color-mix(in srgb,var(--background) 97%,#000); display:flex; flex-direction:column; }
+  .pr-h { padding:14px 15px 11px; border-bottom:1px solid var(--border); }
+  .pr-h .t { font-family:"Space Grotesk",sans-serif; font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .pr-h .t .bolt { color:var(--warning-foreground); }
+  .pr-h .d { font-size:11px; color:var(--muted-foreground); line-height:1.5; margin-top:5px; }
+  .pr-list { padding:10px 11px; overflow:auto; display:flex; flex-direction:column; gap:9px; }
+  .psug { border:1px solid var(--border); border-left:4px solid var(--destructive); border-radius:10px; background:var(--card); padding:9px 10px; display:flex; flex-direction:column; gap:6px; cursor:pointer; }
+  .psug.high { border-left-color:var(--warning); }
+  .ps-top { display:flex; align-items:center; gap:7px; }
+  .ps-imp { font-size:8.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--destructive-foreground); }
+  .ps-tt { font-size:11.5px; font-weight:500; line-height:1.32; }
+  .ps-act { display:flex; gap:6px; margin-top:1px; }
+  .b-auto { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; height:29px; border-radius:8px; border:1px solid color-mix(in srgb,var(--primary) 55%,transparent); background:color-mix(in srgb,var(--primary) 20%,transparent); color:var(--foreground); font-size:11px; font-weight:600; cursor:pointer; }
+  .b-plan { flex:1; display:inline-flex; align-items:center; justify-content:center; height:29px; border-radius:8px; border:1px solid var(--input); background:transparent; color:var(--muted-foreground); font-size:11px; cursor:pointer; }
+
+  /* ── DETAIL DRAWER = the editor (the V2 star) ── */
+  .drawer { width:560px; margin:0 auto; border:1px solid var(--border); border-radius:14px; background:var(--card); box-shadow:0 18px 50px rgba(0,0,0,.4); overflow:hidden; }
+  .dw-h { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .dw-h .ey { font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted-foreground); }
+  .dw-h .x { margin-left:auto; color:var(--muted-foreground); cursor:pointer; }
+  .dw-b { padding:18px; }
+  .dw-id { font-family:"SF Mono",monospace; font-size:12px; color:var(--muted-foreground); }
+  .dw-t { font-size:16px; font-weight:600; line-height:1.35; margin:3px 0 14px; }
+  .meta { display:grid; grid-template-columns:auto 1fr; gap:7px 16px; font-size:12.5px; margin-bottom:6px; }
+  .meta .k{ color:var(--muted-foreground);} .meta .v{ text-align:right; color:var(--foreground);}
+  .bar{ height:5px; border-radius:3px; background:var(--accent); overflow:hidden; margin:2px 0 16px;} .bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--warning),var(--destructive));}
+
+  .sect { border-top:1px solid var(--border); padding-top:13px; margin-top:4px; }
+  .sect-h { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted-foreground); margin-bottom:11px; }
+  .ctrl { display:flex; align-items:center; gap:12px; margin-bottom:13px; }
+  .ctrl .info { flex:1; min-width:0; }
+  .ctrl .nm { font-size:13px; font-weight:500; display:flex; align-items:center; gap:7px; }
+  .ctrl .hint { font-size:11px; color:var(--muted-foreground); line-height:1.4; margin-top:2px; }
+  .badge { font-size:9px; font-weight:600; padding:1px 6px; border-radius:5px; border:1px solid; }
+  .badge.ok{ color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 34%,transparent); background:color-mix(in srgb,var(--success) 9%,transparent);}
+  .badge.no{ color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 36%,transparent); background:color-mix(in srgb,var(--warning) 9%,transparent);}
+  /* toggle switch */
+  .sw { width:38px; height:22px; border-radius:12px; background:var(--input); position:relative; cursor:pointer; transition:background .15s; flex:0 0 auto; }
+  .sw .k { position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 2px rgba(0,0,0,.4); }
+  .sw.on .k { left:18px; }
+  .sw.on.green { background:color-mix(in srgb,var(--success) 60%,transparent); }
+  .sw.on.amber { background:color-mix(in srgb,var(--warning) 60%,transparent); }
+  .sw.on.red { background:color-mix(in srgb,var(--destructive) 65%,transparent); }
+  /* gate segmented */
+  .seg { display:flex; border:1px solid var(--input); border-radius:9px; overflow:hidden; flex:0 0 auto; }
+  .seg button { background:transparent; border:none; border-right:1px solid var(--input); color:var(--muted-foreground); font:inherit; font-size:11.5px; font-weight:500; padding:6px 12px; cursor:pointer; }
+  .seg button:last-child{ border-right:none; }
+  .seg button.on-auto{ background:var(--accent); color:var(--foreground);}
+  .seg button.on-promote{ background:color-mix(in srgb,var(--primary) 20%,transparent); color:var(--foreground);}
+  .seg button.on-veto{ background:color-mix(in srgb,var(--destructive) 18%,transparent); color:var(--destructive-foreground);}
+  .plan-row{ display:flex; gap:7px; }
+  .plan-row .b-auto, .plan-row .b-plan { height:30px; font-size:11.5px; }
+  .actbar{ display:flex; gap:9px; padding-top:14px; margin-top:6px; border-top:1px solid var(--border); }
+  .actbar .b-auto, .actbar .b-plan { height:38px; font-size:13px; }
+  .b-open { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:38px; padding:0 14px; border-radius:9px; border:1px solid var(--input); background:transparent; color:var(--muted-foreground); font-size:12.5px; cursor:pointer; }
+  .rat{ font-size:12px; line-height:1.6; color:color-mix(in srgb,var(--foreground) 86%,transparent); border-top:1px solid var(--border); padding-top:13px; margin-top:14px;}
+  .rat .lbl{ font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted-foreground); margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="caption"><span class="pin">screen 1</span> <span class="vtag">V2</span> <b>Backlog Sequencer · Pickup Forecast</b> — now with the pipeline-state vocabulary (Ready · Planned · parked · vetoed · blocks-main) shown on cards and a state filter bar.</div>
+  <div class="frame"><div class="app">
+    <nav class="rail">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></div>
+      <div class="nav active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8.5 6.5 15.5 11M8.5 17.5 15.5 13"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10.5" y="3" width="6" height="12" rx="1"/><rect x="18" y="3" width="3" height="8" rx="1"/></svg></div>
+    </nav>
+    <div class="main">
+      <div class="head">
+        <div class="top">
+          <div>
+            <h1>Backlog Sequencer</h1>
+            <div class="sub">
+              <span>550 open · ranked for pickup</span>
+              <span class="runchip">RUN-36 · cohort <b>5/18</b> drained</span>
+            </div>
+          </div>
+          <div class="controls">
+            <div class="vtoggle"><button>Dependency</button><button class="on">Pickup Forecast</button></div>
+            <div class="agents">⚙ <b>5</b> agents</div>
+            <button class="btn-p"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Re-sequence</button>
+          </div>
+        </div>
+      </div>
+      <div class="filters">
+        <span class="lbl">Show</span>
+        <span class="sf on"><span class="d" style="background:var(--info)"></span>In flight <span class="ct">7</span></span>
+        <span class="sf on"><span class="d" style="background:var(--success)"></span>Ready <span class="ct">9</span></span>
+        <span class="sf on"><span class="d" style="background:var(--info)"></span>Planned <span class="ct">9</span></span>
+        <span class="sf"><span class="d" style="background:var(--destructive)"></span>Blocks main <span class="ct">6</span></span>
+        <span class="sf"><span class="d" style="background:var(--warning)"></span>Parked <span class="ct">3</span></span>
+        <span class="sf"><span class="d" style="background:var(--muted-foreground)"></span>Vetoed <span class="ct">1</span></span>
+        <span class="sf" style="margin-left:auto">Needs planning <span class="ct">528</span></span>
+      </div>
+      <div class="body">
+        <div class="forecast">
+          <div class="sub-tabs"><button class="on">Waves</button><button>Lanes</button></div>
+          <div class="waves">
+            <div class="wcol now">
+              <div class="wh">▶ Running now <span class="c">3</span></div>
+              <div class="wstack">
+                <div class="fc crit pipe"><div class="fr1"><span class="rk">#1</span><span class="iid">PAN-1908</span><span class="sz">XL</span></div><div class="ftt">Event-driven agent state — SQLite registry</div><div class="chips"><span class="chip run"><span class="dot"></span>in flight</span></div></div>
+                <div class="fc crit pipe"><div class="fr1"><span class="rk">#2</span><span class="iid">PAN-1866</span><span class="sz">XL</span></div><div class="ftt">Backlog Sequencer — whole-backlog DAG</div><div class="chips"><span class="chip run"><span class="dot"></span>in flight</span></div></div>
+                <div class="fc crit pipe"><div class="fr1"><span class="rk">#3</span><span class="iid">PAN-1919</span><span class="sz">L</span></div><div class="ftt">Consolidate per-issue resume state</div><div class="chips"><span class="chip run"><span class="dot"></span>in flight</span></div></div>
+              </div>
+            </div>
+            <div class="warr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+            <div class="wcol">
+              <div class="wh">Wave <span class="c">1</span></div>
+              <div class="wstack">
+                <div class="fc crit blocksmain"><div class="fr1"><span class="rk">#7</span><span class="iid">PAN-2000</span><span class="sz">M</span></div><div class="ftt">RED MAIN — spawn-sequencer stale assertion</div><div class="chips"><span class="chip blocksmain">🔴 blocks main</span><span class="chip parked" style="color:var(--warning-foreground)">needs plan</span></div></div>
+                <div class="fc high"><div class="fr1"><span class="rk">#16</span><span class="iid">PAN-1918</span><span class="sz">M</span></div><div class="ftt">vitest suite runs in no CI path</div><div class="chips"><span class="chip ready">✓ ready</span><span class="chip planned">planned</span></div></div>
+                <div class="fc medium"><div class="fr1"><span class="rk">#73</span><span class="iid">PAN-1862</span><span class="sz">L</span></div><div class="ftt">cache-sharing review convoy</div><div class="chips"><span class="chip ready">✓ ready</span><span class="chip planned">planned</span></div></div>
+              </div>
+            </div>
+            <div class="warr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+            <div class="wcol">
+              <div class="wh">Wave <span class="c">2</span> + held</div>
+              <div class="wstack">
+                <div class="fc medium"><div class="fr1"><span class="rk">#267</span><span class="iid">PAN-1533</span><span class="sz">M</span></div><div class="ftt">fork-into-worktree from branch chip</div><div class="chips"><span class="chip ready">✓ ready</span><span class="chip planned">planned</span></div></div>
+                <div class="fc medium parked"><div class="fr1"><span class="rk">#41</span><span class="iid">PAN-1788</span><span class="sz">XL</span></div><div class="ftt">Merge-train live-cascade validation harness</div><div class="chips"><span class="chip parked">⏸ parked</span></div></div>
+                <div class="fc low vetoed"><span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><div class="fr1"><span class="rk">#88</span><span class="iid">PAN-1604</span><span class="sz">L</span></div><div class="ftt">Auto-rewrite git history on conflict (risky)</div><div class="chips"><span class="chip vetoed">⛔ vetoed</span></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:18px; font-size:11px; color:var(--muted-foreground); border-top:1px dashed var(--border); padding-top:12px; max-width:660px; line-height:1.55">
+            <b style="color:var(--destructive-foreground)">🔴 blocks main</b> jumps the queue even with auto-pickup off · <b style="color:var(--warning-foreground)">⏸ parked</b> is held pending design · <b>⛔ vetoed</b> is a hard NO nothing can override. Click any card to edit these →
+          </div>
+        </div>
+
+        <aside class="planrail">
+          <div class="pr-h">
+            <div class="t"><span class="bolt">⚡</span> Plan next — highest leverage</div>
+            <div class="d">Top-ranked, not yet <b>planned</b> (no spec). The 🔴 ones also block main — plan them first.</div>
+          </div>
+          <div class="pr-list">
+            <div class="psug"><div class="ps-top"><span class="rk">#7</span><span class="iid">PAN-2000</span><span class="ps-imp">critical · 🔴 blocks main</span></div><div class="ps-tt">RED MAIN — spawn-sequencer stale assertion</div><div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div></div>
+            <div class="psug"><div class="ps-top"><span class="rk">#8</span><span class="iid">PAN-1903</span><span class="ps-imp">critical · 🔴 blocks main</span></div><div class="ps-tt">RED MAIN — create-beads flaky "table not found"</div><div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div></div>
+            <div class="psug high"><div class="ps-top"><span class="rk">#10</span><span class="iid">PAN-1859</span><span class="ps-imp">critical</span></div><div class="ps-tt">RED MAIN — agent-spawning resumeAgent continuation</div><div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="caption"><span class="pin">screen 2</span> <span class="vtag">V2</span> <b>Click an issue → the editor drawer</b> — this is where you toggle the pipeline state: Ready, the pickup gate (auto/promote/vetoed), park, and blocks-main.</div>
+  <div class="drawer">
+    <div class="dw-h"><span class="ey">Why rank #7</span><span class="x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div>
+    <div class="dw-b">
+      <div class="dw-id">PAN-2000 · critical · M effort</div>
+      <div class="dw-t">bug(ci): RED MAIN — spawn-sequencer stale assertion + worker-pool health</div>
+      <div class="meta">
+        <span class="k">Impact score</span><span class="v" style="font-family:'SF Mono',monospace">95 / 100</span>
+      </div>
+      <div class="bar"><i style="width:95%"></i></div>
+
+      <div class="sect">
+        <div class="sect-h">Pipeline state · operator controls</div>
+
+        <div class="ctrl">
+          <div class="info"><div class="nm">Ready</div><div class="hint">Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate). The <code style="background:var(--accent);padding:0 3px;border-radius:3px">ready</code> label.</div></div>
+          <div class="sw on green"><div class="k"></div></div>
+        </div>
+
+        <div class="ctrl">
+          <div class="info"><div class="nm">Planned <span class="badge no">✗ no spec</span></div><div class="hint">Derived — has a vBRIEF + beads. Read-only; produced by planning. Not planned yet:</div>
+            <div class="plan-row" style="margin-top:7px"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div>
+          </div>
+        </div>
+
+        <div class="ctrl">
+          <div class="info"><div class="nm">Pickup gate</div><div class="hint"><b>Promote</b>: jump the queue (+ auto-plan if unplanned). <b>Vetoed</b>: hard NO — never pick up, even to unblock main.</div></div>
+          <div class="seg"><button class="on-auto">Auto</button><button>Promote</button><button>Vetoed</button></div>
+        </div>
+
+        <div class="ctrl">
+          <div class="info"><div class="nm">Blocks main 🔴</div><div class="hint">This must land to green main. The Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed). The <code style="background:var(--accent);padding:0 3px;border-radius:3px">blocks-main</code> label.</div></div>
+          <div class="sw on red"><div class="k"></div></div>
+        </div>
+
+        <div class="ctrl">
+          <div class="info"><div class="nm">Park</div><div class="hint">Defer — needs human design/discussion. Excluded from auto-pickup, reversible. The <code style="background:var(--accent);padding:0 3px;border-radius:3px">parked</code> label.</div></div>
+          <div class="sw"><div class="k"></div></div>
+        </div>
+      </div>
+
+      <div class="actbar">
+        <button class="b-auto">⚡ Auto-plan <span style="opacity:.7;font-weight:400;font-size:11px">(pan plan --auto)</span></button>
+        <button class="b-plan">Plan interactively</button>
+        <button class="b-open"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>Open</button>
+      </div>
+
+      <div class="rat">
+        <div class="lbl">AI rationale · from sequence.md</div>
+        Critical CI breakage — main has been red since the PAN-1866 sequencer landed; the stale assertion blocks every downstream merge gate. Highest-leverage fix to restore green main; no dependencies, small effort. Marked <b>blocks-main</b> so the Flywheel strikes it even with auto-pickup off.
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
