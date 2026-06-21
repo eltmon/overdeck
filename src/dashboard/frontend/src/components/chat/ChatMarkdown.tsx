@@ -451,6 +451,40 @@ interface ChatMarkdownProps {
   useStreamdown?: boolean;
 }
 
+// Messages above this size are rendered as plain text behind a collapse instead
+// of through the markdown parser + syntax highlighter, which freezes the panel on
+// very large content (e.g. a backlog-sequencer manifest accidentally inlined into a
+// single message — PAN-1866). Skipping markdown means the browser never builds a
+// huge AST or runs Shiki over hundreds of KB.
+const LARGE_MESSAGE_CHARS = 50_000;
+const LARGE_MESSAGE_PREVIEW_CHARS = 8_000;
+
+function LargeMessageBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const kb = Math.round(text.length / 1024);
+  const overPreview = text.length > LARGE_MESSAGE_PREVIEW_CHARS;
+  const shown = expanded || !overPreview ? text : text.slice(0, LARGE_MESSAGE_PREVIEW_CHARS);
+  return (
+    <div className={styles.chatMarkdown}>
+      <div style={{ fontSize: '0.8em', opacity: 0.6, marginBottom: 6 }}>
+        Large message ({kb} KB) — rendered as plain text to keep the panel responsive.
+      </div>
+      <pre className={styles.mdFallback} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {shown}{!expanded && overPreview ? '\n…' : ''}
+      </pre>
+      {overPreview && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          style={{ marginTop: 6, fontSize: '0.8em', background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', padding: 0 }}
+        >
+          {expanded ? 'Show less' : `Show full message (${kb} KB)`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export const ChatMarkdown = memo(function ChatMarkdown({
   text,
   isStreaming = false,
@@ -465,6 +499,16 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   );
   const contextUseStreamdown = useContext(StreamdownRendererContext);
   const renderWithStreamdown = useStreamdown ?? contextUseStreamdown;
+
+  // Guard: pathologically large messages would freeze the markdown parser/
+  // highlighter — render them as plain text behind a collapse instead (PAN-1866).
+  if (text.length > LARGE_MESSAGE_CHARS) {
+    return (
+      <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
+        <LargeMessageBlock text={text} />
+      </ChatMarkdownErrorBoundary>
+    );
+  }
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
