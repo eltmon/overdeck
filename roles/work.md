@@ -56,7 +56,7 @@ For every bead:
 2. `bd update <bead-id> --claim` — claim it.
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
-5. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory).
+5. Update the per-issue record (`resumePoint`, decisions, hazards, sessionHistory) at `<project-root>/.pan/records/<issue-id-lowercase>.json` — two levels above the workspace. Use the record writers from `src/lib/pan-dir/record.ts` or edit the JSON directly. Do **not** write to `.pan/continue.json`.
 6. `bd close <bead-id> --reason="…"`.
 7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
 8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
@@ -107,7 +107,7 @@ If a subagent fails or returns wrong output:
 
 - Retry once with a clarified prompt that names the specific failure.
 - If it fails again, fall back to doing the bead yourself, serially.
-- Record the fan-out attempt and any failure in `.pan/continue.json` `sessionHistory` so review and crash recovery have context.
+- Record the fan-out attempt and any failure in the per-issue record's `sessionHistory` (`.pan/records/<issue-id>.json`) so review and crash recovery have context.
 
 Do **not** loop forever on a failing subagent. Two attempts, then serial fallback.
 
