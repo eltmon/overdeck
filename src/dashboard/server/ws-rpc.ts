@@ -823,7 +823,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
             if (conv.harness === 'pi') {
               return streamResolvedFullParseSnapshots(
-                () => resolvePiSessionPath(input.conversationName),
+                () => resolvePiSessionPath(conv.tmuxSession),
                 parsePiConversationMessages,
                 conv.model ?? null,
               );
@@ -831,7 +831,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
             if (conv.harness === 'codex') {
               return streamResolvedFullParseSnapshots(
-                () => resolveCodexRolloutPath(input.conversationName),
+                () => resolveCodexRolloutPath(conv.tmuxSession),
                 parseCodexConversationMessages,
                 conv.model ?? null,
               );
