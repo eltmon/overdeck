@@ -3,11 +3,12 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { ComposerFooter } from '../ComposerFooter';
 import { resetComposerStore } from '../../../lib/composerStore';
 
-const { editorState, mockFocus, mockToastError, mockSaveStoredModel } = vi.hoisted(() => ({
+const { editorState, mockFocus, mockToastError, mockSaveStoredModel, voiceWidgetRenders } = vi.hoisted(() => ({
   editorState: { text: '' },
   mockFocus: vi.fn(),
   mockToastError: vi.fn(),
   mockSaveStoredModel: vi.fn(),
+  voiceWidgetRenders: [] as Array<{ autoStartToken?: number }>,
 }));
 
 vi.mock('lexical', () => ({
@@ -60,6 +61,13 @@ vi.mock('../EffortPicker', () => ({
   loadStoredEffort: () => 'medium',
 }));
 
+vi.mock('../VoiceWidget', () => ({
+  VoiceWidget: (props: { autoStartToken?: number }) => {
+    voiceWidgetRenders.push(props);
+    return <div data-testid="voice-widget" data-auto-start-token={props.autoStartToken ?? 0} />;
+  },
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
@@ -98,6 +106,7 @@ describe('ComposerFooter image attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetComposerStore();
+    voiceWidgetRenders.length = 0;
     editorState.text = '';
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('image-1');
     vi.stubGlobal('fetch', vi.fn());
@@ -182,6 +191,16 @@ describe('ComposerFooter image attachments', () => {
     });
     expect(onSend).toHaveBeenCalledWith('@/tmp/overdeck-paste-uploaded.png\nhello world');
     expect(screen.queryByText('paste.png')).not.toBeInTheDocument();
+  });
+
+  it('opens voice input and starts recording with Ctrl+Shift+M', async () => {
+    render(<ComposerFooter conversation={conversation} />);
+
+    fireEvent.keyDown(window, { key: 'M', ctrlKey: true, shiftKey: true });
+
+    const widget = await screen.findByTestId('voice-widget');
+    expect(widget).toHaveAttribute('data-auto-start-token', '1');
+    expect(voiceWidgetRenders.at(-1)?.autoStartToken).toBe(1);
   });
 
   it('uploads dropped images through the same endpoint', async () => {

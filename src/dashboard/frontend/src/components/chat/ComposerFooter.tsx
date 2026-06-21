@@ -131,6 +131,7 @@ export function ComposerFooter({
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
+  const [voiceAutoStartToken, setVoiceAutoStartToken] = useState(0);
   const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
   const editorRef = useRef<LexicalEditor | null>(null);
   const previousConversationNameRef = useRef(conversation.name);
@@ -508,6 +509,21 @@ export function ComposerFooter({
     editor.focus();
   }, []);
 
+  useEffect(() => {
+    const handleVoiceShortcut = (event: KeyboardEvent) => {
+      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const usesModifier = isMac ? event.metaKey : event.ctrlKey;
+      if (!usesModifier || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 'm') return;
+      if (isDisabled) return;
+      event.preventDefault();
+      setIsVoiceWidgetOpen(true);
+      setVoiceAutoStartToken((token) => token + 1);
+    };
+
+    window.addEventListener('keydown', handleVoiceShortcut);
+    return () => window.removeEventListener('keydown', handleVoiceShortcut);
+  }, [isDisabled]);
+
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
       if (key === 'Enter') void handleSubmit();
@@ -598,7 +614,7 @@ export function ComposerFooter({
             onClick={() => setIsVoiceWidgetOpen((open) => !open)}
             disabled={isDisabled}
             type="button"
-            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input'}
+            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
           >
             {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
@@ -621,6 +637,7 @@ export function ComposerFooter({
             onInsert={insertVoiceText}
             onSendDirect={(voiceText) => void handleSubmit(voiceText)}
             onStateChange={setVoiceState}
+            autoStartToken={voiceAutoStartToken}
           />
         )}
       </div>

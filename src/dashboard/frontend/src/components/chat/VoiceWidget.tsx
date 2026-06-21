@@ -1,4 +1,4 @@
-import { Mic, MicOff, Send, X } from 'lucide-react';
+import { Check, Mic, MicOff, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useVoiceTranscription } from '../../hooks/useVoiceTranscription';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -11,11 +11,13 @@ export function VoiceWidget({
   onInsert,
   onSendDirect,
   onStateChange,
+  autoStartToken = 0,
 }: {
   conversation: Conversation;
   onInsert: (text: string) => void;
   onSendDirect: (text: string) => void;
   onStateChange?: (state: { isListening: boolean; error: string | null }) => void;
+  autoStartToken?: number;
 }) {
   const [mode, setMode] = useState<VoiceMode>('edit');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -37,6 +39,11 @@ export function VoiceWidget({
     onStateChange?.({ isListening, error });
     return () => onStateChange?.({ isListening: false, error: null });
   }, [error, isListening, onStateChange]);
+
+  useEffect(() => {
+    if (autoStartToken <= 0 || isListening) return;
+    void start(deviceId || undefined);
+  }, [autoStartToken, deviceId, isListening, start]);
 
   useEffect(() => {
     void navigator.mediaDevices?.enumerateDevices?.().then((items) => {
@@ -134,7 +141,7 @@ export function VoiceWidget({
 
       <div className={styles.voiceWidgetMeta}>
         {mode === 'edit'
-          ? 'Edit mode — Send drops the transcript into the composer to review before you send it.'
+          ? 'Edit mode — Insert transcript drops the text into the composer so you can review it before sending.'
           : 'Direct mode — each finished sentence is sent to the agent as you speak.'}
       </div>
 
@@ -148,11 +155,13 @@ export function VoiceWidget({
           {isListening ? 'Listening' : 'Start'}
         </button>
         <button type="button" className={styles.voiceSecondaryButton} onClick={cancel}>
-          <X size={14} /> Cancel
+          <X size={14} /> Discard
         </button>
-        <button type="button" className={styles.voiceSendButton} onClick={stopAndApply}>
-          <Send size={14} /> Send
-        </button>
+        {mode === 'edit' && (
+          <button type="button" className={styles.voiceInsertButton} onClick={stopAndApply} disabled={!previewText.trim()}>
+            <Check size={14} /> Insert transcript
+          </button>
+        )}
       </div>
     </div>
   );
