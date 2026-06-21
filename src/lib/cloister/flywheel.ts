@@ -200,14 +200,34 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
   return hostname.includes('devcontainer') || hostname.startsWith('api-feature-') || hostname.startsWith('workspace-');
 }
 
+/**
+ * Resume prompt. PAN-2006 FR-8: re-attach the standing brief on resume so its
+ * directives (pipeline-unblock override, never-block, red-main-first) survive a
+ * resume + context compaction — the pre-PAN-2006 resume prompt only pointed at
+ * FLYWHEEL-STATE.md and a long-running orchestrator could drift off-brief.
+ */
+export function buildFlywheelResumePrompt(configSection: string, briefContent?: string): string {
+  const base =
+    'FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior ' +
+    'state. Check `docs/FLYWHEEL-STATE.md` and the latest status snapshot for context.';
+  const brief = briefContent
+    ? `\n\n--- Standing brief (re-read it — it governs pickup, unblocking, and never-block) ---\n\n${briefContent}`
+    : '';
+  return `${base}${configSection}${brief}`;
+}
+
 export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
-  const briefContent = options.briefPath ? await readFile(options.briefPath, 'utf8') : undefined;
+  const workspace = options.workspace ?? process.cwd();
+  // Re-read the brief on every spawn (fresh AND resume) so its directives survive
+  // resume/compaction. Default to the standard brief path when none is supplied.
+  const briefPath = options.briefPath ?? join(workspace, 'docs', 'flywheel-brief.md');
+  const briefContent = await readFile(briefPath, 'utf8').catch(() => undefined);
   const prompt = options.resumeSessionId
-    ? `FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior state. Check \`docs/FLYWHEEL-STATE.md\` and the latest status snapshot for context.${flywheelRunConfigurationSection(options)}`
+    ? buildFlywheelResumePrompt(flywheelRunConfigurationSection(options), briefContent)
     : (options.prompt ?? defaultFlywheelPrompt(runId, options, briefContent));
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
-    workspace: options.workspace ?? process.cwd(),
+    workspace,
     prompt,
     model: options.model,
     harness: options.harness,

@@ -52,7 +52,7 @@ vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
   resolveLiveFlywheelRunId: async () => mocks.activeRunId,
 }));
 
-import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
+import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, buildFlywheelResumePrompt, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
 
 const cleanEnv = { OVERDECK_DISABLE_DEACON: undefined, HOSTNAME: 'host-overdeck' };
 
@@ -194,5 +194,22 @@ describe('flywheel lifecycle', () => {
 
     expect(mocks.paused).toBe(true);
     expect(mocks.activeRunId).toBe('RUN-9');
+  });
+});
+
+describe('buildFlywheelResumePrompt (PAN-2006 FR-8)', () => {
+  it('re-attaches the brief so its directives survive resume', () => {
+    const brief = 'Pipeline blockers override routine backlog pickup limits. Never block on the operator.';
+    const prompt = buildFlywheelResumePrompt('\n\nRun configuration: x', brief);
+    expect(prompt).toContain('FLYWHEEL RESUME');
+    expect(prompt).toContain('Run configuration: x');
+    expect(prompt).toContain('Pipeline blockers override');
+    expect(prompt).toContain('Never block on the operator');
+  });
+
+  it('omits the brief section when no brief content is available', () => {
+    const prompt = buildFlywheelResumePrompt('', undefined);
+    expect(prompt).toContain('FLYWHEEL RESUME');
+    expect(prompt).not.toContain('Standing brief');
   });
 });
