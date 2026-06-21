@@ -13,6 +13,25 @@
  * sessions are safe to reap.
  */
 
+/**
+ * PAN-2007 (operator request, 2026-06-21): temporarily keep specialist
+ * (review/test/ship) tmux sessions ALIVE through the whole pipeline so the
+ * operator can watch them and confirm verdict signaling. While `true`:
+ *   - the PAN-1716 terminal-advancing reaper (`checkTerminalAdvancingSessions`)
+ *     is a no-op, and
+ *   - the `pan specialists done` completion path records the verdict but does
+ *     NOT kill the tmux session.
+ *
+ * The verdict is recorded BEFORE either kill would fire and the deacon advances
+ * the pipeline independently, so disabling the kills loses no state.
+ *
+ * Tradeoff: idle specialist sessions linger and count against the PAN-1665
+ * advancing-role ceiling until close-out. Acceptable for low-volume supervised
+ * debugging only — set back to `false` once the review session-death + reset
+ * loop work is done (see PAN-2007 re-enable checklist).
+ */
+export const KEEP_SPECIALIST_SESSIONS_ALIVE = true;
+
 export type AdvancingRole = 'review' | 'test' | 'ship';
 
 /** Review/test statuses that mean the phase is over and the session has no more work. */

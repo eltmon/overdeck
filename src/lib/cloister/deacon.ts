@@ -4845,7 +4845,10 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 export async function checkTerminalAdvancingSessions(): Promise<string[]> {
   const actions: string[] = [];
   try {
-    const { selectTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const { selectTerminalAdvancingSessions, KEEP_SPECIALIST_SESSIONS_ALIVE } = await import('./reap-terminal-sessions.js');
+    // PAN-2007: operator-requested temporary keep-alive — do not reap specialist
+    // sessions so they stay visible through the pipeline until close-out.
+    if (KEEP_SPECIALIST_SESSIONS_ALIVE) return actions;
     const statuses = loadReviewStatuses();
     const aliveSessions = await Effect.runPromise(listSessionNames());
     const toKill = selectTerminalAdvancingSessions(statuses, [...aliveSessions]);
