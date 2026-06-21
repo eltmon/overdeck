@@ -27,7 +27,7 @@ import { httpHandler } from './http-handler.js';
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
+import { spawnPlanningSession, resolveAutoSpawnOnFinalize, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -1258,8 +1258,20 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
 
     const skipKill = (body as any)?.skipKill === true;
-    const autoSpawn = (body as any)?.autoSpawn === true;
-    if (autoSpawn) {
+    // Honor the launch-time --auto-start intent persisted at planning spawn
+    // (auto-spawn-on-finalize.json) when the caller doesn't explicitly set
+    // autoSpawn. This makes the dashboard "Done" button and host auto-finalize
+    // spawn the work agent for sessions launched with --auto-start, matching
+    // `pan plan finalize`. An explicit body value always wins.
+    const bodyAutoSpawn = (body as any)?.autoSpawn;
+    const autoSpawn = resolveAutoSpawnOnFinalize(bodyAutoSpawn, id);
+    // The origin gate guards the cross-process CLI caller, which sets autoSpawn
+    // explicitly in the body and carries a trusted Origin. A flag-derived
+    // autoSpawn comes from the same dashboard finalize request the operator
+    // already initiated (the rest of complete-planning runs without an origin
+    // gate), so don't add a new gate that could 403 a browser whose Origin host
+    // lags the rename (e.g. overdeck.localhost not yet in trusted origins).
+    if (bodyAutoSpawn === true) {
       const originCheck = validateOrigin(request);
       if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
