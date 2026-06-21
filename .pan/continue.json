@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1832",
   "created": "2026-06-21T00:17:45.903Z",
-  "updated": "2026-06-21T04:06:15.576Z",
+  "updated": "2026-06-21T05:08:13.967Z",
   "gitState": {
     "branch": "feature/pan-1832",
     "sha": "435db620d",
@@ -86,6 +86,31 @@
       "timestamp": "2026-06-21T04:06:15.576Z",
       "reason": "start",
       "agentModel": "claude-sonnet-4-6"
+    },
+    {
+      "timestamp": "2026-06-21T04:42:10.634Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-21T04:42:12.736Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-21T04:50:04.536Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-21T04:53:49.688Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-21T05:08:13.962Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": []

@@ -77,20 +77,17 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:15:38.290Z",
-  "updated": "2026-06-21T08:23:07.223Z",
+  "updated": "2026-06-21T08:28:58.633Z",
   "pipeline": {
     "issueId": "PAN-1832",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-21T08:23:07.171Z",
-    "reviewNotes": "Approved: weighted-distribution sampler is correct, deterministic, security-gated, and fully tested (75 pass, tsc clean); 5 low/nit advisories (flywheel representative-only, effort-check asymmetry) are non-blocking follow-ups.",
-    "testNotes": "TypeScript compilation error in src/dashboard/frontend/src/components/Settings/RolesPanel.tsx:291 — type mismatch when spreading currentRole (RoleConfig) into RoleConfigPatch. The sub property type inference fails because RoleSubConfig.model should remain scalar but the spread from a widened RoleConfig creates ambiguity. Backend tests pass (weighted-model-ref.test.ts all green, 7128 passed), but frontend build blocks dashboard verification. Pre-existing test failures in memory/worker-pool and backlog/sequencer are unrelated to this PR.",
+    "updatedAt": "2026-06-21T08:28:58.493Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2003",
-    "reviewedAtCommit": "df293fb12948b0fa7ec429254ce178737bcefce4",
     "reviewRequestedAt": "2026-06-21T04:53:49.692Z"
   },
   "closeOut": {
@@ -130,10 +127,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 298,
-            "output": 85008,
-            "cacheRead": 33018724,
-            "cacheWrite": 897993
+            "input": 312,
+            "output": 88177,
+            "cacheRead": 33931769,
+            "cacheWrite": 963924
           }
         }
       },
@@ -157,15 +154,15 @@
           "cacheWrite": 155381
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 298,
-          "output": 85008,
-          "cacheRead": 33018724,
-          "cacheWrite": 897993
+          "input": 312,
+          "output": 88177,
+          "cacheRead": 33931769,
+          "cacheWrite": 963924
         }
       },
       "costAtCloseOut": {
-        "usd": 24.37692,
-        "pricingAsOf": "2026-06-21T08:23:07.193Z"
+        "usd": 24.945651,
+        "pricingAsOf": "2026-06-21T08:28:58.563Z"
       }
     },
     "merges": [
@@ -173,6 +170,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "harness": "pi",
+  "model": "glm-5.2"
 }
