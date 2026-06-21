@@ -153,6 +153,106 @@ function streamFullParseSnapshots(
   );
 }
 
+function streamResolvedFullParseSnapshots(
+  resolve: () => Promise<string | null>,
+  parse: (file: string) => Promise<ParseResult>,
+  model: string | null,
+): Stream.Stream<ConversationEvent, PanRpcError> {
+  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
+    Effect.acquireRelease(
+      Effect.promise(async () => {
+        let stopped = false;
+        let resolving = false;
+        let discoveryTimer: ReturnType<typeof setInterval> | null = null;
+        let debounce: ReturnType<typeof setTimeout> | null = null;
+        let watcher: ReturnType<typeof fsWatch> | null = null;
+        let parsing = false;
+        let pendingReparse = false;
+        let sessionFile: string | null = null;
+
+        const offer = (event: ConversationEvent) => {
+          try {
+            Queue.offerUnsafe(queue, event);
+          } catch {
+            // Queue shut down (client disconnected) — ignore.
+          }
+        };
+
+        const emit = async (): Promise<void> => {
+          if (!sessionFile || stopped) return;
+          if (parsing) { pendingReparse = true; return; }
+          parsing = true;
+          try {
+            const result = await parse(sessionFile);
+            offer({
+              kind: 'messages' as const,
+              messages: result.messages,
+              workLog: result.workLog,
+              streaming: result.streaming,
+              snapshot: true,
+              proposedPlan: result.proposedPlan,
+              compactBoundaries:
+                result.compactBoundaries && result.compactBoundaries.length > 0
+                  ? result.compactBoundaries
+                  : undefined,
+              contextUsage: contextUsageFromParseResult(result, model),
+            });
+          } catch {
+            // Transient parse failure (read during a write) — the next change
+            // event re-parses cleanly.
+          } finally {
+            parsing = false;
+            if (pendingReparse) { pendingReparse = false; void emit(); }
+          }
+        };
+
+        const tryResolve = async (): Promise<void> => {
+          if (stopped || resolving || sessionFile) return;
+          resolving = true;
+          try {
+            const resolved = await resolve();
+            if (!resolved) {
+              offer({ kind: 'discovering' });
+              return;
+            }
+            sessionFile = resolved;
+            if (discoveryTimer) {
+              clearInterval(discoveryTimer);
+              discoveryTimer = null;
+            }
+            await emit();
+            try {
+              watcher = fsWatch(resolved, () => {
+                if (debounce) return;
+                debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
+              });
+            } catch {
+              // If the watcher can't attach, the initial snapshot still rendered.
+            }
+          } finally {
+            resolving = false;
+          }
+        };
+
+        await tryResolve();
+        if (!sessionFile) {
+          discoveryTimer = setInterval(() => { void tryResolve(); }, 2000);
+        }
+
+        return {
+          stop: () => {
+            stopped = true;
+            if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
+            if (debounce) { clearTimeout(debounce); debounce = null; }
+            if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
+          },
+        };
+      }),
+      (handle) => Effect.sync(() => handle.stop()),
+    ),
+  );
+}
+
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
   const lookup = new Map<string, string>();
   for (const agent of agents) {
@@ -701,16 +801,18 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             if (!conv && /^(agent-|planning-|specialist-)/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
               if (harness === 'pi') {
-                const file = yield* Effect.promise(() => resolvePiSessionPath(input.conversationName));
-                return file
-                  ? streamFullParseSnapshots(file, parsePiConversationMessages, null)
-                  : conversationDiscoveringStream();
+                return streamResolvedFullParseSnapshots(
+                  () => resolvePiSessionPath(input.conversationName),
+                  parsePiConversationMessages,
+                  null,
+                );
               }
               if (harness === 'codex') {
-                const file = yield* Effect.promise(() => resolveCodexRolloutPath(input.conversationName));
-                return file
-                  ? streamFullParseSnapshots(file, parseCodexConversationMessages, null)
-                  : conversationDiscoveringStream();
+                return streamResolvedFullParseSnapshots(
+                  () => resolveCodexRolloutPath(input.conversationName),
+                  parseCodexConversationMessages,
+                  null,
+                );
               }
               return conversationDiscoveringStream();
             }
@@ -720,17 +822,19 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             }
 
             if (conv.harness === 'pi') {
-              const file = yield* Effect.promise(() => resolvePiSessionPath(input.conversationName));
-              return file
-                ? streamFullParseSnapshots(file, parsePiConversationMessages, conv.model ?? null)
-                : conversationDiscoveringStream();
+              return streamResolvedFullParseSnapshots(
+                () => resolvePiSessionPath(input.conversationName),
+                parsePiConversationMessages,
+                conv.model ?? null,
+              );
             }
 
             if (conv.harness === 'codex') {
-              const file = yield* Effect.promise(() => resolveCodexRolloutPath(input.conversationName));
-              return file
-                ? streamFullParseSnapshots(file, parseCodexConversationMessages, conv.model ?? null)
-                : conversationDiscoveringStream();
+              return streamResolvedFullParseSnapshots(
+                () => resolveCodexRolloutPath(input.conversationName),
+                parseCodexConversationMessages,
+                conv.model ?? null,
+              );
             }
 
             if (conv.harness !== 'claude-code' && conv.harness != null) {
