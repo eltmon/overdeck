@@ -174,6 +174,24 @@ export function computeCohort(nodes: readonly SequenceNode[], lk: ClassifyLookup
   return [...ids];
 }
 
+/**
+ * Pipeline-unblock targets (FR-6): the blocks-main issues the Flywheel may strike
+ * even when auto-pickup is off — in rank order, capped, never `vetoed`, never
+ * already in-flight. `vetoed` is the absolute stop that overrides the unblock path.
+ */
+export function selectUnblockTargets(
+  nodes: readonly SequenceNode[],
+  lk: ClassifyLookups,
+  opts: { cap?: number } = {},
+): ForecastNode[] {
+  const cap = Math.max(1, opts.cap ?? 2);
+  return nodes
+    .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
+    .filter((n) => isUnblockEligible(n.state))
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, cap);
+}
+
 export interface ForecastStats {
   total: number;
   inFlight: number;
