@@ -295,7 +295,7 @@ async function saveRoleConfig(role: RoleId, patch: RoleConfigPatch, subRole?: st
           ...(currentRole.sub ?? {}),
           [subRole]: {
             ...(currentRole.sub?.[subRole] ?? {}),
-            model: patch.model,
+            model: patch.model as ModelRef,
           },
         },
       }
