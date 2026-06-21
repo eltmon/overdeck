@@ -136,10 +136,12 @@ const PROGRESS_TICK_CLASS: Record<PipelineState, string> = {
 
 type GateTone = 'ok' | 'bad' | 'run' | 'wait'
 
+// PAN-1991 #5: gate dots follow the law — emerald=passing, red=failing,
+// blue=running (a machine is working; was purple), neutral=pending/rest.
 const GATE_DOT: Record<GateTone, string> = {
   ok: 'bg-success',
   bad: 'bg-destructive',
-  run: 'bg-signal-review',
+  run: 'bg-info',
   wait: 'bg-muted-foreground',
 }
 
@@ -409,7 +411,7 @@ function GatesRow({ issueId }: { issueId: string }) {
       {gates.map((gate) => (
         <span key={gate.label} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px]">
           <span className={`h-2 w-2 rounded-[2px] ${GATE_DOT[gate.tone]}`} />
-          <span className="font-semibold text-muted-foreground">{gate.label}</span>
+          <span className="font-medium text-muted-foreground">{gate.label}</span>
           <span className="text-foreground">{gate.value}</span>
         </span>
       ))}
