@@ -4,6 +4,7 @@ import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
+import { VETOED_LABEL } from './backlog/pickup.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -245,15 +246,18 @@ export interface SequencePickResult {
   planning: string;
 }
 
-const PARKED_LABELS = new Set(['needs-design', 'needs-discussion']);
+// PAN-2006: `parked` is the unified defer label; needs-design/needs-discussion are
+// honored as legacy aliases until migrated.
+const PARKED_LABELS = new Set(['parked', 'needs-design', 'needs-discussion']);
 
 /**
  * PAN-1866: Pick the highest-ranked eligible issue from a sequence node list.
  *
  * Eligibility rules:
- * - gate must not be 'blocked'
+ * - gate must not be 'blocked' (the `vetoed` pickup state)
+ * - no `vetoed` label — an absolute operator hard-stop (PAN-2006)
  * - not in-pipeline (active review/work/test)
- * - no parked labels (needs-design, needs-discussion)
+ * - no parked labels (`parked`; legacy `needs-design`/`needs-discussion`)
  * - not in the optional exclusion set (e.g. already running agents)
  * - FR-14: must have a vBRIEF spec (ready) or a PRD draft (hasPrd)
  *
@@ -287,7 +291,10 @@ export function pickFromSequence(
     if (inPipeline) continue;
     if (opts?.excludeIssueIds?.has(node.issue)) continue;
     const labels = opts?.issueLabels?.(node.issue) ?? [];
-    if (labels.some((l) => PARKED_LABELS.has(l))) continue;
+    // PAN-2006: the `vetoed` label is an absolute "never pick up" — same hard stop
+    // as gate=blocked, and it overrides even the pipeline-unblock path elsewhere.
+    if (labels.some((l) => l.toLowerCase() === VETOED_LABEL)) continue;
+    if (labels.some((l) => PARKED_LABELS.has(l.toLowerCase()))) continue;
     if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) continue;
     if (opts?.isReadyOrHasPrd && !opts.isReadyOrHasPrd(node.issue)) continue;
     return { issueId: node.issue, rank: node.rank, gate: node.gate, planning: node.planning };

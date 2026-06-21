@@ -127,3 +127,42 @@ describe('pickFromSequence – author/assignee safety gate', () => {
     expect(result?.issueId).toBe('PAN-ANY');
   });
 });
+
+describe('pickFromSequence – vetoed / parked label gates (PAN-2006)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('skips a `vetoed`-labelled rank-1 issue and picks rank-2', () => {
+    const nodes = [makeNode('PAN-VETO', 1), makeNode('PAN-OK', 2)];
+    const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-VETO' ? ['vetoed'] : []),
+    });
+    expect(result?.issueId).toBe('PAN-OK');
+  });
+
+  it('vetoed is case-insensitive', () => {
+    const nodes = [makeNode('PAN-VETO', 1), makeNode('PAN-OK', 2)];
+    const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-VETO' ? ['Vetoed'] : []),
+    });
+    expect(result?.issueId).toBe('PAN-OK');
+  });
+
+  it('skips the new `parked` label as well as legacy needs-design/needs-discussion', () => {
+    const nodes = [
+      makeNode('PAN-PARKED', 1),
+      makeNode('PAN-LEGACY', 2),
+      makeNode('PAN-OK', 3),
+    ];
+    const result = pickFromSequence(nodes, {
+      issueLabels: (id) =>
+        id === 'PAN-PARKED' ? ['parked'] : id === 'PAN-LEGACY' ? ['needs-design'] : [],
+    });
+    expect(result?.issueId).toBe('PAN-OK');
+  });
+
+  it('returns null when the only ready issue is vetoed', () => {
+    const nodes = [makeNode('PAN-VETO', 1)];
+    const result = pickFromSequence(nodes, { issueLabels: () => ['vetoed'] });
+    expect(result).toBeNull();
+  });
+});

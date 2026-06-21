@@ -7,7 +7,8 @@ import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
-import { applyIssueParkedLabel } from '../../../lib/backlog/label-ops.js';
+import { applyIssueVetoedLabel, removeIssueVetoedLabel } from '../../../lib/backlog/label-ops.js';
+import { normalizeGate } from '../../../lib/backlog/pickup.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
@@ -182,11 +183,14 @@ const postBacklogGateRoute = HttpRouter.add(
     if (authError) return authError;
     const body = yield* readJsonBody;
     const issueId = String(body['issueId'] ?? '');
-    const gate = String(body['gate'] ?? '');
+    const rawGate = String(body['gate'] ?? '');
 
     if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
-    if (!['auto', 'ready', 'blocked'].includes(gate))
-      return yield* Effect.fail(new Error('gate must be auto, ready, or blocked') as never);
+    // Accept the PAN-2006 vocabulary (auto/promote/vetoed) and the legacy
+    // spellings (ready/blocked) as aliases during the cutover.
+    if (!['auto', 'promote', 'vetoed', 'ready', 'blocked'].includes(rawGate))
+      return yield* Effect.fail(new Error('gate must be auto, promote, or vetoed') as never);
+    const gate = normalizeGate(rawGate); // 'auto' | 'promote' | 'vetoed'
 
     return yield* Effect.promise(async () => {
       const projectRoot = process.cwd();
@@ -201,12 +205,15 @@ const postBacklogGateRoute = HttpRouter.add(
       const node = doc.nodes.find((n) => n.issue.toUpperCase() === issueId.toUpperCase());
       if (!node) throw new Error(`issue ${issueId} not found in sequence`);
 
-      node.gate = gate as 'auto' | 'ready' | 'blocked';
+      // sequence.md keeps the legacy NodeGate spelling (auto/ready/blocked) to avoid a
+      // schema migration; promote→ready, vetoed→blocked. The vocabulary is normalized on read.
+      node.gate = gate === 'vetoed' ? 'blocked' : gate === 'promote' ? 'ready' : 'auto';
       writeSequenceMd(projectRoot, doc, { operatorEdit: true });
 
-      if (gate === 'blocked') {
-        await applyIssueParkedLabel(issueId);
-      }
+      // Mirror the hard veto to the `vetoed` GitHub label so it's visible + queryable
+      // and honored by pickFromSequence; clear it when the gate is relaxed.
+      if (gate === 'vetoed') await applyIssueVetoedLabel(issueId);
+      else await removeIssueVetoedLabel(issueId);
 
       return jsonResponse({ status: 'ok', issueId, gate });
     });
