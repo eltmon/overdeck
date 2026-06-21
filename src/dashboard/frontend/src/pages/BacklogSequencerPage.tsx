@@ -630,15 +630,15 @@ export function BacklogSequencerPage() {
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
                   <tr className="text-[var(--color-fg-muted)]">
-                    <th className="text-right px-3 py-2 font-medium w-8">#</th>
-                    <th className="text-left px-2 py-2 font-medium w-6">●</th>
-                    <th className="text-left px-2 py-2 font-medium w-28">Issue</th>
-                    <th className="text-center px-2 py-2 font-medium w-16">Tier</th>
-                    <th className="text-left px-2 py-2 font-medium">Why</th>
-                    <th className="text-center px-2 py-2 font-medium w-14">Size</th>
-                    <th className="text-center px-2 py-2 font-medium w-24">Condition</th>
-                    <th className="text-center px-2 py-2 font-medium w-20">Gate</th>
-                    <th className="text-center px-2 py-2 font-medium w-14">Score</th>
+                    <th className="text-right px-3 py-2 font-medium w-8 cursor-help" title="Pickup rank — lower means the Flywheel works it sooner">#</th>
+                    <th className="text-left px-2 py-2 font-medium w-6 cursor-help" title="Importance — red = critical, orange = high, gray = medium, dim = low">●</th>
+                    <th className="text-left px-2 py-2 font-medium w-28 cursor-help" title="Issue ID. Markers: ▶ in pipeline · ⚠ needs refinement · P has PRD · ✓ planned (spec + beads)">Issue</th>
+                    <th className="text-center px-2 py-2 font-medium w-16 cursor-help" title="Tier band by rank: Now · Next · Later · Someday">Tier</th>
+                    <th className="text-left px-2 py-2 font-medium cursor-help" title="One-line rationale for this ranking (from the sequencer)">Why</th>
+                    <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Estimated effort: XS / S / M / L / XL">Size</th>
+                    <th className="text-center px-2 py-2 font-medium w-24 cursor-help" title="AI condition: ok · needs-refinement (vague spec) · stale (likely close)">Condition</th>
+                    <th className="text-center px-2 py-2 font-medium w-20 cursor-help" title="Operator pickup gate: auto (normal) · promote (jump queue) · vetoed (never pick)">Gate</th>
+                    <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Impact score (0–100) the sequencer assigned">Score</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -657,19 +657,22 @@ export function BacklogSequencerPage() {
                             : 'even:bg-[color-mix(in_srgb,var(--color-fg)_3%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-fg)_9%,transparent)]'
                         }`}
                       >
-                        <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
+                        <td className={`text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums border-l-2 ${node.inPipeline ? 'border-l-[var(--info)]' : 'border-l-transparent'}`}>
                           {node.rank}
                         </td>
                         <td className="px-2 py-2">
-                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-gray-700'}`} />
+                          <span
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-gray-700'}`}
+                            title={`Importance: ${node.importance}`}
+                          />
                         </td>
                         <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
                           {node.issueId}
                           {node.inPipeline && (
-                            <span className="ml-1 text-[9px] text-green-400 align-top">▶</span>
+                            <span className="ml-1 text-[9px] text-[var(--info-foreground)] align-top" title="In pipeline — active work / review / test">▶</span>
                           )}
                           {isRefine && (
-                            <span className="ml-1 text-[9px] text-yellow-400 align-top">⚠</span>
+                            <span className="ml-1 text-[9px] text-yellow-400 align-top" title="Needs refinement — vague/underspecified">⚠</span>
                           )}
                           {node.hasPrd && (
                             <span className="ml-1 text-[9px] text-blue-400 align-top" title="Has PRD">P</span>
@@ -690,12 +693,18 @@ export function BacklogSequencerPage() {
                           {node.size}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}
+                            title={node.condition === 'needs-refinement' ? 'Needs refinement — vague/underspecified' : node.condition === 'stale' ? 'Stale — likely a candidate to close' : 'OK — well-specified'}
+                          >
                             {node.condition === 'needs-refinement' ? '⚠ refine' : node.condition === 'stale' ? '⊘ stale' : node.condition}
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}
+                            title={node.gate === 'ready' ? (node.inPipeline ? 'Auto (in-pipeline pin)' : 'Promoted — jumps the queue') : node.gate === 'blocked' ? 'Vetoed — never auto-picked' : 'Auto — normal eligibility'}
+                          >
                             {node.gate === 'ready' ? (node.inPipeline ? 'auto' : '📌') : node.gate === 'blocked' ? '⛔' : node.gate}
                           </span>
                         </td>
