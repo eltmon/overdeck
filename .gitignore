@@ -63,6 +63,10 @@ CLAUDE.md
 # the spawned conversation reads them from disk; auto-commit sweeps must not
 # push them into PRs.
 .pan/handoff-*.md
+# Backlog Sequencer manifest — transient input written each pass and referenced
+# from the prompt (the agent reads it instead of having it inlined). Only the
+# ranked output .pan/backlog/sequence.md is canonical/tracked.
+.pan/backlog/manifest.json
 
 # Docs-index builder scratch dir (buildDocsIndex writes docs-index.*.tmp.sqlite
 # here, renames the result into dist/, but never removes the dir). Transient —

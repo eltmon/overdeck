@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
 import type { AgentState } from '../agents.js';
 import { spawnRun, determineModel } from '../agents.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
@@ -48,8 +49,22 @@ export async function spawnSequencerAgent(
   // Dashboard read-model issues key the human ref as `identifier` (not `ref`)
   // and carry canonical statuses; normalize to tracker `Issue` objects so the
   // backlog ranking pipeline can read `issue.ref`/`issue.state` (PAN-1866 fix).
-  const issues = normalizeBacklogIssues(rawIssues);
+  const allIssues = normalizeBacklogIssues(rawIssues);
+  // Scope to Panopticon/overdeck issues only for now. The sequencer is a single
+  // global runner; ranking every connected project's open issues (MIN/KRUX/TIN/…)
+  // bloats the manifest and isn't meaningful for an overdeck-only sequence.
+  // PAN-1999 generalizes this to one sequencer per project — drop the filter then.
+  const issues = allIssues.filter((issue) => issue.ref.toUpperCase().startsWith('PAN-'));
   const input = await collectOpenBacklog(projectRoot, issues);
+
+  // Write the manifest to a file and reference it from the prompt instead of
+  // inlining hundreds of KB of JSON. Inlining produced a single multi-hundred-KB
+  // chat message that froze the dashboard conversation panel and blew past
+  // small-context models (PAN-1866). The agent reads the file with the Read tool.
+  const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');
+  await mkdir(dirname(manifestPath), { recursive: true });
+  await writeFile(manifestPath, JSON.stringify(input.manifest, null, 2), 'utf-8');
+
   const model = determineModel({ role: 'sequencer', model: opts.model });
   const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
 
@@ -75,8 +90,6 @@ export function buildSequencerPrompt(pass: PassMode, opts: SequencerPromptInput)
   const { manifest, bodies, priorSequence } = input;
   const hasPrior = priorSequence !== null;
   const priorSequencePath = `${projectRoot}/.pan/backlog/sequence.md`;
-
-  const manifestJson = JSON.stringify(manifest, null, 2);
 
   const passInstructions = {
     creation: `
@@ -159,6 +172,6 @@ ${passInstructions[pass]}
 ${priorContext}
 ## Backlog manifest (${manifest.length} open issues, ${bodies.count} bodies available in ${Math.ceil(bodies.count / batchSize)} batches of ${batchSize})
 
-${manifestJson}
+The manifest is written to \`.pan/backlog/manifest.json\` (relative to the project root) — it is NOT inlined here. Read it FIRST (the Read tool, or \`cat .pan/backlog/manifest.json\`) to load every open issue's { id, title, labels, priority, ageMs, inPipeline, hasPrd, ready, updatedAt }. Do NOT ask for it to be pasted into the prompt.
 ${commonRules}`;
 }
