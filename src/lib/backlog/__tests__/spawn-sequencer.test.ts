@@ -6,6 +6,7 @@ vi.mock('../../../lib/agents.js', () => ({
 }));
 
 vi.mock('../backlog-input.js', () => ({
+  normalizeBacklogIssues: vi.fn((raw) => raw),
   collectOpenBacklog: vi.fn().mockResolvedValue({
     manifest: [{ id: 'PAN-1', title: 'Test', labels: [], priority: 1, ageMs: 0, inPipeline: false, hasPrd: false, ready: false }],
     bodies: { count: 1, getBatch: () => [] },
