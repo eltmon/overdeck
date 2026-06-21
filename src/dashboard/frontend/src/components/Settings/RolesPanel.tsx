@@ -472,6 +472,14 @@ export function RolesPanel() {
                 : [{ model: savedRoleModel as ModelRef, weight: 1 }]
             );
             const scalarSavedModel = savedIsDistribution ? undefined : savedRoleModel as ModelRef;
+            // When the parent role is a distribution, give sub-roles a concrete representative
+            // so their "Parent" option shows a meaningful inherited model.
+            const parentModelRefForSubRoles: ModelRef | undefined = savedIsDistribution
+              ? (savedRoleModel as WeightedModelRef[]).reduce(
+                  (best, e) => (e.weight > best.weight ? e : best),
+                  (savedRoleModel as WeightedModelRef[])[0],
+                ).model
+              : scalarSavedModel;
             const tooltip = scalarSavedModel ? modelRefTooltip(scalarSavedModel, workhorses) : undefined;
             const isExpanded = !!expandedRoles[role.id];
             const canExpand = !!role.subRoles?.length;
@@ -702,7 +710,7 @@ export function RolesPanel() {
                     <div className="grid gap-3 md:grid-cols-2">
                       {role.subRoles?.map((subRole) => {
                         const subModel = getSubRoleModel(settings, role, subRole);
-                        const subTooltip = modelRefTooltip(subModel, workhorses, scalarSavedModel);
+                        const subTooltip = modelRefTooltip(subModel, workhorses, parentModelRefForSubRoles);
 
                         return (
                           <div key={subRole.id} className="rounded-md border border-border bg-card p-3">
@@ -723,7 +731,7 @@ export function RolesPanel() {
                               providerGroups={providerGroups}
                               providers={settings?.models?.providers}
                               claudeAuth={claudeAuthQuery.data}
-                              parentModelRef={scalarSavedModel}
+                              parentModelRef={parentModelRefForSubRoles}
                               disabled={saveMutation.isPending}
                               onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, patch: { model: modelRef } })}
                             />
