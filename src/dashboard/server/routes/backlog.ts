@@ -7,8 +7,16 @@ import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
-import { applyIssueVetoedLabel, removeIssueVetoedLabel } from '../../../lib/backlog/label-ops.js';
-import { normalizeGate } from '../../../lib/backlog/pickup.js';
+import {
+  applyIssueVetoedLabel, removeIssueVetoedLabel,
+  applyIssueReadyLabel, removeIssueReadyLabel,
+  applyIssueParkedLabel, removeIssueParkedLabel,
+  applyIssueBlocksMainLabel, removeIssueBlocksMainLabel,
+} from '../../../lib/backlog/label-ops.js';
+import {
+  normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats,
+  type ClassifyLookups, type ForecastNode, type LaneBlock,
+} from '../../../lib/backlog/pickup.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
@@ -258,6 +266,150 @@ const postBacklogPlanningRoute = HttpRouter.add(
   })),
 );
 
+// ─── Shared classify lookups (single source of truth — PAN-2006) ──────────────
+
+/**
+ * Build the {@link ClassifyLookups} the shared pickup module needs from live
+ * project state: labels (in-memory issue service), planned (vBRIEF spec + beads),
+ * and in-pipeline (review status / live workspace).
+ */
+function buildClassifyLookups(projectRoot: string): ClassifyLookups {
+  const labelsByIssue = new Map<string, string[]>();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getSharedIssueService } = require('../services/issue-service-singleton.js') as typeof import('../services/issue-service-singleton.js');
+    for (const issue of getSharedIssueService().getIssues() as Array<Record<string, unknown>>) {
+      const id = typeof issue['identifier'] === 'string' ? issue['identifier'].toUpperCase() : '';
+      if (!id) continue;
+      const raw = Array.isArray(issue['labels']) ? (issue['labels'] as unknown[]) : [];
+      const names = raw
+        .map((l) => (typeof l === 'string' ? l : ((l as { name?: string })?.name ?? '')))
+        .filter((s): s is string => Boolean(s));
+      labelsByIssue.set(id, names);
+    }
+  } catch { /* issue service not ready — treat as no labels */ }
+
+  const specsDir = join(projectRoot, '.pan', 'specs');
+  const specIssues = new Set<string>();
+  if (existsSync(specsDir)) {
+    for (const f of readdirSync(specsDir)) {
+      const m = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+      if (m) specIssues.add(m[1]!.toUpperCase());
+    }
+  }
+  const workspacesDir = join(projectRoot, 'workspaces');
+  const beadsIssues = new Set<string>();
+  if (existsSync(workspacesDir)) {
+    for (const dir of readdirSync(workspacesDir)) {
+      const m = /^feature-([a-z]+-\d+)$/i.exec(dir);
+      if (m && existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) beadsIssues.add(m[1]!.toUpperCase());
+    }
+  }
+
+  return {
+    labels: (id) => labelsByIssue.get(id.toUpperCase()) ?? [],
+    isPlanned: (id) => {
+      const u = id.toUpperCase();
+      return specIssues.has(u) && beadsIssues.has(u);
+    },
+    isInPipeline: (id) => {
+      const u = id.toUpperCase();
+      const rs = getReviewStatusSync(u);
+      return (rs !== null && rs.reviewStatus !== 'pending') || existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`));
+    },
+  };
+}
+
+// ─── Route: GET /api/backlog/forecast ─────────────────────────────────────────
+// PAN-2005: the pickup forecast (waves / lanes / cohort / stats) computed entirely
+// from the shared pickup module so the UI can never diverge from the Flywheel.
+
+const getBacklogForecastRoute = HttpRouter.add(
+  'GET',
+  '/api/backlog/forecast',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const n = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get('n') ?? '5', 10) || 5));
+    return yield* Effect.try({
+      try: () => {
+        const projectRoot = process.cwd();
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        if (!existsSync(seqPath)) {
+          return jsonResponse({ n, stats: null, inFlight: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [] });
+        }
+        const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+        if (!parsed.ok) throw new Error(`parse error: ${parsed.error}`);
+        const nodes = parsed.doc.nodes;
+        const lk = buildClassifyLookups(projectRoot);
+
+        // Per-issue display meta (title/importance/score/why) to enrich the module's
+        // ForecastNode (which only carries issue/rank/size/state).
+        const titleByIssue = new Map<string, string>();
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getSharedIssueService } = require('../services/issue-service-singleton.js') as typeof import('../services/issue-service-singleton.js');
+          for (const issue of getSharedIssueService().getIssues() as Array<Record<string, unknown>>) {
+            const id = typeof issue['identifier'] === 'string' ? issue['identifier'].toUpperCase() : '';
+            const title = typeof issue['title'] === 'string' ? issue['title'] : '';
+            if (id && title) titleByIssue.set(id, title);
+          }
+        } catch { /* titles optional */ }
+        const metaById = new Map(nodes.map((x) => [x.issue, x]));
+        const enrich = (f: ForecastNode) => {
+          const m = metaById.get(f.issue);
+          return {
+            ...f,
+            title: titleByIssue.get(f.issue.toUpperCase()) ?? '',
+            importance: m?.importance ?? 'medium',
+            score: m?.score ?? 0,
+            why: m?.why ?? '',
+          };
+        };
+
+        const inFlight = nodes
+          .map((x) => ({ issue: x.issue, rank: x.rank, size: x.size, state: classifyIssue(x, lk) }))
+          .filter((x) => x.state.inPipeline)
+          .sort((a, b) => a.rank - b.rank)
+          .map(enrich);
+        const waves = computeWaves(nodes, lk, n).map((w) => w.map(enrich));
+        const lanesRaw = computeLanes(nodes, lk, n);
+        const lanes = {
+          makespan: lanesRaw.makespan,
+          blocks: lanesRaw.blocks.map((b: LaneBlock) => ({ ...enrich(b), lane: b.lane, start: b.start, end: b.end })),
+        };
+        const cohort = computeCohort(nodes, lk, n);
+        const stats = computeStats(nodes, lk);
+
+        return jsonResponse({ n, stats, inFlight, waves, lanes, cohort });
+      },
+      catch: (err) => new Error(String(err)),
+    });
+  })),
+);
+
+// ─── Route: POST /api/backlog/sequence/labels — editor toggles (PAN-2006 WI-8) ─
+
+const postBacklogLabelsRoute = HttpRouter.add(
+  'POST',
+  '/api/backlog/sequence/labels',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+    const issueId = String(body['issueId'] ?? '');
+    if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
+
+    return yield* Effect.promise(async () => {
+      if (typeof body['ready'] === 'boolean') await (body['ready'] ? applyIssueReadyLabel : removeIssueReadyLabel)(issueId);
+      if (typeof body['parked'] === 'boolean') await (body['parked'] ? applyIssueParkedLabel : removeIssueParkedLabel)(issueId);
+      if (typeof body['blocksMain'] === 'boolean') await (body['blocksMain'] ? applyIssueBlocksMainLabel : removeIssueBlocksMainLabel)(issueId);
+      return jsonResponse({ status: 'ok', issueId });
+    });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const backlogRouteLayer = Layer.mergeAll(
@@ -265,6 +417,8 @@ export const backlogRouteLayer = Layer.mergeAll(
   postBacklogRegenerateRoute,
   postBacklogGateRoute,
   postBacklogPlanningRoute,
+  getBacklogForecastRoute,
+  postBacklogLabelsRoute,
 );
 
 export default backlogRouteLayer;
