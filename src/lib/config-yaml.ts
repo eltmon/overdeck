@@ -669,6 +669,12 @@ export interface ExperimentalConfig {
   claudeCodeChannelsMcp?: boolean;
   /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
   streamdownRenderer?: boolean;
+  /**
+   * Show the advanced harness selector and all explicit harness/model choices in
+   * dashboard model pickers. Default false: pickers use each provider's default
+   * harness and hide the permutation matrix.
+   */
+  showHarnessModelPermutations?: boolean;
 }
 
 /**
@@ -919,6 +925,8 @@ export interface NormalizedExperimentalConfig {
   claudeCodeChannelsMcp: boolean;
   /** Whether dashboard chat markdown renders through Streamdown. */
   streamdownRenderer: boolean;
+  /** Whether model pickers expose explicit harness/model permutations. */
+  showHarnessModelPermutations: boolean;
 }
 
 /**
@@ -1186,6 +1194,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     claudeCodeChannels: false,
     claudeCodeChannelsMcp: false,
     streamdownRenderer: false,
+    showHarnessModelPermutations: false,
   },
   claude: {
     permissionMode: 'auto',
@@ -1844,6 +1853,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
       claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
       streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
+      showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations,
     },
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
@@ -2269,6 +2279,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (typeof config.experimental.streamdownRenderer === 'boolean') {
         result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+      }
+      if (typeof config.experimental.showHarnessModelPermutations === 'boolean') {
+        result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
       }
     }
 

@@ -28866,7 +28866,8 @@ const DEFAULT_CONFIG = {
 	experimental: {
 		claudeCodeChannels: false,
 		claudeCodeChannelsMcp: false,
-		streamdownRenderer: false
+		streamdownRenderer: false,
+		showHarnessModelPermutations: false
 	},
 	claude: { permissionMode: "auto" },
 	codex: { permissionMode: "auto-review" }
@@ -29221,7 +29222,8 @@ function mergeConfigs(...configs) {
 		experimental: {
 			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
 			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
-			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer
+			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
+			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
 		},
 		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
 		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
@@ -29429,6 +29431,7 @@ function mergeConfigs(...configs) {
 			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
 			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
 			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+			if (typeof config.experimental.showHarnessModelPermutations === "boolean") result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
 		}
 		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
 		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;

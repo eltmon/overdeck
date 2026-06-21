@@ -193,6 +193,8 @@ export interface SettingsConfig {
     claudeCodeChannelsMcp?: boolean;
     /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
     streamdownRenderer?: boolean;
+    /** Show explicit harness/model permutations in dashboard model pickers. */
+    showHarnessModelPermutations?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.

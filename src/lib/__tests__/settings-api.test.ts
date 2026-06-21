@@ -125,7 +125,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         rollupPendingThreshold: 4,
         sidebarRefreshIntervalMs: 10000,
       },
-      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: false, showHarnessModelPermutations: false },
       rtk: { enabled: false },
       claude: { permissionMode: 'auto' },
       tts: {
@@ -210,12 +210,14 @@ describe('loadSettingsApi', () => {
     const { loadSettingsApi } = await import('../settings-api.js');
 
     expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(false);
+    expect(loadSettingsApi().experimental?.showHarnessModelPermutations).toBe(false);
 
     mockLoadConfig.mockReturnValue(baseConfig({
-      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: true },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: true, showHarnessModelPermutations: true },
     }));
 
     expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(true);
+    expect(loadSettingsApi().experimental?.showHarnessModelPermutations).toBe(true);
   });
 
   it('returns seeded workhorses and roles without legacy overrides', async () => {
@@ -569,12 +571,14 @@ describe('saveSettingsApi', () => {
       experimental: {
         ...settings.experimental,
         streamdownRenderer: true,
+        showHarnessModelPermutations: true,
       },
     }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('experimental:');
     expect(written).toContain('streamdownRenderer: true');
+    expect(written).toContain('showHarnessModelPermutations: true');
   });
 
   it('persists conversation search settings', async () => {
@@ -859,6 +863,7 @@ describe('validateSettingsApi', () => {
         claudeCodeChannels: 'yes',
         claudeCodeChannelsMcp: 'yes',
         streamdownRenderer: 'yes',
+        showHarnessModelPermutations: 'yes',
       } as never,
     });
 
@@ -866,6 +871,7 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('experimental.claudeCodeChannels must be a boolean');
     expect(result.errors).toContain('experimental.claudeCodeChannelsMcp must be a boolean');
     expect(result.errors).toContain('experimental.streamdownRenderer must be a boolean');
+    expect(result.errors).toContain('experimental.showHarnessModelPermutations must be a boolean');
   });
 
   it('rejects invalid tts field types', async () => {

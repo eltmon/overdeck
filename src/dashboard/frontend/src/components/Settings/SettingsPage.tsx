@@ -1564,6 +1564,16 @@ export function SettingsPage() {
     });
   };
 
+  const handleHarnessModelPermutationsToggle = (enabled: boolean) => {
+    applySettings({
+      ...formData,
+      experimental: {
+        ...formData.experimental,
+        showHarnessModelPermutations: enabled,
+      },
+    });
+  };
+
   const handleRtkToggle = (enabled: boolean) => {
     applySettings({
       ...formData,
@@ -1735,6 +1745,29 @@ export function SettingsPage() {
         <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
           Providers
         </h2>
+        <div className="mb-3 flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-border/70 bg-card/40">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-foreground">Show all harness/model permutations</span>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Off by default. When off, model pickers use each provider&apos;s default harness and hide explicit Claude Code, Pi, and Codex combinations.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(formData.experimental?.showHarnessModelPermutations)}
+            aria-label="Show all harness/model permutations"
+            data-testid="show-harness-model-permutations-toggle"
+            onClick={() => handleHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+              formData.experimental?.showHarnessModelPermutations ? 'bg-primary' : 'bg-muted'
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              formData.experimental?.showHarnessModelPermutations ? 'translate-x-[18px]' : 'translate-x-[3px]'
+            }`} />
+          </button>
+        </div>
         <div className="space-y-1">
           {PROVIDERS.map((provider) => {
             const isDefault = provider.id === 'anthropic';

@@ -87,6 +87,8 @@ interface ModelGroup {
   models: PickerModel[];
 }
 
+type ProviderHarnesses = Partial<Record<string, Harness>>;
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
@@ -189,6 +191,14 @@ function formatCost(costPer1M: number): string {
   return `$${Math.round(costPer1M)}/1M`;
 }
 
+function isHarness(value: unknown): value is Harness {
+  return value === 'claude-code' || value === 'pi' || value === 'codex';
+}
+
+function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {
+  return providerHarnesses[provider] ?? 'claude-code';
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface ModelPickerProps {
@@ -212,6 +222,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
+  const [providerHarnesses, setProviderHarnesses] = useState<ProviderHarnesses>({
+    anthropic: 'claude-code',
+    openai: 'codex',
+  });
+  const [showHarnessModelPermutations, setShowHarnessModelPermutations] = useState(false);
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -227,7 +242,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
     async function loadModels() {
       try {
         await ensureDefaultConversationModel();
-        const [availRes, orRes] = await Promise.allSettled([
+        const [availRes, orRes, settingsRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
             Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
           >,
@@ -235,10 +250,30 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             models: Array<{ id: string; name: string; promptCostPer1M: number; supportsThinking: boolean }>;
             favorites: string[];
           }>,
+          fetch('/api/settings').then((r) => r.json()) as Promise<{
+            models?: {
+              provider_harnesses?: Partial<Record<string, Harness | ''>>;
+              provider_default_harnesses?: Partial<Record<string, Harness>>;
+            };
+            experimental?: { showHarnessModelPermutations?: boolean };
+          }>,
         ]);
 
         const avail = availRes.status === 'fulfilled' ? availRes.value : {};
         const orData = orRes.status === 'fulfilled' ? orRes.value : { models: [], favorites: [] };
+        if (settingsRes.status === 'fulfilled') {
+          const defaults = settingsRes.value.models?.provider_default_harnesses ?? {};
+          const overrides = settingsRes.value.models?.provider_harnesses ?? {};
+          const nextProviderHarnesses: ProviderHarnesses = {};
+          for (const [provider, defaultHarness] of Object.entries(defaults)) {
+            if (isHarness(defaultHarness)) nextProviderHarnesses[provider] = defaultHarness;
+          }
+          for (const [provider, overrideHarness] of Object.entries(overrides)) {
+            if (isHarness(overrideHarness)) nextProviderHarnesses[provider] = overrideHarness;
+          }
+          setProviderHarnesses((prev) => ({ ...prev, ...nextProviderHarnesses }));
+          setShowHarnessModelPermutations(settingsRes.value.experimental?.showHarnessModelPermutations === true);
+        }
         const newGroups: ModelGroup[] = [];
 
         for (const [prov, models] of Object.entries(avail)) {
@@ -319,6 +354,9 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
 
   const allModels = groups.flatMap((g) => g.models);
   const selectedModel = allModels.find((m) => m.id === value);
+  const effectiveHarness = showHarnessModelPermutations
+    ? harness
+    : selectedModel ? providerDefaultHarness(selectedModel.provider, providerHarnesses) : harness;
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
 
   // Show provider sidebar when there are multiple AI providers
@@ -329,6 +367,19 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const showGroupHeaders = filteredGroups.length > 1;
 
   function handleSelect(model: PickerModel) {
+    const nextHarness = providerDefaultHarness(model.provider, providerHarnesses);
+    if (!showHarnessModelPermutations && harness !== undefined && onHarnessChange && harness !== nextHarness) {
+      if (onComboChange) {
+        onComboChange(model.id, model.effortLevels, nextHarness);
+      } else {
+        onChange(model.id, model.effortLevels);
+        onHarnessChange(nextHarness);
+      }
+      saveStoredHarness(nextHarness);
+      localStorage.setItem(MODEL_STORAGE_KEY, model.id);
+      setOpen(false);
+      return;
+    }
     onChange(model.id, model.effortLevels);
     localStorage.setItem(MODEL_STORAGE_KEY, model.id);
     setOpen(false);
@@ -353,13 +404,13 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           />
         )}
         <span className={styles.pickerLabel}>{label}</span>
-        {harness === 'pi' && (
+        {effectiveHarness === 'pi' && (
           <span className={styles.harnessIndicator} title="Pi harness active">
             <HarnessLogo harness="pi" className={styles.harnessIndicatorIcon} />
             Pi
           </span>
         )}
-        {harness === 'codex' && (
+        {effectiveHarness === 'codex' && (
           <span className={styles.harnessIndicator} title="Codex harness active">
             <HarnessLogo harness="codex" className={styles.harnessIndicatorIcon} />
             Codex
@@ -415,7 +466,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                 If the user picks a harness incompatible with the current model,
                 we auto-flip the model to a sensible default and toast the reason
                 instead of greying out the harness option (PAN-1067). */}
-            {harness !== undefined && onHarnessChange && (
+            {showHarnessModelPermutations && harness !== undefined && onHarnessChange && (
               <>
                 <div className={`${styles.pickerGroupHeader} ${styles.pickerHarnessHeader}`}>Harness</div>
                 {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
@@ -512,8 +563,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                     )}
                     {group.models.map((model) => {
                       const lvl = costWarningLevel(model.costPer1MTokens);
-                      const decision = harness
-                        ? canUsePickerHarness(harness, model.id, harnessPolicy)
+                      const modelHarness = showHarnessModelPermutations
+                        ? harness
+                        : providerDefaultHarness(model.provider, providerHarnesses);
+                      const decision = modelHarness
+                        ? canUsePickerHarness(modelHarness, model.id, harnessPolicy)
                         : { allowed: true };
                       const isLocked = !decision.allowed;
                       return (
