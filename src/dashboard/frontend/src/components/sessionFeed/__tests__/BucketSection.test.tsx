@@ -61,7 +61,7 @@ describe('BucketSection', () => {
     const buttons = screen.getAllByRole('button');
     expect(buttons.map((button) => button.textContent)).toEqual([
       'Git card messagePAN-13893m ago',
-      'Activity card headlineworkspace-a · PAN-1389·4m ago',
+      'Activity card headlineworkspace-a · PAN-1389·4m agoEvent',
       'Claude Code5m agoConversation card snippet',
     ]);
 

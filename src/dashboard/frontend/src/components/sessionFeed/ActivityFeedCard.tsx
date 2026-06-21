@@ -1,4 +1,5 @@
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { NotificationClassBadge } from '../NotificationClassBadge';
 import type { ActivitySessionFeedEntry } from './types';
 
 interface ActivityFeedCardProps {
@@ -27,6 +28,9 @@ export function ActivityFeedCard({ entry, onSelect, now = new Date() }: Activity
             <time dateTime={entry.timestamp} className="shrink-0">
               {formatRelativeTime(entry.timestamp, now)}
             </time>
+          </div>
+          <div className="mt-1 flex justify-end">
+            <NotificationClassBadge kind={entry.activityClass ?? 'operational'} />
           </div>
         </div>
       </div>

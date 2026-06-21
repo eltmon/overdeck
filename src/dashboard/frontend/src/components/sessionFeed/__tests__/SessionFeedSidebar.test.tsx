@@ -172,8 +172,8 @@ describe('SessionFeedSidebar', () => {
     const section = screen.getByText('Just Now').closest('section');
     expect(section).not.toBeNull();
     expect(within(section as HTMLElement).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'Newer activityfeature-pan-1389 · PAN-1389·1m ago',
-      'Older activityfeature-pan-1389 · PAN-1389·3m ago',
+      'Newer activityfeature-pan-1389 · PAN-1389·1m agoMemory',
+      'Older activityfeature-pan-1389 · PAN-1389·3m agoMemory',
     ]);
   });
 

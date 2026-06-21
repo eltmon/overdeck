@@ -21,6 +21,7 @@ export function createObservationFeedSelector() {
       .slice(0, MAX_OBSERVATION_FEED_ENTRIES)
       .map((observation) => ({
         kind: 'activity',
+        activityClass: 'memory',
         id: observation.id,
         timestamp: observation.timestamp,
         workspaceId: observation.workspaceId,

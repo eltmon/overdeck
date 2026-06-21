@@ -14,6 +14,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Terminal, XCircle, Loader2, X, Info, AlertTriangle, CheckCircle2, Volume2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore } from '../lib/store';
+import { NotificationClassBadge } from './NotificationClassBadge';
 
 export interface ActivityEntry {
   id: string;
@@ -229,6 +230,11 @@ function ActivityItem({ activity }: { activity: ActivityEntry }) {
           event: {activity.triggeringEvent}
         </p>
       )}
+
+      {/* Class label (lower-right) — distinguishes operational events from memory observations */}
+      <div className="mt-1.5 flex justify-end">
+        <NotificationClassBadge kind="operational" />
+      </div>
     </div>
   );
 }

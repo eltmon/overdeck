@@ -25,6 +25,14 @@ export interface ConversationSessionFeedEntry extends SessionFeedEntryBase {
 
 export interface ActivitySessionFeedEntry extends SessionFeedEntryBase {
   kind: 'activity';
+  /**
+   * Which class this activity entry came from. Both operational pipeline events
+   * and AI memory observations are folded into `kind: 'activity'` (see
+   * useActivityEntryFeed / useObservationFeed), which made them indistinguishable
+   * in the feed. This discriminator drives the per-card class badge. Defaults to
+   * 'operational' when absent (older cached entries).
+   */
+  activityClass?: 'operational' | 'memory';
   headline: string;
   summary: string;
   narrative?: string;

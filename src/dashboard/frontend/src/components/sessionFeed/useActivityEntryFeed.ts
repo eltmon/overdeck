@@ -47,6 +47,7 @@ export function createActivityEntryFeedSelector() {
         const tags = level ? [sourceName, level] : [sourceName];
         return {
           kind: 'activity',
+          activityClass: 'operational',
           id,
           timestamp,
           workspaceId: null,

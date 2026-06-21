@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { NotificationClassBadge } from '../components/NotificationClassBadge';
 import type { AgentSnapshot, FeatureRegistryEntry, MemoryHealthSnapshot, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
 import { fetchProjects, type ProjectData } from '../components/CommandDeck/projectsData';
@@ -403,6 +404,9 @@ function HomeActivityFeedItem({ observation, now }: { observation: MemoryObserva
           ))}
         </div>
       ) : null}
+      <div className="mt-2 flex justify-end">
+        <NotificationClassBadge kind="memory" />
+      </div>
     </li>
   );
 }

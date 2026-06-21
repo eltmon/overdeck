@@ -4,6 +4,7 @@ import type { DashboardState } from '../../lib/store';
 import { useDashboardStore } from '../../lib/store';
 import { bucketByTime, type TimeBucketKey } from '../../lib/timeBuckets';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { NotificationClassBadge } from '../NotificationClassBadge';
 
 const BUCKET_LABELS: Record<TimeBucketKey, string> = {
   justNow: 'Just Now',
@@ -131,6 +132,9 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
                               <time dateTime={observation.timestamp} className="shrink-0">
                                 {formatRelativeTime(observation.timestamp, now)}
                               </time>
+                            </div>
+                            <div className="mt-1 flex justify-end">
+                              <NotificationClassBadge kind="memory" />
                             </div>
                           </div>
                         </div>
