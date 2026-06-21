@@ -1553,7 +1553,7 @@ export default function App() {
         >
           {activeTab === 'home' && (
             <div className="w-full h-full overflow-hidden">
-              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} onNewProject={handleNewProject} onSelectProject={handleSelectProject} />
+              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} onNewProject={handleNewProject} onSelectProject={handleSelectProject} onOpenSettings={() => setActiveTab('settings')} />
             </div>
           )}
           {activeTab === 'command-deck' && (

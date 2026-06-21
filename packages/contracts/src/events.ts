@@ -948,6 +948,11 @@ export const MemoryHealthChangedEvent = Schema.Struct({
     issueId: IssueId,
     status: Schema.Literals(["healthy", "degraded", "failing"]),
     reason: Schema.NullOr(Schema.String),
+    // Human-readable cause of the most recent failure (e.g. the provider error
+    // message). Distinct from `reason`, which is a coarse machine code like
+    // "extraction-failed". Surfaced verbatim in the UI so the operator can see
+    // *why* memory extraction is failing without reading server logs.
+    detail: Schema.optional(Schema.String),
     ragDecision: Schema.optional(RagDecision),
   }),
 })

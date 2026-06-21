@@ -64,8 +64,19 @@ export async function extractWithProviderPolicy<T>(
     }
   }
 
-  await recordHealth(options.identity, { status: 'failing', reason: 'extraction-failed', success: false });
+  await recordHealth(options.identity, { status: 'failing', reason: 'extraction-failed', detail: describeExtractionError(lastError, selection), success: false });
   return { status: 'dropped', reason: 'extraction-failed', error: lastError };
+}
+
+/**
+ * Render the provider failure into a short, operator-readable cause that names
+ * the provider/model that was tried. This is surfaced verbatim in the dashboard
+ * so the operator can see *why* extraction is failing without server logs.
+ */
+function describeExtractionError(error: unknown, selection: ExtractionProviderSelection): string {
+  const raw = error instanceof Error ? error.message : String(error ?? 'unknown error');
+  const message = raw.length > 300 ? `${raw.slice(0, 300)}…` : raw;
+  return `${selection.provider}/${selection.model}: ${message}`;
 }
 
 export async function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): Promise<number> {

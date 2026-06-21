@@ -12,6 +12,7 @@ import type {
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
+  MemoryHealthSnapshot,
   MemoryObservation,
   MemoryStatus,
   ResetMarker,
@@ -237,6 +238,26 @@ export const selectMemoryStatus =
   (issueId: string) =>
   (s: DashboardState): MemoryStatus | undefined =>
     s.statusByIssueId[issueId]
+
+export const selectMemoryHealth =
+  (issueId: string) =>
+  (s: DashboardState): MemoryHealthSnapshot | undefined =>
+    s.healthByIssueId[issueId]
+
+/**
+ * The most recent failing memory-extraction health across all issues, or null.
+ * Drives the Home "memory extraction is failing" warning so the operator learns
+ * *why* observations stopped instead of staring at an empty feed. Picks the
+ * newest failure by `updatedAt` so the surfaced cause is the freshest one.
+ */
+export const selectLatestMemoryFailure = (s: DashboardState): MemoryHealthSnapshot | null => {
+  let latest: MemoryHealthSnapshot | null = null
+  for (const health of Object.values(s.healthByIssueId)) {
+    if (health.status !== 'failing') continue
+    if (!latest || health.updatedAt > latest.updatedAt) latest = health
+  }
+  return latest
+}
 
 export const selectResetMarkersByScope =
   (scope: string, scopeId: string) =>

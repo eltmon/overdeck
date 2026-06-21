@@ -208,6 +208,7 @@ describe('memory extraction provider policy', () => {
     expect(recordHealth).toHaveBeenCalledWith(identity, {
       status: 'failing',
       reason: 'extraction-failed',
+      detail: expect.stringContaining('failed'),
       success: false,
     });
   });

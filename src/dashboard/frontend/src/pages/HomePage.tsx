@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
+import type { AgentSnapshot, FeatureRegistryEntry, MemoryHealthSnapshot, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
 import { fetchProjects, type ProjectData } from '../components/CommandDeck/projectsData';
-import { useDashboardStore } from '../lib/store';
+import { useDashboardStore, selectLatestMemoryFailure } from '../lib/store';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { Issue } from '../types';
@@ -39,6 +40,8 @@ interface HomePageProps {
   onNewProject?: () => void;
   /** PAN-1969: open a registered project's deck (same path as the sidebar). */
   onSelectProject?: (projectName: string) => void;
+  /** Open Settings (Memory tab) — used by the memory-extraction failure notice. */
+  onOpenSettings?: () => void;
   now?: Date;
 }
 
@@ -88,7 +91,7 @@ async function fetchMetricsSummary(): Promise<MetricsSummaryResponse> {
   return response.json() as Promise<MetricsSummaryResponse>;
 }
 
-export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, now }: HomePageProps = {}) {
+export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, onOpenSettings, now }: HomePageProps = {}) {
   const registryQuery = useQuery({
     queryKey: ['feature-registry'],
     queryFn: fetchFeatureRegistry,
@@ -113,6 +116,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, n
   const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
   const agentsById = useDashboardStore((state) => state.agentsById);
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const memoryFailure = useDashboardStore(selectLatestMemoryFailure);
   const currentTime = now ?? new Date();
   const workspaceCards = useMemo(() => buildHomeWorkspaceCards({
     issuesRaw,
@@ -150,7 +154,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, n
           ))}
         </section>
 
-        <HomeActivityFeed observations={actionObservations} now={currentTime} />
+        <HomeActivityFeed observations={actionObservations} failure={memoryFailure} onOpenSettings={onOpenSettings} now={currentTime} />
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="workspace-status-title">
           <div>
@@ -284,7 +288,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, n
   );
 }
 
-function HomeActivityFeed({ observations, now }: { observations: Array<MemoryObservation & { actionStatus: string }>; now: Date }) {
+function HomeActivityFeed({ observations, failure, onOpenSettings, now }: { observations: Array<MemoryObservation & { actionStatus: string }>; failure?: MemoryHealthSnapshot | null; onOpenSettings?: () => void; now: Date }) {
   const buckets = useMemo(() => bucketByTime(observations, (observation) => observation.timestamp, now), [observations, now]);
 
   return (
@@ -294,10 +298,12 @@ function HomeActivityFeed({ observations, now }: { observations: Array<MemoryObs
         <p className="text-sm text-muted-foreground">Recent actionable memory observations across workspaces.</p>
       </div>
 
+      {failure && <MemoryFailureNotice failure={failure} onOpenSettings={onOpenSettings} />}
+
       {observations.length === 0 ? (
         <div data-testid="home-activity-empty" className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">No actionable observations yet.</p>
-          <p className="mt-1">Observations will appear after PAN-1052 memory extraction creates them.</p>
+          <p className="mt-1">Observations are extracted from running work agents — they appear here once an agent makes a change worth recording.</p>
         </div>
       ) : (
         <div className="mt-4 space-y-5">
@@ -320,6 +326,54 @@ function HomeActivityFeed({ observations, now }: { observations: Array<MemoryObs
       )}
     </section>
   );
+}
+
+function MemoryFailureNotice({ failure, onOpenSettings }: { failure: MemoryHealthSnapshot; onOpenSettings?: () => void }) {
+  const guidance = explainMemoryFailure(failure);
+  return (
+    <div
+      data-testid="home-memory-failure"
+      className="mt-4 rounded-lg border border-destructive/32 bg-destructive/8 p-4 text-sm text-foreground"
+      role="alert"
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="font-medium text-destructive">Memory extraction is failing</p>
+          <p className="mt-1 text-muted-foreground">{guidance}</p>
+          {failure.detail ? (
+            <p className="mt-2 break-words font-mono text-[11px] text-muted-foreground">{failure.detail}</p>
+          ) : null}
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Memory observations and agent memory injection are disabled until this is fixed.
+          </p>
+          {onOpenSettings ? (
+            <button
+              onClick={onOpenSettings}
+              className="mt-3 rounded-sm border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              Open Settings › Memory
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Map a memory-extraction failure into one actionable sentence for the operator. */
+function explainMemoryFailure(failure: MemoryHealthSnapshot): string {
+  const detail = (failure.detail ?? '').toLowerCase();
+  if (detail.includes('could not resolve authentication') || detail.includes('anthropic_api_key') || detail.includes('x-api-key')) {
+    return 'The Anthropic API provider has no API key. Switch the extraction provider to cliproxy (your ChatGPT subscription) in Settings › Memory.';
+  }
+  if (detail.includes('unknown provider for model') || detail.includes('does not exist') || detail.includes('unknown model')) {
+    return 'The configured extraction model is not available on cliproxy. Pick a served model (e.g. gpt-5.4-mini) in Settings › Memory.';
+  }
+  if (detail.includes('401') || detail.includes('unauthorized') || detail.includes('expired')) {
+    return 'The extraction provider rejected the credentials — the codex/ChatGPT subscription token used by cliproxy may have expired. Re-authenticate, then it will recover automatically.';
+  }
+  return 'Background memory-extraction calls are failing. Check the extraction provider and model in Settings › Memory.';
 }
 
 function HomeActivityFeedItem({ observation, now }: { observation: MemoryObservation & { actionStatus: string }; now: Date }) {

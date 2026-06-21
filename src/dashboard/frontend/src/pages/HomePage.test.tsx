@@ -273,7 +273,7 @@ describe('HomePage', () => {
     renderHomePage();
 
     expect(await screen.findByText('No actionable observations yet.')).toBeInTheDocument();
-    expect(screen.getByText('Observations will appear after PAN-1052 memory extraction creates them.')).toBeInTheDocument();
+    expect(screen.getByText('Observations are extracted from running work agents — they appear here once an agent makes a change worth recording.')).toBeInTheDocument();
   });
 
   it('renders Knowledge Registry rows from the dashboard API', async () => {

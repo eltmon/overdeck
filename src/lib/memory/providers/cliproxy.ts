@@ -57,7 +57,12 @@ export class CliproxyExtractionProvider implements ExtractionProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`cliproxy extraction failed: HTTP ${response.status}`);
+      // Include the response body — for an unmapped model cliproxy returns a
+      // body like {"error":{"message":"unknown provider for model X"}}, which is
+      // the actionable part the operator needs (drop it and the error is useless).
+      const body = await response.text().catch(() => '');
+      const detail = extractCliproxyErrorMessage(body);
+      throw new Error(`cliproxy extraction failed: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`);
     }
 
     const body = await response.json() as AnthropicCompatibleResponse;
@@ -85,4 +90,17 @@ export class CliproxyExtractionProvider implements ExtractionProvider {
       requestId,
     };
   }
+}
+
+/** Pull the human-readable message out of cliproxy's Anthropic-style error body. */
+function extractCliproxyErrorMessage(body: string): string {
+  if (!body) return '';
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: unknown } };
+    const message = parsed.error?.message;
+    if (typeof message === 'string' && message.trim()) return message.trim();
+  } catch {
+    // Not JSON — fall through to the raw (bounded) body.
+  }
+  return body.length > 200 ? `${body.slice(0, 200)}…` : body;
 }

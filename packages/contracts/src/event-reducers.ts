@@ -45,6 +45,8 @@ export interface MemoryHealthSnapshot {
   issueId: string
   status: 'healthy' | 'degraded' | 'failing'
   reason: string | null
+  /** Human-readable cause of the most recent failure (provider error text). */
+  detail?: string
   ragDecision?: RagDecision
   updatedAt: string
 }
@@ -873,9 +875,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         issueId: event.payload.issueId,
         status: event.payload.status,
         reason: event.payload.reason,
-        // Omit the key entirely when absent — an explicit `ragDecision: undefined`
-        // is not a valid JSON value and makes the whole DashboardSnapshot fail the
+        // Omit absent optionals entirely — an explicit `key: undefined` is not a
+        // valid JSON value and makes the whole DashboardSnapshot fail the
         // Schema.Json codec used for the `memory` field, breaking the RPC bootstrap.
+        ...(event.payload.detail !== undefined ? { detail: event.payload.detail } : {}),
         ...(event.payload.ragDecision !== undefined ? { ragDecision: event.payload.ragDecision } : {}),
         updatedAt: event.timestamp,
       }

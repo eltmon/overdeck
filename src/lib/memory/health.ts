@@ -9,6 +9,8 @@ export interface MemoryHealthSnapshot {
   status: MemoryHealthStatus;
   last_success: string | null;
   last_failure: string | null;
+  /** Human-readable cause of the most recent failure (provider error text). */
+  last_failure_detail?: string | null;
   extractions_attempted: number;
   extractions_succeeded: number;
   failed_by_reason: Record<string, number>;
@@ -17,6 +19,8 @@ export interface MemoryHealthSnapshot {
 export interface MemoryHealthUpdate {
   status: MemoryHealthStatus;
   reason?: string;
+  /** Human-readable cause (provider error message) when this update is a failure. */
+  detail?: string;
   success?: boolean;
 }
 
@@ -25,6 +29,7 @@ export interface MemoryHealthChangedPayload {
   issueId: string;
   status: MemoryHealthStatus;
   reason: string | null;
+  detail?: string;
 }
 
 export interface MemoryHealthUpdateOptions {
@@ -49,9 +54,15 @@ export async function updateMemoryHealth(
   const path = getMemoryHealthPath(identity);
   const current = await readMemoryHealth(path);
   const now = (options.now ?? new Date()).toISOString();
+  // Preserve the prior failure detail when a later detail-less failure write
+  // arrives (e.g. the pipeline records 'extraction-failed' a second time after
+  // the provider policy already captured the real provider error). Clear it on
+  // success so a recovered pipeline doesn't keep showing a stale cause.
+  const nextDetail = update.success ? null : (update.detail ?? current.last_failure_detail ?? null);
   const next: MemoryHealthSnapshot = {
     ...current,
     status: update.status,
+    last_failure_detail: nextDetail,
     extractions_attempted: current.extractions_attempted + 1,
     extractions_succeeded: current.extractions_succeeded + (update.success ? 1 : 0),
     last_success: update.success ? now : current.last_success,
@@ -67,12 +78,19 @@ export async function updateMemoryHealth(
   await ensureParentDir(path);
   await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
 
-  if (current.status !== next.status) {
-    const payload = {
+  // Emit on a status transition, OR when a new failure detail first becomes
+  // available while already failing — otherwise the operator would never learn
+  // *why* a pipeline that was already 'failing' is failing (the event only ever
+  // fired on the initial healthy→failing flip, which carried no detail).
+  const statusChanged = current.status !== next.status;
+  const detailChanged = !update.success && (nextDetail ?? null) !== (current.last_failure_detail ?? null);
+  if (statusChanged || detailChanged) {
+    const payload: MemoryHealthChangedPayload = {
       projectId: identity.projectId,
       issueId: identity.issueId,
       status: next.status,
       reason: update.reason ?? null,
+      ...(nextDetail ? { detail: nextDetail } : {}),
     };
     await (options.emitHealthChanged ?? emitMemoryHealthChanged)(payload, now);
   }
