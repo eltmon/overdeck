@@ -347,7 +347,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       issueId: config.agentId.replace(/^agent-/, ''),
       workspace: config.workspace,
       harness: 'claude-code',
-      model: determineModel({ model: config.model, role: 'work' }),
+      model: determineModel({ model: config.model, role: 'work', spawnKey: `work:${config.agentId.replace(/^agent-/, '')}` }),
       role: 'work',
       prompt: config.prompt,
     });
