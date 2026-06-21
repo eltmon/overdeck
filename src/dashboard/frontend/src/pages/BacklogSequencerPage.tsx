@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListOrdered, GitFork, RefreshCw, Filter, Play } from 'lucide-react';
 import { BacklogDAG, RationaleSidePanel, type SequenceNode } from '../components/backlog/BacklogDAG';
+import { BacklogForecast } from '../components/backlog/BacklogForecast';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface SequenceEdge {
@@ -15,7 +16,7 @@ interface SequenceResponse {
   edges: SequenceEdge[];
 }
 
-type View = 'list' | 'dag';
+type View = 'list' | 'dag' | 'forecast';
 type ImportanceFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type ConditionFilter = 'all' | 'ok' | 'needs-refinement' | 'stale';
 
@@ -260,6 +261,13 @@ export function BacklogSequencerPage() {
           >
             <GitFork className="w-3 h-3" />
             DAG
+          </button>
+          <button
+            onClick={() => setView('forecast')}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'forecast' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+          >
+            <Play className="w-3 h-3" />
+            Forecast
           </button>
         </div>
 
@@ -641,6 +649,15 @@ export function BacklogSequencerPage() {
                   onPlanningChange={handlePlanningChange}
                 />
               </div>
+            </div>
+          )}
+
+          {!isLoading && !error && allNodes.length > 0 && view === 'forecast' && (
+            <div className="flex-1 min-h-0">
+              <BacklogForecast
+                className="w-full h-full"
+                onSelectIssue={(id) => setSelectedNode(allNodes.find((nn) => nn.issueId === id) ?? null)}
+              />
             </div>
           )}
         </div>
