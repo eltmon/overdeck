@@ -20,7 +20,6 @@
 #   - src/lib/vbrief/io.ts, continue-state.ts, lifecycle-io.ts
 #   - src/lib/planning/spawn-planning-session.ts
 #   - src/lib/cloister/feedback-writer.ts
-#   - src/cli/commands/done.ts
 #   - src/dashboard/server/routes/agents.ts
 set -euo pipefail
 
@@ -123,7 +122,6 @@ CONTINUE_EXCLUDES=(
   ':!src/lib/vbrief/continue-state.ts'
   ':!src/lib/planning/spawn-planning-session.ts'
   ':!src/lib/cloister/feedback-writer.ts'
-  ':!src/cli/commands/done.ts'
   ':!src/dashboard/server/routes/agents.ts'
   ':!src/**/__tests__/*'
   ':!*.md'
