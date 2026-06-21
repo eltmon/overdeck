@@ -160,7 +160,7 @@ const center: React.CSSProperties = { display: 'flex', alignItems: 'center', jus
 const BKF_CSS = `
   .bkf-stats { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px; }
   .bkf-stat { display:flex; align-items:baseline; gap:6px; padding:6px 11px; border:1px solid var(--border); border-radius:8px; background:var(--card); font-size:11.5px; color:var(--muted-foreground); }
-  .bkf-stat b { font-family:ui-monospace,monospace; font-size:14px; font-weight:600; color:var(--foreground); }
+  .bkf-stat b { font-family:ui-monospace,monospace; font-size:14px; font-weight: 500; color:var(--foreground); }
   .bkf-stat.live b{color:var(--info-foreground);} .bkf-stat.go b{color:var(--success-foreground);} .bkf-stat.warn b{color:var(--warning-foreground);} .bkf-stat.danger b{color:var(--destructive-foreground);} .bkf-stat.info b{color:var(--info-foreground);}
   .bkf-subtabs { display:flex; gap:6px; align-items:center; margin-bottom:14px; }
   .bkf-subtabs button { background:transparent; border:1px solid var(--input); border-radius:8px; color:var(--muted-foreground); font:inherit; font-size:11px; font-weight:500; padding:5px 11px; cursor:pointer; }
@@ -169,7 +169,7 @@ const BKF_CSS = `
   .bkf-waves { display:flex; align-items:flex-start; gap:14px; overflow-x:auto; padding-bottom:8px; }
   .bkf-wcol { width:212px; flex:0 0 auto; }
   .bkf-wh { font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted-foreground); margin-bottom:9px; display:flex; gap:7px; align-items:center; }
-  .bkf-wh .c { font-family:ui-monospace,monospace; color:var(--foreground); font-weight:700; }
+  .bkf-wh .c { font-family:ui-monospace,monospace; color:var(--foreground); font-weight: 500; }
   .bkf-wcol.now .bkf-wh { color:var(--info-foreground); }
   .bkf-wstack { display:flex; flex-direction:column; gap:8px; }
   .bkf-empty { font-size:11px; color:var(--muted-foreground); font-style:italic; }
@@ -182,12 +182,12 @@ const BKF_CSS = `
   .bkf-card.parked { opacity:.6; border-style:dashed; }
   .bkf-card.vetoed { opacity:.5; filter:grayscale(.5); border-style:dashed; }
   .bkf-r1 { display:flex; align-items:center; gap:6px; }
-  .bkf-rk { font-family:ui-monospace,monospace; font-size:10px; font-weight:600; background:var(--accent); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
+  .bkf-rk { font-family:ui-monospace,monospace; font-size:10px; font-weight: 500; background:var(--accent); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
   .bkf-iid { font-family:ui-monospace,monospace; font-size:10px; color:var(--muted-foreground); }
-  .bkf-sz { margin-left:auto; font-size:8.5px; font-weight:600; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
+  .bkf-sz { margin-left:auto; font-size:8.5px; font-weight: 500; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
   .bkf-ttl { font-size:11px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; color:var(--foreground); }
   .bkf-chips { display:flex; gap:4px; flex-wrap:wrap; }
-  .bkf-chip { font-size:8.5px; font-weight:600; padding:1px 5px; border-radius:4px; border:1px solid; }
+  .bkf-chip { font-size:8.5px; font-weight: 500; padding:1px 5px; border-radius:4px; border:1px solid; }
   .bkf-chip.run { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 9%,transparent); display:inline-flex; gap:3px; align-items:center; }
   .bkf-chip.ready { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 32%,transparent); background:color-mix(in srgb,var(--success) 9%,transparent); }
   .bkf-chip.planned { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 30%,transparent); background:color-mix(in srgb,var(--info) 8%,transparent); }

@@ -285,7 +285,7 @@ export function BacklogSequencerPage() {
         <div className="min-w-[280px] flex-1">
           <div className="flex items-center gap-2">
             <ListOrdered className="w-4 h-4 text-[var(--color-accent)]" />
-            <h1 className="font-display text-[22px] leading-tight font-semibold tracking-normal text-[var(--color-fg)]">
+            <h1 className="font-display text-[22px] leading-tight font-medium tracking-normal text-[var(--color-fg)]">
               Backlog Sequencer
               {allNodes.length > 0 && (
                 <span className="ml-2 font-mono text-sm font-normal text-[var(--color-fg-muted)]">· {allNodes.length} open</span>
@@ -394,7 +394,7 @@ export function BacklogSequencerPage() {
       {seqRunning && (
         <div className="shrink-0 flex items-center gap-2 px-5 py-2 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--info)_28%,transparent)] text-xs">
           <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--info-foreground)]" />
-          <span className="text-[var(--info-foreground)] font-semibold">Sequencing pass running</span>
+          <span className="text-[var(--info-foreground)] font-medium">Sequencing pass running</span>
           <span className="text-[var(--color-fg)]">
             ranked <b className="font-mono">{seqStatus?.processed ?? 0}</b> / <b className="font-mono">{seqStatus?.total ?? '…'}</b> issues
           </span>
@@ -408,7 +408,7 @@ export function BacklogSequencerPage() {
       {/* Spawn error banner */}
       {spawnError && (
         <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-red-900/20 border-b border-red-900/40 text-xs">
-          <span className="text-red-400 font-semibold">Run pass failed</span>
+          <span className="text-red-400 font-medium">Run pass failed</span>
           <span className="text-red-300 truncate flex-1">{spawnError}</span>
           <button
             onClick={() => setSpawnError(null)}
@@ -473,7 +473,7 @@ export function BacklogSequencerPage() {
       {/* Candidates-to-close summary */}
       {showStale && staleNodes.length > 0 && (
         <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3">
-          <div className="text-xs font-semibold text-[var(--color-fg-muted)] mb-2">Candidates to close ({staleNodes.length})</div>
+          <div className="text-xs font-medium text-[var(--color-fg-muted)] mb-2">Candidates to close ({staleNodes.length})</div>
           <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
             {staleNodes.map((n) => (
               <div key={n.issueId} className="flex items-center gap-2 text-xs">
@@ -494,7 +494,7 @@ export function BacklogSequencerPage() {
       {/* Needs-refinement banner */}
       {refineNodes.length > 0 && (
         <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-yellow-900/20 border-b border-yellow-900/40 text-xs">
-          <span className="text-yellow-400 font-semibold">⚠ {refineNodes.length} need refinement</span>
+          <span className="text-yellow-400 font-medium">⚠ {refineNodes.length} need refinement</span>
           <span className="text-yellow-700">{refineNodes.slice(0, 5).map((n) => n.issueId).join(', ')}{refineNodes.length > 5 ? ` +${refineNodes.length - 5}` : ''}</span>
           <button
             onClick={() => handleDraftPrd(refineNodes[0]!.issueId)}
@@ -509,28 +509,28 @@ export function BacklogSequencerPage() {
       {allNodes.length > 0 && (
         <div className="flex flex-wrap gap-2 px-6 py-2.5 border-b border-[var(--color-border)] shrink-0">
           <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-fg-muted)]">
-            <b className="text-[var(--color-fg)] font-semibold font-mono">{allNodes.length}</b> open issues
+            <b className="text-[var(--color-fg)] font-medium font-mono">{allNodes.length}</b> open issues
           </span>
           <button
             onClick={() => setInPipelineOnly((p) => !p)}
             className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${inPipelineOnly ? 'border-blue-500/60 bg-blue-900/20 text-blue-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-blue-500/40'}`}
           >
             <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-            In pipeline <b className="font-mono font-semibold text-[var(--color-fg)]">{inPipelineCount}</b>
+            In pipeline <b className="font-mono font-medium text-[var(--color-fg)]">{inPipelineCount}</b>
           </button>
           <button
             onClick={() => setReadyOnly((p) => !p)}
             className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${readyOnly ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-emerald-500/40'}`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            Ready <b className="font-mono font-semibold text-[var(--color-fg)]">{readyCount}</b>
+            Ready <b className="font-mono font-medium text-[var(--color-fg)]">{readyCount}</b>
           </button>
           <button
             onClick={() => setHasPrdOnly((p) => !p)}
             className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${hasPrdOnly ? 'border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] text-[var(--color-accent)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[var(--color-border)]/80'}`}
           >
             <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
-            Has PRD <b className="font-mono font-semibold text-[var(--color-fg)]">{hasPrdCount}</b>
+            Has PRD <b className="font-mono font-medium text-[var(--color-fg)]">{hasPrdCount}</b>
           </button>
           {refineNodes.length > 0 && (
             <button
@@ -538,7 +538,7 @@ export function BacklogSequencerPage() {
               className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${conditionFilter === 'needs-refinement' ? 'border-yellow-500/60 bg-yellow-900/20 text-yellow-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-yellow-500/40'}`}
             >
               <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-              ⚠ Needs refinement <b className="font-mono font-semibold text-[var(--color-fg)]">{refineNodes.length}</b>
+              ⚠ Needs refinement <b className="font-mono font-medium text-[var(--color-fg)]">{refineNodes.length}</b>
             </button>
           )}
           {staleNodes.length > 0 && (
@@ -547,7 +547,7 @@ export function BacklogSequencerPage() {
               className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${conditionFilter === 'stale' ? 'border-gray-400/60 bg-gray-800 text-gray-300' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-gray-500/40'}`}
             >
               <span className="w-2 h-2 rounded-full bg-gray-500 opacity-50 shrink-0" />
-              ⊘ Stale candidates <b className="font-mono font-semibold text-[var(--color-fg)]">{staleNodes.length}</b>
+              ⊘ Stale candidates <b className="font-mono font-medium text-[var(--color-fg)]">{staleNodes.length}</b>
             </button>
           )}
           <button
@@ -555,7 +555,7 @@ export function BacklogSequencerPage() {
             className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${tierFilter === 'now' ? 'border-red-500/60 bg-red-900/20 text-red-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-red-500/40'}`}
           >
             <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-            Tier 1 · Now <b className="font-mono font-semibold text-[var(--color-fg)]">{tierCounts.now}</b>
+            Tier 1 · Now <b className="font-mono font-medium text-[var(--color-fg)]">{tierCounts.now}</b>
           </button>
         </div>
       )}
@@ -575,7 +575,7 @@ export function BacklogSequencerPage() {
               className={`flex-1 min-w-[140px] flex flex-col gap-0.5 px-3.5 py-2.5 border border-l-4 ${t.accent} rounded-lg bg-[var(--color-surface)] text-left hover:bg-[var(--color-surface-hover)] transition-colors shadow-sm ${tierFilter === t.key ? `ring-1 ${t.ring} border-[var(--color-border)]` : 'border-[var(--color-border)]'}`}
             >
               <span className="text-xs text-[var(--color-fg)]">{t.emoji} {t.label}</span>
-              <span className="font-mono text-lg font-semibold text-[var(--color-fg)] leading-tight">{t.count}</span>
+              <span className="font-mono text-lg font-medium text-[var(--color-fg)] leading-tight">{t.count}</span>
               <span className="text-[10px] text-[var(--color-fg-muted)]">{t.sub}</span>
             </button>
           ))}
@@ -585,7 +585,7 @@ export function BacklogSequencerPage() {
       {/* Focus note */}
       {tierFilter && allNodes.length > 0 && (
         <div className="flex items-center gap-2 px-5 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0 text-xs text-[var(--color-fg-muted)]">
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-widest bg-[var(--color-accent)] text-[var(--color-fg)]">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-widest bg-[var(--color-accent)] text-[var(--color-fg)]">
             Showing {TIER_LABEL[tierFilter]}
           </span>
           <span>

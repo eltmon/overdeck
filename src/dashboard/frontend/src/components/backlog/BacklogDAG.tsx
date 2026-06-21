@@ -234,7 +234,7 @@ function buildPanelFlags(node: SequenceNode): Array<{ label: string; kind: FlagK
 
 function panelChipStyle(kind: FlagKind): CSSProperties {
   const base: CSSProperties = {
-    fontSize: 9, fontWeight: 500, letterSpacing: '0.04em', padding: '1px 6px',
+    fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', padding: '1px 6px',
     borderRadius: 'var(--radius-sm, 4px)', border: '1px solid', lineHeight: '15px', whiteSpace: 'nowrap',
   };
   switch (kind) {
@@ -253,7 +253,7 @@ const META_GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'auto 1
 const META_KEY: CSSProperties = { color: 'var(--muted-foreground)' };
 const META_VAL: CSSProperties = { color: 'var(--foreground)', textAlign: 'right' };
 const SECTION_LABEL: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 7 };
-const SECTION_HINT: CSSProperties = { fontSize: 11, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
+const SECTION_HINT: CSSProperties = { fontSize: 12, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
 
 function SegControl({
   value,
@@ -275,7 +275,7 @@ function SegControl({
             style={{
               flex: 1,
               padding: '3px 6px',
-              fontSize: 9,
+              fontSize: 10,
               fontWeight: isActive ? 700 : 400,
               border: 'none',
               cursor: 'pointer',
@@ -299,8 +299,8 @@ function ToggleRow({ label, hint, on, color, onChange }: {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, margin: '9px 0' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 10.5, color: 'var(--muted-foreground)', lineHeight: 1.4, marginTop: 2 }}>{hint}</div>
+        <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 10, color: 'var(--muted-foreground)', lineHeight: 1.4, marginTop: 2 }}>{hint}</div>
       </div>
       <button
         onClick={() => onChange(!on)}
@@ -394,7 +394,7 @@ export function RationaleSidePanel({
         </span>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}
         >
           ×
         </button>
@@ -403,7 +403,7 @@ export function RationaleSidePanel({
       {/* Identity */}
       <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{node.issueId}</div>
       {node.title && (
-        <div style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 14px' }}>{node.title}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 14px' }}>{node.title}</div>
       )}
 
       {/* Metrics — importance + impact score */}
@@ -447,9 +447,9 @@ export function RationaleSidePanel({
             onChange={(v) => toggleLabel('ready', v)}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '9px 0' }}>
-            <span style={{ fontSize: 12.5, fontWeight: 500 }}>Planned</span>
+            <span style={{ fontSize: 12, fontWeight: 500 }}>Planned</span>
             <span style={{
-              fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 5, border: '1px solid',
+              fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 5, border: '1px solid',
               ...(planned
                 ? { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }
                 : { color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 34%, transparent)', background: 'color-mix(in srgb, var(--warning) 9%, transparent)' }),
@@ -500,7 +500,7 @@ export function RationaleSidePanel({
       </div>
 
       {/* AI rationale */}
-      <div style={{ fontSize: 13, lineHeight: 1.6, color: 'color-mix(in srgb, var(--foreground) 88%, transparent)', borderTop: '1px solid var(--border)', paddingTop: 13 }}>
+      <div style={{ fontSize: 12, lineHeight: 1.6, color: 'color-mix(in srgb, var(--foreground) 88%, transparent)', borderTop: '1px solid var(--border)', paddingTop: 13 }}>
         <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 6 }}>
           AI rationale · from sequence.md
         </div>
@@ -636,9 +636,9 @@ export function BacklogDAG({
         .bk-dag-root .node.gate-blocked { opacity: .82; }
         .bk-dag-root .node.gate-promoted { border-top: 2px solid color-mix(in srgb, var(--primary) 60%, transparent); }
         .bk-dag-root .node .row1 { display: flex; align-items: center; gap: 7px; }
-        .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 600; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
+        .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 500; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
         .bk-dag-root .node .iid { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
-        .bk-dag-root .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 600; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 15px; }
+        .bk-dag-root .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 500; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 15px; }
         .bk-dag-root .node .title { font-size: 12.5px; font-weight: 500; color: var(--foreground); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .bk-dag-root .node .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
         .bk-dag-root .chip { font-size: 9px; font-weight: 500; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; border: 1px solid; line-height: 14px; }
