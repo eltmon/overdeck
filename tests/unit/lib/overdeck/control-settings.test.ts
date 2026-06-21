@@ -10,6 +10,7 @@ import {
   SettingsWriterLive,
   ConfigResolver,
   ConfigResolverLive,
+  FLYWHEEL_MERGE_TRAIN_ENABLED_KEY,
   type FlywheelConfig,
   type IssuePolicy,
 } from '../../../../src/lib/overdeck/control-settings.js';
@@ -170,7 +171,7 @@ describe('SettingsResolver', () => {
     const { dbLayer, busLayer, flags } = makeWiredFakeDb();
     flags.set('flywheel.auto_pickup_backlog', true);
     flags.set('flywheel.require_uat_before_merge', false);
-    flags.set('merge_train_enabled', true);
+    flags.set(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, true);
 
     const layer = SettingsResolverLive.pipe(Layer.provide(dbLayer), Layer.provide(busLayer));
 
@@ -254,7 +255,7 @@ describe('SettingsWriter', () => {
     );
 
     expect(upsertedKeys).toContain('flywheel.auto_pickup_backlog');
-    expect(upsertedKeys).toContain('merge_train_enabled');
+    expect(upsertedKeys).toContain(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY);
     expect(upsertedKeys).not.toContain('flywheel.require_uat_before_merge');
     expect(result.autoPickupBacklog).toBe(true);
     expect(result.mergeTrainEnabled).toBe(true);
