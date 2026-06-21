@@ -70,6 +70,20 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         }
 
+        // Join issue titles from the in-memory read-model issue service so the
+        // detail panel can show the title (the sequence cache stores only the id).
+        // getIssues() is the hot in-memory path — no disk I/O per request.
+        const titleByIssue = new Map<string, string>();
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getSharedIssueService } = require('../services/issue-service-singleton.js') as typeof import('../services/issue-service-singleton.js');
+          for (const issue of getSharedIssueService().getIssues() as Array<Record<string, unknown>>) {
+            const id = typeof issue['identifier'] === 'string' ? issue['identifier'].toUpperCase() : '';
+            const title = typeof issue['title'] === 'string' ? issue['title'] : '';
+            if (id && title) titleByIssue.set(id, title);
+          }
+        } catch { /* issue service not ready — titles are optional */ }
+
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
           const reviewStatus = getReviewStatusSync(issueUpper);
@@ -80,6 +94,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
           const ready = specIssues.has(issueUpper) && issuesWithBeads.has(issueUpper);
           return {
             issueId: r.issueId,
+            title: titleByIssue.get(issueUpper),
             rank: r.rank,
             size: r.size,
             importance: r.importance,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactFlow, {
@@ -17,6 +17,7 @@ import dagre from '@dagrejs/dagre';
 
 export interface SequenceNode {
   issueId: string;
+  title?: string;
   rank: number;
   size: string;
   importance: string;
@@ -239,6 +240,64 @@ function sequenceToFlow(
 
 // ── Side panel ──
 
+// Importance → color swatch (mirrors the mockup's IMP_SW map, theme-token based).
+const IMP_SWATCH: Record<string, string> = {
+  critical: 'var(--destructive)',
+  high: 'var(--warning)',
+  medium: 'var(--color-neutral-400)',
+  low: 'color-mix(in srgb, var(--muted-foreground) 55%, transparent)',
+};
+
+// Planning-policy hint shown under the segmented control (verbatim from the mockup).
+const PLAN_HINT: Record<string, string> = {
+  interactive: 'Interactive: a human drives planning — a HARD gate. The Flywheel surfaces it as needs-you and never auto-runs it.',
+  skip: 'Skip: no planning — pan start --auto straight to work (trivial/tiny/urgent).',
+  auto: 'Auto: the AI plans it end-to-end (pan plan --auto).',
+};
+
+// Pickup-gate hint shown under the segmented control (verbatim from the mockup).
+const GATE_HINT: Record<string, string> = {
+  ready: 'Promoted: eligible for auto-pickup now, even ahead of heuristics (operator or Flywheel emergency-promote).',
+  blocked: 'Held: the Flywheel will not auto-pick this.',
+  auto: 'Auto: normal eligibility (ready · not blocked · passes the security filter).',
+};
+
+type FlagKind = 'pipeline' | 'refine' | 'stale' | 'ready' | 'prd' | 'none';
+
+function buildPanelFlags(node: SequenceNode): Array<{ label: string; kind: FlagKind }> {
+  const flags: Array<{ label: string; kind: FlagKind }> = [];
+  if (node.inPipeline) flags.push({ label: 'in pipeline', kind: 'pipeline' });
+  if (node.condition === 'needs-refinement') flags.push({ label: '⚠ needs refinement', kind: 'refine' });
+  if (node.condition === 'stale') flags.push({ label: '⊘ likely stale · candidate to close', kind: 'stale' });
+  if (node.ready) flags.push({ label: '✓ READY', kind: 'ready' });
+  if (node.hasPrd) flags.push({ label: 'PRD', kind: 'prd' });
+  if (flags.length === 0) flags.push({ label: 'not yet planned', kind: 'none' });
+  return flags;
+}
+
+function panelChipStyle(kind: FlagKind): CSSProperties {
+  const base: CSSProperties = {
+    fontSize: 9, fontWeight: 500, letterSpacing: '0.04em', padding: '1px 6px',
+    borderRadius: 'var(--radius-sm, 4px)', border: '1px solid', lineHeight: '15px', whiteSpace: 'nowrap',
+  };
+  switch (kind) {
+    case 'ready':
+      return { ...base, color: 'var(--success-foreground)', borderColor: 'color-mix(in srgb, var(--success) 32%, transparent)', background: 'color-mix(in srgb, var(--success) 10%, transparent)' };
+    case 'refine':
+      return { ...base, color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 32%, transparent)', background: 'color-mix(in srgb, var(--warning) 10%, transparent)' };
+    case 'pipeline':
+      return { ...base, color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 32%, transparent)', background: 'color-mix(in srgb, var(--info) 10%, transparent)' };
+    default:
+      return { ...base, color: 'var(--muted-foreground)', borderColor: 'var(--border)', background: 'var(--accent)' };
+  }
+}
+
+const META_GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '7px 14px', fontSize: 12 };
+const META_KEY: CSSProperties = { color: 'var(--muted-foreground)' };
+const META_VAL: CSSProperties = { color: 'var(--foreground)', textAlign: 'right' };
+const SECTION_LABEL: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 7 };
+const SECTION_HINT: CSSProperties = { fontSize: 11, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
+
 function SegControl({
   value,
   options,
@@ -310,94 +369,108 @@ export function RationaleSidePanel({
     try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
   }
 
+  const flags = buildPanelFlags(node);
+  const clampedScore = Math.max(0, Math.min(100, node.score));
+
   return (
     <div style={{
-      width: 300,
+      width: 320,
       flexShrink: 0,
-      background: 'var(--color-surface)',
-      borderLeft: '1px solid var(--color-border)',
-      padding: '14px',
+      background: 'var(--card)',
+      borderLeft: '1px solid var(--border)',
+      padding: '16px',
       overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: 10,
+      color: 'var(--foreground)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 700, fontSize: 12, color: '#60a5fa', fontFamily: 'monospace' }}>
-          {node.issueId}
+      {/* Header: eyebrow + close */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--muted-foreground)' }}>
+          Why rank #{node.rank}
         </span>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: 'var(--color-fg-muted)', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
         >
           ×
         </button>
       </div>
 
-      {/* Score + importance */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {[
-          ['rank', `#${node.rank}`],
-          ['score', String(node.score)],
-          ['size', node.size],
-          ['importance', node.importance],
-          ['condition', node.condition],
-        ].map(([k, v]) => (
-          <span key={k} style={{ fontSize: 9, background: 'var(--color-accent)', color: 'var(--color-fg-muted)', borderRadius: 3, padding: '2px 5px' }}>
-            {k}: {v}
+      {/* Identity */}
+      <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{node.issueId}</div>
+      {node.title && (
+        <div style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 14px' }}>{node.title}</div>
+      )}
+
+      {/* Metrics — importance + impact score */}
+      <div style={{ ...META_GRID, marginTop: node.title ? 0 : 12 }}>
+        <span style={META_KEY}>Importance</span>
+        <span style={META_VAL}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: IMP_SWATCH[node.importance] ?? 'var(--muted-foreground)' }} />
+            {node.importance}
           </span>
-        ))}
+        </span>
+        <span style={META_KEY}>Impact score</span>
+        <span style={{ ...META_VAL, fontFamily: 'monospace' }}>{node.score} / 100</span>
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: 'var(--accent)', overflow: 'hidden', marginTop: 3, marginBottom: 12 }}>
+        <div style={{ height: '100%', width: `${clampedScore}%`, borderRadius: 3, background: 'linear-gradient(90deg, var(--warning), var(--destructive))' }} />
       </div>
 
-      {/* Why */}
-      <div style={{ fontSize: 10, color: 'var(--color-fg-muted)', lineHeight: 1.5, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
-        <div style={{ fontWeight: 600, color: 'var(--color-fg)', marginBottom: 4 }}>Why ranked #{node.rank}</div>
-        {node.why}
+      {/* Metrics — size + dependencies */}
+      <div style={{ ...META_GRID, marginBottom: 14 }}>
+        <span style={META_KEY}>Est. size</span>
+        <span style={META_VAL}>{node.size} effort</span>
+        <span style={META_KEY}>Depends on</span>
+        <span style={{ ...META_VAL, fontFamily: 'monospace' }}>{node.dependsOn.length ? node.dependsOn.join(', ') : '— none'}</span>
       </div>
 
-      {/* Rationale */}
-      {node.rationale && (
-        <div style={{ fontSize: 10, color: 'var(--color-fg-muted)', lineHeight: 1.5, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
-          <div style={{ fontWeight: 600, color: 'var(--color-fg)', marginBottom: 4 }}>Rationale</div>
-          {node.rationale}
+      {/* Status flags */}
+      {flags.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+          {flags.map((f, i) => <span key={i} style={panelChipStyle(f.kind)}>{f.label}</span>)}
         </div>
       )}
 
-      {/* Gate control */}
-      <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
-        <div style={{ fontSize: 9, color: 'var(--color-fg-muted)', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Pickup Gate {busy && '…'}
-        </div>
-        <SegControl
-          value={gate}
-          options={[
-            { value: 'auto', label: 'Auto' },
-            { value: 'ready', label: '📌 Promote', activeColor: '#15803d' },
-            { value: 'blocked', label: '⛔ Hold', activeColor: '#b91c1c' },
-          ]}
-          onChange={handleGateChange}
-        />
-        <div style={{ fontSize: 9, color: 'var(--color-fg-muted)', marginTop: 5, lineHeight: 1.45 }}>
-          {gate === 'ready' && 'Promoted — Flywheel will pick this up next.'}
-          {gate === 'blocked' && 'Held — Flywheel will skip this until unblocked.'}
-          {gate === 'auto' && 'Auto — Flywheel decides based on rank.'}
-        </div>
-      </div>
-
-      {/* Planning policy control */}
-      <div>
-        <div style={{ fontSize: 9, color: 'var(--color-fg-muted)', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Planning Policy
-        </div>
+      {/* Planning policy */}
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
+        <div style={SECTION_LABEL}>Planning · AI-suggested, operator-overridable</div>
         <SegControl
           value={planning}
           options={[
             { value: 'skip', label: 'Skip' },
             { value: 'auto', label: 'Auto' },
-            { value: 'interactive', label: 'Interactive' },
+            { value: 'interactive', label: '⚑ Interactive', activeColor: '#b45309' },
           ]}
           onChange={handlePlanningChange}
         />
+        <div style={SECTION_HINT}>{PLAN_HINT[planning] ?? ''}</div>
+      </div>
+
+      {/* Pickup gate */}
+      <div style={{ marginBottom: 13 }}>
+        <div style={SECTION_LABEL}>Pickup gate · operator {busy && '…'}</div>
+        <SegControl
+          value={gate}
+          options={[
+            { value: 'auto', label: 'Auto' },
+            { value: 'ready', label: '✓ Ready', activeColor: '#15803d' },
+            { value: 'blocked', label: '⛔ Block', activeColor: '#b91c1c' },
+          ]}
+          onChange={handleGateChange}
+        />
+        <div style={SECTION_HINT}>{GATE_HINT[gate] ?? ''}</div>
+      </div>
+
+      {/* AI rationale */}
+      <div style={{ fontSize: 13, lineHeight: 1.6, color: 'color-mix(in srgb, var(--foreground) 88%, transparent)', borderTop: '1px solid var(--border)', paddingTop: 13 }}>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 6 }}>
+          AI rationale · from sequence.md
+        </div>
+        {node.why}
+        {node.rationale && <div style={{ marginTop: 8 }}>{node.rationale}</div>}
       </div>
     </div>
   );
