@@ -1102,6 +1102,9 @@ interface MessagesResponse {
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
   contextUsage?: ContextUsage | null;
+  /** Server-side resolution failure to surface in the panel (e.g. the live
+   * session could not be resolved from the launcher). Rendered as a banner. */
+  error?: string;
 }
 
 async function fetchMessages(name: string, signal?: AbortSignal): Promise<MessagesResponse> {
@@ -1310,6 +1313,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
       {isLoading || isDiscovering ? (
         <div className={styles.conversationConnecting}>
           <span>{isDiscovering ? 'Discovering conversation…' : 'Loading…'}</span>
+        </div>
+      ) : data?.error ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
+            ⚠ Session could not be resolved
+          </p>
+          <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
         </div>
       ) : isSpawning ? (
         <div className={styles.conversationEmptyState}>

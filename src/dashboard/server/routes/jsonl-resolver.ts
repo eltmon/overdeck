@@ -151,6 +151,44 @@ export async function resolveClaudeSessionId(
   return null;
 }
 
+/**
+ * Read the Claude session id PINNED into an agent/conversation launcher.sh.
+ *
+ * The launcher is what spawns the live tmux pane: it runs
+ * `claude … --session-id <uuid>` (or `--resume <uuid>`), so the pinned id is the
+ * EXACT session the Terminal tab attaches to — the only deterministic ground
+ * truth for "which session is live right now." Resolving the transcript panel
+ * from this id makes the Conversation tab match the Terminal tab by construction,
+ * instead of guessing via JSONL mtime (racy: an older session's file gets touched
+ * by a compaction summary write-back or a transient relaunch, its mtime jumps
+ * ahead of the live session's, and the panel renders the wrong transcript).
+ *
+ * Checks the conversation launcher dir first, then the agent launcher dir.
+ * Returns the uuid, or null when no launcher exists or it pins no session id.
+ */
+const LAUNCHER_UUID =
+  '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const LAUNCHER_SESSION_ID_RE = new RegExp(`--session-id\\s+'?(${LAUNCHER_UUID})'?`);
+const LAUNCHER_RESUME_RE = new RegExp(`--resume\\s+'?(${LAUNCHER_UUID})'?`);
+
+export async function readLauncherPinnedSessionId(
+  tmuxSession: string,
+  opts: { overdeckHomeOverride?: string } = {},
+): Promise<string | null> {
+  const home = opts.overdeckHomeOverride ?? getOverdeckHome();
+  const candidates = [
+    join(home, 'conversations', tmuxSession, 'launcher.sh'),
+    join(home, 'agents', tmuxSession, 'launcher.sh'),
+  ];
+  for (const path of candidates) {
+    const text = await readOptional(path);
+    if (!text) continue;
+    const match = LAUNCHER_SESSION_ID_RE.exec(text) ?? LAUNCHER_RESUME_RE.exec(text);
+    if (match) return match[1]!;
+  }
+  return null;
+}
+
 /** Read the harness recorded in the agent's state.json, or null when absent. */
 export async function resolveAgentHarness(
   agentId: string,

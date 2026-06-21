@@ -24,7 +24,7 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
+import { readLauncherPinnedSessionId, resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
@@ -764,17 +764,31 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   if (conv.harness === 'codex') {
     return resolveCodexRolloutPath(conv.tmuxSession);
   }
-  // claude-code: a work/conversation agent can be re-spawned or rotated onto a
-  // NEW Claude session (fresh start, compact recovery, model/harness drift).
-  // conv.claudeSessionId is captured once and goes stale, pinning the panel to an
-  // OLD transcript while the terminal shows the live one. Resolve the agent's
-  // freshest live session (the same session.id → sessions.json mtime lookup the
-  // work-agent transcript resolver uses), falling back to the recorded id.
-  const freshest = await resolveClaudeSessionId(conv.tmuxSession);
-  const sessionId = freshest ?? conv.claudeSessionId;
+  // claude-code: the launcher pins `--session-id <id>` (or `--resume <id>`) — the
+  // EXACT session the live tmux pane runs. Resolving from that pinned id makes the
+  // Conversation tab match the Terminal tab by construction. We deliberately do
+  // NOT guess via a JSONL-mtime "freshest" heuristic: a conversation accumulates
+  // many session ids in its agent dir's sessions.json (transient relaunches,
+  // sub-sessions), and a compaction summary write-back to an OLD session's file
+  // bumps its mtime ahead of the live one — so the heuristic renders the wrong
+  // transcript while the terminal shows the right one (the reported mismatch bug).
+  // conv.claudeSessionId (the conversation_files-recorded canonical id, resolved at
+  // the read door) is the secondary for ended conversations whose launcher has been
+  // cleaned up — NOT a fall back to the old mtime heuristic.
+  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
+  const sessionId = pinned ?? conv.claudeSessionId;
   if (sessionId) {
     return sessionFilePath(conv.cwd, sessionId);
   }
+  // Neither the launcher nor the conversation record yields a session id. For a
+  // live conversation this must never happen — scream so it gets attention
+  // instead of silently rendering a wrong/empty transcript. The /messages route
+  // turns this (for an active conversation) into a visible panel error.
+  console.error(
+    `[conversations] UNRESOLVED claude-code session for conversation '${conv.name}' ` +
+      `(tmux=${conv.tmuxSession}, status=${conv.status}, cwd=${conv.cwd}): no --session-id ` +
+      `pinned in launcher.sh and no recorded claudeSessionId. The transcript panel cannot be trusted.`,
+  );
   return null;
 }
 
@@ -3092,8 +3106,25 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
 
         if (!sessionFile) {
-          // Session file should always be set (deterministic from --session-id).
-          // If missing, it's a legacy conversation — return empty.
+          // The session file is deterministic from the launcher's pinned
+          // --session-id (resolveSessionFile). If it's unresolved for a LIVE
+          // conversation, the panel would otherwise silently show an empty or
+          // wrong transcript — surface it loudly instead so it gets attention
+          // (resolveSessionFile already screamed server-side). Returned with a
+          // 200 + `error` field so it flows through the normal data path and the
+          // panel can render a banner rather than a generic fetch failure.
+          if (conv && conv.status === 'active') {
+            return jsonResponse({
+              messages: [],
+              workLog: [],
+              streaming: false,
+              error:
+                `Could not resolve the live session for this conversation — its launcher pins ` +
+                `no --session-id and no session is recorded. The transcript cannot be shown ` +
+                `reliably; this needs attention.`,
+            });
+          }
+          // Ended/legacy conversation with no session file — genuinely empty.
           return jsonResponse({ messages: [], workLog: [], streaming: false });
         }
 

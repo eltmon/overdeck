@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import {
+  readLauncherPinnedSessionId,
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
   resolveJsonlPath,
@@ -315,6 +316,94 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     });
 
     expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+});
+
+describe('readLauncherPinnedSessionId — Conversation tab matches Terminal tab', () => {
+  const TMUX = 'conv-20260620-3784';
+  const PINNED = 'fcd61bd6-56b3-489b-bb34-d7d4f13be95e';
+  const RESUMED = '09125ebe-6b26-474b-b32d-da89a93b8baf';
+  let overdeckHome: string;
+
+  beforeEach(() => {
+    overdeckHome = join(testDir, 'overdeck');
+  });
+
+  async function writeConversationLauncher(body: string): Promise<void> {
+    const dir = join(overdeckHome, 'conversations', TMUX);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'launcher.sh'), body);
+  }
+
+  it('returns the --session-id pinned in the conversation launcher', async () => {
+    await writeConversationLauncher(
+      `node '/x/pty-supervisor.js' claude --permission-mode auto --model 'claude-opus-4-8' --session-id '${PINNED}'\n`,
+    );
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBe(PINNED);
+  });
+
+  it('falls back to --resume when no --session-id is present', async () => {
+    await writeConversationLauncher(`node '/x/pty-supervisor.js' claude --resume '${RESUMED}'\n`);
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBe(RESUMED);
+  });
+
+  it('prefers --session-id over --resume', async () => {
+    await writeConversationLauncher(
+      `node '/x/pty-supervisor.js' claude --resume '${RESUMED}' --session-id '${PINNED}'\n`,
+    );
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBe(PINNED);
+  });
+
+  it('handles an unquoted session id', async () => {
+    await writeConversationLauncher(`node /x/pty-supervisor.js claude --session-id ${PINNED}\n`);
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBe(PINNED);
+  });
+
+  it('checks the conversation launcher before the agent launcher', async () => {
+    await writeConversationLauncher(`claude --session-id '${PINNED}'\n`);
+    const agentDir = join(overdeckHome, 'agents', TMUX);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'launcher.sh'), `claude --session-id '${RESUMED}'\n`);
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBe(PINNED);
+  });
+
+  it('falls back to the agent launcher when no conversation launcher exists', async () => {
+    const agentDir = join(overdeckHome, 'agents', TMUX);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'launcher.sh'), `claude --session-id '${PINNED}'\n`);
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBe(PINNED);
+  });
+
+  it('returns null when no launcher exists', async () => {
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBeNull();
+  });
+
+  it('returns null when the launcher pins no session id', async () => {
+    await writeConversationLauncher(`node /x/pty-supervisor.js claude --permission-mode auto\n`);
+
+    const id = await readLauncherPinnedSessionId(TMUX, { overdeckHomeOverride: overdeckHome });
+
+    expect(id).toBeNull();
   });
 });
 
