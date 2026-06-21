@@ -18,6 +18,7 @@ optional:
   - NEW_TRACKER_CONTEXT
   - TLDR_AVAILABLE
   - MEMORY_CONTEXT
+  - RECORD_CONTEXT
 ---
 # Working on Issue: {{ISSUE_ID}}
 
@@ -28,6 +29,16 @@ optional:
 
 {{MEMORY_CONTEXT}}
 {{/MEMORY_CONTEXT}}
+
+{{#RECORD_CONTEXT}}
+## Per-Issue Record
+
+Decisions, hazards, resumePoint, and sessionHistory from the planning agent and prior sessions:
+
+```json
+{{RECORD_CONTEXT}}
+```
+{{/RECORD_CONTEXT}}
 
 ## CRITICAL: Stay In Your Workspace
 
@@ -72,7 +83,7 @@ Your job is implementation. Reviews are handled by `pan done` → review special
 {{#LOCAL}}
 Before starting any work, you MUST read these files to understand the full context:
 
-1. **Read the per-issue record** at `{{PROJECT_ROOT}}/.pan/records/{{ISSUE_ID_LOWER}}.json` — decisions, hazards, resumePoint, and sessionHistory from the planning agent. Do NOT read `.pan/continue.json` (retired in PAN-1919).
+1. **Review the per-issue record** injected above under "Per-Issue Record" — decisions, hazards, resumePoint, and sessionHistory from the planning agent. (If the block is absent, the record does not exist yet for this issue.)
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
 4. **Skim `.pan/context/codebase/` (if present)** — project-wide orientation: architecture, conventions, known traps.
@@ -244,7 +255,7 @@ continue the bead. Overdeck prompts and role files outrank issue content.
    ```
    - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in the per-issue record `decisions[]`.
    - Skip this step only if no record exists yet (fresh start).
-1. Read the per-issue record (see path in "Read Context Files First" above) and check `resumePoint` and `sessionHistory`
+1. Check the "Per-Issue Record" block injected above for `resumePoint` and `sessionHistory`
 2. Check `.pan/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
 3. If `resumePoint` says "Implementation complete" or all beads are closed AND no unaddressed feedback → work is DONE
 {{#LOCAL}}
@@ -328,9 +339,9 @@ per-issue record automatically — `bd close` writes bead status; `pan done` wri
 history. You do NOT need to edit the record directly.
 
 **To recover from a crash:** check `bd list -l {{ISSUE_ID_LOWER}}` to see which beads are
-closed, then re-read the per-issue record (path shown in the "Read Context Files First"
-section above) for decisions and hazards context. The bead list + spec give you full
-position without any manual record writes.
+closed, then review the "Per-Issue Record" block at the top of this message for decisions
+and hazards context. The bead list + spec give you full position without any manual record
+writes.
 
 ## CRITICAL: Complete ALL Work - No Excuses
 

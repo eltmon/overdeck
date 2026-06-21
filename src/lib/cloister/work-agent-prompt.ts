@@ -41,6 +41,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
   let featureContextStr = '';
   let polyrepoContextStr = '';
   let pendingFeedbackStr = '';
+  let recordContextStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = await readPlanningContext(ctx.workspacePath);
@@ -65,6 +66,16 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
     polyrepoContextStr = buildPolyrepoContext(issueId, ctx.workspacePath);
     pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
+
+    try {
+      const project = { name: 'inferred', path: ctx.projectRoot };
+      const record = readRecordContinueViewSync(project, issueIdLower);
+      if (record) {
+        recordContextStr = JSON.stringify(record, null, 2);
+      }
+    } catch {
+      // Record may not exist yet for a fresh issue — silently skip
+    }
   }
 
   return await Effect.runPromise(renderPrompt({
@@ -87,6 +98,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
       TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
+      RECORD_CONTEXT: recordContextStr,
     },
   }));
 }
