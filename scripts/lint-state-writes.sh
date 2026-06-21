@@ -18,7 +18,6 @@
 #   - src/lib/pan-dir/continue.ts, continues.ts
 #   - src/lib/pan-dir/feedback.ts, sessions.ts
 #   - src/lib/vbrief/io.ts, continue-state.ts, lifecycle-io.ts
-#   - src/lib/planning/spawn-planning-session.ts
 #   - src/lib/cloister/feedback-writer.ts
 #   - src/dashboard/server/routes/agents.ts
 set -euo pipefail
@@ -120,7 +119,6 @@ CONTINUE_EXCLUDES=(
   ':!src/lib/pan-dir/continues.ts'
   ':!src/lib/vbrief/io.ts'
   ':!src/lib/vbrief/continue-state.ts'
-  ':!src/lib/planning/spawn-planning-session.ts'
   ':!src/lib/cloister/feedback-writer.ts'
   ':!src/dashboard/server/routes/agents.ts'
   ':!src/**/__tests__/*'
