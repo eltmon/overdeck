@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   workResumeSlotsAvailable,
   canDispatchAdvancing,
+  tryReserveAdvancingSlot,
+  resetPatrolDispatchBudget,
   type ConcurrencyLimits,
   type RunningCounts,
 } from '../../../src/lib/cloister/concurrency.js';
@@ -68,23 +70,21 @@ describe('concurrency governor — config + counting', () => {
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, total: 3 });
   });
 
-  it('reserves advancing slots up to the ceiling per patrol, then resets', async () => {
-    vi.resetModules();
-    // ceiling = max_work_agents (1) + reserved_advancing_slots (1) = 2
-    vi.doMock('../../../src/lib/cloister/config.js', () => ({
-      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 1, reserved_advancing_slots: 1 } }),
-    }));
-    vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [], // 0 running → all headroom is from the per-patrol budget
-    }));
-    const { tryReserveAdvancingSlot, resetPatrolDispatchBudget } = await import('../../../src/lib/cloister/concurrency.js');
+  it('reserves advancing slots up to the ceiling per patrol, then resets', () => {
+    // PAN-2000: inject counts + limits directly instead of vi.doMock'ing config.js
+    // and agents.js. The mock-based form flaked under the parallel run when the
+    // doMock intermittently didn't apply (the real config/running-count leaked in),
+    // mirroring the deterministic dependency-injection pattern the "pure math"
+    // tests above already use. ceiling = max_work_agents (1) + reserved (1) = 2.
+    const counts: RunningCounts = { work: 0, advancing: 0, total: 0 }; // 0 running
+    const limits: ConcurrencyLimits = { maxWorkAgents: 1, reservedAdvancingSlots: 1, totalCeiling: 2, exemptOperatorStarted: true };
 
     resetPatrolDispatchBudget();
-    expect(tryReserveAdvancingSlot()).toBe(true);  // 0 running + 0 reserved < 2
-    expect(tryReserveAdvancingSlot()).toBe(true);  // 0 + 1 < 2
-    expect(tryReserveAdvancingSlot()).toBe(false); // 0 + 2 >= 2 → defer
+    expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // 0 running + 0 reserved < 2
+    expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // 0 + 1 < 2
+    expect(tryReserveAdvancingSlot(counts, limits)).toBe(false); // 0 + 2 >= 2 → defer
     resetPatrolDispatchBudget();
-    expect(tryReserveAdvancingSlot()).toBe(true);  // budget cleared for the next patrol
+    expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // budget cleared for the next patrol
   });
 
   it('emergency brake stops excess work agents idle-first and clears stoppedByUser', async () => {
