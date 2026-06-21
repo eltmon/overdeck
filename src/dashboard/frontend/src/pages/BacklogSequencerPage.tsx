@@ -152,8 +152,17 @@ export function BacklogSequencerPage() {
         body: JSON.stringify({ pass: spawnPass }),
       });
       if (!res.ok) {
-        const detail = await res.text().catch(() => '');
-        throw new Error(`HTTP ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+        // Prefer the structured { error } message the backend returns (e.g. the
+        // 409 "a sequencer pass is already running" guidance) over a raw status dump.
+        let message = `Request failed (HTTP ${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.error) message = String(body.error);
+        } catch {
+          const text = await res.text().catch(() => '');
+          if (text) message = text.slice(0, 300);
+        }
+        throw new Error(message);
       }
       setTimeout(() => refetch(), 2000);
     } catch (err) {
