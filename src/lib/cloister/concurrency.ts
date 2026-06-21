@@ -142,10 +142,11 @@ export function resetPatrolDispatchBudget(): void {
  * status untouched so a later patrol retries), never fail. Counts both tmux-alive
  * agents and advancing dispatches already reserved this patrol.
  */
-export function tryReserveAdvancingSlot(): boolean {
-  const { total } = countRunningAgents();
-  const { totalCeiling } = getConcurrencyLimits();
-  if (total + advancingReservedThisPatrol >= totalCeiling) return false;
+export function tryReserveAdvancingSlot(
+  counts: RunningCounts = countRunningAgents(),
+  limits: ConcurrencyLimits = getConcurrencyLimits(),
+): boolean {
+  if (counts.total + advancingReservedThisPatrol >= limits.totalCeiling) return false;
   advancingReservedThisPatrol++;
   return true;
 }
