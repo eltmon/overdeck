@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Backlog Pickup Forecast · real-data mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design/style-guide/mockups/_shared.css" />
+<style>
+  body { margin: 0; font-family: "DM Sans", system-ui, sans-serif; background: var(--background); color: var(--foreground); }
+  .page { padding: 22px 28px 80px; max-width: 1500px; margin: 0 auto; }
+  h1 { font-family: "Space Grotesk", sans-serif; font-size: 24px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 4px; }
+  .sub { color: var(--muted-foreground); font-size: 13px; margin-bottom: 16px; max-width: 880px; line-height: 1.5; }
+  .statbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 26px; }
+  .stat { display: flex; flex-direction: column; gap: 2px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); min-width: 96px; }
+  .stat b { font-family: "Space Grotesk", monospace; font-size: 22px; font-weight: 600; }
+  .stat span { font-size: 11px; color: var(--muted-foreground); }
+  .stat.warn b { color: var(--warning-foreground); } .stat.live b { color: var(--info-foreground); } .stat.go b { color: var(--success-foreground); }
+  .concept { margin: 0 0 40px; }
+  .ctitle { font-family: "Space Grotesk", sans-serif; font-size: 15px; font-weight: 600; margin: 0 0 3px; display: flex; align-items: center; gap: 9px; }
+  .ctitle .num { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted-foreground); }
+  .cdesc { color: var(--muted-foreground); font-size: 12.5px; margin: 0 0 14px; max-width: 920px; line-height: 1.5; }
+
+  /* node card */
+  .card { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--heat, var(--muted-foreground)); border-radius: 9px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 1px 2px rgba(0,0,0,.3); box-sizing: border-box; }
+  .card.crit { --heat: var(--destructive); border-left-width: 5px; } .card.high { --heat: var(--warning); border-left-width: 5px; }
+  .card.medium { --heat: color-mix(in srgb, var(--color-neutral-400) 80%, transparent); } .card.low { --heat: color-mix(in srgb, var(--muted-foreground) 55%, transparent); }
+  .card.pipe { box-shadow: 0 0 0 1.5px var(--info), 0 0 14px color-mix(in srgb, var(--info) 42%, transparent); animation: rp 2.6s ease-in-out infinite; }
+  @keyframes rp { 0%,100%{ box-shadow: 0 0 0 1.5px var(--info), 0 0 10px color-mix(in srgb,var(--info) 32%,transparent);} 50%{ box-shadow: 0 0 0 1.5px var(--info), 0 0 20px color-mix(in srgb,var(--info) 58%,transparent);} }
+  .card.plan { border-style: dashed; border-left-style: solid; opacity: .92; }
+  .r1 { display: flex; align-items: center; gap: 6px; }
+  .rk { font-family: "SF Mono", monospace; font-size: 10.5px; font-weight: 600; background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .iid { font-family: "SF Mono", monospace; font-size: 10.5px; color: var(--muted-foreground); }
+  .sz { margin-left: auto; font-size: 8.5px; font-weight: 600; letter-spacing: .05em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; line-height: 14px; }
+  .ttl { font-size: 11.5px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .chip { font-size: 8.5px; font-weight: 500; letter-spacing: .03em; padding: 1px 5px; border-radius: 4px; border: 1px solid; line-height: 13px; }
+  .chip.ready { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 9%, transparent); }
+  .chip.prd { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+  .chip.plan { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 36%, transparent); background: color-mix(in srgb, var(--warning) 9%, transparent); }
+  .chip.score { margin-left: auto; font-family: "SF Mono", monospace; color: var(--muted-foreground); border-color: transparent; }
+
+  /* Concept 1: waves */
+  .waves { display: flex; gap: 0; align-items: stretch; overflow-x: auto; padding-bottom: 6px; }
+  .wave { flex: 0 0 auto; width: 210px; display: flex; flex-direction: column; gap: 8px; }
+  .wave-h { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); margin-bottom: 2px; display: flex; align-items: center; gap: 7px; }
+  .wave-h .b { font-family: "SF Mono", monospace; color: var(--foreground); font-weight: 600; }
+  .wave.now .wave-h { color: var(--info-foreground); }
+  .warrow { flex: 0 0 auto; width: 46px; display: flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); }
+  .warrow svg { width: 30px; height: 30px; }
+
+  /* Concept 2: lanes / gantt */
+  .gantt { border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--background) 92%, var(--color-white)); padding: 14px 16px; position: relative; }
+  .lane { display: flex; align-items: center; gap: 8px; height: 44px; }
+  .lane-lbl { width: 78px; flex: 0 0 auto; font-size: 11px; color: var(--muted-foreground); font-family: "SF Mono", monospace; }
+  .lane-track { position: relative; flex: 1; height: 100%; border-left: 1px dashed var(--border); }
+  .blk { position: absolute; top: 5px; height: 34px; border-radius: 7px; border: 1px solid var(--border); border-left: 4px solid var(--heat, var(--muted-foreground)); background: var(--card); padding: 3px 7px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+  .blk.crit { --heat: var(--destructive); } .blk.high { --heat: var(--warning); } .blk.medium { --heat: color-mix(in srgb, var(--color-neutral-400) 80%, transparent); } .blk.low { --heat: color-mix(in srgb, var(--muted-foreground) 55%, transparent); }
+  .blk .bi { font-family: "SF Mono", monospace; font-size: 9.5px; color: var(--muted-foreground); }
+  .blk .bt { font-size: 9.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .axis { display: flex; margin: 8px 0 0 86px; color: var(--muted-foreground); font-size: 9.5px; font-family: "SF Mono", monospace; }
+  .axis span { flex: 1; border-left: 1px solid var(--border); padding-left: 3px; }
+  .legend { display: flex; gap: 16px; margin-top: 12px; font-size: 11px; color: var(--muted-foreground); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+
+  /* Concept 3: unlock */
+  .unlock { display: grid; grid-template-columns: 1fr auto 1fr; gap: 22px; align-items: center; }
+  .col-h { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted-foreground); margin-bottom: 9px; }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .gate-mid { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--muted-foreground); }
+  .gate-mid .pill { font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 8px; color: var(--warning-foreground); background: color-mix(in srgb, var(--warning) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 36%, transparent); white-space: nowrap; }
+  .callout { margin: 14px 0 0; padding: 12px 15px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--warning) 34%, transparent); background: color-mix(in srgb, var(--warning) 7%, transparent); color: color-mix(in srgb, var(--foreground) 90%, transparent); font-size: 12.5px; line-height: 1.55; }
+  .callout b { color: var(--warning-foreground); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Backlog Pickup Forecast <span style="font-size:13px;color:var(--muted-foreground);font-weight:400">· real data · modeled at 5 concurrent agents</span></h1>
+  <div class="sub">Instead of arrows = raw dependencies, this models the order the Flywheel will <b>actually pick up work</b> — applying the real eligibility rules (gate≠blocked · not already running · must have a vBRIEF spec or PRD draft) and processing in rank order, 5 at a time. Three ways to read it. All numbers are live from <code>/api/backlog/sequence</code>.</div>
+  <div class="statbar" id="statbar"></div>
+
+  <div class="concept">
+    <div class="ctitle"><span class="num">1</span> Pickup Waves — "what gets picked next, 5 at a time"</div>
+    <div class="cdesc">Each wave is the next batch of 5 eligible issues in rank order. The bold arrows are the pickup sequence: when a wave's slots free up, the next wave starts. <b>"In flight now"</b> = the 7 issues currently running (the pulsing nodes on the graph).</div>
+    <div class="waves" id="waves"></div>
+  </div>
+
+  <div class="concept">
+    <div class="ctitle"><span class="num">2</span> Agent-Lane Forecast — "when, and where's the long pole"</div>
+    <div class="cdesc">5 agent lanes, time → right (block width ∝ effort: XS…XL). Each ready issue drops into the first lane that frees up, in pickup order — a realistic parallel forecast. The makespan shows how long 5 agents take to clear the <i>ready</i> queue (≈ 6 effort-units).</div>
+    <div class="gantt" id="gantt"></div>
+    <div class="legend">
+      <span><i style="border-color:var(--destructive)"></i>critical</span>
+      <span><i style="border-color:var(--warning)"></i>high</span>
+      <span><i style="border-color:color-mix(in srgb,var(--color-neutral-400) 80%,transparent)"></i>medium</span>
+      <span>block width = estimated effort</span>
+    </div>
+  </div>
+
+  <div class="concept">
+    <div class="ctitle"><span class="num">3</span> The Planning Bottleneck — "the highest-leverage move the graph reveals"</div>
+    <div class="cdesc">The forecast exposes something a dependency graph can't: your <b>top-ranked criticals are not in the pickup queue at all</b> — they have no spec or PRD, so auto-pickup skips them. Planning them is what actually unblocks priority throughput.</div>
+    <div class="unlock">
+      <div>
+        <div class="col-h">⚠ top criticals — blocked on planning</div>
+        <div class="stack" id="planLeft"></div>
+      </div>
+      <div class="gate-mid">
+        <div class="pill">pan plan →</div>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div style="font-size:10px;text-align:center;max-width:90px">becomes pickable · jumps the queue</div>
+      </div>
+      <div>
+        <div class="col-h">✓ ready queue today (what runs instead)</div>
+        <div class="stack" id="planRight"></div>
+      </div>
+    </div>
+    <div class="callout" id="callout"></div>
+  </div>
+</div>
+
+<script>
+const D = {"N":5,"makespan":6,"stats":{"total":544,"inflight":7,"ready":9,"needsPlan":528,"blocked":0},"inflight":[{"rank":1,"id":"PAN-1908","title":"feat(architecture): event-driven agent state — SQLite runtime registry + git-permanent issue records in the infra repo (big-bang)","size":"XL","imp":"critical","score":99,"gate":"ready","cond":"ok","ready":false,"prd":true,"pipe":true,"deps":[]},{"rank":2,"id":"PAN-1866","title":"Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth","size":"XL","imp":"critical","score":98,"gate":"ready","cond":"ok","ready":true,"prd":true,"pipe":true,"deps":[]},{"rank":3,"id":"PAN-1919","title":"Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual \"continues\" + fold in state.json harness/model)","size":"L","imp":"critical","score":97,"gate":"ready","cond":"ok","ready":true,"prd":true,"pipe":true,"deps":["PAN-1908"]},{"rank":4,"id":"PAN-1832","title":"Role Models: support multiple models per role with weighted distribution (load-spreading across providers)","size":"M","imp":"high","score":96,"gate":"ready","cond":"ok","ready":true,"prd":false,"pipe":true,"deps":[]},{"rank":5,"id":"PAN-1982","title":"Revive convoy review as a configurable opt-in — global/project/per-issue (quick stays default)","size":"L","imp":"high","score":95,"gate":"ready","cond":"ok","ready":true,"prd":false,"pipe":true,"deps":[]},{"rank":6,"id":"PAN-1992","title":"Skills: migrate all panopticon.db references to overdeck.db and re-verify against the new data model","size":"M","imp":"high","score":94,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":true,"deps":["PAN-1983"]},{"rank":205,"id":"PAN-1224","title":"Ensure 'ship' (or close-out) restarts the running dashboard so merged code is actually live","size":"M","imp":"high","score":50,"gate":"auto","cond":"needs-refinement","ready":true,"prd":false,"pipe":true,"deps":[]}],"waves":[[{"rank":16,"id":"PAN-1918","title":"bug(ci): full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang stalls the only gate that runs it","size":"M","imp":"high","score":86,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]},{"rank":73,"id":"PAN-1862","title":"feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review","size":"L","imp":"medium","score":58,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":["PAN-1982"]},{"rank":267,"id":"PAN-1533","title":"Fork-into-worktree from conversation branch chip","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]},{"rank":268,"id":"PAN-1696","title":"feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]},{"rank":269,"id":"PAN-1775","title":"feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]}],[{"rank":270,"id":"PAN-1776","title":"feat(supervisor): hot-updatable delivery path — version-stamped supervisors, rolling refresh, and dumb-shim primitives with server-side delivery logic","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]},{"rank":297,"id":"PAN-1852","title":"Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data","size":"M","imp":"medium","score":44,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]},{"rank":430,"id":"PAN-1791","title":"Tiered execution: difficulty-routed bead dispatch + event-driven supervisor review (standing tier agents with plan-filtered commit feeds)","size":"M","imp":"medium","score":40,"gate":"auto","cond":"needs-refinement","ready":false,"prd":true,"pipe":false,"deps":[]},{"rank":492,"id":"PAN-1762","title":"Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)","size":"M","imp":"medium","score":39,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[]}]],"sched":[{"rank":16,"id":"PAN-1918","title":"bug(ci): full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang stalls the only gate that runs it","size":"M","imp":"high","score":86,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":0,"start":0,"end":3},{"rank":73,"id":"PAN-1862","title":"feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review","size":"L","imp":"medium","score":58,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":["PAN-1982"],"lane":1,"start":0,"end":5},{"rank":267,"id":"PAN-1533","title":"Fork-into-worktree from conversation branch chip","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":2,"start":0,"end":3},{"rank":268,"id":"PAN-1696","title":"feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":3,"start":0,"end":3},{"rank":269,"id":"PAN-1775","title":"feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":4,"start":0,"end":3},{"rank":270,"id":"PAN-1776","title":"feat(supervisor): hot-updatable delivery path — version-stamped supervisors, rolling refresh, and dumb-shim primitives with server-side delivery logic","size":"M","imp":"medium","score":45,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":0,"start":3,"end":6},{"rank":297,"id":"PAN-1852","title":"Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data","size":"M","imp":"medium","score":44,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":2,"start":3,"end":6},{"rank":430,"id":"PAN-1791","title":"Tiered execution: difficulty-routed bead dispatch + event-driven supervisor review (standing tier agents with plan-filtered commit feeds)","size":"M","imp":"medium","score":40,"gate":"auto","cond":"needs-refinement","ready":false,"prd":true,"pipe":false,"deps":[],"lane":3,"start":3,"end":6},{"rank":492,"id":"PAN-1762","title":"Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)","size":"M","imp":"medium","score":39,"gate":"auto","cond":"ok","ready":false,"prd":true,"pipe":false,"deps":[],"lane":4,"start":3,"end":6}],"planUnlock":[{"rank":7,"id":"PAN-2000","title":"bug(ci): RED MAIN — PAN-1866 fallout: spawn-sequencer stale assertion + worker-pool health.json + flaky concurrency","size":"M","imp":"critical","score":95,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":["PAN-1866"]},{"rank":8,"id":"PAN-1903","title":"bug(ci): RED MAIN — create-beads.test.ts flaky 'table not found: issues' bd-DB-init race (PAN-1629 follow-up)","size":"M","imp":"critical","score":94,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]},{"rank":9,"id":"PAN-1880","title":"bug(ci): main RED — start-sync-main-conflict.test.ts hits process.exit(1) under CI single-fork (maxForks:1) cross-file mock pollution; empties merge gate","size":"L","imp":"critical","score":93,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]},{"rank":10,"id":"PAN-1859","title":"bug(ci): main RED — agent-spawning.test.ts 'resumeAgent delivers continue prompt through Pi FIFO' fails (writePiCommand not called)","size":"M","imp":"critical","score":92,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]},{"rank":11,"id":"PAN-1857","title":"bug(ci): main RED — verification-gate.test.ts asserts stale 'src/dashboard/frontend' in DEFAULT_GATES.test after generic-command change (10ba58a42)","size":"S","imp":"critical","score":91,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]},{"rank":12,"id":"PAN-1698","title":"bug(ci): main is RED — model-count + schema-version + substrate-smoke test expectations stale (blocks every verify/ship/strike gate)","size":"M","imp":"critical","score":90,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]},{"rank":13,"id":"PAN-1783","title":"bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title","size":"S","imp":"high","score":89,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]},{"rank":14,"id":"PAN-1824","title":"Flaky main CI: real-timer integration tests time out (~5s) on loaded runners — fork recovery, rollout-JSONL, heartbeat, conversation-routes family","size":"M","imp":"high","score":88,"gate":"ready","cond":"ok","ready":false,"prd":false,"pipe":false,"deps":[]}]};
+const impClass = (i) => i;
+function cardHTML(n, extra='') {
+  const chips = [];
+  if (n.ready) chips.push('<span class="chip ready">✓ READY</span>');
+  else if (n.prd) chips.push('<span class="chip prd">PRD</span>');
+  if (!n.ready && !n.prd) chips.push('<span class="chip plan">⚠ needs plan</span>');
+  chips.push('<span class="chip score">'+n.score+'</span>');
+  return '<div class="card '+impClass(n.imp)+(n.pipe?' pipe':'')+(extra?(' '+extra):'')+'">'+
+    '<div class="r1"><span class="rk">#'+n.rank+'</span><span class="iid">'+n.id+'</span><span class="sz">'+n.size+'</span></div>'+
+    '<div class="ttl">'+esc(n.title)+'</div>'+
+    '<div class="chips">'+chips.join('')+'</div></div>';
+}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// stat bar
+document.getElementById('statbar').innerHTML = [
+  ['live','In flight now', D.stats.inflight],
+  ['go','Ready to pick', D.stats.ready],
+  ['warn','Need planning first', D.stats.needsPlan],
+  ['', 'Blocked (held)', D.stats.blocked],
+  ['', 'Total open', D.stats.total],
+].map(([k,l,v])=>'<div class="stat '+k+'"><b>'+v+'</b><span>'+l+'</span></div>').join('');
+
+// Concept 1 — waves
+const arrow = '<div class="warrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
+let wh = '<div class="wave now"><div class="wave-h">▶ In flight now <span class="b">'+D.stats.inflight+'</span></div>'+
+  D.inflight.map(n=>cardHTML(n)).join('')+'</div>';
+D.waves.forEach((w,i)=>{ wh += arrow + '<div class="wave"><div class="wave-h">Wave <span class="b">'+(i+1)+'</span></div>'+w.map(n=>cardHTML(n)).join('')+'</div>'; });
+document.getElementById('waves').innerHTML = wh;
+
+// Concept 2 — gantt
+const unit = Math.max(34, Math.floor(980 / Math.max(D.makespan,1)));
+let g = '';
+for (let l=0; l<D.N; l++){
+  const blks = D.sched.filter(s=>s.lane===l).map(s=>{
+    const left = s.start*unit, w = (s.end-s.start)*unit-4;
+    return '<div class="blk '+impClass(s.imp)+'" style="left:'+left+'px;width:'+w+'px" title="'+esc(s.title)+'"><div class="bi">#'+s.rank+' '+s.id+'</div><div class="bt">'+esc(s.title)+'</div></div>';
+  }).join('');
+  g += '<div class="lane"><div class="lane-lbl">agent '+(l+1)+'</div><div class="lane-track">'+blks+'</div></div>';
+}
+let axis=''; for(let t=0;t<=D.makespan;t++) axis+='<span>'+t+'</span>';
+g += '<div class="axis">'+axis+'</div>';
+document.getElementById('gantt').innerHTML = g;
+
+// Concept 3 — unlock
+document.getElementById('planLeft').innerHTML = D.planUnlock.map(n=>cardHTML(n,'plan')).join('') || '<div style="color:var(--muted-foreground);font-size:12px">none</div>';
+document.getElementById('planRight').innerHTML = (D.waves[0]||[]).map(n=>cardHTML(n)).join('');
+const firstPlanRank = D.planUnlock.length ? D.planUnlock[0].rank : null;
+const firstReadyRank = (D.waves[0] && D.waves[0][0]) ? D.waves[0][0].rank : null;
+document.getElementById('callout').innerHTML =
+  '<b>'+D.planUnlock.length+' of your highest-ranked critical/high issues can\'t be auto-picked</b> — they have no spec or PRD, so the Flywheel skips straight past them. '+
+  (firstPlanRank!=null && firstReadyRank!=null ? 'Today it starts at <b>#'+firstReadyRank+'</b> while <b>#'+firstPlanRank+'</b> (and everything above it) waits. ' : '')+
+  'Running <code>pan plan</code> on the left column would move those criticals into Wave 1 and reorder the entire forecast — the single highest-leverage action this view surfaces.';
+</script>
+</body>
+</html>
