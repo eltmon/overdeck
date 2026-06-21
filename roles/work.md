@@ -56,13 +56,12 @@ For every bead:
 2. `bd update <bead-id> --claim` — claim it.
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
-5. Update the per-issue record (`resumePoint`, decisions, hazards, sessionHistory) at `<project-root>/.pan/records/<issue-id-lowercase>.json` — two levels above the workspace. Use the record writers from `src/lib/pan-dir/record.ts` or edit the JSON directly. Do **not** write to `.pan/continue.json`.
-6. `bd close <bead-id> --reason="…"`.
-7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
-8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-9. If `metadata.requiresInspection === false`, skip inspection and continue.
-10. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection.
-11. Continue with the next ready bead.
+5. `bd close <bead-id> --reason="…"`. (`bd close` writes bead status to the per-issue record automatically — do **not** write to the record or `.pan/continue.json` directly.)
+6. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+8. If `metadata.requiresInspection === false`, skip inspection and continue.
+9. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection.
+10. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
 
@@ -107,7 +106,7 @@ If a subagent fails or returns wrong output:
 
 - Retry once with a clarified prompt that names the specific failure.
 - If it fails again, fall back to doing the bead yourself, serially.
-- Record the fan-out attempt and any failure in the per-issue record's `sessionHistory` (`.pan/records/<issue-id>.json`) so review and crash recovery have context.
+- Record the fan-out attempt and any failure in a `pan tell` message and in the commit body so review and crash recovery have context.
 
 Do **not** loop forever on a failing subagent. Two attempts, then serial fallback.
 
