@@ -1,73 +1,202 @@
 {
   "vBRIEFInfo": {
     "version": "0.6",
-    "created": "2026-06-16T20:51:21.000Z",
-    "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
-    "updated": "2026-06-17T06:48:50.195Z"
+    "created": "2026-06-21T00:16:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (finish the cutover; retire the dual continues + state.json harness/model source)",
+    "updated": "2026-06-21T00:28:34.971Z"
   },
   "plan": {
     "id": "pan-1919",
-    "title": "Consolidate per-issue resume/progress state into ONE git-tracked record",
-    "status": "running",
-    "uid": "02b495bd-49d3-40e0-8d37-7c5c14ead517",
+    "title": "Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
+    "status": "proposed",
+    "uid": "9b8d08bc-a41d-437e-97fd-d60bce8189e2",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
-    "created": "2026-06-16T20:51:21.000Z",
-    "updated": "2026-06-17T06:48:50.195Z",
+    "sequence": 2,
+    "created": "2026-06-21T00:16:50Z",
+    "updated": "2026-06-21T00:28:34.971Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1919",
+        "uri": "https://github.com/eltmon/overdeck/issues/1919",
         "label": "PAN-1919",
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/reference/state-model.mdx",
-        "label": "State Model",
-        "type": "doc"
+        "uri": ".pan/drafts/PAN-1919.md",
+        "label": "PRD draft",
+        "type": "prd"
       }
     ],
     "tags": [
       "state-model",
       "records",
+      "cutover",
       "refactor",
-      "pan-1908",
-      "migration"
+      "single-source-of-truth"
     ],
     "narratives": {
-      "Problem": "Per-issue resume/progress state is scattered across five places; two ('continues') are a confusing duplicate, and the only non-derivable field (harness+model) lived only in machine-local state.json that never travels. An agent on a second machine cannot reliably know what has been done, and a local DB loss strands resume state. NOTE: the foundation already landed in commit e9914c9429 (record schema superset at src/lib/pan-dir/record.ts:97-120, sync-path status-override writer/reader, harness/model mirror, no-loss test — 63 related tests green). There is no existing spec or beads. This plan scopes ONLY the remaining gaps + verification; the work agent verifies-and-completes and does NOT rebuild the foundation.",
-      "Proposal": "Close the remaining gaps so every write path lands in the single git-tracked record at <workspace>/.pan/records/<issue>.json (on the feature branch, git-tracked, travels via push): (1) fix the async dashboard split-brain that still writes workspace continue.json; (2) route the four remaining continue-state surfaces (done.ts, planning spawn, cloister readers, dashboard routes) to the record; (3) complete the one-time backfill to cover statusOverrides+harness+model at schemaVersion 2 (inspection-gated); (4) retire the legacy continues to read-only; (5) prove it with a no-loss/no-remaining-writers test and a cross-machine resume test. harness/model already resume from the record on a fresh machine (agents.ts:1096-1103) — this issue verifies that, it does not reimplement it.",
-      "NonGoals": "- CI guard and the enforced single-write-surface API are PAN-1921; this issue only stops legacy writes far enough to make the continues read-only.\n- Reconstructing the cache from git + GitHub (boot replay replacement) is PAN-1920.\n- Making pipeline verdicts reconstruction-safe is PAN-1922; keep the existing 'pipeline' mirror field unchanged.\n- Keeping agent transcripts (JSONL) in git; beads cleanup; cache pruning/VACUUM (PAN-1847).\n- Rebuilding the record schema or writer (already landed in commit e9914c9429).\n- Mass-deleting the 132 historical .pan/continues/ files (kept as read-only legacy and backfill source).\n- Adding a pan_records entry to projects.yaml (the record is branch-resident and needs no config)."
+      "Problem": "Per-issue resume/progress state is split across the project continue (.pan/continues/<issue>.vbrief.json on main), the gitignored workspace continue (.pan/continue.json), and machine-local state.json (harness/model). The record foundation (PanIssueRecord at src/lib/pan-dir/record.ts) LANDED in commit e9914c9429 — schema superset, writers, statusOverrides + harness/model read/write cutover, and a no-loss schema test — but the cutover is INCOMPLETE: the old continue plane is still the live source of truth for decisions, hazards, resumePoint, beadsMapping, sessionHistory, and feedback; an async/sync split-brain ships (vbrief/dag.ts writes continue.json while io.ts writes the record); the backfill drops statusOverrides/harness/model and writes the wrong schemaVersion; rebuild-agents still reads state.json for harness/model; and the legacy continues are never retired.",
+      "Proposal": "Finish the cutover, do not rebuild. Reroute every remaining live writer/reader of the two continues onto the per-issue record, fix the async split-brain and the backfill, switch rebuild-agents to read harness/model from the record, then retire the dead continue modules to types-only/legacy. The PAN-1921 guard scripts/lint-state-writes.sh already names every un-cut file in its legacy-exception list — that list IS the cutover checklist: each cutover bead reroutes its file and removes it from the legacy list in the same commit, with the guard staying green. The final bead empties both legacy lists, reclassifies the separate .pan/feedback//.pan/sessions.jsonl delivery surfaces as approved writers, and adds a behavioral no-loss + cross-machine resume test. When the legacy list is empty and the guard is green, the cutover is provably complete.",
+      "NonGoals": "- Rebuilding the record schema or writers (already landed in e9914c9429); this plan only completes the cutover.\n- Removing the state.json file itself — it stays as a rollback/rebuild artifact; only its role as the SOURCE of harness/model is retired (PAN-1920 owns full state.json/cache rework).\n- Reconstructing the disposable cache from git + GitHub (boot-replay replacement) — PAN-1920.\n- Making pipeline verdicts reconstruction-safe — PAN-1922; keep the record's existing pipeline block as-is.\n- The .pan/feedback/ markdown delivery files and .pan/sessions.jsonl — a separate agent-delivery surface, not per-issue resume state; reclassified as approved writers, not cut over.\n- Mass-deleting the 142 historical .pan/continues/ files; they remain read-only legacy and backfill source.\n- Keeping agent transcripts (JSONL) in git; beads cleanup; cache pruning/VACUUM (PAN-1847)."
     },
     "autoDecisions": [
       {
-        "summary": "Record name = 'record' at .pan/records/<issue>.json (already implemented).",
-        "rationale": "Unifies with the PAN-1908 records plane; retires the 'continues' name the vBRIEF maintainer disliked. Changing it now would churn the landed foundation."
+        "summary": "Scope = finish the cutover, not rebuild. The schema/writers/no-loss-test + statusOverrides + harness/model read/write landed in e9914c9429; the AC gap is migrating the remaining old-continue fields, fixing the backfill, switching rebuild-agents, and retiring the legacy plane.",
+        "rationale": "Rebuilding landed-and-tested code would be wasteful and risky; the verified gap is the incomplete cutover, not the foundation."
       },
       {
-        "summary": "Pipeline verdicts: keep the existing 'pipeline' mirror field unchanged; do not expand verdict handling.",
-        "rationale": "Open decision #2 leaned toward reading verdicts from the PR; PAN-1922 owns reconstruction-safe verdicts. Keeping this issue about work progress respects the epic's execution order."
+        "summary": "Name = record / .pan/records/<issue>.json (already chosen and landed). Resolves issue open-decision #1; journal rejected.",
+        "rationale": "Unifies with the PAN-1908 records plane already in code; a second rename would churn for no gain."
       },
       {
-        "summary": "Backfill targets only in-flight issues (live workspace/branch); 132 historical closed continues stay read-only legacy.",
-        "rationale": "Resume only matters for in-flight work; migrating closed issues with no workspace has no resume value and risks churn."
+        "summary": "Pipeline verdicts stay in the record's existing pipeline block sourced from DB review_status as today; no new verdict plumbing. Resolves issue open-decision #2.",
+        "rationale": "The issue leaned 'read from the PR; keep the record about work progress'; reconstruction-safe verdicts are PAN-1922's job."
       },
       {
-        "summary": "Continues become read-only legacy, not mass-deleted.",
-        "rationale": "AC6 explicitly allows 'removed OR read-only legacy with a migration'; preserving historical files avoids destroying the backfill source and audit history."
+        "summary": "Cutover strategy = reroute the lifecycle-io *ForIssue adapters + pan-dir/continue.ts read/write to the record, then delete dead modules.",
+        "rationale": "Rerouting the five adapters transparently cuts over feedback-writer/agents.ts/reopen.ts/routes-issues at once, minimizing call-site churn and blast radius."
       },
       {
-        "summary": "No pan_records entry added to projects.yaml.",
-        "rationale": "Design decision #4 makes the record branch-resident; its path resolves from the workspace. Backfill's leftover infra-repo coupling is reconciled to the branch path instead."
+        "summary": "state.json is retained as a rollback/rebuild artifact; only its role as the source of harness/model is retired (live reads already cut over via getAgentStateSync override; rebuild-agents is the last read).",
+        "rationale": "Full state.json removal belongs to the cache-rebuild work (PAN-1920); the AGENT-STATE-PLANES model keeps state.json as a rebuild source."
+      },
+      {
+        "summary": ".pan/feedback/ markdown delivery files and .pan/sessions.jsonl are a separate agent-delivery surface, OUT OF SCOPE; in the lint guard, reclassify pan-dir/feedback.ts+sessions.ts from the legacy-exception list to the approved-writer allowlist.",
+        "rationale": "The consolidated 'feedback' field is the structured ContinueFeedbackEntry[] the record already holds; forcing a cutover of the gitignored markdown delivery dir would be scope creep, and reclassification keeps NFR-1 (empty legacy list) reachable."
+      },
+      {
+        "summary": "Keep the Continue* TYPE definitions; delete only the dead fs-I/O. record.ts imports ContinueDecision/ContinueHazard/etc. from continue-state.ts.",
+        "rationale": "Deleting the types would break record.ts and wide callers; reducing continue-state.ts to types-only is the surgical retirement."
+      },
+      {
+        "summary": "Backfill migrates only in-flight issues; the 142 historical closed continues remain read-only legacy.",
+        "rationale": "Resume only matters for in-flight work; migrating closed history is unnecessary risk."
       }
     ],
     "items": [
       {
-        "id": "fix-async-statusoverride-splitbrain",
-        "title": "Fix async dashboard status-override split-brain (dag.ts → record)",
+        "id": "rec-helpers",
+        "title": "Add record read-view + decisions/hazards/resumePoint/beadsMapping writers (foundation)",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-16T20:51:21.000Z",
+        "created": "2026-06-21T00:16:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1919",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "cutover-lifecycle-io",
+            "fix-dag-split-brain",
+            "cutover-done",
+            "cutover-spawn-planning",
+            "cutover-cloister-readers",
+            "cutover-dashboard-routes",
+            "complete-backfill"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/pan-dir/record.ts with the read/write surface the cutover beads depend on. (1) Add readRecordContinueViewSync(project, issueId) returning a ContinueState-shaped projection { decisions, hazards, resumePoint, beadsMapping, sessionHistory, feedback } from the record (or null when absent), so old readWorkspaceContinue/readContinueStateSync callers can switch with minimal churn. (2) Add discrete read-modify-write setters for decisions, hazards, resumePoint, and beadsMapping (e.g. writeRecordDecisions/Hazards/ResumePoint/BeadsMapping, sync + async) that mutate only their field, write via writeIssueRecordSync, and queueIssueRecordCommit (matching the existing writeStatusOverride/appendSessionEntry shape). These are the cross-cutting contract the cutover beads encode assumptions about — keep names/signatures stable. record.ts is already on the lint approved-writer allowlist, so raw fs primitives are permitted here."
+        },
+        "items": [
+          {
+            "id": "rec-helpers.ac1",
+            "title": "readRecordContinueViewSync returns a ContinueState-shaped object carrying decisions/hazards/resumePoint/beadsMapping/sessionHistory/feedback from the record, and returns null when no record file exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rec-helpers.ac2",
+            "title": "Each new field setter (decisions, hazards, resumePoint, beadsMapping) persists its value into .pan/records/<issue>.json such that readIssueRecordSync reads it back unchanged, and leaves the other record fields intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rec-helpers.ac3",
+            "title": "Each new setter commits the record path via queueIssueRecordCommit, matching the existing writeStatusOverrideSync behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rec-helpers.ac4",
+            "title": "Unit tests cover the read-view projection and every new setter round-trip; npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cutover-lifecycle-io",
+        "title": "Reroute lifecycle-io continue adapters to the record (cuts over feedback/session callers)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T00:16:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1919",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Reroute the five project-continue adapters in src/lib/vbrief/lifecycle-io.ts — readContinueStateForIssue (:482), writeContinueStateForIssue (:493), appendContinueSessionEntryForIssue (:501), appendFeedbackEntryForIssue (:509), clearFeedbackForIssue (:517) — to read/write the per-issue record via rec-helpers (readRecordContinueViewSync, record.appendSessionEntry, record.appendFeedbackEntry, the new decisions/hazards setters) instead of continue-state.ts. This transparently cuts over every project-continue caller: src/lib/agents.ts:4819, src/lib/reopen.ts:100, src/dashboard/server/routes/issues.ts:2100, and src/lib/cloister/feedback-writer.ts:74/115/145/160 (clear/read/append structured feedback). Then remove 'lifecycle-io.ts' and 'continue-state.ts' from CONTINUE_EXCLUDES in scripts/lint-state-writes.sh (the structured-feedback/session writes now go to the record). Keep promoteContinueToProject untouched here (retired in retire-legacy-continues)."
+        },
+        "items": [
+          {
+            "id": "cutover-lifecycle-io.ac1",
+            "title": "Calling appendContinueSessionEntryForIssue or appendFeedbackEntryForIssue persists the entry to the per-issue record (record.sessionHistory / record.feedback) and stores nothing in .pan/continues/<issue>.vbrief.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-lifecycle-io.ac2",
+            "title": "Specialist feedback written via feedback-writer.ts persists to record.feedback[] and is read back by readIssueRecord; clearFeedbackForIssue empties record.feedback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-lifecycle-io.ac3",
+            "title": "readContinueStateForIssue returns the record's continue-view (decisions/hazards/sessionHistory/feedback) sourced from .pan/records/, not the legacy continue file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-lifecycle-io.ac4",
+            "title": "lifecycle-io.ts and continue-state.ts are removed from CONTINUE_EXCLUDES and scripts/lint-state-writes.sh exits 0 with no legacy warning for either file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-dag-split-brain",
+        "title": "Fix async status-override split-brain in vbrief/dag.ts → record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T00:16:50Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1919",
@@ -79,28 +208,28 @@
           ]
         },
         "narrative": {
-          "Action": "src/lib/vbrief/dag.ts:867-929 mirrorTaskOperationToContinueFile still writes workspace continue.json via readWorkspaceContinue/writeWorkspaceContinue (import at dag.ts:10), while the sync CLI path (vbrief/io.ts:370,402) already writes the record via writeStatusOverrideSync. Converge the async path onto the record using the async writeStatusOverride from src/lib/pan-dir/record.ts. Remove the continue.json read/write from this mirror path. No fallback chain — root cause."
+          "Action": "src/lib/vbrief/dag.ts mirrorTaskOperationToContinueFile (:867-929) currently reads/writes the workspace .pan/continue.json via readWorkspaceContinue/writeWorkspaceContinue (lines 875, 904), so the async dashboard DAG path disagrees with the sync io.ts path that writes statusOverrides to the record. Reroute it to persist statusOverrides to the per-issue record via the async writeStatusOverride (preserve the Effect boundary — wrap the sync record writer in Effect.try if needed). Drop the now-unused readWorkspaceContinue/writeWorkspaceContinue import from dag.ts. Then remove 'dag.ts' from the guard's CONTINUE_EXCLUDES."
         },
         "items": [
           {
-            "id": "fix-async-statusoverride-splitbrain.ac1",
-            "title": "When a task status change is applied through the async dashboard path, the new status persists to .pan/records/<issue>.json statusOverrides (not workspace continue.json)",
+            "id": "fix-dag-split-brain.ac1",
+            "title": "After a DAG task operation, the bead status override is persisted into .pan/records/<issue>.json and the workspace .pan/continue.json is not written",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "fix-async-statusoverride-splitbrain.ac2",
-            "title": "After the async path runs, readWorkspacePlan returns the item with the updated status sourced from the record overlay",
+            "id": "fix-dag-split-brain.ac2",
+            "title": "Given both the sync (io.ts updateItemStatus) and async (dag.ts mirror) paths run, then the record statusOverrides map contains a single consistent set of overrides",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "fix-async-statusoverride-splitbrain.ac3",
-            "title": "No writeWorkspaceContinue call remains on the task-operation mirror path in dag.ts (grep returns no production caller there)",
+            "id": "fix-dag-split-brain.ac3",
+            "title": "dag.ts is removed from CONTINUE_EXCLUDES and scripts/lint-state-writes.sh exits 0 with no legacy warning for dag.ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -109,11 +238,57 @@
         ]
       },
       {
-        "id": "route-done-continue-to-record",
-        "title": "Route done.ts continue read/write to the record",
+        "id": "cutover-done",
+        "title": "Route pan done continue read/write → record",
         "status": "pending",
-        "priority": "high",
-        "created": "2026-06-16T20:51:21.000Z",
+        "priority": "medium",
+        "created": "2026-06-21T00:16:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1919",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/done.ts, replace the workspace-continue read/write with record operations via rec-helpers. recordTestWaiver (:153-165) reads continue state and appends a 'Test gate waived' decision — switch to read the record view and append the decision via the record decisions setter. The end-of-done session-entry write (~:500-512) appends an 'end' sessionHistory entry — switch to record.appendSessionEntry. Preserve the Effect.runPromise boundary. Then remove 'done.ts' from the guard's CONTINUE_EXCLUDES."
+        },
+        "items": [
+          {
+            "id": "cutover-done.ac1",
+            "title": "recordTestWaiver persists the test-waiver decision to the record's decisions and stores nothing in .pan/continue.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-done.ac2",
+            "title": "pan done persists its end session entry such that a subsequent readIssueRecord then returns it in record.sessionHistory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-done.ac3",
+            "title": "done.ts is removed from CONTINUE_EXCLUDES and scripts/lint-state-writes.sh exits 0 with no legacy warning for done.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cutover-spawn-planning",
+        "title": "Route planning-spawn continue write → record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-21T00:16:50Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1919",
@@ -124,28 +299,28 @@
           ]
         },
         "narrative": {
-          "Action": "src/cli/commands/done.ts:155,160,505,508 reads and writes workspace continue.json. Route those to the record: read decisions/hazards/resumePoint/sessionHistory via readIssueRecord, write sessionHistory/resumePoint via appendSessionEntry/writeIssueRecord (record.ts). Writes must queue a branch commit so they travel."
+          "Action": "In src/lib/planning/spawn-planning-session.ts (~:595), the planning kickoff writes the seeded continue context (decisions/hazards/beadsMapping/initial sessionHistory) via writeWorkspaceContinue. Reroute it to seed the per-issue record via rec-helpers setters + record.appendSessionEntry. Verify planning resume still reads the seeded context from the record. Then remove 'spawn-planning-session.ts' from the guard's CONTINUE_EXCLUDES. Hazard: this changes the path that wrote THIS session's continue.json — confirm a fresh plan run seeds the record and a resumed planning session still finds its context."
         },
         "items": [
           {
-            "id": "route-done-continue-to-record.ac1",
-            "title": "When done.ts loads resume context, it returns decisions/hazards/resumePoint/sessionHistory sourced from the record (readIssueRecord), not workspace continue.json",
+            "id": "cutover-spawn-planning.ac1",
+            "title": "A planning kickoff creates the per-issue record (initial sessionHistory plus any decisions/hazards) and writes no .pan/continue.json for that purpose",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "route-done-continue-to-record.ac2",
-            "title": "done.ts writes its sessionHistory/resumePoint updates to the record and the write queues a branch commit",
+            "id": "cutover-spawn-planning.ac2",
+            "title": "When a planning session resumes, then the record returns its seeded context (decisions/hazards/sessionHistory present)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "route-done-continue-to-record.ac3",
-            "title": "A grep of done.ts returns no readWorkspaceContinue or writeWorkspaceContinue call",
+            "id": "cutover-spawn-planning.ac3",
+            "title": "spawn-planning-session.ts is removed from CONTINUE_EXCLUDES and scripts/lint-state-writes.sh exits 0 with no legacy warning for it",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -154,43 +329,44 @@
         ]
       },
       {
-        "id": "route-planning-continue-to-record",
-        "title": "Route planning-spawn continue write to the record",
+        "id": "cutover-cloister-readers",
+        "title": "Route cloister + scope continue readers → record read-view",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-16T20:51:21.000Z",
+        "created": "2026-06-21T00:16:50Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1919",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
-            "FR-2"
+            "FR-2",
+            "FR-3"
           ]
         },
         "narrative": {
-          "Action": "src/lib/planning/spawn-planning-session.ts:598 writes workspace continue.json to seed the planning sessionHistory entry. Route it to the record (appendSessionEntry/writeIssueRecord). H2: this changes the exact path that wrote this session's continue.json — verify a planning session still persists and resumes its sessionHistory via the record."
+          "Action": "Switch the remaining resume-context READERS to readRecordContinueViewSync (rec-helpers): src/lib/cloister/work-agent-prompt.ts (:142, :362 readWorkspaceContinue), src/lib/cloister/handoff-context.ts (:122 readWorkspaceContinue, :130 readContinueStateSync), and src/cli/commands/scope.ts (:357 readContinueStateSync). Leave work-agent-prompt.ts:153 readFeedback (the .pan/feedback/ markdown delivery dir) unchanged — that is the separate delivery surface (D6). These readers are not in the lint write-lists (read-only), so no guard list change is required, but no non-test caller of readWorkspaceContinue/readContinueStateSync may remain in these files."
         },
         "items": [
           {
-            "id": "route-planning-continue-to-record.ac1",
-            "title": "spawn-planning-session.ts persists the planning sessionHistory entry to the record instead of workspace continue.json",
+            "id": "cutover-cloister-readers.ac1",
+            "title": "The work-agent prompt produced for an issue contains the decisions/hazards/sessionHistory drawn from the record via readRecordContinueViewSync, not readWorkspaceContinue/readContinueStateSync",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "route-planning-continue-to-record.ac2",
-            "title": "Starting a fresh planning session creates/updates .pan/records/<issue>.json with a reason:\"planning\" sessionHistory entry",
+            "id": "cutover-cloister-readers.ac2",
+            "title": "pan scope reads its continue state from the record and renders the same decisions/hazards as before from record-sourced data",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "route-planning-continue-to-record.ac3",
-            "title": "A grep of spawn-planning-session.ts returns no writeWorkspaceContinue call",
+            "id": "cutover-cloister-readers.ac3",
+            "title": "git grep returns no non-test call to readWorkspaceContinue or readContinueStateSync in work-agent-prompt.ts, handoff-context.ts, or scope.ts, while the markdown readFeedback call survives",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -199,43 +375,44 @@
         ]
       },
       {
-        "id": "route-cloister-continue-readers-to-record",
-        "title": "Route cloister context-builder readers to the record",
+        "id": "cutover-dashboard-routes",
+        "title": "Route dashboard continue read/write (routes/agents.ts + routes/workspaces.ts) → record",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-16T20:51:21.000Z",
+        "created": "2026-06-21T00:16:50Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1919",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
-            "FR-2"
+            "FR-2",
+            "FR-3"
           ]
         },
         "narrative": {
-          "Action": "src/lib/cloister/work-agent-prompt.ts:142,362 and src/lib/cloister/handoff-context.ts:122 read workspace continue.json to build resume context (decisions/hazards/sessionHistory). Route both to read the record via readIssueRecord so cross-machine context is complete."
+          "Action": "Replace the inline raw-fs continue helpers readWorkspaceContinueState/writeWorkspaceContinueState in src/dashboard/server/routes/agents.ts (:327-347) with record read/write (async, via the record async writers / readRecordContinueViewSync); and switch src/dashboard/server/routes/workspaces.ts readWorkspaceContinueFile (:213, used at :1832) to read the record. Server-reachable code: use async exec/IO only, never execSync (NFR-3). Then remove 'routes/agents.ts' from the guard's CONTINUE_EXCLUDES (workspaces.ts is read-only — not in the write list)."
         },
         "items": [
           {
-            "id": "route-cloister-continue-readers-to-record.ac1",
-            "title": "The work-agent-prompt resume context contains decisions/hazards loaded from the record, not workspace continue.json",
+            "id": "cutover-dashboard-routes.ac1",
+            "title": "routes/agents.ts reads and writes per-issue resume state through the record, and the inline readWorkspaceContinueState/writeWorkspaceContinueState raw-fs helpers no longer touch .pan/continue.json",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "route-cloister-continue-readers-to-record.ac2",
-            "title": "The handoff context contains sessionHistory/decisions sourced from the record",
+            "id": "cutover-dashboard-routes.ac2",
+            "title": "routes/workspaces.ts returns continue/resume context sourced from the record on the relevant endpoint",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "route-cloister-continue-readers-to-record.ac3",
-            "title": "A grep of work-agent-prompt.ts and handoff-context.ts returns no readWorkspaceContinue call",
+            "id": "cutover-dashboard-routes.ac3",
+            "title": "routes/agents.ts is removed from CONTINUE_EXCLUDES and scripts/lint-state-writes.sh exits 0 with no legacy warning for it; no execSync is introduced in server-reachable code",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -244,304 +421,212 @@
         ]
       },
       {
-        "id": "route-dashboard-continue-to-record",
-        "title": "Route dashboard routes continue read/write to the record",
+        "id": "rebuild-agents-from-record",
+        "title": "rebuild-agents reads harness/model from the record (state.json no longer the source)",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-16T20:51:21.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1919",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-2"
-          ]
-        },
-        "narrative": {
-          "Action": "src/dashboard/server/routes/agents.ts:2884,2908 and src/dashboard/server/routes/workspaces.ts:1832 read/write workspace continue.json. Route them to the record via readIssueRecord/writeIssueRecord. Where an explicit workspace path is available, prefer getIssueRecordPathForWorkspace (H5). Server-reachable code must stay async (no execSync; use the async record APIs)."
-        },
-        "items": [
-          {
-            "id": "route-dashboard-continue-to-record.ac1",
-            "title": "routes/agents.ts reads/writes continue state via the record (readIssueRecord/writeIssueRecord), not workspace continue.json",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "route-dashboard-continue-to-record.ac2",
-            "title": "routes/workspaces.ts reads continue state from the record",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "route-dashboard-continue-to-record.ac3",
-            "title": "No readWorkspaceContinue/writeWorkspaceContinue call remains in routes/agents.ts or routes/workspaces.ts",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "complete-backfill-migration",
-        "title": "Complete the backfill to cover statusOverrides + harness/model at schemaVersion 2",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-16T20:51:21.000Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1919",
-          "requiresInspection": true,
-          "inspectionDepth": "fast",
-          "foundationFor": [
-            "retire-continue-writers-readonly-legacy"
-          ],
-          "traces": [
-            "FR-4"
-          ]
-        },
-        "narrative": {
-          "Action": "src/lib/pan-dir/records.ts:66-75 projectContinue copies only 6 continue fields (decisions/hazards/resumePoint/beadsMapping/sessionHistory/feedback) and writes schemaVersion:1; record.ts uses RECORD_SCHEMA_VERSION=2. Extend buildIssueRecord/records-backfill.ts to also copy statusOverrides (from workspace continue.json) and harness/model (from state.json), write schemaVersion:2, target the branch record path (.pan/records/<issue>.json), and run only for in-flight issues with a live workspace (D3). Decouple from the infra-repo-only gate (D7). This bead is inspection-gated: a wrong field map permanently loses state once continues are retired (H3)."
-        },
-        "items": [
-          {
-            "id": "complete-backfill-migration.ac1",
-            "title": "buildIssueRecord copies statusOverrides from the workspace continue.json (when present) into the record",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "complete-backfill-migration.ac2",
-            "title": "buildIssueRecord copies harness/model from state.json (when present) into the record",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "complete-backfill-migration.ac3",
-            "title": "The backfill produces a record with schemaVersion:2 (matching RECORD_SCHEMA_VERSION), not 1",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "complete-backfill-migration.ac4",
-            "title": "The backfill saves to the branch record path (.pan/records/<issue>.json) only for in-flight issues with a live workspace, and saves nothing for issues without a workspace",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "complete-backfill-migration.ac5",
-            "title": "A backfill test on a sample issue passes, confirming decisions/hazards/resumePoint/beadsMapping/sessionHistory/feedback/statusOverrides/harness/model all persist into the record",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "retire-continue-writers-readonly-legacy",
-        "title": "Retire continues to read-only legacy (stop all production writes)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-16T20:51:21.000Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1919",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-5"
-          ]
-        },
-        "narrative": {
-          "Action": "Once all writers are routed to the record (beads above) and backfill is complete, make src/lib/pan-dir/continue.ts and continues.ts read-only legacy: remove or no-call their writer exports (writeWorkspaceContinue and project-continue writers), keeping reader exports for legacy/backfill. No production path writes workspace .pan/continue.json or project .pan/continues/<issue>.vbrief.json. Do NOT mass-delete the 132 historical continue files (D4/D5)."
-        },
-        "items": [
-          {
-            "id": "retire-continue-writers-readonly-legacy.ac1",
-            "title": "A grep returns no production caller of writeWorkspaceContinue, so workspace .pan/continue.json receives no production writes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "retire-continue-writers-readonly-legacy.ac2",
-            "title": "A grep returns no production writer of project .pan/continues/<issue>.vbrief.json",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "retire-continue-writers-readonly-legacy.ac3",
-            "title": "continue.ts/continues.ts contains only reader exports for legacy/backfill, and a grep returns zero production callers of their writer exports",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "retire-continue-writers-readonly-legacy.ac4",
-            "title": "Status updates, resume, and planning still work end-to-end sourced from the record (typecheck + suite green)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "no-remaining-writers-guard-test",
-        "title": "No-loss / no-remaining-writers assertion test",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-16T20:51:21.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1919",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "NFR-2"
-          ]
-        },
-        "narrative": {
-          "Action": "Add a one-shot assertion test (extending src/lib/pan-dir/__tests__/record-no-loss.test.ts) that (a) re-asserts the record schema carries all nine legacy fields, and (b) asserts no production source file (excluding tests, backfill, and legacy reader modules) references the retired continue writers. This is a one-shot test, NOT the enforced CI write-surface guard (that is PAN-1921)."
-        },
-        "items": [
-          {
-            "id": "no-remaining-writers-guard-test.ac1",
-            "title": "The test passes, confirming the record schema contains decisions/hazards/resumePoint/beadsMapping/statusOverrides/sessionHistory/feedback/harness/model",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "no-remaining-writers-guard-test.ac2",
-            "title": "The test fails if any production source file (excluding tests/backfill/legacy readers) contains a writeWorkspaceContinue or project-continue writer call",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "no-remaining-writers-guard-test.ac3",
-            "title": "The test fails (red) if a new writer of continue.json is reintroduced",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "cross-machine-resume-test",
-        "title": "Cross-machine resume integration test (record-only resume)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-16T20:51:21.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1919",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-3",
-            "FR-6"
-          ]
-        },
-        "narrative": {
-          "Action": "Add an integration test proving the headline acceptance criterion: a record written on a temp 'machine A' workspace (harness/model/decisions/hazards/statusOverrides/sessionHistory), then read on a fresh 'machine B' temp dir with NO SQLite agents row and NO state.json, resumes from the record alone. Exercises agents.ts:1096-1103 (record overlay wins) and readWorkspacePlan statusOverrides."
-        },
-        "items": [
-          {
-            "id": "cross-machine-resume-test.ac1",
-            "title": "The test writes a record on a temp machine-A workspace then reads it on a fresh machine-B temp dir with no SQLite agents row and no state.json",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "cross-machine-resume-test.ac2",
-            "title": "On machine B, the resume read path returns harness/model sourced from the record",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "cross-machine-resume-test.ac3",
-            "title": "On machine B, readWorkspacePlan returns the statusOverrides sourced from the record",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "cross-machine-resume-test.ac4",
-            "title": "On machine B, the decisions/hazards/sessionHistory state survives the absence of DB and state.json, and the record alone returns it",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "update-legacy-continue-tests",
-        "title": "Update legacy-continue tests for the record",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-16T20:51:21.000Z",
+        "created": "2026-06-21T00:16:50Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1919",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/database/agent-backfill.ts (the backfillAgentsFromStateJsonSync path behind pan admin db rebuild-agents, ~:167-233), prefer the per-issue record for harness/model: when a record exists for the agent's issue, use record.harness/record.model; fall back to the state.json values only when the record lacks them. This makes the agents-table rebuild source harness/model from the travelling record rather than machine-local state.json (the last state.json-as-source read for these fields). Live lifecycle reads are already cut over via getAgentStateSync (agents.ts:1095-1097)."
+        },
+        "items": [
+          {
+            "id": "rebuild-agents-from-record.ac1",
+            "title": "When a per-issue record carries harness/model, pan admin db rebuild-agents produces an agents-table row using the record's harness/model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-agents-from-record.ac2",
+            "title": "When no record exists or it lacks harness/model, the rebuild falls back to the state.json values (no regression for pre-record agents)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-agents-from-record.ac3",
+            "title": "Given a record harness/model differing from state.json, then the rebuild produces an agents-table row that uses the record value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "complete-backfill",
+        "title": "Complete the migration backfill — fold statusOverrides+harness+model, schemaVersion 2, branch path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T00:16:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1919",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "retire-legacy-continues"
+          ],
+          "traces": [
+            "FR-4",
             "FR-5"
           ]
         },
         "narrative": {
-          "Action": "Update the tests that exercise the old continue plane so they pass against the record or assert read-only-legacy behavior: src/lib/pan-dir/__tests__/pan-dir.test.ts, src/lib/vbrief/__tests__/lifecycle-io.test.ts, src/lib/vbrief/__tests__/continue-state.test.ts, tests/vbrief/full-spec.test.ts. Do not weaken coverage — re-point assertions at the record."
+          "Action": "Fix the migration backfill in src/lib/pan-dir/records.ts so retiring the continues loses nothing. (1) buildIssueRecord (:170-184) currently hardcodes schemaVersion: 1 — write RECORD_SCHEMA_VERSION (2) instead. (2) projectContinue (:66-75) folds only the six project-continue fields — also fold the workspace continue's statusOverrides and state.json harness/model into the built record (read the workspace continue.json + readAgentHarnessModelRecordSync/state.json) so the record is a superset of project ∪ workspace ∪ state.json. (3) Ensure the write targets the in-branch record path for in-flight issues and leaves historical closed continues untouched. This bead is inspection-gated because a wrong field map permanently loses state once the continues are retired (H3); retire-legacy-continues is blocked on it."
         },
         "items": [
           {
-            "id": "update-legacy-continue-tests.ac1",
-            "title": "The pan-dir.test.ts and lifecycle-io.test.ts suite passes against the record-based read/write or the read-only-legacy behavior of continue.ts",
+            "id": "complete-backfill.ac1",
+            "title": "buildIssueRecord produces a record whose schemaVersion equals RECORD_SCHEMA_VERSION (2), not a hardcoded 1",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "update-legacy-continue-tests.ac2",
-            "title": "continue-state.test.ts and tests/vbrief/full-spec.test.ts compile and the suite passes after the writer migration",
+            "id": "complete-backfill.ac2",
+            "title": "Backfilling an issue that has a workspace continue with statusOverrides and a state.json harness/model produces a record carrying those statusOverrides, harness, and model alongside the project-continue fields",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "update-legacy-continue-tests.ac3",
-            "title": "The full vitest suite passes with no new failures attributable to beads 1-7",
+            "id": "complete-backfill.ac3",
+            "title": "Given a sample in-flight issue, then the backfilled record contains every field from project continue, workspace continue, and state.json harness/model (a superset, no field dropped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-backfill.ac4",
+            "title": "Re-running the backfill preserves an unchanged record (skipped, no new commit) and leaves historical closed .pan/continues/ files untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retire-legacy-continues",
+        "title": "Retire dead continue modules to types-only / read-only legacy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-21T00:16:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1919",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "audit-empty-guard-and-tests"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Once every writer/reader is rerouted, retire the dead old-plane code without breaking shared types (D7). (1) Delete src/lib/pan-dir/continues.ts (no live callers) and drop its exports from src/lib/pan-dir/index.ts. (2) Reduce src/lib/vbrief/continue-state.ts to types-only: remove its fs-I/O functions (readContinueStateSync/writeContinueStateSync/appendSessionEntrySync/appendFeedbackEntrySync/clearFeedbackSync + the writer-lock machinery + Effect variants), KEEP the exported Continue* interfaces (record.ts imports them). (3) Remove readWorkspaceContinue/writeWorkspaceContinue from src/lib/pan-dir/continue.ts, keeping getWorkspacePanPaths/ensureWorkspacePanDir (feedback/context/sessions surfaces). (4) Remove promoteContinueToProject and its call sites (lifecycle-io.ts:472, routes/issues.ts:217) — the record is a single in-branch file; no project promotion. (5) Verify .pan/records/ stays git-tracked (not gitignored). No production code path may write .pan/continues/ or .pan/continue.json afterward."
+        },
+        "items": [
+          {
+            "id": "retire-legacy-continues.ac1",
+            "title": "pan-dir/continues.ts is deleted, its exports removed from pan-dir/index.ts, and git grep finds no non-test reference to it; npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-legacy-continues.ac2",
+            "title": "continue-state.ts preserves its Continue* type exports but defines no fs read/write function, and pan-dir/continue.ts deletes readWorkspaceContinue/writeWorkspaceContinue while keeping getWorkspacePanPaths/ensureWorkspacePanDir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-legacy-continues.ac3",
+            "title": "With promoteContinueToProject and its call sites deleted, the planning-promotion flow still produces the promoted spec on main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-legacy-continues.ac4",
+            "title": "git grep shows no production (non-test, non-backfill-read) write to .pan/continues/ or .pan/continue.json, and git check-ignore confirms .pan/records/<issue>.json is not gitignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-empty-guard-and-tests",
+        "title": "Empty the lint legacy lists + behavioral no-loss + cross-machine resume tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T00:16:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1919",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Close the audit gate and prove no loss. (1) In scripts/lint-state-writes.sh empty the CONTINUE_EXCLUDES list and the PAN_DIR_LEGACY list (only the approved record/spec/auto-commit/drafts/context writers remain); move src/lib/pan-dir/feedback.ts and sessions.ts into the approved-writer allowlist (D6 — separate delivery surfaces). Update tests/unit/scripts/lint-state-writes.test.ts so it asserts the legacy lists are empty and still fails if a new continue-plane writer is introduced. (2) Add a behavioral no-loss test: write each consolidated field (decisions, hazards, resumePoint, beadsMapping, statusOverrides, sessionHistory, feedback, harness, model) through the cutover writers and assert each lands in the record while the legacy continue files are not written. (3) Add a cross-machine resume test: given ONLY the record + spec (simulate a clone — no state.json, no continues), assert resume recovers decisions, statusOverrides, harness, and model from the record alone. Use fake timers for any delay-based assertions."
+        },
+        "items": [
+          {
+            "id": "audit-empty-guard-and-tests.ac1",
+            "title": "scripts/lint-state-writes.sh has empty CONTINUE_EXCLUDES and PAN_DIR_LEGACY lists, feedback.ts/sessions.ts are on the approved-writer allowlist, and the script exits 0 with no legacy warnings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-empty-guard-and-tests.ac2",
+            "title": "lint-state-writes.test.ts asserts the legacy lists are empty and fails when a new ad-hoc write to .pan/continue.json/.pan/continues is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-empty-guard-and-tests.ac3",
+            "title": "Given all nine consolidated fields written through the cutover writers, then each persists in the record and neither .pan/continue.json nor .pan/continues/<issue>.vbrief.json receives a write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-empty-guard-and-tests.ac4",
+            "title": "Given only the record plus spec (no state.json, no continues), then resume produces decisions, statusOverrides, harness, and model from the record alone",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -552,54 +637,99 @@
     ],
     "edges": [
       {
-        "from": "fix-async-statusoverride-splitbrain",
-        "to": "retire-continue-writers-readonly-legacy",
+        "from": "rec-helpers",
+        "to": "cutover-lifecycle-io",
         "type": "blocks"
       },
       {
-        "from": "route-done-continue-to-record",
-        "to": "retire-continue-writers-readonly-legacy",
+        "from": "rec-helpers",
+        "to": "fix-dag-split-brain",
         "type": "blocks"
       },
       {
-        "from": "route-planning-continue-to-record",
-        "to": "retire-continue-writers-readonly-legacy",
+        "from": "rec-helpers",
+        "to": "cutover-done",
         "type": "blocks"
       },
       {
-        "from": "route-cloister-continue-readers-to-record",
-        "to": "retire-continue-writers-readonly-legacy",
+        "from": "rec-helpers",
+        "to": "cutover-spawn-planning",
         "type": "blocks"
       },
       {
-        "from": "route-dashboard-continue-to-record",
-        "to": "retire-continue-writers-readonly-legacy",
+        "from": "rec-helpers",
+        "to": "cutover-cloister-readers",
         "type": "blocks"
       },
       {
-        "from": "complete-backfill-migration",
-        "to": "retire-continue-writers-readonly-legacy",
+        "from": "rec-helpers",
+        "to": "cutover-dashboard-routes",
         "type": "blocks"
       },
       {
-        "from": "retire-continue-writers-readonly-legacy",
-        "to": "no-remaining-writers-guard-test",
+        "from": "rec-helpers",
+        "to": "complete-backfill",
         "type": "blocks"
       },
       {
-        "from": "complete-backfill-migration",
-        "to": "cross-machine-resume-test",
+        "from": "cutover-lifecycle-io",
+        "to": "retire-legacy-continues",
         "type": "blocks"
       },
       {
-        "from": "retire-continue-writers-readonly-legacy",
-        "to": "update-legacy-continue-tests",
+        "from": "fix-dag-split-brain",
+        "to": "retire-legacy-continues",
         "type": "blocks"
+      },
+      {
+        "from": "cutover-done",
+        "to": "retire-legacy-continues",
+        "type": "blocks"
+      },
+      {
+        "from": "cutover-spawn-planning",
+        "to": "retire-legacy-continues",
+        "type": "blocks"
+      },
+      {
+        "from": "cutover-cloister-readers",
+        "to": "retire-legacy-continues",
+        "type": "blocks"
+      },
+      {
+        "from": "cutover-dashboard-routes",
+        "to": "retire-legacy-continues",
+        "type": "blocks"
+      },
+      {
+        "from": "complete-backfill",
+        "to": "retire-legacy-continues",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-legacy-continues",
+        "to": "audit-empty-guard-and-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "cutover-lifecycle-io",
+        "to": "audit-empty-guard-and-tests",
+        "type": "informs"
+      },
+      {
+        "from": "fix-dag-split-brain",
+        "to": "audit-empty-guard-and-tests",
+        "type": "informs"
+      },
+      {
+        "from": "cutover-dashboard-routes",
+        "to": "audit-empty-guard-and-tests",
+        "type": "informs"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-16-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record.vbrief.json"
+      "canonicalFilename": "2026-06-21-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record-retire-dual-continues-fold-in-state-json-harness-model.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "proposed"
 }
