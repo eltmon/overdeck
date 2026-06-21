@@ -5,6 +5,7 @@ import ReactFlow, {
   type Node,
   type Edge,
   Background,
+  BackgroundVariant,
   Controls,
   useNodesState,
   useEdgesState,
@@ -46,33 +47,30 @@ export interface SequenceResponse {
 
 // ── Size → node dimensions ──
 
+// Node widths mirror the mockup (.node.xs … .node.xl); height is a layout-spacing
+// estimate only — ReactFlow measures the real rendered size.
 const SIZE_DIMS: Record<string, { w: number; h: number }> = {
-  XS: { w: 160, h: 56 },
-  S:  { w: 190, h: 64 },
-  M:  { w: 220, h: 72 },
-  L:  { w: 250, h: 80 },
-  XL: { w: 280, h: 88 },
+  XS: { w: 150, h: 90 },
+  S:  { w: 168, h: 90 },
+  M:  { w: 196, h: 94 },
+  L:  { w: 216, h: 94 },
+  XL: { w: 236, h: 98 },
 };
 function sizeDims(size: string) {
   return SIZE_DIMS[size] ?? SIZE_DIMS['M']!;
 }
 
-// ── Importance → left-border color ──
-
-const IMPORTANCE_BORDER: Record<string, string> = {
-  critical: '#ef4444',
-  high:     '#f97316',
-  medium:   '#6b7280',
-  low:      '#374151',
+// Importance → node modifier class (drives the colored left border, mockup .node.crit etc.)
+const IMPORTANCE_CLASS: Record<string, string> = {
+  critical: 'crit',
+  high: 'high',
+  medium: 'med',
+  low: 'low',
 };
-
-// ── Condition styling ──
-
-const CONDITION_STYLE: Record<string, { color: string; label: string }> = {
-  'ok':                { color: '#22c55e', label: '' },
-  'needs-refinement':  { color: '#f59e0b', label: '⚠ REFINE' },
-  'stale':             { color: '#6b7280', label: '⊘ STALE' },
-};
+// size string (XS…XL) → lowercase modifier class
+function sizeClass(size: string): string {
+  return (size || 'M').toLowerCase();
+}
 
 // ── dagre layout ──
 
@@ -113,90 +111,30 @@ interface IssueNodeData {
 
 function IssueNode({ data }: { data: IssueNodeData }) {
   const { node, onSelect } = data;
-  const dims = sizeDims(node.size);
-  const borderLeft = IMPORTANCE_BORDER[node.importance] ?? IMPORTANCE_BORDER['medium']!;
-  const isInPipeline = node.inPipeline;
-  const isStale = node.condition === 'stale';
-  const cond = CONDITION_STYLE[node.condition];
+  const cls = ['node', sizeClass(node.size), IMPORTANCE_CLASS[node.importance] ?? 'med'];
+  if (node.inPipeline) cls.push('pipe');
+  if (node.condition === 'needs-refinement') cls.push('cond-refine');
+  if (node.condition === 'stale') cls.push('cond-stale');
+  if (node.gate === 'blocked') cls.push('gate-blocked');
+  if (node.gate === 'ready') cls.push('gate-promoted');
 
   return (
-    <div
-      onClick={() => onSelect(node)}
-      className={isInPipeline ? 'plan-glow' : undefined}
-      style={{
-        width: dims.w,
-        height: dims.h,
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderLeft: `4px solid ${borderLeft}`,
-        borderRadius: 6,
-        padding: '5px 8px',
-        fontSize: 11,
-        color: 'var(--color-fg)',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-        opacity: isStale ? 0.55 : 1,
-        textDecoration: isStale ? 'line-through' : undefined,
-        boxShadow: '0 1px 2px rgba(15,23,42,0.08)',
-      }}
-    >
-      {/* Top row: rank badge + issueId + size */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{
-          fontFamily: 'monospace',
-          fontSize: 9,
-          background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
-          color: 'var(--color-fg)',
-          border: '1px solid color-mix(in srgb, var(--color-accent) 18%, transparent)',
-          borderRadius: 3,
-          padding: '1px 4px',
-          flexShrink: 0,
-        }}>
-          #{node.rank}
-        </span>
-        <span style={{ fontWeight: 600, fontSize: 11, color: '#60a5fa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-          {node.issueId}
-        </span>
-        <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)', borderRadius: 3, padding: '0 4px', flexShrink: 0 }}>
-          {node.size}
-        </span>
-        {isInPipeline && (
-          <span style={{
-            fontSize: 8, background: 'rgba(59,130,246,0.15)', color: '#93c5fd',
-            borderRadius: 3, padding: '1px 4px', fontWeight: 700,
-            textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0,
-          }}>
-            live
-          </span>
-        )}
+    <div className={cls.join(' ')} onClick={() => onSelect(node)}>
+      <div className="row1">
+        <span className="rank">#{node.rank}</span>
+        <span className="iid">{node.issueId}</span>
+        <span className="size-tag">{node.size}</span>
       </div>
-
-      {/* Why text */}
-      <div style={{ fontSize: 9, color: 'var(--color-fg-muted)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-        {node.why}
-      </div>
-
-      {/* Bottom row: chips */}
-      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-        {node.gate === 'ready' && (
-          <span style={{ fontSize: 8, background: 'rgba(21,128,61,0.2)', color: '#86efac', border: '1px solid rgba(134,239,172,0.2)', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
-            📌 PROMOTED
-          </span>
-        )}
-        {node.gate === 'blocked' && (
-          <span style={{ fontSize: 8, background: 'rgba(153,27,27,0.2)', color: '#fca5a5', border: '1px solid rgba(252,165,165,0.2)', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
-            ⛔ HELD
-          </span>
-        )}
-        {cond?.label && (
-          <span style={{ fontSize: 8, borderRadius: 3, padding: '1px 4px', fontWeight: 600, color: cond.color, background: 'var(--color-surface)', border: `1px solid ${cond.color}44` }}>
-            {cond.label}
-          </span>
-        )}
+      <div className="title">{node.title || node.why}</div>
+      <div className="chips">
+        {node.gate === 'ready' && <span className="chip promoted">📌 PROMOTED</span>}
+        {node.gate === 'blocked' && <span className="chip held">⛔ HELD</span>}
+        {node.inPipeline && <span className="chip verb work"><span className="pulsedot" />in pipeline</span>}
+        {node.condition === 'needs-refinement' && <span className="chip refine">⚠ REFINE</span>}
+        {node.condition === 'stale' && <span className="chip stale">⊘ STALE</span>}
+        {node.ready && <span className="chip ready">✓ READY</span>}
+        {node.hasPrd && <span className="chip prd">PRD</span>}
+        <span className="score">{node.score}</span>
       </div>
     </div>
   );
@@ -219,17 +157,21 @@ function sequenceToFlow(
   }));
 
   const rawEdges: Edge[] = edges.map((e, i) => {
+    // 'unblocks' = hard dependency (solid); 'informs' = advisory (dashed, tinted).
     const isDashed = e.type === 'informs';
-    const color = isDashed ? '#60a5fa' : 'var(--color-fg-muted)';
+    const color = isDashed
+      ? 'color-mix(in srgb, var(--info) 60%, transparent)'
+      : 'color-mix(in srgb, var(--muted-foreground) 55%, transparent)';
     return {
       id: `e-${i}-${e.from}-${e.to}`,
       source: e.from,
       target: e.to,
-      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },
+      type: 'default', // bezier curve, matches the mockup's curved edges
+      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color },
       style: {
         stroke: color,
         strokeWidth: 1.5,
-        strokeDasharray: isDashed ? '6 4' : undefined,
+        strokeDasharray: isDashed ? '5 4' : undefined,
       },
     };
   });
@@ -562,19 +504,64 @@ export function BacklogDAG({
 
   return (
     <div
-      className={className}
-      style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--color-bg)' }}
+      className={`bk-dag-root${className ? ` ${className}` : ''}`}
+      style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--background)' }}
     >
       <style>{`
-        @keyframes plan-glow {
-          0%, 100% { box-shadow: 0 0 6px rgba(59,130,246,0.4); }
-          50% { box-shadow: 0 0 16px rgba(59,130,246,0.8); }
+        /* ── Backlog DAG nodes — ported from docs/design/mockups/backlog-sequencer-scaled-opus.html, scoped to .bk-dag-root ── */
+        .bk-dag-root .react-flow { background: transparent; }
+        .bk-dag-root .react-flow__node { cursor: pointer; }
+        .bk-dag-root .node {
+          background: var(--card); border: 1px solid var(--border);
+          border-left: 4px solid var(--heat, var(--muted-foreground));
+          border-radius: 8px; padding: 9px 11px 9px 12px; box-sizing: border-box;
+          cursor: pointer; user-select: none; color: var(--foreground);
+          transition: transform 160ms, box-shadow 160ms, border-color 160ms;
+          box-shadow: 0 1px 2px rgba(0,0,0,.3);
+          display: flex; flex-direction: column; gap: 5px;
         }
-        .plan-glow { animation: plan-glow 2s ease-in-out infinite; }
-        .react-flow { background: var(--color-bg); }
-        .react-flow__controls-button { background: var(--color-surface) !important; border-color: var(--color-border) !important; color: var(--color-fg) !important; }
-        .react-flow__controls-button svg { fill: var(--color-fg) !important; }
-        .react-flow__controls-button:hover { background: var(--color-surface-hover) !important; }
+        .bk-dag-root .node:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+        .bk-dag-root .node.xs { width: 150px; } .bk-dag-root .node.s { width: 168px; }
+        .bk-dag-root .node.m { width: 196px; } .bk-dag-root .node.l { width: 216px; }
+        .bk-dag-root .node.xl { width: 236px; }
+        .bk-dag-root .node.crit { --heat: var(--destructive); border-left-width: 5px; }
+        .bk-dag-root .node.high { --heat: var(--warning); border-left-width: 5px; }
+        .bk-dag-root .node.med  { --heat: color-mix(in srgb, var(--color-neutral-400) 80%, transparent); }
+        .bk-dag-root .node.low  { --heat: color-mix(in srgb, var(--muted-foreground) 55%, transparent); }
+        .bk-dag-root .node.pipe { --phase: var(--info);
+          box-shadow: 0 0 0 1.5px var(--phase), 0 0 16px color-mix(in srgb, var(--phase) 45%, transparent), 0 2px 6px rgba(0,0,0,.35);
+          animation: bk-ringpulse 2.6s ease-in-out infinite; }
+        @keyframes bk-ringpulse {
+          0%,100% { box-shadow: 0 0 0 1.5px var(--phase), 0 0 12px color-mix(in srgb, var(--phase) 35%, transparent), 0 2px 6px rgba(0,0,0,.35); }
+          50%     { box-shadow: 0 0 0 1.5px var(--phase), 0 0 22px color-mix(in srgb, var(--phase) 60%, transparent), 0 2px 6px rgba(0,0,0,.35); }
+        }
+        .bk-dag-root .node.cond-refine { border-style: dashed; border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
+        .bk-dag-root .node.cond-stale { opacity: .5; filter: grayscale(.6); border-style: dashed; }
+        .bk-dag-root .node.cond-stale .title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent); }
+        .bk-dag-root .node.cond-stale:hover { opacity: 1; filter: none; }
+        .bk-dag-root .node.pipe.cond-stale { opacity: 1; filter: none; }
+        .bk-dag-root .node.gate-blocked { opacity: .82; }
+        .bk-dag-root .node.gate-promoted { border-top: 2px solid color-mix(in srgb, var(--primary) 60%, transparent); }
+        .bk-dag-root .node .row1 { display: flex; align-items: center; gap: 7px; }
+        .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 600; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
+        .bk-dag-root .node .iid { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+        .bk-dag-root .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 600; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 15px; }
+        .bk-dag-root .node .title { font-size: 12.5px; font-weight: 500; color: var(--foreground); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .bk-dag-root .node .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        .bk-dag-root .chip { font-size: 9px; font-weight: 500; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; border: 1px solid; line-height: 14px; }
+        .bk-dag-root .chip.prd { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+        .bk-dag-root .chip.ready { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
+        .bk-dag-root .chip.refine { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+        .bk-dag-root .chip.stale { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+        .bk-dag-root .chip.promoted { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 50%, transparent); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+        .bk-dag-root .chip.held { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 40%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); }
+        .bk-dag-root .chip.verb { display: inline-flex; align-items: center; gap: 3px; }
+        .bk-dag-root .chip.verb.work { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+        .bk-dag-root .chip.verb .pulsedot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: bk-blink 1.4s ease-in-out infinite; }
+        @keyframes bk-blink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+        .bk-dag-root .node .score { font-family: ui-monospace, "SF Mono", monospace; font-size: 9.5px; color: var(--muted-foreground); margin-left: auto; }
+        .bk-dag-root .react-flow__controls-button { background: var(--card) !important; border-color: var(--border) !important; color: var(--foreground) !important; }
+        .bk-dag-root .react-flow__controls-button svg { fill: var(--foreground) !important; }
       `}</style>
       <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
         <ReactFlow
@@ -583,13 +570,14 @@ export function BacklogDAG({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           nodeTypes={NODE_TYPES}
+          nodesDraggable={false}
           fitView
           fitViewOptions={{ padding: 0.15 }}
           minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background color="var(--color-border)" gap={20} size={1} />
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.1} color="color-mix(in srgb, var(--muted-foreground) 28%, transparent)" />
           <Controls />
         </ReactFlow>
       </div>
