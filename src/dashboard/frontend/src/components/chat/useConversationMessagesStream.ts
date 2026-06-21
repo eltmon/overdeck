@@ -110,11 +110,15 @@ export function applyConversationMessagesEvent(
 
 export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number }): boolean {
   if (!conversation.sessionAlive) return false;
-  // Real DB conversations (id >= 0) keep the original behavior: stream only for
-  // claude-code (or legacy null harness). Pi/codex DB conversations stay on the
-  // existing HTTP-poll path to limit blast radius.
+  // Real DB conversations stream for every transcript-backed harness. Claude
+  // Code uses the incremental JSONL stream; pi/codex use full snapshot streams.
+  // Polling pi/codex every 2s is visibly stale during fast turns and can leave
+  // the Conversation view behind the Terminal view.
   if (conversation.id !== undefined && conversation.id >= 0) {
-    return conversation.harness === 'claude-code' || conversation.harness == null;
+    return conversation.harness === 'claude-code' ||
+      conversation.harness === 'pi' ||
+      conversation.harness === 'codex' ||
+      conversation.harness == null;
   }
   // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels).
   // Only pi/codex stream here (PAN-1908): the server tails their transcript and

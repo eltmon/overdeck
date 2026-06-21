@@ -715,7 +715,25 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            if (!conv || (conv.harness !== 'claude-code' && conv.harness != null)) {
+            if (!conv) {
+              return conversationDiscoveringStream();
+            }
+
+            if (conv.harness === 'pi') {
+              const file = yield* Effect.promise(() => resolvePiSessionPath(input.conversationName));
+              return file
+                ? streamFullParseSnapshots(file, parsePiConversationMessages, conv.model ?? null)
+                : conversationDiscoveringStream();
+            }
+
+            if (conv.harness === 'codex') {
+              const file = yield* Effect.promise(() => resolveCodexRolloutPath(input.conversationName));
+              return file
+                ? streamFullParseSnapshots(file, parseCodexConversationMessages, conv.model ?? null)
+                : conversationDiscoveringStream();
+            }
+
+            if (conv.harness !== 'claude-code' && conv.harness != null) {
               return conversationDiscoveringStream();
             }
 

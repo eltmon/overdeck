@@ -90,7 +90,8 @@ describe('shouldStreamConversationMessages', () => {
   it('streams live Claude Code conversations and legacy null-harness conversations', () => {
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'claude-code' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: null })).toBe(true);
-    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'pi' })).toBe(false);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'pi' })).toBe(true);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'codex' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: false, harness: null })).toBe(false);
     expect(shouldStreamConversationMessages({ id: -1, sessionAlive: true, harness: 'claude-code' })).toBe(false);
   });

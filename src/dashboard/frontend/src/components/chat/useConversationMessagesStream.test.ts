@@ -10,9 +10,9 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
     expect(shouldStreamConversationMessages(base({ id: 42, harness: null }))).toBe(true);
   });
 
-  it('does NOT stream a real pi/codex DB conversation (unchanged — stays on poll)', () => {
-    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'pi' }))).toBe(false);
-    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'codex' }))).toBe(false);
+  it('streams real pi/codex DB conversations via full JSONL snapshots', () => {
+    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'pi' }))).toBe(true);
+    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'codex' }))).toBe(true);
   });
 
   it('streams a synthetic pi work-agent session', () => {
