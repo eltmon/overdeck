@@ -17,7 +17,6 @@
         "@linear/sdk": "^70.0.0",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@octokit/rest": "^22.0.1",
-        "@overdeck/contracts": "workspace:*",
         "@types/mustache": "^4.2.6",
         "@types/ws": "^8.18.1",
         "@xenova/transformers": "^2.17.2",
@@ -44,6 +43,7 @@
         "@commitlint/config-conventional": "^20.5.0",
         "@effect/vitest": "catalog:",
         "@napi-rs/canvas": "^1.0.0",
+        "@overdeck/contracts": "workspace:*",
         "@types/inquirer": "^9.0.9",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^20.10.0",
@@ -63,7 +63,7 @@
       "name": "@overdeck/desktop",
       "version": "0.21.0",
       "bin": {
-        "overdeck": "./bin/overdeck.mjs",
+        "overdeck-desktop": "./bin/overdeck.mjs",
       },
       "dependencies": {
         "conf": "^13.0.0",
