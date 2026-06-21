@@ -1,0 +1,4 @@
+{
+  "status": "failed",
+  "notes": "TypeScript compilation error in src/dashboard/frontend/src/components/Settings/RolesPanel.tsx:291 — type mismatch when spreading currentRole (RoleConfig) into RoleConfigPatch. The sub property type inference fails because RoleSubConfig.model should remain scalar but the spread from a widened RoleConfig creates ambiguity. Backend tests pass (weighted-model-ref.test.ts all green, 7128 passed), but frontend build blocks dashboard verification. Pre-existing test failures in memory/worker-pool and backlog/sequencer are unrelated to this PR."
+}
