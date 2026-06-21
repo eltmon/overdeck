@@ -14,6 +14,10 @@
 #   flywheel-* → AUTO-APPROVE. The Fix-All Flywheel orchestrator
 #                (OVERDECK_AGENT_ID=flywheel-orchestrator) is fully headless —
 #                a prompt hangs the entire run. It does NOT use an agent-* id.
+#   sequencer-* → AUTO-APPROVE. The Backlog Sequencer
+#                (OVERDECK_AGENT_ID=sequencer-runner) is a headless singleton
+#                runner like the flywheel — it reads issues via `gh` with no human
+#                present, so an approval prompt stalls the whole ranking pass.
 #   strike-* / inspect-* → AUTO-APPROVE. Headless strike (implement+merge) and
 #                per-bead inspect agents, same autonomy as a work agent.
 #   planning-* → AUTO-APPROVE. A planning agent must not be MORE restrictive than
@@ -57,7 +61,7 @@ echo "[$(date -Iseconds)] auto-approve-hook: AGENT=${OVERDECK_AGENT_ID:-unset} t
 # Overdeck pipeline agents (work + planning). Conversations (human present,
 # currently bypass) and plain human sessions (unset) keep normal prompts.
 case "${OVERDECK_AGENT_ID:-}" in
-  agent-*|planning-*|flywheel-*|strike-*|inspect-*) : ;;
+  agent-*|planning-*|flywheel-*|strike-*|inspect-*|sequencer-*) : ;;
   *) exit 0 ;;
 esac
 
