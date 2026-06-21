@@ -21,6 +21,8 @@ import { getDatabase } from './index.js';
 import { agentStateToDbAgent } from './agent-mappers.js';
 import type { AgentState } from '../agents.js';
 import type { Agent as DbAgent } from './agents-db.js';
+import { readAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
+import type { RuntimeName } from '../runtimes/types.js';
 
 const VALID_ROLES = new Set<AgentState['role']>([
   'plan',
@@ -149,6 +151,11 @@ export interface BackfillAgentsOptions {
    * Useful for tests and for environments where tmux is unavailable.
    */
   listLiveSessions?: () => Set<string>;
+  /**
+   * Override per-issue record lookup for harness/model. Defaults to
+   * readAgentHarnessModelRecordSync. Useful for tests.
+   */
+  readHarnessModel?: (issueId: string) => { harness?: RuntimeName; model?: string } | null;
 }
 
 export interface BackfillAgentsResult {
@@ -170,6 +177,7 @@ export function backfillAgentsFromStateJsonSync(
 ): BackfillAgentsResult {
   const agentsDir = join(getOverdeckHome(), 'agents');
   const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNames();
+  const readHarnessModel = options?.readHarnessModel ?? readAgentHarnessModelRecordSync;
   let processed = 0;
   let skipped = 0;
   let markedStopped = 0;
@@ -217,7 +225,19 @@ export function backfillAgentsFromStateJsonSync(
         markedStopped++;
       }
 
-      const row = agentStateToDbAgent(reconciled);
+      // PAN-1919: prefer harness/model from the per-issue git-tracked record so
+      // rebuild-agents sources from the travelling record, not machine-local state.
+      let effective = reconciled;
+      if (reconciled.issueId) {
+        const rec = readHarnessModel(reconciled.issueId);
+        if (rec?.harness || rec?.model) {
+          effective = { ...reconciled };
+          if (rec.harness) effective.harness = rec.harness;
+          if (rec.model) effective.model = rec.model;
+        }
+      }
+
+      const row = agentStateToDbAgent(effective);
       upsert.run(buildNamedParams(row));
       processed++;
 
