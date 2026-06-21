@@ -18,6 +18,7 @@ import {
   readExistingHandoffDoc,
   recoverStuckForks,
   registerInFlightForkPipeline,
+  shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
 
@@ -83,6 +84,33 @@ describe('conversationSessionAliveFromState', () => {
 
   it('keeps provisioning forks out of the live-session path', () => {
     expect(conversationSessionAliveFromState({ status: 'active', forkStatus: 'spawning' }, true)).toBe(false);
+  });
+});
+
+describe('shouldReportUnresolvedLiveSession', () => {
+  it('reports the banner for an active claude-code conversation (launcher pins --session-id)', () => {
+    expect(shouldReportUnresolvedLiveSession({ status: 'active', harness: 'claude-code' })).toBe(true);
+  });
+
+  it('treats a null harness as claude-code (default) and reports the banner', () => {
+    expect(shouldReportUnresolvedLiveSession({ status: 'active', harness: null })).toBe(true);
+  });
+
+  it('does NOT report the banner for a freshly-spawned codex conversation (rollout written on first turn)', () => {
+    expect(shouldReportUnresolvedLiveSession({ status: 'active', harness: 'codex' })).toBe(false);
+  });
+
+  it('does NOT report the banner for a freshly-spawned pi conversation (session JSONL written on first turn)', () => {
+    expect(shouldReportUnresolvedLiveSession({ status: 'active', harness: 'pi' })).toBe(false);
+  });
+
+  it('does NOT report the banner for an ended conversation regardless of harness', () => {
+    expect(shouldReportUnresolvedLiveSession({ status: 'ended', harness: 'claude-code' })).toBe(false);
+  });
+
+  it('does NOT report the banner when there is no conversation record', () => {
+    expect(shouldReportUnresolvedLiveSession(null)).toBe(false);
+    expect(shouldReportUnresolvedLiveSession(undefined)).toBe(false);
   });
 });
 

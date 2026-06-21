@@ -793,6 +793,30 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
 }
 
 /**
+ * Decide whether an unresolved session file should surface the loud
+ * "Session could not be resolved — needs attention" banner.
+ *
+ * Only LIVE claude-code conversations qualify. The claude-code launcher pins
+ * `--session-id` synchronously at spawn (resolveSessionFile reads it back), so a
+ * null session file for an active conversation means the launcher is broken and
+ * the panel would otherwise silently render an empty/wrong transcript — worth a
+ * loud banner.
+ *
+ * codex and pi write their transcript JSONL (codex rollout, pi session file)
+ * only on the FIRST turn, so a null session file BEFORE the first turn is the
+ * EXPECTED empty state for a freshly-spawned conversation, not an error. They
+ * must fall through to the benign empty-messages response so the panel shows the
+ * friendly "How can I help you?" first-message state instead of a scary banner
+ * (PAN-1919 follow-up: codex/GPT-5.5 conversations flashed the banner on spawn).
+ */
+export function shouldReportUnresolvedLiveSession(
+  conv: Pick<Conversation, 'status' | 'harness'> | null | undefined,
+): boolean {
+  if (!conv || conv.status !== 'active') return false;
+  return (conv.harness ?? 'claude-code') === 'claude-code';
+}
+
+/**
  * Detect whether a session file path is a Codex rollout JSONL. Codex writes
  * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Overdeck the per-agent
  * CODEX_HOME lives at .../agents/<id>/codex-home, so the path also satisfies
@@ -3106,14 +3130,18 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
 
         if (!sessionFile) {
-          // The session file is deterministic from the launcher's pinned
-          // --session-id (resolveSessionFile). If it's unresolved for a LIVE
-          // conversation, the panel would otherwise silently show an empty or
-          // wrong transcript — surface it loudly instead so it gets attention
+          // For a LIVE claude-code conversation the session file is deterministic
+          // from the launcher's pinned --session-id (resolveSessionFile). If it's
+          // unresolved, the panel would otherwise silently show an empty or wrong
+          // transcript — surface it loudly instead so it gets attention
           // (resolveSessionFile already screamed server-side). Returned with a
           // 200 + `error` field so it flows through the normal data path and the
           // panel can render a banner rather than a generic fetch failure.
-          if (conv && conv.status === 'active') {
+          //
+          // codex/pi conversations write their transcript JSONL only on the first
+          // turn, so a null session file before then is the expected empty state,
+          // not an error — they fall through to the benign empty-messages response.
+          if (shouldReportUnresolvedLiveSession(conv)) {
             return jsonResponse({
               messages: [],
               workLog: [],
@@ -3124,7 +3152,8 @@ const getConversationMessagesRoute = HttpRouter.add(
                 `reliably; this needs attention.`,
             });
           }
-          // Ended/legacy conversation with no session file — genuinely empty.
+          // Ended/legacy conversation, or a codex/pi conversation that has not yet
+          // written its first-turn transcript — genuinely empty.
           return jsonResponse({ messages: [], workLog: [], streaming: false });
         }
 
