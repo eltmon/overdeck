@@ -15,6 +15,7 @@ const mockGetCostBreakdownByStageAndModel = vi.hoisted(() => vi.fn());
 const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
+const mockListOverdeckAgentStatesSync = vi.hoisted(() => vi.fn());
 
 // records.ts now imports from overdeck/cost-sync (not database/cost-events-db)
 vi.mock('../../overdeck/cost-sync.js', () => ({
@@ -29,6 +30,22 @@ vi.mock('../../merge-set.js', () => ({
 vi.mock('../auto-commit.js', () => ({
   queueAutoCommit: mockQueueAutoCommit,
 }));
+
+vi.mock('../../overdeck/agent-state-sync.js', () => ({
+  listOverdeckAgentStatesSync: mockListOverdeckAgentStatesSync,
+  getOverdeckAgentStateSync: vi.fn(),
+  saveOverdeckAgentStateSync: vi.fn(),
+}));
+
+const mockResolveProjectFromIssueSync = vi.hoisted(() => vi.fn().mockReturnValue(null));
+
+vi.mock('../../projects.js', async () => {
+  const actual = await vi.importActual<typeof import('../../projects.js')>('../../projects.js');
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: mockResolveProjectFromIssueSync,
+  };
+});
 
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
@@ -45,6 +62,7 @@ import {
 import {
   readIssueRecordSync,
   readRecordContinueViewSync,
+  RECORD_SCHEMA_VERSION,
   writeRecordDecisionsSync,
   writeRecordDecisions,
   writeRecordHazardsSync,
@@ -63,6 +81,7 @@ describe('buildIssueRecord', () => {
     mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
     mockGetCostForIssueFromDb.mockReturnValue(null);
     mockGetMergeSetSync.mockReturnValue(null);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
     mockQueueAutoCommit.mockClear();
   });
 
@@ -609,5 +628,95 @@ describe('writeRecordBeadsMapping / writeRecordBeadsMappingSync (PAN-1919)', () 
     const record = readIssueRecordSync(project, 'PAN-1919');
     expect(record?.beadsMapping).toEqual(beadsMapping);
     expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+});
+
+describe('PAN-1919: buildIssueRecord backfill migration', () => {
+  function makeProject(): ProjectConfig {
+    const path = mkdtempSync(join(tmpdir(), 'pan-records-build-'));
+    return { name: 'Test', path };
+  }
+
+  beforeEach(() => {
+    mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
+    mockGetCostForIssueFromDb.mockReturnValue(null);
+    mockGetMergeSetSync.mockReturnValue(null);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
+    mockResolveProjectFromIssueSync.mockReturnValue(null);
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    mockResolveProjectFromIssueSync.mockReturnValue(null);
+  });
+
+  it('produces a record with schemaVersion equal to RECORD_SCHEMA_VERSION (2)', async () => {
+    const project = makeProject();
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.schemaVersion).toBe(RECORD_SCHEMA_VERSION);
+    expect(record.schemaVersion).toBe(2);
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('folds workspace continue statusOverrides into the record', async () => {
+    const project = makeProject();
+    const workspaceDir = join(project.path, 'workspaces', 'feature-pan-1919');
+    mkdirSync(join(workspaceDir, '.pan'), { recursive: true });
+    writeFileSync(
+      join(workspaceDir, '.pan', 'continue.json'),
+      JSON.stringify({ statusOverrides: { 'item-1': 'completed', 'item-2': 'skipped' } }),
+    );
+    mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'pan', projectPath: project.path });
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.statusOverrides).toEqual({ 'item-1': 'completed', 'item-2': 'skipped' });
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('returns undefined statusOverrides when no workspace continue exists', async () => {
+    const project = makeProject();
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.statusOverrides).toBeUndefined();
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('folds harness and model from agents table into the record', async () => {
+    const project = makeProject();
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      {
+        id: 'agent-pan-1919',
+        issueId: 'PAN-1919',
+        role: 'work',
+        harness: 'claude-code',
+        model: 'claude-opus-4-8',
+        status: 'stopped',
+        startedAt: '2026-06-21T00:00:00.000Z',
+      },
+    ]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('claude-code');
+    expect(record.model).toBe('claude-opus-4-8');
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('prefers existing record harness/model over agents table', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      harness: 'pi',
+      model: 'kimi-k2.5',
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      { id: 'agent-pan-1919', issueId: 'PAN-1919', role: 'work', harness: 'claude-code', model: 'claude-opus-4-8', status: 'stopped', startedAt: '2026-06-21T00:00:00.000Z' },
+    ]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('pi');
+    expect(record.model).toBe('kimi-k2.5');
+    rmSync(project.path, { recursive: true, force: true });
   });
 });
