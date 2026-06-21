@@ -16,7 +16,9 @@ import {
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
-import { resolveLiveFlywheelRunId } from '../../dashboard/server/services/flywheel-run-state.js';
+import { resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
+import { buildClassifyLookups } from '../backlog/lookups.js';
+import { computeCohort } from '../backlog/pickup.js';
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
@@ -265,6 +267,21 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
   const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions(options));
   setFlywheelActiveRunId(runId);
   setFlywheelGloballyPaused(false);
+
+  // PAN-2006 WI-7: freeze the run's cohort (in-flight ∪ current+next wave) at start.
+  // The Run is complete once this cohort drains; mid-run pickups don't extend it.
+  // Best-effort — a missing/unparseable sequence just means no cohort gate yet.
+  try {
+    const workspace = options.workspace ?? process.cwd();
+    const seqPath = join(workspace, '.pan', 'backlog', 'sequence.md');
+    if (existsSync(seqPath)) {
+      const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+      if (parsed.ok) {
+        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5));
+      }
+    }
+  } catch { /* cohort snapshot is best-effort */ }
+
   return agent;
 }
 

@@ -15,8 +15,9 @@ import {
 } from '../../../lib/backlog/label-ops.js';
 import {
   normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats,
-  type ClassifyLookups, type ForecastNode, type LaneBlock,
+  type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
+import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
@@ -271,60 +272,6 @@ const postBacklogPlanningRoute = HttpRouter.add(
     });
   })),
 );
-
-// ─── Shared classify lookups (single source of truth — PAN-2006) ──────────────
-
-/**
- * Build the {@link ClassifyLookups} the shared pickup module needs from live
- * project state: labels (in-memory issue service), planned (vBRIEF spec + beads),
- * and in-pipeline (review status / live workspace).
- */
-function buildClassifyLookups(projectRoot: string): ClassifyLookups {
-  const labelsByIssue = new Map<string, string[]>();
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getSharedIssueService } = require('../services/issue-service-singleton.js') as typeof import('../services/issue-service-singleton.js');
-    for (const issue of getSharedIssueService().getIssues() as Array<Record<string, unknown>>) {
-      const id = typeof issue['identifier'] === 'string' ? issue['identifier'].toUpperCase() : '';
-      if (!id) continue;
-      const raw = Array.isArray(issue['labels']) ? (issue['labels'] as unknown[]) : [];
-      const names = raw
-        .map((l) => (typeof l === 'string' ? l : ((l as { name?: string })?.name ?? '')))
-        .filter((s): s is string => Boolean(s));
-      labelsByIssue.set(id, names);
-    }
-  } catch { /* issue service not ready — treat as no labels */ }
-
-  const specsDir = join(projectRoot, '.pan', 'specs');
-  const specIssues = new Set<string>();
-  if (existsSync(specsDir)) {
-    for (const f of readdirSync(specsDir)) {
-      const m = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
-      if (m) specIssues.add(m[1]!.toUpperCase());
-    }
-  }
-  const workspacesDir = join(projectRoot, 'workspaces');
-  const beadsIssues = new Set<string>();
-  if (existsSync(workspacesDir)) {
-    for (const dir of readdirSync(workspacesDir)) {
-      const m = /^feature-([a-z]+-\d+)$/i.exec(dir);
-      if (m && existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) beadsIssues.add(m[1]!.toUpperCase());
-    }
-  }
-
-  return {
-    labels: (id) => labelsByIssue.get(id.toUpperCase()) ?? [],
-    isPlanned: (id) => {
-      const u = id.toUpperCase();
-      return specIssues.has(u) && beadsIssues.has(u);
-    },
-    isInPipeline: (id) => {
-      const u = id.toUpperCase();
-      const rs = getReviewStatusSync(u);
-      return (rs !== null && rs.reviewStatus !== 'pending') || existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`));
-    },
-  };
-}
 
 // ─── Route: GET /api/backlog/forecast ─────────────────────────────────────────
 // PAN-2005: the pickup forecast (waves / lanes / cohort / stats) computed entirely

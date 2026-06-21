@@ -48,9 +48,12 @@ Verify with `gh issue view <num> --json author,assignees`. Any other state — t
 
 **Why this matters.** When auto-pickup is enabled (see `vision.mdx`), this filter is the only safeguard between an attacker filing a malicious issue and the Flywheel autonomously running an agent against it. The "or assignee" branch lets the operator deliberately pull a legitimate third-party issue into the Flywheel's purview by self-assigning; the default-deny posture against unsolicited third-party issues stays. Never weaken the default-deny without thinking about what an adversary could craft.
 
-### Parked labels
+### Pipeline-state labels (PAN-2006)
 
-Skip any issue labeled `needs-design` or `needs-discussion`. These are held for a human decision. Do not suggest planning, starting, or advancing them. Do not file derivative beads for them.
+- **`parked`** (and legacy `needs-design` / `needs-discussion`) — held for a human decision. Skip entirely: do not plan, start, advance, or file derivative beads.
+- **`vetoed`** — an absolute operator hard-stop. NEVER pick up, plan, or strike a `vetoed` issue, **even if it would unblock the pipeline** (it overrides the pipeline-blocker override above). The one exception to "never block".
+- **`ready`** — Definition of Ready: the operator has marked it workable. Routine auto-pickup only ever starts issues that are `ready` **and** Planned (have a vBRIEF spec + beads). (The pipeline-unblock / red-main override may still strike a non-ready `blocks-main` issue.)
+- **`blocks-main`** — must land to green main; prioritize/strike it even with auto-pickup off (never if also `vetoed`).
 
 ### Discretion on parked items (decide, don't delegate)
 
@@ -145,9 +148,15 @@ These are different artifacts. Do not conflate them.
 
 If `docs/FLYWHEEL-STATE.md` does not exist when you want to record something durable, create it.
 
+## Run definition — cohort drain-to-quiescence (PAN-2006)
+
+A **Run** commits to draining a frozen **cohort** snapshotted at start (`${OVERDECK_HOME}/flywheel/runs/<runId>/cohort.json`): everything in-flight at start ∪ the auto-pickable issues in the current + next wave. The Run is **complete when every cohort member reaches a terminal state** (merged + closed-out, or vetoed/parked out). Issues you pick up mid-run (e.g. unblockers, newly-readied work) are real work but do **not** extend the cohort — they may carry into the next Run. Think Linear cycle, not an open-ended loop.
+
+**The last tick of a Run is a retrospective.** Before reporting, review the run's activity and capture improvements — recurring stalls, missing guardrails, candidate new skills/process fixes — into `docs/FLYWHEEL-STATE.md` and/or filed issues. Then report.
+
 ## End of run
 
-When there is no more eligible work, or when paused indefinitely, run `pan flywheel report`. That command:
+When the cohort has drained (or you are paused indefinitely), do the retrospective above, then run `pan flywheel report`. That command:
 
 1. Writes the per-run report at `${OVERDECK_HOME}/flywheel/runs/<runId>/report.md`.
 2. Commits any pending changes to `docs/FLYWHEEL-STATE.md`.
