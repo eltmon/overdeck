@@ -20,6 +20,10 @@ type View = 'list' | 'dag' | 'forecast';
 type ImportanceFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type ConditionFilter = 'all' | 'ok' | 'needs-refinement' | 'stale';
 
+interface BacklogSequencerPageProps {
+  onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
+}
+
 const CONDITION_BADGE_CLASS: Record<string, string> = {
   ok:                  'border border-[color-mix(in_srgb,var(--success)_32%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success-foreground)]',
   'needs-refinement':  'border border-[color-mix(in_srgb,var(--warning)_36%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning-foreground)]',
@@ -61,7 +65,7 @@ function scoreTier(rank: number, total: number): string {
 
 const DAG_NODE_BUDGET = 150;
 
-export function BacklogSequencerPage() {
+export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProps = {}) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('dag');
   const [importanceFilter, setImportanceFilter] = useState<ImportanceFilter>('all');
@@ -735,6 +739,7 @@ export function BacklogSequencerPage() {
                   onSelectNode={(n) => setSelectedNode(n)}
                   onGateChange={handleGateChange}
                   onPlanningChange={handlePlanningChange}
+                  onIssueAction={onIssueAction}
                 />
               </div>
             </div>
@@ -757,6 +762,7 @@ export function BacklogSequencerPage() {
             onClose={() => setSelectedNode(null)}
             onGateChange={handleGateChange}
             onPlanningChange={handlePlanningChange}
+            onIssueAction={onIssueAction}
           />
         )}
       </div>

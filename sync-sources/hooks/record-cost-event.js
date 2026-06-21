@@ -28864,6 +28864,7 @@ const DEFAULT_CONFIG = {
 		agentBlockCount: 10
 	},
 	experimental: {
+		experimentalFeatures: false,
 		claudeCodeChannels: false,
 		claudeCodeChannelsMcp: false,
 		streamdownRenderer: false,
@@ -29220,6 +29221,7 @@ function mergeConfigs(...configs) {
 			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
 		},
 		experimental: {
+			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
 			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
 			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
 			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
@@ -29428,6 +29430,7 @@ function mergeConfigs(...configs) {
 			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
 		}
 		if (config.experimental) {
+			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
 			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
 			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
 			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;

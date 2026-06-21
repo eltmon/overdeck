@@ -124,7 +124,22 @@ export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'overdeck.ui.sessionFeedSid
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
+  // Cockpit deep-link: /command-deck/<project>/<issue> (PAN-2005). The bare
+  // /command-deck is matched by PATH_TO_TAB below; the nested form needs the prefix.
+  if (path.startsWith('/command-deck/')) return 'command-deck';
   return PATH_TO_TAB[path] || 'home';
+}
+
+/**
+ * Parse a cockpit deep-link `/command-deck/<project>/<issue>` into its parts, or
+ * null when the path is not a cockpit route. Lets a reload/bookmark/back-button
+ * restore the exact issue cockpit tab (panes are otherwise localStorage-only).
+ */
+export function getCockpitRouteFromPath(path = window.location.pathname): { project: string; issue: string } | null {
+  const m = path.match(/^\/command-deck\/([^/]+)\/([^/]+)$/);
+  if (!m) return null;
+  const dec = (s: string) => { try { return decodeURIComponent(s); } catch { return s; } };
+  return { project: dec(m[1] ?? ''), issue: dec(m[2] ?? '') };
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
@@ -523,6 +538,11 @@ export default function App() {
   const [conversationViewModes, setConversationViewModes] = useState<ConversationViewModeMap>(
     () => initialConversationRoute.viewModes,
   );
+  // Cockpit deep-link (PAN-2005): the issue cockpit tab restored from
+  // /command-deck/<project>/<issue>. Mirrors the conversation deep-link pattern.
+  const [cockpitRoute, setCockpitRouteState] = useState<{ project: string; issue: string } | null>(
+    () => getCockpitRouteFromPath(),
+  );
   const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
     setSelectedConvIdState(id);
     setConversationViewModeState(id ? viewMode : 'conversation');
@@ -738,6 +758,18 @@ export default function App() {
     }
   }, [activeTab, experimentalFeaturesEnabled, setActiveTab]);
 
+  // Sync the URL to the active issue cockpit (PAN-2005). replaceState (like the
+  // conversation route) keeps history clean; reload/bookmark restores the tab.
+  // issueId=null reverts to the bare /command-deck (cockpit closed / home).
+  const onCockpitChange = useCallback((projectKey: string | null, issueId: string | null) => {
+    if (projectKey && issueId) {
+      const path = `/command-deck/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}`;
+      if (window.location.pathname !== path) window.history.replaceState({ tab: 'command-deck' }, '', path);
+    } else if (window.location.pathname.startsWith('/command-deck/')) {
+      window.history.replaceState({ tab: 'command-deck' }, '', '/command-deck');
+    }
+  }, []);
+
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
     // hit.projectKey is the resolved dashboard project key (name ?? key); the raw
@@ -811,6 +843,7 @@ export default function App() {
       setSelectedConvIdState(routeState.convId);
       setConversationViewModeState(routeState.viewMode);
       setConversationViewModes(routeState.viewModes);
+      setCockpitRouteState(getCockpitRouteFromPath());
       syncDrawerFromUrl();
     };
     window.addEventListener('popstate', onPopState);
@@ -1361,6 +1394,39 @@ export default function App() {
     openIssue(issueId);
   }, [openIssue, setActiveTab]);
 
+  // PAN-2005: three ways to open an issue from the backlog detail drawer.
+  //   browser → the tracker (GitHub) issue page in a new tab
+  //   modal   → the right-side issue overlay (IssueDrawer; already URL-synced via ?issue=)
+  //   panel   → the full cockpit tab in the project's deck (deep-linked /command-deck/<proj>/<issue>)
+  const handleBacklogIssueAction = useCallback((issueId: string, mode: 'browser' | 'modal' | 'panel') => {
+    const issue = issues.find((i) => i.identifier === issueId);
+    if (mode === 'browser') {
+      // Prefer the tracker's canonical URL; fall back to deriving from the
+      // project's owner/repo (project.name is "owner/repo" for GitHub projects).
+      const num = issueId.replace(/^[A-Za-z]+-/, '');
+      const repo = issue?.project?.name;
+      const url = issue?.url
+        || (repo && repo.includes('/') ? `https://github.com/${repo}/issues/${num}` : null);
+      if (!url) { openIssue(issueId); return; }
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (mode === 'modal') {
+      openIssue(issueId);
+      return;
+    }
+    // panel: resolve the issue's deck and open its cockpit tab; fall back to the
+    // overlay if we can't resolve a project key.
+    const projectKey = issue?.project?.name ?? selectedProjectKey;
+    if (!projectKey) {
+      openIssue(issueId);
+      return;
+    }
+    setActiveTab('command-deck');
+    setCockpitRouteState({ project: projectKey, issue: issueId });
+    onCockpitChange(projectKey, issueId);
+  }, [issues, openIssue, selectedProjectKey, setActiveTab, onCockpitChange]);
+
   const handleOpenWorkspaceHome = useCallback((issueId: string) => {
     setActiveTab('kanban');
     openIssue(issueId);
@@ -1582,6 +1648,8 @@ export default function App() {
                 selectedProject={selectedProjectKey}
                 onSelectProject={setSelectedProjectKey}
                 onProjectPrefixChange={setSearchProjectPrefix}
+                cockpitIssue={cockpitRoute}
+                onCockpitChange={onCockpitChange}
               />
             </div>
           )}
@@ -1683,7 +1751,7 @@ export default function App() {
         )}
         {activeTab === 'backlog' && (
           <div className="w-full h-full overflow-hidden">
-            <BacklogSequencerPage />
+            <BacklogSequencerPage onIssueAction={handleBacklogIssueAction} />
           </div>
         )}
         {activeTab === 'settings' && (

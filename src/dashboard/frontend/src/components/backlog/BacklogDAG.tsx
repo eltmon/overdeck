@@ -321,13 +321,36 @@ export interface RationaleSidePanelProps {
   onClose: () => void;
   onGateChange: (issueId: string, gate: string) => Promise<void>;
   onPlanningChange: (issueId: string, planning: string) => Promise<void>;
+  /** PAN-2005: open the issue in the browser / overlay / cockpit panel. */
+  onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
+
+// Small nav-button style for the drawer's "open issue" row (style-guide: 10px
+// uppercase action link, weight 500, themed border).
+const NAV_BTN: CSSProperties = {
+  flex: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  fontWeight: 500,
+  padding: '5px 6px',
+  borderRadius: 6,
+  cursor: 'pointer',
+  border: '1px solid var(--border)',
+  background: 'var(--accent)',
+  color: 'var(--foreground)',
+};
 
 export function RationaleSidePanel({
   node,
   onClose,
   onGateChange,
   onPlanningChange,
+  onIssueAction,
 }: RationaleSidePanelProps) {
   const [gate, setGate] = useState(node.gate);
   const [planning, setPlanning] = useState(node.planning);
@@ -403,7 +426,16 @@ export function RationaleSidePanel({
       {/* Identity */}
       <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{node.issueId}</div>
       {node.title && (
-        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 14px' }}>{node.title}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 10px' }}>{node.title}</div>
+      )}
+
+      {/* PAN-2005: three ways to open the issue — cockpit panel, overlay, browser */}
+      {onIssueAction && (
+        <div style={{ display: 'flex', gap: 6, margin: `${node.title ? 0 : 10}px 0 14px` }}>
+          <button style={NAV_BTN} onClick={() => onIssueAction(node.issueId, 'panel')} title="Open the full issue cockpit (deep-linked tab)">⛶ Panel</button>
+          <button style={NAV_BTN} onClick={() => onIssueAction(node.issueId, 'modal')} title="Open the issue overlay (quick peek, stays on this page)">▢ Overlay</button>
+          <button style={NAV_BTN} onClick={() => onIssueAction(node.issueId, 'browser')} title="Open the issue on GitHub in a new tab">↗ GitHub</button>
+        </div>
       )}
 
       {/* Metrics — importance + impact score */}
@@ -520,6 +552,8 @@ interface BacklogDAGProps {
   onSelectNode?: (n: SequenceNode | null) => void;
   onGateChange?: (issueId: string, gate: string) => Promise<void>;
   onPlanningChange?: (issueId: string, planning: string) => Promise<void>;
+  /** PAN-2005: open the selected issue in the browser / overlay / cockpit panel. */
+  onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
 
 export function BacklogDAG({
@@ -529,6 +563,7 @@ export function BacklogDAG({
   onSelectNode,
   onGateChange,
   onPlanningChange,
+  onIssueAction,
 }: BacklogDAGProps) {
   const queryClient = useQueryClient();
   const [internalSelectedNode, setInternalSelectedNode] = useState<SequenceNode | null>(null);
@@ -680,6 +715,7 @@ export function BacklogDAG({
           onClose={handleClose}
           onGateChange={handleGateChange}
           onPlanningChange={handlePlanningChange}
+          onIssueAction={onIssueAction}
         />
       )}
     </div>

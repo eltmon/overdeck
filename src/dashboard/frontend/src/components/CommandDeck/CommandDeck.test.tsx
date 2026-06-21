@@ -51,6 +51,12 @@ vi.mock('../Stage', () => ({
   Stage: (props: any) => <div data-testid="stage" data-deck={props.deckKey} />,
 }));
 
+// CommandDeck calls useConfirm() at render; the test doesn't mount a DialogProvider,
+// so stub the hook to a no-op confirm (returns true) to keep the deck renderable.
+vi.mock('../DialogProvider', () => ({
+  useConfirm: () => async () => true,
+}));
+
 vi.mock('../sessionFeed/SessionFeedSidebar', () => ({
   // PAN-1591: the merged Awareness rail passes the project's issues via
   // `projectIssueIds` (scopeSwitcher mode); keep `issueIds` as a fallback.
