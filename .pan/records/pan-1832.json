@@ -77,20 +77,17 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:15:38.290Z",
-  "updated": "2026-06-21T09:02:15.310Z",
+  "updated": "2026-06-21T09:11:43.824Z",
   "pipeline": {
     "issueId": "PAN-1832",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-21T09:02:15.269Z",
-    "reviewNotes": "Approved: weighted-distribution sampler is correct, deterministic, security-gated, and fully tested (75 pass, tsc clean); 5 low/nit advisories (flywheel representative-only, effort-check asymmetry) are non-blocking follow-ups.",
-    "testNotes": "TypeScript compilation error in src/dashboard/frontend/src/components/Settings/RolesPanel.tsx:291 — type mismatch when spreading currentRole (RoleConfig) into RoleConfigPatch. The sub property type inference fails because RoleSubConfig.model should remain scalar but the spread from a widened RoleConfig creates ambiguity. Backend tests pass (weighted-model-ref.test.ts all green, 7128 passed), but frontend build blocks dashboard verification. Pre-existing test failures in memory/worker-pool and backlog/sequencer are unrelated to this PR.",
+    "updatedAt": "2026-06-21T09:11:43.686Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2003",
-    "reviewedAtCommit": "7c03e0f78f5219891e4d469927a808b1656b759d",
     "reviewRequestedAt": "2026-06-21T08:29:36.784Z"
   },
   "closeOut": {
@@ -98,16 +95,16 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-opus-4-8": {
-            "input": 232,
-            "output": 5241,
-            "cacheRead": 688454,
-            "cacheWrite": 8619
+            "input": 284,
+            "output": 5834,
+            "cacheRead": 1606370,
+            "cacheWrite": 9956
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 34704,
-            "output": 6433,
+            "input": 40254,
+            "output": 9082,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -130,23 +127,23 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 317,
-            "output": 89851,
-            "cacheRead": 34348599,
-            "cacheWrite": 965826
+            "input": 347,
+            "output": 103855,
+            "cacheRead": 37068291,
+            "cacheWrite": 1062463
           }
         }
       },
       "totals": {
         "anthropic/claude-opus-4-8": {
-          "input": 35954,
-          "output": 89934,
-          "cacheRead": 6921202,
-          "cacheWrite": 559044
+          "input": 36006,
+          "output": 90527,
+          "cacheRead": 7839118,
+          "cacheWrite": 560381
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 34704,
-          "output": 6433,
+          "input": 40254,
+          "output": 9082,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -157,15 +154,15 @@
           "cacheWrite": 155381
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 317,
-          "output": 89851,
-          "cacheRead": 34348599,
-          "cacheWrite": 965826
+          "input": 347,
+          "output": 103855,
+          "cacheRead": 37068291,
+          "cacheWrite": 1062463
         }
       },
       "costAtCloseOut": {
-        "usd": 25.102957,
-        "pricingAsOf": "2026-06-21T09:02:15.283Z"
+        "usd": 26.973803,
+        "pricingAsOf": "2026-06-21T09:11:43.748Z"
       }
     },
     "merges": [
@@ -173,6 +170,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "harness": "pi",
+  "model": "glm-5.2"
 }
