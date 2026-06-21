@@ -14,7 +14,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameS
 import { Effect } from 'effect';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
-import { appendFeedbackEntrySync, appendSessionEntrySync, clearFeedbackSync, continueFilename, readContinueStateSync, writeContinueStateSync, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
+import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirsSync,
@@ -29,7 +29,6 @@ import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
 import { findSpecByIssue, getProjectPanPaths, updateSpecStatus, writeSpecForIssue } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
-import { getContinueFilePath, getContinuesDir } from '../pan-dir/continues.js';
 import {
   appendFeedbackEntrySync as appendFeedbackEntryToRecord,
   appendSessionEntrySync as appendSessionEntryToRecord,
@@ -307,8 +306,6 @@ export function deleteVBrief(projectRoot: string, issueId: string): boolean {
     unlinkSync(found.path);
   }
 
-  const continuePath = getContinueFilePath(projectRoot, issueId);
-  if (existsSync(continuePath)) unlinkSync(continuePath);
   invalidateVBriefIndex(projectRoot);
   return true;
 }
@@ -429,33 +426,6 @@ export interface PromotedVBrief {
   canonicalFilename: string;
 }
 
-/**
- * Promote the workspace continue file (`<workspace>/.pan/continue.json`) — which the
- * planning agent populates with decisions, hazards, resumePoint, and beadsMapping —
- * into the canonical project-side `.pan/continues/<issue-lowercase>.vbrief.json`.
- *
- * This is the ONLY place the planning agent's continue context crosses from the
- * workspace into the project store. Both promotion paths (the sync
- * `promoteVBriefToProposed` and the dashboard's async `completePlanningArtifacts`)
- * MUST call this. PAN-1395 regressed precisely because the dashboard path wrote the
- * spec + beads but skipped this step, so the work-agent handoff read an empty
- * `decisions` array even though the planning agent had recorded them.
- *
- * Returns the destination path, or null when the workspace has no continue file.
- */
-export function promoteContinueToProject(
-  workspacePath: string,
-  projectRoot: string,
-  issueId: string,
-): string | null {
-  const sourceContinue = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-  if (!existsSync(sourceContinue)) return null;
-  const destContinue = getContinueFilePath(projectRoot, issueId.toUpperCase());
-  mkdirSync(dirname(destContinue), { recursive: true });
-  copyFileSync(sourceContinue, destContinue);
-  return destContinue;
-}
-
 export function promoteVBriefToProposed(
   workspacePath: string,
   projectRoot: string,
@@ -476,14 +446,8 @@ export function promoteVBriefToProposed(
 
   const promoted = writeSpecForIssueSync(projectRoot, planDoc, 'proposed', canonicalFilename);
 
-  const destContinue = promoteContinueToProject(workspacePath, projectRoot, upperIssueId);
-
   invalidateVBriefIndex(projectRoot);
-  return { destVBrief: promoted.path, destContinue, canonicalFilename };
-}
-
-export function resolveContinueStateDir(projectRoot: string, _issueId: string): string {
-  return getContinuesDir(projectRoot);
+  return { destVBrief: promoted.path, destContinue: null, canonicalFilename };
 }
 
 export function readContinueStateForIssue(

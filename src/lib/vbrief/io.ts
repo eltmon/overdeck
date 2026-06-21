@@ -21,7 +21,6 @@ import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
-import { readWorkspaceContinue } from '../pan-dir/continue.js';
 import {
   getProjectConfigFromWorkspacePath,
   readIssueRecord,

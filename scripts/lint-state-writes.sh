@@ -15,9 +15,9 @@
 #
 # Legacy exceptions (known scattered state writes not yet routed to the record
 # writer; tracked for follow-up):
-#   - src/lib/pan-dir/continue.ts, continues.ts
+#   - src/lib/pan-dir/continue.ts (workspace-dir helpers only, no write functions)
 #   - src/lib/pan-dir/feedback.ts, sessions.ts
-#   - src/lib/vbrief/io.ts, continue-state.ts, lifecycle-io.ts
+#   - src/lib/vbrief/io.ts (writeWorkspaceContinueSync — workspace-local only)
 #   - src/lib/cloister/feedback-writer.ts
 set -euo pipefail
 
@@ -45,7 +45,6 @@ PAN_DIR_APPROVED=(
 )
 PAN_DIR_LEGACY=(
   ':!src/lib/pan-dir/continue.ts'
-  ':!src/lib/pan-dir/continues.ts'
   ':!src/lib/pan-dir/feedback.ts'
   ':!src/lib/pan-dir/sessions.ts'
 )
@@ -117,7 +116,6 @@ CONTINUE_EXCLUDES=(
   ':!src/lib/pan-dir/continue.ts'
   ':!src/lib/pan-dir/continues.ts'
   ':!src/lib/vbrief/io.ts'
-  ':!src/lib/vbrief/continue-state.ts'
   ':!src/lib/cloister/feedback-writer.ts'
   ':!src/**/__tests__/*'
   ':!*.md'
