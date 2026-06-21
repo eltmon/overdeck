@@ -3640,7 +3640,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   // Determine model based on role configuration
-  const selectedModel = determineModel({ model: options.model, role });
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${options.issueId}` });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
