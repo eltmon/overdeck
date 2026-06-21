@@ -289,6 +289,8 @@ describe('memory extraction worker pool', () => {
       status: 'healthy',
       last_success: '2026-05-16T22:02:00.000Z',
       last_failure: '2026-05-16T22:01:00.000Z',
+      // PAN-1866: health records carry last_failure_detail; a success clears it to null.
+      last_failure_detail: null,
       extractions_attempted: 3,
       extractions_succeeded: 1,
       failed_by_reason: { 'extraction-failed': 2 },

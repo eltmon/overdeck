@@ -9,11 +9,15 @@ clear-writing
 cliproxy
 code-review-performance
 code-review-security
+codebase-design
 conv-lookup
 crash-investigation
 dependency-update
+domain-modeling
 feature-work
 github-cli
+grilling
+improve-codebase-architecture
 incident-response
 knowledge-capture
 myn-standards
