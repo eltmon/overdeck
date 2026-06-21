@@ -18,7 +18,7 @@ import { getConversationByName } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath } from './routes/jsonl-resolver.js';
+import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
@@ -719,8 +719,23 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            const sessionFile = conv.claudeSessionId
-              ? sessionFilePath(conv.cwd, conv.claudeSessionId)
+            // Resolve the live session id from the launcher's pinned --session-id
+            // FIRST (ground truth — the exact session the running pane uses), then
+            // fall back to the conversations-table claudeSessionId. This mirrors
+            // resolveSessionFile() on the REST /messages path. Without it the live
+            // stream resolved ONLY via claudeSessionId, which the read door derives
+            // as the OLDEST conversation_files locator (`ORDER BY created_at ASC`).
+            // For a re-run singleton (e.g. the Backlog Sequencer) that oldest
+            // locator is a stale/never-written session, so the stream tailed a
+            // missing file and the panel showed the empty "How can I help you?"
+            // state even though the terminal showed the live run (PAN-1866).
+            const launcherTmuxSession = conv.tmuxSession;
+            const pinnedSessionId = launcherTmuxSession
+              ? yield* Effect.promise(() => readLauncherPinnedSessionId(launcherTmuxSession))
+              : null;
+            const resolvedSessionId = pinnedSessionId ?? conv.claudeSessionId;
+            const sessionFile = resolvedSessionId
+              ? sessionFilePath(conv.cwd, resolvedSessionId)
               : null;
             const model = conv.model ?? null;
 
