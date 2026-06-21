@@ -208,8 +208,12 @@ function buildReviewRolePrompt(opts: {
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
     '',
-    'After signaling the verdict, exit Claude Code cleanly so the tmux session ends:',
-    '  exit',
+    // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
+    // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
+    // review cycle without a cold re-spawn. Exiting before the signal command is
+    // what stranded reviews at reviewStatus=reviewing.
+    'After running the signal command above, STOP and wait — do not exit, do not run',
+    'any further commands. The session stays open for the next review cycle.',
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
@@ -277,8 +281,12 @@ function buildSelfReviewPrompt(opts: {
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
     '',
-    'After signaling the verdict, exit Claude Code cleanly so the tmux session ends:',
-    '  exit',
+    // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
+    // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
+    // review cycle without a cold re-spawn. Exiting before the signal command is
+    // what stranded reviews at reviewStatus=reviewing.
+    'After running the signal command above, STOP and wait — do not exit, do not run',
+    'any further commands. The session stays open for the next review cycle.',
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
