@@ -93,6 +93,10 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         } catch { /* issue service not ready — titles are optional */ }
 
+        // Per-issue pipeline state from the shared classifier (single source of truth)
+        // so the editor drawer can read/toggle ready / parked / vetoed / blocks-main.
+        const lookups = buildClassifyLookups(projectRoot);
+
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
           const reviewStatus = getReviewStatusSync(issueUpper);
@@ -101,6 +105,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
           const ready = specIssues.has(issueUpper) && issuesWithBeads.has(issueUpper);
+          const state = classifyIssue({ issue: r.issueId, gate: r.gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
           return {
             issueId: r.issueId,
             title: titleByIssue.get(issueUpper),
@@ -116,6 +121,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             inPipeline,
             hasPrd,
             ready,
+            state,
           };
         });
 

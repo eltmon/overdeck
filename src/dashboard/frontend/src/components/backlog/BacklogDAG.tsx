@@ -16,9 +16,21 @@ import dagre from '@dagrejs/dagre';
 
 // ── Types ──
 
+export interface PipelineState {
+  ready: boolean;
+  planned: boolean;
+  parked: boolean;
+  vetoed: boolean;
+  blocksMain: boolean;
+  inPipeline: boolean;
+  gate: 'auto' | 'promote' | 'vetoed';
+}
+
 export interface SequenceNode {
   issueId: string;
   title?: string;
+  /** PAN-2006 pipeline state from the shared classifier (editor controls). */
+  state?: PipelineState;
   rank: number;
   size: string;
   importance: string;
@@ -199,9 +211,9 @@ const PLAN_HINT: Record<string, string> = {
 
 // Pickup-gate hint shown under the segmented control (verbatim from the mockup).
 const GATE_HINT: Record<string, string> = {
-  ready: 'Promoted: eligible for auto-pickup now, even ahead of heuristics (operator or Flywheel emergency-promote).',
-  blocked: 'Held: the Flywheel will not auto-pick this.',
-  auto: 'Auto: normal eligibility (ready · not blocked · passes the security filter).',
+  ready: 'Promote: jump the queue ahead of rank (and auto-plan it if it has no spec yet).',
+  blocked: 'Vetoed: an absolute NO — never auto-picked, planned, or struck, even to unblock the pipeline.',
+  auto: 'Auto: normal eligibility (Ready · Planned · not parked · not vetoed).',
 };
 
 type FlagKind = 'pipeline' | 'refine' | 'stale' | 'ready' | 'prd' | 'none';
@@ -277,6 +289,30 @@ function SegControl({
   );
 }
 
+// PAN-2006: a labelled on/off switch for the editor drawer's pipeline-state controls.
+function ToggleRow({ label, hint, on, color, onChange }: {
+  label: string; hint: string; on: boolean; color: string; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, margin: '9px 0' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 10.5, color: 'var(--muted-foreground)', lineHeight: 1.4, marginTop: 2 }}>{hint}</div>
+      </div>
+      <button
+        onClick={() => onChange(!on)}
+        aria-pressed={on}
+        style={{
+          flexShrink: 0, width: 38, height: 22, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative',
+          background: on ? `color-mix(in srgb, ${color} 60%, transparent)` : 'var(--input)', transition: 'background 0.15s',
+        }}
+      >
+        <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }} />
+      </button>
+    </div>
+  );
+}
+
 export interface RationaleSidePanelProps {
   node: SequenceNode;
   onClose: () => void;
@@ -293,11 +329,18 @@ export function RationaleSidePanel({
   const [gate, setGate] = useState(node.gate);
   const [planning, setPlanning] = useState(node.planning);
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(!!node.state?.ready);
+  const [parked, setParked] = useState(!!node.state?.parked);
+  const [blocksMain, setBlocksMain] = useState(!!node.state?.blocksMain);
+  const planned = !!node.state?.planned;
 
   useEffect(() => {
     setGate(node.gate);
     setPlanning(node.planning);
-  }, [node.issueId, node.gate, node.planning]);
+    setReady(!!node.state?.ready);
+    setParked(!!node.state?.parked);
+    setBlocksMain(!!node.state?.blocksMain);
+  }, [node.issueId, node.gate, node.planning, node.state]);
 
   async function handleGateChange(v: string) {
     setGate(v);
@@ -309,6 +352,21 @@ export function RationaleSidePanel({
     setPlanning(v);
     setBusy(true);
     try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
+  }
+
+  // PAN-2006 WI-10: toggle ready / parked / blocks-main labels via the editor write-door.
+  async function toggleLabel(field: 'ready' | 'parked' | 'blocksMain', value: boolean) {
+    if (field === 'ready') setReady(value);
+    if (field === 'parked') setParked(value);
+    if (field === 'blocksMain') setBlocksMain(value);
+    setBusy(true);
+    try {
+      await fetch('/api/backlog/sequence/labels', {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ issueId: node.issueId, [field]: value }),
+      });
+    } finally { setBusy(false); }
   }
 
   const flags = buildPanelFlags(node);
@@ -376,6 +434,38 @@ export function RationaleSidePanel({
         </div>
       )}
 
+      {/* Pipeline state — operator controls (PAN-2006) */}
+      {node.state && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
+          <div style={SECTION_LABEL}>Pipeline state · operator controls {busy && '…'}</div>
+          <ToggleRow
+            label="Ready" color="var(--success)" on={ready}
+            hint="Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate)."
+            onChange={(v) => toggleLabel('ready', v)}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '9px 0' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 500 }}>Planned</span>
+            <span style={{
+              fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 5, border: '1px solid',
+              ...(planned
+                ? { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }
+                : { color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 34%, transparent)', background: 'color-mix(in srgb, var(--warning) 9%, transparent)' }),
+            }}>{planned ? '✓ has spec + beads' : '✗ no spec'}</span>
+            <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>derived</span>
+          </div>
+          <ToggleRow
+            label="Blocks main 🔴" color="var(--destructive)" on={blocksMain}
+            hint="Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed)."
+            onChange={(v) => toggleLabel('blocksMain', v)}
+          />
+          <ToggleRow
+            label="Park" color="var(--warning)" on={parked}
+            hint="Defer — needs human design/discussion; excluded from auto-pickup, reversible."
+            onChange={(v) => toggleLabel('parked', v)}
+          />
+        </div>
+      )}
+
       {/* Planning policy */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
         <div style={SECTION_LABEL}>Planning · AI-suggested, operator-overridable</div>
@@ -398,8 +488,8 @@ export function RationaleSidePanel({
           value={gate}
           options={[
             { value: 'auto', label: 'Auto' },
-            { value: 'ready', label: '✓ Ready', activeColor: '#15803d' },
-            { value: 'blocked', label: '⛔ Block', activeColor: '#b91c1c' },
+            { value: 'ready', label: '📌 Promote', activeColor: '#15803d' },
+            { value: 'blocked', label: '⛔ Vetoed', activeColor: '#b91c1c' },
           ]}
           onChange={handleGateChange}
         />
