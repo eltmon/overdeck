@@ -4,17 +4,17 @@
     "created": "2026-06-21T00:16:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (finish the cutover; retire the dual continues + state.json harness/model source)",
-    "updated": "2026-06-21T04:44:07.762Z"
+    "updated": "2026-06-21T04:44:08.056Z"
   },
   "plan": {
     "id": "pan-1919",
     "title": "Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
-    "status": "approved",
+    "status": "running",
     "uid": "9b8d08bc-a41d-437e-97fd-d60bce8189e2",
     "author": "agent:claude-opus-4-8",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-06-21T00:16:50Z",
-    "updated": "2026-06-21T04:44:07.762Z",
+    "updated": "2026-06-21T04:44:08.056Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1919",
