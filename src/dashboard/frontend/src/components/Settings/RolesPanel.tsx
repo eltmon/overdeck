@@ -7,6 +7,8 @@ import { PROVIDER_BRANDS } from '../shared/branding';
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
+interface WeightedModelRef { model: ModelRef; weight: number; }
+type RoleModelRef = ModelRef | WeightedModelRef[];
 type Harness = 'claude-code' | 'pi' | 'codex';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
@@ -16,7 +18,7 @@ interface RoleSubConfig {
 }
 
 interface RoleConfig {
-  model?: ModelRef;
+  model?: RoleModelRef;
   harness?: Harness;
   effort?: Effort;
   maxAgents?: number;
@@ -26,7 +28,7 @@ interface RoleConfig {
 
 type RolesConfig = Partial<Record<RoleId, RoleConfig>>;
 type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
-type RoleConfigPatch = Omit<RoleConfig, 'harness'> & { harness?: Harness | null };
+type RoleConfigPatch = Omit<RoleConfig, 'harness' | 'model'> & { harness?: Harness | null; model?: RoleModelRef; };
 type RolesConfigPayload = Partial<Record<RoleId, RoleConfigPatch>>;
 
 interface SettingsResponse {
@@ -173,8 +175,16 @@ async function fetchClaudeAuth(): Promise<ClaudeAuthStatus> {
   return res.json();
 }
 
-function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): ModelRef {
+function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): RoleModelRef {
   return settings?.roles?.[role.id]?.model ?? role.defaultModel;
+}
+
+function distributionSummaryText(entries: WeightedModelRef[]): string {
+  const total = entries.reduce((sum, e) => sum + e.weight, 0);
+  if (total === 0) return 'distribution';
+  return entries
+    .map((e) => `${Math.round((e.weight / total) * 100)}% ${e.model}`)
+    .join(' / ');
 }
 
 function getSubRoleModel(
@@ -452,7 +462,9 @@ export function RolesPanel() {
         <div className="space-y-3">
           {ROLES.map((role) => {
             const roleModel = getRoleModel(settings, role);
-            const tooltip = modelRefTooltip(roleModel, workhorses);
+            const isDistribution = Array.isArray(roleModel);
+            const scalarRoleModel = isDistribution ? undefined : roleModel as ModelRef;
+            const tooltip = scalarRoleModel ? modelRefTooltip(scalarRoleModel, workhorses) : undefined;
             const isExpanded = !!expandedRoles[role.id];
             const canExpand = !!role.subRoles?.length;
             const flywheelConfig = role.id === 'flywheel' ? getFlywheelConfig(settings) : null;
@@ -471,7 +483,9 @@ export function RolesPanel() {
                           className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                           title={tooltip}
                         >
-                          Default: {displayModelRef(roleModel)}
+                          {isDistribution
+                            ? `Distribution: ${distributionSummaryText(roleModel as WeightedModelRef[])}`
+                            : `Default: ${displayModelRef(scalarRoleModel!)}`}
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-snug text-muted-foreground">{role.description}</p>
@@ -494,16 +508,25 @@ export function RolesPanel() {
                   </div>
                   <div className="md:w-80">
                     <div className="space-y-3">
-                      <ModelPicker
-                        label={`${role.name} model`}
-                        value={roleModel}
-                        workhorses={workhorses}
-                        providerGroups={providerGroups}
-                        providers={settings?.models?.providers}
-                        claudeAuth={claudeAuthQuery.data}
-                        disabled={saveMutation.isPending}
-                        onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
-                      />
+                      {isDistribution ? (
+                        <div
+                          className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+                          data-testid="distribution-summary"
+                        >
+                          {distributionSummaryText(roleModel as WeightedModelRef[])}
+                        </div>
+                      ) : (
+                        <ModelPicker
+                          label={`${role.name} model`}
+                          value={scalarRoleModel!}
+                          workhorses={workhorses}
+                          providerGroups={providerGroups}
+                          providers={settings?.models?.providers}
+                          claudeAuth={claudeAuthQuery.data}
+                          disabled={saveMutation.isPending}
+                          onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
