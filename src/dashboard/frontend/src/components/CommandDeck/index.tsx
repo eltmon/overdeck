@@ -597,14 +597,27 @@ export function CommandDeck({
   // and popstate — select the project and open (or focus) the issue's cockpit tab.
   useEffect(() => {
     if (!cockpitIssue) return;
+    // Wait until deck keys are loaded so the project segment normalizes correctly
+    // on the FIRST apply (else we'd lock onto the raw repo key and never re-resolve).
+    if (registeredProjects.length === 0) return;
     const key = `${cockpitIssue.project}/${cockpitIssue.issue}`;
     if (key === appliedCockpit.current) return;
     appliedCockpit.current = key;
+    // Normalize the URL's project segment to a real dashboard deck key — a stale
+    // or hand-built link may carry the tracker repo ("eltmon/panopticon-cli")
+    // instead of the deck key ("panopticon-cli"); the sync effect then self-corrects
+    // the URL once the feature is selected.
+    const seg = cockpitIssue.project;
+    const tail = seg.includes('/') ? seg.split('/').pop()! : seg;
+    const rp = registeredProjects.find(
+      (p) => p.key === seg || p.name === seg || p.key === tail || p.name === tail,
+    );
+    const deckKey = rp ? (rp.name ?? rp.key) : seg;
     setSelectedFeature(cockpitIssue.issue);
     setSelectedConversation(null);
-    onSelectProject?.(cockpitIssue.project);
-    openIssueTabIn(cockpitIssue.project, cockpitIssue.issue, cockpitIssue.issue);
-  }, [cockpitIssue, onSelectProject, openIssueTabIn]);
+    onSelectProject?.(deckKey);
+    openIssueTabIn(deckKey, cockpitIssue.issue, cockpitIssue.issue);
+  }, [cockpitIssue, onSelectProject, openIssueTabIn, registeredProjects]);
 
   // PAN-2005: sync the URL when the selected issue changes (tree click, etc.).
   // Defined after the conversation-route sync above so the issue path wins when
@@ -615,7 +628,6 @@ export function CommandDeck({
     if (selectedFeature === prevFeatureRef.current) return;
     prevFeatureRef.current = selectedFeature;
     if (selectedFeature && selectedProject) {
-      appliedCockpit.current = `${selectedProject}/${selectedFeature}`;
       onCockpitChange(selectedProject, selectedFeature);
     }
   }, [selectedFeature, selectedProject, onCockpitChange]);

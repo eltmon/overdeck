@@ -1394,6 +1394,29 @@ export default function App() {
     openIssue(issueId);
   }, [openIssue, setActiveTab]);
 
+  // Registered projects (deck keys) — shared cache with CommandDeck. Used to map an
+  // issue's tracker repo (e.g. "eltmon/panopticon-cli") to the dashboard deck key
+  // (e.g. "panopticon-cli") so the cockpit opens in the deck whose conversations/tree
+  // actually match (PAN-2005).
+  const { data: registeredProjects = [] } = useQuery<Array<{ key: string; name: string; path: string }>>({
+    queryKey: ['registered-projects'],
+    queryFn: async () => {
+      const r = await fetch('/api/registered-projects');
+      if (!r.ok) throw new Error('Failed to fetch registered projects');
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+  const resolveDeckKey = useCallback((issueId: string): string | null => {
+    const issue = issues.find((i) => i.identifier === issueId);
+    const repo = issue?.sourceRepo || issue?.project?.name || '';
+    const repoName = repo.includes('/') ? repo.split('/').pop()! : repo;
+    const rp = registeredProjects.find(
+      (p) => p.key === repoName || p.name === repoName || p.key === repo || p.name === repo,
+    );
+    return rp ? (rp.name ?? rp.key) : (selectedProjectKey ?? null);
+  }, [issues, registeredProjects, selectedProjectKey]);
+
   // PAN-2005: three ways to open an issue from the backlog detail drawer.
   //   browser → the tracker (GitHub) issue page in a new tab
   //   modal   → the right-side issue overlay (IssueDrawer; already URL-synced via ?issue=)
@@ -1415,9 +1438,10 @@ export default function App() {
       openIssue(issueId);
       return;
     }
-    // panel: resolve the issue's deck and open its cockpit tab; fall back to the
+    // panel: resolve the issue's dashboard deck key (NOT the tracker repo) so the
+    // cockpit opens in the deck whose conversations/tree match; fall back to the
     // overlay if we can't resolve a project key.
-    const projectKey = issue?.project?.name ?? selectedProjectKey;
+    const projectKey = resolveDeckKey(issueId);
     if (!projectKey) {
       openIssue(issueId);
       return;
@@ -1425,7 +1449,7 @@ export default function App() {
     setActiveTab('command-deck');
     setCockpitRouteState({ project: projectKey, issue: issueId });
     onCockpitChange(projectKey, issueId);
-  }, [issues, openIssue, selectedProjectKey, setActiveTab, onCockpitChange]);
+  }, [issues, openIssue, resolveDeckKey, setActiveTab, onCockpitChange]);
 
   const handleOpenWorkspaceHome = useCallback((issueId: string) => {
     setActiveTab('kanban');
