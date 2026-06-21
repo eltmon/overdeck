@@ -4,7 +4,7 @@ import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
-import { VETOED_LABEL } from './backlog/pickup.js';
+import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -246,9 +246,6 @@ export interface SequencePickResult {
   planning: string;
 }
 
-// PAN-2006: `parked` is the unified defer label; needs-design/needs-discussion are
-// honored as legacy aliases until migrated.
-const PARKED_LABELS = new Set(['parked', 'needs-design', 'needs-discussion']);
 
 /**
  * PAN-1866: Pick the highest-ranked eligible issue from a sequence node list.
@@ -279,24 +276,34 @@ export function pickFromSequence(
      *  state. Return true to treat an issue as in-pipeline and skip it. When absent only
      *  review_status is checked (backward-compatible default). */
     isInPipeline?: (issueId: string) => boolean;
+    /** PAN-2006 Definition of Ready: when true, only issues carrying the `ready`
+     *  label are eligible (the hard entry gate). The live Flywheel passes true;
+     *  legacy callers omit it and keep their pre-DoR behavior. */
+    requireReady?: boolean;
   },
 ): SequencePickResult | null {
+  // Single source of truth: the same classifier the Forecast UI uses (PAN-2006).
+  // `isReadyOrHasPrd` maps to the module's `planned` gate; review_status + the
+  // optional callback feed the `inPipeline` gate; vetoed / parked / gate-blocked are
+  // derived from labels + the node's gate inside classifyIssue.
+  const lookups: ClassifyLookups = {
+    labels: opts?.issueLabels ?? (() => []),
+    isPlanned: opts?.isReadyOrHasPrd ?? (() => true),
+    isInPipeline: (issueId) => {
+      const reviewStatus = getReviewStatusSync(issueId.toUpperCase());
+      return (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
+        (opts?.isInPipeline?.(issueId) ?? false);
+    },
+  };
+
   const sorted = [...nodes].sort((a, b) => a.rank - b.rank);
   for (const node of sorted) {
-    if (node.gate === 'blocked') continue;
-    const reviewStatus = getReviewStatusSync(node.issue.toUpperCase());
-    const inPipeline =
-      (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
-      (opts?.isInPipeline?.(node.issue) ?? false);
-    if (inPipeline) continue;
+    const state = classifyIssue(node, lookups);
+    // DoR is conditional: when not required, treat readiness as satisfied so the
+    // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
+    if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true })) continue;
     if (opts?.excludeIssueIds?.has(node.issue)) continue;
-    const labels = opts?.issueLabels?.(node.issue) ?? [];
-    // PAN-2006: the `vetoed` label is an absolute "never pick up" — same hard stop
-    // as gate=blocked, and it overrides even the pipeline-unblock path elsewhere.
-    if (labels.some((l) => l.toLowerCase() === VETOED_LABEL)) continue;
-    if (labels.some((l) => PARKED_LABELS.has(l.toLowerCase()))) continue;
     if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) continue;
-    if (opts?.isReadyOrHasPrd && !opts.isReadyOrHasPrd(node.issue)) continue;
     return { issueId: node.issue, rank: node.rank, gate: node.gate, planning: node.planning };
   }
   return null;

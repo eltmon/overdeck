@@ -166,3 +166,28 @@ describe('pickFromSequence – vetoed / parked label gates (PAN-2006)', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('pickFromSequence – Definition of Ready gate (PAN-2006, requireReady)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('with requireReady, skips an unlabelled rank-1 and picks the rank-2 that is `ready`', () => {
+    const nodes = [makeNode('PAN-NOTREADY', 1), makeNode('PAN-READY', 2)];
+    const result = pickFromSequence(nodes, {
+      requireReady: true,
+      issueLabels: (id) => (id === 'PAN-READY' ? ['ready'] : []),
+    });
+    expect(result?.issueId).toBe('PAN-READY');
+  });
+
+  it('with requireReady and nothing marked ready, returns null', () => {
+    const nodes = [makeNode('PAN-1', 1), makeNode('PAN-2', 2)];
+    const result = pickFromSequence(nodes, { requireReady: true, issueLabels: () => [] });
+    expect(result).toBeNull();
+  });
+
+  it('without requireReady (legacy), an unlabelled rank-1 is still picked', () => {
+    const nodes = [makeNode('PAN-1', 1)];
+    const result = pickFromSequence(nodes, { issueLabels: () => [] });
+    expect(result?.issueId).toBe('PAN-1');
+  });
+});
