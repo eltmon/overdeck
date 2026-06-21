@@ -3,6 +3,7 @@ import {
   fnv1a32,
   pickWeightedModelRef,
   representativeModelRef,
+  resolveModel,
 } from '../../src/lib/config-yaml.js';
 
 describe('fnv1a32', () => {
@@ -108,5 +109,78 @@ describe('representativeModelRef', () => {
 
   it('returns the sole entry when only one entry exists', () => {
     expect(representativeModelRef([{ model: 'only', weight: 100 }])).toBe('only');
+  });
+});
+
+describe('resolveModel with distribution (RoleModelRef array)', () => {
+  const workhorses = {
+    expensive: 'claude-opus-4-8',
+    mid: 'claude-sonnet-4-6',
+    cheap: 'claude-haiku-4-5',
+  };
+
+  const distConfig = {
+    workhorses,
+    roles: {
+      work: {
+        model: [
+          { model: 'claude-opus-4-8', weight: 70 },
+          { model: 'claude-sonnet-4-6', weight: 30 },
+        ],
+        sub: {
+          inspect: { model: 'workhorse:cheap' },
+        },
+      },
+    },
+  } as Parameters<typeof resolveModel>[2];
+
+  it('samples the distribution by spawnKey', () => {
+    const result = resolveModel('work', undefined, distConfig, 'issue:pan-1832');
+    expect(['claude-opus-4-8', 'claude-sonnet-4-6']).toContain(result);
+  });
+
+  it('is deterministic: same spawnKey always returns same model', () => {
+    const key = 'issue:pan-1832';
+    expect(resolveModel('work', undefined, distConfig, key)).toBe(
+      resolveModel('work', undefined, distConfig, key),
+    );
+  });
+
+  it('without spawnKey returns the representative (highest-weight) model', () => {
+    expect(resolveModel('work', undefined, distConfig)).toBe('claude-opus-4-8');
+  });
+
+  it('sub-role takes precedence over parent distribution even with a spawnKey', () => {
+    expect(resolveModel('work', 'inspect', distConfig, 'any-key')).toBe('claude-haiku-4-5');
+  });
+
+  it('resolves a workhorse ref inside a distribution entry', () => {
+    const workhorseDist = {
+      workhorses,
+      roles: {
+        work: {
+          model: [
+            { model: 'workhorse:mid', weight: 60 },
+            { model: 'workhorse:expensive', weight: 40 },
+          ],
+        },
+      },
+    } as Parameters<typeof resolveModel>[2];
+    const result = resolveModel('work', undefined, workhorseDist, 'some-key');
+    expect(['claude-sonnet-4-6', 'claude-opus-4-8']).toContain(result);
+  });
+
+  it('scalar role model resolves identically with or without spawnKey (back-compat)', () => {
+    const scalarConfig = {
+      workhorses,
+      roles: { work: { model: 'claude-sonnet-4-6' } },
+    } as Parameters<typeof resolveModel>[2];
+    expect(resolveModel('work', undefined, scalarConfig)).toBe('claude-sonnet-4-6');
+    expect(resolveModel('work', undefined, scalarConfig, 'any-key')).toBe('claude-sonnet-4-6');
+  });
+
+  it('default model resolves when no role config is set', () => {
+    const result = resolveModel('plan', undefined, { workhorses });
+    expect(result).toBe('claude-opus-4-8'); // workhorse:expensive
   });
 });

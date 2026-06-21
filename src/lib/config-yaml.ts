@@ -1694,21 +1694,29 @@ export function resolveModel(
   role: Role,
   subRole?: string,
   config: Pick<NormalizedConfig, 'roles' | 'workhorses'> = {},
+  spawnKey?: string,
 ): ModelId {
   const roleConfig = config.roles?.[role];
   const rawSubModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
   const subModel = rawSubModel === PARENT_MODEL_REF ? undefined : rawSubModel;
   const roleModel = roleConfig?.model;
-  // Array form (distribution) is handled by the resolve-sampling bead (spawnKey path).
-  // Without a spawnKey, fall through to the default so scalar behaviour is unchanged.
-  const scalarRoleModel: ModelRef | undefined = Array.isArray(roleModel) ? undefined : roleModel;
-  const ref = subModel ?? scalarRoleModel ?? DEFAULT_MODEL_REFS[role];
-  const fieldPath = subModel
-    ? `roles.${role}.sub.${subRole}.model`
-    : scalarRoleModel
-      ? `roles.${role}.model`
-      : `defaults.${role}.model`;
-  return derefWorkhorse(ref, config, fieldPath);
+
+  // Sub-role model takes precedence; never sample the parent distribution for a sub-role.
+  if (subModel) {
+    const fieldPath = `roles.${role}.sub.${subRole}.model`;
+    return derefWorkhorse(subModel, config, fieldPath);
+  }
+
+  if (Array.isArray(roleModel)) {
+    const picked = spawnKey
+      ? pickWeightedModelRef(roleModel, spawnKey)
+      : representativeModelRef(roleModel);
+    return derefWorkhorse(picked, config, `roles.${role}.model`);
+  }
+
+  const scalarRef = roleModel ?? DEFAULT_MODEL_REFS[role];
+  const fieldPath = roleModel ? `roles.${role}.model` : `defaults.${role}.model`;
+  return derefWorkhorse(scalarRef, config, fieldPath);
 }
 
 function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
