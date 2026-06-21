@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pickup Forecast — full UI mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../../design/style-guide/mockups/_shared.css" />
+<style>
+  body { margin:0; font-family:"DM Sans",system-ui,sans-serif; background:color-mix(in srgb,var(--background) 80%,#000); color:var(--foreground); }
+  .stage { max-width:1500px; margin:0 auto; padding:24px 22px 90px; }
+  .caption { font-family:"Space Grotesk",sans-serif; font-size:13px; color:var(--muted-foreground); margin:26px 6px 8px; display:flex; gap:8px; align-items:center; }
+  .caption b { color:var(--foreground); font-weight:600; }
+  .caption .pin { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--info-foreground); border:1px solid color-mix(in srgb,var(--info) 30%,transparent); background:color-mix(in srgb,var(--info) 8%,transparent); border-radius:5px; padding:2px 7px; }
+
+  /* ── app frame ── */
+  .frame { border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.4); background:var(--background); }
+  .app { display:flex; height:830px; }
+  .rail { width:52px; flex:0 0 auto; background:color-mix(in srgb,var(--background) 96%,#000); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding:12px 0; gap:6px; }
+  .rail .mark { color:var(--primary); margin-bottom:8px; }
+  .rail .nav { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); }
+  .rail .nav.active { background:var(--accent); color:var(--foreground); }
+  .rail svg { width:18px; height:18px; }
+
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .head { padding:16px 22px 12px; border-bottom:1px solid var(--border); }
+  .head .top { display:flex; align-items:flex-start; gap:16px; }
+  .head h1 { font-family:"Space Grotesk",sans-serif; font-size:21px; font-weight:600; margin:0; }
+  .head .sub { font-size:12px; color:var(--muted-foreground); margin-top:3px; }
+  .head .controls { margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .vtoggle { display:flex; border:1px solid var(--input); border-radius:9px; overflow:hidden; }
+  .vtoggle button { background:transparent; border:none; color:var(--muted-foreground); font:inherit; font-size:12px; font-weight:500; padding:7px 13px; cursor:pointer; }
+  .vtoggle button.on { background:var(--accent); color:var(--foreground); }
+  .agents { display:inline-flex; align-items:center; gap:7px; height:33px; padding:0 11px; border:1px solid var(--input); border-radius:9px; font-size:12px; color:var(--muted-foreground); }
+  .agents b { color:var(--foreground); font-family:"SF Mono",monospace; }
+  .agents .hint { font-size:9px; color:var(--muted-foreground); opacity:.8; }
+  .btn-p { display:inline-flex; align-items:center; gap:6px; height:33px; padding:0 13px; border-radius:9px; border:1px solid color-mix(in srgb,var(--primary) 50%,transparent); background:color-mix(in srgb,var(--primary) 18%,transparent); color:var(--foreground); font-size:12px; font-weight:600; cursor:pointer; }
+  .stats { display:flex; gap:7px; margin-top:13px; flex-wrap:wrap; }
+  .st { display:flex; align-items:baseline; gap:6px; padding:6px 11px; border:1px solid var(--border); border-radius:8px; background:var(--card); font-size:11.5px; color:var(--muted-foreground); }
+  .st b { font-family:"SF Mono",monospace; font-size:14px; font-weight:600; color:var(--foreground); }
+  .st.live b{ color:var(--info-foreground);} .st.go b{ color:var(--success-foreground);} .st.warn b{ color:var(--warning-foreground);}
+
+  .body { flex:1; display:flex; min-height:0; }
+  .forecast { flex:1; min-width:0; padding:16px 20px; overflow:auto; background:radial-gradient(circle at 1px 1px, color-mix(in srgb,var(--muted-foreground) 12%,transparent) 1px, transparent 0); background-size:22px 22px; }
+  .sub-tabs { display:flex; gap:6px; margin-bottom:14px; }
+  .sub-tabs button { background:transparent; border:1px solid var(--input); border-radius:8px; color:var(--muted-foreground); font:inherit; font-size:11px; font-weight:500; padding:5px 11px; cursor:pointer; }
+  .sub-tabs button.on { background:var(--accent); color:var(--foreground); }
+
+  /* waves */
+  .waves { display:flex; align-items:flex-start; gap:0; }
+  .wcol { width:200px; flex:0 0 auto; }
+  .wh { font-size:10.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted-foreground); margin-bottom:9px; display:flex; gap:7px; align-items:center; }
+  .wh .c { font-family:"SF Mono",monospace; color:var(--foreground); font-weight:700; }
+  .wcol.now .wh { color:var(--info-foreground); }
+  .wstack { display:flex; flex-direction:column; gap:8px; }
+  .warr { width:38px; flex:0 0 auto; align-self:center; padding-top:54px; color:color-mix(in srgb,var(--muted-foreground) 70%,transparent); display:flex; justify-content:center; }
+  .warr svg{ width:24px; height:24px; }
+
+  .fc { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:5px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+  .fc:hover{ box-shadow:0 5px 16px rgba(0,0,0,.4); transform:translateY(-1px); }
+  .fc.crit{--heat:var(--destructive);} .fc.high{--heat:var(--warning);} .fc.medium{--heat:color-mix(in srgb,var(--color-neutral-400) 80%,transparent);}
+  .fc.pipe{ box-shadow:0 0 0 1.5px var(--info),0 0 12px color-mix(in srgb,var(--info) 40%,transparent); animation:rp 2.6s ease-in-out infinite;}
+  @keyframes rp{0%,100%{box-shadow:0 0 0 1.5px var(--info),0 0 9px color-mix(in srgb,var(--info) 30%,transparent);}50%{box-shadow:0 0 0 1.5px var(--info),0 0 18px color-mix(in srgb,var(--info) 55%,transparent);}}
+  .fr1{ display:flex; align-items:center; gap:6px; }
+  .rk{ font-family:"SF Mono",monospace; font-size:10px; font-weight:600; background:var(--accent); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
+  .iid{ font-family:"SF Mono",monospace; font-size:10px; color:var(--muted-foreground); }
+  .sz{ margin-left:auto; font-size:8.5px; font-weight:600; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
+  .ftt{ font-size:11px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .chips{ display:flex; gap:4px; flex-wrap:wrap; }
+  .chip{ font-size:8.5px; font-weight:600; padding:1px 5px; border-radius:4px; border:1px solid; }
+  .chip.prd{ color:var(--muted-foreground); border-color:var(--border); background:var(--accent);}
+  .chip.run{ color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 9%,transparent); display:inline-flex; gap:3px; align-items:center;}
+  .dot{ width:5px; height:5px; border-radius:50%; background:currentColor; animation:bl 1.4s infinite;} @keyframes bl{0%,100%{opacity:1}50%{opacity:.3}}
+
+  /* plan-next rail */
+  .planrail { width:380px; flex:0 0 auto; border-left:1px solid var(--border); background:color-mix(in srgb,var(--background) 97%,#000); display:flex; flex-direction:column; }
+  .pr-h { padding:15px 16px 12px; border-bottom:1px solid var(--border); }
+  .pr-h .t { font-family:"Space Grotesk",sans-serif; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .pr-h .t .bolt { color:var(--warning-foreground); }
+  .pr-h .d { font-size:11.5px; color:var(--muted-foreground); line-height:1.5; margin-top:5px; }
+  .pr-list { padding:10px 12px; overflow:auto; display:flex; flex-direction:column; gap:9px; }
+  .psug { border:1px solid var(--border); border-left:4px solid var(--destructive); border-radius:10px; background:var(--card); padding:10px 11px; display:flex; flex-direction:column; gap:7px; cursor:pointer; }
+  .psug:hover { border-color:color-mix(in srgb,var(--primary) 40%,transparent); }
+  .psug.high { border-left-color:var(--warning); }
+  .ps-top { display:flex; align-items:center; gap:7px; }
+  .ps-imp { font-size:8.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--destructive-foreground); }
+  .psug.high .ps-imp { color:var(--warning-foreground); }
+  .ps-open { margin-left:auto; color:var(--muted-foreground); display:flex; }
+  .ps-open svg{ width:14px; height:14px; }
+  .ps-tt { font-size:12px; font-weight:500; line-height:1.34; }
+  .ps-why { font-size:10.5px; color:var(--muted-foreground); line-height:1.4; }
+  .ps-why .red { color:var(--destructive-foreground); font-weight:600; }
+  .ps-act { display:flex; gap:7px; margin-top:1px; }
+  .b-auto { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; height:30px; border-radius:8px; border:1px solid color-mix(in srgb,var(--primary) 55%,transparent); background:color-mix(in srgb,var(--primary) 20%,transparent); color:var(--foreground); font-size:11.5px; font-weight:600; cursor:pointer; }
+  .b-plan { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; height:30px; border-radius:8px; border:1px solid var(--input); background:transparent; color:var(--muted-foreground); font-size:11.5px; font-weight:500; cursor:pointer; }
+  .pr-foot { margin-top:auto; padding:11px 14px; border-top:1px solid var(--border); font-size:10.5px; color:var(--muted-foreground); line-height:1.5; }
+  .pr-foot code{ background:var(--accent); padding:0 4px; border-radius:3px; }
+
+  /* detail drawer (frame 2) */
+  .drawer { width:560px; margin:0 auto; border:1px solid var(--border); border-radius:14px; background:var(--card); box-shadow:0 18px 50px rgba(0,0,0,.4); overflow:hidden; }
+  .dw-h { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .dw-h .ey { font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted-foreground); }
+  .dw-h .x { margin-left:auto; color:var(--muted-foreground); cursor:pointer; }
+  .dw-b { padding:18px; }
+  .dw-id { font-family:"SF Mono",monospace; font-size:12px; color:var(--muted-foreground); }
+  .dw-t { font-size:17px; font-weight:600; line-height:1.35; margin:3px 0 16px; }
+  .meta { display:grid; grid-template-columns:auto 1fr; gap:8px 16px; font-size:12.5px; margin-bottom:14px; }
+  .meta .k{ color:var(--muted-foreground);} .meta .v{ text-align:right; color:var(--foreground);}
+  .heat{ display:inline-flex; align-items:center; gap:6px;} .heat .sw{ width:10px; height:10px; border-radius:3px; background:var(--destructive);}
+  .bar{ height:5px; border-radius:3px; background:var(--accent); overflow:hidden; margin:-6px 0 14px;} .bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--warning),var(--destructive));}
+  .flags{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;}
+  .actbar{ display:flex; gap:9px; padding:14px 0 4px; border-top:1px solid var(--border); }
+  .actbar .b-auto, .actbar .b-plan { height:38px; font-size:13px; }
+  .b-open { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:38px; padding:0 14px; border-radius:9px; border:1px solid var(--input); background:transparent; color:var(--muted-foreground); font-size:12.5px; cursor:pointer; }
+  .rat{ font-size:12.5px; line-height:1.6; color:color-mix(in srgb,var(--foreground) 88%,transparent); border-top:1px solid var(--border); padding-top:13px; margin-top:14px;}
+  .rat .lbl{ font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted-foreground); margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="caption"><span class="pin">screen 1</span> <b>Backlog Sequencer · Pickup Forecast</b> — the main view: pickup waves on the left, "Plan next" suggestions with one-click actions on the right.</div>
+  <div class="frame"><div class="app">
+    <nav class="rail">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></div>
+      <div class="nav active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8.5 6.5 15.5 11M8.5 17.5 15.5 13"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10.5" y="3" width="6" height="12" rx="1"/><rect x="18" y="3" width="3" height="8" rx="1"/></svg></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+    </nav>
+    <div class="main">
+      <div class="head">
+        <div class="top">
+          <div>
+            <h1>Backlog Sequencer</h1>
+            <div class="sub">544 open · ranked for pickup · sequence regenerated 2h ago (claude-opus-4-8)</div>
+          </div>
+          <div class="controls">
+            <div class="vtoggle"><button>Dependency</button><button class="on">Pickup Forecast</button></div>
+            <div class="agents">⚙ <b>5</b> agents <span class="hint">= maxAgents ▾</span></div>
+            <button class="btn-p"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Re-sequence</button>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="st live"><b>7</b> in flight</div>
+          <div class="st go"><b>9</b> ready to pick</div>
+          <div class="st warn"><b>528</b> need planning</div>
+          <div class="st"><b>0</b> blocked</div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="forecast">
+          <div class="sub-tabs"><button class="on">Waves</button><button>Lanes</button></div>
+          <div class="waves">
+            <div class="wcol now">
+              <div class="wh">▶ Running now <span class="c">3</span></div>
+              <div class="wstack">
+                <div class="fc crit pipe"><div class="fr1"><span class="rk">#1</span><span class="iid">PAN-1908</span><span class="sz">XL</span></div><div class="ftt">Event-driven agent state — SQLite registry</div><div class="chips"><span class="chip run"><span class="dot"></span>in flight</span></div></div>
+                <div class="fc crit pipe"><div class="fr1"><span class="rk">#2</span><span class="iid">PAN-1866</span><span class="sz">XL</span></div><div class="ftt">Backlog Sequencer — whole-backlog DAG</div><div class="chips"><span class="chip run"><span class="dot"></span>in flight</span></div></div>
+                <div class="fc crit pipe"><div class="fr1"><span class="rk">#3</span><span class="iid">PAN-1919</span><span class="sz">L</span></div><div class="ftt">Consolidate per-issue resume state</div><div class="chips"><span class="chip run"><span class="dot"></span>in flight</span></div></div>
+              </div>
+            </div>
+            <div class="warr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+            <div class="wcol">
+              <div class="wh">Wave <span class="c">1</span></div>
+              <div class="wstack">
+                <div class="fc high"><div class="fr1"><span class="rk">#16</span><span class="iid">PAN-1918</span><span class="sz">M</span></div><div class="ftt">vitest suite runs in no CI path</div><div class="chips"><span class="chip prd">PRD</span></div></div>
+                <div class="fc medium"><div class="fr1"><span class="rk">#73</span><span class="iid">PAN-1862</span><span class="sz">L</span></div><div class="ftt">cache-sharing review convoy</div><div class="chips"><span class="chip prd">PRD</span></div></div>
+                <div class="fc medium"><div class="fr1"><span class="rk">#267</span><span class="iid">PAN-1533</span><span class="sz">M</span></div><div class="ftt">fork-into-worktree from branch chip</div><div class="chips"><span class="chip prd">PRD</span></div></div>
+              </div>
+            </div>
+            <div class="warr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+            <div class="wcol">
+              <div class="wh">Wave <span class="c">2</span></div>
+              <div class="wstack">
+                <div class="fc medium"><div class="fr1"><span class="rk">#268</span><span class="iid">PAN-1696</span><span class="sz">M</span></div><div class="ftt">decouple merge-train from Flywheel</div><div class="chips"><span class="chip prd">PRD</span></div></div>
+                <div class="fc medium"><div class="fr1"><span class="rk">#297</span><span class="iid">PAN-1852</span><span class="sz">M</span></div><div class="ftt">capability-tiered work-agent model</div><div class="chips"><span class="chip prd">PRD</span></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px; font-size:11px; color:var(--muted-foreground); border-top:1px dashed var(--border); padding-top:12px; max-width:640px; line-height:1.5">
+            Only <b style="color:var(--warning-foreground)">9 issues</b> are auto-pickable. The Flywheel will work through these waves of 5 — but your top-ranked criticals aren't here. They're in <b>Plan next →</b>.
+          </div>
+        </div>
+
+        <aside class="planrail">
+          <div class="pr-h">
+            <div class="t"><span class="bolt">⚡</span> Plan next — highest leverage</div>
+            <div class="d">These top-ranked issues are <b>skipped by auto-pickup</b> — they have no spec. Planning one moves it into Wave 1 and reorders the forecast. Sorted by rank × importance.</div>
+          </div>
+          <div class="pr-list">
+            <div class="psug">
+              <div class="ps-top"><span class="rk">#7</span><span class="iid">PAN-2000</span><span class="ps-imp">critical</span><span class="ps-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg></span></div>
+              <div class="ps-tt">RED MAIN — spawn-sequencer stale assertion + worker-pool health</div>
+              <div class="ps-why"><span class="red">● red main</span> · #7 critical, no spec → auto-pickup skips it</div>
+              <div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div>
+            </div>
+            <div class="psug">
+              <div class="ps-top"><span class="rk">#8</span><span class="iid">PAN-1903</span><span class="ps-imp">critical</span><span class="ps-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg></span></div>
+              <div class="ps-tt">RED MAIN — create-beads flaky "table not found: issues"</div>
+              <div class="ps-why"><span class="red">● red main</span> · #8 critical, no spec → auto-pickup skips it</div>
+              <div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div>
+            </div>
+            <div class="psug">
+              <div class="ps-top"><span class="rk">#9</span><span class="iid">PAN-1880</span><span class="ps-imp">critical</span><span class="ps-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg></span></div>
+              <div class="ps-tt">RED MAIN — start-sync-main-conflict hits process.exit(1)</div>
+              <div class="ps-why"><span class="red">● red main</span> · #9 critical, no spec → auto-pickup skips it</div>
+              <div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div>
+            </div>
+            <div class="psug">
+              <div class="ps-top"><span class="rk">#10</span><span class="iid">PAN-1859</span><span class="ps-imp">critical</span><span class="ps-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg></span></div>
+              <div class="ps-tt">RED MAIN — agent-spawning resumeAgent continuation</div>
+              <div class="ps-why"><span class="red">● red main</span> · #10 critical, no spec → auto-pickup skips it</div>
+              <div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div>
+            </div>
+            <div class="psug high">
+              <div class="ps-top"><span class="rk">#13</span><span class="iid">PAN-1783</span><span class="ps-imp">high</span><span class="ps-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg></span></div>
+              <div class="ps-tt">RED MAIN — Command Deck resource-strip Playwright fixture</div>
+              <div class="ps-why"><span class="red">● red main</span> · #13 high, no spec → auto-pickup skips it</div>
+              <div class="ps-act"><button class="b-auto">⚡ Auto-plan</button><button class="b-plan">Plan…</button></div>
+            </div>
+          </div>
+          <div class="pr-foot"><b style="color:var(--foreground)">⚡ Auto-plan</b> = <code>pan plan --auto</code> (AI plans end-to-end, hands-free) · <b style="color:var(--foreground)">Plan…</b> = <code>pan plan</code> (interactive Q&amp;A) · click a card to open the full issue.</div>
+        </aside>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="caption"><span class="pin">screen 2</span> <b>Click any issue</b> → detail drawer slides in, with the same actions: auto-plan, plan interactively, open on GitHub, or set the pickup gate.</div>
+  <div class="drawer">
+    <div class="dw-h"><span class="ey">Why rank #7</span><span class="x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div>
+    <div class="dw-b">
+      <div class="dw-id">PAN-2000</div>
+      <div class="dw-t">bug(ci): RED MAIN — PAN-1866 fallout: spawn-sequencer stale assertion + worker-pool health</div>
+      <div class="meta">
+        <span class="k">Importance</span><span class="v"><span class="heat"><span class="sw"></span>critical</span></span>
+        <span class="k">Impact score</span><span class="v" style="font-family:'SF Mono',monospace">95 / 100</span>
+      </div>
+      <div class="bar"><i style="width:95%"></i></div>
+      <div class="meta">
+        <span class="k">Est. size</span><span class="v">M effort</span>
+        <span class="k">Depends on</span><span class="v" style="font-family:'SF Mono',monospace">— none</span>
+        <span class="k">Status</span><span class="v" style="color:var(--warning-foreground)">needs planning (no spec / PRD)</span>
+      </div>
+      <div class="flags">
+        <span class="chip" style="color:var(--warning-foreground);border-color:color-mix(in srgb,var(--warning) 36%,transparent);background:color-mix(in srgb,var(--warning) 9%,transparent)">⚠ needs plan</span>
+        <span class="chip" style="color:var(--destructive-foreground);border-color:color-mix(in srgb,var(--destructive) 36%,transparent);background:color-mix(in srgb,var(--destructive) 9%,transparent)">● red main</span>
+      </div>
+      <div class="actbar">
+        <button class="b-auto">⚡ Auto-plan <span style="opacity:.7;font-weight:400;font-size:11px">(pan plan --auto)</span></button>
+        <button class="b-plan">Plan interactively</button>
+        <button class="b-open"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>Open</button>
+      </div>
+      <div class="rat">
+        <div class="lbl">AI rationale · from sequence.md</div>
+        Critical CI breakage — main has been red since the PAN-1866 sequencer landed; the stale spawn-sequencer assertion blocks every downstream merge gate. Highest-leverage fix to restore green main; no dependencies, small effort.
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
