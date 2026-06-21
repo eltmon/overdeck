@@ -77,21 +77,21 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:15:38.290Z",
-  "updated": "2026-06-21T09:46:06.157Z",
+  "updated": "2026-06-21T09:47:28.314Z",
   "pipeline": {
     "issueId": "PAN-1832",
-    "reviewStatus": "reviewing",
-    "testStatus": "passed",
-    "verificationStatus": "failed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-21T09:45:57.799Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-06-21T09:47:18.908Z",
+    "reviewNotes": "specialist-context role-level resolve site still lacks spawnKey",
     "testNotes": "All quality gates pass. TypeScript compilation (root tsc --noEmit covering src/**/*): clean. Vite production build: clean. Unit tests: 7128 passed, 51 skipped. Two pre-existing failures in tests/lib/memory/worker-pool.test.ts and src/lib/backlog/__tests__/spawn-sequencer.test.ts are unrelated to PAN-1832 and existed before this branch. The TypeScript error at RolesPanel.tsx:291 that blocked the previous test run is resolved by the `model: patch.model as ModelRef` cast at line 298 (commit 4e2a43a91).",
     "verificationNotes": "Verification FAILED at test (80146ms):\n\nt to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/components/Settings/__tests__/RolesPanel.test.tsx > RolesPanel > renders role cards in order with workhorse, specific model, and flywheel choices\nAssertionError: expected [ <div …(2)>…(1)</div>, …(7) ] to have a length of 7 but got 8\n\n- Expected\n+ Received\n\n- 7\n+ 8\n\n ❯ src/components/Settings/__tests__/RolesPanel.test.tsx:125:19\n    123|\n    124|     const cards = await screen.findAllByTestId('role-card');\n    125|     expect(cards).toHaveLength(7);\n       |                   ^\n    126|     expect(cards.map((card) => within(card).getByRole('heading', { lev…\n    127|       'Plan',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2003",
     "reviewedAtCommit": "85d731d8b40442032d98c1796543999073bdb459",
-    "reviewRequestedAt": "2026-06-21T09:38:10.960Z"
+    "reviewRequestedAt": "2026-06-21T09:46:15.189Z"
   },
   "closeOut": {
     "usage": {
@@ -106,8 +106,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 45144,
-            "output": 9797,
+            "input": 50030,
+            "output": 10726,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -130,10 +130,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 429,
-            "output": 135078,
-            "cacheRead": 46908510,
-            "cacheWrite": 1426610
+            "input": 433,
+            "output": 135473,
+            "cacheRead": 47178997,
+            "cacheWrite": 1428351
           }
         }
       },
@@ -145,8 +145,8 @@
           "cacheWrite": 565518
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 45144,
-          "output": 9797,
+          "input": 50030,
+          "output": 10726,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -157,15 +157,15 @@
           "cacheWrite": 155381
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 429,
-          "output": 135078,
-          "cacheRead": 46908510,
-          "cacheWrite": 1426610
+          "input": 433,
+          "output": 135473,
+          "cacheRead": 47178997,
+          "cacheWrite": 1428351
         }
       },
       "costAtCloseOut": {
-        "usd": 32.730659,
-        "pricingAsOf": "2026-06-21T09:45:57.862Z"
+        "usd": 32.824271,
+        "pricingAsOf": "2026-06-21T09:47:18.928Z"
       }
     },
     "merges": [
@@ -173,8 +173,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "distribution-editor": "completed",
     "distribution-editor.ac1": "completed",
