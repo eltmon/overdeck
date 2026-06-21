@@ -1,0 +1,372 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-21T04:27:06.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1224: surface a failed post-merge dashboard deploy loudly (stale-code signal)",
+    "updated": "2026-06-21T04:34:19.587Z"
+  },
+  "plan": {
+    "id": "pan-1224",
+    "title": "Surface a failed post-merge dashboard deploy so merged code that didn't go live is visible",
+    "status": "proposed",
+    "uid": "fefd42cf-4982-4048-9906-c7d54adfb48f",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-21T04:27:06.000Z",
+    "updated": "2026-06-21T04:34:19.587Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1224",
+        "label": "PAN-1224",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deploy",
+      "dashboard",
+      "post-merge",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "PAN-1224's core ask — rebuild+restart the dashboard after a PR merges so UAT-on-main runs against merged code — is already shipped (PAN-444 added deploy step 0 to postMergeLifecycle; PAN-1723/1763/1764 hardened scripts/post-merge-deploy.sh). The one unaddressed slice is Q3: when the post-merge build FAILS (post-merge-deploy.sh exits non-zero before the restart marker and restart at :73/:82/:91), the old dashboard keeps running on STALE code and NO operator-visible signal fires (dashboard.lifecycle_failed is only emitted on a fresh boot that never happens, or by the in-process runner — neither is a build failure; the deacon-patrol fallback emits nothing). The operator silently UATs old code; the only trace is /tmp/overdeck-deploy.log.",
+      "Proposal": "Add a cross-process 'dashboard is stale' file marker (~/.overdeck/dashboard-stale.json) that the failing deploy script writes (pre-dist-swap failures only) and the running dashboard surfaces two ways: (a) an error-level activity-feed entry via a new poll+dedupe watcher modelled on restart-announcer, and (b) a persistent top banner driven by GET /api/dashboard/stale. The marker is the single source of truth, owned by one server-lib module that the bash writer, the endpoint, the watcher, and `pan reload` all conform to. The marker clears on deploy-script success and on a successful `pan reload`.",
+      "NonGoals": "- Do NOT make the deacon-patrol fallback (deacon.ts:5007-5033) emit failure, add a stale-build watchdog, or add a pan doctor check (the rejected 'broader hardening' option).\n- Do NOT write the marker on the health-check-timeout path (post-merge-deploy.sh:186): post-dist-swap the fresh code is on disk; that is the existing backend-offline banner's job.\n- Do NOT change rebuild scope, restart strategy, sidecar boundaries, or any Q1/Q2/Q4/Q6 behavior — already correct.\n- Do NOT add a browser button that triggers a rebuild; the remedy is `pan reload`.\n- Do NOT touch remote/multi-user dashboards (issue Q5).\n- Do NOT overload restart-status.json for the persistent stale state (wrong lifetime: single-slot, overwritten on next restart).\n- Do NOT clear the marker on `pan restart` (no rebuild = does not fix staleness) or on plain server boot."
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "stale-marker-lib",
+        "title": "Add dashboard-stale-marker lib module (canonical schema + read/clear/write)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T04:27:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1224",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "stale-script-write",
+            "stale-endpoint",
+            "stale-watcher",
+            "reload-clear"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/dashboard-stale-marker.ts (sibling of, and modelled on, src/lib/restart-status.ts). Export interface DashboardStaleMarker { issueId?: string; reason: string; stage: 'fetch'|'worktree'|'build'; error: string; logFile: string; timestamp: number }. Export STALE_MARKER_PATH = join(getOverdeckHome(), 'dashboard-stale.json') using getOverdeckHome() from ./paths.js. Implement readDashboardStaleMarker(): Promise<DashboardStaleMarker|null> with defensive field validation (ENOENT and any parse/validation failure -> null, copying the shape of readRestartStatusPromise at restart-status.ts:40-77); clearDashboardStaleMarker(): Promise<void> (unlink, ignore ENOENT); writeDashboardStaleMarker(marker): Promise<void> (atomic tmp-write + rename, mirror writeRestartStatusPromise). Add unit tests in src/lib/__tests__/dashboard-stale-marker.test.ts."
+        },
+        "items": [
+          {
+            "id": "stale-marker-lib.ac1",
+            "title": "writeDashboardStaleMarker then readDashboardStaleMarker round-trips an identical DashboardStaleMarker object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-marker-lib.ac2",
+            "title": "readDashboardStaleMarker returns null when the file is absent (ENOENT) and when the file contains malformed JSON or a missing/typed-wrong required field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-marker-lib.ac3",
+            "title": "clearDashboardStaleMarker removes an existing marker file and resolves without throwing when the file is already absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-marker-lib.ac4",
+            "title": "STALE_MARKER_PATH resolves to <overdeck-home>/dashboard-stale.json via getOverdeckHome()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-script-write",
+        "title": "post-merge-deploy.sh writes the stale marker on pre-swap failure, clears on success",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T04:27:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/post-merge-deploy.sh define STALE_MARKER=\"$HOME/.overdeck/dashboard-stale.json\" next to RESTART_MARKER (:22). Add a write_stale_marker <stage> <msg> helper that writes JSON matching the DashboardStaleMarker schema (issueId from $ISSUE_ID, reason from $REASON, stage, error truncated to ~200 chars, logFile=$LOG_FILE, timestamp via $(date +%s000) as the restart marker does at :119). Call write_stale_marker before the three pre-dist-swap failure exits: git fetch fail (:73, stage=fetch), git worktree add fail (:82, stage=worktree), npm run build fail (:91, stage=build). Do NOT call it on the health-check-timeout exit (:186). On the success path, before exit 0 (:181), run rm -f \"$STALE_MARKER\"."
+        },
+        "items": [
+          {
+            "id": "stale-script-write.ac1",
+            "title": "A forced `npm run build` failure creates ~/.overdeck/dashboard-stale.json containing stage=build, the issueId, logFile=/tmp/overdeck-deploy.log, and a numeric timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-script-write.ac2",
+            "title": "The git-fetch and git-worktree failure exits write the marker with stage=fetch and stage=worktree respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-script-write.ac3",
+            "title": "A successful deploy run (exit 0) deletes ~/.overdeck/dashboard-stale.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-script-write.ac4",
+            "title": "The health-check-timeout path exits 1 without creating the stale marker file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-endpoint",
+        "title": "Add GET /api/dashboard/stale read endpoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T04:27:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/misc.ts add a GET /api/dashboard/stale route (HttpRouter.add + jsonResponse, following the existing route + Layer-merge pattern in this module). Handler returns jsonResponse(marker ? { stale: true, ...marker } : { stale: false }) where marker = await readDashboardStaleMarker() from src/lib/dashboard-stale-marker.js. Register the route in the module's exported Layer alongside the existing routes."
+        },
+        "items": [
+          {
+            "id": "stale-endpoint.ac1",
+            "title": "GET /api/dashboard/stale returns { stale: true, issueId, stage, error, logFile, timestamp } when the marker file is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-endpoint.ac2",
+            "title": "GET /api/dashboard/stale returns { stale: false } when no marker file exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-endpoint.ac3",
+            "title": "The endpoint responds 200 and does not throw when the marker file is malformed (degrades to { stale: false })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-watcher",
+        "title": "Stale-deploy watcher emits one deduped error activity entry per new marker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T04:27:06.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/stale-deploy-watcher.ts modelled on restart-announcer.ts. Export announceNewStaleDeploy(deps?) (single pass; injectable readMarker/emit/getLastAnnounced/setLastAnnounced) and startStaleDeployWatcher()/stopStaleDeployWatcher() (poll loop with unref()ed timers and a bootstrap-fast then steady cadence, copying the announcer's structure). Read via readDashboardStaleMarker(); dedupe by marker.timestamp persisted in control-settings key 'stale_deploy_watcher.last_announced_ts' (getSetting/setSetting from ../../../lib/overdeck/control-settings.js). On a new marker emit emitActivityEntrySync({ source: 'deploy-script', level: 'error', message: a standalone sentence naming the issue and the `pan reload` remedy, details: error plus log path, issueId }). Wire startStaleDeployWatcher() into src/dashboard/server/main.ts next to startRestartAnnouncer() (:517) and stopStaleDeployWatcher() next to stopRestartAnnouncer() (:504). Add a unit test driving announceNewStaleDeploy with injected deps; use vi.useFakeTimers() for any loop-cadence assertions."
+        },
+        "items": [
+          {
+            "id": "stale-watcher.ac1",
+            "title": "Given a marker whose timestamp has not been announced, announceNewStaleDeploy emits exactly one activity entry with level 'error' and source 'deploy-script' and returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-watcher.ac2",
+            "title": "Given a marker whose timestamp equals the persisted last-announced value, announceNewStaleDeploy emits nothing and returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-watcher.ac3",
+            "title": "Given no marker present, announceNewStaleDeploy emits nothing and returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-watcher.ac4",
+            "title": "The emitted activity message is a complete standalone sentence that contains the merged issue id and the literal remedy text `pan reload`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-banner",
+        "title": "Frontend hook + persistent StaleDashboardBanner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-21T04:27:06.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/hooks/useDashboardStaleStatus.ts mirroring hooks/useCodexAuthStatus.ts: a typed fetch of GET /api/dashboard/stale wrapped in useQuery({ queryKey: ['dashboard-stale'], refetchInterval: 10_000, staleTime: 0 }). Create src/dashboard/frontend/src/components/StaleDashboardBanner.tsx mirroring components/CodexAuthBanner.tsx: returns null unless data?.stale; otherwise a persistent top banner reusing the destructive utility classes already used by the backend-offline banner (App.tsx:1410, bg-destructive/15 border-b-2 border-destructive/50 ...) with a standalone message naming the issue and the `pan reload` remedy (no action button). Render <StaleDashboardBanner /> in the banner stack in src/dashboard/frontend/src/App.tsx (near :1383-1438); it must be independent of dashboardLifecycle.active so it does not collide with the existing 'Dashboard is restarting' banner. Add a component test in src/dashboard/frontend/src/components/__tests__/StaleDashboardBanner.test.tsx."
+        },
+        "items": [
+          {
+            "id": "stale-banner.ac1",
+            "title": "When the stale endpoint reports { stale: true, issueId }, StaleDashboardBanner renders a banner containing the issue id and the text 'pan reload'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-banner.ac2",
+            "title": "When the stale endpoint reports { stale: false }, StaleDashboardBanner renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-banner.ac3",
+            "title": "The banner renders with the destructive banner styling and remains independent of the existing dashboardLifecycle restart banner (neither banner suppresses the other)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload-clear",
+        "title": "pan reload clears the stale marker on success",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-21T04:27:06.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/reload.ts, inside recordReloadStatus(startedAt, success, error) (:63-75), when success === true also `await clearDashboardStaleMarker()` (imported from ../../lib/dashboard-stale-marker.js). This single chokepoint covers both success branches — the pan-dev SIGUSR2 path (:102) and the detached-production path (:161). Do not clear on failure. Extend the existing reload test (src/cli/commands/__tests__/reload.test.ts) to assert the clear-on-success behavior."
+        },
+        "items": [
+          {
+            "id": "reload-clear.ac1",
+            "title": "A successful `pan reload` (success=true) deletes an existing ~/.overdeck/dashboard-stale.json via clearDashboardStaleMarker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-clear.ac2",
+            "title": "A failed `pan reload` (success=false) preserves the stale marker (the marker file is not deleted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stale-marker-lib",
+        "to": "stale-script-write",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-marker-lib",
+        "to": "stale-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-marker-lib",
+        "to": "stale-watcher",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-marker-lib",
+        "to": "reload-clear",
+        "type": "blocks"
+      },
+      {
+        "from": "stale-endpoint",
+        "to": "stale-banner",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-21-PAN-1224-surface-a-failed-post-merge-dashboard-deploy-so-merged-code-that-didn-t-go-live-is-visible.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
