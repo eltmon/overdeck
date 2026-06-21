@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ListOrdered, GitFork, RefreshCw, Filter, Play } from 'lucide-react';
+import { ListOrdered, GitFork, RefreshCw, Filter, Play, Trash2 } from 'lucide-react';
 import { BacklogDAG, RationaleSidePanel, type SequenceNode } from '../components/backlog/BacklogDAG';
 import { BacklogForecast } from '../components/backlog/BacklogForecast';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
@@ -71,6 +71,7 @@ export function BacklogSequencerPage() {
   const [showStale, setShowStale] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [spawning, setSpawning] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('incremental');
   const [showPassPicker, setShowPassPicker] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export function BacklogSequencerPage() {
   }, [allNodes]);
 
   const inPipelineCount = useMemo(() => allNodes.filter((n) => n.inPipeline).length, [allNodes]);
-  const readyCount = useMemo(() => allNodes.filter((n) => n.ready).length, [allNodes]);
+  const readyCount = useMemo(() => allNodes.filter((n) => n.state?.ready ?? false).length, [allNodes]);
   const hasPrdCount = useMemo(() => allNodes.filter((n) => n.hasPrd).length, [allNodes]);
 
   const filteredNodes = useMemo(() => {
@@ -113,7 +114,9 @@ export function BacklogSequencerPage() {
       if (importanceFilter !== 'all' && n.importance !== importanceFilter) return false;
       if (conditionFilter !== 'all' && n.condition !== conditionFilter) return false;
       if (inPipelineOnly && !n.inPipeline) return false;
-      if (readyOnly && n.gate !== 'ready') return false;
+      // PAN-2006: "Ready" = the Definition-of-Ready state (ready label), not the
+      // promote gate. (The old check compared gate==='ready', so it filtered nothing.)
+      if (readyOnly && !(n.state?.ready ?? false)) return false;
       if (hasPrdOnly && !n.hasPrd) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -182,6 +185,29 @@ export function BacklogSequencerPage() {
       setSpawnError(err instanceof Error ? err.message : String(err));
     } finally {
       setSpawning(false);
+    }
+  }
+
+  async function handleClearSequence() {
+    if (clearing || spawning) return;
+    if (!window.confirm('Delete the backlog sequencing? This removes the ranked sequence (sequence.md + cache) and any operator gate overrides. A re-sequence pass regenerates it.')) return;
+    setClearing(true);
+    setSpawnError(null);
+    try {
+      const res = await fetch('/api/backlog/sequence/clear', {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+      });
+      if (!res.ok) {
+        let message = `Request failed (HTTP ${res.status})`;
+        try { const body = await res.json(); if (body?.error) message = String(body.error); } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      setTimeout(() => refetch(), 500);
+    } catch (err) {
+      setSpawnError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -292,6 +318,15 @@ export function BacklogSequencerPage() {
 
         {/* Run pass button */}
         <div className="relative ml-auto flex items-center gap-1">
+          <button
+            onClick={handleClearSequence}
+            disabled={clearing || spawning}
+            className="px-2.5 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:text-[var(--destructive)] hover:border-[color-mix(in_srgb,var(--destructive)_40%,transparent)] disabled:opacity-50"
+            title="Delete the backlog sequencing (sequence.md + cache). Re-sequence regenerates it."
+          >
+            <Trash2 className="w-3 h-3" />
+            {clearing ? 'Clearing…' : 'Clear'}
+          </button>
           <button
             onClick={handleRunPass}
             disabled={spawning}
@@ -576,7 +611,11 @@ export function BacklogSequencerPage() {
                       <tr
                         key={node.issueId}
                         onClick={() => setSelectedNode((p) => (p?.issueId === node.issueId ? null : node))}
-                        className={`border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${isSelected ? 'bg-[var(--color-surface)] ring-inset ring-1 ring-[var(--color-accent)]' : ''}`}
+                        className={`transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${
+                          isSelected
+                            ? 'bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] ring-inset ring-1 ring-[var(--color-accent)]'
+                            : 'even:bg-[color-mix(in_srgb,var(--color-fg)_3%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-fg)_9%,transparent)]'
+                        }`}
                       >
                         <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
                           {node.rank}
@@ -604,7 +643,7 @@ export function BacklogSequencerPage() {
                             {TIER_LABEL[tier]}
                           </span>
                         </td>
-                        <td className={`px-2 py-2 text-[var(--color-fg-muted)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
+                        <td className={`px-2 py-2 text-[var(--color-fg)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
                           {node.why}
                         </td>
                         <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
@@ -617,7 +656,7 @@ export function BacklogSequencerPage() {
                         </td>
                         <td className="px-2 py-2 text-center">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
-                            {node.gate === 'ready' ? '📌' : node.gate === 'blocked' ? '⛔' : node.gate}
+                            {node.gate === 'ready' ? (node.inPipeline ? 'auto' : '📌') : node.gate === 'blocked' ? '⛔' : node.gate}
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">

@@ -116,7 +116,7 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 1. Re-read all issue bodies in batches of ${batchSize}. NEVER inline the entire backlog in one prompt. Do NOT concatenate all bodies — read them batch by batch against your running shortlist.
 2. Re-derive all ai-inferred and github-ref edges.
 3. Preserve operator edges verbatim.
-4. Never re-rank in-pipeline issues (inPipeline=true); pin them at rank 1 or their prior rank with gate=ready.
+4. Never re-rank in-pipeline issues (inPipeline=true); pin them at rank 1 or their prior rank. Leave gate=auto — do NOT set gate=ready (the gate is operator-only; in-pipeline is detected automatically).
 `,
   };
 
@@ -124,7 +124,7 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 ## Ranking rules (all passes)
 
 - Rank by IMPACT toward shipping, not raw priority signal. GitHub priority and issue age are inputs, not determinants.
-- NEVER re-rank in-pipeline issues (inPipeline: true in the manifest). Pin them with gate=ready.
+- NEVER re-rank in-pipeline issues (inPipeline: true in the manifest). Pin them at their rank; leave gate=auto (do NOT set gate=ready — gate is operator-only).
 - Assign condition to every issue: ok / needs-refinement / stale.
 - Every node's why field must be ≤ 140 characters (displayed in the ranked table).
 - Write full-paragraph rationale only for the active top tier (~top 80 nodes).

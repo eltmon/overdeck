@@ -128,7 +128,10 @@ function IssueNode({ data }: { data: IssueNodeData }) {
   if (node.condition === 'needs-refinement') cls.push('cond-refine');
   if (node.condition === 'stale') cls.push('cond-stale');
   if (node.gate === 'blocked') cls.push('gate-blocked');
-  if (node.gate === 'ready') cls.push('gate-promoted');
+  // gate=ready on an in-flight issue is the sequencer auto-PINNING active work, not an
+  // operator promotion — only badge a real (idle) operator promote.
+  const isPromoted = node.gate === 'ready' && !node.inPipeline;
+  if (isPromoted) cls.push('gate-promoted');
 
   return (
     <div className={cls.join(' ')} onClick={() => onSelect(node)}>
@@ -139,8 +142,8 @@ function IssueNode({ data }: { data: IssueNodeData }) {
       </div>
       <div className="title">{node.title || node.why}</div>
       <div className="chips">
-        {node.gate === 'ready' && <span className="chip promoted">📌 PROMOTED</span>}
-        {node.gate === 'blocked' && <span className="chip held">⛔ HELD</span>}
+        {isPromoted && <span className="chip promoted">📌 PROMOTED</span>}
+        {node.gate === 'blocked' && <span className="chip held">⛔ VETOED</span>}
         {node.inPipeline && <span className="chip verb work"><span className="pulsedot" />in pipeline</span>}
         {node.condition === 'needs-refinement' && <span className="chip refine">⚠ REFINE</span>}
         {node.condition === 'stale' && <span className="chip stale">⊘ STALE</span>}

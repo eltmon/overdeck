@@ -1,1 +1,1 @@
-export { getBacklogSequenceForRoot } from '../database/backlog-sequence-db.js';
+export { getBacklogSequenceForRoot, clearBacklogSequence } from '../database/backlog-sequence-db.js';

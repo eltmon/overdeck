@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
@@ -19,7 +19,7 @@ import {
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
-import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
+import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 
@@ -363,6 +363,35 @@ const postBacklogLabelsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/backlog/sequence/clear — delete the sequencing ──────────
+// Removes the ranked sequence (sequence.md + the disposable DB cache). Recoverable:
+// a re-sequence pass regenerates it. The operator gate fields live in sequence.md, so
+// clearing also drops operator overrides — intentional ("delete the sequencing").
+
+const postBacklogClearRoute = HttpRouter.add(
+  'POST',
+  '/api/backlog/sequence/clear',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    return yield* Effect.try({
+      try: () => {
+        const projectRoot = process.cwd();
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        // Clear the cache under the project key recorded in the md (if parseable).
+        if (existsSync(seqPath)) {
+          const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+          if (parsed.ok) clearBacklogSequence(parsed.doc.project);
+          rmSync(seqPath, { force: true });
+        }
+        return jsonResponse({ status: 'ok', cleared: true });
+      },
+      catch: (err) => new Error(String(err)),
+    });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const backlogRouteLayer = Layer.mergeAll(
@@ -372,6 +401,7 @@ export const backlogRouteLayer = Layer.mergeAll(
   postBacklogPlanningRoute,
   getBacklogForecastRoute,
   postBacklogLabelsRoute,
+  postBacklogClearRoute,
 );
 
 export default backlogRouteLayer;
