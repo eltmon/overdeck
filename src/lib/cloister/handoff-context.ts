@@ -13,10 +13,8 @@ import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
-import { resolveVBriefDir } from '../vbrief/lifecycle.js';
-import { readContinueStateSync, type ContinueState } from '../vbrief/continue-state.js';
-import { readWorkspaceContinue } from '../pan-dir/index.js';
+import type { ContinueState } from '../vbrief/continue-state.js';
+import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
@@ -116,29 +114,14 @@ async function captureFiles(
   issueId: string,
 ): Promise<void> {
   try {
-    // Read the live workspace continue state first, then migration fallbacks.
-    let continueState: ContinueState | null = null;
+    // Read continue context from the per-issue record (PAN-1919).
     try {
-      continueState = await Effect.runPromise(readWorkspaceContinue(workspace));
-    } catch { /* ignore */ }
-    if (!continueState) {
-      const resolved = resolveProjectFromIssueSync(issueId);
-      if (resolved) {
-        for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
-          try {
-            const lifecycleDir = resolveVBriefDir(resolved.projectPath, dir);
-            const cs = readContinueStateSync(lifecycleDir, issueId);
-            if (cs) {
-              continueState = cs;
-              break;
-            }
-          } catch { /* ignore */ }
-        }
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspace);
+      const recordView = readRecordContinueViewSync(project, issueId);
+      if (recordView) {
+        context.continueState = recordView as unknown as ContinueState;
       }
-    }
-    if (continueState) {
-      context.continueState = continueState;
-    }
+    } catch { /* ignore */ }
 
     // Read CLAUDE.md if it exists
     const claudeMd = join(workspace, 'CLAUDE.md');

@@ -17,7 +17,7 @@ import {
   type VBriefTransitionResult,
 } from '../../lib/vbrief/lifecycle-io.js';
 import { findPlanSync, readPlanSync } from '../../lib/vbrief/io.js';
-import { readContinueStateSync } from '../../lib/vbrief/continue-state.js';
+import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../../lib/pan-dir/record.js';
 import { listVBriefs, readVBriefDocument } from '../../lib/vbrief/vbrief-index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
@@ -354,27 +354,32 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
   // Continue-state summary (last session, decisions count, hazards count)
   let cs;
   try {
-    cs = readContinueStateSync(projectPath, upperId);
+    const resolved = resolveProjectFromIssueSync(upperId);
+    const recordProject = resolved
+      ? { name: resolved.projectKey, path: resolved.projectPath }
+      : getProjectConfigFromWorkspacePath(projectPath);
+    cs = readRecordContinueViewSync(recordProject, upperId);
   } catch (err: any) {
     console.log();
     console.log(chalk.bold('Continue State:'));
-    console.log(chalk.red(`  Failed to read continue file: ${err.message}`));
+    console.log(chalk.red(`  Failed to read record: ${err.message}`));
     return;
   }
 
   console.log();
   console.log(chalk.bold('Continue State:'));
   if (!cs) {
-    console.log(chalk.dim('  (no continue file found)'));
+    console.log(chalk.dim('  (no record found)'));
     return;
   }
   console.log(`  Decisions: ${cs.decisions.length}`);
   console.log(`  Hazards:   ${cs.hazards.length}`);
   console.log(`  Sessions:  ${cs.sessionHistory.length}`);
-  if (cs.gitState && (cs.gitState.branch || cs.gitState.sha)) {
-    const branch = cs.gitState.branch ? chalk.cyan(cs.gitState.branch) : chalk.dim('(none)');
-    const sha = cs.gitState.sha ? chalk.dim(cs.gitState.sha) : chalk.dim('(none)');
-    const dirty = cs.gitState.dirty ? chalk.yellow(' [dirty]') : '';
+  const gitState = (cs as any).gitState;
+  if (gitState && (gitState.branch || gitState.sha)) {
+    const branch = gitState.branch ? chalk.cyan(gitState.branch) : chalk.dim('(none)');
+    const sha = gitState.sha ? chalk.dim(gitState.sha) : chalk.dim('(none)');
+    const dirty = gitState.dirty ? chalk.yellow(' [dirty]') : '';
     console.log(`  Git:       ${branch} @ ${sha}${dirty}`);
   }
   if (cs.resumePoint?.description) {

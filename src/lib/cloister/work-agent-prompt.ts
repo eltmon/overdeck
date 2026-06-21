@@ -6,7 +6,8 @@ import { readContinueState, type ContinueFeedbackEntry } from '../vbrief/continu
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
@@ -139,9 +140,10 @@ async function readPendingFeedback(workspacePath: string): Promise<string> {
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
     try {
-      const cont = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-      if (cont?.feedback?.length) {
-        continueEntries.push(...cont.feedback)
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      const recordView = readRecordContinueViewSync(project, issueId);
+      if (recordView?.feedback?.length) {
+        continueEntries.push(...recordView.feedback);
       }
     } catch { /* ignore */ }
   }
@@ -359,9 +361,10 @@ export async function readPlanningContext(workspacePath: string): Promise<string
   if (!issueId) return null;
 
   try {
-    const workspaceContinue = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-    if (workspaceContinue) {
-      return JSON.stringify(workspaceContinue, null, 2)
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const recordView = readRecordContinueViewSync(project, issueId);
+    if (recordView) {
+      return JSON.stringify(recordView, null, 2);
     }
   } catch { /* ignore */ }
 
