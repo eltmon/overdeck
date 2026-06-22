@@ -469,6 +469,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/workspaces/:issueId',                         kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver + workspace details' },
   { surface: 'POST /api/workspaces',                                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter (workspace creation path)' },
   { surface: 'POST /api/workspaces/:issueId/rebuild-stack',          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Stack rebuild; outside 8 remodel domains' },
+  { surface: 'POST /api/workspaces/:issueId/rebuild-and-start',      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Stack rebuild + chained agent start via pan CLI; outside 8 remodel domains' },
   { surface: 'GET /api/workspaces/:issueId/state-md',                kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (state doc)' },
   { surface: 'GET /api/workspaces/:issueId/inference-md',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Inference doc; outside 8 remodel domains' },
   { surface: 'GET /api/workspaces/:issueId/plan',                    kind: 'http', disposition: 'READ',        door: 'IssuesResolver.getPlan' },
