@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-22T19:26:39Z · model: claude-sonnet-4-5 · open: 549_
+_Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 
 
 | rank | issue | size | importance | condition | depends-on | why |
@@ -884,8 +884,8 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-22T19:26:39Z",
-  "model": "claude-sonnet-4-5",
+  "generatedAt": "2026-06-22T21:51:32Z",
+  "model": "glm-4.7",
   "pass": "incremental",
   "openCount": 549,
   "nodes": [
