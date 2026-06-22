@@ -200,6 +200,29 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('recoverReview').enabledWhen(reviewFailed)).toBe(true);
     expect(action('recoverAgent').enabledWhen(reviewRunning)).toBe(false);
   });
+
+  it('enables rebuildAndStart wherever a normal start is viable and a workspace exists', () => {
+    const canStart: IssueActionState = {
+      ...baseState,
+      hasPlan: true,
+      hasBeads: true,
+      agent: { status: 'stopped', role: 'work' },
+    };
+    expect(action('rebuildAndStart').enabledWhen(canStart)).toBe(true);
+    // rebuild operates on the workspace's Docker stack → requires a workspace
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, workspace: { exists: false, path: undefined } })).toBe(false);
+    // mirrors canStartAgent: needs plan + beads, a stopped agent, not merged
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasPlan: false })).toBe(false);
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasBeads: false })).toBe(false);
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, agent: { status: 'running', role: 'work' } })).toBe(false);
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, isMerged: true })).toBe(false);
+  });
+
+  it('points rebuildAndStart at the chained workspace endpoint as a safe action', () => {
+    expect(action('rebuildAndStart').endpoint).toBe('/api/workspaces/:id/rebuild-and-start');
+    expect(action('rebuildAndStart').kind).toBe('safe');
+    expect(action('rebuildAndStart').group).toBe('workspace');
+  });
 });
 
 describe('getPhasePrimaryActions', () => {

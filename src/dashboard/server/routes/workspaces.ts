@@ -618,36 +618,10 @@ function isGitHubIssue(issueId: string): {
   return { isGitHub: false };
 }
 
-function spawnPanCommand(
-  args: string[],
-  description: string,
-  cwd?: string,
-  options?: { issueId?: string; pendingOperation?: PendingOperation['type'] },
-): string {
-  const activityId = Date.now().toString();
-  if (options?.issueId && options.pendingOperation) {
-    setPendingOperation(options.issueId, options.pendingOperation);
-    emitActivityEntrySync({
-      source: 'dashboard',
-      level: 'info',
-      issueId: options.issueId.toUpperCase(),
-      message: `${description} started`,
-    });
-  }
-  logActivity({
-    id: activityId,
-    timestamp: new Date().toISOString(),
-    command: `pan ${args.join(' ')}`,
-    status: 'running',
-    output: [],
-  });
-
-  const child = spawn('pan', args, {
-    cwd: cwd || process.cwd(),
-    detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
+function attachPanOutputStreams(
+  child: { stdout?: NodeJS.ReadableStream | null; stderr?: NodeJS.ReadableStream | null },
+  activityId: string,
+): void {
   child.stdout?.on('data', (data) => {
     data.toString().split('\n').filter(Boolean).forEach((line: string) => {
       appendActivityOutput(activityId, line);
@@ -658,16 +632,91 @@ function spawnPanCommand(
       appendActivityOutput(activityId, `[stderr] ${line}`);
     });
   });
-  child.on('close', (code) => {
+}
+
+interface ChainPanOnSuccess {
+  args: string[];
+  /** Activity message emitted when the first command succeeds and the chained
+   * command begins (e.g. "Stack rebuilt — starting agent"). */
+  phaseLabel: string;
+}
+
+export function spawnPanCommand(
+  args: string[],
+  description: string,
+  cwd?: string,
+  options?: {
+    issueId?: string;
+    pendingOperation?: PendingOperation['type'];
+    /** When set, this second `pan` invocation runs only if the first exits 0,
+     * streaming into the same activity. Used by the rebuild-and-start route to
+     * chain `pan start` after a successful `pan workspace rebuild`. */
+    chainOnSuccess?: ChainPanOnSuccess;
+  },
+): string {
+  const activityId = Date.now().toString();
+  const issueId = options?.issueId;
+  const pendingOp = options?.pendingOperation;
+  const chain = options?.chainOnSuccess;
+  const commandLine = chain ? `pan ${args.join(' ')} && pan ${chain.args.join(' ')}` : `pan ${args.join(' ')}`;
+
+  if (issueId && pendingOp) {
+    setPendingOperation(issueId, pendingOp);
+    emitActivityEntrySync({
+      source: 'dashboard',
+      level: 'info',
+      issueId: issueId.toUpperCase(),
+      message: `${description} started`,
+    });
+  }
+  logActivity({
+    id: activityId,
+    timestamp: new Date().toISOString(),
+    command: commandLine,
+    status: 'running',
+    output: [],
+  });
+
+  const finalize = (code: number | null, failedCommand: string) => {
     updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
-    if (options?.issueId && options.pendingOperation) {
-      completePendingOperation(options.issueId, code === 0 ? null : `pan ${args.join(' ')} exited ${code ?? 'unknown'}`);
+    if (issueId && pendingOp) {
+      completePendingOperation(issueId, code === 0 ? null : `${failedCommand} exited ${code ?? 'unknown'}`);
       emitActivityEntrySync({
         source: 'dashboard',
         level: code === 0 ? 'success' : 'error',
-        issueId: options.issueId.toUpperCase(),
+        issueId: issueId.toUpperCase(),
         message: `${description} ${code === 0 ? 'completed' : 'failed'}`,
       });
+    }
+  };
+
+  const child = spawn('pan', args, {
+    cwd: cwd || process.cwd(),
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  attachPanOutputStreams(child, activityId);
+
+  child.on('close', (code) => {
+    if (code === 0 && chain) {
+      if (issueId) {
+        emitActivityEntrySync({
+          source: 'dashboard',
+          level: 'info',
+          issueId: issueId.toUpperCase(),
+          message: chain.phaseLabel,
+        });
+      }
+      appendActivityOutput(activityId, `--- ${chain.phaseLabel} ---`);
+      const next = spawn('pan', chain.args, {
+        cwd: cwd || process.cwd(),
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      attachPanOutputStreams(next, activityId);
+      next.on('close', (nextCode) => finalize(nextCode, `pan ${chain.args.join(' ')}`));
+    } else {
+      finalize(code, `pan ${args.join(' ')}`);
     }
   });
 
@@ -1807,6 +1856,44 @@ const postWorkspaceRebuildRoute = HttpRouter.add(
     return jsonResponse({
       success: true,
       message: `Rebuilding stack for ${issueId}`,
+      activityId,
+    });
+  }))
+);
+
+// ─── Route: POST /api/workspaces/:issueId/rebuild-and-start ──────────────────
+// Recovery action for the `stack-unhealthy` work-agent spawn block: rebuild the
+// workspace's Docker stack, then spawn the work agent once the stack is healthy.
+// Fire-and-forget like the rebuild-stack route, but chains `pan start` after a
+// successful `pan workspace rebuild` under a single activityId so the dashboard
+// streams both phases as one operation.
+const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/rebuild-and-start',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    }
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const activityId = spawnPanCommand(
+      ['workspace', 'rebuild', issueId],
+      `Rebuild & start for ${issueId}`,
+      projectPath,
+      {
+        issueId,
+        pendingOperation: 'rebuild-stack',
+        chainOnSuccess: {
+          args: ['start', issueId],
+          phaseLabel: `Stack rebuilt — starting agent for ${issueId.toUpperCase()}`,
+        },
+      },
+    );
+    return jsonResponse({
+      success: true,
+      message: `Rebuilding stack and starting agent for ${issueId}`,
       activityId,
     });
   }))
@@ -6508,6 +6595,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
   postWorkspaceRebuildRoute,
+  postWorkspaceRebuildAndStartRoute,
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
