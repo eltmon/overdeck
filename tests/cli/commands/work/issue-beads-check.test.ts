@@ -138,7 +138,29 @@ describe('hasBeadsTasks', () => {
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
-  it('regression: five concurrent start gate reads all recover from transient lock contention', async () => {
+  // SKIPPED — structurally flaky under CI parallel-worker load; red-gated the
+  // v0.30.0 release (run 27969902569, the sole failure: 1/7189). Passes
+  // reliably in isolation locally but intermittently fails in CI.
+  //
+  // Root cause: the mock decides pass/fail from the PARITY of a single shared
+  // monotonic `calls` counter (odd → 'database is locked', even → success),
+  // while the 5 concurrent retry loops drive that counter through
+  // fake-timer-driven interleaving AND runBdWithRetry wraps each call in a REAL
+  // cross-process file lock (withBdProcessLock, real fs.open/process.kill). So
+  // whether a given caller's Nth attempt lands on an even or odd global call
+  // number depends on lock-acquisition + microtask ordering under load — one
+  // caller can draw 5 odd-parity calls and exhaust maxAttempts, falling back to
+  // jsonl (count 0) and failing the `source === 'bd'` assertion. A shared
+  // parity mock cannot guarantee every concurrent caller recovers within a
+  // bounded per-caller budget.
+  //
+  // The retry-recovery path this guards is still covered DETERMINISTICALLY by
+  // the sibling test above ('retries the live start gate query before falling
+  // back to jsonl'). The only coverage lost here is the concurrent aspect, which
+  // a shared mock cannot assert reliably — a proper rewrite needs per-caller
+  // failure injection (unique caller id threaded through runBdWithRetry, or a
+  // deterministic fake lock with no real fs/process.kill). See follow-up.
+  it.skip('regression: five concurrent start gate reads all recover from transient lock contention', async () => {
     vi.useFakeTimers();
     let calls = 0;
     childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
