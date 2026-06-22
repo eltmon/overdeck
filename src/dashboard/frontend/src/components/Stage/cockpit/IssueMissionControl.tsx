@@ -5,7 +5,7 @@ import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
-import { PrDiffTab, statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
+import { statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
 import { VBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/VBriefTab'
 import {
   useActivityQuery,
@@ -30,6 +30,7 @@ import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
 import { BeadsRail } from './BeadsRail'
+import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
@@ -1119,7 +1120,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'code' && (
               <div className="space-y-3.5">
                 <GitHubCiPanel issueId={issueId} />
-                <PrDiffTab issueId={issueId} />
+                <ChangedFilesView issueId={issueId} />
               </div>
             )}
             {activeTab === 'plan' && <PlanMissionTab issueId={issueId} />}
