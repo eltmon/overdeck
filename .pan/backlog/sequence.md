@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-21T20:45:10Z · model: glm-5.2 · open: 549_
+_Last sequenced: 2026-06-22T19:26:39Z · model: claude-sonnet-4-5 · open: 549_
 
 
 | rank | issue | size | importance | condition | depends-on | why |
@@ -11,7 +11,6 @@ _Last sequenced: 2026-06-21T20:45:10Z · model: glm-5.2 · open: 549_
 | 5 | PAN-1982 | M | high | ok |  | Revive convoy review as configurable opt-in (global/project/per-issue); quick stays default. Pinned. |
 | 7 | PAN-1224 | M | high | ok |  | ship/close-out must restart the running dashboard so merged code goes live. Pinned bug. |
 | 8 | PAN-1992 | M | high | ok |  | Migrate all panopticon.db references to overdeck.db across skills; re-verify. Pinned. |
-| 9 | PAN-1903 | M | critical | ok |  | LIVE RED MAIN: create-beads bd-DB-init race (issue-beads-check failing on main right now). |
 | 10 | PAN-806 | L | critical | ok | PAN-804 | Epic B: work agents must never touch git (pan work done owns rebase). Critical safety. |
 | 11 | PAN-807 | L | critical | ok | PAN-804 | Epic C: pre-flight workspace sanity on spawn; stop hard-resetting local branches (data-loss risk). |
 | 12 | PAN-804 | L | high | ok |  | Epic D: archaeological repo audit + pre-1.0 cleanup (dangling commits, branch drift). Execute FIRST. |
@@ -92,468 +91,469 @@ _Last sequenced: 2026-06-21T20:45:10Z · model: glm-5.2 · open: 549_
 | 87 | PAN-1209 | S | medium | ok |  | PAN-1052 bead projection disagrees with bd state |
 | 88 | PAN-1130 | S | medium | ok |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
 | 89 | PAN-1131 | S | medium | ok |  | Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle') |
-| 90 | PAN-1830 | S | medium | ok |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
-| 91 | PAN-1862 | L | medium | ok |  | feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review |
-| 92 | PAN-244 | S | medium | ok |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 93 | PAN-245 | S | medium | ok |  | Ctrl+C aborts planning dialog instead of copying text |
-| 94 | PAN-247 | S | medium | ok |  | Deacon has no backoff or escalation for repeated specialist startup failures |
-| 95 | PAN-304 | S | medium | ok |  | closeLinearDirect returns stepOk even when state update never happens |
-| 96 | PAN-321 | S | medium | ok |  | Ephemeral merge specialist fails silently for polyrepo MYN projects |
-| 97 | PAN-324 | S | medium | ok |  | Agent detail pane missing Merge/Approve button |
-| 98 | PAN-334 | S | medium | ok |  | Dashboard server has no duplicate-process protection — zombie instances cause 502 |
-| 99 | PAN-538 | L | medium | ok |  | npm run build sometimes skips Vite frontend rebuild |
-| 100 | PAN-673 | M | medium | ok |  | fix(dashboard): virtualizer inline ref causes blank conversation page on large message lists |
-| 101 | PAN-681 | S | medium | ok |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 102 | PAN-886 | S | medium | ok |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 103 | PAN-890 | S | medium | ok |  | Conflict-resolver agent merges stale main snapshot and never pushes |
-| 104 | PAN-899 | S | medium | ok |  | Agent CLI commands fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE |
-| 105 | PAN-900 | S | medium | ok |  | Trust devroot for conversations + atomic .claude.json writes |
-| 106 | PAN-928 | S | medium | ok |  | verification-runner: polyrepo workspaces fail at sync-target-branch |
-| 107 | PAN-929 | S | medium | ok |  | review-run: polyrepo workspaces detect overlay repo instead of code repos |
-| 108 | PAN-932 | S | medium | ok |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 109 | PAN-933 | S | medium | ok |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 110 | PAN-1027 | S | medium | ok |  | Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
-| 111 | PAN-1038 | S | medium | ok |  | Conversation diff panel always empty: conv.claudeSessionId is null for all conversations |
-| 112 | PAN-1042 | S | medium | ok |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 113 | PAN-1068 | S | medium | ok |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 114 | PAN-1113 | S | medium | ok |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 115 | PAN-1128 | S | medium | ok |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 116 | PAN-1129 | S | medium | ok |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 117 | PAN-1149 | S | medium | ok |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 118 | PAN-1150 | S | medium | ok |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 119 | PAN-1173 | S | medium | ok |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 120 | PAN-1227 | L | medium | ok |  | Substrate: bead can be closed without delivering the work — add per-bead delivery check in pan done |
-| 121 | PAN-1232 | S | medium | ok |  | PAN-1148 follow-up — IssueDrawer 6 tabs as placeholders + title font + header structure + stream colors |
-| 122 | PAN-1234 | S | medium | ok |  | PAN-1148 follow-up — cross-cutting (Space Grotesk / keyboard shortcuts / /issues/:id route / INPUT badge / pulse keyframe / conformance... |
-| 123 | PAN-1240 | S | medium | ok |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
-| 124 | PAN-1243 | S | medium | ok |  | pan admin hooks install: resolver fails outside repo CWD (auto-config breaks flywheel resume) |
-| 125 | PAN-1247 | S | medium | ok |  | Substrate: deacon orphan-test recovery loops dispatch_failed forever on an unhealthy workspace docker stack |
-| 126 | PAN-1258 | S | medium | ok |  | Swarm slot spawn hangs silently before writeLauncherScriptAtomic when model=kimi-k2.6 |
-| 127 | PAN-1330 | S | medium | ok |  | CLI cannot address planning-*/specialist-* sessions — pan tell/pan kill hard-code 'agent-' prefix; no 'pan plan abort' |
-| 128 | PAN-1336 | S | medium | ok |  | Swarm: pan swarm --auto-advance cannot advance — no slot-PR merger, slots never self-terminate |
-| 129 | PAN-1386 | S | medium | ok |  | Flywheel orchestrator never emits status snapshots — dashboard 'flywheel' pane stays blank during an active run |
-| 130 | PAN-1392 | S | medium | ok |  | pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
-| 131 | PAN-1416 | S | medium | ok |  | Workspace-spawned dashboard servers can bind the main pan.localhost port and hijack the canonical dashboard |
-| 132 | PAN-1434 | S | medium | ok |  | conv-find.py reports session_file: N/A for newer conversation records (wrong column) |
-| 133 | PAN-1438 | S | medium | ok |  | pan flywheel start launcher process orphans when orchestrator dies externally |
-| 134 | PAN-1439 | S | medium | ok |  | Recover conv-2084's in-progress PANOPTICON_PROJECT_ROOT env var work |
-| 135 | PAN-1440 | S | medium | ok |  | Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
-| 136 | PAN-1445 | L | medium | ok |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 137 | PAN-1446 | L | medium | ok |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 138 | PAN-1447 | S | medium | ok |  | PAN-1194 follow-up: restore failed-merge slot UI deleted by sibling PAN-1148 merge |
-| 139 | PAN-1449 | S | medium | ok |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
-| 140 | PAN-1472 | S | medium | ok |  | Swarm inspect agents emit pan tell to parent agent ID — fails when only slot agents exist |
-| 141 | PAN-1530 | S | medium | needs-refinement |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 142 | PAN-1559 | S | medium | ok |  | Orphaned inspect sessions: live tmux panes with no state.json escape all reapers |
-| 143 | PAN-1564 | M | medium | ok |  | Pi extension path + dashboard server spawn both depend on launch cwd (fix: resolve against packageRoot + pin spawn cwd) |
-| 144 | PAN-1565 | S | medium | ok |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 145 | PAN-1570 | S | medium | ok |  | Cost recorder silently dropped ALL cost events since 2026-05-21 (Effect-migration regression) |
-| 146 | PAN-1571 | S | medium | ok |  | Large multi-line pastes (handoff docs) land unsubmitted — paste/submit verification is blind to Claude's collapsed "[Pasted text +N lin... |
-| 147 | PAN-1582 | S | medium | ok |  | Handoff fork falls back to summary: external authoring session stalls on Write permission |
-| 148 | PAN-1624 | S | medium | ok |  | pan handoff --author external: authored doc is socket_write-ten but never submitted — successor sits at empty welcome screen |
-| 149 | PAN-1637 | S | medium | ok |  | Conversation resume reattaches to a keep-alive corpse (no harness-liveness probe) |
-| 150 | PAN-1638 | S | medium | ok |  | Conversation DB status stays 'active' after the harness process dies |
-| 151 | PAN-1652 | S | medium | ok |  | Conversation title regeneration 500s on large transcripts — claude title invocation times out at 30s |
-| 152 | PAN-1673 | S | medium | ok |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 153 | PAN-1674 | S | medium | ok |  | TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC |
-| 154 | PAN-1681 | M | medium | ok |  | bug(pipeline): test agents narrate 'tests pass' but never run pan specialists done test → strand at test=pending; no test-completion fa... |
-| 155 | PAN-1682 | M | medium | ok |  | bug(dashboard): strike agents missing from Command Deck issue tree — resource-discovery.ts:471 tmux-prefix allowlist omits 'strike-' (9... |
-| 156 | PAN-1688 | S | medium | ok |  | System Briefing: 'Cost today' card always $0.00 — reads orphaned cost-monitor.dailyTotal instead of cost_events |
-| 157 | PAN-1689 | S | medium | ok |  | System Briefing: 'Paused / troubled' card inflated ~8x (~185 vs real ~24) by stale stopped sub-agent tombstones |
-| 158 | PAN-1718 | S | medium | ok |  | Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes |
-| 159 | PAN-1722 | S | medium | ok |  | Awareness rail activity entries don't survive page load — snapshot doesn't seed recentActivity, only live events accumulate |
-| 160 | PAN-1781 | S | medium | ok |  | Context-overflow recovery: claude --resume bypasses panopticon-native compact boundaries (~50% of the time) — compaction is a silent no... |
-| 161 | PAN-1789 | S | medium | ok |  | Conversation status shows 'ended' for a live codex-harness handoff session |
-| 162 | PAN-1790 | S | medium | ok |  | pan handoff: focus text without conv id mis-parses as conversation; help string missing codex; 500-char focus limit undocumented |
-| 163 | PAN-1793 | S | medium | ok |  | pan handoff kickoff message is not delivered to pi-harness conversations |
-| 164 | PAN-1795 | S | medium | ok |  | Codebase map bootstrapped in planning worktree is never promoted to main (PAN-1788 WI-6 wiring gap) |
-| 165 | PAN-1816 | S | medium | ok |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag + aut... |
-| 166 | PAN-1817 | S | medium | ok |  | Linear API quota exhausted by IssueDataService polling (2500/hr ceiling hit, 84+ poll errors) — regression of the pre-safeguard tracker... |
-| 167 | PAN-1823 | S | medium | ok |  | Linear polling is not rate-limit-aware — no 429 backoff (secondary to PAN-1817) |
-| 168 | PAN-1824 | S | medium | ok |  | Flaky main CI: real-timer integration tests time out (~5s) on loaded runners — fork recovery, rollout-JSONL, heartbeat, conversation-ro... |
-| 169 | PAN-1827 | S | medium | ok |  | Conversation view blank for pi-harness sessions — resolver handles claude-code and codex only (flywheel orchestrator affected) |
-| 170 | PAN-1828 | S | medium | ok |  | Conversation fork/handoff harness defaults ignore source conversation harness — silent claude-code coercion |
-| 171 | PAN-1833 | S | medium | ok |  | Pi spawn checks pi-extension via process.cwd() — 'Pi extension not built' when pan start/strike is run from any non-repo-root dir |
-| 172 | PAN-1850 | S | medium | ok |  | Conversation transcripts >10MB are truncated by the initial-read cap (missing-middle live view) |
-| 173 | PAN-1893 | M | medium | ok |  | bug(cli): pan start STILL crashes toUpperCase after sync-main conflict for gpt-5.5/claude-code agent state — PAN-1872 fix incomplete (P... |
-| 174 | PAN-1897 | M | medium | ok |  | bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error) |
-| 175 | PAN-1900 | M | medium | ok |  | bug(flywheel): UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle (3 for 0614) |
-| 176 | PAN-1912 | S | medium | ok |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 177 | PAN-1956 | S | medium | ok |  | bug: GLM-5.2 and GLM-5.1: contextWindow set to output cap (should be input context); also verify pricing + text-only image handling |
-| 178 | PAN-1993 | S | medium | ok |  | Planning a freshly-created issue 404s (start-planning races GitHub issue propagation) |
-| 179 | PAN-1994 | M | medium | ok |  | bug(pipeline): fresh plan --auto issue inherits another issue's merged/verifying-on-main/paused state (PAN-1982 got PAN-1866's) |
-| 180 | PAN-1998 | S | medium | ok |  | Remodel cleanup: drop orphan observation_index + reset_markers tables from the overdeck.db migration (LOW) |
-| 181 | PAN-2001 | M | medium | ok |  | bug(pipeline): re-running `pan plan` on an already-planned issue phantom-merges it (merged/verifying-on-main + review_status=merged, no... |
-| 182 | PAN-1889 | L | medium | ok |  | feat(flywheel): retention/compaction policy for docs/FLYWHEEL-STATE.md — it grows unbounded and is read whole every run |
-| 183 | PAN-1436 | S | medium | ok |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 184 | PAN-1711 | S | medium | ok |  | Dashboard event loop stalls 15-25s under load — watchdog force-restarted it 3x in 45 min |
-| 185 | PAN-1769 | S | medium | ok |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil... |
-| 186 | PAN-1451 | S | low | ok |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 187 | PAN-1888 | M | low | ok |  | chore(hooks): work-agent-stop-hook still reads legacy review-status.json — finish the PAN-1883 SQLite-truth migration |
-| 188 | PAN-838 | S | low | ok |  | synthesis.json contains hallucinated timestamp + sparse structure (only counts, no findings arrays) |
-| 189 | PAN-1066 | S | low | ok |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 190 | PAN-1126 | L | low | ok |  | Integrate TLDR summaries into review context manifest |
-| 191 | PAN-1533 | S | low | ok |  | Fork-into-worktree from conversation branch chip |
-| 192 | PAN-1696 | S | low | ok |  | feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view |
-| 193 | PAN-1775 | L | low | ok |  | feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
-| 194 | PAN-2005 | S | low | ok |  | Backlog Sequencer: Pickup Forecast — visualize Flywheel pickup order (waves, lanes, planning bottleneck) |
-| 195 | PAN-2006 | S | low | ok |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 196 | PAN-37 | L | medium | ok |  | Support external PR selection for merge-agent |
-| 197 | PAN-38 | L | medium | ok |  | Support multiple merge agents per repository |
-| 198 | PAN-77 | S | medium | ok |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 199 | PAN-111 | L | medium | ok |  | Support cross-machine planning state sync without cross-contamination |
-| 200 | PAN-243 | S | medium | ok |  | Audit dashboard actions: ensure all are available via CLI |
-| 201 | PAN-252 | S | medium | ok |  | Disable Sync with Main button when workspace is up to date |
-| 202 | PAN-255 | S | medium | ok |  | Agents lack awareness of MCP tools — sync MCP config and inject into prompts |
-| 203 | PAN-258 | S | medium | ok |  | Kanban board: fit all columns without horizontal scrolling |
-| 204 | PAN-277 | S | medium | ok |  | Session reasoning capture & collaborative PRD refinement |
-| 205 | PAN-293 | S | medium | ok |  | Project Living Memory — per-project semantic memory for agents |
-| 206 | PAN-294 | S | medium | ok |  | Surface module initialization errors as system-level, not per-issue |
-| 207 | PAN-1469 | S | medium | ok |  | End-to-end review and consolidation of all project documentation |
-| 208 | PAN-1494 | M | medium | ok |  | chore(docs): register docs/FLYWHEEL-VISION on panopticon-cli.com (Mintlify) — needed for public sharing |
-| 209 | PAN-450 | S | medium | ok |  | Adopt remaining Effect patterns — Schema, Platform, Streams, Logging, Testing |
-| 210 | PAN-452 | S | medium | ok |  | Conversation input bar — mode/permissions/workspace selectors |
-| 211 | PAN-454 | S | medium | ok |  | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
-| 212 | PAN-456 | S | medium | ok |  | Store Claude Code session IDs for agent resume after crash/restart |
-| 213 | PAN-463 | L | medium | ok |  | Add Qwen 3.6+ model support |
-| 214 | PAN-465 | L | medium | ok |  | Add OpenRouter as a model provider |
-| 215 | PAN-466 | L | medium | ok |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 216 | PAN-531 | L | medium | ok |  | PAN: Windows Electron support (WSL2 required) |
-| 217 | PAN-546 | S | medium | ok |  | Remove claude-code-router — all providers use direct env var injection |
-| 218 | PAN-548 | S | medium | ok |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 219 | PAN-1684 | L | medium | ok |  | docs(marketing): build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 220 | PAN-606 | S | medium | ok |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 221 | PAN-607 | S | medium | ok |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 222 | PAN-608 | L | medium | ok |  | Integrate Destructive Command Guard (dcg) with configurable settings |
-| 223 | PAN-613 | S | medium | needs-refinement |  | Investigate thinking effort levels for agents — reduce signature corruption frequency |
-| 224 | PAN-629 | S | medium | ok |  | Workspace quotas and resource governance |
-| 225 | PAN-637 | S | medium | ok |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 226 | PAN-649 | S | medium | ok |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 227 | PAN-654 | S | medium | ok |  | Project Setup Wizard — Dashboard UI |
-| 228 | PAN-675 | S | medium | ok |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 229 | PAN-678 | S | medium | ok |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 230 | PAN-687 | L | medium | ok |  | Support OpenCode as alternative coding agent |
-| 231 | PAN-783 | XL | medium | ok |  | Agents Page Redesign — Unified Multi-View Experience |
-| 232 | PAN-818 | S | medium | ok |  | Make summary optional when forking conversations |
-| 233 | PAN-901 | L | medium | ok |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 234 | PAN-902 | L | medium | ok |  | Settings: add 'Run pan sync' button to configuration menu |
-| 235 | PAN-903 | S | medium | ok |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 236 | PAN-938 | S | medium | ok |  | Fizzy visual pipeline — Kanban mirror for specialist pipeline |
-| 237 | PAN-947 | S | medium | ok |  | feat: project management actions in unified sidebar |
-| 238 | PAN-949 | L | medium | ok |  | feat: add conversation for project from sidebar |
-| 239 | PAN-958 | L | medium | ok |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 240 | PAN-1037 | S | medium | ok |  | Retire 'planning-' tmux prefix — fold into agent-PAN-N keyed by phase |
-| 241 | PAN-1060 | S | medium | ok |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 242 | PAN-1102 | L | medium | ok |  | feat(dashboard): real-time notification + interactive prompts when agent awaits user input |
-| 243 | PAN-1151 | S | medium | ok |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 244 | PAN-1164 | S | medium | ok |  | Push diff summary updates over /ws/rpc instead of 5s polling |
-| 245 | PAN-1165 | S | medium | ok |  | Lightweight review path for small/trivial PRs |
-| 246 | PAN-1202 | S | medium | ok |  | Swarm: prune merged/completed slot state directories after wave converges |
-| 247 | PAN-1223 | S | medium | ok |  | Auto-update for users in the field (npm + desktop binaries) |
-| 248 | PAN-1432 | S | medium | ok |  | Merge agent leaves packages/contracts/dist stale — typecheck breaks on every fresh checkout |
-| 249 | PAN-1437 | S | medium | ok |  | pan flywheel report semantics: split read-only snapshot from run finalization |
-| 250 | PAN-1442 | S | medium | ok |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 251 | PAN-1443 | L | medium | ok |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
-| 252 | PAN-1453 | S | medium | ok |  | Audit: 3 cheap verifications that should ride along with merges (PAN-1170, PAN-1316, PAN-457 CLI parity) |
-| 253 | PAN-1473 | L | medium | ok |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 254 | PAN-1485 | S | medium | ok |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 255 | PAN-1489 | XL | medium | ok |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
-| 256 | PAN-1490 | L | medium | ok |  | feat(dashboard): show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 257 | PAN-1524 | S | medium | ok |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 258 | PAN-1542 | S | medium | ok |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 259 | PAN-1545 | L | medium | ok |  | feat(dashboard): New Terminal button — spawn ad-hoc bash sessions from sidebar / conversation / drawer / palette |
-| 260 | PAN-399 | S | medium | ok |  | Release specialist — coordinated post-merge rollout and release safety |
-| 261 | PAN-1577 | S | medium | ok |  | Move a conversation to a different project (CLI + drag/drop + menu action) |
-| 262 | PAN-1610 | S | medium | ok |  | Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer) |
-| 263 | PAN-1623 | S | medium | ok |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 264 | PAN-532 | S | medium | ok |  | Per-project and per-issue model overrides for workflow agent model selection |
-| 265 | PAN-1653 | L | medium | ok |  | perf(docs-rag): batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 266 | PAN-1654 | L | medium | ok |  | perf(build): run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 267 | PAN-1655 | S | medium | ok |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 268 | PAN-1656 | S | medium | ok |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 269 | PAN-1657 | S | medium | ok |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 270 | PAN-1666 | S | medium | ok |  | [EPIC] Pipeline Throughput Hardening — run many work agents safely, on-demand specialists, slot manager, fly.io scale-out |
-| 271 | PAN-1671 | L | medium | ok |  | feat(dashboard): surface pending ExitPlanMode plan as a popup modal (reuse PlanCard + /plan-action) |
-| 272 | PAN-1672 | S | medium | ok |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 273 | PAN-1676 | L | medium | ok |  | feat(fly.io): harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 274 | PAN-1685 | S | medium | ok |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 275 | PAN-1837 | L | medium | ok |  | Support Kimi Code as a first-class harness (Moonshot's own coding CLI) |
-| 276 | PAN-1838 | L | medium | ok |  | [research] Grok Build (xAI) coding harness — research and specify support |
-| 277 | PAN-1839 | S | medium | ok |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 278 | PAN-1840 | L | medium | ok |  | Add 'pan switch <id>' — change a running agent's model/harness in one command (kill + fresh-start + re-onboard) |
-| 279 | PAN-1844 | S | medium | ok |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 280 | PAN-1853 | S | medium | ok |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 281 | PAN-1854 | S | medium | ok |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 282 | PAN-1916 | L | medium | ok |  | feat(search): configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 283 | PAN-1955 | S | medium | ok |  | Issue cockpit: move beads from a tab into a persistent right rail with a 'working now' highlight |
-| 284 | PAN-1965 | S | medium | ok |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 285 | PAN-1966 | S | medium | ok |  | Single authoritative pipeline-membership resolver — one function for "what's in the pipeline" (collapse the 5 divergent views) |
-| 286 | PAN-1967 | L | medium | ok |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 287 | PAN-1968 | S | medium | ok |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 288 | PAN-1985 | S | medium | ok |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 289 | PAN-1991 | XL | medium | ok |  | Issue cockpit redesign — incremental rollout (tracking) |
-| 290 | PAN-1995 | S | medium | ok |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 291 | PAN-2004 | S | medium | ok |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 292 | PAN-43 | L | low | ok |  | Add Slack and email notifications for agent events |
-| 293 | PAN-44 | S | low | ok |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 294 | PAN-47 | S | low | ok |  | PRD files should be committed to feature branch, moved to completed/ on merge |
-| 295 | PAN-51 | S | low | ok |  | Documentation: Clarify issue tracker options beyond Linear |
-| 296 | PAN-52 | S | low | ok |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 297 | PAN-54 | L | low | ok |  | feat: Add pan test:e2e command for full workflow integration test |
-| 298 | PAN-55 | S | low | ok |  | Track specialist costs with time period filtering |
-| 299 | PAN-817 | S | medium | ok |  | Improve planning dialog layout and content fit |
-| 300 | PAN-104 | S | low | ok |  | Cost alerts/notifications when spending exceeds thresholds |
-| 301 | PAN-106 | S | low | ok |  | Cost prediction/estimation for in-progress work |
-| 302 | PAN-924 | S | medium | ok |  | Spike: evaluate GitNexus for Panopticon integration |
-| 303 | PAN-1040 | L | medium | ok |  | feat(infra): event-driven dispatch for inspect-agent (requiresInspection=true beads) |
-| 304 | PAN-1041 | S | medium | ok |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 305 | PAN-146 | S | low | ok |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 306 | PAN-155 | XL | low | ok |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 307 | PAN-175 | S | low | ok |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 308 | PAN-176 | S | low | ok |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 309 | PAN-177 | S | low | ok |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 310 | PAN-178 | S | low | ok |  | PAN-178: Crash recovery with granular task checkpointing |
-| 311 | PAN-180 | S | low | ok |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 312 | PAN-190 | S | low | ok |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 313 | PAN-633 | L | low | ok |  | Update Cloister PRD and docs index — stale relative to implementation |
-| 314 | PAN-634 | S | low | ok |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 315 | PAN-198 | S | low | ok |  | Structured audit trail for agent actions |
-| 316 | PAN-1103 | L | medium | ok |  | feat(dashboard): surface AskUserQuestion choice options in conversation view |
-| 317 | PAN-674 | L | low | ok |  | docs: add glossary of Panopticon domain terms |
-| 318 | PAN-227 | L | low | ok |  | Phase gate validation — mid-implementation acceptance checks |
-| 319 | PAN-228 | S | low | ok |  | Shift-left post-edit diagnostics — type check after every edit |
-| 320 | PAN-241 | XL | low | ok |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
-| 321 | PAN-249 | L | low | ok |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 322 | PAN-265 | S | low | ok |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 323 | PAN-271 | S | low | ok |  | Auto-assign Linear project from project config when creating issues |
-| 324 | PAN-283 | S | low | ok |  | Reset should sync workspace feature branch with latest main |
-| 325 | PAN-297 | S | low | ok |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 326 | PAN-298 | S | low | ok |  | Auto-detect package manager and runtime in workspace setup |
-| 327 | PAN-299 | S | low | ok |  | Granular session state persistence across context compaction |
-| 328 | PAN-306 | M | low | ok |  | fix: merge-agent polyrepo false failures — stale refs, wrong error field, short timeout |
-| 329 | PAN-371 | S | low | ok |  | Agents tab only shows global specialists, not per-project ephemeral ones |
-| 330 | PAN-1474 | L | low | ok |  | Add ACKNOWLEDGEMENTS doc — credit borrowed code from open-source projects (MIT/Apache 2.0) |
-| 331 | PAN-1555 | S | low | ok |  | Docs: remove/update stale swarm-runtime references after PAN-1517 |
-| 332 | PAN-407 | S | low | ok |  | Run Panopticon from a main workspace for development isolation |
-| 333 | PAN-438 | L | low | ok |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 334 | PAN-459 | S | low | ok |  | Planning setup screen with SSE progress streaming |
-| 335 | PAN-461 | S | low | ok |  | Deep-wipe multi-step progress dialog |
-| 336 | PAN-468 | S | low | ok |  | Agent test conversations pollute production database — need test isolation |
-| 337 | PAN-471 | S | low | ok |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 338 | PAN-472 | S | low | ok |  | GET /api/costs/by-issue takes 10s — N+1 query on 353K rows × 184 issues |
-| 339 | PAN-476 | S | low | ok |  | Agent resume with Haiku session summary instead of claude --resume |
-| 340 | PAN-480 | S | low | ok |  | Pass --effort flag when spawning planning agents via Cloister |
-| 341 | PAN-483 | S | low | ok |  | Unify Resume Agent UX — all entry points should show message input |
-| 342 | PAN-487 | S | low | ok |  | VBRIEF not archived to docs/prds/completed/ after merge |
-| 343 | PAN-543 | L | low | ok |  | Add confirmation dialog before applying Optimal Defaults |
-| 344 | PAN-552 | S | low | ok |  | Claude Code terminals should respect app light/dark mode scheme |
-| 345 | PAN-554 | L | low | ok |  | Add kanban board deeplinks for issue URLs |
-| 346 | PAN-564 | S | low | ok |  | Slash menu positioned incorrectly — cut off / off-screen |
-| 347 | PAN-565 | S | low | ok |  | Handle CTRL-Z to undo accidental conversation archival |
-| 348 | PAN-568 | S | low | ok |  | Kanban: Show workspace and tmux session counts in stats |
-| 349 | PAN-570 | S | low | ok |  | Show PLAN badge on costs when under a subscription/plan |
-| 350 | PAN-571 | L | low | ok |  | Add OpenRouter credits/plan status endpoint and UI |
-| 351 | PAN-576 | S | low | ok |  | Global / search should include conversations in addition to workspace features |
-| 352 | PAN-589 | S | low | ok |  | Review and update commands-skills.md with all available Panopticon skills |
-| 353 | PAN-591 | L | low | ok |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 354 | PAN-1683 | S | low | ok |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) — strike keeps falling o... |
-| 355 | PAN-603 | S | low | ok |  | Plan review loop with configurable reviewer model |
-| 356 | PAN-604 | S | low | ok |  | Hide planning agent from workspace detail pane |
-| 357 | PAN-622 | S | low | ok |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 358 | PAN-623 | S | low | ok |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 359 | PAN-624 | S | low | ok |  | Loop nodes: iterative agent execution with conditional termination |
-| 360 | PAN-656 | S | low | ok |  | Docs site scroll broken: dashboard CSS leaks onto panopticon-cli.com |
-| 361 | PAN-658 | S | low | ok |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
-| 362 | PAN-660 | S | low | ok |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 363 | PAN-663 | S | low | ok |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 364 | PAN-683 | M | low | ok |  | fix(tests): shadow-state getPendingSyncCount test is environment-dependent |
-| 365 | PAN-701 | S | low | ok |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 366 | PAN-702 | L | low | ok |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 367 | PAN-709 | L | low | ok |  | feat(flywheel): self-improving flywheel — retro agent, skill-change pipeline, audience-scoped skills, Q&A detection, autonomous daemon |
-| 368 | PAN-727 | S | low | ok |  | Fix orphaned work-agent start handoff after planning |
-| 369 | PAN-730 | L | low | ok |  | Add provider account telemetry for credits, balances, and usage |
-| 370 | PAN-735 | S | low | ok |  | Settings page: review and configure overridden subagent model files |
-| 371 | PAN-736 | S | low | ok |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
-| 372 | PAN-738 | L | low | ok |  | Add right-click fork option to conversation list |
-| 373 | PAN-743 | L | low | ok |  | Add consistent new conversation icon actions in Command Deck |
-| 374 | PAN-747 | S | low | ok |  | Conversation list items lack accessible labels in accessibility tree |
-| 375 | PAN-749 | S | low | ok |  | Research and borrow best features from gstack |
-| 376 | PAN-750 | XL | low | ok |  | PAN-XXX: Complete Metrics Page Redesign — Real Data, Charts, Time Filtering, and TLDR Analytics |
-| 377 | PAN-751 | S | low | ok |  | PAN-XXX: Historical Metrics Data Persistence — Beyond the 30-Day JSONL Window |
-| 378 | PAN-752 | L | low | ok |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 379 | PAN-762 | S | low | ok |  | Settings: warn when model overrides target disabled providers |
-| 380 | PAN-764 | L | low | ok |  | Add quota/usage inspector for routed model providers |
-| 381 | PAN-765 | S | low | ok |  | Preserve trailing zeros in cost displays |
-| 382 | PAN-769 | S | low | ok |  | Track verification/review/test phase churn over time |
-| 383 | PAN-771 | S | low | needs-refinement |  | Investigate Vercel Sandbox execution backend support |
-| 384 | PAN-772 | S | low | ok |  | Unify terminal stack behavior across tmux sessions |
-| 385 | PAN-773 | S | low | ok |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 386 | PAN-774 | XL | low | ok |  | Unify launch UX and release pipeline for 1.0 — npx panctl, lazy prereqs, cross-platform desktop builds |
-| 387 | PAN-775 | XL | low | ok |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 388 | PAN-777 | S | low | ok |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 389 | PAN-778 | S | low | ok |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 390 | PAN-780 | S | low | ok |  | Agent stuck in feedback loop when old feedback files exist but review has passed |
-| 391 | PAN-786 | S | low | ok |  | Post planning Q\&A answers as issue comment |
-| 392 | PAN-790 | S | low | ok |  | PAN-789: Eliminate remaining TanStack Query polling — complete push-first migration |
-| 393 | PAN-791 | S | low | ok |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
-| 394 | PAN-793 | S | low | ok |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
-| 395 | PAN-797 | S | low | ok |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 396 | PAN-810 | S | low | ok |  | Inspector: diagnostic UI when pipeline phase is unknown |
-| 397 | PAN-832 | S | low | ok |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 398 | PAN-833 | S | low | ok |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 399 | PAN-834 | S | low | ok |  | Cleanup: legacy ~/.panopticon/heartbeats/ directory has not been written since 2026-04-22 |
-| 400 | PAN-835 | S | low | ok |  | Workspace creation removes stale .planning/ from previous issue but doesn't commit deletion → PR diff includes 982 unrelated lines |
-| 401 | PAN-853 | S | low | ok |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 402 | PAN-898 | S | low | ok |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 403 | PAN-904 | S | low | ok |  | Make AI title generation model configurable |
-| 404 | PAN-908 | S | low | ok |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 405 | PAN-927 | S | low | ok |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 406 | PAN-943 | L | low | ok |  | Add memory file review and management command |
-| 407 | PAN-944 | S | low | ok |  | Make vBRIEF the durable task graph source of truth |
-| 408 | PAN-948 | L | low | ok |  | Implement pan scope lifecycle commands |
-| 409 | PAN-961 | S | low | ok |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 410 | PAN-962 | S | low | ok |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 411 | PAN-984 | S | low | ok |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 412 | PAN-1049 | S | low | ok |  | Spike: evaluate Tauri v2 desktop shell |
-| 413 | PAN-1051 | S | low | ok |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 414 | PAN-1063 | S | low | ok |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 415 | PAN-1064 | S | low | ok |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 416 | PAN-1065 | S | low | ok |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 417 | PAN-1101 | S | low | ok |  | Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire |
-| 418 | PAN-1115 | S | low | ok |  | Inject observation context into agent prompts |
-| 419 | PAN-1116 | S | low | ok |  | Memory: cross-project search mode |
-| 420 | PAN-1117 | S | low | ok |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 421 | PAN-1121 | S | low | ok |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 422 | PAN-1122 | S | low | ok |  | Trim OpenAI model catalog to 5 supported models |
-| 423 | PAN-1123 | L | low | ok |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 424 | PAN-1124 | S | low | ok |  | Decouple specs and PRDs from workspaces — write directly to main |
-| 425 | PAN-1133 | S | low | ok |  | TLDR: deacon supervision + pan doctor check + GC |
-| 426 | PAN-1135 | S | low | ok |  | Document the hook system in docs/HOOKS.md |
-| 427 | PAN-1136 | S | low | ok |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
-| 428 | PAN-1147 | S | low | ok |  | Work-agent done flow stalls at 'push and re-request review' after addressing review feedback |
-| 429 | PAN-1152 | S | low | ok |  | Remove PANOPTICON_DEV env-var persistence — derive Traefik mode from the running command |
-| 430 | PAN-1153 | S | low | ok |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' — breaks pan dev proxy |
-| 431 | PAN-1154 | S | low | ok |  | pan up does not kill existing port holders — startup races against orphan dashboard servers |
-| 432 | PAN-1166 | S | low | ok |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
-| 433 | PAN-1208 | L | low | ok |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 434 | PAN-1222 | S | low | ok |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 435 | PAN-1238 | S | low | ok |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
-| 436 | PAN-1242 | S | low | ok |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
-| 437 | PAN-1244 | S | low | ok |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 438 | PAN-1245 | S | low | ok |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
-| 439 | PAN-1325 | S | low | ok |  | Artifact storage model is unsafe for polyrepo projects — define a canonical "orchestration repo" |
-| 440 | PAN-1356 | S | low | ok |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 441 | PAN-1479 | L | low | ok |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 442 | PAN-1480 | S | low | ok |  | TLDR: 93% bypass rate — daemon/hook integration broken |
-| 443 | PAN-1481 | L | low | ok |  | Add cost-event telemetry for Caveman token savings |
-| 444 | PAN-1482 | S | low | ok |  | Token spend report should aggregate data from repo, not just local machine |
-| 445 | PAN-1483 | S | low | ok |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 446 | PAN-1493 | S | low | ok |  | TEST: write hello.txt — probe for PAN-1200 Universal Context System verification |
-| 447 | PAN-1547 | M | low | ok |  | fix: @panctl/cli npm install warns on Node <22 (engine mismatch + deprecated deps) |
-| 448 | PAN-1548 | M | low | ok |  | fix: npx @panctl/cli shows stale placeholder message referencing v0.8.0 |
-| 449 | PAN-1550 | L | low | ok |  | feat: FilesPane + BrowserPane — file browser and embedded web view implementation details |
-| 450 | PAN-1552 | S | low | ok |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 451 | PAN-1553 | L | low | needs-refinement |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 452 | PAN-1572 | S | low | ok |  | Settings permission-mode can desync from resolved config — agents silently use --dangerously-skip-permissions despite 'Auto' |
-| 453 | PAN-1573 | S | low | ok |  | Consideration for reintroducing ability to --dangerously-skip-permissions, DO NOT act on this issue |
-| 454 | PAN-1581 | S | low | ok |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 455 | PAN-1592 | S | low | ok |  | Composer: make pasted images reload-durable (persist across page reload, not just conversation switches) |
-| 456 | PAN-1619 | S | low | ok |  | Bridge host Codex auth into workspace containers + honest gpt-5.5 lock reason |
-| 457 | PAN-1620 | S | low | ok |  | Awaiting-Merge button is clickable on a conflicting/CI-failing PR (stale blockerReasons) |
-| 458 | PAN-1621 | S | low | ok |  | pan close human-only gate over-blocks operator conv-* sessions |
-| 459 | PAN-1622 | S | low | ok |  | pan dev restart leaves orphan dashboard servers (stale serving + multi-Deacon risk) |
-| 460 | PAN-1627 | S | low | ok |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr... |
-| 461 | PAN-537 | S | low | ok |  | feat: show changed files diff summary after each agent response in activity view |
-| 462 | PAN-1640 | S | low | ok |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 463 | PAN-1641 | L | low | ok |  | Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness |
-| 464 | PAN-1643 | L | low | ok |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 465 | PAN-1644 | S | low | ok |  | Hook-driven progressive conversation titling |
-| 466 | PAN-1646 | S | low | ok |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 467 | PAN-1667 | L | low | ok |  | feat(dashboard): unify Agents + Resources into one issue-centric holistic view |
-| 468 | PAN-1668 | M | low | ok |  | bug(dashboard): right-click 'restart with <model>' carries model only, never harness — can't move a review off Kimi |
-| 469 | PAN-1669 | M | low | ok |  | bug(dashboard): restart-with-model doesn't emit a live event — issue tree shows stale model until manual refresh |
-| 470 | PAN-1670 | M | low | ok |  | bug(dev): pan dev hot-reload wedges tabs on 'Reconnecting to the dashboard…' — PAN-1580 boot watchdog never fires under Vite |
-| 471 | PAN-592 | S | low | ok |  | Audit: Planning agent CLAUDE.md and STATE.md contents vs expectations |
-| 472 | PAN-1691 | L | low | ok |  | feat(flywheel): conflict-aware merge train + on-demand UAT candidate — stop the rebase-cascade that strands ready PRs |
-| 473 | PAN-1705 | M | low | ok |  | bug(dashboard): conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse |
-| 474 | PAN-1706 | M | low | ok |  | bug(agents): orphaned playwright-mcp headless Chromiums keep full dashboard pages open — each multiplies dashboard poll load |
-| 475 | PAN-1708 | M | low | ok |  | bug(lifecycle): pan start CLI never flips spec plan.status proposed→approved — all 8 in-flight specs stuck at proposed, triggering reco... |
-| 476 | PAN-1710 | M | low | ok |  | bug(ci): 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 — serv... |
-| 477 | PAN-1726 | M | low | ok |  | bug(lifecycle): postMergeLifecycle did not pause the merged issue's work agent — idle agent holds a work slot and throttles all pipelin... |
-| 478 | PAN-1728 | M | low | ok |  | bug(work): PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch |
-| 479 | PAN-1729 | M | low | ok |  | test(beads): beads-scoping work.md "-l {{ISSUE_ID_LOWER}}" label-filter assertion fails on main |
-| 480 | PAN-1730 | M | low | ok |  | bug(governor): idle awaiting-test work sessions count against the PAN-1665 ceiling — pipeline livelocks when work pool alone exceeds to... |
-| 481 | PAN-1734 | M | low | ok |  | fix(test): request-review-nudge remote workspace HEAD test fails on main |
-| 482 | PAN-1735 | L | low | ok |  | feat(flywheel): adopt externally-completed readyForMerge issues into the pipeline/merge queue |
-| 483 | PAN-1739 | M | low | ok |  | bug(dashboard): Command Deck issue TREE still hides strike agents — frontend FeatureItem session-type allowlist omits 'strike' (4th all... |
-| 484 | PAN-1740 | S | low | ok |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
-| 485 | PAN-646 | L | low | ok |  | Canceled issues: add guided Recover workflow |
-| 486 | PAN-1748 | L | low | ok |  | feat(cloister): reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 487 | PAN-1750 | L | low | ok |  | feat(flywheel): UAT assembly/conflict agent — observability surfaces + configurable harness/model (default gpt-5.5 via Codex) |
-| 488 | PAN-1751 | L | low | ok |  | feat(settings): harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 489 | PAN-1754 | L | low | ok |  | feat(settings): surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 490 | PAN-1755 | M | low | ok |  | bug(cloister): uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 491 | PAN-1758 | M | low | ok |  | bug(cloister): ship lane cannot converge on a continuously-moving main — 37 re-dispatches for one issue; readyForMerge only ever flips ... |
-| 492 | PAN-1761 | M | low | ok |  | bug(dashboard): conversations endpoints fetched via relative /api path — 403 inside workspace/UAT containers (session cookie is on the ... |
-| 493 | PAN-1762 | S | low | ok |  | Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B) |
-| 494 | PAN-1773 | S | low | ok |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 495 | PAN-1774 | M | low | ok |  | bug(uat): workspace server container crashloops when dist/dashboard/server.js is missing |
-| 496 | PAN-1782 | S | low | ok |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout — decouple precompaction from the handoff author model |
-| 497 | PAN-1846 | M | low | ok |  | bug(cloister): unbounded log growth — deacon.log 687MB / dashboard.log 91MB, no rotation; per-agent skip line logged every 60s patrol |
-| 498 | PAN-700 | S | low | ok |  | Detachable terminal for conversation view — popout into OS window |
-| 499 | PAN-1868 | S | low | ok |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 500 | PAN-713 | L | low | ok |  | test: add unit tests for doneCommand and approveCommand |
-| 501 | PAN-1874 | L | low | ok |  | feat(review): per-issue override for review mode / re-review scope (extends PAN-1862 project-scope config) |
-| 502 | PAN-1875 | L | low | ok |  | feat(flywheel): add `pan flywheel stop` — graceful shutdown that writes the report |
-| 503 | PAN-1879 | M | low | ok |  | bug(restart): pan restart silently re-applies stale boot gates; no way to re-enable deacon/resume (asymmetric flags) |
-| 504 | PAN-1878 | S | low | ok |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 505 | PAN-1882 | M | low | ok |  | bug(strike): strike workspaces never cleaned up — worktrees + branches pile up forever (27 / 16GB observed) |
-| 506 | PAN-1894 | S | low | ok |  | Show UAT stack startup state in issue tree and issue slide-out |
-| 507 | PAN-1895 | S | low | ok |  | Spawn work agents from issue workspace slide-out |
-| 508 | PAN-1896 | S | low | ok |  | Reduce approval friction for GitHub CLI operations in managed sessions |
-| 509 | PAN-1906 | S | low | ok |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 510 | PAN-1907 | S | low | ok |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every... |
-| 511 | PAN-1909 | M | low | ok |  | bug(planning): pan plan done handoff tail hangs (dashboard-notify/transition) — declares 'done' with spec only on local main |
-| 512 | PAN-1910 | S | low | ok |  | fast-follow(PAN-1908): collapse issue status to ONE canonical field — labels become a derived projection, not the source of truth |
-| 513 | PAN-1914 | S | low | ok |  | Follow-up: move /api/health/agents off agent-directory scans |
-| 514 | PAN-1917 | XL | low | ok |  | /sessions page redesign: unify with conversation view |
-| 515 | PAN-1918 | M | low | ok |  | bug(ci): full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang sta... |
-| 516 | PAN-1926 | L | low | ok |  | feat(strike): --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 517 | PAN-1927 | M | low | ok |  | fix(config): remove hardcoded model fallbacks — default/role model must come from explicit settings |
-| 518 | PAN-1928 | S | low | ok |  | Lock model switching to brand-new conversations only (0 messages) — never for agents or started sessions |
-| 519 | PAN-1929 | S | low | ok |  | hazard(auto-commit): background git rebase rewrites history in the SHARED primary worktree — stop mutating the shared tree |
-| 520 | PAN-1931 | L | low | ok |  | complete-planning force-adds gitignored .pan/ state via 'git add -f' (regresses PAN-1215, violates PAN-1819) |
-| 521 | PAN-1932 | S | low | ok |  | Schema migration downgrades user_version when DB is newer than code (=== SCHEMA_VERSION should be >=) |
-| 522 | PAN-1934 | S | low | ok |  | hazard: verification gate drives agents through up to 10 retry cycles on an unfixable check (no operator escalation, invisible burn) |
-| 523 | PAN-1935 | S | low | ok |  | pi/kimi work-agent cost not recorded in cost_events → runaway spend is invisible (no cost-based safety possible) |
-| 524 | PAN-1937 | S | low | ok |  | feat: data export — portable bundle (conversations + favorites core; decoupled optional cost ledger) + user-facing Export my data |
-| 525 | PAN-1949 | S | low | ok |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all bead verdicts |
-| 526 | PAN-1951 | S | low | ok |  | Inspector agent should resume a warm session instead of cold-spawning a new one per bead |
-| 527 | PAN-1953 | S | low | ok |  | Design: beads rail mockup |
-| 528 | PAN-1954 | S | low | ok |  | Beads rail: move beads to right sidebar, highlight active work |
-| 529 | PAN-1958 | S | low | ok |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 530 | PAN-1963 | L | low | ok |  | Default to no-resume on dashboard boot; add 'Resume all' to the stopped-agents banner |
-| 531 | PAN-1980 | S | low | ok |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
-| 532 | PAN-1983 | S | low | ok |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 533 | PAN-1984 | L | low | ok |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 534 | PAN-1986 | S | low | ok |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 535 | PAN-1987 | S | low | ok |  | Allow renaming a registered project (display name is locked at registration) |
-| 536 | PAN-1988 | S | low | ok |  | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
-| 537 | PAN-1989 | S | low | ok |  | Replace Pi harness with ohmypi and evaluate advanced features |
-| 538 | PAN-1990 | S | low | ok |  | First-class workspaces and projects with per-workspace memory |
-| 539 | PAN-1999 | S | low | ok |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 540 | PAN-2002 | L | low | ok |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 541 | PAN-2007 | S | low | ok |  | Temporary: keep specialist (review/test/ship) sessions alive through the pipeline — disable PAN-1716 reaper + done-path kill |
-| 542 | PAN-2008 | L | low | ok |  | feat(ci): store-access guard — fail the build on direct store reads outside a domain resolver (PAN-1936 slice) |
-| 543 | PAN-2009 | M | low | ok |  | bug(pi): dead pi agent can't be resumed — ready.json 30s timeout + PAN-1980 blocks fresh-launch → review stuck stopped |
-| 544 | PAN-802 | S | low | ok |  | Resume on conversation session forks instead of resuming |
-| 545 | PAN-826 | L | low | ok |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
-| 546 | PAN-863 | S | low | ok |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
-| 547 | PAN-1857 | M | high | stale |  | bug(ci): main RED — verification-gate.test.ts asserts stale 'src/dashboard/frontend' in DEFAULT_GATES.test after generic-command change... |
-| 548 | PAN-1859 | M | high | stale |  | bug(ci): main RED — agent-spawning.test.ts 'resumeAgent delivers continue prompt through Pi FIFO' fails (writePiCommand not called) |
-| 549 | PAN-1880 | M | high | stale |  | bug(ci): main RED — start-sync-main-conflict.test.ts hits process.exit(1) under CI single-fork (maxForks:1) cross-file mock pollution; ... |
-| 550 | PAN-1698 | M | medium | stale |  | bug(ci): main is RED — model-count + schema-version + substrate-smoke test expectations stale (blocks every verify/ship/strike gate) |
-| 551 | PAN-1783 | M | medium | stale |  | bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title |
+| 90 | PAN-2010 | S | medium | ok |  | Sequencer one-shot session lingers after done (state.json stuck 'running'); singleton guard blocks next pass. Auto-clear finished sessions. |
+| 91 | PAN-1830 | S | medium | ok |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
+| 92 | PAN-1862 | L | medium | ok |  | feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review |
+| 93 | PAN-244 | S | medium | ok |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 94 | PAN-245 | S | medium | ok |  | Ctrl+C aborts planning dialog instead of copying text |
+| 95 | PAN-247 | S | medium | ok |  | Deacon has no backoff or escalation for repeated specialist startup failures |
+| 96 | PAN-304 | S | medium | ok |  | closeLinearDirect returns stepOk even when state update never happens |
+| 97 | PAN-321 | S | medium | ok |  | Ephemeral merge specialist fails silently for polyrepo MYN projects |
+| 98 | PAN-324 | S | medium | ok |  | Agent detail pane missing Merge/Approve button |
+| 99 | PAN-334 | S | medium | ok |  | Dashboard server has no duplicate-process protection — zombie instances cause 502 |
+| 100 | PAN-538 | L | medium | ok |  | npm run build sometimes skips Vite frontend rebuild |
+| 101 | PAN-673 | M | medium | ok |  | fix(dashboard): virtualizer inline ref causes blank conversation page on large message lists |
+| 102 | PAN-681 | S | medium | ok |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 103 | PAN-886 | S | medium | ok |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 104 | PAN-890 | S | medium | ok |  | Conflict-resolver agent merges stale main snapshot and never pushes |
+| 105 | PAN-899 | S | medium | ok |  | Agent CLI commands fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE |
+| 106 | PAN-900 | S | medium | ok |  | Trust devroot for conversations + atomic .claude.json writes |
+| 107 | PAN-928 | S | medium | ok |  | verification-runner: polyrepo workspaces fail at sync-target-branch |
+| 108 | PAN-929 | S | medium | ok |  | review-run: polyrepo workspaces detect overlay repo instead of code repos |
+| 109 | PAN-932 | S | medium | ok |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 110 | PAN-933 | S | medium | ok |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 111 | PAN-1027 | S | medium | ok |  | Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
+| 112 | PAN-1038 | S | medium | ok |  | Conversation diff panel always empty: conv.claudeSessionId is null for all conversations |
+| 113 | PAN-1042 | S | medium | ok |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 114 | PAN-1068 | S | medium | ok |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 115 | PAN-1113 | S | medium | ok |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 116 | PAN-1128 | S | medium | ok |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 117 | PAN-1129 | S | medium | ok |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 118 | PAN-1149 | S | medium | ok |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 119 | PAN-1150 | S | medium | ok |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 120 | PAN-1173 | S | medium | ok |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 121 | PAN-1227 | L | medium | ok |  | Substrate: bead can be closed without delivering the work — add per-bead delivery check in pan done |
+| 122 | PAN-1232 | S | medium | ok |  | PAN-1148 follow-up — IssueDrawer 6 tabs as placeholders + title font + header structure + stream colors |
+| 123 | PAN-1234 | S | medium | ok |  | PAN-1148 follow-up — cross-cutting (Space Grotesk / keyboard shortcuts / /issues/:id route / INPUT badge / pulse keyframe / conformance... |
+| 124 | PAN-1240 | S | medium | ok |  | Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
+| 125 | PAN-1243 | S | medium | ok |  | pan admin hooks install: resolver fails outside repo CWD (auto-config breaks flywheel resume) |
+| 126 | PAN-1247 | S | medium | ok |  | Substrate: deacon orphan-test recovery loops dispatch_failed forever on an unhealthy workspace docker stack |
+| 127 | PAN-1258 | S | medium | ok |  | Swarm slot spawn hangs silently before writeLauncherScriptAtomic when model=kimi-k2.6 |
+| 128 | PAN-1330 | S | medium | ok |  | CLI cannot address planning-*/specialist-* sessions — pan tell/pan kill hard-code 'agent-' prefix; no 'pan plan abort' |
+| 129 | PAN-1336 | S | medium | ok |  | Swarm: pan swarm --auto-advance cannot advance — no slot-PR merger, slots never self-terminate |
+| 130 | PAN-1386 | S | medium | ok |  | Flywheel orchestrator never emits status snapshots — dashboard 'flywheel' pane stays blank during an active run |
+| 131 | PAN-1392 | S | medium | ok |  | pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
+| 132 | PAN-1416 | S | medium | ok |  | Workspace-spawned dashboard servers can bind the main pan.localhost port and hijack the canonical dashboard |
+| 133 | PAN-1434 | S | medium | ok |  | conv-find.py reports session_file: N/A for newer conversation records (wrong column) |
+| 134 | PAN-1438 | S | medium | ok |  | pan flywheel start launcher process orphans when orchestrator dies externally |
+| 135 | PAN-1439 | S | medium | ok |  | Recover conv-2084's in-progress PANOPTICON_PROJECT_ROOT env var work |
+| 136 | PAN-1440 | S | medium | ok |  | Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
+| 137 | PAN-1445 | L | medium | ok |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 138 | PAN-1446 | L | medium | ok |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 139 | PAN-1447 | S | medium | ok |  | PAN-1194 follow-up: restore failed-merge slot UI deleted by sibling PAN-1148 merge |
+| 140 | PAN-1449 | S | medium | ok |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
+| 141 | PAN-1472 | S | medium | ok |  | Swarm inspect agents emit pan tell to parent agent ID — fails when only slot agents exist |
+| 142 | PAN-1530 | S | medium | needs-refinement |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 143 | PAN-1559 | S | medium | ok |  | Orphaned inspect sessions: live tmux panes with no state.json escape all reapers |
+| 144 | PAN-1564 | M | medium | ok |  | Pi extension path + dashboard server spawn both depend on launch cwd (fix: resolve against packageRoot + pin spawn cwd) |
+| 145 | PAN-1565 | S | medium | ok |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 146 | PAN-1570 | S | medium | ok |  | Cost recorder silently dropped ALL cost events since 2026-05-21 (Effect-migration regression) |
+| 147 | PAN-1571 | S | medium | ok |  | Large multi-line pastes (handoff docs) land unsubmitted — paste/submit verification is blind to Claude's collapsed "[Pasted text +N lin... |
+| 148 | PAN-1582 | S | medium | ok |  | Handoff fork falls back to summary: external authoring session stalls on Write permission |
+| 149 | PAN-1624 | S | medium | ok |  | pan handoff --author external: authored doc is socket_write-ten but never submitted — successor sits at empty welcome screen |
+| 150 | PAN-1637 | S | medium | ok |  | Conversation resume reattaches to a keep-alive corpse (no harness-liveness probe) |
+| 151 | PAN-1638 | S | medium | ok |  | Conversation DB status stays 'active' after the harness process dies |
+| 152 | PAN-1652 | S | medium | ok |  | Conversation title regeneration 500s on large transcripts — claude title invocation times out at 30s |
+| 153 | PAN-1673 | S | medium | ok |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 154 | PAN-1674 | S | medium | ok |  | TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC |
+| 155 | PAN-1681 | M | medium | ok |  | bug(pipeline): test agents narrate 'tests pass' but never run pan specialists done test → strand at test=pending; no test-completion fa... |
+| 156 | PAN-1682 | M | medium | ok |  | bug(dashboard): strike agents missing from Command Deck issue tree — resource-discovery.ts:471 tmux-prefix allowlist omits 'strike-' (9... |
+| 157 | PAN-1688 | S | medium | ok |  | System Briefing: 'Cost today' card always $0.00 — reads orphaned cost-monitor.dailyTotal instead of cost_events |
+| 158 | PAN-1689 | S | medium | ok |  | System Briefing: 'Paused / troubled' card inflated ~8x (~185 vs real ~24) by stale stopped sub-agent tombstones |
+| 159 | PAN-1718 | S | medium | ok |  | Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes |
+| 160 | PAN-1722 | S | medium | ok |  | Awareness rail activity entries don't survive page load — snapshot doesn't seed recentActivity, only live events accumulate |
+| 161 | PAN-1781 | S | medium | ok |  | Context-overflow recovery: claude --resume bypasses panopticon-native compact boundaries (~50% of the time) — compaction is a silent no... |
+| 162 | PAN-1789 | S | medium | ok |  | Conversation status shows 'ended' for a live codex-harness handoff session |
+| 163 | PAN-1790 | S | medium | ok |  | pan handoff: focus text without conv id mis-parses as conversation; help string missing codex; 500-char focus limit undocumented |
+| 164 | PAN-1793 | S | medium | ok |  | pan handoff kickoff message is not delivered to pi-harness conversations |
+| 165 | PAN-1795 | S | medium | ok |  | Codebase map bootstrapped in planning worktree is never promoted to main (PAN-1788 WI-6 wiring gap) |
+| 166 | PAN-1816 | S | medium | ok |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag + aut... |
+| 167 | PAN-1817 | S | medium | ok |  | Linear API quota exhausted by IssueDataService polling (2500/hr ceiling hit, 84+ poll errors) — regression of the pre-safeguard tracker... |
+| 168 | PAN-1823 | S | medium | ok |  | Linear polling is not rate-limit-aware — no 429 backoff (secondary to PAN-1817) |
+| 169 | PAN-1824 | S | medium | ok |  | Flaky main CI: real-timer integration tests time out (~5s) on loaded runners — fork recovery, rollout-JSONL, heartbeat, conversation-ro... |
+| 170 | PAN-1827 | S | medium | ok |  | Conversation view blank for pi-harness sessions — resolver handles claude-code and codex only (flywheel orchestrator affected) |
+| 171 | PAN-1828 | S | medium | ok |  | Conversation fork/handoff harness defaults ignore source conversation harness — silent claude-code coercion |
+| 172 | PAN-1833 | S | medium | ok |  | Pi spawn checks pi-extension via process.cwd() — 'Pi extension not built' when pan start/strike is run from any non-repo-root dir |
+| 173 | PAN-1850 | S | medium | ok |  | Conversation transcripts >10MB are truncated by the initial-read cap (missing-middle live view) |
+| 174 | PAN-1893 | M | medium | ok |  | bug(cli): pan start STILL crashes toUpperCase after sync-main conflict for gpt-5.5/claude-code agent state — PAN-1872 fix incomplete (P... |
+| 175 | PAN-1897 | M | medium | ok |  | bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error) |
+| 176 | PAN-1900 | M | medium | ok |  | bug(flywheel): UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle (3 for 0614) |
+| 177 | PAN-1912 | S | medium | ok |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 178 | PAN-1956 | S | medium | ok |  | bug: GLM-5.2 and GLM-5.1: contextWindow set to output cap (should be input context); also verify pricing + text-only image handling |
+| 179 | PAN-1993 | S | medium | ok |  | Planning a freshly-created issue 404s (start-planning races GitHub issue propagation) |
+| 180 | PAN-1994 | M | medium | ok |  | bug(pipeline): fresh plan --auto issue inherits another issue's merged/verifying-on-main/paused state (PAN-1982 got PAN-1866's) |
+| 181 | PAN-1998 | S | medium | ok |  | Remodel cleanup: drop orphan observation_index + reset_markers tables from the overdeck.db migration (LOW) |
+| 182 | PAN-2001 | M | medium | ok |  | bug(pipeline): re-running `pan plan` on an already-planned issue phantom-merges it (merged/verifying-on-main + review_status=merged, no... |
+| 183 | PAN-1889 | L | medium | ok |  | feat(flywheel): retention/compaction policy for docs/FLYWHEEL-STATE.md — it grows unbounded and is read whole every run |
+| 184 | PAN-1436 | S | medium | ok |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 185 | PAN-1711 | S | medium | ok |  | Dashboard event loop stalls 15-25s under load — watchdog force-restarted it 3x in 45 min |
+| 186 | PAN-1769 | S | medium | ok |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil... |
+| 187 | PAN-1451 | S | low | ok |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 188 | PAN-1888 | M | low | ok |  | chore(hooks): work-agent-stop-hook still reads legacy review-status.json — finish the PAN-1883 SQLite-truth migration |
+| 189 | PAN-838 | S | low | ok |  | synthesis.json contains hallucinated timestamp + sparse structure (only counts, no findings arrays) |
+| 190 | PAN-1066 | S | low | ok |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 191 | PAN-1126 | L | low | ok |  | Integrate TLDR summaries into review context manifest |
+| 192 | PAN-1533 | S | low | ok |  | Fork-into-worktree from conversation branch chip |
+| 193 | PAN-1696 | S | low | ok |  | feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view |
+| 194 | PAN-1775 | L | low | ok |  | feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
+| 195 | PAN-2005 | S | low | ok |  | Backlog Sequencer: Pickup Forecast — visualize Flywheel pickup order (waves, lanes, planning bottleneck) |
+| 196 | PAN-2006 | S | low | ok |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 197 | PAN-37 | L | medium | ok |  | Support external PR selection for merge-agent |
+| 198 | PAN-38 | L | medium | ok |  | Support multiple merge agents per repository |
+| 199 | PAN-77 | S | medium | ok |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 200 | PAN-111 | L | medium | ok |  | Support cross-machine planning state sync without cross-contamination |
+| 201 | PAN-243 | S | medium | ok |  | Audit dashboard actions: ensure all are available via CLI |
+| 202 | PAN-252 | S | medium | ok |  | Disable Sync with Main button when workspace is up to date |
+| 203 | PAN-255 | S | medium | ok |  | Agents lack awareness of MCP tools — sync MCP config and inject into prompts |
+| 204 | PAN-258 | S | medium | ok |  | Kanban board: fit all columns without horizontal scrolling |
+| 205 | PAN-277 | S | medium | ok |  | Session reasoning capture & collaborative PRD refinement |
+| 206 | PAN-293 | S | medium | ok |  | Project Living Memory — per-project semantic memory for agents |
+| 207 | PAN-294 | S | medium | ok |  | Surface module initialization errors as system-level, not per-issue |
+| 208 | PAN-1469 | S | medium | ok |  | End-to-end review and consolidation of all project documentation |
+| 209 | PAN-1494 | M | medium | ok |  | chore(docs): register docs/FLYWHEEL-VISION on panopticon-cli.com (Mintlify) — needed for public sharing |
+| 210 | PAN-450 | S | medium | ok |  | Adopt remaining Effect patterns — Schema, Platform, Streams, Logging, Testing |
+| 211 | PAN-452 | S | medium | ok |  | Conversation input bar — mode/permissions/workspace selectors |
+| 212 | PAN-454 | S | medium | ok |  | Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| 213 | PAN-456 | S | medium | ok |  | Store Claude Code session IDs for agent resume after crash/restart |
+| 214 | PAN-463 | L | medium | ok |  | Add Qwen 3.6+ model support |
+| 215 | PAN-465 | L | medium | ok |  | Add OpenRouter as a model provider |
+| 216 | PAN-466 | L | medium | ok |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 217 | PAN-531 | L | medium | ok |  | PAN: Windows Electron support (WSL2 required) |
+| 218 | PAN-546 | S | medium | ok |  | Remove claude-code-router — all providers use direct env var injection |
+| 219 | PAN-548 | S | medium | ok |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 220 | PAN-1684 | L | medium | ok |  | docs(marketing): build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 221 | PAN-606 | S | medium | ok |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 222 | PAN-607 | S | medium | ok |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 223 | PAN-608 | L | medium | ok |  | Integrate Destructive Command Guard (dcg) with configurable settings |
+| 224 | PAN-613 | S | medium | needs-refinement |  | Investigate thinking effort levels for agents — reduce signature corruption frequency |
+| 225 | PAN-629 | S | medium | ok |  | Workspace quotas and resource governance |
+| 226 | PAN-637 | S | medium | ok |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 227 | PAN-649 | S | medium | ok |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 228 | PAN-654 | S | medium | ok |  | Project Setup Wizard — Dashboard UI |
+| 229 | PAN-675 | S | medium | ok |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 230 | PAN-678 | S | medium | ok |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 231 | PAN-687 | L | medium | ok |  | Support OpenCode as alternative coding agent |
+| 232 | PAN-783 | XL | medium | ok |  | Agents Page Redesign — Unified Multi-View Experience |
+| 233 | PAN-818 | S | medium | ok |  | Make summary optional when forking conversations |
+| 234 | PAN-901 | L | medium | ok |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 235 | PAN-902 | L | medium | ok |  | Settings: add 'Run pan sync' button to configuration menu |
+| 236 | PAN-903 | S | medium | ok |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 237 | PAN-938 | S | medium | ok |  | Fizzy visual pipeline — Kanban mirror for specialist pipeline |
+| 238 | PAN-947 | S | medium | ok |  | feat: project management actions in unified sidebar |
+| 239 | PAN-949 | L | medium | ok |  | feat: add conversation for project from sidebar |
+| 240 | PAN-958 | L | medium | ok |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 241 | PAN-1037 | S | medium | ok |  | Retire 'planning-' tmux prefix — fold into agent-PAN-N keyed by phase |
+| 242 | PAN-1060 | S | medium | ok |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 243 | PAN-1102 | L | medium | ok |  | feat(dashboard): real-time notification + interactive prompts when agent awaits user input |
+| 244 | PAN-1151 | S | medium | ok |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 245 | PAN-1164 | S | medium | ok |  | Push diff summary updates over /ws/rpc instead of 5s polling |
+| 246 | PAN-1165 | S | medium | ok |  | Lightweight review path for small/trivial PRs |
+| 247 | PAN-1202 | S | medium | ok |  | Swarm: prune merged/completed slot state directories after wave converges |
+| 248 | PAN-1223 | S | medium | ok |  | Auto-update for users in the field (npm + desktop binaries) |
+| 249 | PAN-1432 | S | medium | ok |  | Merge agent leaves packages/contracts/dist stale — typecheck breaks on every fresh checkout |
+| 250 | PAN-1437 | S | medium | ok |  | pan flywheel report semantics: split read-only snapshot from run finalization |
+| 251 | PAN-1442 | S | medium | ok |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 252 | PAN-1443 | L | medium | ok |  | Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
+| 253 | PAN-1453 | S | medium | ok |  | Audit: 3 cheap verifications that should ride along with merges (PAN-1170, PAN-1316, PAN-457 CLI parity) |
+| 254 | PAN-1473 | L | medium | ok |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 255 | PAN-1485 | S | medium | ok |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 256 | PAN-1489 | XL | medium | ok |  | task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
+| 257 | PAN-1490 | L | medium | ok |  | feat(dashboard): show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 258 | PAN-1524 | S | medium | ok |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 259 | PAN-1542 | S | medium | ok |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 260 | PAN-1545 | L | medium | ok |  | feat(dashboard): New Terminal button — spawn ad-hoc bash sessions from sidebar / conversation / drawer / palette |
+| 261 | PAN-399 | S | medium | ok |  | Release specialist — coordinated post-merge rollout and release safety |
+| 262 | PAN-1577 | S | medium | ok |  | Move a conversation to a different project (CLI + drag/drop + menu action) |
+| 263 | PAN-1610 | S | medium | ok |  | Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer) |
+| 264 | PAN-1623 | S | medium | ok |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 265 | PAN-532 | S | medium | ok |  | Per-project and per-issue model overrides for workflow agent model selection |
+| 266 | PAN-1653 | L | medium | ok |  | perf(docs-rag): batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 267 | PAN-1654 | L | medium | ok |  | perf(build): run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 268 | PAN-1655 | S | medium | ok |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 269 | PAN-1656 | S | medium | ok |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 270 | PAN-1657 | S | medium | ok |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 271 | PAN-1666 | S | medium | ok |  | [EPIC] Pipeline Throughput Hardening — run many work agents safely, on-demand specialists, slot manager, fly.io scale-out |
+| 272 | PAN-1671 | L | medium | ok |  | feat(dashboard): surface pending ExitPlanMode plan as a popup modal (reuse PlanCard + /plan-action) |
+| 273 | PAN-1672 | S | medium | ok |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 274 | PAN-1676 | L | medium | ok |  | feat(fly.io): harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 275 | PAN-1685 | S | medium | ok |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 276 | PAN-1837 | L | medium | ok |  | Support Kimi Code as a first-class harness (Moonshot's own coding CLI) |
+| 277 | PAN-1838 | L | medium | ok |  | [research] Grok Build (xAI) coding harness — research and specify support |
+| 278 | PAN-1839 | S | medium | ok |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 279 | PAN-1840 | L | medium | ok |  | Add 'pan switch <id>' — change a running agent's model/harness in one command (kill + fresh-start + re-onboard) |
+| 280 | PAN-1844 | S | medium | ok |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 281 | PAN-1853 | S | medium | ok |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 282 | PAN-1854 | S | medium | ok |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 283 | PAN-1916 | L | medium | ok |  | feat(search): configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 284 | PAN-1991 | XL | medium | ok |  | Issue cockpit redesign — 10-item incremental rollout plan; parent tracker for PAN-1955/#1232/#1234. Concrete, no-loss, ready to ship #1. |
+| 285 | PAN-1955 | S | medium | ok |  | Issue cockpit: move beads from a tab into a persistent right rail with a 'working now' highlight |
+| 286 | PAN-1965 | S | medium | ok |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 287 | PAN-1966 | S | medium | ok |  | Single authoritative pipeline-membership resolver — one function for "what's in the pipeline" (collapse the 5 divergent views) |
+| 288 | PAN-1967 | L | medium | ok |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 289 | PAN-1968 | S | medium | ok |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 290 | PAN-1985 | S | medium | ok |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 291 | PAN-1995 | S | medium | ok |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 292 | PAN-2004 | S | medium | ok |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 293 | PAN-43 | L | low | ok |  | Add Slack and email notifications for agent events |
+| 294 | PAN-44 | S | low | ok |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 295 | PAN-47 | S | low | ok |  | PRD files should be committed to feature branch, moved to completed/ on merge |
+| 296 | PAN-51 | S | low | ok |  | Documentation: Clarify issue tracker options beyond Linear |
+| 297 | PAN-52 | S | low | ok |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 298 | PAN-54 | L | low | ok |  | feat: Add pan test:e2e command for full workflow integration test |
+| 299 | PAN-55 | S | low | ok |  | Track specialist costs with time period filtering |
+| 300 | PAN-817 | S | medium | ok |  | Improve planning dialog layout and content fit |
+| 301 | PAN-104 | S | low | ok |  | Cost alerts/notifications when spending exceeds thresholds |
+| 302 | PAN-106 | S | low | ok |  | Cost prediction/estimation for in-progress work |
+| 303 | PAN-924 | S | medium | ok |  | Spike: evaluate GitNexus for Panopticon integration |
+| 304 | PAN-1040 | L | medium | ok |  | feat(infra): event-driven dispatch for inspect-agent (requiresInspection=true beads) |
+| 305 | PAN-1041 | S | medium | ok |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 306 | PAN-146 | S | low | ok |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 307 | PAN-155 | XL | low | ok |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 308 | PAN-175 | S | low | ok |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 309 | PAN-176 | S | low | ok |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 310 | PAN-177 | S | low | ok |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 311 | PAN-178 | S | low | ok |  | PAN-178: Crash recovery with granular task checkpointing |
+| 312 | PAN-180 | S | low | ok |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 313 | PAN-190 | S | low | ok |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 314 | PAN-633 | L | low | ok |  | Update Cloister PRD and docs index — stale relative to implementation |
+| 315 | PAN-634 | S | low | ok |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 316 | PAN-198 | S | low | ok |  | Structured audit trail for agent actions |
+| 317 | PAN-1103 | L | medium | ok |  | feat(dashboard): surface AskUserQuestion choice options in conversation view |
+| 318 | PAN-674 | L | low | ok |  | docs: add glossary of Panopticon domain terms |
+| 319 | PAN-227 | L | low | ok |  | Phase gate validation — mid-implementation acceptance checks |
+| 320 | PAN-228 | S | low | ok |  | Shift-left post-edit diagnostics — type check after every edit |
+| 321 | PAN-241 | XL | low | ok |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
+| 322 | PAN-249 | L | low | ok |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 323 | PAN-265 | S | low | ok |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 324 | PAN-271 | S | low | ok |  | Auto-assign Linear project from project config when creating issues |
+| 325 | PAN-283 | S | low | ok |  | Reset should sync workspace feature branch with latest main |
+| 326 | PAN-297 | S | low | ok |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 327 | PAN-298 | S | low | ok |  | Auto-detect package manager and runtime in workspace setup |
+| 328 | PAN-299 | S | low | ok |  | Granular session state persistence across context compaction |
+| 329 | PAN-306 | M | low | ok |  | fix: merge-agent polyrepo false failures — stale refs, wrong error field, short timeout |
+| 330 | PAN-371 | S | low | ok |  | Agents tab only shows global specialists, not per-project ephemeral ones |
+| 331 | PAN-1474 | L | low | ok |  | Add ACKNOWLEDGEMENTS doc — credit borrowed code from open-source projects (MIT/Apache 2.0) |
+| 332 | PAN-1555 | S | low | ok |  | Docs: remove/update stale swarm-runtime references after PAN-1517 |
+| 333 | PAN-407 | S | low | ok |  | Run Panopticon from a main workspace for development isolation |
+| 334 | PAN-438 | L | low | ok |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 335 | PAN-459 | S | low | ok |  | Planning setup screen with SSE progress streaming |
+| 336 | PAN-461 | S | low | ok |  | Deep-wipe multi-step progress dialog |
+| 337 | PAN-468 | S | low | ok |  | Agent test conversations pollute production database — need test isolation |
+| 338 | PAN-471 | S | low | ok |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 339 | PAN-472 | S | low | ok |  | GET /api/costs/by-issue takes 10s — N+1 query on 353K rows × 184 issues |
+| 340 | PAN-476 | S | low | ok |  | Agent resume with Haiku session summary instead of claude --resume |
+| 341 | PAN-480 | S | low | ok |  | Pass --effort flag when spawning planning agents via Cloister |
+| 342 | PAN-483 | S | low | ok |  | Unify Resume Agent UX — all entry points should show message input |
+| 343 | PAN-487 | S | low | ok |  | VBRIEF not archived to docs/prds/completed/ after merge |
+| 344 | PAN-543 | L | low | ok |  | Add confirmation dialog before applying Optimal Defaults |
+| 345 | PAN-552 | S | low | ok |  | Claude Code terminals should respect app light/dark mode scheme |
+| 346 | PAN-554 | L | low | ok |  | Add kanban board deeplinks for issue URLs |
+| 347 | PAN-564 | S | low | ok |  | Slash menu positioned incorrectly — cut off / off-screen |
+| 348 | PAN-565 | S | low | ok |  | Handle CTRL-Z to undo accidental conversation archival |
+| 349 | PAN-568 | S | low | ok |  | Kanban: Show workspace and tmux session counts in stats |
+| 350 | PAN-570 | S | low | ok |  | Show PLAN badge on costs when under a subscription/plan |
+| 351 | PAN-571 | L | low | ok |  | Add OpenRouter credits/plan status endpoint and UI |
+| 352 | PAN-576 | S | low | ok |  | Global / search should include conversations in addition to workspace features |
+| 353 | PAN-589 | S | low | ok |  | Review and update commands-skills.md with all available Panopticon skills |
+| 354 | PAN-591 | L | low | ok |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 355 | PAN-1683 | S | low | ok |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) — strike keeps falling o... |
+| 356 | PAN-603 | S | low | ok |  | Plan review loop with configurable reviewer model |
+| 357 | PAN-604 | S | low | ok |  | Hide planning agent from workspace detail pane |
+| 358 | PAN-622 | S | low | ok |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 359 | PAN-623 | S | low | ok |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 360 | PAN-624 | S | low | ok |  | Loop nodes: iterative agent execution with conditional termination |
+| 361 | PAN-656 | S | low | ok |  | Docs site scroll broken: dashboard CSS leaks onto panopticon-cli.com |
+| 362 | PAN-658 | S | low | ok |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 363 | PAN-660 | S | low | ok |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 364 | PAN-663 | S | low | ok |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 365 | PAN-683 | M | low | ok |  | fix(tests): shadow-state getPendingSyncCount test is environment-dependent |
+| 366 | PAN-701 | S | low | ok |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 367 | PAN-702 | L | low | ok |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 368 | PAN-709 | L | low | ok |  | feat(flywheel): self-improving flywheel — retro agent, skill-change pipeline, audience-scoped skills, Q&A detection, autonomous daemon |
+| 369 | PAN-727 | S | low | ok |  | Fix orphaned work-agent start handoff after planning |
+| 370 | PAN-730 | L | low | ok |  | Add provider account telemetry for credits, balances, and usage |
+| 371 | PAN-735 | S | low | ok |  | Settings page: review and configure overridden subagent model files |
+| 372 | PAN-736 | S | low | ok |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
+| 373 | PAN-738 | L | low | ok |  | Add right-click fork option to conversation list |
+| 374 | PAN-743 | L | low | ok |  | Add consistent new conversation icon actions in Command Deck |
+| 375 | PAN-747 | S | low | ok |  | Conversation list items lack accessible labels in accessibility tree |
+| 376 | PAN-749 | S | low | ok |  | Research and borrow best features from gstack |
+| 377 | PAN-750 | XL | low | ok |  | PAN-XXX: Complete Metrics Page Redesign — Real Data, Charts, Time Filtering, and TLDR Analytics |
+| 378 | PAN-751 | S | low | ok |  | PAN-XXX: Historical Metrics Data Persistence — Beyond the 30-Day JSONL Window |
+| 379 | PAN-752 | L | low | ok |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 380 | PAN-762 | S | low | ok |  | Settings: warn when model overrides target disabled providers |
+| 381 | PAN-764 | L | low | ok |  | Add quota/usage inspector for routed model providers |
+| 382 | PAN-765 | S | low | ok |  | Preserve trailing zeros in cost displays |
+| 383 | PAN-769 | S | low | ok |  | Track verification/review/test phase churn over time |
+| 384 | PAN-771 | S | low | needs-refinement |  | Investigate Vercel Sandbox execution backend support |
+| 385 | PAN-772 | S | low | ok |  | Unify terminal stack behavior across tmux sessions |
+| 386 | PAN-773 | S | low | ok |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 387 | PAN-774 | XL | low | ok |  | Unify launch UX and release pipeline for 1.0 — npx panctl, lazy prereqs, cross-platform desktop builds |
+| 388 | PAN-775 | XL | low | ok |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 389 | PAN-777 | S | low | ok |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 390 | PAN-778 | S | low | ok |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 391 | PAN-780 | S | low | ok |  | Agent stuck in feedback loop when old feedback files exist but review has passed |
+| 392 | PAN-786 | S | low | ok |  | Post planning Q\&A answers as issue comment |
+| 393 | PAN-790 | S | low | ok |  | PAN-789: Eliminate remaining TanStack Query polling — complete push-first migration |
+| 394 | PAN-791 | S | low | ok |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
+| 395 | PAN-793 | S | low | ok |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
+| 396 | PAN-797 | S | low | ok |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 397 | PAN-810 | S | low | ok |  | Inspector: diagnostic UI when pipeline phase is unknown |
+| 398 | PAN-832 | S | low | ok |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 399 | PAN-833 | S | low | ok |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 400 | PAN-834 | S | low | ok |  | Cleanup: legacy ~/.panopticon/heartbeats/ directory has not been written since 2026-04-22 |
+| 401 | PAN-835 | S | low | ok |  | Workspace creation removes stale .planning/ from previous issue but doesn't commit deletion → PR diff includes 982 unrelated lines |
+| 402 | PAN-853 | S | low | ok |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 403 | PAN-898 | S | low | ok |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 404 | PAN-904 | S | low | ok |  | Make AI title generation model configurable |
+| 405 | PAN-908 | S | low | ok |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 406 | PAN-927 | S | low | ok |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 407 | PAN-943 | L | low | ok |  | Add memory file review and management command |
+| 408 | PAN-944 | S | low | ok |  | Make vBRIEF the durable task graph source of truth |
+| 409 | PAN-948 | L | low | ok |  | Implement pan scope lifecycle commands |
+| 410 | PAN-961 | S | low | ok |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 411 | PAN-962 | S | low | ok |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 412 | PAN-984 | S | low | ok |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 413 | PAN-1049 | S | low | ok |  | Spike: evaluate Tauri v2 desktop shell |
+| 414 | PAN-1051 | S | low | ok |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 415 | PAN-1063 | S | low | ok |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 416 | PAN-1064 | S | low | ok |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 417 | PAN-1065 | S | low | ok |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 418 | PAN-1101 | S | low | ok |  | Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire |
+| 419 | PAN-1115 | S | low | ok |  | Inject observation context into agent prompts |
+| 420 | PAN-1116 | S | low | ok |  | Memory: cross-project search mode |
+| 421 | PAN-1117 | S | low | ok |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 422 | PAN-1121 | S | low | ok |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 423 | PAN-1122 | S | low | ok |  | Trim OpenAI model catalog to 5 supported models |
+| 424 | PAN-1123 | L | low | ok |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 425 | PAN-1124 | S | low | ok |  | Decouple specs and PRDs from workspaces — write directly to main |
+| 426 | PAN-1133 | S | low | ok |  | TLDR: deacon supervision + pan doctor check + GC |
+| 427 | PAN-1135 | S | low | ok |  | Document the hook system in docs/HOOKS.md |
+| 428 | PAN-1136 | S | low | ok |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
+| 429 | PAN-1147 | S | low | ok |  | Work-agent done flow stalls at 'push and re-request review' after addressing review feedback |
+| 430 | PAN-1152 | S | low | ok |  | Remove PANOPTICON_DEV env-var persistence — derive Traefik mode from the running command |
+| 431 | PAN-1153 | S | low | ok |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' — breaks pan dev proxy |
+| 432 | PAN-1154 | S | low | ok |  | pan up does not kill existing port holders — startup races against orphan dashboard servers |
+| 433 | PAN-1166 | S | low | ok |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 434 | PAN-1208 | L | low | ok |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 435 | PAN-1222 | S | low | ok |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 436 | PAN-1238 | S | low | ok |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
+| 437 | PAN-1242 | S | low | ok |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
+| 438 | PAN-1244 | S | low | ok |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
+| 439 | PAN-1245 | S | low | ok |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
+| 440 | PAN-1325 | S | low | ok |  | Artifact storage model is unsafe for polyrepo projects — define a canonical "orchestration repo" |
+| 441 | PAN-1356 | S | low | ok |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 442 | PAN-1479 | L | low | ok |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 443 | PAN-1480 | S | low | ok |  | TLDR: 93% bypass rate — daemon/hook integration broken |
+| 444 | PAN-1481 | L | low | ok |  | Add cost-event telemetry for Caveman token savings |
+| 445 | PAN-1482 | S | low | ok |  | Token spend report should aggregate data from repo, not just local machine |
+| 446 | PAN-1483 | S | low | ok |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 447 | PAN-1493 | S | low | ok |  | TEST: write hello.txt — probe for PAN-1200 Universal Context System verification |
+| 448 | PAN-1547 | M | low | ok |  | fix: @panctl/cli npm install warns on Node <22 (engine mismatch + deprecated deps) |
+| 449 | PAN-1548 | M | low | ok |  | fix: npx @panctl/cli shows stale placeholder message referencing v0.8.0 |
+| 450 | PAN-1550 | L | low | ok |  | feat: FilesPane + BrowserPane — file browser and embedded web view implementation details |
+| 451 | PAN-1552 | S | low | ok |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 452 | PAN-1553 | L | low | needs-refinement |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 453 | PAN-1572 | S | low | ok |  | Settings permission-mode can desync from resolved config — agents silently use --dangerously-skip-permissions despite 'Auto' |
+| 454 | PAN-1573 | S | low | ok |  | Consideration for reintroducing ability to --dangerously-skip-permissions, DO NOT act on this issue |
+| 455 | PAN-1581 | S | low | ok |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 456 | PAN-1592 | S | low | ok |  | Composer: make pasted images reload-durable (persist across page reload, not just conversation switches) |
+| 457 | PAN-1619 | S | low | ok |  | Bridge host Codex auth into workspace containers + honest gpt-5.5 lock reason |
+| 458 | PAN-1620 | S | low | ok |  | Awaiting-Merge button is clickable on a conflicting/CI-failing PR (stale blockerReasons) |
+| 459 | PAN-1621 | S | low | ok |  | pan close human-only gate over-blocks operator conv-* sessions |
+| 460 | PAN-1622 | S | low | ok |  | pan dev restart leaves orphan dashboard servers (stale serving + multi-Deacon risk) |
+| 461 | PAN-1627 | S | low | ok |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr... |
+| 462 | PAN-537 | S | low | ok |  | feat: show changed files diff summary after each agent response in activity view |
+| 463 | PAN-1640 | S | low | ok |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 464 | PAN-1641 | L | low | ok |  | Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness |
+| 465 | PAN-1643 | L | low | ok |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 466 | PAN-1644 | S | low | ok |  | Hook-driven progressive conversation titling |
+| 467 | PAN-1646 | S | low | ok |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 468 | PAN-1667 | L | low | ok |  | feat(dashboard): unify Agents + Resources into one issue-centric holistic view |
+| 469 | PAN-1668 | M | low | ok |  | bug(dashboard): right-click 'restart with <model>' carries model only, never harness — can't move a review off Kimi |
+| 470 | PAN-1669 | M | low | ok |  | bug(dashboard): restart-with-model doesn't emit a live event — issue tree shows stale model until manual refresh |
+| 471 | PAN-1670 | M | low | ok |  | bug(dev): pan dev hot-reload wedges tabs on 'Reconnecting to the dashboard…' — PAN-1580 boot watchdog never fires under Vite |
+| 472 | PAN-592 | S | low | ok |  | Audit: Planning agent CLAUDE.md and STATE.md contents vs expectations |
+| 473 | PAN-1691 | L | low | ok |  | feat(flywheel): conflict-aware merge train + on-demand UAT candidate — stop the rebase-cascade that strands ready PRs |
+| 474 | PAN-1705 | M | low | ok |  | bug(dashboard): conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse |
+| 475 | PAN-1706 | M | low | ok |  | bug(agents): orphaned playwright-mcp headless Chromiums keep full dashboard pages open — each multiplies dashboard poll load |
+| 476 | PAN-1708 | M | low | ok |  | bug(lifecycle): pan start CLI never flips spec plan.status proposed→approved — all 8 in-flight specs stuck at proposed, triggering reco... |
+| 477 | PAN-1710 | M | low | ok |  | bug(ci): 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 — serv... |
+| 478 | PAN-1726 | M | low | ok |  | bug(lifecycle): postMergeLifecycle did not pause the merged issue's work agent — idle agent holds a work slot and throttles all pipelin... |
+| 479 | PAN-1728 | M | low | ok |  | bug(work): PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch |
+| 480 | PAN-1729 | M | low | ok |  | test(beads): beads-scoping work.md "-l {{ISSUE_ID_LOWER}}" label-filter assertion fails on main |
+| 481 | PAN-1730 | M | low | ok |  | bug(governor): idle awaiting-test work sessions count against the PAN-1665 ceiling — pipeline livelocks when work pool alone exceeds to... |
+| 482 | PAN-1734 | M | low | ok |  | fix(test): request-review-nudge remote workspace HEAD test fails on main |
+| 483 | PAN-1735 | L | low | ok |  | feat(flywheel): adopt externally-completed readyForMerge issues into the pipeline/merge queue |
+| 484 | PAN-1739 | M | low | ok |  | bug(dashboard): Command Deck issue TREE still hides strike agents — frontend FeatureItem session-type allowlist omits 'strike' (4th all... |
+| 485 | PAN-1740 | S | low | ok |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
+| 486 | PAN-646 | L | low | ok |  | Canceled issues: add guided Recover workflow |
+| 487 | PAN-1748 | L | low | ok |  | feat(cloister): reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 488 | PAN-1750 | L | low | ok |  | feat(flywheel): UAT assembly/conflict agent — observability surfaces + configurable harness/model (default gpt-5.5 via Codex) |
+| 489 | PAN-1751 | L | low | ok |  | feat(settings): harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 490 | PAN-1754 | L | low | ok |  | feat(settings): surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 491 | PAN-1755 | M | low | ok |  | bug(cloister): uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 492 | PAN-1758 | M | low | ok |  | bug(cloister): ship lane cannot converge on a continuously-moving main — 37 re-dispatches for one issue; readyForMerge only ever flips ... |
+| 493 | PAN-1761 | M | low | ok |  | bug(dashboard): conversations endpoints fetched via relative /api path — 403 inside workspace/UAT containers (session cookie is on the ... |
+| 494 | PAN-1762 | S | low | ok |  | Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B) |
+| 495 | PAN-1773 | S | low | ok |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 496 | PAN-1774 | M | low | ok |  | bug(uat): workspace server container crashloops when dist/dashboard/server.js is missing |
+| 497 | PAN-1782 | S | low | ok |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout — decouple precompaction from the handoff author model |
+| 498 | PAN-1846 | M | low | ok |  | bug(cloister): unbounded log growth — deacon.log 687MB / dashboard.log 91MB, no rotation; per-agent skip line logged every 60s patrol |
+| 499 | PAN-700 | S | low | ok |  | Detachable terminal for conversation view — popout into OS window |
+| 500 | PAN-1868 | S | low | ok |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 501 | PAN-713 | L | low | ok |  | test: add unit tests for doneCommand and approveCommand |
+| 502 | PAN-1874 | L | low | ok |  | feat(review): per-issue override for review mode / re-review scope (extends PAN-1862 project-scope config) |
+| 503 | PAN-1875 | L | low | ok |  | feat(flywheel): add `pan flywheel stop` — graceful shutdown that writes the report |
+| 504 | PAN-1879 | M | low | ok |  | bug(restart): pan restart silently re-applies stale boot gates; no way to re-enable deacon/resume (asymmetric flags) |
+| 505 | PAN-1878 | S | low | ok |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 506 | PAN-1882 | M | low | ok |  | bug(strike): strike workspaces never cleaned up — worktrees + branches pile up forever (27 / 16GB observed) |
+| 507 | PAN-1894 | S | low | ok |  | Show UAT stack startup state in issue tree and issue slide-out |
+| 508 | PAN-1895 | S | low | ok |  | Spawn work agents from issue workspace slide-out |
+| 509 | PAN-1896 | S | low | ok |  | Reduce approval friction for GitHub CLI operations in managed sessions |
+| 510 | PAN-1906 | S | low | ok |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 511 | PAN-1907 | S | low | ok |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every... |
+| 512 | PAN-1909 | M | low | ok |  | bug(planning): pan plan done handoff tail hangs (dashboard-notify/transition) — declares 'done' with spec only on local main |
+| 513 | PAN-1910 | S | low | ok |  | fast-follow(PAN-1908): collapse issue status to ONE canonical field — labels become a derived projection, not the source of truth |
+| 514 | PAN-1914 | S | low | ok |  | Follow-up: move /api/health/agents off agent-directory scans |
+| 515 | PAN-1917 | XL | low | ok |  | /sessions page redesign: unify with conversation view |
+| 516 | PAN-1918 | M | low | ok |  | bug(ci): full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang sta... |
+| 517 | PAN-1926 | L | low | ok |  | feat(strike): --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 518 | PAN-1927 | M | low | ok |  | fix(config): remove hardcoded model fallbacks — default/role model must come from explicit settings |
+| 519 | PAN-1928 | S | low | ok |  | Lock model switching to brand-new conversations only (0 messages) — never for agents or started sessions |
+| 520 | PAN-1929 | S | low | ok |  | hazard(auto-commit): background git rebase rewrites history in the SHARED primary worktree — stop mutating the shared tree |
+| 521 | PAN-1931 | L | low | ok |  | complete-planning force-adds gitignored .pan/ state via 'git add -f' (regresses PAN-1215, violates PAN-1819) |
+| 522 | PAN-1932 | S | low | ok |  | Schema migration downgrades user_version when DB is newer than code (=== SCHEMA_VERSION should be >=) |
+| 523 | PAN-1934 | S | low | ok |  | hazard: verification gate drives agents through up to 10 retry cycles on an unfixable check (no operator escalation, invisible burn) |
+| 524 | PAN-1935 | S | low | ok |  | pi/kimi work-agent cost not recorded in cost_events → runaway spend is invisible (no cost-based safety possible) |
+| 525 | PAN-1937 | S | low | ok |  | feat: data export — portable bundle (conversations + favorites core; decoupled optional cost ledger) + user-facing Export my data |
+| 526 | PAN-1949 | S | low | ok |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all bead verdicts |
+| 527 | PAN-1951 | S | low | ok |  | Inspector agent should resume a warm session instead of cold-spawning a new one per bead |
+| 528 | PAN-1953 | S | low | ok |  | Design: beads rail mockup |
+| 529 | PAN-1954 | S | low | ok |  | Beads rail: move beads to right sidebar, highlight active work |
+| 530 | PAN-1958 | S | low | ok |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 531 | PAN-1963 | L | low | ok |  | Default to no-resume on dashboard boot; add 'Resume all' to the stopped-agents banner |
+| 532 | PAN-1980 | S | low | ok |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
+| 533 | PAN-1983 | S | low | ok |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 534 | PAN-1984 | L | low | ok |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 535 | PAN-1986 | S | low | ok |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 536 | PAN-1987 | S | low | ok |  | Allow renaming a registered project (display name is locked at registration) |
+| 537 | PAN-1988 | S | low | ok |  | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
+| 538 | PAN-1989 | S | low | ok |  | Replace Pi harness with ohmypi and evaluate advanced features |
+| 539 | PAN-1990 | S | low | ok |  | First-class workspaces and projects with per-workspace memory |
+| 540 | PAN-1999 | S | low | ok |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 541 | PAN-2002 | L | low | ok |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 542 | PAN-2007 | S | low | ok |  | Temporary: keep specialist (review/test/ship) sessions alive through the pipeline — disable PAN-1716 reaper + done-path kill |
+| 543 | PAN-2008 | L | low | ok |  | feat(ci): store-access guard — fail the build on direct store reads outside a domain resolver (PAN-1936 slice) |
+| 544 | PAN-2009 | M | low | ok |  | bug(pi): dead pi agent can't be resumed — ready.json 30s timeout + PAN-1980 blocks fresh-launch → review stuck stopped |
+| 545 | PAN-802 | S | low | ok |  | Resume on conversation session forks instead of resuming |
+| 546 | PAN-826 | L | low | ok |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
+| 547 | PAN-863 | S | low | ok |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
+| 548 | PAN-1857 | M | high | stale |  | bug(ci): main RED — verification-gate.test.ts asserts stale 'src/dashboard/frontend' in DEFAULT_GATES.test after generic-command change... |
+| 549 | PAN-1859 | M | high | stale |  | bug(ci): main RED — agent-spawning.test.ts 'resumeAgent delivers continue prompt through Pi FIFO' fails (writePiCommand not called) |
+| 550 | PAN-1880 | M | high | stale |  | bug(ci): main RED — start-sync-main-conflict.test.ts hits process.exit(1) under CI single-fork (maxForks:1) cross-file mock pollution; ... |
+| 551 | PAN-1698 | M | medium | stale |  | bug(ci): main is RED — model-count + schema-version + substrate-smoke test expectations stale (blocks every verify/ship/strike gate) |
+| 552 | PAN-1783 | M | medium | stale |  | bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title |
 
 ## Rationale detail
 
@@ -580,10 +580,6 @@ Pinned in-pipeline (verifying-on-main). Bug: merged code wasn't actually live be
 ### PAN-1992 (rank 8)
 
 Pinned in-pipeline (verifying-on-main). Rename fallout: every skill/db reference to the old 'panopticon.db' name must move to 'overdeck.db' so the rename is consistent end-to-end. Merged and verifying; pinned.
-
-### PAN-1903 (rank 9)
-
-Main CI is currently RED — the only failing test is issue-beads-check.test.ts, the same bd-DB-init 'table not found: issues' race family PAN-1903 root-causes. A red main empties the merge gate (every PR inherits the failing check), so this single flake blocks ALL shipping. PAN-1903 has a precise root cause (bd lazy-init races the first bd call) and a scoped fix (deterministic test DB init before the body runs). Highest-leverage unblock on the board.
 
 ### PAN-806 (rank 10)
 
@@ -877,6 +873,10 @@ Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so sear
 
 When the devcontainer template changes, existing workspaces are pinned to the old render with no warning/migration (observed: api service bound to no port because cmd was stale). Versioning + stale detection + re-render keeps workspaces current.
 
+### PAN-113 (rank 83)
+
+POST /api/agents spawns pan work issue and returns immediately; if it fails the user sees 'Agent Started!' with no agent running, errors only in the in-memory activity log. Should verify readiness before reporting success.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -884,8 +884,8 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-21T20:45:10Z",
-  "model": "glm-5.2",
+  "generatedAt": "2026-06-22T19:26:39Z",
+  "model": "claude-sonnet-4-5",
   "pass": "incremental",
   "openCount": 549,
   "nodes": [
@@ -966,19 +966,6 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
       "rationale": "Pinned in-pipeline (verifying-on-main). Rename fallout: every skill/db reference to the old 'panopticon.db' name must move to 'overdeck.db' so the rename is consistent end-to-end. Merged and verifying; pinned.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1903",
-      "rank": 9,
-      "size": "M",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "LIVE RED MAIN: create-beads bd-DB-init race (issue-beads-check failing on main right now).",
-      "rationale": "Main CI is currently RED — the only failing test is issue-beads-check.test.ts, the same bd-DB-init 'table not found: issues' race family PAN-1903 root-causes. A red main empties the merge gate (every PR inherits the failing check), so this single flake blocks ALL shipping. PAN-1903 has a precise root cause (bd lazy-init races the first bd call) and a scoped fix (deterministic test DB init before the body runs). Highest-leverage unblock on the board.",
-      "gate": "auto",
-      "planning": "interactive"
     },
     {
       "issue": "PAN-806",
@@ -2033,7 +2020,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1830",
-      "rank": 90,
+      "rank": 91,
       "size": "S",
       "importance": "medium",
       "score": 34,
@@ -2045,7 +2032,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1862",
-      "rank": 91,
+      "rank": 92,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -2057,7 +2044,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-244",
-      "rank": 92,
+      "rank": 93,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2069,7 +2056,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-245",
-      "rank": 93,
+      "rank": 94,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2081,7 +2068,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-247",
-      "rank": 94,
+      "rank": 95,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2093,7 +2080,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-304",
-      "rank": 95,
+      "rank": 96,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2105,7 +2092,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-321",
-      "rank": 96,
+      "rank": 97,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2117,7 +2104,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-324",
-      "rank": 97,
+      "rank": 98,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2129,7 +2116,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-334",
-      "rank": 98,
+      "rank": 99,
       "size": "S",
       "importance": "medium",
       "score": 29,
@@ -2141,7 +2128,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-538",
-      "rank": 99,
+      "rank": 100,
       "size": "L",
       "importance": "medium",
       "score": 28,
@@ -2153,7 +2140,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-673",
-      "rank": 100,
+      "rank": 101,
       "size": "M",
       "importance": "medium",
       "score": 28,
@@ -2165,7 +2152,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-681",
-      "rank": 101,
+      "rank": 102,
       "size": "S",
       "importance": "medium",
       "score": 28,
@@ -2177,7 +2164,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-886",
-      "rank": 102,
+      "rank": 103,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2189,7 +2176,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-890",
-      "rank": 103,
+      "rank": 104,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2201,7 +2188,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-899",
-      "rank": 104,
+      "rank": 105,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2213,7 +2200,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-900",
-      "rank": 105,
+      "rank": 106,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2225,7 +2212,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-928",
-      "rank": 106,
+      "rank": 107,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2237,7 +2224,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-929",
-      "rank": 107,
+      "rank": 108,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2249,7 +2236,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-932",
-      "rank": 108,
+      "rank": 109,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2261,7 +2248,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-933",
-      "rank": 109,
+      "rank": 110,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2273,7 +2260,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1027",
-      "rank": 110,
+      "rank": 111,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2285,7 +2272,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1038",
-      "rank": 111,
+      "rank": 112,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2297,7 +2284,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1042",
-      "rank": 112,
+      "rank": 113,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2309,7 +2296,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1068",
-      "rank": 113,
+      "rank": 114,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2321,7 +2308,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1113",
-      "rank": 114,
+      "rank": 115,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2333,7 +2320,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1128",
-      "rank": 115,
+      "rank": 116,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2345,7 +2332,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1129",
-      "rank": 116,
+      "rank": 117,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2357,7 +2344,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1149",
-      "rank": 117,
+      "rank": 118,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2369,7 +2356,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1150",
-      "rank": 118,
+      "rank": 119,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2381,7 +2368,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1173",
-      "rank": 119,
+      "rank": 120,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2393,7 +2380,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1227",
-      "rank": 120,
+      "rank": 121,
       "size": "L",
       "importance": "medium",
       "score": 27,
@@ -2405,7 +2392,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1232",
-      "rank": 121,
+      "rank": 122,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2417,7 +2404,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1234",
-      "rank": 122,
+      "rank": 123,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2429,7 +2416,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1240",
-      "rank": 123,
+      "rank": 124,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2441,7 +2428,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1243",
-      "rank": 124,
+      "rank": 125,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2453,7 +2440,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1247",
-      "rank": 125,
+      "rank": 126,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2465,7 +2452,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1258",
-      "rank": 126,
+      "rank": 127,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2477,7 +2464,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1330",
-      "rank": 127,
+      "rank": 128,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2489,7 +2476,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1336",
-      "rank": 128,
+      "rank": 129,
       "size": "S",
       "importance": "medium",
       "score": 27,
@@ -2501,7 +2488,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1386",
-      "rank": 129,
+      "rank": 130,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2513,7 +2500,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1392",
-      "rank": 130,
+      "rank": 131,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2525,7 +2512,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1416",
-      "rank": 131,
+      "rank": 132,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2537,7 +2524,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1434",
-      "rank": 132,
+      "rank": 133,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2549,7 +2536,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1438",
-      "rank": 133,
+      "rank": 134,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2561,7 +2548,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1439",
-      "rank": 134,
+      "rank": 135,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2573,7 +2560,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1440",
-      "rank": 135,
+      "rank": 136,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2585,7 +2572,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1445",
-      "rank": 136,
+      "rank": 137,
       "size": "L",
       "importance": "medium",
       "score": 26,
@@ -2597,7 +2584,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1446",
-      "rank": 137,
+      "rank": 138,
       "size": "L",
       "importance": "medium",
       "score": 26,
@@ -2609,7 +2596,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1447",
-      "rank": 138,
+      "rank": 139,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2621,7 +2608,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1449",
-      "rank": 139,
+      "rank": 140,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2633,7 +2620,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1472",
-      "rank": 140,
+      "rank": 141,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2645,7 +2632,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1530",
-      "rank": 141,
+      "rank": 142,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2657,7 +2644,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1559",
-      "rank": 142,
+      "rank": 143,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2669,7 +2656,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1564",
-      "rank": 143,
+      "rank": 144,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -2681,7 +2668,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1565",
-      "rank": 144,
+      "rank": 145,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2693,7 +2680,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1570",
-      "rank": 145,
+      "rank": 146,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2705,7 +2692,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1571",
-      "rank": 146,
+      "rank": 147,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2717,7 +2704,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1582",
-      "rank": 147,
+      "rank": 148,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2729,7 +2716,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1624",
-      "rank": 148,
+      "rank": 149,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2741,7 +2728,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1637",
-      "rank": 149,
+      "rank": 150,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2753,7 +2740,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1638",
-      "rank": 150,
+      "rank": 151,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2765,7 +2752,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1652",
-      "rank": 151,
+      "rank": 152,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2777,7 +2764,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1673",
-      "rank": 152,
+      "rank": 153,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2789,7 +2776,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1674",
-      "rank": 153,
+      "rank": 154,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2801,7 +2788,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1681",
-      "rank": 154,
+      "rank": 155,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -2813,7 +2800,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1682",
-      "rank": 155,
+      "rank": 156,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -2825,7 +2812,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1688",
-      "rank": 156,
+      "rank": 157,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2837,7 +2824,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1689",
-      "rank": 157,
+      "rank": 158,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2849,7 +2836,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1718",
-      "rank": 158,
+      "rank": 159,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2861,7 +2848,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1722",
-      "rank": 159,
+      "rank": 160,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2873,7 +2860,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1781",
-      "rank": 160,
+      "rank": 161,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2885,7 +2872,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1789",
-      "rank": 161,
+      "rank": 162,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2897,7 +2884,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1790",
-      "rank": 162,
+      "rank": 163,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2909,7 +2896,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1793",
-      "rank": 163,
+      "rank": 164,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2921,7 +2908,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1795",
-      "rank": 164,
+      "rank": 165,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2933,7 +2920,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1816",
-      "rank": 165,
+      "rank": 166,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2945,7 +2932,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1817",
-      "rank": 166,
+      "rank": 167,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2957,7 +2944,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1823",
-      "rank": 167,
+      "rank": 168,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2969,7 +2956,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1824",
-      "rank": 168,
+      "rank": 169,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2981,7 +2968,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1827",
-      "rank": 169,
+      "rank": 170,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -2993,7 +2980,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1828",
-      "rank": 170,
+      "rank": 171,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3005,7 +2992,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1833",
-      "rank": 171,
+      "rank": 172,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3017,7 +3004,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1850",
-      "rank": 172,
+      "rank": 173,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3029,7 +3016,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1893",
-      "rank": 173,
+      "rank": 174,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -3041,7 +3028,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1897",
-      "rank": 174,
+      "rank": 175,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -3053,7 +3040,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1900",
-      "rank": 175,
+      "rank": 176,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -3065,7 +3052,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1912",
-      "rank": 176,
+      "rank": 177,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3077,7 +3064,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1956",
-      "rank": 177,
+      "rank": 178,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3089,7 +3076,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1993",
-      "rank": 178,
+      "rank": 179,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3101,7 +3088,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1994",
-      "rank": 179,
+      "rank": 180,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -3113,7 +3100,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1998",
-      "rank": 180,
+      "rank": 181,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -3125,7 +3112,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2001",
-      "rank": 181,
+      "rank": 182,
       "size": "M",
       "importance": "medium",
       "score": 26,
@@ -3137,7 +3124,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1889",
-      "rank": 182,
+      "rank": 183,
       "size": "L",
       "importance": "medium",
       "score": 25,
@@ -3149,7 +3136,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1436",
-      "rank": 183,
+      "rank": 184,
       "size": "S",
       "importance": "medium",
       "score": 24,
@@ -3161,7 +3148,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1711",
-      "rank": 184,
+      "rank": 185,
       "size": "S",
       "importance": "medium",
       "score": 24,
@@ -3173,7 +3160,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1769",
-      "rank": 185,
+      "rank": 186,
       "size": "S",
       "importance": "medium",
       "score": 24,
@@ -3185,7 +3172,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1451",
-      "rank": 186,
+      "rank": 187,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -3197,7 +3184,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1888",
-      "rank": 187,
+      "rank": 188,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -3209,7 +3196,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-838",
-      "rank": 188,
+      "rank": 189,
       "size": "S",
       "importance": "low",
       "score": 19,
@@ -3221,7 +3208,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1066",
-      "rank": 189,
+      "rank": 190,
       "size": "S",
       "importance": "low",
       "score": 19,
@@ -3233,7 +3220,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1126",
-      "rank": 190,
+      "rank": 191,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -3245,7 +3232,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1533",
-      "rank": 191,
+      "rank": 192,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -3257,7 +3244,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1696",
-      "rank": 192,
+      "rank": 193,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -3269,7 +3256,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1775",
-      "rank": 193,
+      "rank": 194,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -3281,7 +3268,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2005",
-      "rank": 194,
+      "rank": 195,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -3293,7 +3280,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2006",
-      "rank": 195,
+      "rank": 196,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -3305,7 +3292,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-37",
-      "rank": 196,
+      "rank": 197,
       "size": "L",
       "importance": "medium",
       "score": 18,
@@ -3317,7 +3304,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-38",
-      "rank": 197,
+      "rank": 198,
       "size": "L",
       "importance": "medium",
       "score": 18,
@@ -3329,7 +3316,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-77",
-      "rank": 198,
+      "rank": 199,
       "size": "S",
       "importance": "medium",
       "score": 17,
@@ -3341,7 +3328,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-111",
-      "rank": 199,
+      "rank": 200,
       "size": "L",
       "importance": "medium",
       "score": 17,
@@ -3353,7 +3340,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-243",
-      "rank": 200,
+      "rank": 201,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3365,7 +3352,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-252",
-      "rank": 201,
+      "rank": 202,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3377,7 +3364,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-255",
-      "rank": 202,
+      "rank": 203,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3389,7 +3376,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-258",
-      "rank": 203,
+      "rank": 204,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3401,7 +3388,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-277",
-      "rank": 204,
+      "rank": 205,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3413,7 +3400,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-293",
-      "rank": 205,
+      "rank": 206,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3425,7 +3412,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-294",
-      "rank": 206,
+      "rank": 207,
       "size": "S",
       "importance": "medium",
       "score": 16,
@@ -3437,7 +3424,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1469",
-      "rank": 207,
+      "rank": 208,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3449,7 +3436,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1494",
-      "rank": 208,
+      "rank": 209,
       "size": "M",
       "importance": "medium",
       "score": 15,
@@ -3461,7 +3448,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-450",
-      "rank": 209,
+      "rank": 210,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3473,7 +3460,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-452",
-      "rank": 210,
+      "rank": 211,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3485,7 +3472,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-454",
-      "rank": 211,
+      "rank": 212,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3497,7 +3484,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-456",
-      "rank": 212,
+      "rank": 213,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3509,7 +3496,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-463",
-      "rank": 213,
+      "rank": 214,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3521,7 +3508,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-465",
-      "rank": 214,
+      "rank": 215,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3533,7 +3520,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-466",
-      "rank": 215,
+      "rank": 216,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3545,7 +3532,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-531",
-      "rank": 216,
+      "rank": 217,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3557,7 +3544,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-546",
-      "rank": 217,
+      "rank": 218,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3569,7 +3556,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-548",
-      "rank": 218,
+      "rank": 219,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3581,7 +3568,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1684",
-      "rank": 219,
+      "rank": 220,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3593,7 +3580,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-606",
-      "rank": 220,
+      "rank": 221,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3605,7 +3592,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-607",
-      "rank": 221,
+      "rank": 222,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3617,7 +3604,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-608",
-      "rank": 222,
+      "rank": 223,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3629,7 +3616,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-613",
-      "rank": 223,
+      "rank": 224,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3641,7 +3628,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-629",
-      "rank": 224,
+      "rank": 225,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3653,7 +3640,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-637",
-      "rank": 225,
+      "rank": 226,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3665,7 +3652,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-649",
-      "rank": 226,
+      "rank": 227,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3677,7 +3664,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-654",
-      "rank": 227,
+      "rank": 228,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3689,7 +3676,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-675",
-      "rank": 228,
+      "rank": 229,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3701,7 +3688,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-678",
-      "rank": 229,
+      "rank": 230,
       "size": "S",
       "importance": "medium",
       "score": 15,
@@ -3713,7 +3700,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-687",
-      "rank": 230,
+      "rank": 231,
       "size": "L",
       "importance": "medium",
       "score": 15,
@@ -3725,7 +3712,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-783",
-      "rank": 231,
+      "rank": 232,
       "size": "XL",
       "importance": "medium",
       "score": 15,
@@ -3737,7 +3724,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-818",
-      "rank": 232,
+      "rank": 233,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3749,7 +3736,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-901",
-      "rank": 233,
+      "rank": 234,
       "size": "L",
       "importance": "medium",
       "score": 14,
@@ -3761,7 +3748,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-902",
-      "rank": 234,
+      "rank": 235,
       "size": "L",
       "importance": "medium",
       "score": 14,
@@ -3773,7 +3760,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-903",
-      "rank": 235,
+      "rank": 236,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3785,7 +3772,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-938",
-      "rank": 236,
+      "rank": 237,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3797,7 +3784,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-947",
-      "rank": 237,
+      "rank": 238,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3809,7 +3796,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-949",
-      "rank": 238,
+      "rank": 239,
       "size": "L",
       "importance": "medium",
       "score": 14,
@@ -3821,7 +3808,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-958",
-      "rank": 239,
+      "rank": 240,
       "size": "L",
       "importance": "medium",
       "score": 14,
@@ -3833,7 +3820,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1037",
-      "rank": 240,
+      "rank": 241,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3845,7 +3832,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1060",
-      "rank": 241,
+      "rank": 242,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3857,7 +3844,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1102",
-      "rank": 242,
+      "rank": 243,
       "size": "L",
       "importance": "medium",
       "score": 14,
@@ -3869,7 +3856,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1151",
-      "rank": 243,
+      "rank": 244,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3881,7 +3868,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1164",
-      "rank": 244,
+      "rank": 245,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3893,7 +3880,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1165",
-      "rank": 245,
+      "rank": 246,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3905,7 +3892,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1202",
-      "rank": 246,
+      "rank": 247,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3917,7 +3904,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1223",
-      "rank": 247,
+      "rank": 248,
       "size": "S",
       "importance": "medium",
       "score": 14,
@@ -3929,7 +3916,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1432",
-      "rank": 248,
+      "rank": 249,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -3941,7 +3928,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1437",
-      "rank": 249,
+      "rank": 250,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -3953,7 +3940,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1442",
-      "rank": 250,
+      "rank": 251,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -3965,7 +3952,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1443",
-      "rank": 251,
+      "rank": 252,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -3977,7 +3964,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1453",
-      "rank": 252,
+      "rank": 253,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -3989,7 +3976,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1473",
-      "rank": 253,
+      "rank": 254,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4001,7 +3988,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1485",
-      "rank": 254,
+      "rank": 255,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4013,7 +4000,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1489",
-      "rank": 255,
+      "rank": 256,
       "size": "XL",
       "importance": "medium",
       "score": 13,
@@ -4025,7 +4012,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1490",
-      "rank": 256,
+      "rank": 257,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4037,7 +4024,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1524",
-      "rank": 257,
+      "rank": 258,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4049,7 +4036,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1542",
-      "rank": 258,
+      "rank": 259,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4061,7 +4048,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1545",
-      "rank": 259,
+      "rank": 260,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4073,7 +4060,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-399",
-      "rank": 260,
+      "rank": 261,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4085,7 +4072,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1577",
-      "rank": 261,
+      "rank": 262,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4097,7 +4084,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1610",
-      "rank": 262,
+      "rank": 263,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4109,7 +4096,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1623",
-      "rank": 263,
+      "rank": 264,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4121,7 +4108,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-532",
-      "rank": 264,
+      "rank": 265,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4133,7 +4120,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1653",
-      "rank": 265,
+      "rank": 266,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4145,7 +4132,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1654",
-      "rank": 266,
+      "rank": 267,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4157,7 +4144,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1655",
-      "rank": 267,
+      "rank": 268,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4169,7 +4156,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1656",
-      "rank": 268,
+      "rank": 269,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4181,7 +4168,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1657",
-      "rank": 269,
+      "rank": 270,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4193,7 +4180,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1666",
-      "rank": 270,
+      "rank": 271,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4205,7 +4192,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1671",
-      "rank": 271,
+      "rank": 272,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4217,7 +4204,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1672",
-      "rank": 272,
+      "rank": 273,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4229,7 +4216,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1676",
-      "rank": 273,
+      "rank": 274,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4241,7 +4228,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1685",
-      "rank": 274,
+      "rank": 275,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4253,7 +4240,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1837",
-      "rank": 275,
+      "rank": 276,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4265,7 +4252,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1838",
-      "rank": 276,
+      "rank": 277,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4277,7 +4264,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1839",
-      "rank": 277,
+      "rank": 278,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4289,7 +4276,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1840",
-      "rank": 278,
+      "rank": 279,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4301,7 +4288,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1844",
-      "rank": 279,
+      "rank": 280,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4313,7 +4300,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1853",
-      "rank": 280,
+      "rank": 281,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4325,7 +4312,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1854",
-      "rank": 281,
+      "rank": 282,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4337,7 +4324,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1916",
-      "rank": 282,
+      "rank": 283,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4349,7 +4336,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1955",
-      "rank": 283,
+      "rank": 285,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4361,7 +4348,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1965",
-      "rank": 284,
+      "rank": 286,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4373,7 +4360,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1966",
-      "rank": 285,
+      "rank": 287,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4385,7 +4372,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1967",
-      "rank": 286,
+      "rank": 288,
       "size": "L",
       "importance": "medium",
       "score": 13,
@@ -4397,7 +4384,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1968",
-      "rank": 287,
+      "rank": 289,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4409,7 +4396,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1985",
-      "rank": 288,
+      "rank": 290,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4421,19 +4408,20 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1991",
-      "rank": 289,
+      "rank": 284,
       "size": "XL",
       "importance": "medium",
       "score": 13,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Issue cockpit redesign — incremental rollout (tracking)",
+      "why": "Issue cockpit redesign — 10-item incremental rollout plan; parent tracker for PAN-1955/#1232/#1234. Concrete, no-loss, ready to ship #1.",
+      "rationale": "Body expanded from a bare title to a complete, reviewed 10-item incremental rollout plan (design mockups + explicit ordering, \"start with #1 Beads rail\"); it is now the canonical parent tracker for the issue-cockpit UX effort — PAN-1955/#1232/#1234 roll up under it — so it moves up to sit directly above its first rollout child PAN-1955, without crossing into the bug cluster above.",
       "gate": "auto",
       "planning": "interactive"
     },
     {
       "issue": "PAN-1995",
-      "rank": 290,
+      "rank": 291,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4445,7 +4433,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2004",
-      "rank": 291,
+      "rank": 292,
       "size": "S",
       "importance": "medium",
       "score": 13,
@@ -4457,7 +4445,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-43",
-      "rank": 292,
+      "rank": 293,
       "size": "L",
       "importance": "low",
       "score": 13,
@@ -4469,7 +4457,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-44",
-      "rank": 293,
+      "rank": 294,
       "size": "S",
       "importance": "low",
       "score": 13,
@@ -4481,7 +4469,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-47",
-      "rank": 294,
+      "rank": 295,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4493,7 +4481,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-51",
-      "rank": 295,
+      "rank": 296,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4505,7 +4493,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-52",
-      "rank": 296,
+      "rank": 297,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4517,7 +4505,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-54",
-      "rank": 297,
+      "rank": 298,
       "size": "L",
       "importance": "low",
       "score": 12,
@@ -4529,7 +4517,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-55",
-      "rank": 298,
+      "rank": 299,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4541,7 +4529,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-817",
-      "rank": 299,
+      "rank": 300,
       "size": "S",
       "importance": "medium",
       "score": 12,
@@ -4553,7 +4541,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-104",
-      "rank": 300,
+      "rank": 301,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4565,7 +4553,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-106",
-      "rank": 301,
+      "rank": 302,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4577,7 +4565,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-924",
-      "rank": 302,
+      "rank": 303,
       "size": "S",
       "importance": "medium",
       "score": 12,
@@ -4589,7 +4577,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1040",
-      "rank": 303,
+      "rank": 304,
       "size": "L",
       "importance": "medium",
       "score": 12,
@@ -4601,7 +4589,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1041",
-      "rank": 304,
+      "rank": 305,
       "size": "S",
       "importance": "medium",
       "score": 12,
@@ -4613,7 +4601,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-146",
-      "rank": 305,
+      "rank": 306,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4625,7 +4613,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-155",
-      "rank": 306,
+      "rank": 307,
       "size": "XL",
       "importance": "low",
       "score": 12,
@@ -4637,7 +4625,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-175",
-      "rank": 307,
+      "rank": 308,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4649,7 +4637,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-176",
-      "rank": 308,
+      "rank": 309,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4661,7 +4649,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-177",
-      "rank": 309,
+      "rank": 310,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4673,7 +4661,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-178",
-      "rank": 310,
+      "rank": 311,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4685,7 +4673,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-180",
-      "rank": 311,
+      "rank": 312,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4697,7 +4685,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-190",
-      "rank": 312,
+      "rank": 313,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4709,7 +4697,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-633",
-      "rank": 313,
+      "rank": 314,
       "size": "L",
       "importance": "low",
       "score": 12,
@@ -4721,7 +4709,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-634",
-      "rank": 314,
+      "rank": 315,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4733,7 +4721,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-198",
-      "rank": 315,
+      "rank": 316,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -4745,7 +4733,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1103",
-      "rank": 316,
+      "rank": 317,
       "size": "L",
       "importance": "medium",
       "score": 12,
@@ -4757,7 +4745,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-674",
-      "rank": 317,
+      "rank": 318,
       "size": "L",
       "importance": "low",
       "score": 12,
@@ -4769,7 +4757,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-227",
-      "rank": 318,
+      "rank": 319,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -4781,7 +4769,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-228",
-      "rank": 319,
+      "rank": 320,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4793,7 +4781,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-241",
-      "rank": 320,
+      "rank": 321,
       "size": "XL",
       "importance": "low",
       "score": 11,
@@ -4805,7 +4793,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-249",
-      "rank": 321,
+      "rank": 322,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -4817,7 +4805,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-265",
-      "rank": 322,
+      "rank": 323,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4829,7 +4817,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-271",
-      "rank": 323,
+      "rank": 324,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4841,7 +4829,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-283",
-      "rank": 324,
+      "rank": 325,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4853,7 +4841,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-297",
-      "rank": 325,
+      "rank": 326,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4865,7 +4853,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-298",
-      "rank": 326,
+      "rank": 327,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4877,7 +4865,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-299",
-      "rank": 327,
+      "rank": 328,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4889,7 +4877,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-306",
-      "rank": 328,
+      "rank": 329,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -4901,7 +4889,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-371",
-      "rank": 329,
+      "rank": 330,
       "size": "S",
       "importance": "low",
       "score": 11,
@@ -4913,7 +4901,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1474",
-      "rank": 330,
+      "rank": 331,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -4925,7 +4913,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1555",
-      "rank": 331,
+      "rank": 332,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -4937,7 +4925,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-407",
-      "rank": 332,
+      "rank": 333,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -4949,7 +4937,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-438",
-      "rank": 333,
+      "rank": 334,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -4961,7 +4949,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-459",
-      "rank": 334,
+      "rank": 335,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -4973,7 +4961,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-461",
-      "rank": 335,
+      "rank": 336,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -4985,7 +4973,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-468",
-      "rank": 336,
+      "rank": 337,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -4997,7 +4985,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-471",
-      "rank": 337,
+      "rank": 338,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5009,7 +4997,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-472",
-      "rank": 338,
+      "rank": 339,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5021,7 +5009,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-476",
-      "rank": 339,
+      "rank": 340,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5033,7 +5021,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-480",
-      "rank": 340,
+      "rank": 341,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5045,7 +5033,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-483",
-      "rank": 341,
+      "rank": 342,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5057,7 +5045,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-487",
-      "rank": 342,
+      "rank": 343,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5069,7 +5057,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-543",
-      "rank": 343,
+      "rank": 344,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5081,7 +5069,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-552",
-      "rank": 344,
+      "rank": 345,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5093,7 +5081,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-554",
-      "rank": 345,
+      "rank": 346,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5105,7 +5093,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-564",
-      "rank": 346,
+      "rank": 347,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5117,7 +5105,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-565",
-      "rank": 347,
+      "rank": 348,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5129,7 +5117,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-568",
-      "rank": 348,
+      "rank": 349,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5141,7 +5129,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-570",
-      "rank": 349,
+      "rank": 350,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5153,7 +5141,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-571",
-      "rank": 350,
+      "rank": 351,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5165,7 +5153,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-576",
-      "rank": 351,
+      "rank": 352,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5177,7 +5165,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-589",
-      "rank": 352,
+      "rank": 353,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5189,7 +5177,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-591",
-      "rank": 353,
+      "rank": 354,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5201,7 +5189,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1683",
-      "rank": 354,
+      "rank": 355,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5213,7 +5201,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-603",
-      "rank": 355,
+      "rank": 356,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5225,7 +5213,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-604",
-      "rank": 356,
+      "rank": 357,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5237,7 +5225,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-622",
-      "rank": 357,
+      "rank": 358,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5249,7 +5237,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-623",
-      "rank": 358,
+      "rank": 359,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5261,7 +5249,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-624",
-      "rank": 359,
+      "rank": 360,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5273,7 +5261,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-656",
-      "rank": 360,
+      "rank": 361,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5285,7 +5273,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-658",
-      "rank": 361,
+      "rank": 362,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5297,7 +5285,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-660",
-      "rank": 362,
+      "rank": 363,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5309,7 +5297,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-663",
-      "rank": 363,
+      "rank": 364,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5321,7 +5309,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-683",
-      "rank": 364,
+      "rank": 365,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -5333,7 +5321,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-701",
-      "rank": 365,
+      "rank": 366,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5345,7 +5333,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-702",
-      "rank": 366,
+      "rank": 367,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5357,7 +5345,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-709",
-      "rank": 367,
+      "rank": 368,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5369,7 +5357,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-727",
-      "rank": 368,
+      "rank": 369,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5381,7 +5369,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-730",
-      "rank": 369,
+      "rank": 370,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5393,7 +5381,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-735",
-      "rank": 370,
+      "rank": 371,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5405,7 +5393,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-736",
-      "rank": 371,
+      "rank": 372,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5417,7 +5405,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-738",
-      "rank": 372,
+      "rank": 373,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5429,7 +5417,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-743",
-      "rank": 373,
+      "rank": 374,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5441,7 +5429,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-747",
-      "rank": 374,
+      "rank": 375,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5453,7 +5441,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-749",
-      "rank": 375,
+      "rank": 376,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5465,7 +5453,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-750",
-      "rank": 376,
+      "rank": 377,
       "size": "XL",
       "importance": "low",
       "score": 10,
@@ -5477,7 +5465,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-751",
-      "rank": 377,
+      "rank": 378,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5489,7 +5477,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-752",
-      "rank": 378,
+      "rank": 379,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5501,7 +5489,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-762",
-      "rank": 379,
+      "rank": 380,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5513,7 +5501,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-764",
-      "rank": 380,
+      "rank": 381,
       "size": "L",
       "importance": "low",
       "score": 10,
@@ -5525,7 +5513,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-765",
-      "rank": 381,
+      "rank": 382,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5537,7 +5525,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-769",
-      "rank": 382,
+      "rank": 383,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5549,7 +5537,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-771",
-      "rank": 383,
+      "rank": 384,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5561,7 +5549,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-772",
-      "rank": 384,
+      "rank": 385,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5573,7 +5561,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-773",
-      "rank": 385,
+      "rank": 386,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5585,7 +5573,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-774",
-      "rank": 386,
+      "rank": 387,
       "size": "XL",
       "importance": "low",
       "score": 10,
@@ -5597,7 +5585,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-775",
-      "rank": 387,
+      "rank": 388,
       "size": "XL",
       "importance": "low",
       "score": 10,
@@ -5609,7 +5597,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-777",
-      "rank": 388,
+      "rank": 389,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5621,7 +5609,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-778",
-      "rank": 389,
+      "rank": 390,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5633,7 +5621,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-780",
-      "rank": 390,
+      "rank": 391,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5645,7 +5633,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-786",
-      "rank": 391,
+      "rank": 392,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5657,7 +5645,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-790",
-      "rank": 392,
+      "rank": 393,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5669,7 +5657,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-791",
-      "rank": 393,
+      "rank": 394,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5681,7 +5669,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-793",
-      "rank": 394,
+      "rank": 395,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5693,7 +5681,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-797",
-      "rank": 395,
+      "rank": 396,
       "size": "S",
       "importance": "low",
       "score": 10,
@@ -5705,7 +5693,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-810",
-      "rank": 396,
+      "rank": 397,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5717,7 +5705,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-832",
-      "rank": 397,
+      "rank": 398,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5729,7 +5717,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-833",
-      "rank": 398,
+      "rank": 399,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5741,7 +5729,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-834",
-      "rank": 399,
+      "rank": 400,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5753,7 +5741,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-835",
-      "rank": 400,
+      "rank": 401,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5765,7 +5753,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-853",
-      "rank": 401,
+      "rank": 402,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5777,7 +5765,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-898",
-      "rank": 402,
+      "rank": 403,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5789,7 +5777,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-904",
-      "rank": 403,
+      "rank": 404,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5801,7 +5789,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-908",
-      "rank": 404,
+      "rank": 405,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5813,7 +5801,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-927",
-      "rank": 405,
+      "rank": 406,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5825,7 +5813,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-943",
-      "rank": 406,
+      "rank": 407,
       "size": "L",
       "importance": "low",
       "score": 9,
@@ -5837,7 +5825,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-944",
-      "rank": 407,
+      "rank": 408,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5849,7 +5837,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-948",
-      "rank": 408,
+      "rank": 409,
       "size": "L",
       "importance": "low",
       "score": 9,
@@ -5861,7 +5849,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-961",
-      "rank": 409,
+      "rank": 410,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5873,7 +5861,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-962",
-      "rank": 410,
+      "rank": 411,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5885,7 +5873,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-984",
-      "rank": 411,
+      "rank": 412,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5897,7 +5885,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1049",
-      "rank": 412,
+      "rank": 413,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5909,7 +5897,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1051",
-      "rank": 413,
+      "rank": 414,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5921,7 +5909,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1063",
-      "rank": 414,
+      "rank": 415,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5933,7 +5921,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1064",
-      "rank": 415,
+      "rank": 416,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5945,7 +5933,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1065",
-      "rank": 416,
+      "rank": 417,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5957,7 +5945,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1101",
-      "rank": 417,
+      "rank": 418,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5969,7 +5957,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1115",
-      "rank": 418,
+      "rank": 419,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5981,7 +5969,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1116",
-      "rank": 419,
+      "rank": 420,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -5993,7 +5981,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1117",
-      "rank": 420,
+      "rank": 421,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6005,7 +5993,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1121",
-      "rank": 421,
+      "rank": 422,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6017,7 +6005,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1122",
-      "rank": 422,
+      "rank": 423,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6029,7 +6017,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1123",
-      "rank": 423,
+      "rank": 424,
       "size": "L",
       "importance": "low",
       "score": 9,
@@ -6041,7 +6029,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1124",
-      "rank": 424,
+      "rank": 425,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6053,7 +6041,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1133",
-      "rank": 425,
+      "rank": 426,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6065,7 +6053,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1135",
-      "rank": 426,
+      "rank": 427,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6077,7 +6065,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1136",
-      "rank": 427,
+      "rank": 428,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6089,7 +6077,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1147",
-      "rank": 428,
+      "rank": 429,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6101,7 +6089,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1152",
-      "rank": 429,
+      "rank": 430,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6113,7 +6101,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1153",
-      "rank": 430,
+      "rank": 431,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6125,7 +6113,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1154",
-      "rank": 431,
+      "rank": 432,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6137,7 +6125,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1166",
-      "rank": 432,
+      "rank": 433,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6149,7 +6137,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1208",
-      "rank": 433,
+      "rank": 434,
       "size": "L",
       "importance": "low",
       "score": 9,
@@ -6161,7 +6149,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1222",
-      "rank": 434,
+      "rank": 435,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6173,18 +6161,6 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1238",
-      "rank": 435,
-      "size": "S",
-      "importance": "low",
-      "score": 9,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1242",
       "rank": 436,
       "size": "S",
       "importance": "low",
@@ -6196,8 +6172,20 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
       "planning": "auto"
     },
     {
-      "issue": "PAN-1244",
+      "issue": "PAN-1242",
       "rank": 437,
+      "size": "S",
+      "importance": "low",
+      "score": 9,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1244",
+      "rank": 438,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6209,7 +6197,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1245",
-      "rank": 438,
+      "rank": 439,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6221,7 +6209,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1325",
-      "rank": 439,
+      "rank": 440,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6233,7 +6221,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1356",
-      "rank": 440,
+      "rank": 441,
       "size": "S",
       "importance": "low",
       "score": 9,
@@ -6245,7 +6233,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1479",
-      "rank": 441,
+      "rank": 442,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6257,7 +6245,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1480",
-      "rank": 442,
+      "rank": 443,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6269,7 +6257,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1481",
-      "rank": 443,
+      "rank": 444,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6281,7 +6269,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1482",
-      "rank": 444,
+      "rank": 445,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6293,7 +6281,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1483",
-      "rank": 445,
+      "rank": 446,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6305,7 +6293,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1493",
-      "rank": 446,
+      "rank": 447,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6317,7 +6305,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1547",
-      "rank": 447,
+      "rank": 448,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6329,7 +6317,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1548",
-      "rank": 448,
+      "rank": 449,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6341,7 +6329,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1550",
-      "rank": 449,
+      "rank": 450,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6353,7 +6341,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1552",
-      "rank": 450,
+      "rank": 451,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6365,7 +6353,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1553",
-      "rank": 451,
+      "rank": 452,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6377,7 +6365,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1572",
-      "rank": 452,
+      "rank": 453,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6389,7 +6377,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1573",
-      "rank": 453,
+      "rank": 454,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6401,7 +6389,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1581",
-      "rank": 454,
+      "rank": 455,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6413,7 +6401,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1592",
-      "rank": 455,
+      "rank": 456,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6425,7 +6413,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1619",
-      "rank": 456,
+      "rank": 457,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6437,7 +6425,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1620",
-      "rank": 457,
+      "rank": 458,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6449,7 +6437,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1621",
-      "rank": 458,
+      "rank": 459,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6461,7 +6449,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1622",
-      "rank": 459,
+      "rank": 460,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6473,7 +6461,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1627",
-      "rank": 460,
+      "rank": 461,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6485,7 +6473,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-537",
-      "rank": 461,
+      "rank": 462,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6497,7 +6485,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1640",
-      "rank": 462,
+      "rank": 463,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6509,7 +6497,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1641",
-      "rank": 463,
+      "rank": 464,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6521,7 +6509,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1643",
-      "rank": 464,
+      "rank": 465,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6533,7 +6521,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1644",
-      "rank": 465,
+      "rank": 466,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6545,7 +6533,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1646",
-      "rank": 466,
+      "rank": 467,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6557,7 +6545,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1667",
-      "rank": 467,
+      "rank": 468,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6569,7 +6557,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1668",
-      "rank": 468,
+      "rank": 469,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6581,7 +6569,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1669",
-      "rank": 469,
+      "rank": 470,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6593,7 +6581,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1670",
-      "rank": 470,
+      "rank": 471,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6605,7 +6593,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-592",
-      "rank": 471,
+      "rank": 472,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6617,7 +6605,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1691",
-      "rank": 472,
+      "rank": 473,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6629,7 +6617,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1705",
-      "rank": 473,
+      "rank": 474,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6641,7 +6629,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1706",
-      "rank": 474,
+      "rank": 475,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6653,7 +6641,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1708",
-      "rank": 475,
+      "rank": 476,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6665,7 +6653,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1710",
-      "rank": 476,
+      "rank": 477,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6677,7 +6665,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1726",
-      "rank": 477,
+      "rank": 478,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6689,7 +6677,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1728",
-      "rank": 478,
+      "rank": 479,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6701,7 +6689,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1729",
-      "rank": 479,
+      "rank": 480,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6713,7 +6701,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1730",
-      "rank": 480,
+      "rank": 481,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6725,7 +6713,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1734",
-      "rank": 481,
+      "rank": 482,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6737,7 +6725,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1735",
-      "rank": 482,
+      "rank": 483,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6749,7 +6737,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1739",
-      "rank": 483,
+      "rank": 484,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6761,7 +6749,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1740",
-      "rank": 484,
+      "rank": 485,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6773,7 +6761,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-646",
-      "rank": 485,
+      "rank": 486,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6785,7 +6773,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1748",
-      "rank": 486,
+      "rank": 487,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6797,7 +6785,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1750",
-      "rank": 487,
+      "rank": 488,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6809,7 +6797,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1751",
-      "rank": 488,
+      "rank": 489,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6821,7 +6809,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1754",
-      "rank": 489,
+      "rank": 490,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6833,7 +6821,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1755",
-      "rank": 490,
+      "rank": 491,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6845,7 +6833,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1758",
-      "rank": 491,
+      "rank": 492,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6857,7 +6845,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1761",
-      "rank": 492,
+      "rank": 493,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6869,7 +6857,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1762",
-      "rank": 493,
+      "rank": 494,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6881,7 +6869,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1773",
-      "rank": 494,
+      "rank": 495,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6893,7 +6881,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1774",
-      "rank": 495,
+      "rank": 496,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6905,7 +6893,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1782",
-      "rank": 496,
+      "rank": 497,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6917,7 +6905,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1846",
-      "rank": 497,
+      "rank": 498,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -6929,7 +6917,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-700",
-      "rank": 498,
+      "rank": 499,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6941,7 +6929,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1868",
-      "rank": 499,
+      "rank": 500,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -6953,7 +6941,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-713",
-      "rank": 500,
+      "rank": 501,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6965,7 +6953,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1874",
-      "rank": 501,
+      "rank": 502,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6977,7 +6965,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1875",
-      "rank": 502,
+      "rank": 503,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -6989,7 +6977,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1879",
-      "rank": 503,
+      "rank": 504,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -7001,7 +6989,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1878",
-      "rank": 504,
+      "rank": 505,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7013,7 +7001,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1882",
-      "rank": 505,
+      "rank": 506,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -7025,7 +7013,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1894",
-      "rank": 506,
+      "rank": 507,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7037,7 +7025,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1895",
-      "rank": 507,
+      "rank": 508,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7049,7 +7037,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1896",
-      "rank": 508,
+      "rank": 509,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7061,7 +7049,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1906",
-      "rank": 509,
+      "rank": 510,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7073,7 +7061,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1907",
-      "rank": 510,
+      "rank": 511,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7085,7 +7073,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1909",
-      "rank": 511,
+      "rank": 512,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -7097,7 +7085,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1910",
-      "rank": 512,
+      "rank": 513,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7109,7 +7097,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1914",
-      "rank": 513,
+      "rank": 514,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7121,7 +7109,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1917",
-      "rank": 514,
+      "rank": 515,
       "size": "XL",
       "importance": "low",
       "score": 8,
@@ -7133,7 +7121,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1918",
-      "rank": 515,
+      "rank": 516,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -7145,7 +7133,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1926",
-      "rank": 516,
+      "rank": 517,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -7157,7 +7145,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1927",
-      "rank": 517,
+      "rank": 518,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -7169,7 +7157,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1928",
-      "rank": 518,
+      "rank": 519,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7181,7 +7169,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1929",
-      "rank": 519,
+      "rank": 520,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7193,7 +7181,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1931",
-      "rank": 520,
+      "rank": 521,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -7205,7 +7193,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1932",
-      "rank": 521,
+      "rank": 522,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7217,7 +7205,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1934",
-      "rank": 522,
+      "rank": 523,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7229,7 +7217,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1935",
-      "rank": 523,
+      "rank": 524,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7241,7 +7229,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1937",
-      "rank": 524,
+      "rank": 525,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7253,7 +7241,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1949",
-      "rank": 525,
+      "rank": 526,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7265,7 +7253,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1951",
-      "rank": 526,
+      "rank": 527,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7277,7 +7265,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1953",
-      "rank": 527,
+      "rank": 528,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7289,7 +7277,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1954",
-      "rank": 528,
+      "rank": 529,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7301,7 +7289,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1958",
-      "rank": 529,
+      "rank": 530,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7313,7 +7301,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1963",
-      "rank": 530,
+      "rank": 531,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -7325,7 +7313,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1980",
-      "rank": 531,
+      "rank": 532,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7337,7 +7325,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1983",
-      "rank": 532,
+      "rank": 533,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7349,7 +7337,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1984",
-      "rank": 533,
+      "rank": 534,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -7361,7 +7349,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1986",
-      "rank": 534,
+      "rank": 535,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7373,7 +7361,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1987",
-      "rank": 535,
+      "rank": 536,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7385,7 +7373,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1988",
-      "rank": 536,
+      "rank": 537,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7397,7 +7385,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1989",
-      "rank": 537,
+      "rank": 538,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7409,7 +7397,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1990",
-      "rank": 538,
+      "rank": 539,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7421,7 +7409,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1999",
-      "rank": 539,
+      "rank": 540,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7433,7 +7421,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2002",
-      "rank": 540,
+      "rank": 541,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -7445,7 +7433,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2007",
-      "rank": 541,
+      "rank": 542,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7457,7 +7445,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2008",
-      "rank": 542,
+      "rank": 543,
       "size": "L",
       "importance": "low",
       "score": 8,
@@ -7469,7 +7457,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-2009",
-      "rank": 543,
+      "rank": 544,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -7481,7 +7469,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-802",
-      "rank": 544,
+      "rank": 545,
       "size": "S",
       "importance": "low",
       "score": 8,
@@ -7493,7 +7481,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-826",
-      "rank": 545,
+      "rank": 546,
       "size": "L",
       "importance": "low",
       "score": 7,
@@ -7505,7 +7493,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-863",
-      "rank": 546,
+      "rank": 547,
       "size": "S",
       "importance": "low",
       "score": 7,
@@ -7517,7 +7505,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1857",
-      "rank": 547,
+      "rank": 548,
       "size": "M",
       "importance": "high",
       "score": 34,
@@ -7529,7 +7517,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1859",
-      "rank": 548,
+      "rank": 549,
       "size": "M",
       "importance": "high",
       "score": 34,
@@ -7541,7 +7529,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1880",
-      "rank": 549,
+      "rank": 550,
       "size": "M",
       "importance": "high",
       "score": 34,
@@ -7553,7 +7541,7 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1698",
-      "rank": 550,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -7565,13 +7553,26 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
     },
     {
       "issue": "PAN-1783",
-      "rank": 551,
+      "rank": 552,
       "size": "M",
       "importance": "medium",
       "score": 34,
       "condition": "stale",
       "dependsOn": [],
       "why": "bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2010",
+      "rank": 90,
+      "size": "S",
+      "importance": "medium",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequencer one-shot session lingers after done (state.json stuck 'running'); singleton guard blocks next pass. Auto-clear finished sessions.",
+      "rationale": "New bug, fresh and reproducible (hit 3x in one session): the one-shot sequencer-runner tmux session is not torn down on completion, so its singleton guard - which only checks for session existence - refuses the next pass even when nothing is generating; same 'finished-but-lingering misclassified by an idempotency guard' defect class as PAN-1130/1131/1830, so it ranks with that cluster.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -7716,6 +7717,41 @@ When the devcontainer template changes, existing workspaces are pinned to the ol
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.45
+    },
+    {
+      "from": "PAN-1991",
+      "to": "PAN-1955",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-1991",
+      "to": "PAN-1226",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-1991",
+      "to": "PAN-1232",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-1991",
+      "to": "PAN-1234",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-2010",
+      "to": "PAN-2005",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
