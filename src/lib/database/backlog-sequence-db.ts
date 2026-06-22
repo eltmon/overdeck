@@ -42,6 +42,19 @@ export function upsertBacklogSequence(projectKey: string, doc: SequenceDoc): voi
         doc.generatedAt,
       );
     }
+    // Full-sync the cache to exactly the sequence doc: purge rows for issues that
+    // dropped out (closed, or re-sequenced away). Without this the upsert is
+    // insert-only and the cache shows stale issues the md no longer lists — e.g. a
+    // closed PAN-1903 lingering at its old rank.
+    const keep = nodes.map((n) => n.issue);
+    if (keep.length > 0) {
+      const placeholders = keep.map(() => '?').join(',');
+      db.prepare(
+        `DELETE FROM backlog_sequence WHERE project_key = ? AND issue_id NOT IN (${placeholders})`,
+      ).run(projectKey, ...keep);
+    } else {
+      db.prepare('DELETE FROM backlog_sequence WHERE project_key = ?').run(projectKey);
+    }
   });
 
   tx(doc.nodes);
