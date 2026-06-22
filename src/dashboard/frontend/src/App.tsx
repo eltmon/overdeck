@@ -682,11 +682,18 @@ export default function App() {
   });
 
   const showCliproxyBanner = cliproxyStatus && !cliproxyStatus.running;
-  const { data: experimentalFeaturesEnabled = false } = useQuery({
+  // `data` is undefined while the settings query is loading (or errored) and
+  // a boolean once it settles — fetchExperimentalFeaturesEnabled always returns
+  // true/false. We must NOT default to false: doing so makes the redirect
+  // effect below bounce a deep-link to an experimental route (e.g. /agents) to
+  // /home during the loading window, before the settings resolve — so a reload
+  // with experimental features ON would always lose the route.
+  const { data: experimentalFeaturesEnabled } = useQuery({
     queryKey: ['settings', 'experimental-features'],
     queryFn: fetchExperimentalFeaturesEnabled,
     staleTime: 30_000,
   });
+  const experimentalFeaturesKnown = experimentalFeaturesEnabled === true || experimentalFeaturesEnabled === false;
 
   const restartCliproxyMutation = useMutation({
     mutationFn: restartCliproxy,
@@ -742,21 +749,25 @@ export default function App() {
     },
   });
 
-  // URL-synced tab navigation
+  // URL-synced tab navigation. Only bounce experimental tabs once the settings
+  // query has actually resolved to "off"; during loading we honor the requested
+  // tab and let the effect below reconcile once the value is known.
   const setActiveTab = useCallback((tab: Tab) => {
-    const nextTab = !experimentalFeaturesEnabled && isExperimentalTab(tab) ? 'home' : tab;
+    const denyExperimental = experimentalFeaturesKnown && !experimentalFeaturesEnabled;
+    const nextTab = denyExperimental && isExperimentalTab(tab) ? 'home' : tab;
     setActiveTabState(nextTab);
     const path = TAB_PATHS[nextTab];
     if (window.location.pathname !== path) {
       window.history.pushState({ tab: nextTab }, '', path);
     }
-  }, [experimentalFeaturesEnabled]);
+  }, [experimentalFeaturesEnabled, experimentalFeaturesKnown]);
 
   useEffect(() => {
+    if (!experimentalFeaturesKnown) return;
     if (!experimentalFeaturesEnabled && isExperimentalTab(activeTab)) {
       setActiveTab('home');
     }
-  }, [activeTab, experimentalFeaturesEnabled, setActiveTab]);
+  }, [activeTab, experimentalFeaturesEnabled, experimentalFeaturesKnown, setActiveTab]);
 
   // Sync the URL to the active issue cockpit (PAN-2005). replaceState (like the
   // conversation route) keeps history clean; reload/bookmark restores the tab.

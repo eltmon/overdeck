@@ -113,7 +113,10 @@ async function newContext(): Promise<BrowserContext> {
         summary: { active: 1, stale: 0, warning: 0, stuck: 0, total: 1 },
         agentsNeedingAttention: [],
       });
-      if (path === '/api/settings') return json({ tts: { enabled: false } });
+      // The /agents route is a gated experimental nav surface — enable the
+      // flag so the route renders its FleetAgentsView instead of redirecting
+      // to /home. See src/lib/experimentalFeatures.ts (EXPERIMENTAL_TAB_IDS).
+      if (path === '/api/settings') return json({ tts: { enabled: false }, experimental: { experimentalFeatures: true } });
       if (path === '/api/tts/health') return json({ ok: true, queue: 0, model: 'test-tts' });
       if (path === '/api/deacon/status') return json({
         isRunning: true,
