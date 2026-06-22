@@ -83,7 +83,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
+          # Deliberately NO `registry-url`. setup-node's registry-url writes a
+          # dummy `//registry.npmjs.org/:_authToken=XXXXX...` into .npmrc, which
+          # makes `npm publish` attempt (failing) token auth instead of OIDC
+          # Trusted Publishing — the cause of the v0.30.0/v0.30.1 publish 404s.
+          # With npm 11.5.1+ and `id-token: write`, `npm publish` uses OIDC
+          # automatically when no token is configured (requires a Trusted
+          # Publisher on each @overdeck/* package on npmjs.com).
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
