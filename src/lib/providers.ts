@@ -14,7 +14,7 @@ import type { RuntimeName } from './runtimes/types.js';
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral';
 
 /**
  * Provider configuration
@@ -197,6 +197,45 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: false,
     description: 'Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out).',
   },
+
+  groq: {
+    name: 'groq',
+    displayName: 'Groq',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    authType: 'static',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-qwq-32b', 'gemma2-9b-it'],
+    haikuModel: 'llama-3.1-8b-instant',
+    tierModels: { opus: 'llama-3.3-70b-versatile', sonnet: 'llama-3.3-70b-versatile', haiku: 'llama-3.1-8b-instant' },
+    tested: false,
+    description: 'Route via omp using GROQ_API_KEY. Ultra-low-latency inference on open-weight models.',
+  },
+
+  cerebras: {
+    name: 'cerebras',
+    displayName: 'Cerebras',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    authType: 'static',
+    models: ['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'],
+    haikuModel: 'llama3.1-8b',
+    tierModels: { opus: 'llama3.3-70b', sonnet: 'llama3.1-70b', haiku: 'llama3.1-8b' },
+    tested: false,
+    description: 'Route via omp using CEREBRAS_API_KEY. Hardware-accelerated inference on Cerebras wafer-scale chips.',
+  },
+
+  mistral: {
+    name: 'mistral',
+    displayName: 'Mistral AI',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    authType: 'static',
+    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+    haikuModel: 'mistral-small-latest',
+    tierModels: { opus: 'mistral-large-latest', sonnet: 'mistral-large-latest', haiku: 'mistral-small-latest' },
+    tested: false,
+    description: 'Route via omp using MISTRAL_API_KEY.',
+  },
 };
 
 export function getBuiltInDefaultHarness(provider: ProviderName | string): RuntimeName {
@@ -261,6 +300,21 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   // Check MiMo models
   if (['mimo-v2.5-pro', 'mimo-v2.5'].includes(modelId)) {
     return PROVIDERS.mimo;
+  }
+
+  // Check Groq models
+  if (['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-qwq-32b', 'gemma2-9b-it'].includes(modelId)) {
+    return PROVIDERS.groq;
+  }
+
+  // Check Cerebras models
+  if (['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'].includes(modelId)) {
+    return PROVIDERS.cerebras;
+  }
+
+  // Check Mistral models
+  if (['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'].includes(modelId)) {
+    return PROVIDERS.mistral;
   }
 
   // Default to Anthropic if unknown
@@ -330,6 +384,12 @@ export function getProviderEnvSync(
     env.GEMINI_API_KEY = apiKey;
   } else if (provider.name === 'xai') {
     env.XAI_API_KEY = apiKey;
+  } else if (provider.name === 'groq') {
+    env.GROQ_API_KEY = apiKey;
+  } else if (provider.name === 'cerebras') {
+    env.CEREBRAS_API_KEY = apiKey;
+  } else if (provider.name === 'mistral') {
+    env.MISTRAL_API_KEY = apiKey;
   }
 
   // MiniMax, Z.AI, and MiMo recommend longer timeouts
