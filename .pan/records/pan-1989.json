@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-23T20:38:51.886Z",
+  "updated": "2026-06-23T20:41:00.102Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "blocked",
@@ -183,5 +183,22 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "statusOverrides": {
+    "widen-union": "completed",
+    "widen-union.ac1": "completed",
+    "widen-union.ac2": "completed",
+    "widen-union.ac3": "completed",
+    "widen-union.ac4": "completed",
+    "audit-enumeration": "completed",
+    "audit-enumeration.ac1": "completed",
+    "audit-enumeration.ac2": "completed",
+    "audit-enumeration.ac3": "completed",
+    "omp-contract": "completed",
+    "omp-contract.ac1": "completed",
+    "omp-contract.ac2": "completed",
+    "omp-contract.ac3": "completed",
+    "omp-contract.ac4": "completed",
+    "omp-contract.ac5": "completed"
+  }
 }
