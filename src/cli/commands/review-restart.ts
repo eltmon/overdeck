@@ -21,6 +21,45 @@ export interface ReviewRestartOptions {
   role?: string;
 }
 
+type ReviewRestartResult = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  killed?: string[] | number;
+  model?: string;
+};
+
+function previewResponseBody(body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed) return '';
+  return trimmed.length > 500 ? `${trimmed.slice(0, 500)}...` : trimmed;
+}
+
+function parseReviewRestartResponse(body: string, ok: boolean): ReviewRestartResult {
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return ok
+      ? { success: true }
+      : { success: false, error: 'Failed to restart review' };
+  }
+
+  try {
+    return JSON.parse(trimmed) as ReviewRestartResult;
+  } catch (error) {
+    const preview = previewResponseBody(trimmed);
+    if (ok) {
+      return {
+        success: true,
+        message: preview ? `Dashboard accepted the restart but returned a non-JSON response: ${preview}` : undefined,
+      };
+    }
+    return {
+      success: false,
+      error: preview || (error instanceof Error ? error.message : 'Failed to restart review'),
+    };
+  }
+}
+
 export async function reviewRestartCommand(
   id: string,
   opts: ReviewRestartOptions = {},
@@ -55,13 +94,7 @@ export async function reviewRestartCommand(
       body: JSON.stringify({ model: opts.model }),
     });
 
-    const result = await response.json() as {
-      success: boolean;
-      message?: string;
-      error?: string;
-      killed?: string[] | number;
-      model?: string;
-    };
+    const result = parseReviewRestartResponse(await response.text(), response.ok);
 
     if (!response.ok) {
       console.error(chalk.red(`\nError: ${result.error || 'Failed to restart review'}`));
