@@ -134,6 +134,7 @@ import {
 } from '../../../lib/agent-enrichment.js';
 import { parseEntireConversation } from '../services/conversation-service.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import { readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath, resolveAgentHarness } from './jsonl-resolver.js';
 import type { ConversationResponse } from '@overdeck/contracts';
@@ -1044,6 +1045,13 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
       const sessionFile = await resolvePiSessionPath(id);
       if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
       const result = await parsePiConversationMessages(sessionFile);
+      return { ...result, streaming: false };
+    }
+
+    if (harness === 'ohmypi') {
+      const sessionFile = await resolvePiSessionPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parseOhmypiConversationMessages(sessionFile);
       return { ...result, streaming: false };
     }
 

@@ -124,6 +124,7 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
     if (conversation.endedAt) return false;
     return conversation.harness === 'claude-code' ||
       conversation.harness === 'pi' ||
+      conversation.harness === 'ohmypi' ||
       conversation.harness === 'codex' ||
       conversation.harness == null;
   }
@@ -135,7 +136,7 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   if (!conversation.sessionAlive) return false;
   const name = conversation.name ?? '';
   const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
-  const streamable = conversation.harness === 'pi' || conversation.harness === 'codex';
+  const streamable = conversation.harness === 'pi' || conversation.harness === 'ohmypi' || conversation.harness === 'codex';
   return isAgentSession && streamable;
 }
 

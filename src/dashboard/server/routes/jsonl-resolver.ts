@@ -280,7 +280,7 @@ export async function resolveJsonlPath(
   if (harness === 'codex') {
     return resolveCodexRolloutPath(agentId, opts);
   }
-  if (harness === 'pi') {
+  if (harness === 'pi' || harness === 'ohmypi') {
     return resolvePiSessionPath(agentId, opts);
   }
 

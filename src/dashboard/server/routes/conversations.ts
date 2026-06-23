@@ -140,6 +140,7 @@ import { resolveConversationMessageLocator } from '../services/conversation-mess
 import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
   compactConversationNative,
@@ -453,6 +454,8 @@ async function getCachedMessages(
     // because a Codex path (.../agents/<id>/codex-home/sessions/...) also
     // matches the Pi detector's substrings.
     result = await parseCodexConversationMessages(sessionFile);
+  } else if (isOhmypiSessionFile(sessionFile)) {
+    result = await parseOhmypiConversationMessages(sessionFile);
   } else if (isPiSessionFile(sessionFile)) {
     result = await parsePiConversationMessages(sessionFile);
   } else if (isSpecialist) {
