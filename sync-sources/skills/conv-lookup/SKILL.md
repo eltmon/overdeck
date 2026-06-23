@@ -31,7 +31,7 @@ Use this skill whenever the user references a Overdeck conversation — by `pan.
 - User asks for recent conversation history
 - Need to find the JSONL session file for a conversation to analyze its content
 
-> **Do not** try `WebFetch` on `pan.localhost/conv/<id>` — the dashboard is an SPA and WebFetch will return empty page chrome. Always go through the script / DB.
+> **Do not** try `WebFetch` on `pan.localhost/conv/<id>` — the dashboard is an SPA and WebFetch will return empty page chrome. Always go through the script / `pan conv` CLI.
 
 ## "Which conversation am I in?"
 
@@ -50,11 +50,13 @@ same way.
 
 ## How it works
 
-Every Overdeck conversation is tracked in the SQLite database at `~/.overdeck/panopticon.db` in the `conversations` table. Use the first-class CLI resolver to map a conversation ID to its Claude Code JSONL transcript:
+Conversation and session state lives in the Overdeck SQLite database, but **this skill never reads that DB directly** — the DB location (`~/.overdeck/overdeck.db`) and its schema (UUID conversation ids, `claude_session_id` in `conversation_files`, etc.) are not a stable contract and have already shifted once across the rebrand (PAN-2019). Instead, everything routes through the canonical `pan conv` CLI read door, which is schema-stable:
 
 ```bash
 pan conv jsonl <id>        # alias: pan conv transcript <id>
 pan conv jsonl --json <id>
+pan conv show --json <id>   # conversation metadata (PAN-2018: conversation-first)
+pan conv list --format json # discovered sessions
 ```
 
 `pan conv jsonl` is the canonical resolver. It reads the conversation's `claude_session_id` + `cwd`, resolves through the shared Overdeck transcript-path helper, preserves the one-level `~/.claude/projects/*/<session-id>.jsonl` fallback, and reports one of:
@@ -102,6 +104,11 @@ Conversation #108
   Last assistant: I traced the remaining nonsense generation to...
 ```
 
+The Name/Status/Model/Title/Cost fields come from `pan conv show --json`. On
+main branches predating PAN-2018, `show` returns session-only data and these
+fields show `N/A` (the script falls back to `pan conv jsonl` for id / cwd /
+transcript); they populate automatically once PAN-2018 lands.
+
 ### Get only the JSONL path
 
 Prefer the canonical resolver directly:
@@ -138,16 +145,18 @@ python3 scripts/conv-find.py --search gpt-5.4 --json
 ```
 
 For a single conversation, `--json` includes:
-- database metadata
-- a `session_summary` object with normalized session info
+- conversation metadata (resolved through `pan conv show --json`; falls back to the `pan conv jsonl` resolver on older main)
+- a `session_summary` object with normalized session info parsed from the transcript
 
-### List recent conversations
+### List recent sessions
 
 ```bash
 python3 scripts/conv-find.py --recent 20   # default 20
 ```
 
-### Search by title/cwd/model
+### Search by model / workspace / tools / files
+
+Search is a client-side substring filter over `pan conv list --format json` (there is no CLI search door yet). It matches across primary model, workspace path, issue id, summary, models used, tools used, and files touched:
 
 ```bash
 python3 scripts/conv-find.py --search lexerra
@@ -198,36 +207,27 @@ for line in path.read_text().splitlines():
     # content may be a string, list[str], or list[dict]
 ```
 
-## Key database columns
+## Do not query the DB directly
 
-The `conversations` table has these useful columns:
-- `id` — numeric conversation ID (the number in `/conv/<id>`)
-- `name` — Overdeck-generated name (e.g., `20260412-4175`)
-- `status` — `active` or `ended`
-- `cwd` — working directory when spawned
-- `issue_id` — associated issue (null for manual convs)
-- `claude_session_id` — Claude Code session UUID; `pan conv jsonl` combines this with `cwd` to resolve the JSONL path (see "How it works")
-- `session_file` — **deprecated (PAN-451)**: full JSONL path on legacy rows only; NULL since 2026-05
-- `title` — auto/AI-set title from first message
-- `title_seed` — original user message that started the conversation
-- `total_cost` — cached total cost in USD
-- `model` — model used (e.g., `claude-opus-4-6`, `gpt-5.4`)
-- `effort` — effort level (`low`, `medium`, `high`)
-- `created_at`, `ended_at` — timestamps
+There is no stable contract for the on-disk DB path or the `conversations`
+schema, and both have already changed once (rebrand: `~/.panopticon` →
+`~/.overdeck`; schema: integer → UUID ids, `claude_session_id` moved into
+`conversation_files`). Direct SQL against the DB is what broke this skill in
+the first place (PAN-2019).
 
-## Quick SQL queries
-
-For direct database queries, use Python's built-in sqlite3 CLI — the standalone `sqlite3` binary is NOT installed on all machines:
+Use the CLI doors instead:
 
 ```bash
-# Find conversation by ID
-python3 -m sqlite3 ~/.overdeck/panopticon.db "SELECT id, name, status, claude_session_id, cwd, title, model, created_at FROM conversations WHERE id = 108;"
-
-# Search by keyword in title
-python3 -m sqlite3 ~/.overdeck/panopticon.db "SELECT id, claude_session_id, cwd, title FROM conversations WHERE title LIKE '%lexerra%';"
+pan conv jsonl --json <id>      # transcript path + claudeSessionId + cwd
+pan conv show --json <id>       # conversation metadata (PAN-2018)
+pan conv list --format json     # discovered sessions
+pan conv current --json         # the conversation you are running in
 ```
 
-(`python3 -m sqlite3 <db> "<sql>"` requires Python ≥3.12, which is the baseline here. If a plain `sqlite3` binary happens to be on PATH it works the same.)
+If you genuinely need a raw DB inspection for debugging (not for resolving a
+conversation), prefer the dashboard's read API (`GET /api/conversations/<id>`)
+or the `pan conv` doors over hand-written SQL — the DB is a disposable cache
+rebuilt from durable sources.
 
 ## Comparing two conversations
 
