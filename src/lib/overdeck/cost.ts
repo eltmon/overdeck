@@ -2,12 +2,12 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
-import { and, desc, eq, gte, like, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from './infra.js';
-import { IssueId } from './issues.js';
+import { IssueId, type IssueId as IssueIdType } from './issues.js';
 import {
   getAllBudgetsSync,
   checkBudgetSync,
@@ -15,7 +15,7 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parsePiSessionSync } from '../cost-parsers/pi-parser.js';
+import { parsePiSessionCostEventsSync } from '../cost-parsers/pi-parser.js';
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 
@@ -182,6 +182,21 @@ function toTokens(r: TokenRow): Tokens {
 
 function toRollup(key: string, r: TokenRow & { cost: number | null }): Rollup {
   return { key, cost: r.cost ?? 0, tokens: toTokens(r) };
+}
+
+function issueIdFromAgentName(agentName: string): IssueIdType | null {
+  const match = agentName.match(/(?:^|-)((?:pan|min|aud|krux|cli)-\d+)(?:-|$)/i);
+  return match ? match[1]!.toUpperCase() as IssueIdType : null;
+}
+
+function inferPiProvider(model: string, provider: string | null): string | null {
+  if (provider) return provider;
+  const lower = model.toLowerCase();
+  if (lower.includes('kimi') || lower.startsWith('minimax')) return 'custom';
+  if (lower.includes('claude')) return 'anthropic';
+  if (lower.includes('gpt')) return 'openai';
+  if (lower.includes('gemini')) return 'google';
+  return null;
 }
 
 // ── CostResolver — the read door ──────────────────────────────────────────────
@@ -451,20 +466,23 @@ export const CostWriterLive = Layer.effect(
     const archive = yield* CostArchive;
     const bus = yield* EventBus;
 
-    // Dedup by requestId or sourceFile: pi/codex sessions carry a file path but no requestId,
-    // so the UNIQUE(request_id) constraint doesn't catch re-imports of the same file.
+    // Dedup by requestId first. Cumulative imports that have no requestId fall
+    // back to sourceFile; per-message pi events all share one sourceFile, so
+    // sourceFile must not suppress later requestIds from the same session.
     const checkDuplicate = (e: CostEvent) =>
       Effect.gen(function* () {
-        if (e.requestId == null && e.sourceFile == null) return false;
-        const conditions = [
-          e.requestId != null ? eq(costEventsTable.requestId, e.requestId) : undefined,
-          e.sourceFile != null ? eq(costEventsTable.sourceFile, e.sourceFile) : undefined,
-        ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined);
+        const condition =
+          e.requestId != null
+            ? eq(costEventsTable.requestId, e.requestId)
+            : e.sourceFile != null
+              ? eq(costEventsTable.sourceFile, e.sourceFile)
+              : null;
+        if (!condition) return false;
         const existing = yield* Effect.promise(() =>
           q
             .select({ id: costEventsTable.id })
             .from(costEventsTable)
-            .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+            .where(condition)
             .limit(1),
         );
         return (existing as unknown[]).length > 0;
@@ -534,16 +552,40 @@ export const CostWriterLive = Layer.effect(
           const sessionFiles = yield* Effect.sync(() => walkJsonl(sessionRoot));
 
           for (const sessionFile of sessionFiles) {
-            const session = yield* Effect.sync(() =>
-              source === 'pi'
-                ? parsePiSessionSync(sessionFile)
-                : parseCodexSessionSync(sessionFile),
-            );
+            if (source === 'pi') {
+              const events = yield* Effect.sync(() => parsePiSessionCostEventsSync(sessionFile));
+              for (const usage of events) {
+                const event: CostEvent = {
+                  ts:          new Date(usage.timestamp),
+                  issueId:     issueIdFromAgentName(agentName),
+                  agentId:     agentName,
+                  sessionId:   usage.sessionId,
+                  sessionType: source,
+                  provider:    inferPiProvider(usage.model, usage.provider),
+                  model:       usage.model,
+                  input:       usage.input,
+                  output:      usage.output,
+                  cacheRead:   usage.cacheRead,
+                  cacheWrite:  usage.cacheWrite,
+                  cost:        usage.cost,
+                  requestId:   usage.requestId,
+                  sourceFile:  sessionFile,
+                };
+
+                const wasDuplicate = yield* checkDuplicate(event);
+                if (!wasDuplicate) {
+                  if (yield* record(event)) imported++;
+                }
+              }
+              continue;
+            }
+
+            const session = yield* Effect.sync(() => parseCodexSessionSync(sessionFile));
             if (!session) continue;
 
             const event: CostEvent = {
               ts:          new Date(session.startTime),
-              issueId:     null,
+              issueId:     issueIdFromAgentName(agentName),
               agentId:     agentName,
               sessionId:   session.sessionId,
               sessionType: source,

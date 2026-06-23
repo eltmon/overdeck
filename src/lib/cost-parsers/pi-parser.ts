@@ -64,6 +64,20 @@ interface PiMessageEntry {
   };
 }
 
+export interface PiCostEventUsage {
+  requestId: string;
+  timestamp: string;
+  sessionId: string;
+  sessionFile: string;
+  provider: string | null;
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+}
+
 interface PiGenericEntry {
   type: string;
   id: string;
@@ -93,6 +107,7 @@ interface ParseResult {
   ok: boolean;
   reason?: string;
   usage?: SessionUsage;
+  usageEvents?: PiCostEventUsage[];
 }
 
 // Known top-level entry types. Anything else is logged once per session.
@@ -120,6 +135,12 @@ export function parsePiSessionSync(filePath: string): SessionUsage | null {
   if (!existsSync(filePath)) return null;
   const result = parsePiSessionContent(readFileSync(filePath, 'utf8'), filePath);
   return result.ok ? result.usage! : null;
+}
+
+export function parsePiSessionCostEventsSync(filePath: string): PiCostEventUsage[] {
+  if (!existsSync(filePath)) return [];
+  const result = parsePiSessionContent(readFileSync(filePath, 'utf8'), filePath);
+  return result.ok ? result.usageEvents ?? [] : [];
 }
 
 /**
@@ -228,6 +249,7 @@ export function parsePiSessionContent(content: string, filePath = '<inline>'): P
     string,
     { cost: number; inputTokens: number; outputTokens: number; messageCount: number }
   > = {};
+  const usageEvents: PiCostEventUsage[] = [];
   const modelsInOrder: string[] = [];
   let compactionCount = 0;
 
@@ -245,6 +267,7 @@ export function parsePiSessionContent(content: string, filePath = '<inline>'): P
     const usage = entry.message.usage;
     if (!usage) continue;
     const model = entry.message.model || 'unknown';
+    const provider = typeof entry.message.provider === 'string' ? entry.message.provider : null;
     const input = usage.input ?? 0;
     const output = usage.output ?? 0;
     const cacheRead = usage.cacheRead ?? 0;
@@ -273,6 +296,20 @@ export function parsePiSessionContent(content: string, filePath = '<inline>'): P
     slot.inputTokens += input;
     slot.outputTokens += output;
     slot.messageCount += 1;
+
+    usageEvents.push({
+      requestId: `pi:${root.id}:${entry.id}`,
+      timestamp: entry.timestamp || root.timestamp,
+      sessionId: root.id,
+      sessionFile: filePath,
+      provider,
+      model,
+      input,
+      output,
+      cacheRead,
+      cacheWrite,
+      cost,
+    });
   }
 
   // Observability: log Pi-inline-cost vs locally-recomputed-from-cost-fields
@@ -312,6 +349,7 @@ export function parsePiSessionContent(content: string, filePath = '<inline>'): P
       messageCount,
       modelBreakdown,
     },
+    usageEvents,
   };
 }
 
@@ -339,4 +377,12 @@ export const parsePiSession = (
   Effect.try({
     try: () => parsePiSessionSync(filePath),
     catch: (cause) => new FsError({ path: filePath, operation: 'parsePiSession', cause }),
+  });
+
+export const parsePiSessionCostEvents = (
+  filePath: string,
+): Effect.Effect<PiCostEventUsage[], FsError> =>
+  Effect.try({
+    try: () => parsePiSessionCostEventsSync(filePath),
+    catch: (cause) => new FsError({ path: filePath, operation: 'parsePiSessionCostEvents', cause }),
   });

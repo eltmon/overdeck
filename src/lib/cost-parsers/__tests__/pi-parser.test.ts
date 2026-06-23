@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { join } from 'path'
-import { parsePiSessionSync } from '../pi-parser.js'
+import { parsePiSessionCostEventsSync, parsePiSessionSync } from '../pi-parser.js'
 
 const FIXTURES = join(__dirname, 'fixtures', 'pi')
 
@@ -27,6 +27,22 @@ describe('parsePiSession', () => {
     expect(result!.cost).toBeCloseTo(0.0006 + 0.000525, 9)
     expect(result!.model).toBe('claude-sonnet-4-6')
     expect(result!.modelBreakdown!['claude-sonnet-4-6']!.messageCount).toBe(2)
+  })
+
+  it('linear session: exposes one stable cost event per assistant usage message', () => {
+    const events = parsePiSessionCostEventsSync(join(FIXTURES, 'linear.jsonl'))
+    expect(events).toHaveLength(2)
+    expect(events.map((event) => event.requestId)).toEqual([
+      'pi:019df5a5-aaaa-aaaa-aaaa-aaaaaaaaaaaa:e3',
+      'pi:019df5a5-aaaa-aaaa-aaaa-aaaaaaaaaaaa:e5',
+    ])
+    expect(events[0]).toMatchObject({
+      sessionId: '019df5a5-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      model: 'claude-sonnet-4-6',
+      input: 100,
+      output: 20,
+      cost: 0.0006,
+    })
   })
 
   it('forked session: counts only the active (latest-leaf) branch (AC2)', () => {
