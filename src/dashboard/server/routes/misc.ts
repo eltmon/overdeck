@@ -51,7 +51,8 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
+import { getNoResumeMode, disableNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
+import { autoResumeStoppedWorkAgents } from '../../../lib/cloister/deacon.js';
 import { createSession, killSession, listSessionNames, resizeWindow, sendKeys, sessionExists } from '../../../lib/tmux.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
@@ -679,6 +680,36 @@ const getNoResumeModeRoute = HttpRouter.add(
   'GET',
   '/api/no-resume-mode',
   Effect.sync(() => jsonResponse(getNoResumeMode())),
+);
+
+// ─── Route: POST /api/resume-all ─────────────────────────────────────────────
+
+/**
+ * Operator "Resume all" — the call-to-action behind the no-resume banner.
+ * PAN-1963 makes agent auto-resume OFF by default at every boot, so after the
+ * dashboard loads, stopped agents wait for the operator to put them back to
+ * work. This clears no-resume mode for the running process (so the Deacon's
+ * patrols and lifecycle-event handlers resume agents again) and immediately
+ * sweeps the stopped work agents rather than waiting for the next patrol tick.
+ */
+const postResumeAllRoute = HttpRouter.add(
+  'POST',
+  '/api/resume-all',
+  Effect.promise(async () => {
+    try {
+      disableNoResumeMode();
+      const resumed = await autoResumeStoppedWorkAgents();
+      console.log(`[resume-all] No-resume mode cleared; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
+      return jsonResponse({ ok: true, resumed, count: resumed.length });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Error resuming all agents:', error);
+      return jsonResponse(
+        { ok: false, error: 'Failed to resume agents: ' + msg },
+        { status: 500 },
+      );
+    }
+  }),
 );
 
 // ─── Route: GET /api/deacon/status ───────────────────────────────────────────
@@ -1774,6 +1805,7 @@ export const miscRouteLayer = Layer.mergeAll(
   getTrackerStatusRoute,
   postRallyValidateRoute,
   getNoResumeModeRoute,
+  postResumeAllRoute,
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,
