@@ -307,6 +307,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/tracker-status',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Tracker connection status; outside 8 remodel domains' },
   { surface: 'POST /api/rally/validate',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Rally validator; outside 8 remodel domains' },
   { surface: 'GET /api/no-resume-mode',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Boot flag probe; outside 8 remodel domains' },
+  { surface: 'POST /api/resume-all',                      kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.disableNoResumeMode + AgentWriter.resume ×N' },
   { surface: 'GET /api/deacon/status',                    kind: 'http', disposition: 'READ',        door: 'SettingsResolver.isDeaconPaused + live status' },
   { surface: 'GET /api/deacon/logs',                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Deacon log stream; outside 8 remodel domains' },
   { surface: 'POST /api/deacon/patrol',                   kind: 'http', disposition: 'RELOCATE',    door: 'CloisterRuntime.patrol (residue)' },
