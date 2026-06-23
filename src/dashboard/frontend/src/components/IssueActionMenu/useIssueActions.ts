@@ -115,7 +115,6 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'tell':
     case 'stopAgent':
     case 'pause':
-    case 'switchModel':
       return 'This action requires a running agent.';
     case 'resumeSession':
     case 'resetSession':
@@ -164,7 +163,6 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'autoPlan',
   'startSkipPlanning',
   'tell',
-  'switchModel',
   'inspectBead',
   'open',
   'upload',

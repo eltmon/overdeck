@@ -30,11 +30,7 @@ import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
-import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
-import {
-  decideSwitchStrategy,
-  getEffectiveTargetWindow,
-} from '../../../lib/conversations/switch-strategy.js';
+import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -146,13 +142,11 @@ import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-lan
 import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
-  maybeCompactBeforeRespawn,
   compactConversationNative,
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
 import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome } from '../../../lib/paths.js';
-import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import {
   generateSummaryForFork,
@@ -330,91 +324,7 @@ function shellQuote(str: string): string {
 }
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
-const DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW = 200_000;
-const SWITCH_MODEL_STATUSLINE_TIMEOUT_MS = 5_000;
-const SWITCH_MODEL_STATUSLINE_POLL_MS = 250;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
-
-function modelCapabilityForModel(model: string | null | undefined) {
-  if (!model) return undefined;
-  const resolvedModel = resolveModelIdSync(model);
-  return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
-    ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
-    : undefined;
-}
-
-function registryContextWindowForModel(model: string | null | undefined): number {
-  return modelCapabilityForModel(model)?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
-}
-
-function displayNameForModel(model: string): string {
-  return modelCapabilityForModel(model)?.displayName ?? model;
-}
-
-async function isCliproxyRoutedModel(model: string | null | undefined): Promise<boolean> {
-  if (!model) return false;
-  return getProviderForModelSync(model).name === 'openai'
-    && (await getProviderAuthMode(model)) === 'subscription';
-}
-
-function providerRoutingSignature(exports: string): string {
-  return exports
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith('unset '))
-    .join('\n');
-}
-
-async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
-  if (!targetModel || currentModel === targetModel) return false;
-
-  const targetSignature = providerRoutingSignature(await getProviderExportsForModel(targetModel));
-  if (!currentModel) return targetSignature !== '';
-
-  const currentSignature = providerRoutingSignature(await getProviderExportsForModel(currentModel));
-  return currentSignature !== targetSignature;
-}
-
-const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
-
-function normalizePaneLine(line: string): string {
-  return line.replace(ANSI_ESCAPE_PATTERN, '').trim().toLowerCase();
-}
-
-function modelStatuslinePrefix(line: string): string {
-  return line.startsWith('statusline:') ? line.slice('statusline:'.length).trimStart() : line;
-}
-
-function hasStatuslineModelConfirmation(pane: string, targetModel: string): boolean {
-  const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
-  const targetModelId = targetModel.toLowerCase();
-  const expectedWithId = `${targetDisplayName} (${targetModelId})`;
-
-  for (const rawLine of pane.split(/\r?\n/)) {
-    const line = normalizePaneLine(rawLine);
-    if (!line || line.includes('/model')) continue;
-
-    const modelLine = modelStatuslinePrefix(line);
-    if (modelLine === targetModelId || modelLine.startsWith(`${targetModelId} `)) return true;
-    if (modelLine === expectedWithId || modelLine.startsWith(`${expectedWithId} `)) return true;
-  }
-
-  return false;
-}
-
-async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < SWITCH_MODEL_STATUSLINE_TIMEOUT_MS) {
-    const pane = await Effect.runPromise(
-      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
-    );
-    if (hasStatuslineModelConfirmation(pane, targetModel)) {
-      return true;
-    }
-    await new Promise(r => setTimeout(r, SWITCH_MODEL_STATUSLINE_POLL_MS));
-  }
-  return false;
-}
 
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
@@ -2811,9 +2721,8 @@ const postConversationResumeRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
 //
-// Kill the current session (if alive), update the model in the DB, and resume.
-// Used by the model picker in the sidebar to switch models without going through
-// the full resume flow.
+// Update the model/harness only for a brand-new conversation before any runtime
+// session exists. Once a conversation has a session id, the model is locked.
 
 const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
@@ -2832,6 +2741,12 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        if (conv.claudeSessionId) {
+          return jsonResponse(
+            { error: 'Conversation model is locked once a conversation has started' },
+            { status: 409 },
+          );
         }
 
         const model = typeof body['model'] === 'string' && body['model'].trim()
@@ -2874,137 +2789,16 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
 
-        // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.claudeSessionId;
+        if (model) setConversationModel(name, model);
+        if (harnessChanged) setConversationHarness(name, harness);
 
-        // Resolve the transcript before the kill→spawn gap so the route can decide
-        // whether compaction is actually needed for the target window.
-        const sessionFile = await resolveSessionFile(conv);
-        const cwd = conv.cwd;
-        const tmuxSession = conv.tmuxSession;
-        const effort = conv.effort ?? undefined;
-        const issueId = conv.issueId ?? undefined;
-        const targetModel = model ?? conv.model ?? undefined;
-        const providerRoutingChanged = await hasProviderRoutingChanged(conv.model, targetModel);
-        const contextUsage = sessionFile && existsSync(sessionFile)
-          ? await computeContextUsage(sessionFile, conv.model ?? targetModel ?? null)
-          : null;
-        const contextTokens = contextUsage?.estimatedTokens ?? 0;
-        const currentObservedCeiling = Math.max(contextUsage?.maxObservedInputTokens ?? 0, contextTokens);
-        const effectiveTargetWindow = getEffectiveTargetWindow({
-          registryWindow: registryContextWindowForModel(targetModel),
-          currentObservedCeiling,
-          cliproxyRouted: await isCliproxyRoutedModel(targetModel),
-          providerRoutingChanged,
+        const updated = getConversationByName(name) ?? conv;
+        return jsonResponse({
+          ...updated,
+          model: model ?? updated.model,
+          harness,
+          sessionAlive: false,
         });
-        const switchStrategy = decideSwitchStrategy({
-          harnessChanged,
-          providerRoutingChanged,
-          contextTokens,
-          effectiveTargetWindow,
-        });
-
-        if (harness === 'claude-code' && switchStrategy.useModelCommand && targetModel) {
-          if (model) setConversationModel(name, model);
-          try {
-            await deliverAgentMessage(
-              tmuxSession,
-              `/model ${targetModel}`,
-              'conversation-switch-model',
-              resolveConversationDeliveryMethod(conv),
-            );
-            if (await waitForModelStatusline(tmuxSession, targetModel)) {
-              markConversationActive(name);
-              return jsonResponse({ ...conv, status: 'active', model: targetModel, harness, reattached: false, sessionAlive: true });
-            }
-            console.warn(`[conversations] switch-model Tier 1 statusline verification timed out for ${name}; falling back to respawn`);
-          } catch (deliveryErr: unknown) {
-            const msg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
-            console.warn(`[conversations] switch-model Tier 1 delivery failed for ${name}; falling back to respawn: ${msg}`);
-          }
-        }
-
-        // Mark the session as mid-respawn BEFORE killing it so terminal
-        // WS reconnects landing in the kill→spawn gap don't get a fatal
-        // 4404. The marker is cleared in the `finally` below regardless
-        // of which branch returns or throws.
-        const respawn = markRespawnPending(tmuxSession);
-        try {
-          // Tier 1 (/model in-session) is wired by the follow-up bead. Until then,
-          // every switch still respawns; the tier decision already owns whether
-          // this respawn compacts.
-          await Effect.runPromise(killSession(tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-          // Persist the new model and harness
-          if (model) setConversationModel(name, model);
-          if (harnessChanged) setConversationHarness(name, harness);
-
-          // Only resume if the session JSONL actually exists — Claude Code's --resume
-          // fails with "No conversation found" if the file is missing (e.g., first
-          // model switch on a fresh conversation or cross-provider switch).
-          let resumeSessionId = oldSessionId ?? randomUUID();
-          let canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
-          if (oldSessionId && !canResume) {
-            console.error(
-              `[conversations] SESSION-LOST ${name} harness=${currentHarness} ` +
-              `claudeSessionId=${oldSessionId} resolved=${sessionFile ?? 'null'} — ` +
-              `switch-model will start a fresh session`,
-            );
-          }
-
-          if (harnessChanged) {
-            // Runtime change: convert the existing transcript into the target
-            // harness's format so history carries over. Native (Claude-format)
-            // compaction must NOT run here — it would write Claude records into a
-            // Pi JSONL (or vice versa). The converter produces a fresh session in
-            // the target format and returns its session id.
-            if (canResume && sessionFile) {
-              try {
-                const result = await Effect.runPromise(convertConversationTranscript({
-                  fromHarness: currentHarness,
-                  toHarness: harness,
-                  sourceSessionFile: sessionFile,
-                  cwd,
-                  tmuxSession,
-                }));
-                resumeSessionId = result.sessionId;
-                canResume = true;
-                if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
-                // For Codex, result.sessionId is the thread-id; persisted separately by initCodexHome/writeThreadId.
-              } catch (convErr) {
-                const cm = convErr instanceof Error ? convErr.message : String(convErr);
-                console.error(`[conversations] SESSION-CONVERT-FAILED ${name} ${currentHarness}->${harness}: ${cm}`);
-                canResume = false;
-              }
-            } else {
-              // No source transcript to convert — start the new harness fresh.
-              canResume = false;
-            }
-          } else if (harness === 'claude-code') {
-            // Same harness, Claude Code: native (Claude-format) compaction is correct
-            // only when the tier decision says the active context will not fit.
-            const compactionFork = await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
-            if (compactionFork) {
-              resumeSessionId = compactionFork.forkedSessionId;
-              setConversationClaudeSessionId(name, compactionFork.forkedSessionId);
-            }
-          }
-          // Pi staying on Pi: skip native compaction — it is Claude-format only and
-          // would corrupt the Pi JSONL. Pi manages its own context.
-
-          await spawnConversationSession(tmuxSession, cwd, resumeSessionId, model, effort, issueId, canResume, harness);
-          await waitForTmuxSession(tmuxSession);
-          if (harness === 'pi') {
-            await waitForPiTuiReady(tmuxSession);
-          } else if (harness !== 'codex') {
-            await waitForReadySignal(tmuxSession, 30);
-          }
-
-          markConversationActive(name);
-          return jsonResponse({ ...conv, status: 'active', model, harness, reattached: false, sessionAlive: true });
-        } finally {
-          respawn.done();
-        }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);

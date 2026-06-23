@@ -3,8 +3,6 @@ import { MoreHorizontal, X } from 'lucide-react';
 
 import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
-import { SwitchModelModal } from '../SwitchModelModal';
-import { useSwitchModel } from '../../hooks/useSwitchModel';
 import type { IssueActionKey } from '../../lib/issueActions';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
@@ -29,7 +27,6 @@ const AGENT_SCOPE_ACTION_KEYS = new Set<IssueActionKey>([
   'untroubled',
   'recoverAgent',
   'resumeSession',
-  'switchModel',
 ]);
 
 function actionButtonClass(view: IssueActionView, inline: boolean) {
@@ -207,8 +204,7 @@ function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; act
 }
 
 export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
-  const { activeDialog, agent, lifecycle, issue, workspace, closeDialog } = actions;
-  const { switchMutation, isPending: isSwitchPending } = useSwitchModel(agent?.id, issueId);
+  const { activeDialog, issue, workspace, closeDialog } = actions;
   const handleClose = () => {
     const restoreFocus = activeDialog?.key === 'open';
     closeDialog();
@@ -225,22 +221,6 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
         autoStart={activeDialog.key === 'startSkipPlanning'}
         onClose={handleClose}
         onComplete={handleClose}
-      />
-    );
-  }
-
-  if (activeDialog.key === 'switchModel' && agent) {
-    return (
-      <SwitchModelModal
-        currentModel={agent.model}
-        currentHarness={agent.harness ?? null}
-        agentId={agent.id}
-        issueId={issueId}
-        agentStatus={agent.status}
-        hasResumableSession={lifecycle?.canResumeSession === true}
-        onClose={handleClose}
-        onSwitch={(model, message, harness) => switchMutation.mutate({ model, message, harness })}
-        isPending={isSwitchPending}
       />
     );
   }

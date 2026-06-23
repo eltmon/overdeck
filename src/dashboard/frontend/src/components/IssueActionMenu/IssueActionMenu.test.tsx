@@ -128,7 +128,7 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-untroubled')).toHaveTextContent('Clear troubled gate');
     expect(screen.getByTestId('issue-action-recoverAgent')).toHaveTextContent('Recover agent');
     expect(screen.getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
-    expect(screen.getByTestId('issue-action-switchModel')).toHaveTextContent('Switch model');
+    expect(screen.queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();

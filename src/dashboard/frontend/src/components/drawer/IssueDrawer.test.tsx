@@ -731,7 +731,6 @@ describe('IssueDrawer', () => {
           "issue-action-doneWork",
           "issue-action-stopAgent",
           "issue-action-pause",
-          "issue-action-switchModel",
           "issue-action-syncMain",
           "issue-action-inspectBead",
           "issue-action-wipe",

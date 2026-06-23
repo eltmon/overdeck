@@ -35,7 +35,6 @@ export type IssueActionKey =
   | 'untroubled'
   | 'recoverAgent'
   | 'resumeSession'
-  | 'switchModel'
   | 'syncMain'
   | 'rebuildAndStart'
   | 'inspectBead'
@@ -234,7 +233,6 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'untroubled', label: 'Clear troubled gate', panVerb: 'untroubled', endpoint: '/api/agents/:agentId/untroubled', enabledWhen: isTroubled, phasePrimary: [], kind: 'safe', group: 'agent' },
   { key: 'recoverAgent', label: 'Recover agent', panVerb: 'recover', endpoint: '/api/agents/:agentId/recover', enabledWhen: canRecoverAgent, phasePrimary: phasePrimary('recoverAgent'), kind: 'safe', group: 'agent' },
   { key: 'resumeSession', label: 'Resume session', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'switchModel', label: 'Switch model', panVerb: null, endpoint: null, enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
   { key: 'rebuildAndStart', label: 'Rebuild & start', panVerb: 'workspace rebuild && start', endpoint: '/api/workspaces/:id/rebuild-and-start', enabledWhen: canRebuildAndStart, phasePrimary: [], kind: 'safe', group: 'workspace' },
   { key: 'inspectBead', label: 'Inspect bead', panVerb: 'inspect --bead', endpoint: '/api/issues/:id/beads/:beadId/inspect', enabledWhen: canInspectBead, phasePrimary: [], kind: 'dialog', group: 'review' },

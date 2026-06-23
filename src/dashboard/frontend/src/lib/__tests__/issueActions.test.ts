@@ -28,7 +28,6 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'untroubled',
   'recoverAgent',
   'resumeSession',
-  'switchModel',
   'syncMain',
   'inspectBead',
   'reopen',
@@ -175,7 +174,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('tell').enabledWhen(stopped)).toBe(false);
     expect(action('stopAgent').enabledWhen(stopped)).toBe(false);
     expect(action('pause').enabledWhen(stopped)).toBe(false);
-    expect(action('switchModel').enabledWhen(stopped)).toBe(false);
     expect(action('recoverAgent').enabledWhen(stopped)).toBe(true);
     expect(action('resumeSession').enabledWhen(stopped)).toBe(true);
   });
