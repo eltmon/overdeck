@@ -354,6 +354,26 @@ describe('planFinalizeCommand', () => {
     expect(after.plan.metadata?.canonicalFilename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-947-/);
   });
 
+  it('exits nonzero when beads succeed but promotion fails', async () => {
+    const workspacePath = makeWorkspace('PAN-949');
+    const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      error: 'complete-planning timed out after 90s',
+    }), { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+      Effect.succeed({ success: true, created: ['PAN-949: Task one'], errors: [], beadIds: new Map() }),
+    );
+
+    await expect(planFinalizeCommand({ workspace: workspacePath, qualityLint: false }))
+      .rejects.toThrow('process.exit:1');
+
+    const after = readDoc(planPath);
+    expect(after.plan.status).toBe('proposed');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('runs a clean finalize on retry after a prior beads failure (AC3)', async () => {
     const workspacePath = makeWorkspace('PAN-948');
     const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');

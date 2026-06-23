@@ -246,7 +246,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   if (options.json) {
     console.log(JSON.stringify({
-      success: true,
+      success: promoted || noPromote,
       created: result.created,
       count: result.created.length,
       canonicalFilename,
@@ -286,6 +286,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
       console.log(chalk.dim('Run `pan plan done ' + issueId + '` to retry, or click Done in the dashboard.'));
     }
+  }
+
+  if (!noPromote && !promoted) {
+    process.exit(1);
   }
 }
 
