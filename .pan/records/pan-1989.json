@@ -102,17 +102,15 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-23T22:41:48.751Z",
+  "updated": "2026-06-23T22:53:18.515Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-23T22:41:43.494Z",
-    "reviewNotes": "ohmypi conversations still keep active TUI path behind harness pi",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (17789ms):\n\nsrc/components/CommandDeck/index.tsx(824,120): error TS2322: Type 'import(\"/home/eltmon/Projects/overdeck/workspaces/feature-pan-1989/src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker\").Harness | undefined' is not assignable to type 'import(\"/home/eltmon/Projects/overdeck/workspaces/feature-pan-1989/packages/contracts/src/types\").Harness | undefined'.\n  Type '\"pi\"' is not assignable to type 'Harness | undefined'.\nsrc/components/IssueAgentCard.tsx(241,97): error TS2367: This comparison appears to be unintentional because the types 'Harness' and '\"pi\"' have no overlap.\nsrc/components/IssueAgentCard.tsx(518,54): error TS2367: This comparison appears to be unintentional because the types 'Harness' and '\"pi\"' have no overlap.\nsrc/components/context/ContextPage.tsx(205,23): error TS7053: Element implicitly has an 'any' type because expression of type 'PreviewTab' can't be used to index type '{ readonly \"claude-code\": string; readonly ohmypi: string; readonly codex: string; readonly fullPrompt: string; }'.\n  Property 'pi' does not exist on type '{ readonly \"claude-code\": string; readonly ohmypi: string; readonly codex: string; readonly fullPrompt: string; }'.\n",
+    "updatedAt": "2026-06-23T22:53:18.495Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-23T22:40:09.931Z"
   },
@@ -135,9 +133,9 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 116882,
-            "output": 16469,
-            "cacheRead": 0,
+            "input": 124946,
+            "output": 17621,
+            "cacheRead": 7424,
             "cacheWrite": 0
           }
         },
@@ -151,10 +149,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1285,
-            "output": 396935,
-            "cacheRead": 163589918,
-            "cacheWrite": 2078774
+            "input": 1293,
+            "output": 399019,
+            "cacheRead": 164517559,
+            "cacheWrite": 2082197
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -172,15 +170,15 @@
           "cacheWrite": 1214818
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1286,
-          "output": 397056,
-          "cacheRead": 163667295,
-          "cacheWrite": 2078930
+          "input": 1294,
+          "output": 399140,
+          "cacheRead": 164594936,
+          "cacheWrite": 2082353
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 116882,
-          "output": 16469,
-          "cacheRead": 0,
+          "input": 124946,
+          "output": 17621,
+          "cacheRead": 7424,
           "cacheWrite": 0
         },
         "custom/glm-5.2": {
@@ -191,8 +189,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 79.69333,
-        "pricingAsOf": "2026-06-23T22:41:43.514Z"
+        "usd": 80.015743,
+        "pricingAsOf": "2026-06-23T22:53:18.515Z"
       }
     },
     "merges": [
