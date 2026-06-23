@@ -13,7 +13,7 @@ const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   dryRun?: boolean;
 }

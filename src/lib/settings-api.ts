@@ -456,8 +456,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    errors.push(`${fieldPath}.harness must be claude-code, pi, codex, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -1061,8 +1061,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, codex, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, or empty string`);
         }
       }
     }

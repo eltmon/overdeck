@@ -8,7 +8,6 @@ import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 
 const execAsync = promisify(exec);
 const BINARY_BY_HARNESS: Partial<Record<RuntimeName, string>> = {
-  pi: 'pi',
   ohmypi: 'omp',
   codex: 'codex',
 };

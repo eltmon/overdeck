@@ -173,8 +173,8 @@ async function resolveExplicitHarnessFlag(
     return undefined;
   }
 
-  if (harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
+  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', or 'codex'.\n`);
     process.exit(1);
   }
 

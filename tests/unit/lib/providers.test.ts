@@ -6,15 +6,18 @@ import type { RuntimeName } from '../../../src/lib/runtimes/types.js';
 const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   anthropic: 'claude-code',
   openai: 'codex',
-  google: 'pi',
-  kimi: 'pi',
-  minimax: 'pi',
-  zai: 'pi',
-  mimo: 'pi',
-  openrouter: 'pi',
-  nous: 'pi',
-  dashscope: 'pi',
-  xai: 'pi',
+  google: 'ohmypi',
+  kimi: 'ohmypi',
+  minimax: 'ohmypi',
+  zai: 'ohmypi',
+  mimo: 'ohmypi',
+  openrouter: 'ohmypi',
+  nous: 'ohmypi',
+  dashscope: 'ohmypi',
+  xai: 'ohmypi',
+  groq: 'ohmypi',
+  cerebras: 'ohmypi',
+  mistral: 'ohmypi',
 };
 
 describe('providers', () => {
@@ -29,7 +32,7 @@ describe('providers', () => {
   it('returns the built-in default harness for known providers', () => {
     expect(getBuiltInDefaultHarness('openai')).toBe('codex');
     expect(getBuiltInDefaultHarness('anthropic')).toBe('claude-code');
-    expect(getBuiltInDefaultHarness('kimi')).toBe('pi');
+    expect(getBuiltInDefaultHarness('kimi')).toBe('ohmypi');
   });
 
   it('falls back to claude-code for unknown providers', () => {

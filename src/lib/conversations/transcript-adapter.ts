@@ -197,7 +197,7 @@ function serializePiEntry(entry: PiEntry, includeThinking: boolean): string | un
 }
 
 const piAdapter: ConversationTranscriptAdapter = {
-  name: 'pi',
+  name: 'ohmypi',
   supportsPlainForkAsSource: false,
   supportsSourceAuthoredHandoff: false,
 
@@ -247,7 +247,6 @@ const piAdapter: ConversationTranscriptAdapter = {
 
 const REGISTRY: Record<RuntimeName, ConversationTranscriptAdapter> = {
   'claude-code': claudeCodeAdapter,
-  'pi': piAdapter,
   'ohmypi': piAdapter,
   'codex': claudeCodeAdapter,
 };
