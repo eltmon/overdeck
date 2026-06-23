@@ -26,6 +26,7 @@ import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/use
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import type { PaneType } from '../../../lib/panesStore'
+import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
@@ -222,25 +223,6 @@ function computePipelineStates(args: {
     ship,
     merge: rs?.mergeStatus === 'merged' ? 'done' : rs?.readyForMerge ? 'active' : 'todo',
   }
-}
-
-function activePhaseLabel(states: Record<PipelinePhaseKey, PipelineState>): string {
-  const order: Array<[string, PipelineState]> = [
-    ['Plan', states.plan],
-    ['Work', states.work],
-    ['Review', states.review],
-    ['Test', states.test],
-    ['CI/CD', states.ci],
-    ['Ship', states.ship],
-    ['Merge', states.merge],
-  ]
-  const failed = order.find(([, s]) => s === 'fail')
-  if (failed) return `${failed[0]} (failed)`
-  const active = order.find(([, s]) => s === 'active')
-  if (active) return `${active[0]} (in progress)`
-  const todo = order.find(([, s]) => s === 'todo')
-  if (todo) return `${todo[0]} (pending)`
-  return 'Merged'
 }
 
 function nextAction(rs: ReviewStatusData | undefined): string {
@@ -731,6 +713,8 @@ function IssueTreeContextPanel({
   actionDock,
   timeline,
   onBackToIssue,
+  onTab,
+  onOpenAgent,
 }: {
   context: IssueTreeContext
   issueId: string
@@ -741,6 +725,8 @@ function IssueTreeContextPanel({
   actionDock: ReactNode
   timeline: ReactNode
   onBackToIssue: () => void
+  onTab: (tab: MissionTab) => void
+  onOpenAgent: (type: string) => void
 }) {
   const copy: Record<IssueTreeContext, { title: string; summary: string }> = {
     issue: { title: issueId, summary: 'Issue overview from the tree. Workspace tabs stay visible above this pane.' },
@@ -756,7 +742,7 @@ function IssueTreeContextPanel({
         />
       )
     }
-    if (context === 'issue') return <OverviewTab issueId={issueId} />
+    if (context === 'issue') return <OverviewTab issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
     return <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />
   })()
 
@@ -892,73 +878,103 @@ function OpenPaneCard({ title, description, action, onOpen }: { title: string; d
   )
 }
 
-function KRow({ k, children }: { k: string; children: ReactNode }) {
+const NOW_LABEL: Record<string, string> = {
+  work: 'Work', strike: 'Strike', review: 'Review', reviewer: 'Reviewer',
+  test: 'Test', ship: 'Ship', merge: 'Ship', planning: 'Plan', legacy: 'Plan',
+}
+const NOW_MODEL_PLACEHOLDERS = new Set(['', 'unknown', 'specialist', 'planning', 'idle', 'none'])
+function nowModel(m: string | undefined): string {
+  const v = (m ?? '').trim()
+  return NOW_MODEL_PLACEHOLDERS.has(v.toLowerCase()) ? '' : v.replace(/^claude-/, '')
+}
+
+const NOW_DOT: Record<CockpitTone, string> = {
+  info: 'bg-info', success: 'bg-success', warning: 'bg-warning', destructive: 'bg-destructive',
+  review: 'bg-signal-review', cost: 'bg-signal-cost', muted: 'bg-muted-foreground',
+}
+
+interface NowState { tone: CockpitTone; text: string; agentType?: string; agentLabel?: string }
+function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; model?: string } | undefined): NowState {
+  const label = active ? (NOW_LABEL[active.type] ?? active.type) : ''
+  const model = active ? nowModel(active.model) : ''
+  const agentLabel = active ? (model ? `${label.toLowerCase()} · ${model}` : label.toLowerCase()) : undefined
+  if (rs?.mergeStatus === 'merged') return { tone: 'success', text: 'Merged — ready to close out' }
+  if (rs?.readyForMerge) return { tone: 'success', text: 'Review & tests passed — ready to merge' }
+  if (rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') {
+    const onIt = active?.type === 'work'
+    return { tone: 'destructive', text: onIt ? 'Review blocked — work agent is fixing it' : 'Review blocked — awaiting the work agent', agentType: onIt ? 'work' : undefined, agentLabel: onIt ? agentLabel : undefined }
+  }
+  if (rs?.testStatus === 'testing') return { tone: 'info', text: 'Tests running' }
+  if (rs?.verificationStatus === 'running') return { tone: 'info', text: 'Verification running' }
+  if (active) return { tone: 'info', text: `${label} agent is working`, agentType: active.type, agentLabel }
+  return { tone: 'muted', text: 'Idle — awaiting the pipeline' }
+}
+
+/** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
+ * Agents lane, and the beads rail don't already show: what's happening, the next
+ * action, the diff size, and the last few status events. No status grid. */
+function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void }) {
+  const review = useReviewStatusQuery(issueId)
+  const pr = usePrQuery(issueId)
+  const activity = useActivityQuery(issueId)
+  const rs = review.data
+  const p = pr.data?.pr
+  const sections = activity.data?.sections ?? []
+  const active = sections.find((s) => s.status === 'running' || s.status === 'active' || s.status === 'starting')
+  const hasWork = sections.some((s) => s.type === 'work')
+  const now = deriveNow(rs, active)
+  const recent = [...(rs?.history ?? [])]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 3)
+  const nowDate = new Date()
+  const lk = 'rounded-[8px] border border-border px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-accent'
+
   return (
-    <div className="flex justify-between gap-4 border-b border-border py-1.5 text-[12px] last:border-0">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="min-w-0 text-right text-foreground">{children}</span>
+    <div className="rounded-[16px] border border-border bg-card p-4">
+      <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
+        <span className={`h-[9px] w-[9px] shrink-0 rounded-full ${NOW_DOT[now.tone]}`} />
+        <span>{now.text}</span>
+        {now.agentLabel && (
+          <button type="button" onClick={() => now.agentType && onOpenAgent(now.agentType)} className="rounded-[6px] border border-info/40 bg-info/10 px-1.5 font-mono text-[11px] text-info-foreground">
+            {now.agentLabel}
+          </button>
+        )}
+      </div>
+      <div className="mt-2.5 text-[12.5px]">
+        <span className="text-muted-foreground">Next:</span> {nextAction(rs)}
+        {p && <> · <span className="text-muted-foreground">diff</span> <span className="text-success-foreground">+{p.additions}</span> <span className="text-destructive-foreground">−{p.deletions}</span> · {p.changedFiles} file{p.changedFiles === 1 ? '' : 's'}</>}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {hasWork && <button type="button" className={lk} onClick={() => onOpenAgent('work')}>Open work agent ↗</button>}
+        {p && <button type="button" className={lk} onClick={() => onTab('code')}>Open diff →</button>}
+        {p?.url && <a className={lk} href={p.url} target="_blank" rel="noreferrer">Open PR ↗</a>}
+      </div>
+      {recent.length > 0 && (
+        <div className="mt-3.5">
+          <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+            <span>Recent activity</span>
+            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('timeline')}>→ Timeline</button>
+          </div>
+          {recent.map((h, i) => (
+            <div key={`${h.type}-${h.timestamp}-${i}`} className="flex items-baseline gap-2.5 py-1 text-[12.5px]">
+              <span className={`mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full ${NOW_DOT[statusToTone(h.status)]}`} />
+              <span className="capitalize">{h.type} {h.status}</span>
+              <span className="ml-auto text-[10.5px] text-muted-foreground">{formatRelativeTime(h.timestamp, nowDate)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-/** "Now" card — the issue's current state in one glance (mockup Overview, left). */
-function NowCard({ issueId }: { issueId: string }) {
-  const review = useReviewStatusQuery(issueId)
-  const ci = useIssueCheckRunsQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const actions = useIssueActions(issueId)
-  const rs = review.data
-  const work = activity.data?.sections.find((section) => section.type === 'work')
-  const states = computePipelineStates({ hasPlan: actions.state.hasPlan, rs, ci: ci.data, work })
-  const phase = phaseStatus(rs)
-  const tone = statusToTone(phase)
-  return (
-    <CockpitCard tone={tone} title="Now" right={<CockpitPill tone={tone}>{phase}</CockpitPill>}>
-      <KRow k="Phase">{activePhaseLabel(states)}</KRow>
-      <KRow k="Review">{rs?.reviewStatus ?? 'pending'}</KRow>
-      <KRow k="Test">{rs?.testStatus ?? 'pending'}</KRow>
-      {rs?.reviewNotes && <KRow k="Blocker"><span className="text-destructive-foreground">{rs.reviewNotes}</span></KRow>}
-      <KRow k="Next action">{nextAction(rs)}</KRow>
-    </CockpitCard>
-  )
-}
-
-/** "Issue" card — PR / CI / diff / verification facts (mockup Overview, right). */
-function IssueCard({ issueId }: { issueId: string }) {
-  const review = useReviewStatusQuery(issueId)
-  const pr = usePrQuery(issueId)
-  const ci = useIssueCheckRunsQuery(issueId)
-  const rs = review.data
-  const p = pr.data?.pr
-  const summary = ci.data?.summary
-  return (
-    <CockpitCard tone="muted" title="Issue">
-      <KRow k="Pull request">
-        {p ? (
-          p.url ? (
-            <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">#{p.number} · {p.mergeable ?? p.state.toLowerCase()}</a>
-          ) : (
-            <span>#{p.number} · {p.mergeable ?? p.state.toLowerCase()}</span>
-          )
-        ) : 'no PR'}
-      </KRow>
-      <KRow k="CI checks">{summary?.total ? `${summary.passed}/${summary.total} passed` : 'no checks'}</KRow>
-      <KRow k="Diff">{p ? <span><span className="text-success-foreground">+{p.additions}</span> <span className="text-destructive-foreground">−{p.deletions}</span> · {p.changedFiles} file{p.changedFiles === 1 ? '' : 's'}</span> : '—'}</KRow>
-      <KRow k="Verification">{rs?.verificationStatus ?? 'pending'}{rs?.verificationCycleCount ? ` · ${rs.verificationCycleCount} cycle${rs.verificationCycleCount === 1 ? '' : 's'}` : ''}</KRow>
-      <KRow k="Merge-ready">{rs?.readyForMerge ? 'yes' : 'no'}</KRow>
-    </CockpitCard>
-  )
-}
-
-/** Overview — faithful to the v3 mockup: blocker spotlight + Now / Issue cards. */
-function OverviewTab({ issueId }: { issueId: string }) {
+/** Overview — blocker spotlight + the lean Now panel (PAN-1991 #9). The status
+ * grid that used to live here is the header gates + pipeline; not repeated. */
+function OverviewTab({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void }) {
   return (
     <div className="space-y-3.5">
       <IssueBlockerSpotlight issueId={issueId} />
-      <div className="grid gap-3.5 xl:grid-cols-2">
-        <NowCard issueId={issueId} />
-        <IssueCard issueId={issueId} />
-      </div>
+      <NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
     </div>
   )
 }
@@ -1008,18 +1024,20 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setTreeContext(null)
     setActiveTab(null)
   }
+  // Open an agent's conversation by session type (work/review/test/…). Shared by
+  // the pipeline phases (#4) and the Overview "Now" links (#9).
+  const openAgentByType = (type: string): boolean => {
+    const session = treeSessions.find((s) => s.type === type)
+    if (session) { selectSessionFromTree(session); return true }
+    return false
+  }
   // PAN-1991 #4/#6: clicking a pipeline phase opens that phase's info. Work/
   // Review/Test open the agent's own conversation/findings (per #6, review
   // findings live on the Review agent, not a status tab); CI/CD opens Code.
   const handlePhaseClick = (phase: PipelinePhaseKey) => {
-    const openSession = (type: SessionNode['type']) => {
-      const session = treeSessions.find((s) => s.type === type)
-      if (session) { selectSessionFromTree(session); return true }
-      return false
-    }
-    if (phase === 'work') { if (!openSession('work')) selectTab('overview'); return }
-    if (phase === 'review') { if (!openSession('review')) selectTab('overview'); return }
-    if (phase === 'test') { if (!openSession('test')) selectTab('overview'); return }
+    if (phase === 'work') { if (!openAgentByType('work')) selectTab('overview'); return }
+    if (phase === 'review') { if (!openAgentByType('review')) selectTab('overview'); return }
+    if (phase === 'test') { if (!openAgentByType('test')) selectTab('overview'); return }
     if (phase === 'plan') { selectTab('plan'); return }
     if (phase === 'ci') { selectTab('code'); return }
     selectTab('overview') // ship / merge — until the Ship & Merge view (later item)
@@ -1114,9 +1132,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 actionDock={actionDock}
                 timeline={timeline}
                 onBackToIssue={selectIssueFromTree}
+                onTab={selectTab}
+                onOpenAgent={openAgentByType}
               />
             )}
-            {activeTab === 'overview' && <OverviewTab issueId={issueId} />}
+            {activeTab === 'overview' && <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} />}
             {activeTab === 'code' && (
               <div className="space-y-3.5">
                 <GitHubCiPanel issueId={issueId} />
