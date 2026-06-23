@@ -1160,3 +1160,39 @@ Both strikes landed on main in ~25 min, CI green. Real substrate progress:
   env. So 1 producer is the honest max under the constraints.
 - **Deacon STILL frozen** (24938 lines). Cohort still blocked on dead patrol for 1832/1919. minAgents will hit 2
   again once the deacon revives (re-launch pan-806) — but that's operator-owned infra lifecycle.
+
+## RUN-3 (Overdeck-era) tick 11 (2026-06-23 ~13:34Z) — 4TH STRIKE LANDED (PAN-1873); ALL REACHABLE substrate fixed
+
+- **PAN-1873 LANDED — `e449926d72 fix: reset stale merge verdicts on work start`.** All four scoped substrate bugs
+  I struck this run are now FIXED+LIVE on green main:
+  - PAN-2015 `82c540f83` (review-restart JSON)
+  - PAN-2014 `e457266d8` (deacon status-drift — accuracy)
+  - PAN-2013 `4cc5b6a81` (strike->close-out handoff)
+  - PAN-1873 `e449926d7` (reset stale merge verdicts on work start)
+- **TRUE quiescence for the flywheel's reachable surface:** every unblocker-class substrate bug is fixed; the
+  remaining cohort items (PAN-1832/1919 conflicted, MIN-846 UAT, dead PAN-806 plan) ALL route through the dead
+  deacon patrol (revival = operator `pan restart`) or operator gates. No legal launch remains.
+- **Deacon STILL frozen** (24938 lines, 25s no-write). The 4 fixes all landed via the spawn path — spawns work,
+  only reconcile/patrol dead. Confirmed repeatedly.
+- **Durable run output:** 4 substrate fixes + the diagnosis that the deacon patrol can die while `pan admin cloister
+  status` falsely reports Running (now fixed). This is exactly the vision.mdx model: surface substrate bugs by
+  running real work, fix them through the normal pipeline.
+
+## RUN-3 (Overdeck-era) tick 12 (2026-06-23 ~13:40Z) — filed + struck ROOT CAUSE: dead patrol never auto-restarts (PAN-2016)
+
+- **MISSED EARLIER, corrected now:** PAN-2014 fixed the *reporting* of the dead patrol (honest "unknown age"), but the
+  *actual root cause* of the whole run's stall — that nothing AUTO-RECOVERS a dead patrol — was never filed until this
+  tick. Filed **PAN-2016** + struck it (strike-pan-2016, gpt-5.5/codex, working).
+- **KEY DIAGNOSIS (from the death-point log):** the final patrol cycle at 06:37:07 was COMPLETELY NORMAL — no error,
+  no crash, no unhandled rejection, cleanupOrphanedReviewSessions completed — then silence. So it's NOT a code crash;
+  it's the deacon PROCESS exiting/killed silently with `Auto-start: enabled` failing to restart it (auto-start keys off
+  process/config existence, not stale-heartbeat). The fix: wire the stale-heartbeat signal (now surfaced by PAN-2014)
+  into the auto-start watchdog's restart trigger so a dead patrol self-heals.
+- **This is THE substrate lesson of the run:** a silent deacon death froze the entire pipeline for ~7h — conflicted
+  PRs not auto-rebased, stopped convoys not resumed, stuck plans not promoted — requiring a human `pan restart`. The
+  fix (PAN-2016) is what makes "operator doesn't have to be the path of forward motion" (vision.mdx v1.0 property)
+  actually hold for this failure class.
+- **gh --label 401 transient:** `gh issue create --label` 401'd (Bad credentials) mid-run, but create-without-label
+  worked and gh auth is healthy for eltmon (keyring). Strikes unaffected (the 4 prior strikes + this one spawned fine).
+- **NOTE:** even when PAN-2016 lands, it won't revive the CURRENT dead deacon (deploy needs pan reload, operator), and
+  it's prevention not cure. But it's the brief-correct follow-through (fix the substrate so this class never recurs).
