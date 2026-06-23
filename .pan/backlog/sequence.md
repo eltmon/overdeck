@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
+_Last sequenced: 2026-06-23T23:13:48Z · model: glm-4.7 · open: 552_
 
 
 | rank | issue | size | importance | condition | depends-on | why |
@@ -9,8 +9,10 @@ _Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 | 2 | PAN-1849 | M | critical | ok |  | Flywheel's first duty = fix red main; UAT/smoke catches UI regressions unit tests miss. Pinned. |
 | 4 | PAN-1832 | M | high | ok |  | Role models with weighted multi-model distribution; spreads rate-limit risk across providers. Pinned. |
 | 5 | PAN-1982 | M | high | ok |  | Revive convoy review as configurable opt-in (global/project/per-issue); quick stays default. Pinned. |
+| 6 | PAN-2014 | M | critical | ok |  | Deacon patrol loop stops but cloister status still reports Running -> silent pipeline freeze. Substrate. |
 | 7 | PAN-1224 | M | high | ok |  | ship/close-out must restart the running dashboard so merged code goes live. Pinned bug. |
 | 8 | PAN-1992 | M | high | ok |  | Migrate all panopticon.db references to overdeck.db across skills; re-verify. Pinned. |
+| 9 | PAN-2015 | S | high | ok |  | pan review restart throws JSON parse error - the flywheel only convoy-recovery verb is broken. |
 | 10 | PAN-806 | L | critical | ok | PAN-804 | Epic B: work agents must never touch git (pan work done owns rebase). Critical safety. |
 | 11 | PAN-807 | L | critical | ok | PAN-804 | Epic C: pre-flight workspace sanity on spawn; stop hard-resetting local branches (data-loss risk). |
 | 12 | PAN-804 | L | high | ok |  | Epic D: archaeological repo audit + pre-1.0 cleanup (dangling commits, branch drift). Execute FIRST. |
@@ -42,7 +44,7 @@ _Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 | 38 | PAN-1488 | S | high | ok |  | Add required_pull_request_reviews to main branch protection (merge-gate integrity). |
 | 39 | PAN-1556 | M | medium | ok |  | Coalesce review-spawn spam in session/activity feed; supersede re-reviews; keep conversations recent. |
 | 40 | PAN-1865 | L | high | needs-refinement |  | Make Kimi runnable on claude-code harness — root-cause the CLIProxy 200k-context illusion. |
-| 41 | PAN-1873 | M | high | ok |  | verifying_on_main tagged at first merge, never cleared on re-active issues — queue never drains. |
+| 41 | PAN-2039 | M | high | ok |  | pan sync silently strands 62 shipped skills that predate the manifest; never reach ~/.claude/skills. |
 | 42 | PAN-1720 | M | medium | ok |  | Cloister auto-resume tests fail under full parallel run, pass in isolation (test pollution family). |
 | 43 | PAN-630 | XL | high | ok |  | Multi-tenant workspace isolation with ACLs (foundational for shared/multi-user Panopticon). |
 | 44 | PAN-262 | L | high | ok |  | Refactor post-merge lifecycle into composable, idempotent operations. |
@@ -91,7 +93,7 @@ _Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 | 87 | PAN-1209 | S | medium | ok |  | PAN-1052 bead projection disagrees with bd state |
 | 88 | PAN-1130 | S | medium | ok |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
 | 89 | PAN-1131 | S | medium | ok |  | Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle') |
-| 90 | PAN-2010 | S | medium | ok |  | Sequencer one-shot session lingers after done (state.json stuck 'running'); singleton guard blocks next pass. Auto-clear finished sessions. |
+| 90 | PAN-2038 | M | high | ok |  | pan done cannot resolve conversation-created workspaces (no findWorkspacePath fallback) -> review blocked. |
 | 91 | PAN-1830 | S | medium | ok |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
 | 92 | PAN-1862 | L | medium | ok |  | feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review |
 | 93 | PAN-244 | S | medium | ok |  | Deep-wipe leaves local branch and worktree metadata behind |
@@ -180,16 +182,16 @@ _Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 | 176 | PAN-1900 | M | medium | ok |  | bug(flywheel): UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle (3 for 0614) |
 | 177 | PAN-1912 | S | medium | ok |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
 | 178 | PAN-1956 | S | medium | ok |  | bug: GLM-5.2 and GLM-5.1: contextWindow set to output cap (should be input context); also verify pricing + text-only image handling |
-| 179 | PAN-1993 | S | medium | ok |  | Planning a freshly-created issue 404s (start-planning races GitHub issue propagation) |
+| 179 | PAN-2017 | M | medium | ok |  | pan strike spawns the agent but never delivers the task prompt -> idles at welcome, blocks re-strike. |
 | 180 | PAN-1994 | M | medium | ok |  | bug(pipeline): fresh plan --auto issue inherits another issue's merged/verifying-on-main/paused state (PAN-1982 got PAN-1866's) |
-| 181 | PAN-1998 | S | medium | ok |  | Remodel cleanup: drop orphan observation_index + reset_markers tables from the overdeck.db migration (LOW) |
-| 182 | PAN-2001 | M | medium | ok |  | bug(pipeline): re-running `pan plan` on an already-planned issue phantom-merges it (merged/verifying-on-main + review_status=merged, no... |
+| 181 | PAN-2022 | M | medium | ok |  | Strike that aborts without merging leaves agent running -> collides on re-strike, no role-safe clear. |
+| 182 | PAN-2012 | M | medium | needs-refinement |  | Pi agent Conversation tab shows unavailable then Discovering - never the transcript (resolver race). |
 | 183 | PAN-1889 | L | medium | ok |  | feat(flywheel): retention/compaction policy for docs/FLYWHEEL-STATE.md — it grows unbounded and is read whole every run |
 | 184 | PAN-1436 | S | medium | ok |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
 | 185 | PAN-1711 | S | medium | ok |  | Dashboard event loop stalls 15-25s under load — watchdog force-restarted it 3x in 45 min |
 | 186 | PAN-1769 | S | medium | ok |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil... |
 | 187 | PAN-1451 | S | low | ok |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 188 | PAN-1888 | M | low | ok |  | chore(hooks): work-agent-stop-hook still reads legacy review-status.json — finish the PAN-1883 SQLite-truth migration |
+| 188 | PAN-2027 | M | medium | ok | PAN-1989 | Route kimi-k2 through ohmypi harness instead of CLIProxy - eliminates the 200k-context-window illusion. |
 | 189 | PAN-838 | S | low | ok |  | synthesis.json contains hallucinated timestamp + sparse structure (only counts, no findings arrays) |
 | 190 | PAN-1066 | S | low | ok |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
 | 191 | PAN-1126 | L | low | ok |  | Integrate TLDR summaries into review context manifest |
@@ -504,28 +506,28 @@ _Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 | 500 | PAN-1868 | S | low | ok |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 501 | PAN-713 | L | low | ok |  | test: add unit tests for doneCommand and approveCommand |
 | 502 | PAN-1874 | L | low | ok |  | feat(review): per-issue override for review mode / re-review scope (extends PAN-1862 project-scope config) |
-| 503 | PAN-1875 | L | low | ok |  | feat(flywheel): add `pan flywheel stop` — graceful shutdown that writes the report |
-| 504 | PAN-1879 | M | low | ok |  | bug(restart): pan restart silently re-applies stale boot gates; no way to re-enable deacon/resume (asymmetric flags) |
+| 503 | PAN-1935 | M | medium | ok |  | pi/kimi work agents record ZERO cost_events -> runaway spend invisible; cost-based safety blind. |
+| 504 | PAN-2029 | S | low | ok | PAN-1989 | Capture kimi thinking_tokens in ohmypi-parser for complete cost accounting. |
 | 505 | PAN-1878 | S | low | ok |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 506 | PAN-1882 | M | low | ok |  | bug(strike): strike workspaces never cleaned up — worktrees + branches pile up forever (27 / 16GB observed) |
+| 506 | PAN-2028 | S | low | ok | PAN-1989 | ohmypi: per-provider cost grouping in the cost dashboard (flat import today). |
 | 507 | PAN-1894 | S | low | ok |  | Show UAT stack startup state in issue tree and issue slide-out |
 | 508 | PAN-1895 | S | low | ok |  | Spawn work agents from issue workspace slide-out |
 | 509 | PAN-1896 | S | low | ok |  | Reduce approval friction for GitHub CLI operations in managed sessions |
 | 510 | PAN-1906 | S | low | ok |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
 | 511 | PAN-1907 | S | low | ok |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every... |
-| 512 | PAN-1909 | M | low | ok |  | bug(planning): pan plan done handoff tail hangs (dashboard-notify/transition) — declares 'done' with spec only on local main |
+| 512 | PAN-2025 | S | low | ok | PAN-1989 | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks. |
 | 513 | PAN-1910 | S | low | ok |  | fast-follow(PAN-1908): collapse issue status to ONE canonical field — labels become a derived projection, not the source of truth |
 | 514 | PAN-1914 | S | low | ok |  | Follow-up: move /api/health/agents off agent-directory scans |
 | 515 | PAN-1917 | XL | low | ok |  | /sessions page redesign: unify with conversation view |
 | 516 | PAN-1918 | M | low | ok |  | bug(ci): full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang sta... |
 | 517 | PAN-1926 | L | low | ok |  | feat(strike): --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 518 | PAN-1927 | M | low | ok |  | fix(config): remove hardcoded model fallbacks — default/role model must come from explicit settings |
-| 519 | PAN-1928 | S | low | ok |  | Lock model switching to brand-new conversations only (0 messages) — never for agents or started sessions |
-| 520 | PAN-1929 | S | low | ok |  | hazard(auto-commit): background git rebase rewrites history in the SHARED primary worktree — stop mutating the shared tree |
-| 521 | PAN-1931 | L | low | ok |  | complete-planning force-adds gitignored .pan/ state via 'git add -f' (regresses PAN-1215, violates PAN-1819) |
-| 522 | PAN-1932 | S | low | ok |  | Schema migration downgrades user_version when DB is newer than code (=== SCHEMA_VERSION should be >=) |
+| 518 | PAN-2026 | M | low | ok | PAN-1989 | ohmypi: surface the 35+ provider matrix in the dashboard model picker. |
+| 519 | PAN-2024 | S | low | ok | PAN-1989 | ohmypi: wire the frontend Tools toggle in the Conversation panel (parity gap vs Claude Code). |
+| 520 | PAN-2035 | M | low | ok | PAN-1989 | ohmypi: GitHub Copilot subscription provider routing via omp (GPT-4o, Claude 3.7, Gemini 2.0). |
+| 521 | PAN-2032 | M | low | ok | PAN-1989 | ohmypi: local Ollama model as a zero-cost preliminary review role. |
+| 522 | PAN-2030 | S | low | ok | PAN-1989 | ohmypi: version-pin the extension in package.json + pan doctor mismatch warning. |
 | 523 | PAN-1934 | S | low | ok |  | hazard: verification gate drives agents through up to 10 retry cycles on an unfixable check (no operator escalation, invisible burn) |
-| 524 | PAN-1935 | S | low | ok |  | pi/kimi work-agent cost not recorded in cost_events → runaway spend is invisible (no cost-based safety possible) |
+| 524 | PAN-2031 | S | low | ok | PAN-1989 | ohmypi: add a Bun 1.3.11 regression test to the checkOhmypi doctor gate. |
 | 525 | PAN-1937 | S | low | ok |  | feat: data export — portable bundle (conversations + favorites core; decoupled optional cost ledger) + user-facing Export my data |
 | 526 | PAN-1949 | S | low | ok |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all bead verdicts |
 | 527 | PAN-1951 | S | low | ok |  | Inspector agent should resume a warm session instead of cold-spawning a new one per bead |
@@ -539,19 +541,20 @@ _Last sequenced: 2026-06-22T21:51:32Z · model: glm-4.7 · open: 549_
 | 535 | PAN-1986 | S | low | ok |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 536 | PAN-1987 | S | low | ok |  | Allow renaming a registered project (display name is locked at registration) |
 | 537 | PAN-1988 | S | low | ok |  | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
-| 538 | PAN-1989 | S | low | ok |  | Replace Pi harness with ohmypi and evaluate advanced features |
+| 538 | PAN-1989 | L | critical | ok |  | Replace Pi harness with ohmypi and evaluate advanced features |
+| 538 | PAN-2033 | S | low | ok | PAN-1989 | ohmypi: benchmark FIFO vs paste-buffer message delivery latency. |
 | 539 | PAN-1990 | S | low | ok |  | First-class workspaces and projects with per-workspace memory |
 | 540 | PAN-1999 | S | low | ok |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 541 | PAN-2002 | L | low | ok |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 542 | PAN-2007 | S | low | ok |  | Temporary: keep specialist (review/test/ship) sessions alive through the pipeline — disable PAN-1716 reaper + done-path kill |
+| 542 | PAN-2034 | S | low | ok | PAN-1989 | ohmypi: end-to-end test that tool-call steps render in the Conversation panel. |
 | 543 | PAN-2008 | L | low | ok |  | feat(ci): store-access guard — fail the build on direct store reads outside a domain resolver (PAN-1936 slice) |
-| 544 | PAN-2009 | M | low | ok |  | bug(pi): dead pi agent can't be resumed — ready.json 30s timeout + PAN-1980 blocks fresh-launch → review stuck stopped |
+| 544 | PAN-2037 | S | low | ok |  | UI: prominent Start work agent CTA on all issue surfaces when the agent is stopped. |
 | 545 | PAN-802 | S | low | ok |  | Resume on conversation session forks instead of resuming |
 | 546 | PAN-826 | L | low | ok |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
 | 547 | PAN-863 | S | low | ok |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
-| 548 | PAN-1857 | M | high | stale |  | bug(ci): main RED — verification-gate.test.ts asserts stale 'src/dashboard/frontend' in DEFAULT_GATES.test after generic-command change... |
-| 549 | PAN-1859 | M | high | stale |  | bug(ci): main RED — agent-spawning.test.ts 'resumeAgent delivers continue prompt through Pi FIFO' fails (writePiCommand not called) |
-| 550 | PAN-1880 | M | high | stale |  | bug(ci): main RED — start-sync-main-conflict.test.ts hits process.exit(1) under CI single-fork (maxForks:1) cross-file mock pollution; ... |
+| 548 | PAN-2011 | S | medium | ok |  | Conversation vs Terminal tab mismatch - agents route uses mtime resolver, not launcher-pinned session-id. Pinned in-pipeline. |
+| 549 | PAN-2023 | M | medium | ok |  | Fresh headless spawn gets a 67x1 tmux pane -> kickoff delivery fails, agent idles forever. Pinned in-pipeline. |
+| 550 | PAN-2040 | S | low | ok |  | Memory activity feed shows bare lifecycle tokens (done/in_progress/blocked) instead of the observation summary. |
 | 551 | PAN-1698 | M | medium | stale |  | bug(ci): main is RED — model-count + schema-version + substrate-smoke test expectations stale (blocks every verify/ship/strike gate) |
 | 552 | PAN-1783 | M | medium | stale |  | bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title |
 
@@ -573,6 +576,10 @@ Pinned in-pipeline (in-review, ready). Multi-model role pools spread rate-limit/
 
 Pinned in-pipeline (ready). Restores multi-reviewer convoy review behind a config flag so operators get deeper review when they want it while quick-review stays the default. Ready and in the pipeline; pinned.
 
+### PAN-2014 (rank 6)
+
+New critical substrate bug: the watchdog every operator/agent trusts for auto-recovery reports healthy while the patrol produces nothing for hours, so conflicted PRs and stalled convoys never self-heal. Discovered by Flywheel RUN-3; ranked at the top because a silently-frozen deacon defeats the entire autonomous pipeline.
+
 ### PAN-1224 (rank 7)
 
 Pinned in-pipeline (verifying-on-main). Bug: merged code wasn't actually live because ship/close-out never restarted the dashboard — a trust-eroding gap between 'merged' and 'working'. Merged and verifying; pinned.
@@ -580,6 +587,10 @@ Pinned in-pipeline (verifying-on-main). Bug: merged code wasn't actually live be
 ### PAN-1992 (rank 8)
 
 Pinned in-pipeline (verifying-on-main). Rename fallout: every skill/db reference to the old 'panopticon.db' name must move to 'overdeck.db' so the rename is consistent end-to-end. Merged and verifying; pinned.
+
+### PAN-2015 (rank 9)
+
+New high-impact bug: pan review restart is the one explicitly-authorized drive-through verb for stalled review convoys, and it deterministically throws a JSON parse error on every issue. Without it the flywheel cannot drive through any PAN-1614-class stall; it can only surface them.
 
 ### PAN-806 (rank 10)
 
@@ -705,9 +716,9 @@ The activity feed is dominated by review-spawn noise — ~11 entries per review 
 
 Critical, hard. Kimi on claude-code deadlocks because CLIProxy advertises a false ~200k window; long sessions sail past it (the '200k-window illusion'). A $22 silent burn and a stranded critical red-main strike both came from this trap. Needs root-causing the CLIProxy window advertisement; flagged needs-refinement because the fix path is genuinely open (may require CLIProxy-side changes).
 
-### PAN-1873 (rank 41)
+### PAN-2039 (rank 41)
 
-Bug: verifying_on_main is set at first merge but never cleared on re-activation, so re-opened issues keep a stale label and the close-out queue never drains correctly. A label-lifecycle bug that inflates the 'awaiting close-out' surface.
+New substrate bug: 62 shipped Overdeck skill files (pan-memory, pan-logs, knowledge-capture, ...) are stranded because the manifest adoption check only adopts byte-identical files. Breaks skill distribution including this sequencer own skills; slotted where the closed PAN-1873 sat.
 
 ### PAN-1720 (rank 42)
 
@@ -869,14 +880,6 @@ PAN-1416 shipped the cwd guard but not the port lockfile or pan doctor check —
 
 Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so searching for an earlier error/file appears to find nothing. Needs an in-page search that scans the full transcript, not just the viewport.
 
-### PAN-955 (rank 82)
-
-When the devcontainer template changes, existing workspaces are pinned to the old render with no warning/migration (observed: api service bound to no port because cmd was stale). Versioning + stale detection + re-render keeps workspaces current.
-
-### PAN-113 (rank 83)
-
-POST /api/agents spawns pan work issue and returns immediately; if it fails the user sees 'Agent Started!' with no agent running, errors only in the in-memory activity log. Should verify readiness before reporting success.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -884,10 +887,10 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-22T21:51:32Z",
+  "generatedAt": "2026-06-23T23:13:48Z",
   "model": "glm-4.7",
   "pass": "incremental",
-  "openCount": 549,
+  "openCount": 552,
   "nodes": [
     {
       "issue": "PAN-1919",
@@ -912,6 +915,18 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "dependsOn": [],
       "why": "Flywheel's first duty = fix red main; UAT/smoke catches UI regressions unit tests miss. Pinned.",
       "rationale": "Pinned in-pipeline (verifying-on-main). This is the policy that makes a red main the flywheel's #1 priority and adds a browser smoke signal for frontend runtime regressions that backend tests miss — exactly the class that poisoned main recently. Already merged and verifying; pinned so the sequencer never reshuffles it.",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-1989",
+      "rank": 538,
+      "size": "L",
+      "importance": "critical",
+      "score": 92,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Replace Pi harness with ohmypi and evaluate advanced features",
       "gate": "auto",
       "planning": "interactive"
     },
@@ -942,6 +957,19 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "interactive"
     },
     {
+      "issue": "PAN-2014",
+      "rank": 6,
+      "size": "M",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deacon patrol loop stops but cloister status still reports Running -> silent pipeline freeze. Substrate.",
+      "rationale": "New critical substrate bug: the watchdog every operator/agent trusts for auto-recovery reports healthy while the patrol produces nothing for hours, so conflicted PRs and stalled convoys never self-heal. Discovered by Flywheel RUN-3; ranked at the top because a silently-frozen deacon defeats the entire autonomous pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1224",
       "rank": 7,
       "size": "M",
@@ -964,6 +992,19 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "dependsOn": [],
       "why": "Migrate all panopticon.db references to overdeck.db across skills; re-verify. Pinned.",
       "rationale": "Pinned in-pipeline (verifying-on-main). Rename fallout: every skill/db reference to the old 'panopticon.db' name must move to 'overdeck.db' so the rename is consistent end-to-end. Merged and verifying; pinned.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2015",
+      "rank": 9,
+      "size": "S",
+      "importance": "high",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review restart throws JSON parse error - the flywheel only convoy-recovery verb is broken.",
+      "rationale": "New high-impact bug: pan review restart is the one explicitly-authorized drive-through verb for stalled review convoys, and it deterministically throws a JSON parse error on every issue. Without it the flywheel cannot drive through any PAN-1614-class stall; it can only surface them.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1379,15 +1420,15 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "interactive"
     },
     {
-      "issue": "PAN-1873",
+      "issue": "PAN-2039",
       "rank": 41,
       "size": "M",
       "importance": "high",
       "score": 65,
       "condition": "ok",
       "dependsOn": [],
-      "why": "verifying_on_main tagged at first merge, never cleared on re-active issues — queue never drains.",
-      "rationale": "Bug: verifying_on_main is set at first merge but never cleared on re-activation, so re-opened issues keep a stale label and the close-out queue never drains correctly. A label-lifecycle bug that inflates the 'awaiting close-out' surface.",
+      "why": "pan sync silently strands 62 shipped skills that predate the manifest; never reach ~/.claude/skills.",
+      "rationale": "New substrate bug: 62 shipped Overdeck skill files (pan-memory, pan-logs, knowledge-capture, ...) are stranded because the manifest adoption check only adopts byte-identical files. Breaks skill distribution including this sequencer own skills; slotted where the closed PAN-1873 sat.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2015,6 +2056,19 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "condition": "ok",
       "dependsOn": [],
       "why": "Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle')",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2038",
+      "rank": 90,
+      "size": "M",
+      "importance": "high",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done cannot resolve conversation-created workspaces (no findWorkspacePath fallback) -> review blocked.",
+      "rationale": "New substrate bug: pan done resolves the workspace only from work-agent state, so supervised conversation workspaces (no agent) fail at the review-artifact step and block the normal review pipeline, forcing manual push + PR. Ranked in the mid bug tier alongside the pan-start crash family.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3075,14 +3129,15 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1993",
+      "issue": "PAN-2017",
       "rank": 179,
-      "size": "S",
+      "size": "M",
       "importance": "medium",
-      "score": 26,
+      "score": 32,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Planning a freshly-created issue 404s (start-planning races GitHub issue propagation)",
+      "why": "pan strike spawns the agent but never delivers the task prompt -> idles at welcome, blocks re-strike.",
+      "rationale": "New strike-strand bug: the spawn reports success but the kickoff never lands; the agent sits at ctx 0% while state.json says running, and the session-name collision blocks re-strike until an operator manually clears it. Twin of PAN-2022; placed near the pan-start crash family (PAN-1893/1897).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3099,26 +3154,28 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1998",
+      "issue": "PAN-2022",
       "rank": 181,
-      "size": "S",
+      "size": "M",
       "importance": "medium",
-      "score": 26,
+      "score": 30,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Remodel cleanup: drop orphan observation_index + reset_markers tables from the overdeck.db migration (LOW)",
+      "why": "Strike that aborts without merging leaves agent running -> collides on re-strike, no role-safe clear.",
+      "rationale": "New strike-strand bug: a strike that correctly aborts (e.g. refuses a dirty main) leaves state running and the session idle; the flywheel role cannot clear it, stranding the issue until manual pan kill. Same shape as PAN-2017; placed alongside it.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-2001",
+      "issue": "PAN-2012",
       "rank": 182,
       "size": "M",
       "importance": "medium",
       "score": 26,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "bug(pipeline): re-running `pan plan` on an already-planned issue phantom-merges it (merged/verifying-on-main + review_status=merged, no...",
+      "why": "Pi agent Conversation tab shows unavailable then Discovering - never the transcript (resolver race).",
+      "rationale": "New pi-harness UI bug: distinct from the fixed PAN-1827 (the resolver branch now exists) but the transcript still never settles. Marked needs-refinement because the ohmypi migration (PAN-1989) may moot the pi resolver path entirely, so the fix target is ambiguous until the migration lands.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3183,16 +3240,19 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1888",
+      "issue": "PAN-2027",
       "rank": 188,
       "size": "M",
-      "importance": "low",
-      "score": 20,
+      "importance": "medium",
+      "score": 24,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "chore(hooks): work-agent-stop-hook still reads legacy review-status.json — finish the PAN-1883 SQLite-truth migration",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "Route kimi-k2 through ohmypi harness instead of CLIProxy - eliminates the 200k-context-window illusion.",
+      "rationale": "New ohmypi follow-up, the highest-leverage of the P2 cluster: routing kimi-k2 via ohmypi removes the false 200k window that caused the PAN-1865 deadlock, a $22 silent burn, and a stranded critical strike. dependsOn PAN-1989; slotted just above the rest of the P2 batch.",
       "gate": "auto",
-      "planning": "skip"
+      "planning": "auto"
     },
     {
       "issue": "PAN-838",
@@ -4335,6 +4395,19 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "interactive"
     },
     {
+      "issue": "PAN-1991",
+      "rank": 284,
+      "size": "XL",
+      "importance": "medium",
+      "score": 13,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Issue cockpit redesign — 10-item incremental rollout plan; parent tracker for PAN-1955/#1232/#1234. Concrete, no-loss, ready to ship #1.",
+      "rationale": "Body expanded from a bare title to a complete, reviewed 10-item incremental rollout plan (design mockups + explicit ordering, \"start with #1 Beads rail\"); it is now the canonical parent tracker for the issue-cockpit UX effort — PAN-1955/#1232/#1234 roll up under it — so it moves up to sit directly above its first rollout child PAN-1955, without crossing into the bug cluster above.",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
       "issue": "PAN-1955",
       "rank": 285,
       "size": "S",
@@ -4405,19 +4478,6 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "why": "Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1991",
-      "rank": 284,
-      "size": "XL",
-      "importance": "medium",
-      "score": 13,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Issue cockpit redesign — 10-item incremental rollout plan; parent tracker for PAN-1955/#1232/#1234. Concrete, no-loss, ready to ship #1.",
-      "rationale": "Body expanded from a bare title to a complete, reviewed 10-item incremental rollout plan (design mockups + explicit ordering, \"start with #1 Beads rail\"); it is now the canonical parent tracker for the issue-cockpit UX effort — PAN-1955/#1232/#1234 roll up under it — so it moves up to sit directly above its first rollout child PAN-1955, without crossing into the bug cluster above.",
-      "gate": "auto",
-      "planning": "interactive"
     },
     {
       "issue": "PAN-1995",
@@ -6964,26 +7024,30 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "interactive"
     },
     {
-      "issue": "PAN-1875",
+      "issue": "PAN-1935",
       "rank": 503,
-      "size": "L",
-      "importance": "low",
-      "score": 8,
+      "size": "M",
+      "importance": "medium",
+      "score": 18,
       "condition": "ok",
       "dependsOn": [],
-      "why": "feat(flywheel): add `pan flywheel stop` — graceful shutdown that writes the report",
+      "why": "pi/kimi work agents record ZERO cost_events -> runaway spend invisible; cost-based safety blind.",
+      "rationale": "Promoted from rank 524 boilerplate tier: a live incident showed two pi/kimi work agents recorded zero cost while burning through a retry loop, blinding the only cost-based safety surface. Re-relevant under the ohmypi cost work (PAN-2028/2029).",
       "gate": "auto",
-      "planning": "interactive"
+      "planning": "auto"
     },
     {
-      "issue": "PAN-1879",
+      "issue": "PAN-2029",
       "rank": 504,
-      "size": "M",
+      "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 16,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "bug(restart): pan restart silently re-applies stale boot gates; no way to re-enable deacon/resume (asymmetric flags)",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "Capture kimi thinking_tokens in ohmypi-parser for complete cost accounting.",
+      "rationale": "New ohmypi follow-up: kimi-k2 reports thinking_tokens that the parser drops, undercounting cost; pairs with PAN-1935/PAN-2028 to make kimi spend fully visible. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7000,14 +7064,17 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1882",
+      "issue": "PAN-2028",
       "rank": 506,
-      "size": "M",
+      "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 15,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "bug(strike): strike workspaces never cleaned up — worktrees + branches pile up forever (27 / 16GB observed)",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: per-provider cost grouping in the cost dashboard (flat import today).",
+      "rationale": "New ohmypi follow-up: CostWriter imports ohmypi events as a flat list; group by provider so the 35+ provider matrix is auditable. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7072,14 +7139,17 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1909",
+      "issue": "PAN-2025",
       "rank": 512,
-      "size": "M",
+      "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 14,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "bug(planning): pan plan done handoff tail hangs (dashboard-notify/transition) — declares 'done' with spec only on local main",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks.",
+      "rationale": "New ohmypi follow-up: getOhmypiLauncherFields injects KIMI/MINIMAX/DashScope only; extend to Groq/Cerebras/Fireworks so the full provider matrix is usable. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7144,62 +7214,77 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "interactive"
     },
     {
-      "issue": "PAN-1927",
+      "issue": "PAN-2026",
       "rank": 518,
       "size": "M",
       "importance": "low",
-      "score": 8,
+      "score": 13,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "fix(config): remove hardcoded model fallbacks — default/role model must come from explicit settings",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: surface the 35+ provider matrix in the dashboard model picker.",
+      "rationale": "New ohmypi follow-up: the dashboard model selector does not expose omp full provider matrix; users must know model strings. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-1928",
+      "issue": "PAN-2024",
       "rank": 519,
       "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 12,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Lock model switching to brand-new conversations only (0 messages) — never for agents or started sessions",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: wire the frontend Tools toggle in the Conversation panel (parity gap vs Claude Code).",
+      "rationale": "New ohmypi follow-up: tool-call data is parsed but the frontend Tools tab is not wired for ohmypi sessions. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-1929",
+      "issue": "PAN-2035",
       "rank": 520,
-      "size": "S",
+      "size": "M",
       "importance": "low",
-      "score": 8,
+      "score": 12,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "hazard(auto-commit): background git rebase rewrites history in the SHARED primary worktree — stop mutating the shared tree",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: GitHub Copilot subscription provider routing via omp (GPT-4o, Claude 3.7, Gemini 2.0).",
+      "rationale": "New ohmypi follow-up: omp supports github/ routing, giving subscription-tier access to multiple models; wire it as a provider. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-1931",
+      "issue": "PAN-2032",
       "rank": 521,
-      "size": "L",
+      "size": "M",
       "importance": "low",
-      "score": 8,
+      "score": 12,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "complete-planning force-adds gitignored .pan/ state via 'git add -f' (regresses PAN-1215, violates PAN-1819)",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: local Ollama model as a zero-cost preliminary review role.",
+      "rationale": "New ohmypi follow-up: omp routes ollama/ natively; a local Ollama pre-review pass cuts cost on trivial PRs. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-1932",
+      "issue": "PAN-2030",
       "rank": 522,
       "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 11,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Schema migration downgrades user_version when DB is newer than code (=== SCHEMA_VERSION should be >=)",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: version-pin the extension in package.json + pan doctor mismatch warning.",
+      "rationale": "New ohmypi follow-up: the vendored extension targets omp@16.1.16 but has no machine-checked pin; add a doctor warning on mismatch. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7216,14 +7301,17 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1935",
+      "issue": "PAN-2031",
       "rank": 524,
       "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 11,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "pi/kimi work-agent cost not recorded in cost_events → runaway spend is invisible (no cost-based safety possible)",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: add a Bun 1.3.11 regression test to the checkOhmypi doctor gate.",
+      "rationale": "New ohmypi follow-up: checkOhmypi requires bun>=1.3.14 but no test proves the gate actually blocks older Bun. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7384,14 +7472,17 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1989",
+      "issue": "PAN-2033",
       "rank": 538,
       "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 10,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Replace Pi harness with ohmypi and evaluate advanced features",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: benchmark FIFO vs paste-buffer message delivery latency.",
+      "rationale": "New ohmypi follow-up: the FIFO delivery path is expected to beat paste-buffer; add a measured benchmark to confirm before defaulting. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7432,14 +7523,17 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-2007",
+      "issue": "PAN-2034",
       "rank": 542,
       "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 10,
       "condition": "ok",
-      "dependsOn": [],
-      "why": "Temporary: keep specialist (review/test/ship) sessions alive through the pipeline — disable PAN-1716 reaper + done-path kill",
+      "dependsOn": [
+        "PAN-1989"
+      ],
+      "why": "ohmypi: end-to-end test that tool-call steps render in the Conversation panel.",
+      "rationale": "New ohmypi follow-up: ohmypi-conversation-parser is wired but has no integration test proving tool-call steps render end-to-end. dependsOn PAN-1989.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7456,14 +7550,15 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "interactive"
     },
     {
-      "issue": "PAN-2009",
+      "issue": "PAN-2037",
       "rank": 544,
-      "size": "M",
+      "size": "S",
       "importance": "low",
-      "score": 8,
+      "score": 12,
       "condition": "ok",
       "dependsOn": [],
-      "why": "bug(pi): dead pi agent can't be resumed — ready.json 30s timeout + PAN-1980 blocks fresh-launch → review stuck stopped",
+      "why": "UI: prominent Start work agent CTA on all issue surfaces when the agent is stopped.",
+      "rationale": "New small UX enhancement (planning label): surface a start-agent call-to-action on every issue surface when no agent is running, reducing friction to (re)dispatch work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7504,38 +7599,41 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "planning": "auto"
     },
     {
-      "issue": "PAN-1857",
+      "issue": "PAN-2011",
       "rank": 548,
-      "size": "M",
-      "importance": "high",
-      "score": 34,
-      "condition": "stale",
+      "size": "S",
+      "importance": "medium",
+      "score": 22,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "bug(ci): main RED — verification-gate.test.ts asserts stale 'src/dashboard/frontend' in DEFAULT_GATES.test after generic-command change...",
+      "why": "Conversation vs Terminal tab mismatch - agents route uses mtime resolver, not launcher-pinned session-id. Pinned in-pipeline.",
+      "rationale": "New in-pipeline bug (merged, verifying-on-main): the agents conversation route still guesses the session by mtime instead of the launcher-pinned --session-id that the conversations route already uses. Pinned; rank informational while verifying.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-1859",
+      "issue": "PAN-2023",
       "rank": 549,
       "size": "M",
-      "importance": "high",
-      "score": 34,
-      "condition": "stale",
+      "importance": "medium",
+      "score": 22,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "bug(ci): main RED — agent-spawning.test.ts 'resumeAgent delivers continue prompt through Pi FIFO' fails (writePiCommand not called)",
+      "why": "Fresh headless spawn gets a 67x1 tmux pane -> kickoff delivery fails, agent idles forever. Pinned in-pipeline.",
+      "rationale": "New in-pipeline bug (merged, verifying-on-main): a fresh spawn with no attached client stays at a 1-row pane, so the PTY supervisor echo-confirmation never matches and every kickoff bounces; this is what stranded the PAN-1989 spawn. Pinned; rank informational while verifying.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-1880",
+      "issue": "PAN-2040",
       "rank": 550,
-      "size": "M",
-      "importance": "high",
-      "score": 34,
-      "condition": "stale",
+      "size": "S",
+      "importance": "low",
+      "score": 12,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "bug(ci): main RED — start-sync-main-conflict.test.ts hits process.exit(1) under CI single-fork (maxForks:1) cross-file mock pollution; ...",
+      "why": "Memory activity feed shows bare lifecycle tokens (done/in_progress/blocked) instead of the observation summary.",
+      "rationale": "New small UI bug: memory-class rows in the activity feed render bare action-status tokens instead of the observation summary, reading as nonsense next to operational events. Display reads the wrong field of the memory observation.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7560,19 +7658,6 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "condition": "stale",
       "dependsOn": [],
       "why": "bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2010",
-      "rank": 90,
-      "size": "S",
-      "importance": "medium",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequencer one-shot session lingers after done (state.json stuck 'running'); singleton guard blocks next pass. Auto-clear finished sessions.",
-      "rationale": "New bug, fresh and reproducible (hit 3x in one session): the one-shot sequencer-runner tmux session is not torn down on completion, so its singleton guard - which only checks for session existence - refuses the next pass even when nothing is generating; same 'finished-but-lingering misclassified by an idempotency guard' defect class as PAN-1130/1131/1830, so it ranks with that cluster.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -7747,11 +7832,137 @@ POST /api/agents spawns pan work issue and returns immediately; if it fails the 
       "confidence": 0.65
     },
     {
-      "from": "PAN-2010",
-      "to": "PAN-2005",
+      "from": "PAN-1989",
+      "to": "PAN-2024",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2025",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2026",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2027",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2028",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2029",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2030",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2031",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2032",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2033",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2034",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1989",
+      "to": "PAN-2035",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2027",
+      "to": "PAN-1865",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.85
+    },
+    {
+      "from": "PAN-1935",
+      "to": "PAN-2029",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2017",
+      "to": "PAN-2022",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.75
+    },
+    {
+      "from": "PAN-2014",
+      "to": "PAN-1213",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-2015",
+      "to": "PAN-1861",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2038",
+      "to": "PAN-262",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2039",
+      "to": "PAN-1508",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.45
     }
   ]
 }
