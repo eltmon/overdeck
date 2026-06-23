@@ -20,6 +20,13 @@ export {
   PiSpawnTimeout,
 } from './pi.js';
 export {
+  OhmypiRuntimeSync,
+  OhmypiRuntime,
+  createOhmypiRuntimeSync,
+  createOhmypiRuntime,
+  OhmypiSpawnTimeout,
+} from './ohmypi.js';
+export {
   CodexRuntimeSync,
   CodexRuntime,
   createCodexRuntimeSync,
@@ -34,6 +41,7 @@ import type {
 import { getAgentStateSync } from '../agents.js';
 import { createClaudeCodeRuntimeSync } from './claude-code.js';
 import { createPiRuntimeSync } from './pi.js';
+import { createOhmypiRuntimeSync } from './ohmypi.js';
 import { createCodexRuntimeSync } from './codex.js';
 
 /**
@@ -79,8 +87,12 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
       return null;
     }
     const harness = (state as { harness?: RuntimeName }).harness;
+    if (harness === 'ohmypi') {
+      return this.get('ohmypi') ?? null;
+    }
     if (harness === 'pi') {
-      return this.get('pi') ?? null;
+      // Legacy: normalize to ohmypi adapter (PAN-1989).
+      return this.get('ohmypi') ?? null;
     }
     if (harness === 'codex') {
       return this.get('codex') ?? null;
@@ -104,9 +116,10 @@ export function getGlobalRegistry(): RuntimeRegistry {
   if (!globalRegistry) {
     globalRegistry = new RuntimeRegistry();
 
-    // Register Claude Code (default), Pi (PAN-636), and Codex (PAN-1574) runtimes.
+    // Register Claude Code (default), Pi (PAN-636, legacy), ohmypi (PAN-1989), and Codex (PAN-1574) runtimes.
     globalRegistry.register(createClaudeCodeRuntimeSync());
     globalRegistry.register(createPiRuntimeSync());
+    globalRegistry.register(createOhmypiRuntimeSync());
     globalRegistry.register(createCodexRuntimeSync());
   }
   return globalRegistry;

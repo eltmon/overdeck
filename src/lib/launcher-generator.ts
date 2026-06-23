@@ -7,7 +7,7 @@ import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'pi' | 'codex';
+export type LauncherHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex';
 
 export interface LauncherConfig {
   role: Role;
