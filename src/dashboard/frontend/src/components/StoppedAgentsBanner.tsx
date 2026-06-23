@@ -2,7 +2,7 @@ import type { AgentStatus } from '@overdeck/contracts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
-import { useDashboardStore, selectAgents } from '../lib/store';
+import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import { classifyDashboardAgent } from '../lib/agent-classifier';
 import { Agent, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
@@ -13,8 +13,34 @@ interface RestartResult {
   error?: string;
 }
 
+// A stopped plan/review/test/ship agent whose issue has reached one of these
+// statuses has finished its stage — the pipeline already moved past it, the
+// record just never got marked completed. Counting it produces a phantom
+// "stopped" entry (e.g. a planning agent for an issue that's now In Review, or
+// a review agent for an issue already merged-and-verifying). Work agents are
+// intentionally not re-classified here; conversation agents never reach this
+// path (PIPELINE_ROLES excludes them).
+const SPECIALIST_ROLES = new Set(['plan', 'review', 'test', 'ship']);
+const ISSUE_ADVANCED_STATUSES = new Set([
+  'in_review',
+  'verifying_on_main',
+  'done',
+  'canceled',
+  'merged',
+  'closed',
+]);
+
 export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner' | 'pill' } = {}) {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const issues = useDashboardStore(selectIssues) as Array<Record<string, unknown>>;
+
+  // issueId (upper-cased) → canonicalStatus, for the advanced-past-role check below.
+  const issueStatusById = new Map<string, string>();
+  for (const issue of issues) {
+    const id = typeof issue['identifier'] === 'string' ? (issue['identifier'] as string).toUpperCase() : null;
+    const status = typeof issue['canonicalStatus'] === 'string' ? (issue['canonicalStatus'] as string) : null;
+    if (id && status) issueStatusById.set(id, status);
+  }
 
   // Show toast when an agent hits an API error (resolution transitions to 'api_error')
   const prevApiErrorAgentsRef = useRef<Set<string>>(new Set());
@@ -50,6 +76,12 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
     if (a.lifecycle?.isCompleted) return false;
     if (!a.role) return false;
     if (!PIPELINE_ROLES.has(a.role)) return false;
+    // Drop phantom stops: a stopped plan/review/test/ship agent whose issue has
+    // advanced past that stage is finished, not waiting for the operator.
+    if (SPECIALIST_ROLES.has(a.role)) {
+      const issueStatus = issueStatusById.get(a.issueId.toUpperCase());
+      if (issueStatus && ISSUE_ADVANCED_STATUSES.has(issueStatus)) return false;
+    }
     // Only show recently-active agents — old state files are historical debris
     const lastActivity = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
     const startedAt = a.startedAt ? new Date(a.startedAt).getTime() : 0;
