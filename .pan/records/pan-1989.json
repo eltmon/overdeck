@@ -102,23 +102,35 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-23T17:32:21.034Z",
+  "updated": "2026-06-23T20:38:51.886Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-23T14:40:06.933Z"
+    "updatedAt": "2026-06-23T20:38:51.842Z",
+    "reviewNotes": "ohmypi conversation sessions still route through the retired Pi path",
+    "verificationNotes": "Verification FAILED at frontend-typecheck (17789ms):\n\nsrc/components/CommandDeck/index.tsx(824,120): error TS2322: Type 'import(\"/home/eltmon/Projects/overdeck/workspaces/feature-pan-1989/src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker\").Harness | undefined' is not assignable to type 'import(\"/home/eltmon/Projects/overdeck/workspaces/feature-pan-1989/packages/contracts/src/types\").Harness | undefined'.\n  Type '\"pi\"' is not assignable to type 'Harness | undefined'.\nsrc/components/IssueAgentCard.tsx(241,97): error TS2367: This comparison appears to be unintentional because the types 'Harness' and '\"pi\"' have no overlap.\nsrc/components/IssueAgentCard.tsx(518,54): error TS2367: This comparison appears to be unintentional because the types 'Harness' and '\"pi\"' have no overlap.\nsrc/components/context/ContextPage.tsx(205,23): error TS7053: Element implicitly has an 'any' type because expression of type 'PreviewTab' can't be used to index type '{ readonly \"claude-code\": string; readonly ohmypi: string; readonly codex: string; readonly fullPrompt: string; }'.\n  Property 'pi' does not exist on type '{ readonly \"claude-code\": string; readonly ohmypi: string; readonly codex: string; readonly fullPrompt: string; }'.\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
+    "reviewRequestedAt": "2026-06-23T20:33:23.429Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 206,
+            "output": 6301,
+            "cacheRead": 424426,
+            "cacheWrite": 10373
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 21700,
-            "output": 2026,
+            "input": 64387,
+            "output": 6911,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -130,28 +142,44 @@
             "cacheRead": 9989954,
             "cacheWrite": 1201626
           }
+        },
+        "work": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 1206,
+            "output": 377621,
+            "cacheRead": 156378219,
+            "cacheWrite": 1900763
+          }
         }
       },
       "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 20725,
+          "output": 148810,
+          "cacheRead": 10414380,
+          "cacheWrite": 1211999
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 21700,
-          "output": 2026,
+          "input": 64387,
+          "output": 6911,
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "anthropic/claude-opus-4-8": {
-          "input": 20519,
-          "output": 142509,
-          "cacheRead": 9989954,
-          "cacheWrite": 1201626
+        "anthropic/claude-sonnet-4-6": {
+          "input": 1206,
+          "output": 377621,
+          "cacheRead": 156378219,
+          "cacheWrite": 1900763
         }
       },
       "costAtCloseOut": {
-        "usd": 16.170465,
-        "pricingAsOf": "2026-06-23T14:40:06.942Z"
+        "usd": 76.315322,
+        "pricingAsOf": "2026-06-23T20:38:51.885Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2036"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
