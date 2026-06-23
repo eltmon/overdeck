@@ -13,7 +13,7 @@ export interface AgentIconProps {
 
 function harnessForAgent(id: string): Harness | null {
   const key = id.toLowerCase()
-  if (key === 'pi' || key.includes('pi-')) return 'pi'
+  if (key === 'ohmypi' || key === 'pi' || key.includes('pi-')) return 'ohmypi'
   if (key.includes('claude') || key.includes('anthropic')) return 'claude-code'
   if (key.includes('codex') || key.includes('openai') || key.includes('gpt')) return 'codex'
   return null

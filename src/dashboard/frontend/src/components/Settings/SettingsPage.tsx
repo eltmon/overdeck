@@ -81,7 +81,6 @@ interface OpenRouterCatalogResponse {
 
 const HARNESS_LABELS: Record<Harness, string> = {
   'claude-code': 'Claude Code',
-  pi: 'Pi',
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
 };

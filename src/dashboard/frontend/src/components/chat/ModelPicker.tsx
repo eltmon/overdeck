@@ -29,7 +29,6 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
  */
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-4-6',
-  'pi': 'gpt-5.5',
   'ohmypi': 'gpt-5.5',
   'codex': 'codex-4o',
 };
@@ -177,7 +176,7 @@ export function saveStoredModel(modelId: string): void {
 export function loadStoredHarness(): Harness {
   try {
     const stored = localStorage.getItem(HARNESS_STORAGE_KEY);
-    if (stored === 'pi' || stored === 'claude-code' || stored === 'codex') return stored;
+    if (stored === 'ohmypi' || stored === 'claude-code' || stored === 'codex') return stored;
   } catch { /* ignore */ }
   return 'claude-code';
 }
@@ -193,7 +192,7 @@ function formatCost(costPer1M: number): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'pi' || value === 'codex';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {
@@ -405,10 +404,10 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           />
         )}
         <span className={styles.pickerLabel}>{label}</span>
-        {effectiveHarness === 'pi' && (
-          <span className={styles.harnessIndicator} title="Pi harness active">
-            <HarnessLogo harness="pi" className={styles.harnessIndicatorIcon} />
-            Pi
+        {effectiveHarness === 'ohmypi' && (
+          <span className={styles.harnessIndicator} title="oh-my-pi harness active">
+            <HarnessLogo harness="ohmypi" className={styles.harnessIndicatorIcon} />
+            oh-my-pi
           </span>
         )}
         {effectiveHarness === 'codex' && (

@@ -70,7 +70,7 @@ export function ConversationFeedCard({ entry, onSelect, now = new Date() }: Conv
 }
 
 function harnessForFeedAgent(agent: string): Harness {
-  if (agent === 'pi') return 'pi';
+  if (agent === 'ohmypi' || agent === 'pi') return 'ohmypi';
   if (agent === 'codex') return 'codex';
   return 'claude-code';
 }
