@@ -47,17 +47,16 @@ COMPLETED_FILE="$AGENT_STATE_DIR/completed"
 [ -f "$COMPLETED_FILE" ] && exit 0
 
 # Skip if the issue is actively flowing through the specialist pipeline.
-REVIEW_STATUS_FILE="$HOME/.overdeck/review-status.json"
-if [ -f "$REVIEW_STATUS_FILE" ]; then
-  IN_ACTIVE_PIPELINE=$(python3 -c "
+# Read through the dashboard's SQLite-backed review-status API; review-status.json
+# is legacy and can be empty or stale.
+PIPELINE_STATUS_JSON=$(curl -s -m "$PAN_CURL_TIMEOUT" \
+  -H "x-overdeck-internal-token: $PAN_INTERNAL_TOKEN" \
+  "$PAN_DASHBOARD_URL/api/review/$ISSUE_ID/status" 2>/dev/null || echo "")
+if [ -n "$PIPELINE_STATUS_JSON" ]; then
+  IN_ACTIVE_PIPELINE=$(printf '%s' "$PIPELINE_STATUS_JSON" | python3 -c "
 import json, sys
 try:
-    with open('$REVIEW_STATUS_FILE') as f:
-        statuses = json.load(f)
-    issue = '$ISSUE_ID'
-    status = statuses.get(issue) or statuses.get(issue.lower()) or statuses.get(issue.upper())
-    if not status:
-        print('no'); sys.exit(0)
+    status = json.load(sys.stdin)
     review = status.get('reviewStatus', '')
     test = status.get('testStatus', '')
     merge = status.get('mergeStatus', '')
