@@ -210,13 +210,6 @@ CREATE TABLE `merge_sets` (
 );
 --> statement-breakpoint
 CREATE INDEX `merge_sets_project_idx` ON `merge_sets` (`project_key`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `observation_index` (
-	`id` text PRIMARY KEY NOT NULL,
-	`observation_path_jsonl` text NOT NULL,
-	`byte_offset` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `observation_index_path_offset_idx` ON `observation_index` (`observation_path_jsonl`,`byte_offset`);--> statement-breakpoint
 CREATE TABLE `pending_auto_merges` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`issue_id` text NOT NULL,
@@ -235,17 +228,6 @@ CREATE TABLE `pending_auto_merges` (
 --> statement-breakpoint
 CREATE INDEX `pending_auto_merges_issue_idx` ON `pending_auto_merges` (`issue_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `pending_auto_merges_active_issue_idx` ON `pending_auto_merges` (`issue_id`) WHERE status IN ('pending','merging');--> statement-breakpoint
-CREATE TABLE `reset_markers` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`scope` text NOT NULL,
-	`scope_id` text NOT NULL,
-	`from_timestamp` integer NOT NULL,
-	`reason` text,
-	`created_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `reset_markers_scope_idx` ON `reset_markers` (`scope`,`scope_id`,`from_timestamp`);--> statement-breakpoint
-CREATE INDEX `reset_markers_created_at_idx` ON `reset_markers` (`created_at`);--> statement-breakpoint
 CREATE TABLE `review_run_agents` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`run_id` text NOT NULL,

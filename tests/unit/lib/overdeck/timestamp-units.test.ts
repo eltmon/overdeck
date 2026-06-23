@@ -13,6 +13,7 @@ import { Effect, Layer } from 'effect';
 
 import { createEventStore } from '../../../../src/dashboard/server/event-store.js';
 import { Db, EventBus, MemoryFiles, MemorySearch, type FtsStatement } from '../../../../src/lib/overdeck/infra.js';
+import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { overdeckIssues, type IssueId, type Stage } from '../../../../src/lib/overdeck/issues.js';
 import { EventBusLive } from '../../../../src/lib/overdeck/infra.js';
 import { upsertReviewStatusSync } from '../../../../src/lib/overdeck/review-status-sync.js';
@@ -64,7 +65,7 @@ function fakeMemoryLayer(dbLayer: Layer.Layer<Db>) {
     MemorySearch.of({
       statement: <T>(_projectId: string, statement: FtsStatement) =>
         Effect.sync(() => {
-          const db = odbForFakeMemory.raw();
+          const db = memorySearchDb;
           if (statement.method === 'exec') {
             db.exec(statement.sql);
             return undefined as T;
@@ -76,7 +77,7 @@ function fakeMemoryLayer(dbLayer: Layer.Layer<Db>) {
         }),
       transaction: (_projectId: string, statements: ReadonlyArray<FtsStatement>) =>
         Effect.sync(() => {
-          const db = odbForFakeMemory.raw();
+          const db = memorySearchDb;
           return statements.map((statement) => {
             if (statement.method === 'exec') {
               db.exec(statement.sql);
@@ -101,15 +102,28 @@ function fakeMemoryLayer(dbLayer: Layer.Layer<Db>) {
   return MemoryWriterLive.pipe(Layer.provide(Layer.mergeAll(dbLayer, memoryFiles, memorySearch, bus)));
 }
 
-let odbForFakeMemory: OverdeckTestDb;
+let memorySearchDb: SqliteDatabase;
 
 describe('overdeck timestamp units — integer epoch-milliseconds (PAN-1961)', () => {
   let odb: OverdeckTestDb;
   beforeEach(() => {
     odb = setupOverdeckTestDb();
-    odbForFakeMemory = odb;
+    memorySearchDb = openDatabase(':memory:');
+    memorySearchDb.exec(`
+      CREATE TABLE reset_markers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL,
+        scope_id TEXT NOT NULL,
+        from_timestamp INTEGER NOT NULL,
+        reason TEXT,
+        created_at INTEGER NOT NULL
+      );
+    `);
   });
-  afterEach(() => { teardownOverdeckTestDb(odb); });
+  afterEach(() => {
+    memorySearchDb.close();
+    teardownOverdeckTestDb(odb);
+  });
 
   it('Drizzle resolver writes issues.updated_at as epoch MILLISECONDS, not seconds', async () => {
     const before = Date.now();
@@ -175,7 +189,6 @@ describe('overdeck timestamp units — integer epoch-milliseconds (PAN-1961)', (
     const expected: Record<string, string[]> = {
       events: ['timestamp'],
       status_history: ['timestamp'],
-      reset_markers: ['from_timestamp', 'created_at'],
       conversations: ['created_at', 'archived_at', 'ended_at', 'last_attached_at'],
       conversation_files: ['created_at'],
       favorites: ['created_at'],
@@ -251,7 +264,7 @@ describe('overdeck timestamp units — integer epoch-milliseconds (PAN-1961)', (
         Effect.provide(fakeMemoryLayer(odb.dbLayer)),
       ),
     );
-    const row = odb.raw().prepare('SELECT from_timestamp, created_at FROM reset_markers WHERE scope_id = ?').get('PAN-TS-5') as {
+    const row = memorySearchDb.prepare('SELECT from_timestamp, created_at FROM reset_markers WHERE scope_id = ?').get('PAN-TS-5') as {
       from_timestamp: number;
       created_at: number;
     };
