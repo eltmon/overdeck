@@ -626,18 +626,18 @@ describe('generateLauncherScript', () => {
     expect(script).toContain("exec node '/tmp/pan'\\''s supervisor.js' claude");
   });
 
-  it('ignores supervisor wrapping for Pi launchers and review sub-role launchers', () => {
+  it('ignores supervisor wrapping for ohmypi launchers and review sub-role launchers', () => {
     const piScript = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
-      harness: 'pi',
+      harness: 'ohmypi',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
       piSessionDir: '/x/sessions',
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
     });
-    expect(piScript).toContain('exec pi --mode rpc');
+    expect(piScript).toContain('exec omp --mode rpc');
     expect(piScript).not.toContain('pty-supervisor.js');
 
     const reviewScript = generateLauncherScriptSync({
@@ -770,134 +770,8 @@ describe('generateLauncherWrapper', () => {
   });
 });
 
-describe('generateLauncherScript — Pi harness (PAN-636)', () => {
-  it('emits pi --mode rpc with --no-context-files, --extension, and stdin from fifo (AC1, AC2, AC4)', () => {
-    const script = generateLauncherScriptSync({
-      ...DEFAULT_CONFIG,
-      role: 'work',
-      harness: 'pi',
-      model: 'anthropic/claude-sonnet-4-6',
-      piExtensionPath: '/abs/packages/pi-extension/dist/index.js',
-      piFifoPath: '/home/u/.overdeck/agents/agent-pan-636/rpc.in',
-      piSessionDir: '/home/u/.overdeck/agents/agent-pan-636/sessions',
-      // Pi has no permission system — these flags must be DROPPED (AC4).
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
-      promptFile: '/tmp/prompt.txt',
-    });
-    // AC4: no claude permission flags leak into the pi command line.
-    expect(script).not.toMatch(/--dangerously-skip-permissions/);
-    expect(script).not.toMatch(/--permission-mode/);
-    // AC1: rpc + extension + no-context-files all present.
-    expect(script).toMatch(/pi --mode rpc/);
-    expect(script).toMatch(/--no-context-files/);
-    expect(script).toMatch(/--extension '\/abs\/packages\/pi-extension\/dist\/index\.js'/);
-    // AC2: stdin redirected from the fifo via bash read-write redirection so
-    // opening the FIFO does not block before Pi can write its ready marker.
-    expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-636\/rpc\.in'/);
-    // Defensive: read-only redirection would deadlock; assert it is NOT used.
-    expect(script).not.toMatch(/[^<]< '\/home\/u\/\.overdeck\/agents\/agent-pan-636\/rpc\.in'/);
-    expect(script).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      unset TMUX TMUX_PANE STY
-      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
-      export SKIP_DOCS_INDEX=1
-      cd -- '/workspace/project'
-      prompt=$(cat '/tmp/prompt.txt')
-      exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.overdeck/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.overdeck/agents/agent-pan-636/rpc.in'
-      "
-    `);
-  });
-
-  it('uses non-deadlocking <> FIFO redirection so Pi can emit ready.json before any writer attaches (PAN-1055 regression)', () => {
-    const script = generateLauncherScriptSync({
-      ...DEFAULT_CONFIG,
-      agentType: 'work',
-      harness: 'pi',
-      model: 'anthropic/claude-sonnet-4-6',
-      piExtensionPath: '/abs/ext.js',
-      piFifoPath: '/tmp/agent-x/rpc.in',
-      piSessionDir: '/tmp/agent-x/sessions',
-    });
-    // Bash `< fifo` blocks until a writer opens the FIFO. That deadlocked Pi
-    // conversation/fork launches because Pi could not exec — and could not
-    // write ready.json — until something else opened the FIFO for write.
-    // Bash `<> fifo` opens the FIFO read/write and never blocks.
-    expect(script).toMatch(/<> '\/tmp\/agent-x\/rpc\.in'/);
-    expect(script).not.toMatch(/[^<]< '\/tmp\/agent-x\/rpc\.in'/);
-  });
-
-  it('appends --session for resumeSessionId on pi launchers', () => {
-    const script = generateLauncherScriptSync({
-      ...DEFAULT_CONFIG,
-      role: 'work',
-      spawnMode: 'resume',
-      harness: 'pi',
-      model: 'gpt-5.4-mini',
-      piExtensionPath: '/x/dist/index.js',
-      piFifoPath: '/x/rpc.in',
-      piSessionDir: '/x/sessions',
-      resumeSessionId: 'sess-pi-123',
-    });
-    expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model 'openai-codex\/gpt-5.4-mini'/);
-  });
-
-  it('throws when pi launcher is missing required path config', () => {
-    // piSessionDir is the universal requirement (rpc + tui both need it)
-    expect(() =>
-      generateLauncherScriptSync({
-        ...DEFAULT_CONFIG,
-        role: 'work',
-        harness: 'pi',
-        model: 'gpt-5.4-mini',
-      }),
-    ).toThrow(/piSessionDir/);
-
-    // rpc-mode (default) additionally requires piExtensionPath and piFifoPath.
-    expect(() =>
-      generateLauncherScriptSync({
-        ...DEFAULT_CONFIG,
-        agentType: 'work',
-        harness: 'pi',
-        model: 'gpt-5.4-mini',
-        piSessionDir: '/x/sessions',
-        // missing piExtensionPath
-      }),
-    ).toThrow(/piExtensionPath/);
-
-    expect(() =>
-      generateLauncherScriptSync({
-        ...DEFAULT_CONFIG,
-        agentType: 'work',
-        harness: 'pi',
-        model: 'gpt-5.4-mini',
-        piSessionDir: '/x/sessions',
-        piExtensionPath: '/x/dist/index.js',
-        // missing piFifoPath
-      }),
-    ).toThrow(/piFifoPath/);
-  });
-
-  it('pi tui mode launcher omits --mode rpc and FIFO redirect', () => {
-    const script = generateLauncherScriptSync({
-      ...DEFAULT_CONFIG,
-      agentType: 'conversation',
-      harness: 'pi',
-      piMode: 'tui',
-      model: 'gpt-5.4-mini',
-      piSessionDir: '/x/sessions',
-      piExtensionPath: '/x/dist/index.js',
-    });
-    // No --mode rpc flag
-    expect(script).not.toMatch(/--mode rpc/);
-    // No FIFO redirect (`<>`)
-    expect(script).not.toMatch(/<> /);
-    // Still has --session-dir and --extension
-    expect(script).toMatch(/--session-dir '\/x\/sessions'/);
-    expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
-  });
-
-  // ─── ohmypi harness tests (PAN-1989) ──────────────────────────────────────────
+describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
+  // ─── ohmypi harness tests ──────────────────────────────────────────────────
 
   it('ohmypi: emits omp --mode rpc with --extension, no --no-context-files, and stdin from fifo (AC1)', () => {
     const script = generateLauncherScriptSync({

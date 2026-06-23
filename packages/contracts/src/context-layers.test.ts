@@ -101,14 +101,15 @@ describe("context dashboard contracts", () => {
       operation: "preview",
       previews: {
         "claude-code": "Claude Code rendered context",
-        pi: "Pi rendered context",
+        ohmypi: "oh-my-pi rendered context",
+        codex: "Codex rendered context",
         fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],
     })
 
     expect(parsed.previews["claude-code"]).toBe("Claude Code rendered context")
-    expect(parsed.previews.pi).toBe("Pi rendered context")
+    expect(parsed.previews.ohmypi).toBe("oh-my-pi rendered context")
     expect(parsed.previews.fullPrompt).toBe("Overdeck injected prompt audit")
   })
 

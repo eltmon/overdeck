@@ -66,7 +66,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi', 'codex'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -407,9 +407,9 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '',
     previews['claude-code'] || '(no rendered context)',
     '',
-    '## Overdeck-controlled Pi bundle',
+    '## Overdeck-controlled oh-my-pi bundle',
     '',
-    previews.pi || '(no rendered context)',
+    previews.ohmypi || '(no rendered context)',
     '',
     '## Overdeck-controlled Codex bundle',
     '',
@@ -477,7 +477,7 @@ export async function previewContextLayers(
     operation: 'preview',
     previews: {
       'claude-code': previews['claude-code'],
-      pi: previews.pi,
+      ohmypi: previews.ohmypi,
       codex: previews.codex,
       fullPrompt: fullPromptPreview(previews),
     },

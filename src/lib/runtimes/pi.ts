@@ -361,7 +361,7 @@ export class PiRuntimeSync {
     const launcherScript = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
-      harness: 'pi',
+      harness: 'ohmypi',
       piExtensionPath,
       piFifoPath: fifoPath,
       piSessionDir: sessionDir,

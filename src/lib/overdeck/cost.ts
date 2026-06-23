@@ -434,7 +434,7 @@ export class CostWriter extends Context.Service<
     readonly record: (event: CostEvent) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
-      source?: 'claude' | 'pi' | 'codex' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
     }) => Effect.Effect<{ imported: number }, CostIngestError>;
     // Full rebuild from archive; recomputes cost from tokens
     readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>;
@@ -514,10 +514,10 @@ export const CostWriterLive = Layer.effect(
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
-    const reconcile = (opts?: { source?: 'claude' | 'pi' | 'codex' | 'wal' }) =>
+    const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal' }) =>
       Effect.gen(function* () {
         const source = opts?.source ?? 'claude';
-        if (source !== 'pi' && source !== 'codex') return { imported: 0 };
+        if (source !== 'ohmypi' && source !== 'codex') return { imported: 0 };
 
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
@@ -531,7 +531,7 @@ export const CostWriterLive = Layer.effect(
 
         for (const agentName of agentNames) {
           const sessionRoot =
-            source === 'pi'
+            source === 'ohmypi'
               ? join(agentsDir, agentName, 'sessions')
               : join(agentsDir, agentName, 'codex-home', 'sessions');
 
@@ -539,7 +539,7 @@ export const CostWriterLive = Layer.effect(
 
           for (const sessionFile of sessionFiles) {
             const session = yield* Effect.sync(() =>
-              source === 'pi'
+              source === 'ohmypi'
                 ? parsePiSessionSync(sessionFile)
                 : parseCodexSessionSync(sessionFile),
             );
@@ -671,7 +671,7 @@ export const CostApi = HttpApiGroup.make('costs')
   .add(
     HttpApiEndpoint.post('reconcile', '/costs/reconcile', {
       payload: Schema.Struct({
-        source: Schema.optional(Schema.Literals(['claude', 'pi', 'codex', 'wal'])),
+        source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'wal'])),
       }),
       success: Schema.Struct({ imported: Schema.Number }),
       error:   CostIngestError,

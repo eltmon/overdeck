@@ -29,7 +29,6 @@ export type HarnessMarker = 'claude' | 'pi' | 'ohmypi' | 'codex';
 /** Maps a Overdeck {@link Harness} to its templating marker name. */
 export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
   'claude-code': 'claude',
-  pi: 'pi',
   ohmypi: 'ohmypi',
   codex: 'codex',
 };

@@ -7,7 +7,7 @@ import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex';
 
 export interface LauncherConfig {
   role: Role;
@@ -202,7 +202,7 @@ function buildChannelsArgs(config: LauncherConfig): string {
 
 function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
   if (!config.useSupervisor) return cmd;
-  if (config.harness === 'pi' || config.harness === 'ohmypi' || config.reviewSignal) return cmd;
+  if (config.harness === 'ohmypi' || config.reviewSignal) return cmd;
   if (!config.supervisorScriptPath) {
     throw new Error('LauncherConfig.supervisorScriptPath is required when useSupervisor=true');
   }
@@ -413,9 +413,6 @@ function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
   if (config.spawnMode === 'conversation') {
-    if (config.harness === 'pi') {
-      return buildPiCommand(config, false);
-    }
     if (config.harness === 'ohmypi') {
       return buildOhmypiCommand(config, false);
     }
@@ -504,9 +501,6 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (config.harness === 'pi') {
-    return buildPiCommand(config, useExec);
-  }
   if (config.harness === 'ohmypi') {
     return buildOhmypiCommand(config, useExec);
   }

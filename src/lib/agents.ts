@@ -354,7 +354,7 @@ async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promis
       runId: agentId,
       sessionId: agentId,
       agentRole: agentState.role ?? 'work',
-      agentHarness: agentState.harness ?? 'pi',
+      agentHarness: agentState.harness ?? 'claude-code',
     };
     const { injectPromptTimeMemory } = await import('./memory/injection.js');
     const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });

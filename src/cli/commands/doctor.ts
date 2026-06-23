@@ -18,15 +18,10 @@ import {
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
-import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
 import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
-
-// Minimum supported Pi binary version for the Pi harness (PAN-636).
-// Bump in lockstep with packages/pi-extension API surface compatibility.
-export const SUPPORTED_PI_VERSION_MIN = '0.73.0';
 
 // Minimum supported omp version for the ohmypi harness (PAN-1989).
 // omp uses a different version lineage from pi. Baselined at 16.1.16 (verified).
@@ -69,93 +64,6 @@ export function checkCodex(): CheckResult[] {
 function readCodexVersion(): string | null {
   try {
     const out = execSync('codex --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
-    const m = out.match(/(\d+\.\d+\.\d+)/);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
-}
-
-export function checkPi(strict: boolean): CheckResult[] {
-  const out: CheckResult[] = [];
-  if (!checkCommand('pi')) {
-    out.push({
-      name: 'Pi Coding Agent',
-      status: strict ? 'error' : 'warn',
-      message: 'Not installed (optional alternative harness)',
-      fix: 'Install: npm install -g @mariozechner/pi-coding-agent',
-    });
-    return out;
-  }
-
-  const version = readPiVersion();
-  if (!version) {
-    out.push({
-      name: 'Pi Coding Agent',
-      status: 'warn',
-      message: 'Detected but `pi --version` did not return a version string',
-      fix: 'Reinstall: npm install -g @mariozechner/pi-coding-agent',
-    });
-  } else if (compareSemver(version, SUPPORTED_PI_VERSION_MIN) < 0) {
-    out.push({
-      name: 'Pi Coding Agent',
-      status: 'error',
-      message: `v${version} (too old — requires >= ${SUPPORTED_PI_VERSION_MIN})`,
-      fix: 'Upgrade: npm install -g @mariozechner/pi-coding-agent@latest',
-    });
-  } else {
-    out.push({
-      name: 'Pi Coding Agent',
-      status: 'ok',
-      message: `v${version}`,
-    });
-  }
-
-  const extensionDist = join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js');
-  if (!existsSync(extensionDist)) {
-    out.push({
-      name: 'Pi Extension Bundle',
-      status: 'warn',
-      message: 'packages/pi-extension/dist/index.js not found',
-      fix: 'Build it: cd packages/pi-extension && npm run build',
-    });
-  } else {
-    out.push({
-      name: 'Pi Extension Bundle',
-      status: 'ok',
-      message: 'packages/pi-extension/dist/index.js present',
-    });
-  }
-
-  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x Pi conversations. Only
-  // surfaced when a credential exists — users who never use codex aren't
-  // bothered. Expiry is a sync read; `pan pi-auth status` does the live
-  // refresh check.
-  const codexCred = readPiCodexCredential();
-  if (codexCred) {
-    const mins = Math.round((codexCred.expires - Date.now()) / 60_000);
-    if (mins > 1) {
-      out.push({
-        name: 'Pi ChatGPT/Codex auth',
-        status: 'ok',
-        message: `openai-codex token valid (${mins > 120 ? `~${Math.round(mins / 60)}h` : `~${mins}m`})`,
-      });
-    } else {
-      out.push({
-        name: 'Pi ChatGPT/Codex auth',
-        status: 'warn',
-        message: 'openai-codex token expired',
-        fix: 'Refresh/re-auth: pan pi-auth status (auto-refresh) or pan pi-auth login',
-      });
-    }
-  }
-  return out;
-}
-
-function readPiVersion(): string | null {
-  // Pi prints its version to stderr, not stdout — merge both streams.
-  try {
-    const out = execSync('pi --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
     const m = out.match(/(\d+\.\d+\.\d+)/);
     return m ? m[1] : null;
   } catch {

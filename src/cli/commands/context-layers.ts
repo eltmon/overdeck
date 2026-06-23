@@ -159,11 +159,11 @@ export async function contextDiffCommand(options: ContextOptions = {}): Promise<
   const harnesses: Harness[] =
     options.harness === 'claude' || options.harness === 'claude-code'
       ? ['claude-code']
-      : options.harness === 'pi'
-        ? ['pi']
+      : options.harness === 'pi' || options.harness === 'ohmypi'
+        ? ['ohmypi']
         : options.harness === 'codex'
           ? ['codex']
-          : ['claude-code', 'pi', 'codex'];
+          : ['claude-code', 'ohmypi', 'codex'];
 
   for (const harness of harnesses) {
     const rendered = renderGlobalLayer(harness, isDevMode());
