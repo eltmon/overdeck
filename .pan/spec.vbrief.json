@@ -1,117 +1,122 @@
 {
   "vBRIEFInfo": {
     "version": "0.6",
-    "created": "2026-06-19T18:54:56Z",
+    "created": "2026-06-23T08:16:42.000Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-1866: Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth",
-    "updated": "2026-06-19T19:07:26.096Z"
+    "description": "Plan for PAN-1989: Replace Pi harness with oh-my-pi (omp) and evaluate advanced features",
+    "updated": "2026-06-23T08:35:45.833Z"
   },
   "plan": {
-    "id": "pan-1866",
-    "title": "Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth",
+    "id": "pan-1989",
+    "title": "Replace Pi harness with oh-my-pi (omp) and evaluate advanced features",
     "status": "proposed",
-    "uid": "4483025a-1769-4581-bdc1-c29887190926",
+    "uid": "88b45a5d-661f-47e9-a31d-abb5f1cb57a8",
     "author": "agent:claude-opus-4-8",
     "sequence": 2,
-    "created": "2026-06-19T18:54:56Z",
-    "updated": "2026-06-19T19:07:26.096Z",
+    "created": "2026-06-23T08:16:42.000Z",
+    "updated": "2026-06-23T08:35:45.833Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/overdeck/issues/1866",
-        "label": "PAN-1866",
+        "uri": "https://github.com/eltmon/overdeck/issues/1989",
+        "label": "PAN-1989",
         "type": "issue"
       },
       {
-        "uri": ".pan/drafts/PAN-1866.md",
+        "uri": ".pan/drafts/PAN-1989.md",
         "label": "PRD draft",
         "type": "prd"
+      },
+      {
+        "uri": "https://github.com/can1357/oh-my-pi",
+        "label": "oh-my-pi upstream",
+        "type": "reference"
+      },
+      {
+        "uri": "https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent",
+        "label": "@oh-my-pi/pi-coding-agent",
+        "type": "reference"
       }
     ],
     "tags": [
-      "backlog",
-      "sequencer",
-      "flywheel",
-      "dashboard",
-      "dag",
-      "ai-ranking"
+      "harness",
+      "migration",
+      "ohmypi",
+      "pi",
+      "no-loss-audit",
+      "research"
     ],
     "narratives": {
-      "Problem": "There is no surface that shows the entire open backlog sequenced and explained. The Flywheel ranks reactively by fixed tiers + oldest-first (no holistic AI evaluation); GitHub has no real priority (tracker returns priority: undefined); and there is no reproducible, durable plan-of-record. We want an AI that ranks the whole backlog by real impact into a dependency DAG, with a repo-committed markdown source of truth anyone can reproduce.",
-      "Proposal": "Add a configurable-model 'sequencer' role (tmux-hosted, spawned like the Flywheel via spawnRun) that reads the whole open backlog + the prior sequence.md + per-issue pipeline/PRD/ready flags and writes a ranked DAG to .pan/backlog/sequence.md (human table + tiered rationale + a fenced machine-readable JSON block), auto-committed to main. SQLite backlog_sequence is a disposable cache rebuildable from the md. A new Backlog dashboard page renders the sequence as a ReactFlow+dagre DAG (reusing the PlanDAG stack — no new viz dep) with in-pipeline/PRD/ready signals, condition flags (needs-refinement/stale), tiering+filters for 500+ issues, and operator pickup-gate + planning-policy controls. Three passes — creation (full), incremental (changed-only, preserves prior order), review (full re-eval) — keep re-ranking cheap; chunked map-reduce inside the agent session keeps creation/review within the context window. When auto_pickup_backlog is on and a sequence exists, the Flywheel becomes the executor of the sequence order (with emergency promotion) instead of self-ranking.",
-      "NonGoals": "- On-page dependency-edge drawing (drag node->node, source:operator) is deferred to a follow-up issue.\n- 'Over-the-horizon' ghost shadow nodes are deferred.\n- Bidirectional GitHub dependency sync (reading sub-issues / writing Depends-on back to GitHub) is deferred — GitHub metadata is read, never written back.\n- No ranking/priority/condition is written back to the tracker; stale/needs-refinement surface for human action only and never auto-modify the tracker.\n- Non-GitHub trackers are out of scope for this issue (current scope: GitHub for PAN); the design stays tracker-abstraction-friendly but is built against GitHub.\n- No new frontend visualization dependency may be added — ReactFlow 11 + @dagrejs/dagre are reused.\n- Intra-issue vBRIEF/beads edges are NOT used as backlog dependency edges."
+      "Problem": "Overdeck has first-class Pi support across runtime, FIFO RPC, a vendored extension, cost/conversation parsing, harness routing/policy, settings/auth, docs, dashboard, and tests. We are moving to oh-my-pi (binary omp, package @oh-my-pi/pi-coding-agent), a superset FORK of the same pi-mono. The runtime contract (--mode rpc, extension model, JSONL session shape) is largely preserved, but the binary name (pi->omp, no alias), npm package, config/auth dir (~/.pi->~/.omp), and extension import package all change — so this is not a string-rename and requires a verified no-loss audit plus real-output verification. Four in-flight Pi defects (PAN-1859 RED-main resume->FIFO test, PAN-1833 extension cwd detection, PAN-1827 blank pi conversation view, PAN-1912 hidden tool-call detail) must be explicitly dispositioned, not dropped.",
+      "Proposal": "Clean rename pi->ohmypi with read-only back-compat for legacy 'pi' rows/paths, executed as widen->migrate->narrow so every intermediate commit stays green. A gated foundation bead installs omp, captures a real --mode rpc transcript as a parser fixture, and records the exact pi->omp contract (binary/package/flags/paths/extension-import/hook-names/session-format) in docs/ohmypi-contract.md; downstream beads consume the contract instead of guessing. Land parity plus two bounded low-risk wins (additional routable providers; extra observability/cost + tool-call data), deferring all higher-risk omp features to filed follow-ups. Resolve PAN-1859/1833/1827 in their owning beads; split PAN-1912 (data here, UI carried forward).",
+      "NonGoals": "- Adopting LSP/DAP tools, hashline edits, subagents, browser/search, ACP, or model-control UIs in this issue — each becomes a filed follow-up once parity is proven.\n- Keeping the pi binary/@mariozechner/pi-coding-agent package as a runnable harness — omp replaces it; 'pi' survives only as a legacy read alias.\n- Running Pi and omp side-by-side as co-equal harnesses.\n- Rebuilding the frontend Tools show/hide toggle UI (PAN-1912 UI half) — carried forward as a filed follow-up; only the tool-call data is in scope.\n- Destructively migrating existing harness='pi' DB rows — they normalize to 'ohmypi' on read; the DB is a rebuildable cache.\n- Changing the ToS policy posture — the single blocked cell (harness + Anthropic + subscription) is preserved, re-keyed to 'ohmypi'."
     },
-    "autoDecisions": [
-      {
-        "summary": "Sequencer spawns as a tmux-hosted role run via spawnRun(runId,'sequencer',{agentId:'sequencer-runner',...}), mirroring spawnFlywheelAgent.",
-        "rationale": "Every role run in this codebase is a tmux Claude session; there is no direct-LLM-API precedent for role runs (verified in agents.ts/flywheel.ts). Reusing the Flywheel singleton-agent pattern gives lifecycle, observability, and model-routing for free."
-      },
-      {
-        "summary": "Chunked map-reduce (NFR-6) is realized inside the agent session via a compact manifest + a batched body accessor, not server-side multi-call fan-out.",
-        "rationale": "The full backlog (~370k tokens) exceeds one context window; with no direct-API path, the cleanest fit is one agent that reads bodies in batches against a running shortlist. Bodies are never all inlined, satisfying NFR-6, while keeping a single ranker/owner of the order."
-      },
-      {
-        "summary": "in-pipeline is computed server-side from review_status (non-pending) OR live workspace/branch/agent, not by importing the frontend derivePipelineState helper.",
-        "rationale": "derivePipelineState lives in the frontend; importing it into the Effect server breaks the build. Recomputing from the same inputs server-side reuses existing signals without inventing state."
-      },
-      {
-        "summary": "On-demand pass buttons are the acceptance-critical MVP; the debounced delta auto-trigger + periodic review cadence is the lowest-priority bead and may land last.",
-        "rationale": "The PRD marks the auto-trigger 'a follow-up wire-up, not a blocker'. On-demand creation/incremental/review fully satisfies the FR-10 acceptance criteria."
-      },
-      {
-        "summary": "Operator gate 'blocked' reuses the existing parked-label mechanism (BLOCKER_LABELS) rather than a new hold system.",
-        "rationale": "The PRD calls for honoring the existing Flywheel skip immediately; reusing BLOCKER_LABELS avoids a parallel system and is consistent with auto-merge-eligibility."
-      }
-    ],
+    "autoDecisions": [],
     "items": [
       {
-        "id": "sequence-schema",
-        "title": "Define sequence.md JSON schema + TypeScript types",
+        "id": "omp-contract",
+        "title": "Install omp, capture a real RPC transcript, and record the pi->omp contract",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
           "requiresInspection": true,
           "inspectionDepth": "deep",
           "foundationFor": [
-            "sequence-parser",
-            "sequence-writer",
-            "backlog-input",
-            "backlog-cache-table"
+            "runtime-fifo",
+            "extension-pkg",
+            "cost-parser",
+            "conv-parser",
+            "auth-paths",
+            "doctor",
+            "provider-expansion",
+            "research-doc"
           ],
           "traces": [
             "FR-1",
-            "FR-11",
-            "FR-15",
-            "FR-16",
-            "FR-17",
-            "NFR-5"
+            "NFR-2"
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/backlog/types.ts defining the canonical types + a runtime validator for the machine-readable JSON block of .pan/backlog/sequence.md. Top-level: { version, project, generatedAt, model, pass in {creation,incremental,review}, lastReviewPass, openCount, nodes[], edges[] }. Node: { issue, rank, size in {XS,S,M,L,XL}, importance in {critical,high,medium,low}, score 0-100, condition in {ok,needs-refinement,stale}, dependsOn[], why (<=140 chars), rationale? (top-tier only), gate in {auto,ready,blocked}, planning in {skip,auto,interactive} }. Edge: { from, to, type in {unblocks,informs}, source in {github-ref,operator,ai-inferred}, confidence }. Export a parseSequenceJson(value) validator returning a typed SequenceDoc or a typed error. This is the cross-cutting contract the parser, writer, cache, route, and agent all encode assumptions about — keep it stable."
+          "Action": "Run `npm i -g @oh-my-pi/pi-coding-agent`; verify `omp --version`. Run a real `omp --mode rpc` session and capture its session JSONL. Commit the captured transcript as a fixture used by the cost/conversation parser beads. Author docs/ohmypi-contract.md mapping every pi surface to its omp equivalent: binary (omp), package, all CLI flags discovered from `omp --help`/subcommand help (session-dir, extension load, model, provider, resume, --mode rpc/rpc-ui), the config/auth directory (~/.omp/agent), the extension import package + exact hook names from the installed package's TypeScript types, and the real session JSONL shape vs Pi v3 {type:session,version:3}. For any pi flag without an obvious omp equivalent, record the discovered fallback (env var or alternate flag) — never guess downstream."
         },
         "items": [
           {
-            "id": "sequence-schema.ac1",
-            "title": "Exports a SequenceDoc type and a parseSequenceJson validator that returns a typed doc for a well-formed object and rejects an object whose node omits issue, rank, size, importance, or condition",
+            "id": "omp-contract.ac1",
+            "title": "Given omp installed globally, `omp --version` exits 0 and prints a version string recorded in docs/ohmypi-contract.md",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequence-schema.ac2",
-            "title": "The validator accepts exactly the documented enum sets (size XS-XL, importance critical-low, condition ok/needs-refinement/stale, gate auto/ready/blocked, planning skip/auto/interactive, edge source github-ref/operator/ai-inferred) and rejects out-of-enum values",
+            "id": "omp-contract.ac2",
+            "title": "The bead commits a real captured `omp --mode rpc` session transcript as a parser test fixture under the cost/conversation parser test dirs",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequence-schema.ac3",
-            "title": "The validator rejects a node whose why field exceeds 140 characters",
+            "id": "omp-contract.ac3",
+            "title": "docs/ohmypi-contract.md records each pi CLI flag (mode rpc, session-dir, extension, model, provider, resume) mapped to its verified omp flag or a recorded fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "omp-contract.ac4",
+            "title": "docs/ohmypi-contract.md records the extension import package + hook names and the config/auth path (~/.omp/agent), each cited from the installed package or real output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "omp-contract.ac5",
+            "title": "docs/ohmypi-contract.md states whether the omp session JSONL preserves Pi v3 shape and documents any divergence the parsers must handle",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -120,44 +125,108 @@
         ]
       },
       {
-        "id": "sequence-parser",
-        "title": "Implement parseSequenceMd (extract + validate fenced JSON block)",
+        "id": "audit-enumeration",
+        "title": "Write the no-loss audit enumeration of the current Pi surface",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
-            "FR-1",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Author docs/ohmypi-no-loss-audit.md enumerating every current Pi surface item (the 20 surface rows + 4 defect rows from the PRD audit table), each with a disposition column (preserve/replace/retire) and an empty 'home in omp surface' / 'verified' column the migration beads fill in. Map PAN-1859/1833/1827/1912 to resolved-by-bead vs carried-forward."
+        },
+        "items": [
+          {
+            "id": "audit-enumeration.ac1",
+            "title": "docs/ohmypi-no-loss-audit.md contains a row for every Pi surface item (runtime, fifo, launcher, extension, parsers, auth, policy, routing, doctor, settings, docs, frontend, tests, union types), each with a disposition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-enumeration.ac2",
+            "title": "The audit records, for each of PAN-1859/1833/1827/1912, a resolving bead or an explicit carried-forward follow-up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-enumeration.ac3",
+            "title": "Each audit row contains an unfilled 'verified' marker that the closing audit-gate bead later checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "widen-union",
+        "title": "Widen the harness union to include 'ohmypi' and add the legacy normalizer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "runtime-fifo",
+            "extension-pkg",
+            "launcher-omp",
+            "cost-parser",
+            "conv-parser",
+            "auth-paths",
+            "policy-routing",
+            "frontend-labels",
+            "narrow-union"
+          ],
+          "traces": [
+            "FR-2",
             "NFR-1"
           ]
         },
         "narrative": {
-          "Action": "Implement parseSequenceMd(markdown): SequenceDoc | ParseError in src/lib/backlog/sequence-io.ts. Locate the fenced ```json block below the '<!-- machine-readable; do not hand-edit below this line -->' marker, parse it, run it through parseSequenceJson from types.ts, and recover from a malformed/missing block by returning a typed parse error rather than throwing. The human table/prose above the marker is ignored — only the fenced JSON block is authoritative."
+          "Action": "Add 'ohmypi' to both unions — RuntimeName (src/lib/runtimes/types.ts:20) and Harness (packages/contracts/src/types.ts:49) — producing a transient 4-value set 'claude-code'|'pi'|'ohmypi'|'codex'. EXTEND the existing normalizeHarness() at src/lib/overdeck/conversations.ts:851 (today: harness==='pi'||'claude-code'||'codex' ? harness : null) to map legacy 'pi'->'ohmypi' and accept 'ohmypi' — do NOT add a parallel normalizer (single write door per domain). Route the inline duplicate harness validation at src/lib/database/conversations-db.ts:142 through normalizeHarness() so both paths share one source of truth and both accept 'ohmypi' / normalize legacy 'pi' on read. No comparison sites are removed yet; the build stays green."
         },
         "items": [
           {
-            "id": "sequence-parser.ac1",
-            "title": "Given a sequence.md with a valid fenced JSON block, parseSequenceMd returns a SequenceDoc whose nodes length equals the block's node count",
+            "id": "widen-union.ac1",
+            "title": "Both RuntimeName and Harness unions accept 'ohmypi' and typecheck passes with the transient 4-value set",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequence-parser.ac2",
-            "title": "Given a sequence.md whose JSON block is truncated or absent, parseSequenceMd returns a typed parse-error result and does not throw",
+            "id": "widen-union.ac2",
+            "title": "normalizeHarness('pi') returns 'ohmypi' and normalizeHarness('ohmypi'|'claude-code'|'codex') returns the input unchanged, covered by a unit test",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequence-parser.ac3",
-            "title": "Given a sequence.md whose human table disagrees with the fenced JSON block, parseSequenceMd returns the values from the JSON block, ignoring the table/prose above the marker",
+            "id": "widen-union.ac3",
+            "title": "Given an 'ohmypi' row both validation sites (canonical normalizeHarness at overdeck/conversations.ts:851 and the inline check at conversations-db.ts:142, now routed through it) accept it, and given a legacy 'pi' row both resolve it to 'ohmypi' on read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-union.ac4",
+            "title": "Given the transient 4-value union, `npm run typecheck` exits 0 and no harness comparison site breaks",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -166,212 +235,165 @@
         ]
       },
       {
-        "id": "sequence-writer",
-        "title": "Implement writeSequenceMd (render table + tiered rationale + JSON, auto-commit)",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1",
-            "FR-3",
-            "NFR-3",
-            "NFR-5"
-          ]
-        },
-        "narrative": {
-          "Action": "Implement writeSequenceMd(projectRoot, doc) in src/lib/backlog/sequence-io.ts. Render: a header line (last-sequenced timestamp + model + open count); a compact ranked table (rank/issue/size/importance/condition/deps/short why); a '## Rationale detail' section with full paragraphs for the active top tier only (~top 80); and the fenced machine-readable JSON block below the do-not-hand-edit marker. Write to .pan/backlog/sequence.md and call queueAutoCommit({projectRoot, paths:['.pan/backlog/sequence.md'], subject:'chore(state): update backlog sequence (<project>)'}). Store each rationale exactly once (full paragraph only for top tier; one-line why for the tail) to honor the token budget."
-        },
-        "items": [
-          {
-            "id": "sequence-writer.ac1",
-            "title": "writeSequenceMd produces a file that parseSequenceMd round-trips back to a SequenceDoc equal to the input doc (ignoring the generatedAt timestamp)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "sequence-writer.ac2",
-            "title": "The writer emits a full-paragraph rationale only for top-tier nodes and a one-line why for every node, and a footprint test asserts a 522-node document stays <= ~65k tokens",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "sequence-writer.ac3",
-            "title": "writeSequenceMd commits the file via queueAutoCommit with subject 'chore(state): update backlog sequence (<project>)'",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-input",
-        "title": "collectOpenBacklog — manifest + batched body accessor + flag joins",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1",
-            "FR-2",
-            "FR-8",
-            "NFR-6"
-          ]
-        },
-        "narrative": {
-          "Action": "Implement collectOpenBacklog(projectKey) in src/lib/backlog/backlog-input.ts. List all open issues via IssueDataService.getIssues()/tracker.listIssues({includeClosed:false}) excluding closed/cancelled. For each issue join: inPipeline (review_status non-pending OR live workspace/branch/agent), hasPrd (hasIssueDraft from src/lib/pan-dir/drafts.ts), ready (findSpecByIssue present AND computeBeadCounts non-null). Include the GitHub priority field as ONE signal and issue age. Load the prior .pan/backlog/sequence.md when present. Return a compact manifest (id, title, labels, priority-signal, age, inPipeline, hasPrd, ready) PLUS a batched body accessor so a consumer reads N bodies in K batches rather than one inlined concatenation (NFR-6)."
-        },
-        "items": [
-          {
-            "id": "backlog-input.ac1",
-            "title": "collectOpenBacklog returns one manifest entry per open issue and excludes issues whose tracker state is closed or cancelled",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-input.ac2",
-            "title": "Each manifest entry contains inPipeline, hasPrd, and ready flags derived from review_status/workspace, hasIssueDraft, and findSpecByIssue+computeBeadCounts respectively",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-input.ac3",
-            "title": "collectOpenBacklog returns a batched body accessor (not a single inlined concatenation of all bodies), so a caller reads N bodies in K batches",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-input.ac4",
-            "title": "When a prior .pan/backlog/sequence.md exists, collectOpenBacklog loads and returns it alongside the manifest",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "sequencer-role-config",
-        "title": "Register the 'sequencer' role in config (Role union + defaults)",
+        "id": "runtime-fifo",
+        "title": "Rename the runtime + FIFO to ohmypi and land a green resume->FIFO test",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-4"
-          ]
-        },
-        "narrative": {
-          "Action": "Add 'sequencer' to the Role union in src/lib/agents.ts (~line 67); add sequencer: 'workhorse:expensive' to DEFAULT_MODEL_REFS and sequencer: { model: 'workhorse:expensive' } to DEFAULT_ROLES in src/lib/config-yaml.ts (~lines 425 and 443). The model resolves at spawn via determineModel({role:'sequencer'}) -> resolveModel -> derefWorkhorse."
-        },
-        "items": [
-          {
-            "id": "sequencer-role-config.ac1",
-            "title": "resolveModel('sequencer', undefined, {}) returns the expensive-workhorse default (claude-opus-4-8) when no override is configured",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "sequencer-role-config.ac2",
-            "title": "Setting roles.sequencer.model in config and calling resolveModel('sequencer', ...) returns the configured model, overriding the default",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "sequencer-role-config.ac3",
-            "title": "The project typecheck passes with 'sequencer' added to the Role union, and every exhaustive switch over Role still compiles",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "sequencer-prompt",
-        "title": "Author roles/sequencer.md + buildSequencerPrompt(pass, input)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
           "difficulty": "complex",
-          "issueLabel": "pan-1866",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename src/lib/runtimes/pi.ts->ohmypi.ts (PiRuntimeSync/PiRuntime->OhmypiRuntimeSync/OhmypiRuntime) and pi-fifo.ts->ohmypi-fifo.ts (createPiFifo/writePiCommandSync->ohmypi equivalents), updating the registry dispatch at runtimes/index.ts:82 to construct the runtime when harness==='ohmypi'. Preserve spawn/kill/heartbeat/usage/resume behavior. Fix the currently-RED resume->FIFO delivery path so the renamed test (resumeAgent delivers the continue prompt through the ohmypi FIFO) passes. Resolves PAN-1859."
+        },
+        "items": [
+          {
+            "id": "runtime-fifo.ac1",
+            "title": "The runtime registry returns the OhmypiRuntime when state.harness==='ohmypi', covered by a registry-dispatch test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-fifo.ac2",
+            "title": "Given a resumed agent, resumeAgent writes the continue prompt through the ohmypi FIFO (write command invoked), making the previously-failing PAN-1859 test green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-fifo.ac3",
+            "title": "Spawn preserves ready.json readiness signaling and kill preserves the abort->SIGTERM->SIGKILL ladder, covered by the renamed runtime tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-fifo.ac4",
+            "title": "No source file imports the old pi.ts/pi-fifo.ts paths after the rename; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extension-pkg",
+        "title": "Rename the vendored extension to ohmypi and resolve its bundle path from the module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
           "requiresInspection": true,
-          "inspectionDepth": "deep",
+          "inspectionDepth": "fast",
           "foundationFor": [
-            "sequencer-spawn",
-            "backlog-route-regenerate"
+            "launcher-omp",
+            "doctor"
           ],
           "traces": [
-            "FR-1",
-            "FR-2",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename packages/pi-extension->packages/ohmypi-extension (@overdeck/pi-extension->@overdeck/ohmypi-extension). Repoint the extension's import of the harness extension API to omp's package and align the hook names (session_start, tool_execution_end, turn_end) and the pan-done slash command per docs/ohmypi-contract.md. Update build scripts (build:pi-extension->build:ohmypi-extension in package.json and pretest). Resolve the extension dist bundle path from the module/package location rather than process.cwd() so non-repo-root invocations work. Resolves PAN-1833."
+        },
+        "items": [
+          {
+            "id": "extension-pkg.ac1",
+            "title": "The extension package is named @overdeck/ohmypi-extension and `npm run build:ohmypi-extension` produces packages/ohmypi-extension/dist/index.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-pkg.ac2",
+            "title": "When loaded, the extension registers session_start, tool_execution_end, and turn_end handlers and the pan-done slash command against omp's extension API",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-pkg.ac3",
+            "title": "Given pan start invoked from a non-repo-root directory, the extension bundle path resolves from the module location and does not report 'extension not built' (PAN-1833 regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-pkg.ac4",
+            "title": "When a session starts, the extension creates ready.json, validated by an extension unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-omp",
+        "title": "Build the omp launcher command with contract-mapped flags",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
             "FR-3",
-            "FR-10",
-            "FR-11",
-            "FR-13",
-            "FR-16",
-            "FR-17",
-            "NFR-6"
+            "NFR-2",
+            "NFR-3"
           ]
         },
         "narrative": {
-          "Action": "Author roles/sequencer.md (the role prompt) plus a buildSequencerPrompt(pass, input) assembler in src/lib/backlog/sequencer-agent.ts that injects the pass + backlog input. The prompt must instruct the agent to: read the prior sequence.md + the backlog manifest; for creation/review, read issue bodies in BATCHES against a running shortlist then merge (never inline the whole backlog); for incremental, read only changed issues and preserve prior order/rationale unless a delta justifies change (each change carries a rationale); assign every issue a condition (ok/needs-refinement/stale); never re-rank pinned in-pipeline issues; preserve operator-owned gate/planning fields and operator-sourced edges verbatim, re-derive github-ref edges, recompute ai-inferred edges as advisory; rank by impact with GitHub priority + age as inputs (not determinants); stamp pass + generatedAt; write via writeSequenceMd."
+          "Action": "Rename buildPiCommand->buildOhmypiCommand in src/lib/launcher-generator.ts; spawn the omp binary with the contract-mapped flags for RPC mode (work agents: --mode rpc + session-dir + extension + stdin fifo) and TUI mode (conversations: model + session-dir). Update the wrapWithSupervisor harness check (launcher-generator.ts:205) from 'pi' to 'ohmypi'. Preserve provider/env exports and the rpc.in fifo redirection."
         },
         "items": [
           {
-            "id": "sequencer-prompt.ac1",
-            "title": "buildSequencerPrompt('incremental', input) returns a prompt string containing the preserve-prior-order and read-only-changed-issues instructions",
+            "id": "launcher-omp.ac1",
+            "title": "buildOhmypiCommand emits an `omp --mode rpc` invocation with the contract-mapped session-dir, extension, and fifo redirection for work agents, covered by a launcher test",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequencer-prompt.ac2",
-            "title": "buildSequencerPrompt('creation', input) returns a prompt that instructs batched body reads against a running shortlist and explicitly forbids inlining the entire backlog in one prompt",
+            "id": "launcher-omp.ac2",
+            "title": "buildOhmypiCommand emits an omp TUI invocation with model + session-dir for conversations",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequencer-prompt.ac3",
-            "title": "The built prompt for any pass contains instructions to assign each issue a condition and to keep operator-owned gate/planning fields and operator-sourced edges verbatim",
+            "id": "launcher-omp.ac3",
+            "title": "wrapWithSupervisor preserves prior behavior: it skips supervisor wrapping when harness==='ohmypi' exactly as it did for 'pi'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "sequencer-prompt.ac4",
-            "title": "The built prompt contains a rank-by-impact instruction that treats GitHub priority and issue age as inputs only, not as the sole determinant",
+            "id": "launcher-omp.ac4",
+            "title": "The generated launcher script contains `omp` and contains no `pi --mode` invocation",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -380,355 +402,198 @@
         ]
       },
       {
-        "id": "sequencer-spawn",
-        "title": "spawnSequencerAgent(pass) — tmux role run mirroring the Flywheel",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1",
-            "FR-10",
-            "NFR-6"
-          ]
-        },
-        "narrative": {
-          "Action": "Implement spawnSequencerAgent(pass, opts) in src/lib/backlog/sequencer-agent.ts, mirroring spawnFlywheelAgent (src/lib/cloister/flywheel.ts:117). Call spawnRun(runId, 'sequencer', { agentId: 'sequencer-runner', workspace, prompt: buildSequencerPrompt(pass, collectOpenBacklog(project)), model: opts.model, allowHost: true, registerConversation: true }). Select creation automatically when no .pan/backlog/sequence.md exists, else default incremental; accept review explicitly. Model resolves through determineModel({role:'sequencer'})."
-        },
-        "items": [
-          {
-            "id": "sequencer-spawn.ac1",
-            "title": "spawnSequencerAgent launches a tmux-hosted role run with role 'sequencer' and the singleton agent id 'sequencer-runner', resolving its model from roles.sequencer.model",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "sequencer-spawn.ac2",
-            "title": "When no .pan/backlog/sequence.md exists the spawn defaults the pass to creation; when one exists it defaults to incremental; a review pass can be requested explicitly",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "sequencer-spawn.ac3",
-            "title": "The prompt passed to spawnRun contains the selected pass and the backlog input produced by collectOpenBacklog",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "settings-sequencer-role",
-        "title": "Surface the Sequencer role in Settings → Roles",
+        "id": "cost-parser",
+        "title": "Rename the cost parser and verify it against the real omp fixture",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "acJustification": "A settings row has exactly two observable behaviors: it renders with the default, and it persists/round-trips a change.",
-          "traces": [
-            "FR-4"
-          ]
-        },
-        "narrative": {
-          "Action": "Add a 'Sequencer' RoleDefinition to the ROLES array in src/dashboard/frontend/src/components/Settings/RolesPanel.tsx (~line 88): { id:'sequencer', name:'Sequencer', icon:<lucide icon>, description:'Ranks the whole open backlog into a reproducible DAG.', defaultModel:'workhorse:expensive' }. This makes roles.sequencer.model selectable and round-trips through GET/PUT /api/settings."
-        },
-        "items": [
-          {
-            "id": "settings-sequencer-role.ac1",
-            "title": "Settings → Roles renders a 'Sequencer' row whose model selector defaults to the expensive workhorse",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "settings-sequencer-role.ac2",
-            "title": "Changing the Sequencer model and saving persists roles.sequencer.model to config and the new value is read back on the next settings fetch",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-cache-table",
-        "title": "backlog_sequence SQLite cache table + rebuild-from-md",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-9",
-            "NFR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Add the backlog_sequence cache table in src/lib/database/schema.ts: bump SCHEMA_VERSION 56->57; add CREATE TABLE IF NOT EXISTS backlog_sequence (...) in initSchema(); add an additive `if (currentVersion < 57)` block in runMigrations(). Implement rebuildBacklogSequenceFromMd(projectRoot) that parses .pan/backlog/sequence.md (parseSequenceMd) and repopulates the table. The table is a disposable cache fully derivable from the md."
-        },
-        "items": [
-          {
-            "id": "backlog-cache-table.ac1",
-            "title": "Deleting all backlog_sequence rows and running rebuildBacklogSequenceFromMd repopulates the table to a state equivalent to the prior contents, purely from sequence.md",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-cache-table.ac2",
-            "title": "Opening a database at schema version 56 applies the version-57 migration and creates the backlog_sequence table without disturbing existing tables",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-route-get",
-        "title": "GET /api/backlog/sequence — joined view + route registration",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-8",
-            "FR-9"
-          ]
-        },
-        "narrative": {
-          "Action": "Create src/dashboard/server/routes/backlog.ts following the Effect.js HttpRouter pattern in routes/costs.ts. Add GET /api/backlog/sequence: read the parsed sequence (from the backlog_sequence cache, falling back to parseSequenceMd), join per-issue inPipeline/hasPrd/ready live state server-side (do NOT import the frontend derivePipelineState), and return the joined view as JSON. Export backlogRouteLayer = Layer.mergeAll(...) and register it in makeRoutesLayer in src/dashboard/server/server.ts (~line 297)."
-        },
-        "items": [
-          {
-            "id": "backlog-route-get.ac1",
-            "title": "GET /api/backlog/sequence returns the parsed sequence nodes joined with per-issue inPipeline/hasPrd/ready flags as JSON",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-route-get.ac2",
-            "title": "With the SQLite cache emptied, the endpoint reproduces the identical sequence view purely by re-parsing .pan/backlog/sequence.md",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-route-get.ac3",
-            "title": "backlogRouteLayer is registered in makeRoutesLayer and the server typechecks",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-route-regenerate",
-        "title": "POST /api/backlog/sequence/regenerate — trigger a pass",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "acJustification": "A trigger endpoint has two observable behaviors: it spawns on an explicit pass and it defaults the pass correctly.",
-          "traces": [
-            "FR-8",
-            "FR-10"
-          ]
-        },
-        "narrative": {
-          "Action": "Add POST /api/backlog/sequence/regenerate to routes/backlog.ts accepting an optional pass in {creation,incremental,review}; invoke spawnSequencerAgent(pass) and return the spawned run id/status as JSON."
-        },
-        "items": [
-          {
-            "id": "backlog-route-regenerate.ac1",
-            "title": "POST /api/backlog/sequence/regenerate with pass=incremental spawns a sequencer run and returns its run identifier",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-route-regenerate.ac2",
-            "title": "Omitting pass defaults to incremental when a sequence exists and creation when none does",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-operator-fields-route",
-        "title": "POST operator pickup-gate + planning-policy — persist to sequence.md",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-15",
-            "FR-17"
-          ]
-        },
-        "narrative": {
-          "Action": "Add operator-field endpoints to routes/backlog.ts that set the operator-owned pickup gate (auto/ready/blocked) and planning policy (skip/auto/interactive) for a single issue, persisting them into .pan/backlog/sequence.md via writeSequenceMd WITHOUT a full re-sequence (these fields are operator-owned and preserved verbatim by the sequencer). When gate=blocked, also apply the existing parked label (BLOCKER_LABELS from src/lib/cloister/auto-merge-eligibility.ts) so the current Flywheel skip honors it immediately."
-        },
-        "items": [
-          {
-            "id": "backlog-operator-fields-route.ac1",
-            "title": "Setting an issue's gate to ready or blocked persists the value into sequence.md and a subsequent GET /api/backlog/sequence returns the new gate",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-operator-fields-route.ac2",
-            "title": "Setting gate blocked applies the existing parked label so the current Flywheel skip honors it",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-operator-fields-route.ac3",
-            "title": "Setting an issue's planning policy persists planning into sequence.md and the value survives a re-read",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-page-wiring",
-        "title": "Wire the new Backlog top-level tab + page shell",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-5"
-          ]
-        },
-        "narrative": {
-          "Action": "Wire a new top-level Backlog tab: add 'backlog' to the Tab union in src/dashboard/frontend/src/components/Header.tsx (~line 4); add backlog:'/backlog' to TAB_PATHS and a render branch in src/dashboard/frontend/src/App.tsx (~lines 88 and ~1462+); add a Sidebar nav item + lucide icon in src/dashboard/frontend/src/components/Sidebar.tsx (~line 84). Create src/dashboard/frontend/src/pages/BacklogSequencerPage.tsx (template: pages/FlywheelPage.tsx) that fetches GET /api/backlog/sequence and renders a placeholder list of nodes."
-        },
-        "items": [
-          {
-            "id": "backlog-page-wiring.ac1",
-            "title": "Navigating to /backlog (sidebar item or path) renders the BacklogSequencerPage",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-page-wiring.ac2",
-            "title": "The page fetches GET /api/backlog/sequence on mount and renders one entry per returned node",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-page-wiring.ac3",
-            "title": "The frontend typecheck passes with 'backlog' added to the Tab union and TAB_PATHS",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "backlog-dag-node",
-        "title": "BacklogDAG + IssueNode (ReactFlow + dagre, reused stack)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-19T18:54:56Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1866",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
             "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename src/lib/cost-parsers/pi-parser.ts->ohmypi-parser.ts (parsePiSessionSync->parseOhmypiSessionSync) and update src/lib/memory/transcript-source.ts:136 harness filter to 'ohmypi'. Re-point parsing at the real omp transcript shape per the contract; preserve leaf->root active-branch traversal, per-model cost breakdown, and inline usage.cost aggregation. Add a unit test that parses the committed real omp fixture."
+        },
+        "items": [
+          {
+            "id": "cost-parser.ac1",
+            "title": "parseOhmypiSessionSync parses the committed real omp transcript fixture and returns non-zero usage with a per-model breakdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-parser.ac2",
+            "title": "Cost aggregation walks the latest leaf to root and produces a summed inline usage.cost without double-counting across compaction, exercised by a test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-parser.ac3",
+            "title": "Given ohmypi work-agent sessions, transcript-source.ts includes them (harness==='ohmypi') in the in-memory snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-parser",
+        "title": "Rename the conversation parser + 3 dispatchers and fix blank pi/ohmypi rendering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
             "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename pi-conversation-parser.ts->ohmypi-conversation-parser.ts (isPiSessionFile->isOhmypiSessionFile, parsePiConversationMessages->parseOhmypiConversationMessages). Update all three dispatcher surfaces — jsonl-resolver.ts session-path resolve, conversations.ts /messages dispatch, and the parser dispatch — to route ohmypi sessions; keep the path-pattern detector matching legacy on-disk Pi session paths so old transcripts still render. Update ws-rpc.ts:803 delivery, useConversationMessagesStream.ts streamability, and smart-compaction.ts harness checks to 'ohmypi'. Resolves PAN-1827 (conversation view no longer blank for pi/ohmypi sessions)."
+        },
+        "items": [
+          {
+            "id": "conv-parser.ac1",
+            "title": "Given an ohmypi session file, the /messages dispatcher routes to parseOhmypiConversationMessages and returns a non-empty ChatMessage list (PAN-1827 regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-parser.ac2",
+            "title": "Given an ohmypi path and a legacy on-disk pi path, isOhmypiSessionFile returns true for each, so existing transcripts still render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-parser.ac3",
+            "title": "The jsonl-resolver resolves the latest ohmypi session path for an agent, covered by a resolver test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-parser.ac4",
+            "title": "Given harness==='ohmypi', ws-rpc delivery and stream streamability detection behave exactly as they did for 'pi'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auth-paths",
+        "title": "Rename auth helpers to omp paths and the auth command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
             "FR-7",
-            "FR-16",
-            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename src/lib/pi-codex-auth.ts->ohmypi-codex-auth.ts; change getPiAuthPath() to ~/.omp/agent/auth.json per the contract; load omp's OAuth module (replacing the @earendil-works/pi-ai dynamic import) for refresh/device-code login, wrapped so a missing module degrades gracefully. Rename the CLI command src/cli/commands/pi-auth.ts -> `pan ohmypi-auth <status|login>`, keeping `pan pi-auth` registered as a hidden deprecated alias for one release. Update any wrapper skill referencing pi-auth in the same commit (skills lint)."
+        },
+        "items": [
+          {
+            "id": "auth-paths.ac1",
+            "title": "The auth helper persists and reads the codex credential at ~/.omp/agent/auth.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-paths.ac2",
+            "title": "`pan ohmypi-auth status` reports auth status and exits non-zero when the credential is missing/expired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-paths.ac3",
+            "title": "`pan pi-auth` still resolves (deprecated alias) and forwards to the ohmypi-auth handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-paths.ac4",
+            "title": "Given a missing or relocated omp OAuth module, the helper falls back to status 'unavailable' rather than throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-routing",
+        "title": "Re-key the ToS gate and routing/binary check to ohmypi",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
             "NFR-4"
           ]
         },
         "narrative": {
-          "Action": "Implement src/dashboard/frontend/src/components/backlog/BacklogDAG.tsx + a custom IssueNode, reusing ReactFlow 11 + @dagrejs/dagre (TB layout) exactly like src/dashboard/frontend/src/components/PlanDAG.tsx — no new viz dependency. Encode per node: rank badge (mono, top-left), AI size (node width/height), importance left-border heat (red->amber->neutral), in-pipeline glowing ring + live verb badge (reuse the .plan-glow precedent), 📄 PRD chip, ✓ READY chip, directed dependency edges (unblocks solid / informs dashed). Clicking a node opens a side panel showing the issue's rationale from the sequence. Follow the style guide (DM Sans, font-medium, semantic tokens, signal-color discipline)."
+          "Action": "In src/lib/harness-policy.ts re-key the single blocked cell from 'pi'+anthropic+subscription to 'ohmypi'+anthropic+subscription, preserving the block and its fallback-to-claude-code posture. In src/lib/harness-resolve.ts change the binary availability check from `command -v pi` to `command -v omp` and update built-in provider defaults and providerHarnesses normalization that mapped providers to 'pi' so they map to 'ohmypi'. Keep harness-policy.test.ts asserting the blocked cell."
         },
         "items": [
           {
-            "id": "backlog-dag-node.ac1",
-            "title": "The DAG renders each issue as a node sized by AI size with a rank badge and an importance-colored left border, laid out top-to-bottom via dagre",
+            "id": "policy-routing.ac1",
+            "title": "canUseHarnessSync('ohmypi', <anthropic model>, 'subscription') returns allowed:false, and the test suite asserts this is the only blocked cell",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-dag-node.ac2",
-            "title": "In-pipeline nodes render a glowing ring + live badge; the PRD chip and READY chip render only when those flags are present in the joined data",
+            "id": "policy-routing.ac2",
+            "title": "resolveHarness checks `command -v omp` for ohmypi availability and falls back to claude-code when omp is absent",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-dag-node.ac3",
-            "title": "Dependency edges render directed, with unblocks solid and informs dashed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "backlog-dag-node.ac4",
-            "title": "Clicking a node opens a side panel that displays that issue's rationale from the sequence",
+            "id": "policy-routing.ac3",
+            "title": "Given a provider that previously defaulted to 'pi', the built-in default now resolves to 'ohmypi', exercised by a resolve test",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -737,43 +602,44 @@
         ]
       },
       {
-        "id": "backlog-tiering-filters",
-        "title": "Tiered rendering + filters for a 500+ issue backlog",
+        "id": "doctor",
+        "title": "Add the checkOhmypi doctor check",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1866",
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
-            "FR-12"
+            "FR-8",
+            "NFR-3"
           ]
         },
         "narrative": {
-          "Action": "Add tiered rendering + filters to the Backlog page so a 500+ backlog stays usable. Default to a top-tier view: top N + dependency neighbors + always the pinned/in-pipeline set. Render as a DAG up to a ~150-node budget; beyond it, fall back to a virtualized ranked list. Collapse the long tail behind a visible count. Add filters for importance, condition, in-pipeline, and ready. Tiers (Now/Next/Later/Someday) are DERIVED bands over rank/score, not AI-assigned."
+          "Action": "Replace checkPi with checkOhmypi in src/cli/commands/doctor.ts: check the omp binary (command -v omp), parse `omp --version` and compare against a min version baselined for omp per the contract (omp versioning is a distinct lineage from pi 0.79), verify the packages/ohmypi-extension/dist/index.js bundle exists, and report the ~/.omp codex auth credential status with expiry. Keep this CLI-only (execSync acceptable here; never import into server-reachable code). Strict mode exits non-zero on missing/too-old."
         },
         "items": [
           {
-            "id": "backlog-tiering-filters.ac1",
-            "title": "With 500+ nodes the page renders only the top-tier-plus-neighbors set by default and collapses the remainder behind a visible count",
+            "id": "doctor.ac1",
+            "title": "Given omp absent, `pan doctor` reports an actionable 'omp not installed' status with the install command",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-tiering-filters.ac2",
-            "title": "Switching to a tier whose node count exceeds ~150 renders a virtualized ranked list instead of a DAG",
+            "id": "doctor.ac2",
+            "title": "Given omp older than the baselined minimum, `pan doctor` reports a too-old status; `pan doctor --strict` exits non-zero",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-tiering-filters.ac3",
-            "title": "Each filter (importance, condition, in-pipeline, ready) renders only the issues matching the selected facet",
+            "id": "doctor.ac3",
+            "title": "`pan doctor` shows the ohmypi-extension bundle presence and the ~/.omp codex auth status",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -782,14 +648,105 @@
         ]
       },
       {
-        "id": "backlog-condition-indicators",
-        "title": "Condition indicators (REFINE / STALE) + candidates-to-close summary",
+        "id": "frontend-labels",
+        "title": "Show ohmypi / oh-my-pi in dashboard harness pickers and labels",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the harness picker option in PlanDialog.tsx and the conversation row/menu components (CommandDeck/ConversationRow.tsx, ConversationActionMenu.tsx) plus any harness label/icon map so the harness value is 'ohmypi' and the displayed label is 'oh-my-pi'. The POST start-planning/start payloads send 'ohmypi'."
+        },
+        "items": [
+          {
+            "id": "frontend-labels.ac1",
+            "title": "The harness picker shows an 'ohmypi' option labelled 'oh-my-pi' and sends harness:'ohmypi' on start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-labels.ac2",
+            "title": "Given an ohmypi session or a normalized legacy pi session, conversation rows/menus render the 'oh-my-pi' label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-labels.ac3",
+            "title": "No frontend component renders the literal harness label 'Pi' for a new ohmypi session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-expansion",
+        "title": "Low-risk win: surface omp's additional routable providers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1866",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "From the contract/research provider matrix, add a BOUNDED set of omp's additional routable providers to the providers registry (src/lib/providers.ts PROVIDERS) and routing so getProviderForModelSync resolves them, defaulting each to the ohmypi harness. Do NOT add model-control UIs or per-provider tuning — only registry/routing entries. List exactly which providers were added in the bead's commit message."
+        },
+        "items": [
+          {
+            "id": "provider-expansion.ac1",
+            "title": "The PROVIDERS registry gains the bounded set of omp providers, and getProviderForModelSync resolves a model id from each new provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-expansion.ac2",
+            "title": "Each newly added provider defaults to the ohmypi harness via the built-in provider defaults, covered by a resolve test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-expansion.ac3",
+            "title": "The diff contains only PROVIDERS registry/routing entries and no new model-control UI component, keeping the change bounded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observability-toolcalls",
+        "title": "Low-risk win: capture extra omp usage/cost fields and tool-call detail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
@@ -797,28 +754,28 @@
           ]
         },
         "narrative": {
-          "Action": "Render condition treatments on nodes + the rationale panel: needs-refinement -> amber '⚠ REFINE' indicator with a 'Draft PRD' action; stale -> dimmed/strikethrough '⊘ STALE' candidate-to-close treatment with a 'Close issue' action. Add a 'candidates to close' summary listing every stale issue. Neither indicator auto-modifies the tracker — the actions are explicit and operator-initiated. Amber = 'a human must act' per the style guide."
+          "Action": "Using the real omp fixture, capture any additional observability fields omp emits beyond Pi (e.g. cache-hit, reasoning tokens, tool-call traces) in the cost parser output and the extension cost events, and ensure the conversation parser preserves tool-call name+arguments+result detail so the work-log shows tools (PAN-1912 data half). Keep this additive — do not change existing field semantics. The frontend Tools show/hide TOGGLE is NOT built here; it is carried forward as a filed follow-up."
         },
         "items": [
           {
-            "id": "backlog-condition-indicators.ac1",
-            "title": "A needs-refinement issue renders the amber ⚠ REFINE indicator and offers a Draft-PRD action; a stale issue renders dimmed with ⊘ STALE and offers a Close-issue action",
+            "id": "observability-toolcalls.ac1",
+            "title": "parseOhmypiSessionSync produces the additional omp usage/cost fields present in the real fixture (e.g. cache/reasoning tokens) and preserves existing field semantics",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-condition-indicators.ac2",
-            "title": "Neither indicator updates the tracker on its own; the Draft-PRD and Close-issue actions fire only when the operator clicks them",
+            "id": "observability-toolcalls.ac2",
+            "title": "The conversation parser emits tool-call name, arguments, and result for ohmypi transcripts so the work-log renders tool detail",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-condition-indicators.ac3",
-            "title": "A 'candidates to close' summary shows every issue whose condition is stale",
+            "id": "observability-toolcalls.ac3",
+            "title": "The diff contains no frontend Tools show/hide toggle component; the toggle is left to a filed follow-up",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -827,44 +784,44 @@
         ]
       },
       {
-        "id": "backlog-operator-gate-ui",
-        "title": "Operator pickup-gate + planning-policy controls on the node panel",
+        "id": "narrow-union",
+        "title": "Narrow the harness union back to three values (drop writable 'pi')",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1866",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
-            "FR-15",
-            "FR-17"
+            "FR-2",
+            "NFR-1"
           ]
         },
         "narrative": {
-          "Action": "Add a segmented Auto / ✓ Ready / ⛔ Block pickup-gate control and a skip / auto / interactive planning-policy control to the node rationale panel. Nodes display '📌 PROMOTED' when gate=ready and '⛔ HELD' when gate=blocked. The controls POST to the operator-fields route (backlog-operator-fields-route)."
+          "Action": "Remove 'pi' from the writable RuntimeName/Harness unions, returning them to 'claude-code'|'ohmypi'|'codex'. Keep 'pi' only as an accepted input string inside normalizeHarness() (legacy reads). Fix every residual `=== 'pi'` comparison the compiler now flags by routing through normalizeHarness or switching to 'ohmypi'. Run typecheck to confirm no writable 'pi' producer remains."
         },
         "items": [
           {
-            "id": "backlog-operator-gate-ui.ac1",
-            "title": "The rationale panel shows a segmented gate control; choosing ✓ Ready or ⛔ Block calls the operator-fields endpoint and the node updates to 📌 PROMOTED / ⛔ HELD",
+            "id": "narrow-union.ac1",
+            "title": "RuntimeName and Harness unions are exactly 'claude-code'|'ohmypi'|'codex'; typecheck passes with zero residual writable 'pi' comparisons",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-operator-gate-ui.ac2",
-            "title": "The planning-policy control persists the chosen skip/auto/interactive value via the same route",
+            "id": "narrow-union.ac2",
+            "title": "normalizeHarness still accepts the legacy string 'pi' and returns 'ohmypi', covered by the existing normalizer test",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-operator-gate-ui.ac3",
-            "title": "A node's gate/planning selection survives a page reload, read back from the persisted sequence",
+            "id": "narrow-union.ac3",
+            "title": "Given a legacy harness='pi' DB row, it resolves to an ohmypi conversation end to end (no blank or broken row)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -873,14 +830,97 @@
         ]
       },
       {
-        "id": "flywheel-sequence-executor",
-        "title": "Flywheel executes the sequence order under auto_pickup_backlog",
+        "id": "audit-gate",
+        "title": "Closing no-loss audit gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Complete the 'verified' column of docs/ohmypi-no-loss-audit.md and add an executable check (a test or a checklist asserted in review) that fails if any Pi surface row lacks a home (preserved/replaced/retired with rationale) or any of the four defects is undispositioned. Assert there is no remaining runnable 'pi' harness path and no @mariozechner/pi-coding-agent runtime dependency."
+        },
+        "items": [
+          {
+            "id": "audit-gate.ac1",
+            "title": "Every row in docs/ohmypi-no-loss-audit.md contains a filled 'verified' disposition (preserved, replaced, or retired-with-rationale)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-gate.ac2",
+            "title": "An executable audit check fails if any surface row is unaccounted for or any of PAN-1859/1833/1827/1912 is undispositioned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-gate.ac3",
+            "title": "A grep-based check fails if any runnable `pi --mode` launch path or @mariozechner/pi-coding-agent runtime import remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Update harness docs to omp install/use",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-19T18:54:56Z",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1866",
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Update configuration/harnesses.mdx and reference/harness-landscape.mdx to describe installing (`npm i -g @oh-my-pi/pi-coding-agent`) and using omp, the ohmypi harness picker locations, `pan ohmypi-auth`, the ToS gate (re-keyed), and troubleshooting — replacing stale @mariozechner/pi-coding-agent and `pi` binary guidance. Reference the new file paths (ohmypi.ts, ohmypi-fifo.ts, ohmypi-parser.ts)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "harnesses.mdx contains the `npm i -g @oh-my-pi/pi-coding-agent` install step, the omp binary, `pan ohmypi-auth`, and the re-keyed ToS gate, and contains no stale @mariozechner reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "harness-landscape.mdx contains an oh-my-pi entry as the supported alternative harness and references the ohmypi implementation files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "research-doc",
+        "title": "Author the omp capabilities research deliverable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
@@ -888,36 +928,28 @@
           ]
         },
         "narrative": {
-          "Action": "In src/lib/cloister/flywheel.ts (+ src/lib/flywheel-merge-order.ts), when flywheel.auto_pickup_backlog is enabled AND a .pan/backlog/sequence.md exists, make the Flywheel the executor: pick the highest-ranked ELIGIBLE issue from the parsed sequence (eligible = gate != blocked, not parked, not in-pipeline, passes the EXISTING author/assignee security filter, ready-or-has-PRD), and bypass its own P0-P3/oldest-first ranking (kept only as the no-sequence fallback). Add emergency promotion: when it finds a new pipeline-critical issue, file it, set gate:ready, and trigger an incremental pass (spawnSequencerAgent('incremental')) WITHOUT re-ranking the rest. CRITICAL: the existing security filter must still gate every pick (hazard H3)."
+          "Action": "Author docs/ohmypi-capabilities.md: (1) the full omp model/provider matrix (40+ providers across frontier APIs, coding plans, and local), with model-id/provider-prefix/auth-mode/context/reasoning-control/tool-capability notes — NOT scoped to GPT-5.5; (2) concrete Overdeck improvements grouped by model-routing, role-defaults, runtime-delivery, observability/cost, dashboard-UX, and agent-reliability; (3) a Proposed-Follow-ups table, each row tied to the models/providers/workflows it improves and a suggested priority. Include the carried-forward PAN-1912 frontend Tools-toggle as a row."
         },
         "items": [
           {
-            "id": "flywheel-sequence-executor.ac1",
-            "title": "With auto_pickup_backlog on and a sequence present, the Flywheel spawns work for the highest-ranked eligible issue from the sequence rather than its oldest-first pick",
+            "id": "research-doc.ac1",
+            "title": "docs/ohmypi-capabilities.md contains the omp model/provider matrix covering all provider categories (not just OpenAI/GPT-5.5)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "flywheel-sequence-executor.ac2",
-            "title": "The executor refuses to pick a blocked, parked, in-pipeline, or security-filtered (unsolicited third-party) issue from the sequence",
+            "id": "research-doc.ac2",
+            "title": "The doc contains concrete Overdeck improvements grouped by routing, role-defaults, runtime-delivery, observability/cost, dashboard-UX, and reliability",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "flywheel-sequence-executor.ac3",
-            "title": "With no .pan/backlog/sequence.md present, the Flywheel falls back to its existing P0-P3/oldest-first ranking",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "flywheel-sequence-executor.ac4",
-            "title": "Emergency promotion marks a new pipeline-critical issue gate:ready and spawns an incremental pass without re-ranking other issues",
+            "id": "research-doc.ac3",
+            "title": "The doc contains a Proposed-Follow-ups table where each row records the omp feature, the workflows/models/providers it improves, and a priority",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -926,36 +958,43 @@
         ]
       },
       {
-        "id": "backlog-delta-autotrigger",
-        "title": "(Follow-up) debounced delta auto-trigger + periodic review cadence",
+        "id": "file-followups",
+        "title": "File follow-up GitHub issues for advanced omp features",
         "status": "pending",
-        "priority": "low",
-        "created": "2026-06-19T18:54:56Z",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
         "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1866",
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
           "requiresInspection": false,
           "inspectionDepth": "fast",
-          "acJustification": "A wire-up bead with two observable behaviors: a debounced incremental on delta and a periodic review cadence.",
           "traces": [
-            "FR-10"
+            "FR-15"
           ]
         },
         "narrative": {
-          "Action": "Wire the auto-trigger (on-demand buttons remain the acceptance-critical MVP, so this lands last). Add a debounced incremental-pass trigger on backlog deltas (issue opened/closed/edited) via IssueDataService, plus a configurable periodic review-pass cadence. Both call spawnSequencerAgent."
+          "Action": "For each row of the Proposed-Follow-ups table in docs/ohmypi-capabilities.md (including the carried-forward PAN-1912 frontend Tools-toggle), run `gh issue create` with a title, a body tying it to the models/providers/workflows it improves and a link back to PAN-1989, and an appropriate label. Record the created issue numbers back into docs/ohmypi-capabilities.md and the no-loss audit's carried-forward rows."
         },
         "items": [
           {
-            "id": "backlog-delta-autotrigger.ac1",
-            "title": "A backlog delta (issue opened/closed/edited) spawns a single debounced incremental sequencer pass rather than one pass per change",
+            "id": "file-followups.ac1",
+            "title": "The bead creates a GitHub issue for each Proposed-Follow-ups row; each issue body references PAN-1989 and the workflows/models it improves",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "backlog-delta-autotrigger.ac2",
-            "title": "A configurable cadence spawns a periodic review pass",
+            "id": "file-followups.ac2",
+            "title": "The bead creates a follow-up issue for the carried-forward PAN-1912 frontend Tools show/hide toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-followups.ac3",
+            "title": "The bead records the created issue numbers back into docs/ohmypi-capabilities.md and the no-loss audit carried-forward rows",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -966,143 +1005,208 @@
     ],
     "edges": [
       {
-        "from": "sequence-schema",
-        "to": "sequence-parser",
+        "from": "omp-contract",
+        "to": "runtime-fifo",
         "type": "blocks"
       },
       {
-        "from": "sequence-schema",
-        "to": "sequence-writer",
+        "from": "omp-contract",
+        "to": "extension-pkg",
         "type": "blocks"
       },
       {
-        "from": "sequence-schema",
-        "to": "backlog-input",
+        "from": "omp-contract",
+        "to": "cost-parser",
         "type": "blocks"
       },
       {
-        "from": "sequence-schema",
-        "to": "backlog-cache-table",
+        "from": "omp-contract",
+        "to": "conv-parser",
         "type": "blocks"
       },
       {
-        "from": "sequence-parser",
-        "to": "sequence-writer",
+        "from": "omp-contract",
+        "to": "auth-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "provider-expansion",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "research-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "runtime-fifo",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "extension-pkg",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "launcher-omp",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "cost-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "conv-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "auth-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "policy-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "frontend-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-fifo",
+        "to": "launcher-omp",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-pkg",
+        "to": "launcher-omp",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-pkg",
+        "to": "doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "auth-paths",
+        "to": "doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-routing",
+        "to": "provider-expansion",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-parser",
+        "to": "observability-toolcalls",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-parser",
+        "to": "observability-toolcalls",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-fifo",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-pkg",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-omp",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-parser",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-parser",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "auth-paths",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-routing",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-labels",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-expansion",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "observability-toolcalls",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-enumeration",
+        "to": "audit-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "narrow-union",
+        "to": "audit-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-omp",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "auth-paths",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "research-doc",
+        "to": "file-followups",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-gate",
+        "to": "file-followups",
         "type": "informs"
-      },
-      {
-        "from": "sequence-parser",
-        "to": "backlog-cache-table",
-        "type": "blocks"
-      },
-      {
-        "from": "sequence-parser",
-        "to": "backlog-route-get",
-        "type": "blocks"
-      },
-      {
-        "from": "sequence-parser",
-        "to": "flywheel-sequence-executor",
-        "type": "blocks"
-      },
-      {
-        "from": "sequence-writer",
-        "to": "backlog-operator-fields-route",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-input",
-        "to": "sequencer-prompt",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-input",
-        "to": "sequencer-spawn",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-input",
-        "to": "backlog-route-get",
-        "type": "blocks"
-      },
-      {
-        "from": "sequencer-role-config",
-        "to": "sequencer-spawn",
-        "type": "blocks"
-      },
-      {
-        "from": "sequencer-role-config",
-        "to": "settings-sequencer-role",
-        "type": "blocks"
-      },
-      {
-        "from": "sequencer-prompt",
-        "to": "sequencer-spawn",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-cache-table",
-        "to": "backlog-route-get",
-        "type": "blocks"
-      },
-      {
-        "from": "sequencer-spawn",
-        "to": "backlog-route-regenerate",
-        "type": "blocks"
-      },
-      {
-        "from": "sequencer-spawn",
-        "to": "flywheel-sequence-executor",
-        "type": "informs"
-      },
-      {
-        "from": "sequencer-spawn",
-        "to": "backlog-delta-autotrigger",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-route-get",
-        "to": "backlog-route-regenerate",
-        "type": "informs"
-      },
-      {
-        "from": "backlog-route-get",
-        "to": "backlog-operator-fields-route",
-        "type": "informs"
-      },
-      {
-        "from": "backlog-route-get",
-        "to": "backlog-page-wiring",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-page-wiring",
-        "to": "backlog-dag-node",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-dag-node",
-        "to": "backlog-tiering-filters",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-dag-node",
-        "to": "backlog-condition-indicators",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-dag-node",
-        "to": "backlog-operator-gate-ui",
-        "type": "blocks"
-      },
-      {
-        "from": "backlog-operator-fields-route",
-        "to": "backlog-operator-gate-ui",
-        "type": "blocks"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-19-PAN-1866-backlog-sequencer-ai-ranked-whole-backlog-dag-with-a-reproducible-markdown-source-of-truth.vbrief.json"
+      "canonicalFilename": "2026-06-23-PAN-1989-replace-pi-harness-with-oh-my-pi-omp-and-evaluate-advanced-features.vbrief.json"
     }
   }
 }
