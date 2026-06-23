@@ -22,7 +22,7 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['claude-code', 'codex', 'pi']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['claude-code', 'codex', 'pi', 'ohmypi']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();
@@ -43,6 +43,9 @@ describe('shared branding registry', () => {
     rerender(<HarnessLogo harness="pi" />);
     expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
     expect(screen.getByText('π')).toBeInTheDocument();
+
+    rerender(<HarnessLogo harness="ohmypi" />);
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
   });
 
   it('renders every known provider as an inline SVG mark and falls back to a letter badge for unknown providers', () => {

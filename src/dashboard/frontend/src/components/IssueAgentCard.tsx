@@ -238,7 +238,7 @@ export function IssueAgentCard({
   const [pauseReason, setPauseReason] = useState('');
   const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
   const [launchModel, setLaunchModel] = useState(agent.model || defaultModel);
-  const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
+  const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'ohmypi' || getHarness(agent) === 'pi' ? 'ohmypi' : 'claude-code');
   const issueId = inferIssueId(agent);
   const now = useSharedTick();
   const noResumeMode = queryClient.getQueryData<NoResumeMode>(NO_RESUME_QUERY_KEY);
@@ -515,7 +515,7 @@ export function IssueAgentCard({
             <div className="text-sm text-muted-foreground flex items-center gap-2">
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
-                  getHarness(agent) === 'pi'
+                  (getHarness(agent) === 'ohmypi' || getHarness(agent) === 'pi')
                     ? 'bg-purple-500/15 text-purple-300'
                     : 'bg-blue-500/15 text-blue-300'
                 }`}

@@ -105,6 +105,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   'claude-code': { id: 'claude-code', label: 'Claude Code', color: PROVIDER_BRANDS.anthropic.color, Icon: AnthropicIcon },
   codex: { id: 'codex', label: 'Codex', color: PROVIDER_BRANDS.openai.color, Icon: OpenAIIcon },
   pi: { id: 'pi', label: 'Pi', color: '#7c3aed', Icon: PiHarnessIcon },
+  ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

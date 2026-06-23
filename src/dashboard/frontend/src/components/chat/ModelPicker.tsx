@@ -30,6 +30,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-4-6',
   'pi': 'gpt-5.5',
+  'ohmypi': 'gpt-5.5',
   'codex': 'codex-4o',
 };
 

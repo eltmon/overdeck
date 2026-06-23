@@ -4,7 +4,7 @@
 export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'pi' | 'codex';
+export type Harness = 'claude-code' | 'pi' | 'ohmypi' | 'codex';
 export type HarnessOverride = Harness | '';
 
 export interface ProvidersConfig {

@@ -14,7 +14,7 @@ export interface ConversationFeedRow {
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
-  harness?: 'claude-code' | 'pi' | 'codex' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | null;
   archivedAt?: string | null;
   messageCount?: number;
 }
