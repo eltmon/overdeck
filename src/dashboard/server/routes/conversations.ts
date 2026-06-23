@@ -337,7 +337,7 @@ export async function resolveAllowedHarness(requested: unknown, model?: string |
   // command, so persist the matching default harness as the effective value.
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
   try {
     return await resolveHarness({ model, explicit });
   } catch {
@@ -1092,7 +1092,7 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
-  return conv.deliveryMethod ?? (harness === 'pi' ? 'tmux' : 'auto');
+  return conv.deliveryMethod ?? (harness === 'ohmypi' ? 'tmux' : 'auto');
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
@@ -1413,13 +1413,13 @@ export async function spawnConversationSession(
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
     providerEnv = await getProviderEnvForModel(model);
 
-    if (harness === 'pi') {
-      // Preflight: Pi GPT-5.x conversations authenticate with the user's
-      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, Pi
+    if (harness === 'ohmypi') {
+      // Preflight: ohmypi GPT-5.x conversations authenticate with the user's
+      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, omp
       // fails mid-session with the opaque "No API key for provider:
       // openai-codex". Proactively refresh it, and if it can't be revived,
       // fail here with an actionable message. Stays silent (fail-open) when
-      // the auth state can't be determined (e.g. Pi's OAuth module is absent).
+      // the auth state can't be determined (e.g. omp's OAuth module is absent).
       if (getProviderForModelSync(model).name === 'openai') {
         const auth = await getPiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
@@ -1506,7 +1506,7 @@ export async function spawnConversationSession(
   // provider. The user's pi auth (`~/.pi/agent/auth.json`) determines
   // whether the call actually succeeds.
   let launcherModel = model;
-  if (harness === 'pi' && model) {
+  if (harness === 'ohmypi' && model) {
     const piProvider = piProviderForModel(model);
     if (piProvider) launcherModel = `${piProvider}/${model}`;
   }
@@ -2521,7 +2521,7 @@ const postConversationRoute = HttpRouter.add(
             await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
             console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
-            if (harness === 'pi') {
+            if (harness === 'ohmypi') {
               await waitForPiTuiReady(tmuxSession);
             } else if (harness !== 'codex') {
               // Bounded by waitForClaudeReady's existing 30s timeout.
@@ -2709,7 +2709,7 @@ const postConversationResumeRoute = HttpRouter.add(
         try {
           await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
           await waitForTmuxSession(conv.tmuxSession);
-          if (harness === 'pi') {
+          if (harness === 'ohmypi') {
             await waitForPiTuiReady(conv.tmuxSession);
           } else if (harness !== 'codex') {
             await waitForReadySignal(conv.tmuxSession, 30);
@@ -2770,7 +2770,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
         const requestedHarness = body['harness'];
         let harness: RuntimeName = currentHarness;
-        if (requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
+        if (requestedHarness === 'ohmypi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
           if (requestedHarness !== currentHarness) {
             const policyModel = model ?? conv.model ?? '';
             const decision = canUseHarnessSync(
@@ -2881,7 +2881,7 @@ const getConversationMessagesRoute = HttpRouter.add(
                   sessionFile = rollout;
                   setSpecialistSessionCache(name, rollout);
                 }
-              } else if (agentHarness === 'pi') {
+              } else if (agentHarness === 'ohmypi') {
                 const piSession = await resolvePiSessionPath(name);
                 if (piSession) {
                   sessionFile = piSession;
@@ -3715,7 +3715,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
 
-  if (conv.harness === 'pi') {
+  if (conv.harness === 'ohmypi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
     await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
     return;
@@ -3776,11 +3776,11 @@ export async function runForkPipeline(
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
   if (forkMode === 'plain') {
-    if (conv.harness === 'pi' || conv.harness === 'codex') {
+    if (conv.harness === 'ohmypi' || conv.harness === 'codex') {
       // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-      // Pi and Codex cannot consume Claude JSONL, so a plain fork would silently start
+      // ohmypi and Codex cannot consume Claude JSONL, so a plain fork would silently start
       // empty while the pipeline reported success. The summary-fork route already
-      // rejects launchHarness='pi'/'codex'; this guard is defense in depth.
+      // rejects launchHarness='ohmypi'/'codex'; this guard is defense in depth.
       throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
     }
     const tmuxAlive = await forkSessionExists(conv.tmuxSession);
@@ -4161,9 +4161,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
           ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
           : undefined;
-        if (forkMode === 'plain' && (launchHarness === 'pi' || launchHarness === 'codex')) {
+        if (forkMode === 'plain' && (launchHarness === 'ohmypi' || launchHarness === 'codex')) {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-          // Pi and Codex cannot consume Claude JSONL history, so a plain fork would silently
+          // ohmypi and Codex cannot consume Claude JSONL history, so a plain fork would silently
           // start an empty session. Summary forks are fine.
           return jsonResponse({
             error: `Plain forks cannot launch under ${launchHarness} — it cannot consume Claude session history. Use a summary fork instead.`,

@@ -832,13 +832,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // streaming for pi/codex here.
             if (!conv && /^(agent-|planning-|specialist-)/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              if (harness === 'pi') {
-                return streamResolvedFullParseSnapshots(
-                  () => resolvePiSessionPath(input.conversationName),
-                  parsePiConversationMessages,
-                  null,
-                );
-              }
               if (harness === 'ohmypi') {
                 return streamResolvedFullParseSnapshots(
                   () => resolvePiSessionPath(input.conversationName),
@@ -858,14 +851,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
             if (!conv) {
               return conversationDiscoveringStream();
-            }
-
-            if (conv.harness === 'pi') {
-              return streamResolvedFullParseSnapshots(
-                () => resolvePiSessionPath(conv.tmuxSession),
-                parsePiConversationMessages,
-                conv.model ?? null,
-              );
             }
 
             if (conv.harness === 'ohmypi') {
