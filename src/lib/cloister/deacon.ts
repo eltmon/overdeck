@@ -3378,17 +3378,24 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       const branch = `feature/${issueId.toLowerCase()}`;
       let isMerged = false;
 
-      // Check 1: regular merge — branch tip is an ancestor of main
+      // Check 1: diagnostic only. Branch topology alone is not proof of a
+      // completed pipeline merge: a branch created at main with no
+      // implementation commits also satisfies merge-base --is-ancestor. Keep
+      // the stale-merge reconciler PR-backed so re-planning cannot
+      // phantom-merge an already planned issue.
       try {
-        await execFileAsync('git', ['merge-base', '--is-ancestor', branch, 'main'], {
-          cwd: project.projectPath,
-        });
-        isMerged = true;
+        const [branchTip, mainTip] = await Promise.all([
+          execFileAsync('git', ['rev-parse', branch], { cwd: project.projectPath }),
+          execFileAsync('git', ['rev-parse', 'main'], { cwd: project.projectPath }),
+        ]);
+        if (branchTip.stdout.trim() === mainTip.stdout.trim()) {
+          console.log(`[deacon] ${issueId}: branch ${branch} points at main; not treating zero-commit branch as merged`);
+        }
       } catch {
-        // Not a regular merge ancestor — try squash-merge detection
+        // Branch is absent/unreadable — leave merge detection to the PR API.
       }
 
-      // Check 2: squash merge — query GitHub for PR mergedAt/mergeCommit. The
+      // Check 2: query GitHub for PR mergedAt/mergeCommit. The
       // old regex-based detection (`\(PAN-XXXX[ )]` against `git log --pretty=%s`)
       // matched ANY commit that mentioned the issue in a trailer, not just
       // genuine squash merges. That's how PAN-977/945/913/544/457 got

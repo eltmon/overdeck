@@ -263,7 +263,10 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.green(`✓ Verified strike merge: ${reason}`));
 
       const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
-      await postMergeLifecycle(issueId, resolved.projectPath, branchName, { skipDeploy: true });
+      await postMergeLifecycle(issueId, resolved.projectPath, branchName, {
+        skipDeploy: true,
+        allowVerifiedNoPrMerge: true,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Strike post-merge handoff refused for ${issueId}: ${message}`));
