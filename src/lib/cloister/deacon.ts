@@ -237,6 +237,15 @@ export interface DeaconState {
   containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
 }
 
+export type DeaconPatrolHealth = 'running' | 'starting' | 'stale' | 'stopped';
+
+export interface DeaconPatrolFreshness {
+  status: DeaconPatrolHealth;
+  lastPatrol: string | null;
+  secondsSinceLastPatrol: number | null;
+  staleAfterSeconds: number;
+}
+
 /**
  * Result of a health check
  */
@@ -7003,5 +7012,52 @@ export function getDeaconStatus(): {
     isRunning: isDeaconRunning(),
     config: loadConfig(),
     state: loadState(),
+  };
+}
+
+export function assessDeaconPatrolFreshness(
+  params: {
+    isRunning: boolean;
+    lastPatrol?: string;
+    patrolIntervalMs: number;
+    nowMs?: number;
+  }
+): DeaconPatrolFreshness {
+  const staleAfterSeconds = Math.ceil((params.patrolIntervalMs * 3) / 1000);
+  if (!params.isRunning) {
+    return {
+      status: 'stopped',
+      lastPatrol: params.lastPatrol ?? null,
+      secondsSinceLastPatrol: null,
+      staleAfterSeconds,
+    };
+  }
+
+  if (!params.lastPatrol) {
+    return {
+      status: 'starting',
+      lastPatrol: null,
+      secondsSinceLastPatrol: null,
+      staleAfterSeconds,
+    };
+  }
+
+  const nowMs = params.nowMs ?? Date.now();
+  const lastPatrolMs = Date.parse(params.lastPatrol);
+  if (!Number.isFinite(lastPatrolMs)) {
+    return {
+      status: 'stale',
+      lastPatrol: params.lastPatrol,
+      secondsSinceLastPatrol: null,
+      staleAfterSeconds,
+    };
+  }
+
+  const secondsSinceLastPatrol = Math.max(0, Math.floor((nowMs - lastPatrolMs) / 1000));
+  return {
+    status: secondsSinceLastPatrol > staleAfterSeconds ? 'stale' : 'running',
+    lastPatrol: params.lastPatrol,
+    secondsSinceLastPatrol,
+    staleAfterSeconds,
   };
 }

@@ -11,6 +11,7 @@ import {
   checkMassDeath,
   isDeaconRunning,
   getDeaconStatus,
+  assessDeaconPatrolFreshness,
   type DeaconConfig,
   type DeaconState,
 } from '../../../src/lib/cloister/deacon.js';
@@ -273,5 +274,40 @@ describe('Deacon Status', () => {
 
   it('should report not running initially', () => {
     expect(isDeaconRunning()).toBe(false);
+  });
+
+  it('classifies patrol freshness from the persisted heartbeat', () => {
+    const nowMs = Date.parse('2026-06-23T09:32:00.000Z');
+    const fresh = assessDeaconPatrolFreshness({
+      isRunning: true,
+      lastPatrol: '2026-06-23T09:30:30.000Z',
+      patrolIntervalMs: 60_000,
+      nowMs,
+    });
+    expect(fresh.status).toBe('running');
+    expect(fresh.secondsSinceLastPatrol).toBe(90);
+    expect(fresh.staleAfterSeconds).toBe(180);
+
+    const stale = assessDeaconPatrolFreshness({
+      isRunning: true,
+      lastPatrol: '2026-06-23T09:28:30.000Z',
+      patrolIntervalMs: 60_000,
+      nowMs,
+    });
+    expect(stale.status).toBe('stale');
+    expect(stale.secondsSinceLastPatrol).toBe(210);
+
+    expect(assessDeaconPatrolFreshness({
+      isRunning: true,
+      patrolIntervalMs: 60_000,
+      nowMs,
+    }).status).toBe('starting');
+
+    expect(assessDeaconPatrolFreshness({
+      isRunning: false,
+      lastPatrol: '2026-06-23T09:31:00.000Z',
+      patrolIntervalMs: 60_000,
+      nowMs,
+    }).status).toBe('stopped');
   });
 });
