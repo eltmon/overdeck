@@ -133,7 +133,7 @@ export class PiTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'pi')
+        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && (agent.harness === 'pi' || agent.harness === 'ohmypi'))
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);

@@ -42,7 +42,7 @@ import type {
   Agent,
 } from './types.js'
 import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
-import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
+import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypiFifoPaths, OhmypiNotReady } from './ohmypi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
@@ -124,7 +124,7 @@ function resolveLatestOhmypiSessionId(agentId: string): string | null {
   walkJsonl(root, files)
   if (files.length === 0) return null
   files.sort((a, b) => b.mtime - a.mtime)
-  const parsed = parsePiSessionSync(files[0]!.path)
+  const parsed = parseOhmypiSessionSync(files[0]!.path)
   return parsed?.sessionId ?? null
 }
 
@@ -212,14 +212,14 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
   getTokenUsage(agentId: string): TokenUsage | null {
     const session = this.getSessionPath(agentId)
     if (!session) return null
-    const parsed = parsePiSessionSync(session)
+    const parsed = parseOhmypiSessionSync(session)
     return parsed?.usage ?? null
   }
 
   getSessionCost(agentId: string): CostBreakdown | null {
     const session = this.getSessionPath(agentId)
     if (!session) return null
-    const parsed = parsePiSessionSync(session)
+    const parsed = parseOhmypiSessionSync(session)
     if (!parsed) return null
     const totalCost = parsed.cost_v2 ?? parsed.cost ?? 0
     return {
@@ -371,7 +371,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       const files: { path: string; mtime: number }[] = []
       walkJsonl(sessionRoot, files)
       for (const file of files) {
-        const parsed = parsePiSessionSync(file.path)
+        const parsed = parseOhmypiSessionSync(file.path)
         if (!parsed) continue
         sessions.push({
           id: parsed.sessionId,

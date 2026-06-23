@@ -141,7 +141,7 @@ describe('OhmypiRuntime.getSessionCost (AC5)', () => {
   beforeEach(() => { h = withFakeHome() })
   afterEach(() => h.cleanup())
 
-  it('returns a CostBreakdown derived from parsePiSession on the active session', () => {
+  it('returns a CostBreakdown derived from parseOhmypiSession on the active session', () => {
     const r = new OhmypiRuntimeSync()
     const sessRoot = join(h.home, '.overdeck', 'agents', 'agent-D', 'sessions')
     mkdirSync(sessRoot, { recursive: true })
