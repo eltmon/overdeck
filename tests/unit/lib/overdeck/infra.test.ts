@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Effect, Stream } from 'effect';
 
-import { createOverdeckDatabase } from '../../../../scripts/create-overdeck-db.js';
+import { createOverdeckDatabase, OVERDECK_TABLE_COUNT } from '../../../../scripts/create-overdeck-db.js';
 import { openDatabase } from '../../../../src/lib/database/driver.js';
 import {
   CostArchive,
@@ -88,7 +88,7 @@ describe('overdeck infra', () => {
         WHERE type = 'table'
           AND name NOT LIKE 'sqlite_%'
       `).get<{ count: number }>()?.count;
-      expect(tableCount).toBe(32);
+      expect(tableCount).toBe(OVERDECK_TABLE_COUNT);
     } finally {
       raw.close();
     }
