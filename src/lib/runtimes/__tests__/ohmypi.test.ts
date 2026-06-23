@@ -295,6 +295,24 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
     expect(warned).not.toMatch(/session\.id/)
   })
+
+  it('AC(launcher-omp): launcher contains omp binary and no pi --mode invocation', async () => {
+    const agentId = 'agent-omp-binary'
+    const dir = join(h.home, '.overdeck', 'agents', agentId)
+    preCreateReady(agentId)
+
+    const r = new OhmypiRuntimeSync()
+    await r.spawnAgent({
+      agentId,
+      workspace: h.home,
+      model: 'claude-sonnet-4-6',
+      piExtensionPath: '/tmp/fake-extension/dist/index.js',
+    } as any)
+
+    const launcher = require('node:fs').readFileSync(join(dir, 'ohmypi-launcher.sh'), 'utf-8')
+    expect(launcher).toMatch(/\bomp\b/)
+    expect(launcher).not.toMatch(/\bpi --mode\b/)
+  })
 })
 
 describe('OhmypiRuntime.killAgent escalation ladder + cleanup (PAN-1989)', () => {

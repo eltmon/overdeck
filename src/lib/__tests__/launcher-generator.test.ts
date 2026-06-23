@@ -897,6 +897,80 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
   });
 
+  // ─── ohmypi harness tests (PAN-1989) ──────────────────────────────────────────
+
+  it('ohmypi: emits omp --mode rpc with --extension, no --no-context-files, and stdin from fifo (AC1)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'ohmypi',
+      model: 'anthropic/claude-sonnet-4-6',
+      piExtensionPath: '/abs/packages/ohmypi-extension/dist/index.js',
+      piFifoPath: '/home/u/.overdeck/agents/agent-pan-1989/rpc.in',
+      piSessionDir: '/home/u/.overdeck/agents/agent-pan-1989/sessions',
+      promptFile: '/tmp/prompt.txt',
+    });
+    // Binary is omp, not pi.
+    expect(script).toMatch(/exec omp --mode rpc/);
+    expect(script).not.toMatch(/exec pi --mode/);
+    // --no-context-files REMOVED in omp (docs/ohmypi-contract.md).
+    expect(script).not.toMatch(/--no-context-files/);
+    // Extension and session-dir still present.
+    expect(script).toMatch(/--extension '\/abs\/packages\/ohmypi-extension\/dist\/index.js'/);
+    expect(script).toMatch(/--session-dir '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/sessions'/);
+    // FIFO redirection is `<>` (non-blocking), same as pi.
+    expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/rpc\.in'/);
+  });
+
+  it('ohmypi: uses --resume (not --session) for resumeSessionId (AC1, contract)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      spawnMode: 'resume',
+      harness: 'ohmypi',
+      model: 'gpt-5.4-mini',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+      resumeSessionId: 'sess-omp-456',
+    });
+    expect(script).toMatch(/--resume 'sess-omp-456'/);
+    expect(script).not.toMatch(/--session 'sess-omp-456'/);
+  });
+
+  it('ohmypi: wrapWithSupervisor skips supervisor wrapping for ohmypi harness (AC3)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'ohmypi',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+      useSupervisor: true,
+      supervisorScriptPath: '/opt/pty-supervisor.js',
+    });
+    expect(script).toMatch(/exec omp --mode rpc/);
+    expect(script).not.toContain('pty-supervisor.js');
+  });
+
+  it('ohmypi: tui mode omits --mode rpc and FIFO redirect (AC2)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      agentType: 'conversation',
+      harness: 'ohmypi',
+      piMode: 'tui',
+      model: 'gpt-5.4-mini',
+      piSessionDir: '/x/sessions',
+      piExtensionPath: '/x/dist/index.js',
+    });
+    expect(script).not.toMatch(/--mode rpc/);
+    expect(script).not.toMatch(/<> /);
+    expect(script).toMatch(/--session-dir '\/x\/sessions'/);
+    expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
+    expect(script).not.toMatch(/--no-context-files/);
+    expect(script).toMatch(/\bomp\b/);
+  });
+
   // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
 
   it('codex exec mode emits approval_policy=never and workspace sandbox', () => {

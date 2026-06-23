@@ -325,13 +325,10 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       )
     }
 
-    // TODO(PAN-1989 bead launcher-omp): change harness to 'ohmypi' once
-    // generateLauncherScriptSync handles that token (omp binary, --resume,
-    // drops --no-context-files). For now 'pi' produces the correct structure.
     const launcherScript = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
-      harness: 'pi',
+      harness: 'ohmypi',
       piExtensionPath,
       piFifoPath: fifoPath,
       piSessionDir: sessionDir,
