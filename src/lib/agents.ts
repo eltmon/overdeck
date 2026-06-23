@@ -2779,9 +2779,8 @@ export async function buildCavemanExports(
  */
 /**
  * Models that are known-broken for autonomous *work* agents and must never be
- * used to spawn one, even if a project pins them in config. The gate falls back
- * to WORK_AGENT_FALLBACK_MODEL (loudly) for the work role when the model wasn't
- * an explicit per-spawn override.
+ * used to spawn one, even if a project pins them in config. The gate fails
+ * loudly for the work role when the model wasn't an explicit per-spawn override.
  *
  * Empty as of PAN-1584: gpt-5.5 used to wedge at launch with CLIProxy "System
  * messages are not allowed", which was a stale CLIProxyAPI binary (6.9.45)
@@ -2792,8 +2791,6 @@ export async function buildCavemanExports(
  * re-verified in this pass — re-add 'gpt-5.5' here if a Pi init hang resurfaces.)
  */
 const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
-/** Safe fallback when a work agent's resolved model is work-broken. */
-const WORK_AGENT_FALLBACK_MODEL = 'claude-sonnet-4-6';
 
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
   const modelOverride = normalizeModelOverrideSync(options.model);
@@ -2802,16 +2799,16 @@ export function determineModel(options: { model?: string; role?: Role } = {}): s
     : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
 
   // Work-agent safety net: a config pin (or smart-selection) must not spawn a
-  // work agent on a model that is known to wedge for the work role. Fall back
-  // loudly rather than launch a dead agent. Only applies to the work role and
-  // only when the model wasn't an explicit, deliberate per-spawn override.
+  // work agent on a model that is known to wedge for the work role. Fail loudly
+  // rather than launch a dead agent or silently substitute another model. Only
+  // applies to the work role and only when the model wasn't an explicit,
+  // deliberate per-spawn override.
   const role = options.role ?? 'work';
   if (role === 'work' && !modelOverride && WORK_AGENT_BROKEN_MODELS.has(resolved)) {
-    console.warn(
-      `[determineModel] resolved work model "${resolved}" is known-broken for work agents; ` +
-      `falling back to "${WORK_AGENT_FALLBACK_MODEL}". Update roles.work.model in config to silence this.`,
+    throw new Error(
+      `Resolved work model "${resolved}" is known-broken for work agents. ` +
+      'Set roles.work.model to a working model in config.yaml, or pass an explicit --model override.',
     );
-    return WORK_AGENT_FALLBACK_MODEL;
   }
 
   return resolved;

@@ -584,7 +584,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     let settingsModel: string;
     let modelSource: string;
     if (modelOverride) {
-      settingsModel = 'claude-opus-4-7'; // unused — modelOverride wins
+      settingsModel = modelOverride;
       modelSource = 'modelOverride';
     } else {
       settingsModel = resolveModel('plan', undefined, loadConfigSync().config);

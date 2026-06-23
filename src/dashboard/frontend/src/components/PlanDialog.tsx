@@ -127,7 +127,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const defaultPlanningModel = resolveSettingsModelRef(
     settingsQuery.data?.roles?.plan?.model,
     settingsQuery.data?.workhorses,
-  ) || 'claude-opus-4-8';
+  );
   // PAN-1055: Honor the role-level harness override so PlanDialog opens with
   // the harness configured for the plan role under Settings → Roles.
   const defaultPlanningHarness = settingsQuery.data?.roles?.plan?.harness;
@@ -191,7 +191,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     staleTime: 60000,
   });
 
-  const effectivePlanningModel = modelOverride || defaultPlanningModel;
+  const effectivePlanningModel = modelOverride || defaultPlanningModel || '';
   const planningHarnessDecision = canUsePickerHarness(
     harnessOverride,
     effectivePlanningModel,

@@ -103,6 +103,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       providerPlan: {},
       providerHarnesses: {},
       openrouterFavorites: [],
+      defaultConversationModel: 'claude-sonnet-4-6',
       trackerKeys: {},
       tmux: { configMode: 'managed' },
       conversations: {
@@ -153,29 +154,25 @@ describe('getDefaultConversationModelApi', () => {
     mockLoadConfig.mockReturnValue(baseConfig());
   });
 
-  it('defaults to Claude Sonnet when OpenAI is not enabled', async () => {
+  it('returns the explicitly configured default conversation model', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ defaultConversationModel: 'claude-haiku-4-5' }));
+
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('claude-sonnet-4-6');
-    expect(mockResolveModelId).toHaveBeenCalledWith('claude-sonnet-4-6');
+    expect(getDefaultConversationModelApi()).toBe('claude-haiku-4-5');
+    expect(mockResolveModelId).toHaveBeenCalledWith('claude-haiku-4-5');
   });
 
-  it('defaults to GPT-5.5 when OpenAI is enabled', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['anthropic', 'openai']) }));
+  it('fails loudly when default_conversation_model is unset', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      enabledProviders: new Set(['anthropic', 'openai']),
+      defaultConversationModel: undefined,
+    }));
 
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('gpt-5.5');
-    expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.5');
-  });
-
-  it('defaults to Qwen3 Coder Plus when only DashScope is enabled', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['dashscope']) }));
-
-    const { getDefaultConversationModelApi } = await import('../settings-api.js');
-
-    expect(getDefaultConversationModelApi()).toBe('qwen3-coder-plus');
-    expect(mockResolveModelId).toHaveBeenCalledWith('qwen3-coder-plus');
+    expect(() => getDefaultConversationModelApi()).toThrow('No default model configured — set models.default_conversation_model');
+    expect(mockResolveModelId).not.toHaveBeenCalled();
   });
 });
 

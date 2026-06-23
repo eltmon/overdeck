@@ -66,6 +66,19 @@ describe('role model configuration', () => {
     }
   });
 
+  it('honors configured roles.plan.model through the configured expensive workhorse', () => {
+    const { config } = mergeConfigs({
+      workhorses: {
+        expensive: 'gpt-5.5',
+      },
+      roles: {
+        plan: { model: 'workhorse:expensive' },
+      },
+    });
+
+    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.5');
+  });
+
   it('uses sub-role overrides before role-level model refs', () => {
     const config = roleConfig();
 
