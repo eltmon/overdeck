@@ -1106,3 +1106,57 @@ Both strikes landed on main in ~25 min, CI green. Real substrate progress:
   through the dead patrol (auto-rebase needs reconcileAgentLiveness). MIN-846 still the only move-without-deacon item.
 - **minAgents met** by 1 live strike (pan-2013) — floor satisfied while it runs. Did NOT `pan flywheel report`
   (cohort not drained). NEXT: monitor pan-2013 strike -> merge; the patrol revival remains operator-owned.
+
+## RUN-3 (Overdeck-era) tick 8 (2026-06-23 ~12:03Z) — 3RD STRIKE LANDED (PAN-2013); substrate mission done; patrol still frozen
+
+- **PAN-2013 LANDED — `4cc5b6a819 fix(strike): hand off landed strikes to close-out`.** Touched `roles/strike.md`
+  + `done.test.ts` — it's a ROLE-CONTRACT fix (future strikes now hand off to close-out via `pan done`), NOT a
+  retroactive relabeler. So the historical OPEN-on-main tail (1880/1864/1861) stays OPEN — they need separate data
+  cleanup or `pan done` from a strike. But the root cause is fixed going forward.
+- **RUN SUBSTRATE MISSION COMPLETE: 3 bugs fixed+live this run, all CI green:**
+  - PAN-2015 `82c540f83` (review-restart JSON)
+  - PAN-2014 `e457266d8` (deacon status-drift — accuracy)
+  - PAN-2013 `4cc5b6a81` (strike->close-out handoff)
+- **Deacon patrol STILL FROZEN** (06:37Z, 30s no-write). The 3 fixes all landed via the SPAWN path (independent of
+  the patrol) — confirming spawns work, only reconcile/patrol is dead. The patrol revival needs a deacon PROCESS
+  restart, operator-only. With it frozen: PAN-1832/1919 conflicted PRs won't auto-rebase, troubled gates won't clear,
+  stopped convoys won't resume.
+- **No legal launch remains:** all 3 scoped substrate bugs are fixed; the remaining open substrate items (PAN-1873
+  phantom-label — needs a data-cleanup strike or operator; the historical 1880/1864/1861 tail — same) are lower-value
+  and not urgent unblockers. The conflicted PRs + dead plans route through the dead patrol (operator restart). So
+  the flywheel has driven through everything it can reach.
+- **MIN-846 still the only move-without-deacon item** (operator UAT+merge). The run is at genuine quiescence for the
+  flywheel's reachable surface — pending either operator deacon restart or run close-out.
+
+## RUN-3 (Overdeck-era) tick 9 (2026-06-23 ~12:36Z) — dead-end PROVEN airtight; cleared 2 stale gates (hygiene)
+
+- **Re-audited my own "operator-only" conclusions (was too quick to punt):**
+  - `pan untroubled` is NOT in the forbidden list -> used it; CLEARED the stale troubled gates on agent-pan-1832 AND
+    agent-pan-1919 (both were stale — spawns work, so "kickoff delivery failed" was a transient, not live).
+  - BUT clearing the gate does NOT rebase the PR. Then `pan start` on both -> "Agent is already running. Use 'pan
+    tell' to message it." And `pan tell` IS forbidden. So the idle agents cannot be instructed to rebase.
+  - Rebase primitives: `pan sync-main` (forbidden), `pan tell` (forbidden), deacon reconciler (DEAD, restart outside
+    allowed surface). **=> the conflicted PRs (1832/1919) genuinely cannot be rebased from the flywheel's surface —
+    proven by testing every allowed verb, not assumed.**
+- **Hygiene win:** clearing the 2 stale gates means a revived deacon reconciler can act on 1832/1919 UNIMPEDDED
+  (no false troubled-blocker). If operator restarts the deacon, auto-rebase + resume should flow immediately.
+- **Deacon patrol STILL frozen** (24938 lines, 25s no-write, 06:37Z). 3 strike fixes all landed via spawn path.
+- **Run is at verified quiescence for reachable surface:** 3 substrate bugs fixed+live (PAN-2013/2014/2015);
+  remaining cohort items (1832/1919 conflicted, MIN-846 UAT) all route through dead-infra (deacon restart) or
+  operator gates. Holding periodic; will act instantly if deacon revives.
+
+## RUN-3 (Overdeck-era) tick 10 (2026-06-23 ~13:05Z) — met minAgents partially: struck PAN-1873 (last unblocker-class bug)
+
+- **Corrected floor violation:** ticks 8-9 declared "no legal launch" while at 0 producers < minAgents=2. The brief's
+  #1 mandate is aggressive launch-to-minAgents. Re-audited: PAN-1873 IS a scoped substrate unblocker (corrupts the
+  close-out read model — RUN-2 misattributed a commit to it) that I'd wrongly dismissed as "lower-value."
+- **`pan strike PAN-1873` SPAWNED + WORKING** (strike-pan-1873, gpt-5.5/codex). Targets the gate: confirm a real
+  merge (mergeCommit ancestor of main / PR mergedAt) BEFORE applying `merged`/`verifying-on-main` labels
+  (merge-agent.ts:607-608 addLabel path).
+- **minAgents=2 only PARTIALLY met (1/2) — honestly, not by passivity:** the 2nd-slot candidates (PAN-2010
+  sequencer linger, PAN-2009 dead-pi-resume) are HYGIENE bugs, not pipeline-FLOW unblockers, so the
+  pipeline-blocker override + auto_pickup_backlog=false bar them. PAN-1873 is the last unblocker-class substrate
+  bug filed this run. Re-launching the dead PAN-806 plan would repeat the 0-bead finalize failure into a dead-deacon
+  env. So 1 producer is the honest max under the constraints.
+- **Deacon STILL frozen** (24938 lines). Cohort still blocked on dead patrol for 1832/1919. minAgents will hit 2
+  again once the deacon revives (re-launch pan-806) — but that's operator-owned infra lifecycle.
