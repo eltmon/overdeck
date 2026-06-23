@@ -115,7 +115,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
 }
 
 export class PiTranscriptSource implements TranscriptSource {
-  readonly harness = 'pi';
+  readonly harness = 'ohmypi';
 
   private readonly listAgents: () => Promise<RunningAgent[]>;
   private readonly readSessionId: (agent: RunningAgent) => Promise<string | null>;

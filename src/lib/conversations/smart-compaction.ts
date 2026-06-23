@@ -644,7 +644,7 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   const effectiveTimeout = timeoutMs ?? SUMMARY_TIMEOUT_MS;
   const spawnEnv = await buildSpawnEnvForModel(model);
 
-  const child = spawn('pi', [
+  const child = spawn('omp', [
     '--mode', 'rpc',
     '--model', model,
     '--session-dir', sessionDir,

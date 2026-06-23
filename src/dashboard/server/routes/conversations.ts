@@ -993,9 +993,9 @@ export async function handleConversationMessage(
   let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
 
   // PAN-1546: Claude conversations get prompt-time memory via the in-Claude
-  // UserPromptSubmit hook; Pi has no such hook, so inject server-side here for
-  // issue-linked Pi conversations (no-op otherwise).
-  if (harness === 'pi') {
+  // UserPromptSubmit hook; ohmypi has no such hook, so inject server-side here for
+  // issue-linked ohmypi conversations (no-op otherwise).
+  if (harness === 'ohmypi') {
     deliveredMessage = await injectPiConversationMemory(
       { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
       deliveredMessage,

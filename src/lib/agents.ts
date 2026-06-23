@@ -390,7 +390,7 @@ export async function injectPiConversationMemory(
       runId: opts.conversationName,
       sessionId: opts.conversationName,
       agentRole: 'work',
-      agentHarness: 'pi',
+      agentHarness: 'ohmypi',
     };
     const { injectPromptTimeMemory } = await import('./memory/injection.js');
     const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
