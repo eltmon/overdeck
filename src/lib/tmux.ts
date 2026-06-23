@@ -15,6 +15,8 @@ import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 const execFileAsync = promisify(execFile);
 
 const VALID_SESSION_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+const DEFAULT_TMUX_WINDOW_COLS = 200;
+const DEFAULT_TMUX_WINDOW_ROWS = 50;
 
 function validateSessionName(name: string): void {
   if (!VALID_SESSION_NAME_RE.test(name)) {
@@ -469,14 +471,9 @@ function buildNewSessionArgs(
   initialCommand?: string,
   options?: { env?: Record<string, string>; width?: number; height?: number }
 ): string[] {
-  const args = ['new-session', '-d', '-s', name, '-c', cwd];
-
-  if (options?.width !== undefined) {
-    args.push('-x', String(options.width));
-  }
-  if (options?.height !== undefined) {
-    args.push('-y', String(options.height));
-  }
+  const width = options?.width ?? DEFAULT_TMUX_WINDOW_COLS;
+  const height = options?.height ?? DEFAULT_TMUX_WINDOW_ROWS;
+  const args = ['new-session', '-d', '-s', name, '-c', cwd, '-x', String(width), '-y', String(height)];
   if (options?.env) {
     for (const [key, value] of Object.entries(options.env)) {
       args.push('-e', `${key}=${value}`);
@@ -601,7 +598,7 @@ export function createSessionSync(
   name: string,
   cwd: string,
   initialCommand?: string,
-  options?: { env?: Record<string, string> }
+  options?: { env?: Record<string, string>; width?: number; height?: number }
 ): void {
   // PAN-1798: every spawn path must ensure the shared server lives in its
   // dedicated unit before creating a session, so no client becomes the founder.
