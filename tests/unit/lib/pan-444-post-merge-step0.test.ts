@@ -11,16 +11,22 @@ import { join } from 'path';
 const mockUnref = vi.hoisted(() => vi.fn());
 const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
 const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
-const mockExecAsync = vi.hoisted(() => vi.fn(async (cmd: string) => {
-  if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
-  if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
-  if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
-  // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
-  // postMergeLifecycle proceeding past verification, so the gh pr list mock
-  // must report the PR as merged.
-  if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"mergedAt":"2026-04-27T00:00:00Z","mergeCommit":{"oid":"deadbeef"}}]', stderr: '' };
-  return { stdout: '', stderr: '' };
-}));
+const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
+  const defaultExecAsync = async (cmd: string) => {
+    if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
+    if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
+    if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
+    // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
+    // postMergeLifecycle proceeding past verification, so the gh pr list mock
+    // must report the PR as merged.
+    if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"mergedAt":"2026-04-27T00:00:00Z","mergeCommit":{"oid":"deadbeef"}}]', stderr: '' };
+    return { stdout: '', stderr: '' };
+  };
+  return {
+    defaultExecAsync,
+    mockExecAsync: vi.fn(defaultExecAsync),
+  };
+});
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
@@ -147,6 +153,7 @@ const PENDING_FILE = '/tmp/overdeck-test/pending-post-merge.json';
 describe('postMergeLifecycle — step 0 deploy handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExecAsync.mockImplementation(defaultExecAsync);
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);
@@ -208,6 +215,32 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(result).toBeUndefined();
     // If lifecycle ran in-process, it would try to dynamic import lifecycle modules.
     // Since we only mocked spawn and writeFile, reaching this point means it returned early.
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('refuses post-merge lifecycle when no PR exists for the branch', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('allows no-PR lifecycle only when the caller verified the merge separately', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      allowVerifiedNoPrMerge: true,
+    });
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
     expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
@@ -273,6 +306,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 describe('postMergeLifecycle — repoRoot derivation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExecAsync.mockImplementation(defaultExecAsync);
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);
