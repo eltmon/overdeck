@@ -47,6 +47,8 @@ import { resolveHarness } from './harness-resolve.js';
 import { resetPipelineVerdictsForWorkStartSync } from './review-status.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
+import { createOhmypiFifo, ohmypiFifoPaths } from './runtimes/ohmypi-fifo.js';
+import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import { FsError, TmuxError } from './errors.js';
 import { assertIssueHasBeads, BeadsMissingError } from './beads-query.js';
@@ -206,6 +208,36 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
     harness: 'pi',
     piExtensionPath,
     piFifoPath: await Effect.runPromise(createPiFifo(agentId)),
+    piSessionDir: paths.agentDir,
+    model,
+  };
+}
+
+async function getOhmypiLauncherFields(agentId: string, model: string): Promise<{
+  harness: 'pi';
+  piExtensionPath: string;
+  piFifoPath: string;
+  piSessionDir: string;
+  model: string;
+}> {
+  const paths = ohmypiFifoPaths(agentId);
+  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
+  // PAN-1833: resolve from import.meta.url so the path is correct regardless of CWD.
+  // dist files are flat in dist/ so one level up lands at the repo root.
+  const ohmypiExtensionPath = fileURLToPath(
+    new URL('../packages/ohmypi-extension/dist/index.js', import.meta.url)
+  );
+  if (!existsSync(ohmypiExtensionPath)) {
+    throw new Error(
+      `ohmypi extension not built. Run: cd packages/ohmypi-extension && npm run build\n(expected: ${ohmypiExtensionPath})`
+    );
+  }
+  return {
+    // TODO(PAN-1989 bead launcher-omp): change to 'ohmypi' once
+    // generateLauncherScriptSync handles the omp binary and --resume flag.
+    harness: 'pi',
+    piExtensionPath: ohmypiExtensionPath,
+    piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
     model,
   };
@@ -3004,10 +3036,13 @@ export async function buildAgentLaunchConfig(opts: {
   // PAN-1055: pi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getPiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
+  // PAN-1989: ohmypi harness uses getOhmypiLauncherFields() (PAN-1833 fix).
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
   const piLauncherFields = opts.harness === 'pi'
     ? await getPiLauncherFields(opts.agentId, model)
-    : {};
+    : opts.harness === 'ohmypi'
+      ? await getOhmypiLauncherFields(opts.agentId, model)
+      : {};
   const codexLauncherFields = opts.harness === 'codex'
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
     : {};
@@ -3448,7 +3483,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // that silently fell back to Claude shape.
   const piLauncherFields = resolvedHarness === 'pi'
     ? await getPiLauncherFields(agentId, selectedModel)
-    : {};
+    : resolvedHarness === 'ohmypi'
+      ? await getOhmypiLauncherFields(agentId, selectedModel)
+      : {};
   const codexLauncherFields = resolvedHarness === 'codex'
     ? getCodexLauncherFields(agentId, selectedModel, workspace)
     : {};
@@ -4538,7 +4575,9 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     );
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
-      : {};
+      : fallbackHarness === 'ohmypi'
+        ? await getOhmypiLauncherFields(normalizedId, resumeModel)
+        : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
       : {};

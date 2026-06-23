@@ -1,0 +1,29 @@
+{
+  "name": "@overdeck/ohmypi-extension",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Vendored oh-my-pi (omp) extension that emits Overdeck lifecycle signals to ~/.overdeck/agents and ~/.overdeck/heartbeats.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "tsdown": "^0.21.7",
+    "typescript": "catalog:",
+    "vitest": "^4.1.6"
+  }
+}
