@@ -1256,7 +1256,7 @@ Run config: `claude-code` (tag — actual orchestrator is **pi/glm-5.2** per sta
 ## RUN-4 (Overdeck-era) tick 3 + RETROSPECTIVE (2026-06-23 ~15:53Z) — 7 substrate fixes landed; cohort blocked on no-resume (operator)
 
 ### Run output
-- **7 substrate strikes LANDED + closed** (all CI green, ~9-17 min each):
+- **9 substrate strikes LANDED + closed** (all CI green, ~9-17 min each):
   - PAN-2010 `0124944c9` (sequencer-runner linger)
   - PAN-2001 `7b3fa4814` (re-plan phantom-merge — root of the close-out corruption family)
   - PAN-1882 (strike-workspace reaper — deploys on next `pan reload`)
@@ -1264,9 +1264,11 @@ Run config: `claude-code` (tag — actual orchestrator is **pi/glm-5.2** per sta
   - PAN-2009 (dead pi-agent 30s resume timeout)
   - PAN-1931 `79beacea75` (complete-planning `git add -f` bypassing .gitignore)
   - PAN-1993 `f106080241` (planning fresh-issue 404 race)
-- **10 issues CLOSED total** (the 7 above + RUN-3's PAN-2016/2013/1873 carried in as verifying-on-main).
+  - PAN-1888 (work-agent-stop-hook SQLite migration — drop legacy review-status.json)
+  - PAN-1932 (schema migration `=== → >=` user_version downgrade guard)
+- **12 issues CLOSED total** (the 9 above + RUN-3's PAN-2016/2013/1873 carried in as verifying-on-main).
 - **PAN-2017 FILED** (substrate): `pan strike` spawns the agent process but never delivers the task prompt (strike-pan-1897 live repro). Stuck session blocks re-strike via session-name collision.
-- **2 strikes IN-FLIGHT at session end** (PAN-1932 schema user_version guard, PAN-1888 stop-hook SQLite migration) — NEXT RUN: close out when they land.
+- **All 9 launched strikes resolved at session end** (9 landed+closed). No in-flight strikes left for the next run to close.
 - **1 strike STUCK:** PAN-1897 (workspace-prep hang) — trapped by PAN-2017; needs operator `pan kill` to clear before re-strike.
 
 ### The one thing that didn't move: the no-resume freeze (operator-owned)
@@ -1281,5 +1283,5 @@ Run config: `claude-code` (tag — actual orchestrator is **pi/glm-5.2** per sta
 
 ### NEXT RUN / OPERATOR checklist
 - **OPERATOR (unblocks the cohort):** (a) clear OVERDECK_NO_RESUME / click "Resume all" / restart deacon with resume → deacon reconciler auto-rebases 1832/#2003 + 1919/#1950 and resumes stopped convoys (PAN-1879 tracks that this has no clean path today); (b) UAT + merge MIN-846; (c) `pan kill strike-pan-1897` so PAN-1897 can be re-struck cleanly (PAN-2017); (d) `pan reload` to deploy PAN-1882's strike-workspace reaper + PAN-1929's rebase-hazard fix + PAN-2009's pi-resume fix (all landed but not live).
-- **NEXT RUN:** close out PAN-1932 + PAN-1888 when they land; re-strike PAN-1897 after the operator clears its session; once no-resume is cleared, drive 1832/1919 to merge and close MIN-846's tail; then the cohort is drained → `pan flywheel report`.
+- **NEXT RUN:** re-strike PAN-1897 after the operator clears its stuck session; once no-resume is cleared, drive 1832/1919 to merge and close MIN-846's tail; then the cohort is drained → `pan flywheel report`.
 - **Run NOT reported:** cohort is NOT drained (1832/1919/MIN-846 unresolved, operator-gated). Did NOT run `pan flywheel report` — it would falsely declare complete. Run left ACTIVE.
