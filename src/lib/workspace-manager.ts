@@ -309,6 +309,54 @@ function validateFeatureName(name: string): boolean {
 }
 
 /**
+ * Make a `cp -a`-copied Python venv self-contained by pointing its scripts at
+ * the destination venv's OWN interpreter.
+ *
+ * Python venvs are not relocatable: every bin/* console script carries an
+ * absolute `#!<source venv>/bin/python3` shebang, and the activate scripts set
+ * `VIRTUAL_ENV=<source venv>`. Copying a venv to a new path leaves those
+ * pointing at the old location — a repo rename (e.g. panopticon-cli → overdeck)
+ * then breaks every copied script with "bad interpreter: No such file". The
+ * TLDR MCP server silently fails to spawn and the read-enforcer hook silently
+ * no-ops, so every agent pays full token cost on Reads with nothing erroring.
+ *
+ * Rewrites each bin/* shebang and the activate `VIRTUAL_ENV` to the destination
+ * venv's own path. Best-effort and non-fatal: unreadable/binary files skipped.
+ */
+export function relocateVenvScripts(sourceVenv: string, destVenv: string): void {
+  const sourceBin = join(sourceVenv, 'bin');
+  const destBin = join(destVenv, 'bin');
+  const destPy = join(destBin, 'python3');
+  if (!existsSync(destBin) || !existsSync(destPy)) return;
+  for (const entry of readdirSync(destBin)) {
+    const script = join(destBin, entry);
+    try {
+      if (!statSync(script).isFile()) continue;
+      const content = readFileSync(script, 'utf8');
+      const firstLine = content.split('\n', 1)[0] ?? '';
+      if (firstLine.startsWith('#!') && firstLine.includes(sourceBin)) {
+        const restFrom = content.indexOf('\n');
+        writeFileSync(script, `#!${destPy}${restFrom === -1 ? '\n' : content.slice(restFrom)}`);
+      }
+    } catch {
+      // Non-fatal: skip unreadable or binary files.
+    }
+  }
+  for (const name of ['activate', 'activate.csh', 'activate.fish']) {
+    const act = join(destBin, name);
+    if (!existsSync(act)) continue;
+    try {
+      const content = readFileSync(act, 'utf8');
+      if (content.includes(sourceVenv)) {
+        writeFileSync(act, content.split(sourceVenv).join(destVenv));
+      }
+    } catch {
+      // Non-fatal.
+    }
+  }
+}
+
+/**
  * Create a git worktree
  * @param repoPath Path to the source git repository
  * @param targetPath Where to create the worktree
@@ -786,8 +834,15 @@ function copyProjectTemplateDirs(
 
     if (mainVenvExists) {
       // Copy the entire venv from main — faster than pip install (seconds vs 30s+)
-      await execAsync(`cp -a "${join(projectConfig.path, '.venv')}" "${venvPath}"`);
-      result.steps.push('Copied Python venv from main branch');
+      const mainVenvPath = join(projectConfig.path, '.venv');
+      await execAsync(`cp -a "${mainVenvPath}" "${venvPath}"`);
+      // Python venvs are NOT relocatable: `cp -a` preserves the source venv's
+      // absolute interpreter path in every bin/* shebang + activate script.
+      // Rewrite the copy so each script points at the workspace venv's OWN
+      // python — otherwise a repo rename breaks the TLDR MCP server + enforcer
+      // (see relocateVenvScripts docstring).
+      relocateVenvScripts(mainVenvPath, venvPath);
+      result.steps.push('Copied Python venv from main branch (shebangs relocated)');
     } else {
       // Create fresh venv and install llm-tldr
       await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
