@@ -921,6 +921,16 @@ const getUatGenerationsRoute = HttpRouter.add(
   })),
 );
 
+const getUatCandidateRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/uat-candidate',
+  httpHandler(Effect.gen(function* () {
+    const { getUatCandidatePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const payload = yield* Effect.promise(() => getUatCandidatePayload());
+    return jsonResponse(payload);
+  })),
+);
+
 const postUatGenerationStackRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/uat-generations/:name/stack',
@@ -999,6 +1009,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
   getUatGenerationsRoute,
+  getUatCandidateRoute,
   postUatGenerationStackRoute,
   postUatGenerationPromoteRoute,
   postFlywheelAssembleUatRoute,
