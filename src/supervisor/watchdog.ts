@@ -36,7 +36,13 @@ export type SpawnRestartResult = { pid: number | null; error: string | null; don
 export type SpawnRestart = (options?: { restartLockHeld?: boolean }) => SpawnRestartResult | Promise<SpawnRestartResult>;
 export type LogFn = (msg: string) => void | Promise<void>;
 
-type FetchFn = (input: string, init: { signal: AbortSignal }) => Promise<{ ok: boolean; status: number; statusText: string }>;
+type FetchResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  json?: () => Promise<unknown>;
+};
+type FetchFn = (input: string, init: { signal: AbortSignal }) => Promise<FetchResponse>;
 
 interface SupervisorWatchdogDeps {
   config: SupervisorWatchdogConfig;
@@ -53,6 +59,7 @@ interface InternalState {
   lastCheck: string | null;
   consecutiveFailures: number;
   consecutiveHardFailures: number;
+  patrolUnhealthySince: number | null;
   restartAttempts: number[];
   gaveUp: boolean;
   lastError: string | null;
@@ -142,6 +149,7 @@ export class SupervisorWatchdog {
       lastCheck: null,
       consecutiveFailures: 0,
       consecutiveHardFailures: 0,
+      patrolUnhealthySince: null,
       restartAttempts: persistedState.restartAttempts,
       gaveUp: persistedState.gaveUp,
       lastError: null,
@@ -184,7 +192,10 @@ export class SupervisorWatchdog {
   private async runCheck(): Promise<void> {
     const startedAt = this.now();
     const checkedAt = new Date(startedAt).toISOString();
-    const url = `http://127.0.0.1:${this.config.dashboardApiPort}/api/health`;
+    const dashboardBaseUrl = `http://127.0.0.1:${this.config.dashboardApiPort}`;
+    const url = `${dashboardBaseUrl}/api/health`;
+    let restartReason: string | null = null;
+    let restartLogReason: string | null = null;
     try {
       const response = await this.fetchFn(url, {
         signal: AbortSignal.timeout(this.config.requestTimeoutMs),
@@ -192,18 +203,35 @@ export class SupervisorWatchdog {
       if (!response.ok) {
         throw new Error(`health check returned ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
       }
-      const shouldPersistClear = this.state.restartAttempts.length > 0 || this.state.gaveUp;
-      this.state.healthy = true;
-      this.state.lastCheck = checkedAt;
-      this.state.consecutiveFailures = 0;
-      this.state.consecutiveHardFailures = 0;
-      this.state.restartAttempts = [];
-      this.state.gaveUp = false;
-      this.state.lastError = null;
-      if (shouldPersistClear) {
-        await this.persistState();
+
+      const patrolFailure = await this.assessDeaconPatrol(dashboardBaseUrl, startedAt);
+      if (patrolFailure) {
+        this.state.healthy = false;
+        this.state.lastCheck = checkedAt;
+        this.state.consecutiveFailures += 1;
+        this.state.consecutiveHardFailures = 0;
+        this.state.lastError = patrolFailure.message;
+        if (!patrolFailure.restartReady) return;
+        restartReason = patrolFailure.reason;
+        restartLogReason = patrolFailure.logReason;
+      } else {
+        this.state.patrolUnhealthySince = null;
       }
-      return;
+
+      if (!restartReason) {
+        const shouldPersistClear = this.state.restartAttempts.length > 0 || this.state.gaveUp;
+        this.state.healthy = true;
+        this.state.lastCheck = checkedAt;
+        this.state.consecutiveFailures = 0;
+        this.state.consecutiveHardFailures = 0;
+        this.state.restartAttempts = [];
+        this.state.gaveUp = false;
+        this.state.lastError = null;
+        if (shouldPersistClear) {
+          await this.persistState();
+        }
+        return;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.state.healthy = false;
@@ -211,22 +239,27 @@ export class SupervisorWatchdog {
       this.state.consecutiveFailures += 1;
       this.state.consecutiveHardFailures = isTimeoutError(error) ? 0 : this.state.consecutiveHardFailures + 1;
       this.state.lastError = message;
+
+      // Dead vs busy: hard failures (refused/reset/non-OK) restart at
+      // failThreshold; timeout-only streaks wait for busyFailThreshold so a
+      // server starved by verification gates isn't killed mid-pipeline.
+      const hardDown = this.state.consecutiveHardFailures >= this.config.failThreshold;
+      const busyStarved = this.state.consecutiveFailures >= this.config.busyFailThreshold;
+      if (!hardDown && !busyStarved) {
+        if (this.state.consecutiveFailures === this.config.failThreshold) {
+          await this.log(
+            `watchdog: dashboard slow but alive (${this.state.lastError ?? 'timeout'}) — `
+            + `${this.state.consecutiveFailures} consecutive timeouts; deferring restart until ${this.config.busyFailThreshold}`,
+          );
+        }
+        return;
+      }
+      restartReason = hardDown
+        ? `dashboard unreachable: ${this.state.lastError ?? 'health check failed'}`
+        : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`;
+      restartLogReason = hardDown ? 'dashboard unreachable' : 'sustained timeouts — dashboard starved';
     }
 
-    // Dead vs busy: hard failures (refused/reset/non-OK) restart at
-    // failThreshold; timeout-only streaks wait for busyFailThreshold so a
-    // server starved by verification gates isn't killed mid-pipeline.
-    const hardDown = this.state.consecutiveHardFailures >= this.config.failThreshold;
-    const busyStarved = this.state.consecutiveFailures >= this.config.busyFailThreshold;
-    if (!hardDown && !busyStarved) {
-      if (this.state.consecutiveFailures === this.config.failThreshold) {
-        await this.log(
-          `watchdog: dashboard slow but alive (${this.state.lastError ?? 'timeout'}) — `
-          + `${this.state.consecutiveFailures} consecutive timeouts; deferring restart until ${this.config.busyFailThreshold}`,
-        );
-      }
-      return;
-    }
     this.pruneRestartAttempts(startedAt);
     await this.persistState();
     if (this.state.gaveUp) return;
@@ -244,7 +277,7 @@ export class SupervisorWatchdog {
         durationMs: this.now() - startedAt,
         attempts: this.state.restartAttempts.length,
         gaveUp: true,
-        reason: hardDown ? 'dashboard unreachable' : 'sustained health-probe timeouts',
+        reason: restartReason ?? restartLogReason ?? 'dashboard health check failed',
         pid: process.pid,
       }));
       return;
@@ -260,7 +293,7 @@ export class SupervisorWatchdog {
     await this.persistState();
     await this.log(
       `watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures `
-      + `(${hardDown ? 'dashboard unreachable' : 'sustained timeouts — dashboard starved'})`,
+      + `(${restartLogReason ?? 'dashboard health check failed'})`,
     );
 
     let restartError: string | null = null;
@@ -287,9 +320,7 @@ export class SupervisorWatchdog {
       error: restartError ?? undefined,
       durationMs: this.now() - startedAt,
       attempts: this.state.restartAttempts.length,
-      reason: hardDown
-        ? `dashboard unreachable: ${this.state.lastError ?? 'health check failed'}`
-        : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`,
+      reason: restartReason ?? 'dashboard health check failed',
       pid: process.pid,
     }));
     if (restartError) {
@@ -300,6 +331,67 @@ export class SupervisorWatchdog {
   private pruneRestartAttempts(now: number): void {
     const cutoff = now - this.config.windowMs;
     this.state.restartAttempts = this.state.restartAttempts.filter((ts) => ts >= cutoff);
+  }
+
+  private async assessDeaconPatrol(
+    dashboardBaseUrl: string,
+    nowMs: number,
+  ): Promise<{ message: string; restartReady: boolean; reason: string; logReason: string } | null> {
+    const response = await this.fetchFn(`${dashboardBaseUrl}/api/deacon/status`, {
+      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`deacon status check returned ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
+    }
+    if (!response.json) {
+      throw new Error('deacon status check returned no JSON body');
+    }
+
+    const status = await response.json();
+    const record = status && typeof status === 'object' ? status as Record<string, unknown> : {};
+    const isRunning = record.isRunning === true;
+    if (!isRunning) {
+      this.state.patrolUnhealthySince = null;
+      return null;
+    }
+
+    const config = record.config && typeof record.config === 'object' ? record.config as Record<string, unknown> : {};
+    const state = record.state && typeof record.state === 'object' ? record.state as Record<string, unknown> : {};
+    const interval = typeof config.patrolIntervalMs === 'number' && Number.isFinite(config.patrolIntervalMs) && config.patrolIntervalMs > 0
+      ? config.patrolIntervalMs
+      : 60_000;
+    const staleAfterMs = interval * 3;
+    const lastPatrol = typeof state.lastPatrol === 'string' ? state.lastPatrol : null;
+
+    if (!lastPatrol) {
+      this.state.patrolUnhealthySince ??= nowMs;
+      const unhealthyForMs = nowMs - this.state.patrolUnhealthySince;
+      return {
+        message: `deacon patrol heartbeat missing for ${Math.floor(unhealthyForMs / 1000)}s`,
+        restartReady: unhealthyForMs > staleAfterMs,
+        reason: `deacon patrol heartbeat missing for >${Math.ceil(staleAfterMs / 1000)}s`,
+        logReason: 'deacon patrol heartbeat missing',
+      };
+    }
+
+    const lastPatrolMs = Date.parse(lastPatrol);
+    if (!Number.isFinite(lastPatrolMs)) {
+      return {
+        message: `deacon patrol heartbeat invalid: ${lastPatrol}`,
+        restartReady: true,
+        reason: `deacon patrol heartbeat invalid: ${lastPatrol}`,
+        logReason: 'deacon patrol heartbeat invalid',
+      };
+    }
+
+    const ageMs = Math.max(0, nowMs - lastPatrolMs);
+    if (ageMs <= staleAfterMs) return null;
+    return {
+      message: `deacon patrol heartbeat stale for ${Math.floor(ageMs / 1000)}s`,
+      restartReady: true,
+      reason: `deacon patrol heartbeat stale for ${Math.floor(ageMs / 1000)}s (threshold ${Math.ceil(staleAfterMs / 1000)}s)`,
+      logReason: 'deacon patrol heartbeat stale',
+    };
   }
 
   private async persistState(): Promise<void> {

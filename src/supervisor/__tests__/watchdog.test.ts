@@ -24,12 +24,18 @@ function makeWatchdog(overrides: Partial<{
   logs: string[];
   fetchOk: boolean;
   fetchTimeout: boolean;
+  deaconStatus: unknown;
   config: SupervisorWatchdogConfig;
 }> = {}): SupervisorWatchdog {
   const spawns = overrides.spawns ?? { count: 0 };
   const logs = overrides.logs ?? [];
   const fetchOk = overrides.fetchOk ?? false;
   const fetchTimeout = overrides.fetchTimeout ?? false;
+  const deaconStatus = overrides.deaconStatus ?? {
+    isRunning: true,
+    config: { patrolIntervalMs: 60_000 },
+    state: { lastPatrol: '2026-05-17T15:29:00.000Z' },
+  };
   return new SupervisorWatchdog({
     config: overrides.config ?? config,
     now: overrides.now ?? (() => Date.parse('2026-05-17T15:30:00.000Z')),
@@ -38,7 +44,15 @@ function makeWatchdog(overrides: Partial<{
       spawns.count += 1;
       return { pid: 1000 + spawns.count, error: null };
     },
-    fetchFn: async () => {
+    fetchFn: async (input) => {
+      if (input.endsWith('/api/deacon/status')) {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => deaconStatus,
+        };
+      }
       if (fetchTimeout) throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
       return fetchOk
         ? { ok: true, status: 200, statusText: 'OK' }
@@ -144,6 +158,59 @@ describe('SupervisorWatchdog', () => {
       gaveUp: false,
     });
     expect(recovered.status().restartAttempts).toEqual([]);
+  });
+
+  it('restarts when dashboard health is OK but deacon patrol heartbeat is stale', async () => {
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      fetchOk: true,
+      now: () => Date.parse('2026-05-17T15:35:00.000Z'),
+      deaconStatus: {
+        isRunning: true,
+        config: { patrolIntervalMs: 60_000 },
+        state: { lastPatrol: '2026-05-17T15:30:00.000Z' },
+      },
+    });
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 1,
+      consecutiveHardFailures: 0,
+    });
+    expect(watchdog.status().lastError).toContain('deacon patrol heartbeat stale');
+    expect(logs.some((msg) => msg.includes('deacon patrol heartbeat stale'))).toBe(true);
+  });
+
+  it('waits three patrol intervals before restarting a missing initial patrol heartbeat', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      now: () => now,
+      deaconStatus: {
+        isRunning: true,
+        config: { patrolIntervalMs: 60_000 },
+        state: {},
+      },
+    });
+
+    await watchdog.checkOnce();
+    now += 180_000;
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(0);
+
+    now += 1_000;
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(watchdog.status().lastError).toContain('deacon patrol heartbeat missing');
   });
 
   it('preserves the restart cap across supervisor restarts', async () => {
