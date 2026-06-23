@@ -1196,3 +1196,46 @@ Both strikes landed on main in ~25 min, CI green. Real substrate progress:
   worked and gh auth is healthy for eltmon (keyring). Strikes unaffected (the 4 prior strikes + this one spawned fine).
 - **NOTE:** even when PAN-2016 lands, it won't revive the CURRENT dead deacon (deploy needs pan reload, operator), and
   it's prevention not cure. But it's the brief-correct follow-through (fix the substrate so this class never recurs).
+
+## RUN-4 (Overdeck-era) tick 1 (2026-06-23 ~14:43Z) — KEY CORRECTION: patrol is ALIVE, the freeze is no-resume; closed 3, struck 2
+
+Run config: `claude-code` (tag — actual orchestrator is **pi/glm-5.2** per state.json, same discrepancy RUN-3 noted), `effort=high`,
+`minAgents=2`, `maxAgents=20`, `scope=all-tracked-projects`, `auto_pickup_backlog=false`, `require_uat_before_merge=true`.
+
+- **KEY CORRECTION TO RUN-3's "dead patrol" diagnosis.** RUN-3 concluded the deacon patrol was DEAD (deacon.log frozen at 06:37Z).
+  THIS RUN the patrol is **ALIVE** — `~/.overdeck/logs/deacon.log` (path MOVED from `~/.overdeck/deacon.log` during the rename)
+  is advancing ~every 60s (mtime current), and PAN-2016's auto-restart fix (`00563281f8`) is now on main. BUT the deacon process
+  (PID 1098133) carries **`OVERDECK_NO_RESUME=1`**, so every patrol cycle logs `OVERDECK_NO_RESUME=1 — skipping
+  reconcileAgentLiveness`. **THE ACTUAL FREEZE = no-resume, not a dead patrol.** PAN-1963 made no-resume the DEFAULT on dashboard
+  boot (with a planned "Resume all" banner escape hatch that isn't built yet). Effect is identical to a dead patrol: conflicted PRs
+  (1832/1919) never auto-rebase, stopped convoys never resume, troubled gates never clear. The two read/UI-peer dashboard procs
+  (885151/2277912) correctly carry `OVERDECK_DISABLE_DEACON=1` (single-deacon rule — NOT dueling deacons).
+- **OPEN QUESTION (non-blocking, surfaced in status):** is the no-resume clean-slate intended for this run, or should the operator
+  click "Resume all"/restart the deacon with resume so the reconciler auto-heals 1832/1919? **PAN-1879 already tracks the asymmetry**
+  ("pan restart silently re-applies stale boot gates; no way to re-enable deacon/resume") — did NOT file a duplicate. Restarting the
+  deacon is outside the flywheel's allowed surface (`pan up`/`restart`/`reload` forbidden), so this genuinely routes to the operator.
+- **Drove through everything reachable (no passivity — the RUN-3 ticks 3-4 lesson):**
+  - **Closed out 3 RUN-3 fixes** now that main is GREEN (RUN-3 held them during red main): **PAN-2016, PAN-2013, PAN-1873** — all
+    confirmed REAL merges (ancestor-of-main via `git merge-base --is-ancestor`), `pan close --force` succeeded (worktrees/agent-state/
+    strike-branches removed, issues CLOSED on GitHub). Minor non-fatal rename fallout: close-out label step fails on `'in-planning' not
+    found` and the transition log says `eltmon/panopticon-cli` (legacy name) while label update hits `eltmon/overdeck` — both PAN-1964
+    rename residue, non-blocking.
+  - **Struck 2 scoped substrate bugs** (minAgents=2 met; spawn path works WITHOUT the reconciler, re-confirmed): **PAN-2010**
+    (sequencer-runner one-shot lingers — LIVE right now, glm-5.2 session 1004min) + **PAN-1897** (pan start workspace-prep hangs >120s
+    on re-entry — blocks PAN-1711/1827). Both codex/gpt-5.5, provider default (no --harness forced).
+- **Main is solidly GREEN** (last 12 CI runs all `success`; latest d938dd376f8e `feat(cockpit)` in-progress). So the critical
+  "main RED" bugs **PAN-1857/1859/1880 are NOT currently red** — they're fixed-or-latent-flaky. Did NOT strike speculatively;
+  surfaced as medium `investigate` (verify fixed→close, or isolate the flake). Red main was the RUN-1/2/3 P0; it is gone.
+- **Merge gate:** only **MIN-846** readyForMerge (review+test passed) → human UAT+merge gate (require_uat=true). **PAN-1832 (#2003)**
+  + **PAN-1919 (#1950)** still CONFLICTING/DIRTY — both need a rebase that is barred from this role (no-resume reconciler /
+  `pan sync-main` forbidden / work agents idle-and-cannot-be-told). Proven dead-end, same as RUN-3.
+- **Phantom-label family still open:** PAN-1849/1992/1224 (merged tag, no real merge — PAN-1873 root cause, fixed going-forward
+  only). Do NOT `pan close` (verify-merged gate rejects). Needs data cleanup or re-plan — low priority.
+- **System healthy:** RAM 31.4/64.1 GB, swap 7.9/8.2 GB (cold-page eviction, ample free RAM). 9 active agents < cap 20.
+- **DURABLE LESSON (deacon.log path + no-resume vs dead-patrol):** (1) the deacon log moved to `~/.overdeck/logs/deacon.log`
+  post-rename — monitor that path, not the old `~/.overdeck/deacon.log`. (2) Before declaring "dead patrol", grep the log for
+  `skipping reconcileAgentLiveness` — an ALIVE patrol in no-resume mode produces the EXACT same pipeline freeze as a dead one.
+  The discriminator is log-mtime (advancing = alive) + the no-resume skip line (present = frozen-by-design). (3) `pan close`'s
+  non-fatal `'in-planning' label not found` is harmless rename fallout.
+- **NEXT TICK:** monitor strike-pan-2010 + strike-pan-1897 → merge; if either self-aborts (too broad), launch `pan plan --auto`
+  same tick. Watch MIN-846 for operator UAT. If operator clears no-resume → verify 1832/1919 auto-rebase. Re-snapshot.
