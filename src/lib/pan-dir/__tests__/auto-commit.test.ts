@@ -23,8 +23,7 @@ describe('auto-commit', () => {
     execSync('git commit -q -m "init"', { cwd: tmp });
     // Rename whatever the default branch is to `main` so the gate fires.
     execSync('git branch -M main', { cwd: tmp });
-    // Add a self-referencing origin so git pull --rebase origin main works
-    // (the auto-commit pulls before staging to prevent local/remote divergence).
+    // Add a self-referencing origin so the auto-commit fetch has a remote.
     execSync('git remote add origin .', { cwd: tmp });
   });
 
@@ -94,6 +93,52 @@ describe('auto-commit', () => {
 
       expect(result.committed).toBe(false);
       expect(result.reason).toBe('no diff');
+    }),
+  );
+
+  it.effect('does not rebase or move local commits when origin/main is ahead (PAN-1929)', () =>
+    Effect.gen(function* () {
+      const remoteTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-remote-'));
+      const otherTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-other-'));
+      try {
+        execSync('git init --bare -q', { cwd: remoteTmp });
+        execSync(`git remote set-url origin ${remoteTmp}`, { cwd: tmp });
+        execSync('git push -q -u origin main', { cwd: tmp });
+
+        execSync(`git clone -q -b main ${remoteTmp} ${otherTmp}`);
+        execSync('git config user.email t@e.t', { cwd: otherTmp });
+        execSync('git config user.name "Test"', { cwd: otherTmp });
+        execSync('git config commit.gpgsign false', { cwd: otherTmp });
+        writeFileSync(join(otherTmp, 'UPSTREAM.md'), 'remote change');
+        execSync('git add UPSTREAM.md', { cwd: otherTmp });
+        execSync('git commit -q -m "upstream change"', { cwd: otherTmp });
+        execSync('git push -q origin main', { cwd: otherTmp });
+
+        const localBase = execSync('git rev-parse HEAD', { cwd: tmp, encoding: 'utf-8' }).trim();
+        mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+        const path = join(tmp, '.pan', 'continues', 'pan-1929.vbrief.json');
+        writeFileSync(path, '{"issue":"PAN-1929"}');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-1929' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        const commitParent = execSync('git rev-parse HEAD^', { cwd: tmp, encoding: 'utf-8' }).trim();
+        const remoteHead = execSync('git rev-parse origin/main', { cwd: tmp, encoding: 'utf-8' }).trim();
+        let remoteIsAncestor = true;
+        try {
+          execSync('git merge-base --is-ancestor origin/main HEAD', { cwd: tmp });
+        } catch {
+          remoteIsAncestor = false;
+        }
+
+        expect(commitParent).toBe(localBase);
+        expect(remoteHead).not.toBe(localBase);
+        expect(remoteIsAncestor).toBe(false);
+      } finally {
+        rmSync(remoteTmp, { recursive: true, force: true });
+        rmSync(otherTmp, { recursive: true, force: true });
+      }
     }),
   );
 
