@@ -2,10 +2,12 @@ import { useState } from 'react'
 import {
   Compass, Code2, Eye, FlaskConical, GitMerge, Zap, Archive,
   ShieldCheck, Lock, Gauge, ClipboardList, Layers, BadgeCheck,
-  ChevronRight, ChevronDown, GitPullRequest, GitBranch, Box,
+  ChevronRight, ChevronDown, GitPullRequest, GitBranch,
   CircleCheck, CircleX, Circle, type LucideIcon,
 } from 'lucide-react'
-import { useReviewStatusQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
+import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackStatus'
 import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import type { SessionNode } from '@overdeck/contracts'
 import styles from './agentsLane.module.css'
@@ -182,37 +184,106 @@ function Row({
   )
 }
 
-function ResourcesSummary({ feature, branch }: { feature?: ProjectFeature; branch: string }) {
+/**
+ * StackDrawer (PAN-1991 #8) — the workspace stack, pinned to the bottom of the
+ * lane. Replaces the old "Resources" placeholder: same place, collapsed by
+ * default, but a real stack panel — health-led summary, service URLs, live
+ * per-container status (reusing UatStackStatus), git ahead/behind/dirty, PRs,
+ * and the real registry actions. Additive over the old drawer; the only swaps
+ * are the "Resources"→"Stack" rename and trading the raw branch count for
+ * branch + ahead/behind. Honest to the data: no cpu/mem, no per-container
+ * logs/restart; actions are stack-level.
+ */
+function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: ProjectFeature; branch: string }) {
   const [open, setOpen] = useState(false)
+  const ws = useWorkspaceQuery(issueId).data
+  const actions = useIssueActions(issueId)
   const rd = feature?.resourceDetails
-  const containers = rd?.dockerContainerCount ?? 0
   const prs = rd?.prs ?? []
-  const branches = (rd?.localBranchCount ?? 0) + (rd?.remoteBranchCount ?? 0)
-  if (!rd) return null
+  if (!ws?.exists && !rd) return null
+
+  const containers = ws?.containers ?? null
+  const stackHealth = ws?.stackHealth
+  const summary = getUatStackSummary({ containers, stackHealth })
+  const total = summary?.totalCount ?? 0
+  const unhealthy = !!summary && (stackHealth?.healthy === false || summary.healthyCount < summary.totalCount)
+  const healthColor = !summary ? 'var(--muted-foreground)' : unhealthy ? 'var(--destructive)' : 'var(--success)'
+
+  const git = ws?.git
+  const branchName = git?.branch ?? branch
+  const ahead = git?.ahead ?? 0
+  const behind = git?.behind ?? 0
+
+  const services = (ws?.services?.filter((s) => s.url) ?? []).slice()
+  if (services.length === 0) {
+    if (ws?.frontendUrl) services.push({ name: 'Frontend', url: ws.frontendUrl })
+    if (ws?.apiUrl) services.push({ name: 'API', url: ws.apiUrl })
+  }
+
+  const stackActions = ['rebuildAndStart', 'syncMain', 'createWorkspace']
+    .map((key) => actions.all.find((v) => v.action.key === key))
+    .filter((v): v is IssueActionView => !!v && v.enabled)
+
   return (
     <div className={styles.resources}>
       <button type="button" className={styles.resToggle} onClick={() => setOpen((v) => !v)}>
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-        Resources
-        <span className="sum">{containers} containers · {prs.length} PR · {branches} branches</span>
+        Stack
+        <span className="sum" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span className={styles.dot} style={{ background: healthColor }} />
+          {total > 0 ? `${total} ctr` : 'no ctr'}{ahead > 0 ? ` · +${ahead}` : ''} · {prs.length} PR
+        </span>
       </button>
       {open && (
         <div className={styles.resList}>
-          {prs.length > 0 && <div className={styles.resSub}>Pull requests</div>}
-          {prs.map((pr) => (
-            <div key={pr.number} className={styles.resRow}>
-              <GitPullRequest className="ri" />
-              <span>#{pr.number}</span>
-              <span className="rmeta">{pr.isDraft ? 'draft' : pr.state.toLowerCase()}</span>
-            </div>
-          ))}
-          <div className={styles.resSub}>Branch</div>
-          <div className={styles.resRow}><GitBranch className="ri" /><span style={{ fontFamily: 'var(--mono)', fontSize: '10px' }}>{branch}</span><span className="rmeta">{branches}</span></div>
-          {containers > 0 && (
+          {services.length > 0 && (
             <>
-              <div className={styles.resSub}>Containers</div>
-              <div className={styles.resRow}><Box className="ri" /><span>{containers} running</span><span className="rmeta">actions → Stack</span></div>
+              <div className={styles.resSub}>Services</div>
+              <div className={styles.resRow} style={{ gap: 12 }}>
+                {services.map((s) => (
+                  <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" className={styles.resLink}>{s.name} ↗</a>
+                ))}
+              </div>
             </>
+          )}
+
+          {(containers || stackHealth) && (
+            <>
+              <div className={styles.resSub}>Containers{total ? ` · ${total}` : ''}</div>
+              <UatStackStatus density="compact" containers={containers} stackHealth={stackHealth} frontendUrl={ws?.frontendUrl} apiUrl={ws?.apiUrl} />
+            </>
+          )}
+
+          {prs.length > 0 && (
+            <>
+              <div className={styles.resSub}>Pull requests</div>
+              {prs.map((pr) => (
+                <div key={pr.number} className={styles.resRow}>
+                  <GitPullRequest className="ri" />
+                  <span>#{pr.number}</span>
+                  <span className="rmeta">{pr.isDraft ? 'draft' : pr.state.toLowerCase()}</span>
+                </div>
+              ))}
+            </>
+          )}
+
+          <div className={styles.resSub}>Git</div>
+          <div className={styles.resRow}>
+            <GitBranch className="ri" />
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '10px' }}>{branchName}</span>
+            <span className="rmeta">
+              {ahead > 0 ? `+${ahead}` : ''}{behind > 0 ? ` -${behind}` : ''}{git?.dirty ? ' dirty' : (!ahead && !behind ? 'clean' : '')}
+            </span>
+          </div>
+
+          {stackActions.length > 0 && (
+            <div className={styles.resActions}>
+              {stackActions.map((v) => (
+                <button key={v.action.key} type="button" disabled={v.isPending} onClick={v.invoke} className={styles.resBtn}>
+                  {v.action.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -308,7 +379,7 @@ export function AgentsLane({
           sub={formatDur(s.duration)} selected={s.sessionId === selectedSessionId} onClick={() => onSelectSession(s)} />
       ))}
 
-      <ResourcesSummary feature={feature} branch={branch} />
+      <StackDrawer issueId={issueId} feature={feature} branch={branch} />
     </div>
   )
 }
