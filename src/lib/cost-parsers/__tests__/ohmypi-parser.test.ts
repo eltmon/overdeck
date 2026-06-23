@@ -23,6 +23,19 @@ describe('parseOhmypiSession (PAN-1989)', () => {
     expect(keys.length).toBeGreaterThan(0)
   })
 
+  it('AC1: cache tokens (cacheRead, cacheWrite) are captured in totals and per-model breakdown', () => {
+    const result = parseOhmypiSessionSync(join(FIXTURES, 'rpc-toolcall.jsonl'))
+    expect(result).not.toBeNull()
+    // Fixture has cacheRead:0, cacheWrite:0 — verify fields are present (not undefined).
+    expect(typeof result!.usage.cacheReadTokens).toBe('number')
+    expect(typeof result!.usage.cacheWriteTokens).toBe('number')
+    // Per-model breakdown also carries cache tokens (ohmypi-specific extension).
+    const modelEntry = Object.values(result!.modelBreakdown ?? {}).at(0)
+    expect(modelEntry).toBeDefined()
+    expect(typeof modelEntry!.cacheReadTokens).toBe('number')
+    expect(typeof modelEntry!.cacheWriteTokens).toBe('number')
+  })
+
   it('returns null for a non-existent file', () => {
     expect(parseOhmypiSessionSync('/nonexistent/session.jsonl')).toBeNull()
   })

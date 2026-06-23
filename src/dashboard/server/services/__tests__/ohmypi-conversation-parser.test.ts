@@ -39,4 +39,19 @@ describe('parseOhmypiConversationMessages — tool-call join (PAN-1989)', () => 
     expect(readEntry!.tone).not.toBe('error');
     expect(readEntry!.label).toBe('read');
   });
+
+  it('AC2: preserves toolCall arguments so the work-log carries structured input (path for read tool)', async () => {
+    const result = await parseOhmypiConversationMessages(fixture);
+    const readEntry = result.workLog.find((e) => e.toolTitle === 'read');
+    expect(readEntry).toBeDefined();
+    // toolInput must be the arguments object from the toolCall block.
+    expect(readEntry!.toolInput).toEqual({ path: '/tmp/omp-rpc/proj/v.txt' });
+  });
+
+  it('AC2: result text is captured for the tool-result work-log entry', async () => {
+    const result = await parseOhmypiConversationMessages(fixture);
+    const readEntry = result.workLog.find((e) => e.toolTitle === 'read');
+    expect(readEntry).toBeDefined();
+    expect(readEntry!.result).toContain('pi version is 0.79.0');
+  });
 });

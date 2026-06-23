@@ -226,7 +226,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
   let costRecomputedFromTokens = 0;
   const modelBreakdown: Record<
     string,
-    { cost: number; inputTokens: number; outputTokens: number; messageCount: number }
+    { cost: number; inputTokens: number; outputTokens: number; messageCount: number; cacheReadTokens?: number; cacheWriteTokens?: number }
   > = {};
   const modelsInOrder: string[] = [];
   let compactionCount = 0;
@@ -265,7 +265,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     messageCount += 1;
 
     if (!modelBreakdown[model]) {
-      modelBreakdown[model] = { cost: 0, inputTokens: 0, outputTokens: 0, messageCount: 0 };
+      modelBreakdown[model] = { cost: 0, inputTokens: 0, outputTokens: 0, messageCount: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
       modelsInOrder.push(model);
     }
     const slot = modelBreakdown[model]!;
@@ -273,6 +273,8 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     slot.inputTokens += input;
     slot.outputTokens += output;
     slot.messageCount += 1;
+    slot.cacheReadTokens = (slot.cacheReadTokens ?? 0) + cacheRead;
+    slot.cacheWriteTokens = (slot.cacheWriteTokens ?? 0) + cacheWrite;
   }
 
   // Observability: log Pi-inline-cost vs locally-recomputed-from-cost-fields
