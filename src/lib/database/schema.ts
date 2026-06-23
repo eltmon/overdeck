@@ -740,8 +740,8 @@ export function initSchema(db: SqliteDatabase): void {
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
-  if (currentVersion === SCHEMA_VERSION) {
-    return; // Already at latest version
+  if (currentVersion >= SCHEMA_VERSION) {
+    return; // Already at or ahead of this build's schema version
   }
 
   if (currentVersion === 0) {
