@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wrench } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -288,6 +288,33 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
 
+  // PAN-1991 #8: the raw-transcript path (TUI / pi agents, no JSONL) has no
+  // auto-scroll. Land at the newest line when an agent is opened, and stick to
+  // the bottom as the transcript grows unless the operator scrolled up. (The
+  // JSONL/ConversationPanel path already resets via MessagesTimeline.)
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const transcriptPinnedRef = useRef(true);
+  const prevTranscriptSessionRef = useRef<string | null>(null);
+  const onTranscriptScroll = useCallback(() => {
+    const el = transcriptRef.current;
+    if (!el) return;
+    transcriptPinnedRef.current = el.scrollHeight - el.clientHeight - el.scrollTop < 48;
+  }, []);
+  useLayoutEffect(() => {
+    const el = transcriptRef.current;
+    if (!el) return;
+    if (prevTranscriptSessionRef.current !== session.sessionId) {
+      prevTranscriptSessionRef.current = session.sessionId;
+      transcriptPinnedRef.current = true;
+    }
+    if (!transcriptPinnedRef.current) return;
+    el.scrollTop = el.scrollHeight;
+    const raf = requestAnimationFrame(() => {
+      if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [session.sessionId, session.transcript, view]);
+
   return (
     <div className={styles.sessionPanel}>
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
@@ -358,7 +385,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
               onToggleHideToolCalls={toggleHideToolCalls}
             />
           ) : hasTranscript ? (
-            <div className={styles.sessionPanelTranscript}>
+            <div ref={transcriptRef} onScroll={onTranscriptScroll} className={styles.sessionPanelTranscript}>
               <ChatMarkdown text={session.transcript!} isStreaming={false} cwd={undefined} />
             </div>
           ) : (
