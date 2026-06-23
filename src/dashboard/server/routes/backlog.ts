@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
@@ -20,10 +20,13 @@ import {
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
-import { listRunningAgentsSync, getAgentStateSync } from '../../../lib/agents.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
-import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
+import {
+  clearFinishedSequencerRun,
+  getSequencerRunStatus,
+  spawnSequencerAgent,
+} from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 
 const readJsonBody = Effect.gen(function* () {
@@ -162,6 +165,7 @@ const postBacklogRegenerateRoute = HttpRouter.add(
       // into tracker `Issue` objects (their human ref is `identifier`, not `ref`).
       const issues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
       try {
+        await clearFinishedSequencerRun(projectRoot);
         const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
         return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
       } catch (err) {
@@ -409,15 +413,8 @@ const getSequencerStatusRoute = HttpRouter.add(
       const projectRoot = process.cwd();
       // The one-shot sequencer session lingers after it finishes, so "alive" alone
       // would falsely read as running. A pass is done once it writes a fresh
-      // sequence.md (mtime >= startedAt) — until then it's actively generating.
-      const alive = listRunningAgentsSync().some((a) => a.id === SEQUENCER_AGENT_ID && a.tmuxActive);
-      const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
-      const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
-      let freshSequence = false;
-      if (alive && startedAt && existsSync(seqPath)) {
-        try { freshSequence = statSync(seqPath).mtimeMs >= new Date(startedAt).getTime(); } catch { /* stat failed */ }
-      }
-      const running = alive && !freshSequence;
+      // sequence.md (mtime >= startedAt) or its runtime is idle.
+      const { running, startedAt } = getSequencerRunStatus(projectRoot);
 
       let total = 0;
       const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');

@@ -1,13 +1,29 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { AgentState } from '../agents.js';
-import { spawnRun, determineModel } from '../agents.js';
+import { Effect } from 'effect';
+import {
+  spawnRun,
+  determineModel,
+  listRunningAgentsSync,
+  getAgentStateSync,
+  getAgentRuntimeStateSync,
+  stopAgent,
+} from '../agents.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
 import type { CollectOpenBacklogResult } from './backlog-input.js';
 
 export const SEQUENCER_AGENT_ID = 'sequencer-runner';
+
+export type SequencerRunStatus = {
+  alive: boolean;
+  running: boolean;
+  done: boolean;
+  startedAt: string | null;
+  doneReason: 'fresh-sequence' | 'idle' | null;
+};
 
 export type SpawnSequencerOptions = {
   projectRoot?: string;
@@ -22,6 +38,45 @@ export type SpawnSequencerOptions = {
    */
   issues?: ReadonlyArray<Record<string, unknown>>;
 };
+
+export function getSequencerRunStatus(projectRoot: string): SequencerRunStatus {
+  const alive = listRunningAgentsSync().some((a) => a.id === SEQUENCER_AGENT_ID && a.tmuxActive);
+  const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
+  const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+
+  let freshSequence = false;
+  if (alive && startedAt && existsSync(seqPath)) {
+    try {
+      freshSequence = statSync(seqPath).mtimeMs >= new Date(startedAt).getTime();
+    } catch {
+      /* stat failed */
+    }
+  }
+
+  const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
+  const idle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
+  const doneReason = freshSequence ? 'fresh-sequence' : idle ? 'idle' : null;
+  const done = alive && doneReason !== null;
+
+  return {
+    alive,
+    running: alive && !done,
+    done,
+    startedAt,
+    doneReason,
+  };
+}
+
+export async function clearFinishedSequencerRun(
+  projectRoot: string,
+  stop: () => Promise<void> = () => Effect.runPromise(stopAgent(SEQUENCER_AGENT_ID)),
+): Promise<SequencerRunStatus> {
+  const status = getSequencerRunStatus(projectRoot);
+  if (status.done) {
+    await stop();
+  }
+  return status;
+}
 
 export async function spawnSequencerAgent(
   pass: PassMode | 'auto',

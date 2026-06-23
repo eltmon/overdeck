@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('../../../lib/agents.js', () => ({
   spawnRun: vi.fn().mockResolvedValue({ id: 'sequencer-runner', role: 'sequencer' }),
   determineModel: vi.fn().mockReturnValue('claude-opus-4-8'),
+  listRunningAgentsSync: vi.fn().mockReturnValue([]),
+  getAgentStateSync: vi.fn().mockReturnValue(null),
+  getAgentRuntimeStateSync: vi.fn().mockReturnValue(null),
+  stopAgent: vi.fn(),
 }));
 
 vi.mock('../backlog-input.js', () => ({
@@ -14,11 +18,22 @@ vi.mock('../backlog-input.js', () => ({
   }),
 }));
 
-vi.mock('node:fs', () => ({ existsSync: vi.fn() }));
+vi.mock('node:fs', () => ({ existsSync: vi.fn(), statSync: vi.fn() }));
 
-import { existsSync } from 'node:fs';
-import { spawnSequencerAgent, SEQUENCER_AGENT_ID } from '../sequencer-agent.js';
-import { spawnRun, determineModel } from '../../../lib/agents.js';
+import { existsSync, statSync } from 'node:fs';
+import {
+  clearFinishedSequencerRun,
+  getSequencerRunStatus,
+  spawnSequencerAgent,
+  SEQUENCER_AGENT_ID,
+} from '../sequencer-agent.js';
+import {
+  spawnRun,
+  determineModel,
+  listRunningAgentsSync,
+  getAgentStateSync,
+  getAgentRuntimeStateSync,
+} from '../../../lib/agents.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,5 +106,60 @@ describe('spawnSequencerAgent', () => {
       '/tmp/proj',
       issues,
     );
+  });
+
+  it('treats a live sequencer with fresh sequence.md as done', () => {
+    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
+    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
+
+    expect(getSequencerRunStatus('/tmp/proj')).toMatchObject({
+      alive: true,
+      running: false,
+      done: true,
+      doneReason: 'fresh-sequence',
+    });
+  });
+
+  it('clears a finished lingering sequencer before a retry', async () => {
+    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
+    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
+
+    const stop = vi.fn().mockResolvedValue(undefined);
+
+    await clearFinishedSequencerRun('/tmp/proj', stop);
+
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
+  it('does not clear an active sequencer pass', async () => {
+    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
+    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'active' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:00.000Z').getTime() });
+
+    const stop = vi.fn().mockResolvedValue(undefined);
+
+    await clearFinishedSequencerRun('/tmp/proj', stop);
+
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('treats an idle live sequencer as done even without a fresh sequence file', () => {
+    (listRunningAgentsSync as ReturnType<typeof vi.fn>).mockReturnValue([{ id: SEQUENCER_AGENT_ID, tmuxActive: true }]);
+    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    expect(getSequencerRunStatus('/tmp/proj')).toMatchObject({
+      alive: true,
+      running: false,
+      done: true,
+      doneReason: 'idle',
+    });
   });
 });
