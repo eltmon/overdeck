@@ -105,7 +105,8 @@ function buildStrikePrompt(plan: StrikePlan): string {
     '3. Commit on the strike branch with a clear message.',
     '4. Rebase onto `origin/main`, then merge fast-forward to `main` and push.',
     '5. Verify ON main with `npm run typecheck && npm test`.',
-    '6. Report the result. Do NOT call `pan done` — strike does not enter the review pipeline.',
+    `6. Run \`pan done ${plan.issueId} --strike\` to apply the post-merge \`merged\` / \`verifying-on-main\` handoff without entering the review pipeline.`,
+    '7. Report the result. Do NOT call plain `pan done` — strike does not enter the review pipeline.',
     '',
     'If mid-strike you discover the issue is broader than a precision fix, abort, do not push, and report why so the issue can run through the normal pipeline instead.',
   ].join('\n');

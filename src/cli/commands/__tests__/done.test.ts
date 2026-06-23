@@ -4,10 +4,34 @@ import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { augmentCommentWithWaiver, recordTestWaiver } from '../done.js';
+import { augmentCommentWithWaiver, recordTestWaiver, verifyStrikeBranchMergedIntoMain } from '../done.js';
 
 const execFileAsync = promisify(execFile);
 const CLI = join(process.cwd(), 'dist', 'cli', 'index.js');
+
+async function git(cwd: string, args: string[]): Promise<void> {
+  await execFileAsync('git', args, { cwd });
+}
+
+async function createStrikeRepo(issueId = 'PAN-2013'): Promise<{ projectPath: string }> {
+  const root = mkdtempSync(join(tmpdir(), 'pan-strike-merged-'));
+  const remotePath = join(root, 'remote.git');
+  const projectPath = join(root, 'project');
+
+  await execFileAsync('git', ['init', '--bare', remotePath]);
+  mkdirSync(projectPath);
+  await git(projectPath, ['init', '-b', 'main']);
+  await git(projectPath, ['config', 'user.email', 'test@example.com']);
+  await git(projectPath, ['config', 'user.name', 'Test User']);
+  writeFileSync(join(projectPath, 'README.md'), 'base\n');
+  await git(projectPath, ['add', 'README.md']);
+  await git(projectPath, ['commit', '-m', 'initial']);
+  await git(projectPath, ['branch', `strike/${issueId.toLowerCase()}`]);
+  await git(projectPath, ['remote', 'add', 'origin', remotePath]);
+  await git(projectPath, ['push', '-u', 'origin', 'main']);
+
+  return { projectPath };
+}
 
 describe('pan done CLI options', () => {
   it('lists --test-waived in pan done --help (AC1)', async () => {
@@ -67,5 +91,26 @@ describe('recordTestWaiver', () => {
       'Test gate waived: covered by existing test at abc123',
     );
     expect(updated.decisions[1].recordedAt).toMatch(/^\d{4}-/);
+  });
+});
+
+describe('verifyStrikeBranchMergedIntoMain', () => {
+  it('accepts a strike branch contained in origin/main', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).resolves.toBe(
+      'strike/pan-2013 is contained in origin/main',
+    );
+  });
+
+  it('rejects a strike branch that has not landed on origin/main', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    await git(projectPath, ['checkout', 'strike/pan-2013']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'unmerged\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike work']);
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).rejects.toThrow();
   });
 });
