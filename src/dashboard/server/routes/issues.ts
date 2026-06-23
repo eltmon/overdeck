@@ -236,6 +236,17 @@ export function completePlanningFilesToStage(projectPath: string, proposedFilena
   return filesToStage;
 }
 
+export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string[][] {
+  const commands: string[][] = [];
+  if (existsSync(join(gitRoot, '.pan'))) {
+    commands.push(['add', '.pan/']);
+  }
+  if (existsSync(join(gitRoot, '.beads'))) {
+    commands.push(['add', '.beads/']);
+  }
+  return commands;
+}
+
 function getInternalDashboardOrigin(): string {
   const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   return process.env['OVERDECK_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
@@ -1420,11 +1431,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
       }
 
-      if (existsSync(join(gitRoot, '.pan'))) {
-        await execFileAsync('git', ['add', '-f', '.pan/'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-      if (existsSync(join(gitRoot, '.beads'))) {
-        await execFileAsync('git', ['add', '.beads/'], { cwd: gitRoot, encoding: 'utf-8' });
+      for (const args of completePlanningWorkspaceGitAddCommands(gitRoot)) {
+        await execFileAsync('git', args, { cwd: gitRoot, encoding: 'utf-8' });
       }
 
       try {
