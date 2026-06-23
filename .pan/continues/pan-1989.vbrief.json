@@ -1,0 +1,44 @@
+{
+  "version": "1",
+  "issueId": "PAN-1989",
+  "created": "2026-06-23T08:05:04.484Z",
+  "updated": "2026-06-23T08:16:42.000Z",
+  "gitState": { "branch": "feature/pan-1989", "sha": "69b2ee48f", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Clean rename pi→ohmypi across union types, runtime registry, DB enum, routing, ToS gate, files, and frontend — NOT an in-place swap. Keep read-only back-compat: EXTEND the EXISTING normalizeHarness() at src/lib/overdeck/conversations.ts:851 (do not fork it) to map legacy 'pi'→'ohmypi' on read, and the on-disk session-path detector stays harness-agnostic so existing Pi transcripts still parse.", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D2", "summary": "Execute the type rename as widen→migrate→narrow so every intermediate commit is green: (a) widen union to transient 4-value 'claude-code'|'pi'|'ohmypi'|'codex' and extend the existing normalizeHarness(), routing the inline duplicate harness validation at src/lib/database/conversations-db.ts:142 through it (single source of truth); (b) migrate each subsystem to 'ohmypi'; (c) narrow union back to 3 values, keeping 'pi' only in normalizeHarness() for legacy reads. The narrow bead's compiler errors are the residual-site finder. NOTE: conversations-db.ts DOES exist (the orchestrator's 'phantom file' note was wrong) — line 142 is a real inline validation that must be collapsed into normalizeHarness().", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D3", "summary": "omp is a superset FORK of the same pi-mono: --mode rpc, the extension model, and JSONL session shape are preserved; but binary (pi→omp, no pi alias), npm package (@mariozechner/pi-coding-agent→@oh-my-pi/pi-coding-agent), config/auth dir (~/.pi→~/.omp/agent), and the extension import package all change. Exact flags/hook-names/paths are NOT in upstream prose — the gated foundation bead discovers them from `omp --help` + the installed package and records them in docs/ohmypi-contract.md. Downstream beads consume the contract; they never guess.", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D4", "summary": "Verify parser parity against REAL omp output: bead 1 installs omp, runs a real --mode rpc session, and commits the captured transcript as the cost/conversation parser fixture. No assumed-v3 parity.", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D5", "summary": "Parity + two BOUNDED low-risk wins land in this issue: (a) surface omp's additional routable providers; (b) capture extra omp usage/cost fields + tool-call detail in the parsers (PAN-1912 data half). All higher-risk omp features (LSP/DAP, hashline edits, subagents, browser/search, ACP, model-control UIs) are deferred to filed follow-up issues.", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D6", "summary": "No-loss audit is a hard requirement, enumerate-before + verify-after: bead 2 writes docs/ohmypi-no-loss-audit.md enumerating all 20 Pi surface rows + 4 defects; bead 16 is a closing gate that verifies every row has a home (preserved/replaced/retired) and every defect is dispositioned.", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D7", "summary": "Four in-flight Pi defects are explicitly dispositioned, not dropped: PAN-1859 (RED main resume→FIFO test) resolved in bead 4; PAN-1833 (extension cwd detection) resolved in bead 5; PAN-1827 (blank pi conversation view) resolved in bead 8; PAN-1912 split — tool-call data in bead 14, frontend Tools-toggle UI carried forward as a filed follow-up.", "recordedAt": "2026-06-23T08:16:42.000Z" },
+    { "id": "D8", "summary": "Auto-file follow-up GH issues (bead 19) from the capabilities doc's Proposed-Follow-ups table; the operator authorizes agents to file issues freely. Rename `pan pi-auth`→`pan ohmypi-auth`, keeping `pan pi-auth` as a hidden deprecated alias for one release.", "recordedAt": "2026-06-23T08:16:42.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "main is RED (PAN-1859: agent-spawning.test.ts resume→Pi FIFO test fails). The work agent builds on a red base, and a red main silently empties the merge gate.", "mitigation": "Bead 4 must land a GREEN ohmypi resume→FIFO delivery test (it is the rename of the very surface that is failing). Verify CI conclusion (not just HEAD sha) before relying on readyForMerge." },
+    { "id": "H2", "summary": "omp session transcript format may differ from Pi v3 — cost parser and conversation parser break silently if assumed.", "mitigation": "Bead 1 captures a REAL omp --mode rpc transcript as a committed fixture; beads 7/8 are written and unit-tested against it. The contract doc records any v3 divergence." },
+    { "id": "H3", "summary": "omp's exact CLI flags, extension import package, hook names, and OAuth/config path are not enumerated in upstream prose.", "mitigation": "Bead 1 discovers them from `omp --help`/subcommand help + the installed package's TS types and records each in docs/ohmypi-contract.md with a stated fallback for any missing pi-equivalent flag. Downstream beads cite the contract, never guess." },
+    { "id": "H4", "summary": "ToS policy gate (canUseHarnessSync, harness-policy.ts:69) blocks harness+Anthropic+subscription. Renaming the key is easy to get subtly wrong (drop the block, or reorder around it).", "mitigation": "Re-key the SAME blocked cell to 'ohmypi' with posture unchanged; keep harness-policy.test.ts asserting the block. Never weaken or reorder (concerns.md)." },
+    { "id": "H5", "summary": "Transient widened 4-value union could leak past the narrow bead, leaving a dishonest 'pi' as a writable value.", "mitigation": "Bead 15 narrows the writable union to 3 values; 'pi' survives only inside normalizeHarness(); the no-loss-audit gate (bead 16) checks no writable 'pi' producer remains." },
+    { "id": "H6", "summary": "Resume across a model/harness change corrupts context (concerns.md): old Pi sessions resumed under omp.", "mitigation": "Treat a pi→omp identity change like any harness change — fresh session + continue.json re-onboarding, never --resume across the boundary. Legacy Pi transcripts are read-only history, not resume targets." },
+    { "id": "H7", "summary": "Skills/CLI lint (scripts/lint-skills.sh) cross-checks wrapper skills against `pan <verb> --help`; renaming pi-auth or adding ohmypi-auth can fail CI if a wrapper skill drifts.", "mitigation": "Bead 9 updates any skill referencing pi-auth in the same commit and keeps the deprecated alias documented; run `npm run lint` before done." },
+    { "id": "H8", "summary": "Dashboard server code must not use execSync (freezes the event loop); doctor's checkCommand is execSync-based and CLI-only.", "mitigation": "Keep checkOhmypi CLI-only; any server-reachable ohmypi status check uses async exec/spawn (concerns.md)." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1989: Replace Pi harness with ohmypi and evaluate advanced features",
+      "timestamp": "2026-06-23T08:05:04.484Z"
+    },
+    {
+      "timestamp": "2026-06-23T08:16:42.000Z",
+      "reason": "planning",
+      "note": "Discovery complete. Confirmed omp = @oh-my-pi/pi-coding-agent (binary omp), a superset fork of pi-mono. Operator decisions: clean rename, install+capture real omp, doc+auto-file follow-ups, parity+bounded low-risk wins. Folded in orchestrator context: hard no-loss audit FR + disposition of PAN-1859/1833/1827/1912. 19-bead widen→migrate→narrow plan authored.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}

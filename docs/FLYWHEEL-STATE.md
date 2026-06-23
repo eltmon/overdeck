@@ -1317,3 +1317,15 @@ strike-pan-1897 (PAN-2017, prompt never delivered), strike-pan-1900 (work done, 
 ### NEXT
 - monitor strike-pan-1928 (model-switching lock, in flight) → close.
 - OPERATOR: `pan kill` the 4 stranded strikes; `pan reload` (deploy PAN-1879/1929/2009/1882 fixes); `pan restart --resume` (revive the deacon reconciler → auto-rebase 1832/#2003 + 1919/#1950); UAT+merge MIN-846.
+
+## RUN-4 (Overdeck-era) tick 6+ (2026-06-23 ~17:08–17:35Z) — PAN-1928 closed after P0 red-main catch; resume-all-route gap found
+
+- **PAN-1928 LANDED+closed** (`16e10be114`, 23m, model-switching lock). BUT its merge CI run went **RED (P0)**. Investigated immediately (red-main-first discipline):
+  - Real failure: `AC1/AC2: every enumerated HTTP route is present in the matrix` — a route in the codebase had no entry in `no-loss-matrix.ts`. **NOT a PAN-1928 code bug** — PAN-1928 touched `no-loss-matrix.ts` (it adds a model-switching guard), which made the matrix test RUN and expose a **pre-existing gap**: the `resume-all` route (from PAN-1963's no-resume work) was never added to the matrix.
+  - The create-beads `table not found: issues` output in the same run was **stderr logging noise** (the PAN-1903 bd doctor race), NOT an assertion failure — don't be fooled by it into thinking there's a second failure.
+  - Someone (operator/agent) already pushed `4eee86d7bd test(overdeck): account for resume-all route` (1-line matrix fix). Verified its CI → `completed success`. Main green. Then closed PAN-1928.
+  - **LESSON: a strike that touches a shared test-infrastructure file (no-loss-matrix, infra.test) will be the CI run that EXPOSES pre-existing gaps in that file — the red looks like the strike broke it, but the strike just made the test run.** Distinguish "my change's tests" from "pre-existing gap my change surfaced." Same shape as the PAN-2011 transient-interference abort.
+- **Run total: 19 issues closed** (13 strikes via pan close + 3 criticals via gh-with-evidence + 3 RUN-3 carried-in). 2 substrate bugs filed (PAN-2017, PAN-2022). Main green.
+- **Strand pile unchanged (4):** strike-pan-1897/1900/1935/2011 — all need operator `pan kill` (PAN-2022). PAN-2011's fix is ready (aborted on transient red, now resolved).
+- **Fired strike-pan-1909** (pan plan done handoff hangs) to keep minAgents met.
+- **NEXT:** monitor 1909; OPERATOR actions unchanged: `pan kill` the 4 stranded; `pan reload` (deploy 1879/1929/2009/1882); `pan restart --resume` (revive deacon → auto-rebase 1832/#2003 + 1919/#1950); UAT+merge MIN-846.

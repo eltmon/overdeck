@@ -4,17 +4,17 @@
     "created": "2026-06-23T08:16:42.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1989: Replace Pi harness with oh-my-pi (omp) and evaluate advanced features",
-    "updated": "2026-06-23T17:32:43.462Z"
+    "updated": "2026-06-23T17:32:43.761Z"
   },
   "plan": {
     "id": "pan-1989",
     "title": "Replace Pi harness with oh-my-pi (omp) and evaluate advanced features",
-    "status": "approved",
+    "status": "running",
     "uid": "88b45a5d-661f-47e9-a31d-abb5f1cb57a8",
     "author": "agent:claude-opus-4-8",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-06-23T08:16:42.000Z",
-    "updated": "2026-06-23T17:32:43.462Z",
+    "updated": "2026-06-23T17:32:43.761Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1989",
