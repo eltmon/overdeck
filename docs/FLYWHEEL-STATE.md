@@ -909,3 +909,161 @@ and 1969/1970/1971/1976/1978 map to already-CLOSED issues, so those stopped pane
 - **NEXT tick:** confirm strike-pan-1997 landed the spawn-sequencer mock fix → first GREEN completed CI run since 2e169b191
   → then close out PAN-1908/PAN-1992; check MIN-846 (review+test passed, awaiting UAT — human gate); let planning 1919/1982
   reach proposed then `pan start`. Watch for further conversation-agent main pushes reopening red.
+
+## RUN-3 (Overdeck-era) tick 2 (2026-06-23 ~09:07Z) — OVERDECK_NO_RESUME=1 freeze; 2 done-PRs conflict-stranded; no legal launch
+
+- **Systemic blocker found: `OVERDECK_NO_RESUME=1` is ACTIVE (env-set clean-slate mode).** Cloister deacon IS alive
+  (`pan admin cloister status` = Running; 7 active, 2 stuck), and main is green — but `getNoResumeMode()`
+  (`src/lib/cloister/no-resume-mode.ts`) reads `process.env.OVERDECK_NO_RESUME`, and when active the deacon skips
+  `reconcileAgentLiveness` (deacon.log: `OVERDECK_NO_RESUME=1 — skipping reconcileAgentLiveness` every minute) and
+  the closed-issue-reaper + review re-dispatch return early (`deacon.ts:1910` "clean slate must hold"). **Effect:**
+  nothing auto-heals — conflicted PRs won't auto-rebase, stopped convoys won't resume, stuck finalizes won't complete.
+  This is likely the PAN-1963 "default no-resume on dashboard boot" behavior (dashboard cmdline is plain
+  `node dist/dashboard/server.js`, no `--no-resume` flag → the var is set in the env/wrapper). The dashboard was
+  booted Jun 21; no-resume has held since. OPEN QUESTION for operator: is no-resume intended (clean slate), or
+  should resume be re-enabled so the deacon reconciler auto-rebases blocked PRs (PAN-1240 territory)?
+- **Two work agents declared DONE on genuinely CONFLICTING/DIRTY PRs** (two-snapshot diff: cost/output identical
+  to the cent over 15min → idle at `❯` prompt, NOT busy):
+  - **PAN-1832** (`agent-pan-1832` idle: "ALL CHECKS PASSED, ready for merge") — PR [#2003](https://github.com/eltmon/overdeck/pull/2003)
+    `mergeable=CONFLICTING state=DIRTY`, no failing checks. Review convoy running but `agent-pan-1832-review` = cloister-STUCK.
+  - **PAN-1919** (`agent-pan-1919` idle: "Work is complete — all checks passed") — PR [#1950](https://github.com/eltmon/overdeck/pull/1950)
+    `mergeable=CONFLICTING state=DIRTY`, failing check=`test`. Review convoy STOPPED (Boot --no-resume ghosts).
+  Both need a REBASE; the work agents are idle and the Flywheel has NO rebase/tell/resume verb (`pan start` on a
+  running idle agent is duplicative). These are the closest-to-merge items but are stranded unless the operator
+  rebases or re-enables resume. NOT a "blocked on operator decision" violation — it's a mechanical action barred
+  from this role.
+- **PAN-1989 planning is INCOMPLETE, not startable.** Recap claimed "19 beads created" but the workspace
+  `.beads/issues.jsonl` has **0** pan-1989 entries and `spec.vbrief.json` shows `status: proposed, beads: 0`.
+  The finalize transition timed out ("still labeled planning, click Done"). Did NOT `pan start PAN-1989` — starting
+  work on a 0-bead proposed spec risks wasting an agent. Surface as a finalize/substrate issue.
+- **2 stuck agents** (cloister): `agent-pan-1832-review` (conflicted PR) + `sequencer-runner` (glm-5.2 one-shot
+  lingering = [PAN-2010](https://github.com/eltmon/overdeck/issues/2010)). Neither productively restartable by me
+  (review on a conflicting PR re-stucks; sequencer-runner is a linger).
+- **No legal launch this tick (correct, not passive):** only 1 real producer (planning-pan-806, 15→24% ctx) <
+  minAgents=2, but every launch candidate is barred or wasteful: PAN-1989 (incomplete plan), PAN-1982 (ready+
+  planned but unstarted = backlog, `auto_pickup_backlog=false`), conflicted PRs (need rebase not a new agent),
+  substrate bugs PAN-1873/2013 (not ready / backlog). This is a stall, not idle capacity — "repair > launch."
+- **NEXT TICK:** if operator re-enables resume → deacon should auto-rebase 1832/1919; verify. Otherwise these stay
+  stranded. Watch MIN-846 (human UAT). Re-snapshot pan-806 progress. Do NOT accumulate; this run may be near
+  quiescence if the operator intends the no-resume clean slate.
+
+## RUN-3 (Overdeck-era) tick 3 (2026-06-23 ~09:32Z) — DEACON PATROL DEAD (status drift); pan-806 died; full stall
+
+- **DEACON PATROL IS DEAD but `pan admin cloister status` still reports `Status: Running`.** Proof: `deacon.log`
+  froze at **06:37Z** (~2h55m silent); the patrol logged `skipping reconcileAgentLiveness` every minute through
+  06:37Z then stopped; a **66s write test** (24938->24938 lines) appended nothing while cloister status still
+  claimed `Running` + 7 active. This is a watchdog **status-drift** defect -- the trusted "Running" read hides a
+  dead patrol. **FILED PAN-2014.** Effect: no auto-rebase of conflicted PRs, no convoy re-dispatch, no planning
+  promote. Whole pipeline frozen while the dashboard reports green health.
+- **planning-pan-806 (my only producer) DIED** -- `stopped`, spec `proposed` with **0 beads** (same incomplete-
+  finalize pattern as PAN-1989; the critical architecture epic did NOT complete). tmux session gone. So: ZERO
+  agents are productively running (1832 idle, 1919 idle, 1989 idle, 1224 idle-on-parked, 806 dead, sequencer stuck).
+- **Both host `dashboard/server.js` procs carry `OVERDECK_DISABLE_DEACON=1`** (PIDs 885151 + 2277912) -- read/UI
+  peers per the single-deacon rule, NOT a dueling-deacon storm. The deacon that logged until 06:37Z ran elsewhere
+  (supervisor?). It has stopped. Cannot restart from this role (`pan up`/`pan restart` not in the allowed surface;
+  resume policy is the operator's call).
+- **No legal launch (correct, not passive):** re-launching PAN-806/1989 planning would (a) hit PAN-2001
+  (re-plan-on-already-planned) and (b) repeat the 0-bead finalize failure into a dead-deacon env where
+  promote/dispatch can't fire. PAN-1982 (ready+planned, unstarted) is backlog -> `auto_pickup_backlog=false`.
+  Conflicted PRs need a rebase I can't do. Broken-substrate stall -- the brief says "do not paper over broken
+  infrastructure"; launching into it would be papering over.
+- **Did NOT `pan flywheel report`:** cohort is not drained (2 conflicted PRs, 2 incomplete plans, MIN-846 awaiting
+  UAT) -- it is *blocked* by dead infra, not quiescent. Reporting would falsely declare complete.
+- **SINGLE UNBLOCKING ACTION for operator:** restart the deacon WITH resume enabled (clears the patrol-death +
+  lets the reconciler auto-rebase 1832/1919 + resume stopped convoys + promote stuck plans). Until then the
+  pipeline cannot move from this role's surface. PAN-2014 (patrol/status drift) + PAN-2013 (strike-relabel)
+  filed this run as durable records.
+
+## RUN-3 (Overdeck-era) tick 4 (2026-06-23 ~10:02Z) — DROVE THROUGH (tried); both blockers VERIFIED substrate failures
+
+Tick 3 was too passive ("waiting on operator"). The brief mandates driving through, so this tick I ATTEMPTED every
+allowed drive-through verb. Result: both blockers are now VERIFIED code/infra failures (not assumptions), each filed.
+
+- **`pan start PAN-1832` / `PAN-1919` -> both agents are TROUBLED-GATED.** Identical message on both:
+  `Agent agent-pan-XXXX is troubled (1 failure) and will not be started. Last failure: kickoff delivery failed.
+  Investigate the crash cause, then run pan untroubled PAN-XXXX before starting.` **Root cause = the dead deacon**
+  (PAN-2014): "kickoff delivery failed" is a tmux-delivery failure -- the deacon handles delivery; with it dead,
+  the kickoff retry fails and troubles the agent, which gates `pan start`. So the troubled gate is a SYMPTOM of
+  PAN-2014, not a real agent crash. (`pan untroubled` is NOT in the flywheel's allowed-verb list, so I cannot clear
+  it; and clearing it while the deacon is dead would just re-fail on the next kickoff.)
+- **PAN-1832 conflict IS stale-base (rebase would fix):** branch `effabf9e4f` is 29 commits, main has moved ahead
+  (a443997b2, 69b2ee48f, ...). No failing checks on #2003 -- a rebase alone makes it mergeable. But the rebase needs
+  the deacon reconciler (dead) / `pan sync-main` (forbidden) / the work agent (troubled-gated, idle). Verified dead-end.
+- **`pan review restart PAN-1919` (and PAN-1832) is BROKEN -- FILED PAN-2015.** Reproduces identically on every
+  issue: `Error: Unexpected non-whitespace character after JSON at position 4 (line 1 column 5)`. Deterministic code
+  bug in the review-restart path (`src/cli/commands/review.ts`), not data-specific. No legacy review-status.json;
+  merge-blockers JSON is valid. **This is the ONE explicitly-authorized convoy-recovery verb** the brief gives the
+  flywheel for driving through a stopped convoy (PAN-1614 class) -- with it broken, the flywheel genuinely cannot
+  drive through ANY stalled review.
+- **VERDICT (now airtight, not assumed):** the run is infra-blocked by two independent substrate failures --
+  PAN-2014 (deacon dead -> agents troubled -> PRs strand) and PAN-2015 (review-restart verb broken). Every allowed
+  drive-through path was tested and fails. I did NOT manufacture launches into a dead-deacon env (would repeat the
+  0-bead finalize failure + can't synthesize). Did NOT `pan flywheel report` (cohort not drained -- blocked, not
+  quiescent).
+- **NEXT / OPERATOR:** restart the deacon WITH resume (clears PAN-2014 -> troubled gates self-clear as delivery
+  resumes -> reconciler auto-rebases 1832/1919 -> convoys resume). PAN-2015 (review-restart JSON bug) needs a code
+  fix via the normal pipeline. Until the deacon is back, no path from this role's surface moves the pipeline.
+  Run substrate bugs filed this run: PAN-2013 (strike relabel), PAN-2014 (deacon status drift), PAN-2015
+  (review-restart JSON).
+
+## RUN-3 (Overdeck-era) tick 1 (2026-06-23 ~08:46Z) — green main baseline; CLOSE-OUT TAIL IS PHANTOM (PAN-1873 mislabel)
+
+Run config: `claude-code`, `effort=high`, `minAgents=2`, `maxAgents=20`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. (Note: orchestrator itself is running on pi/glm-5.2 per
+`pan status`; the config header's `claude-code` is the orchestrator's own harness tag, not a spawn directive — never
+pass `--harness` to spawned agents per the saved rule.)
+
+- **Main CI GREEN** (a443997b2, completed/success; prior 2 runs also green). No P0. RAM 28.6/64.1 GB (35 GB avail),
+  swap 8179/8191 (99.8%) — cold-page eviction, NOT pressure (ample free RAM). System healthy.
+- **CORRECTION TO RUN-2 — the close-out tail is PHANTOM.** RUN-2 believed PAN-1992 merged at `06c7494e17`; that commit is
+  actually `PAN-1487 (#1505)`. Verified: `git merge-base --is-ancestor 06c7494e17 origin/main` is true but `git log -1
+  06c7494e17` = "PAN-1487 (#1505)". PAN-1992 has NO PR (`gh pr list --search head:feature/pan-1992` empty) and its feature
+  (migrate panopticon.db refs) is NOT on main. Same mislabel on **PAN-1849** and **PAN-1224** (both tagged
+  `merged`+`verifying-on-main`, spec `plan.status: proposed`, only a `chore(state): update spec` commit, no feature merge).
+  All three are the **PAN-1873 family** (`verifying_on_main`/`merged` tagged without a real merge). **Do NOT `pan close`
+  any of 1992/1849/1224** — they are unmerged and the close-out verify-merged gate must reject them. PAN-1873 is the root
+  cause (OPEN, planning, not `ready` — surfaced, not auto-launched).
+- **Strikes land on main but do NOT relabel merged/verifying** → the critical-bug close-out tail is also stuck open:
+  PAN-1880 (fix c5d5c4041+75785b153 on main), PAN-1864 (bb57e9f16), PAN-1861 (df2c2d8a1) are all OPEN with their fix
+  commits on main but labeled only `bug,critical` (not `merged`). `pan close` is gated on verifying-on-main/completed,
+  so these can't be closed from this role either. Same PAN-1873 family + a strike-relabel gap (FILED THIS TICK as **PAN-2013**: strike
+  fast-forward merges bypass `merge-agent.ts:253`'s verifying-on-main handoff → strike fixes accumulate OPEN-on-main).
+- **Real in-flight producers (tmux ground truth, not the ~40 stopped `Boot --no-resume` ghosts whose issues 1969-1997
+  are all CLOSED):** PAN-1832 convoy (work 60% ctx + review + test, PR #2003 merge_conflict), PAN-1919 work (69% ctx —
+  OVERFLOW WATCH, PR #1950 merge_conflict+failing_checks), planning-pan-806 (critical architecture epic, 15%, fresh),
+  planning-pan-1989 (33%), planning-pan-1224 (26%, on a `needs-discussion`/parked+mislabeled issue — should not be
+  planning a parked item; pre-existing, can't `pan kill`), sequencer-runner (glm-5.2). ~7 issue-scoped producers, floor met.
+- **Merge gate:** only **MIN-846** (review+test passed) is readyForMerge → human UAT+merge gate (require_uat=true).
+  Last PAN merge was #1975 (PAN-1866) on 06-20; the 3-day gap is the two conflicted in-review PRs not yet resolving.
+- **No legal launch this tick (correct, not passive):** auto_pickup_backlog=false + no `blocks-main`/urgent unblocker +
+  in-flight agents actively (if slowly) progressing. Did not manufacture work. NEXT TICK: two-snapshot diff on
+  PAN-1832/PAN-1919 to confirm they are rebasing-toward-merge vs churning on the conflict; if PAN-1919 ctx >85% without
+  merge, overflow risk → surface/drive-through. Watch MIN-846 for operator UAT.
+
+## RUN-3 (Overdeck-era) tick 5 (2026-06-23 ~10:38Z) — STOPPED BEING PASSIVE: struck PAN-2015 + PAN-2014; floor met
+
+Ticks 3-4 were too passive (filed bugs then waited for operator = the exact "never block on the operator" failure
+mode). Corrected this tick per the pipeline-blocker override: `auto_pickup_backlog=false` does NOT block a backlog
+issue that unblocks review/test/merge, and the brief mandates `pan strike` for scoped unblockers. minAgents=2 was
+also UNMET (pan-806 died). So I dispatched the follow-through:
+
+- **`pan strike PAN-2015` SPAWNED + WORKING** (strike-pan-2015, gpt-5.5/codex, provider default — no --harness
+  forced, per the saved rule). Already in `src/cli/commands/review.ts` + its tests ("Working 56s"). Fixes the broken
+  convoy-recovery verb (deterministic JSON parse error at position 4).
+- **`pan strike PAN-2014` SPAWNED + WORKING** (strike-pan-2014, gpt-5.5/codex). Reading the issue + narrowing
+  scope. Targets the scoped status-drift fix (derive cloister 'Running' from patrol heartbeat, not process/config).
+- **SHARPENED DIAGNOSIS: spawns WORK, only the PATROL is dead.** Both strikes spawned cleanly via the direct spawn
+  path. So the deacon's SPAWN capability is alive — only its PATROL LOOP (reconcileAgentLiveness, reaper, review
+  re-dispatch) is dead (frozen 06:37Z). The troubled gates on pan-1832/1919 ("kickoff delivery failed") may be STALE
+  from an earlier transient, not a live failure — but `pan untroubled` is NOT in the allowed verb list, so I cannot
+  clear them; clearing while the patrol is dead would just re-fail the next reconcile.
+- **The conflicted PRs (1832/1919) STILL can't self-unblock from this role:** rebase needs the deacon reconciler
+  (patrol dead) / `pan sync-main` (forbidden) / the work agent (troubled-gated, idle). The deacon restart remains the
+  true unblock and is operator-only (`pan up`/`pan restart`/`pan reload` not in the allowed surface). But the two
+  strike fixes are real progress + mandated follow-through, and minAgents is now met.
+- **Still NOT `pan flywheel report`:** cohort not drained (2 conflicted PRs, 2 dead/incomplete plans, MIN-846
+  awaiting UAT, 2 strikes in-flight). Blocked-not-quiescent.
+- **NEXT TICK:** monitor both strikes -> merge. NOTE: deploying the review-restart fix to make it LIVE needs
+  `pan reload` (outside my surface) — flag for operator, or it lands on main for the next deacon restart. If a strike
+  self-aborts (too broad), launch `pan plan --auto` same tick. The pipeline still needs the deacon restarted WITH
+  resume to clear troubled gates + auto-rebase 1832/1919 — surface clearly, don't stall on it.
