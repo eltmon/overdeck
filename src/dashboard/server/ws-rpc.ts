@@ -169,6 +169,19 @@ function streamResolvedFullParseSnapshots(
         let parsing = false;
         let pendingReparse = false;
         let sessionFile: string | null = null;
+        // Lock onto a transcript only once we've actually parsed content from it.
+        // A brand-new pi/codex conversation can briefly resolve to an empty
+        // placeholder transcript while the real session is written under a
+        // different (session-id) filename. The old code stopped discovery at the
+        // FIRST resolved file and tailed that empty file forever — so the panel
+        // showed the empty "How can I help you?" state until a manual refresh
+        // re-subscribed. We keep re-resolving (and switch to the newest file)
+        // until content appears, which also covers a watcher that misses appends.
+        let hasContent = false;
+
+        const stopDiscovery = () => {
+          if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
+        };
 
         const offer = (event: ConversationEvent) => {
           try {
@@ -184,6 +197,11 @@ function streamResolvedFullParseSnapshots(
           parsing = true;
           try {
             const result = await parse(sessionFile);
+            if (result.messages.length > 0 && !hasContent) {
+              // Real content arrived — lock onto this file and stop polling.
+              hasContent = true;
+              stopDiscovery();
+            }
             offer({
               kind: 'messages' as const,
               messages: result.messages,
@@ -206,28 +224,39 @@ function streamResolvedFullParseSnapshots(
           }
         };
 
+        const watchFile = (file: string) => {
+          try {
+            watcher = fsWatch(file, () => {
+              if (debounce) return;
+              debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
+            });
+          } catch {
+            // If the watcher can't attach, the discovery poll still re-parses.
+          }
+        };
+
         const tryResolve = async (): Promise<void> => {
-          if (stopped || resolving || sessionFile) return;
+          if (stopped || resolving || hasContent) return;
           resolving = true;
           try {
             const resolved = await resolve();
             if (!resolved) {
-              offer({ kind: 'discovering' });
+              // Only announce "discovering" before we've ever resolved a file, so
+              // we don't blank an already-shown (empty) snapshot.
+              if (!sessionFile) offer({ kind: 'discovering' });
               return;
             }
-            sessionFile = resolved;
-            if (discoveryTimer) {
-              clearInterval(discoveryTimer);
-              discoveryTimer = null;
-            }
-            await emit();
-            try {
-              watcher = fsWatch(resolved, () => {
-                if (debounce) return;
-                debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
-              });
-            } catch {
-              // If the watcher can't attach, the initial snapshot still rendered.
+            if (resolved !== sessionFile) {
+              // First resolution, or a newer transcript appeared — point the
+              // watcher at it and re-parse.
+              if (watcher) { try { watcher.close(); } catch { /* ignore */ } watcher = null; }
+              sessionFile = resolved;
+              await emit();
+              if (!stopped) watchFile(resolved);
+            } else {
+              // Same (still-empty) file resolved — re-parse in case it grew
+              // without firing a watch event (some FS/watch combos miss appends).
+              await emit();
             }
           } finally {
             resolving = false;
@@ -235,7 +264,9 @@ function streamResolvedFullParseSnapshots(
         };
 
         await tryResolve();
-        if (!sessionFile) {
+        if (!hasContent) {
+          // Keep polling until the transcript has real content. Cheap readdir+stat
+          // every 2s; self-stops via stopDiscovery() the moment content is parsed.
           discoveryTimer = setInterval(() => { void tryResolve(); }, 2000);
         }
 
