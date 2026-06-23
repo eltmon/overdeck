@@ -848,8 +848,11 @@ function toMillis(value: Date | string | number = new Date()): number {
   return new Date(value).getTime();
 }
 
-function normalizeHarness(harness: string | null): RuntimeName | null {
-  return harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : null;
+/** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
+export function normalizeHarness(harness: string | null): RuntimeName | null {
+  if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
+  if (harness === 'claude-code' || harness === 'codex') return harness;
+  return null;
 }
 
 function legacyRowIdForConversationId(id: string | null): number | null {

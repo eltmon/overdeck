@@ -248,6 +248,7 @@ const piAdapter: ConversationTranscriptAdapter = {
 const REGISTRY: Record<RuntimeName, ConversationTranscriptAdapter> = {
   'claude-code': claudeCodeAdapter,
   'pi': piAdapter,
+  'ohmypi': piAdapter,
   'codex': claudeCodeAdapter,
 };
 

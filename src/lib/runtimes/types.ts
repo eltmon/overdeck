@@ -13,11 +13,13 @@
 /**
  * Supported runtime types for agent execution.
  *
- * PAN-636 widened this union to include 'pi' alongside Claude Code. Reads of
- * AgentSnapshot.runtime should go through getHarness() from @overdeck/contracts
- * so unknown or legacy values normalize to 'claude-code'.
+ * PAN-636 widened this union to include 'pi' alongside Claude Code.
+ * PAN-1989 widened it again to include 'ohmypi' (transient 4-value set while
+ * migration is in progress; 'pi' will be dropped once all write sites migrate).
+ * Reads of AgentSnapshot.runtime should go through getHarness() from
+ * @overdeck/contracts so unknown or legacy values normalize to 'claude-code'.
  */
-export type RuntimeName = 'claude-code' | 'pi' | 'codex';
+export type RuntimeName = 'claude-code' | 'pi' | 'ohmypi' | 'codex';
 
 /**
  * Health state of an agent

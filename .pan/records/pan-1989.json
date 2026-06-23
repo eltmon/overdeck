@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-23T14:40:06.942Z",
+  "updated": "2026-06-23T17:32:21.034Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
@@ -154,6 +154,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "pi",
-  "model": "glm-5.2"
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6"
 }
