@@ -2,11 +2,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { execFileSync, execSync, execFile } from 'child_process';
 import { readFileSync } from 'fs';
 import {
+  createSession,
   ensureOverdeckTmuxServerSync,
   ensureOverdeckTmuxServerAsync,
   findManagedServerPidSync,
   _resetWarnedManagedServerDirtyForTest,
 } from '../tmux.js';
+import { Effect } from 'effect';
 
 const execFileSyncMock = vi.hoisted(() => vi.fn());
 const execSyncMock = vi.hoisted(() => vi.fn());
@@ -290,6 +292,61 @@ describe('ensureOverdeckTmuxServerAsync', () => {
 
     const setsidCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'setsid');
     expect(setsidCalls).toHaveLength(1);
+  });
+});
+
+describe('createSession', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
+
+    mockedExecFileSync.mockImplementation((cmd: unknown, args?: unknown) => {
+      const command = String(cmd);
+      const argv = Array.isArray(args) ? (args as string[]) : [];
+      if (isListSessionsCall(command, argv)) return '';
+      if (isSystemctlShowCall(command)) return '0\n';
+      if (command === 'pgrep') throw new Error('no match');
+      return '';
+    });
+
+    mockedExecFile.mockImplementation((_cmd: unknown, _args?: unknown, optionsOrCallback?: unknown, callback?: unknown) => {
+      const cb = typeof optionsOrCallback === 'function' ? optionsOrCallback : callback;
+      if (typeof cb === 'function') {
+        cb(null, '', '');
+      }
+      return {} as ReturnType<typeof execFile>;
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
+  });
+
+  it('creates headless sessions with a usable default pane size', async () => {
+    await Effect.runPromise(createSession('agent-pan-2023', '/tmp/workspace', 'bash launcher.sh'));
+
+    const newSessionCall = mockedExecFile.mock.calls.find(
+      (call) => call[0] === 'tmux' && Array.isArray(call[1]) && call[1].includes('new-session'),
+    );
+
+    expect(newSessionCall).toBeDefined();
+    const argv = newSessionCall![1] as string[];
+    expect(argv).toEqual(expect.arrayContaining(['new-session', '-x', '200', '-y', '50']));
+  });
+
+  it('preserves explicit pane size overrides', async () => {
+    await Effect.runPromise(createSession('agent-pan-2023', '/tmp/workspace', 'bash launcher.sh', {
+      width: 120,
+      height: 30,
+    }));
+
+    const newSessionCall = mockedExecFile.mock.calls.find(
+      (call) => call[0] === 'tmux' && Array.isArray(call[1]) && call[1].includes('new-session'),
+    );
+
+    expect(newSessionCall).toBeDefined();
+    const argv = newSessionCall![1] as string[];
+    expect(argv).toEqual(expect.arrayContaining(['new-session', '-x', '120', '-y', '30']));
   });
 });
 
