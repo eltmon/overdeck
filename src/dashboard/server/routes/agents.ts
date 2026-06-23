@@ -133,6 +133,9 @@ import {
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
+import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
+import { readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath, resolveAgentHarness } from './jsonl-resolver.js';
 import type { ConversationResponse } from '@overdeck/contracts';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -1027,13 +1030,50 @@ const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], st
 /**
  * Resolve and parse an agent's conversation JSONL file.
  * Exported for unit testing — the Effect route layer is not directly unit-testable.
+ *
+ * Dispatches on harness so Pi and Codex agents get their native parsers (PAN-2012).
+ * For claude-code agents, tries the launcher-pinned --session-id first (the exact
+ * session the Terminal tab attaches to) before falling back to mtime-based pick
+ * (PAN-2011). This makes the Conversation tab match the Terminal tab by construction.
  */
 export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
   try {
-    const jsonlPath = await Effect.runPromise(getAgentJsonlPathShared(id));
-    if (!jsonlPath || !existsSync(jsonlPath)) {
-      return EMPTY_CONVERSATION;
+    const harness = await resolveAgentHarness(id);
+
+    if (harness === 'pi') {
+      const sessionFile = await resolvePiSessionPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parsePiConversationMessages(sessionFile);
+      return { ...result, streaming: false };
     }
+
+    if (harness === 'codex') {
+      const sessionFile = await resolveCodexRolloutPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parseCodexConversationMessages(sessionFile);
+      return { ...result, streaming: false };
+    }
+
+    // claude-code (default): try launcher-pinned session ID first (ground truth),
+    // then fall back to mtime-based pick.
+    let jsonlPath: string | null = null;
+    const pinnedSessionId = await readLauncherPinnedSessionId(id);
+    if (pinnedSessionId) {
+      const workspace = await Effect.runPromise(getAgentWorkspaceShared(id));
+      if (workspace) {
+        const candidate = join(
+          homedir(), '.claude', 'projects',
+          encodeClaudeProjectDir(workspace),
+          `${pinnedSessionId}.jsonl`,
+        );
+        if (existsSync(candidate)) jsonlPath = candidate;
+      }
+    }
+    if (!jsonlPath) {
+      jsonlPath = await Effect.runPromise(getAgentJsonlPathShared(id));
+    }
+
+    if (!jsonlPath || !existsSync(jsonlPath)) return EMPTY_CONVERSATION;
     const result = await parseConversationMessages(jsonlPath);
     // Force streaming: false — tmux session is dead, any "streaming" state is stale
     return { ...result, streaming: false };
