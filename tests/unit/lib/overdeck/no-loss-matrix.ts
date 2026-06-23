@@ -603,6 +603,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan flywheel start',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.startFlywheel + AgentWriter.spawn' },
   { surface: 'pan flywheel pause',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.pauseFlywheel + AgentWriter.stop' },
   { surface: 'pan flywheel resume',            kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.resumeFlywheel + AgentWriter.spawn' },
+  { surface: 'pan flywheel stop',              kind: 'cli', disposition: 'WRITE',       door: 'clearFlywheelGate + AgentWriter.stop + Orchestration report' },
   { surface: 'pan flywheel abort',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.abortFlywheel + AgentWriter.stop' },
   { surface: 'pan deacon pause',               kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused(true)' },
   { surface: 'pan deacon unpause',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused(false)' },
