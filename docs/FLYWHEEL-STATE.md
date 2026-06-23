@@ -1239,3 +1239,47 @@ Run config: `claude-code` (tag — actual orchestrator is **pi/glm-5.2** per sta
   non-fatal `'in-planning' label not found` is harmless rename fallout.
 - **NEXT TICK:** monitor strike-pan-2010 + strike-pan-1897 → merge; if either self-aborts (too broad), launch `pan plan --auto`
   same tick. Watch MIN-846 for operator UAT. If operator clears no-resume → verify 1832/1919 auto-rebase. Re-snapshot.
+
+## RUN-4 (Overdeck-era) tick 2 (2026-06-23 ~15:12Z) — 3/4 strikes LANDED+closed; filed PAN-2017; 2 more strikes launched
+
+- **Strike scorecard (3 of 4 landed, all CI green, all closed out):**
+  - **PAN-2010** → `0124944c9 fix(sequencer): clear completed singleton runs` (9m11s). Closed.
+  - **PAN-2001** → `7b3fa4814 fix: merge PAN-2001 strike` (16m26s, history-preserving merge). Closed. Fixes the phantom-merge-on-re-plan root cause.
+  - **PAN-1882** → merged+verifying-on-main (12m19s). Closed. Strike-workspace reaper.
+  - **PAN-1897** → ❌ **STUCK**: spawn delivered the codex process but NOT the task prompt (pane froze at welcome screen, Context 0%, 15+ min). Distinguishing signal: its spawn output OMITTED the `[codex-launcher]`/`[claude-invoke]` lines that healthy strikes emitted. **FILED PAN-2017** (strike spawns process but never delivers task prompt). Re-strike is BLOCKED — `pan strike PAN-1897 --dry-run` reuses session `strike-pan-1897` (collision; needs `pan kill`, which is forbidden from this role). Stranded until operator clears the session.
+- **6 issues CLOSED this run:** PAN-2016/2013/1873 (RUN-3 fixes) + PAN-2010/2001/1882 (RUN-4 strikes). All real merges (ancestor-of-main verified), main green at each close.
+- **Launched 2 more scoped strikes** (minAgents was unmet after the landed strikes finished; over-saturation per brief): **PAN-2009** (dead pi-agent 30s ready.json timeout — unsticks stuck reviews) + **PAN-1929** (auto-commit rebase rewriting shared primary-worktree history — the recurring-divergence hazard from RUN-35). Both codex/gpt-5.5.
+- **No-resume freeze UNCHANGED** (still THE blocker): OVERDECK_NO_RESUME=1 still on deacon PID 1098133; 1832/#2003 + 1919/#1950 still CONFLICTING, still need a rebase outside this role's surface. MIN-846 still the only readyForMerge (human UAT gate).
+- **DURABLE LESSON (strike spawn-delivery):** a strike whose spawn output lacks the `[codex-launcher]`/`[claude-invoke]` lines will idle at the welcome screen forever (process up, prompt never delivered) while reporting `status: running, failureCount: 0`. It is invisible in `pan status` (looks healthy) and traps the issue (session-name collision blocks re-strike without `pan kill`). When a strike shows 0% context after ~2min, treat it as a PAN-2017 spawn-delivery failure, not a slow start.
+- **NEXT TICK:** monitor strike-pan-2009 + strike-pan-1929 → merge → close. Operator: clear strike-pan-1897 so PAN-1897 can re-strike; resume deacon to drain 1832/1919; UAT+merge MIN-846.
+
+## RUN-4 (Overdeck-era) tick 3 + RETROSPECTIVE (2026-06-23 ~15:53Z) — 7 substrate fixes landed; cohort blocked on no-resume (operator)
+
+### Run output
+- **7 substrate strikes LANDED + closed** (all CI green, ~9-17 min each):
+  - PAN-2010 `0124944c9` (sequencer-runner linger)
+  - PAN-2001 `7b3fa4814` (re-plan phantom-merge — root of the close-out corruption family)
+  - PAN-1882 (strike-workspace reaper — deploys on next `pan reload`)
+  - PAN-1929 `f3dcb36ece` (auto-commit rebase shared-tree hazard — the recurring divergence)
+  - PAN-2009 (dead pi-agent 30s resume timeout)
+  - PAN-1931 `79beacea75` (complete-planning `git add -f` bypassing .gitignore)
+  - PAN-1993 `f106080241` (planning fresh-issue 404 race)
+- **10 issues CLOSED total** (the 7 above + RUN-3's PAN-2016/2013/1873 carried in as verifying-on-main).
+- **PAN-2017 FILED** (substrate): `pan strike` spawns the agent process but never delivers the task prompt (strike-pan-1897 live repro). Stuck session blocks re-strike via session-name collision.
+- **2 strikes IN-FLIGHT at session end** (PAN-1932 schema user_version guard, PAN-1888 stop-hook SQLite migration) — NEXT RUN: close out when they land.
+- **1 strike STUCK:** PAN-1897 (workspace-prep hang) — trapped by PAN-2017; needs operator `pan kill` to clear before re-strike.
+
+### The one thing that didn't move: the no-resume freeze (operator-owned)
+**OVERDECK_NO_RESUME=1** on deacon PID 1098133 remained the entire run. The patrol is ALIVE (deacon.log advancing ~60s — CORRECTION to RUN-3's "dead patrol": the log path moved to `~/.overdeck/logs/deacon.log`, and an alive patrol in no-resume mode produces the SAME freeze as a dead one; discriminator = log-mtime + the `skipping reconcileAgentLiveness` line). Because of it, PAN-1832/#2003 and PAN-1919/#1950 never auto-rebased and MIN-846 stayed the only readyForMerge. **All three are the un-drained cohort** and all route through either no-resume (operator `Resume all` / deacon restart — PAN-1879) or the human UAT/merge gate. The flywheel drove through everything reachable; these three are genuinely operator-gated.
+
+### Durable lessons (for future runs)
+1. **Strike spawn-delivery failure is invisible and trapping (PAN-2017).** A strike whose spawn output omits the `[codex-launcher]`/`[claude-invoke]` lines will idle at the harness welcome screen forever (process up, Context 0%, prompt never delivered) while `pan status` shows `running, failureCount: 0`. It ALSO traps the issue — `pan strike <id> --dry-run` reuses the session name, so a re-strike collides until someone runs `pan kill`. **Heuristic:** if a strike shows 0% context after ~2-3 min, it's a PAN-2017 failure, not a slow start; don't wait, don't re-strike (collision) — flag for `pan kill`.
+2. **"Dead patrol" vs "no-resume patrol" look identical — verify before diagnosing.** Both freeze the pipeline identically. Check the deacon.log path (`~/.overdeck/logs/deacon.log` post-rename, NOT `~/.overdeck/deacon.log`): advancing mtime = alive patrol; presence of `OVERDECK_NO_RESUME=1 — skipping reconcileAgentLiveness` = frozen-by-design. RUN-3 misdiagnosed no-resume as a dead patrol and struck PAN-2014 (which only fixed the *reporting*). The actual unblock is clearing no-resume (operator).
+3. **`pan close` works reliably for real merges while main is GREEN.** Closed 10 this run with zero gate rejections. The only noise: a non-fatal `'in-planning' label not found` (PAN-1964 rename residue — the label was removed from the repo but close-out still tries to strip it) and the transition log saying `eltmon/panopticon-cli` (legacy slug) while the label call hits `eltmon/overdeck`. Both harmless.
+4. **Strikes are the right tool for scoped substrate bugs even with the reconciler frozen.** Spawns are independent of the patrol loop — all 7 landed cleanly while no-resume held. The flywheel's substrate mission does not need the deacon; only PR-rebase/convoy-resume does.
+5. **Close out only after confirming green completed CI + ancestor-of-main.** Held RUN-3's tail during red main; this run main was green so all 10 closed cleanly. Always `gh run list … --json status,conclusion` for a *completed* success run (in-progress ≠ green) before `pan close`.
+
+### NEXT RUN / OPERATOR checklist
+- **OPERATOR (unblocks the cohort):** (a) clear OVERDECK_NO_RESUME / click "Resume all" / restart deacon with resume → deacon reconciler auto-rebases 1832/#2003 + 1919/#1950 and resumes stopped convoys (PAN-1879 tracks that this has no clean path today); (b) UAT + merge MIN-846; (c) `pan kill strike-pan-1897` so PAN-1897 can be re-struck cleanly (PAN-2017); (d) `pan reload` to deploy PAN-1882's strike-workspace reaper + PAN-1929's rebase-hazard fix + PAN-2009's pi-resume fix (all landed but not live).
+- **NEXT RUN:** close out PAN-1932 + PAN-1888 when they land; re-strike PAN-1897 after the operator clears its session; once no-resume is cleared, drive 1832/1919 to merge and close MIN-846's tail; then the cohort is drained → `pan flywheel report`.
+- **Run NOT reported:** cohort is NOT drained (1832/1919/MIN-846 unresolved, operator-gated). Did NOT run `pan flywheel report` — it would falsely declare complete. Run left ACTIVE.
