@@ -253,10 +253,10 @@ function doCommit(
 
     const branch = branchResult;
 
-    // PAN-1395 root-cause: fetch origin/main before committing so we can
-    // rebase after the commit, preventing local main from diverging when
-    // a PR merges between beads sync cycles. Fetch is safe with a dirty
-    // working tree (unlike pull --rebase).
+    // Refresh origin/main opportunistically for observability only. Background
+    // auto-commit must not integrate remote changes: rebase rewrites history,
+    // and even a fast-forward merge would move the shared primary worktree HEAD.
+    // Fetch is safe with a dirty working tree because it updates only remote refs.
     yield* runGit(['fetch', 'origin', 'main'], gitRoot).pipe(
       Effect.matchEffect({
         onSuccess: () => Effect.void,
@@ -329,21 +329,6 @@ function doCommit(
       }),
     );
     if (typeof commitOk !== 'boolean') return commitOk;
-
-    // Rebase onto origin/main so the auto-commit sits on top of any PR
-    // merges that landed on the remote between sync cycles.
-    yield* runGit(['rebase', 'origin/main'], gitRoot).pipe(
-      Effect.matchEffect({
-        onSuccess: () => Effect.void,
-        onFailure: (err) => {
-          console.warn(`[pan-dir/auto-commit] rebase failed for ${branch}: ${err.stderr || err._tag}`);
-          // Abort the rebase so the repo isn't left in a conflicted state.
-          return runGit(['rebase', '--abort'], gitRoot).pipe(
-            Effect.matchEffect({ onSuccess: () => Effect.void, onFailure: () => Effect.void }),
-          );
-        },
-      }),
-    );
 
     return { committed: true };
   });

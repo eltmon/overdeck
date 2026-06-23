@@ -18,6 +18,15 @@ describe('schema migrations', () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  it('preserves user_version when the database is newer than this build', () => {
+    const newerVersion = SCHEMA_VERSION + 1;
+    db.pragma(`user_version = ${newerVersion}`);
+
+    runMigrations(db);
+
+    expect(db.pragma('user_version', { simple: true })).toBe(newerVersion);
+  });
+
   it('repairs stale session_file paths when the corrected transcript exists', () => {
     db.pragma('user_version = 15');
     db.exec(`
