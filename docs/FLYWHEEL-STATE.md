@@ -1067,3 +1067,42 @@ also UNMET (pan-806 died). So I dispatched the follow-through:
   `pan reload` (outside my surface) — flag for operator, or it lands on main for the next deacon restart. If a strike
   self-aborts (too broad), launch `pan plan --auto` same tick. The pipeline still needs the deacon restarted WITH
   resume to clear troubled gates + auto-rebase 1832/1919 — surface clearly, don't stall on it.
+
+## RUN-3 (Overdeck-era) tick 6 (2026-06-23 ~11:02Z) — BOTH STRIKES LANDED on main; PAN-2014 fix LIVE (honest status)
+
+Both strikes landed on main in ~25 min, CI green. Real substrate progress:
+- **PAN-2015 — `82c540f836` fix(review): tolerate non-json restart responses.** VERIFIED LIVE: the old
+  `JSON parse error at position 4` is GONE. Retesting `pan review restart PAN-1919` now 404s instead — a DIFFERENT,
+  lesser error = the deacon is `Status: Starting` (mid-boot, HTTP route not loaded), NOT a new bug. The JSON fix
+  itself is confirmed working. (Route `/api/specialists/:project/:issueId/review/restart` exists in specialists.ts:1563.)
+- **PAN-2014 — `e457266d8a` fix(deacon): report stale patrol heartbeat. VERIFIED LIVE:** `pan admin cloister status`
+  now shows `Status: Starting` + `Patrol heartbeat: unknown age` instead of the FALSE `Status: Running`. The
+  diagnosis I filed (false "Running" hiding a dead patrol) is now fixed-and-live in one stroke — operators will no
+  longer be misled.
+- **Deacon is `Status: Starting` but NOT yet running** (deacon.log STILL frozen at 06:37Z; the 3 dashboard procs
+  are old Jun 21/22 boots). So the patrol is not back online yet — the troubled gates on pan-1832/1919 + the
+  conflicted-PR rebases still need the deacon to FINISH starting (operator may have kicked a restart; or the
+  heartbeat fix changed the read without actually reviving the patrol). Next tick: confirm deacon.log starts
+  advancing again.
+- **Run scorecard (substrate):** 3 bugs fixed+live this run (PAN-2014, PAN-2015) / 2 filed-pending (PAN-2013 strike
+  relabel, PAN-1873 phantom label). minAgents met. Did NOT `pan flywheel report` (cohort not drained — 2 conflicted
+  PRs, 2 dead/incomplete plans, MIN-846 awaiting UAT, deacon mid-starting).
+- **LESSON:** `pan strike` for a scoped, reproducible substrate bug works fast and lands in one ~25-min pass even
+  with the deacon patrol dead (spawns are independent of the patrol loop). Prefer it for the JSON/heartbeat-class
+  fixes. Don't over-wait for operator — ticks 3-4's passivity was the mistake; striking was the brief-correct move.
+
+## RUN-3 (Overdeck-era) tick 7 (2026-06-23 ~11:33Z) — PAN-2014 fix was ACCURACY-only; patrol STILL frozen; struck PAN-2013
+
+- **VERIFIED: PAN-2014's heartbeat fix changed the READ, not the patrol.** deacon.log is STILL frozen at 06:37Z
+  (24938 lines, 30s no-write test). `pan admin cloister status` now honestly reports `Status: Starting` /
+  `Patrol heartbeat: unknown age` (vs the old false `Status: Running`) — so operators are no longer misled — but
+  the patrol loop is NOT revived. The same dashboard procs (Jun 21/22 boots) keep running with a dead patrol.
+  **The actual patrol revival needs the deacon PROCESS restarted** (`pan restart`/`pan reload`), which is outside
+  the flywheel's allowed surface. PAN-2014 is a status-accuracy win, not a revival — honest framing for the operator.
+- **Followed through: `pan strike PAN-2013`** (strike-pan-2013, gpt-5.5/codex, working). Now strike slots are free,
+  dispatching the close-out-tail bug (after a strike's FF-merge, apply merged+verifying-on-main via the existing
+  `merge-agent.ts:253` handoff). Fixes the 1880/1864/1861 OPEN-on-main tail.
+- **State unchanged on the conflicted PRs** (1832/1919 still CONFLICTING/DIRTY, agents still TROUBLED) — they route
+  through the dead patrol (auto-rebase needs reconcileAgentLiveness). MIN-846 still the only move-without-deacon item.
+- **minAgents met** by 1 live strike (pan-2013) — floor satisfied while it runs. Did NOT `pan flywheel report`
+  (cohort not drained). NEXT: monitor pan-2013 strike -> merge; the patrol revival remains operator-owned.
