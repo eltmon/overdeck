@@ -67,12 +67,12 @@
       },
       "dependencies": {
         "conf": "^13.0.0",
+        "electron": "40.6.0",
         "electron-updater": "^6.8.3",
       },
       "devDependencies": {
         "@overdeck/contracts": "workspace:*",
         "@types/node": "^22.0.0",
-        "electron": "40.6.0",
         "electron-builder": "^25.1.8",
         "electron-rebuild": "^3.2.9",
         "tsdown": "^0.21.7",
