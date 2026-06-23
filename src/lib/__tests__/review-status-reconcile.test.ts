@@ -37,7 +37,7 @@ const notifier = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: notifier.notify }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
 
 const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
   issueId: 'PAN-1866',
@@ -193,5 +193,75 @@ describe('setReviewStatusSync — host-owned write + journal-preserving merge (P
     const journaled = journal.updateIssueRecordForReviewStatusSync.mock.calls.at(-1)![1] as ReviewStatus;
     expect(journaled.reviewNotes).toBe('must-not-be-erased'); // NOT nulled by the partial update
     expect(journaled.testStatus).toBe('passed');
+  });
+});
+
+describe('resetPipelineVerdictsForWorkStartSync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+    journal.readJournalStatusSync.mockReturnValue(null);
+  });
+
+  it('resets stale merged pipeline state before a work agent starts', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      verificationStatus: 'passed',
+      readyForMerge: true,
+      autoRequeueCount: 2,
+      verificationCycleCount: 1,
+      reviewRetryCount: 1,
+      testRetryCount: 1,
+      mergeRetryCount: 1,
+      recoveryStartedAt: '2026-06-20T07:00:00.000Z',
+      reviewedAtCommit: 'abc123',
+      lastVerifiedCommit: 'abc123',
+    }));
+
+    const result = resetPipelineVerdictsForWorkStartSync('PAN-1866');
+
+    expect(result).toMatchObject({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      autoRequeueCount: 0,
+      verificationCycleCount: 0,
+      reviewRetryCount: 0,
+      testRetryCount: 0,
+      mergeRetryCount: 0,
+    });
+    expect(result?.recoveryStartedAt).toBeUndefined();
+    expect(result?.reviewedAtCommit).toBeUndefined();
+    expect(result?.lastVerifiedCommit).toBeUndefined();
+    expect(journal.updateIssueRecordForReviewStatusSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when pipeline verdicts are already pending', () => {
+    const pending = dbRow({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      autoRequeueCount: 0,
+      verificationCycleCount: 0,
+      reviewRetryCount: 0,
+      testRetryCount: 0,
+      mergeRetryCount: 0,
+      recoveryStartedAt: undefined,
+      reviewedAtCommit: undefined,
+      lastVerifiedCommit: undefined,
+    });
+    db.getFromDb.mockReturnValue(pending);
+
+    const result = resetPipelineVerdictsForWorkStartSync('PAN-1866');
+
+    expect(result).toBeNull();
+    expect(journal.updateIssueRecordForReviewStatusSync).not.toHaveBeenCalled();
+    expect(db.upsert).not.toHaveBeenCalled();
   });
 });

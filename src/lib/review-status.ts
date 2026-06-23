@@ -506,6 +506,52 @@ export function setReviewStatusSync(
   return updated;
 }
 
+export function resetPipelineVerdictsForWorkStartSync(issueId: string): ReviewStatus | null {
+  const status = getReviewStatusSync(issueId);
+  if (!status) return null;
+
+  const isPending =
+    status.reviewStatus === 'pending' &&
+    status.testStatus === 'pending' &&
+    (status.mergeStatus === undefined || status.mergeStatus === 'pending') &&
+    (status.verificationStatus === undefined || status.verificationStatus === 'pending') &&
+    !status.readyForMerge &&
+    status.autoRequeueCount === 0 &&
+    status.verificationCycleCount === 0 &&
+    status.reviewRetryCount === 0 &&
+    status.testRetryCount === 0 &&
+    status.mergeRetryCount === 0 &&
+    status.recoveryStartedAt === undefined &&
+    status.reviewedAtCommit === undefined &&
+    status.lastVerifiedCommit === undefined;
+
+  if (isPending) return null;
+
+  return setReviewStatusSync(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    reviewNotes: undefined,
+    testNotes: undefined,
+    mergeNotes: undefined,
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    verificationCycleCount: 0,
+    stuck: false,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewRetryCount: 0,
+    testRetryCount: 0,
+    mergeRetryCount: 0,
+    recoveryStartedAt: undefined,
+    reviewedAtCommit: undefined,
+    lastVerifiedCommit: undefined,
+  });
+}
+
 /**
  * PAN-1988 — deliver review feedback to the work agent from the HOST when a blocked/failed
  * verdict is reconciled from the journal. Dynamic import to avoid a static import cycle

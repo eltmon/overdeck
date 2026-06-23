@@ -1064,7 +1064,7 @@ export class IssueDataService {
   private async fetchLinearIssues(apiKey: string, sinceUpdatedAt: string | null): Promise<any[]> {
     const allIssues: any[] = [];
     let hasMore = true;
-    let cursor: string | undefined;
+    let cursor: string | null | undefined;
 
     // Build filter conditions
     const filterConditions: string[] = [];
@@ -1179,7 +1179,15 @@ export class IssueDataService {
         throw new Error(message);
       }
 
-      const json = await response.json();
+      const json = await response.json() as {
+        errors?: Array<{ message?: string }>;
+        data?: {
+          issues?: {
+            nodes: any[];
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          };
+        };
+      };
 
       if (json.errors) {
         const message = json.errors[0]?.message || 'Linear GraphQL error';

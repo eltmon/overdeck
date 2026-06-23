@@ -413,7 +413,7 @@ interface UnixHttpServer {
 interface BunGlobal {
   serve: (opts: {
     unix: string;
-    fetch: (req: Request) => Response | Promise<Response>;
+    fetch: (req: Request) => unknown;
   }) => UnixHttpServer;
 }
 

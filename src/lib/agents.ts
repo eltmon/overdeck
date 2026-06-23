@@ -44,6 +44,7 @@ import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
 import { resolveHarness } from './harness-resolve.js';
+import { resetPipelineVerdictsForWorkStartSync } from './review-status.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
 import { Effect } from 'effect';
@@ -3690,6 +3691,16 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
   if (role === 'work') {
+    try {
+      const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
+      if (resetStatus) {
+        const { resetPostMergeState } = await import('./cloister/merge-agent.js');
+        resetPostMergeState(options.issueId);
+      }
+    } catch (err) {
+      console.warn(`[agents] Could not reset stale pipeline verdicts for ${options.issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
       console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
     });
