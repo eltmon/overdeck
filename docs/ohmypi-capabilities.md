@@ -124,17 +124,17 @@ model IDs, the canonical auth mode, and key model capabilities where known.
 
 Each row is a discrete issue worth filing. Priority: P1 = blocks production use, P2 = high value, P3 = incremental.
 
-| # | Feature / Fix | omp capability or workflow | Priority | Notes |
-|---|--------------|--------------------------|----------|-------|
-| FU-1 | Frontend Tools-toggle for ohmypi conversations | Tool-call data capture (ohmypi-parser.ts) | P2 | Tracked as `workspace-r0gq1` |
-| FU-2 | Provider credential passthrough for Groq/Cerebras/Fireworks | omp native Groq/Cerebras/Fireworks routing | P2 | Extend `getOhmypiLauncherFields` env-var injection |
-| FU-3 | ohmypi provider picker in dashboard model selector | omp 35+ provider matrix | P2 | Surface `groq/`, `cerebras/`, `bedrock/` etc. in picker |
-| FU-4 | ohmypi-based Kimi routing (replace CLIProxy for kimi-k2) | omp DashScope native auth | P1 | Eliminates 200k-window illusion (PAN-1865) |
-| FU-5 | Per-provider cost grouping in cost dashboard | omp model-id provider prefix | P2 | Group cost events by provider prefix |
-| FU-6 | Kimi thinking-token cost fields in ohmypi parser | kimi-k2 `thinking_tokens` field | P2 | Extend ohmypi-parser.ts + CacheableCostEvent schema |
-| FU-7 | ohmypi extension version pin + doctor mismatch warn | omp extension API versioning | P2 | Add `compatible-omp-version` to ohmypi-extension/package.json |
-| FU-8 | Bun `1.3.11` regression test in doctor gate | `checkOhmypi` Bun version assertion | P2 | Add test with a mock `bun --version` returning `1.3.11` |
-| FU-9 | Local-model ohmypi review role (Ollama) | omp `ollama/` routing | P3 | Enable zero-cost preliminary review pass |
-| FU-10 | ohmypi FIFO vs paste-buffer latency benchmark | Named-pipe delivery latency | P3 | Measure and document per-message latency win |
-| FU-11 | ohmypi conversation viewer rendering validation | ohmypi-conversation-parser.ts | P2 | End-to-end test that tool-call steps render in Conversation panel |
-| FU-12 | GitHub Copilot provider via ohmypi | omp `github/` routing | P3 | Route Copilot-subscription users to GPT-4o/Claude/Gemini via omp |
+| # | Issue | Feature / Fix | omp capability or workflow | Priority | Notes |
+|---|-------|--------------|--------------------------|----------|-------|
+| FU-1 | [#2024](https://github.com/eltmon/overdeck/issues/2024) | Frontend Tools-toggle for ohmypi conversations | Tool-call data capture (ohmypi-parser.ts) | P2 | Tracked as `workspace-r0gq1` |
+| FU-2 | [#2025](https://github.com/eltmon/overdeck/issues/2025) | Provider credential passthrough for Groq/Cerebras/Fireworks | omp native Groq/Cerebras/Fireworks routing | P2 | Extend `getOhmypiLauncherFields` env-var injection |
+| FU-3 | [#2026](https://github.com/eltmon/overdeck/issues/2026) | ohmypi provider picker in dashboard model selector | omp 35+ provider matrix | P2 | Surface `groq/`, `cerebras/`, `bedrock/` etc. in picker |
+| FU-4 | [#2027](https://github.com/eltmon/overdeck/issues/2027) | ohmypi-based Kimi routing (replace CLIProxy for kimi-k2) | omp DashScope native auth | P1 | Eliminates 200k-window illusion (PAN-1865) |
+| FU-5 | [#2028](https://github.com/eltmon/overdeck/issues/2028) | Per-provider cost grouping in cost dashboard | omp model-id provider prefix | P2 | Group cost events by provider prefix |
+| FU-6 | [#2029](https://github.com/eltmon/overdeck/issues/2029) | Kimi thinking-token cost fields in ohmypi parser | kimi-k2 `thinking_tokens` field | P2 | Extend ohmypi-parser.ts + CacheableCostEvent schema |
+| FU-7 | [#2030](https://github.com/eltmon/overdeck/issues/2030) | ohmypi extension version pin + doctor mismatch warn | omp extension API versioning | P2 | Add `compatible-omp-version` to ohmypi-extension/package.json |
+| FU-8 | [#2031](https://github.com/eltmon/overdeck/issues/2031) | Bun `1.3.11` regression test in doctor gate | `checkOhmypi` Bun version assertion | P2 | Add test with a mock `bun --version` returning `1.3.11` |
+| FU-9 | [#2032](https://github.com/eltmon/overdeck/issues/2032) | Local-model ohmypi review role (Ollama) | omp `ollama/` routing | P3 | Enable zero-cost preliminary review pass |
+| FU-10 | [#2033](https://github.com/eltmon/overdeck/issues/2033) | ohmypi FIFO vs paste-buffer latency benchmark | Named-pipe delivery latency | P3 | Measure and document per-message latency win |
+| FU-11 | [#2034](https://github.com/eltmon/overdeck/issues/2034) | ohmypi conversation viewer rendering validation | ohmypi-conversation-parser.ts | P2 | End-to-end test that tool-call steps render in Conversation panel |
+| FU-12 | [#2035](https://github.com/eltmon/overdeck/issues/2035) | GitHub Copilot provider via ohmypi | omp `github/` routing | P3 | Route Copilot-subscription users to GPT-4o/Claude/Gemini via omp |

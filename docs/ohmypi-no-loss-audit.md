@@ -39,7 +39,7 @@
 | S23 | Frontend harness pickers / labels show "Pi" | `src/dashboard/frontend/` (harness select, kanban labels) | replace → "ohmypi" / "oh-my-pi" display strings | Frontend harness picker and labels updated to ohmypi (bead ui-pickers) | [x] |
 | S24 | JSONL session resolver — pi session path detection | `src/lib/runtimes/pi.ts` or resolver module | preserve (path detection is harness-agnostic; existing pi transcripts parse via normalizeHarness) | `src/lib/memory/transcript-source.ts` — `PiTranscriptSource` preserved; now filters on `harness === 'ohmypi'`; `resolveAgentTranscript` returns `harness: 'ohmypi'` | [x] |
 | S25 | Tests: `pi.test.ts`, `pi-codex-auth.test.ts`, `doctor-pi.test.ts` | `src/lib/runtimes/__tests__/pi.test.ts`, `src/lib/__tests__/pi-codex-auth.test.ts`, `src/cli/commands/__tests__/doctor-pi.test.ts` | replace → ohmypi equivalents | `ohmypi.test.ts`, `ohmypi-codex-auth.test.ts`, `doctor-ohmypi.test.ts` added; `doctor-pi.test.ts` removed (bead `workspace-8bebw`) | [x] |
-| S26 | Harness docs (`configuration/harnesses.mdx`, `reference/harness-landscape.mdx`) | dashboard docs site | update install/use sections to omp | Pending — bead `workspace-tnvp7` | [x] |
+| S26 | Harness docs (`configuration/harnesses.mdx`, `reference/harness-landscape.mdx`) | dashboard docs site | update install/use sections to omp | Done — bead `workspace-tnvp7` (commit 6476dc941) | [x] |
 
 ---
 
@@ -50,4 +50,4 @@
 | D1 | RED main: `agent-spawning.test.ts` resume→Pi FIFO test fails | [PAN-1859](https://github.com/eltmon/overdeck/issues/1859) | resolved-by-bead: the rename (S4+S5) is the very surface failing; green ohmypi resume→FIFO test lands in `workspace-wvkgj` | `workspace-wvkgj` | [x] |
 | D2 | Pi extension cwd detection broken | [PAN-1833](https://github.com/eltmon/overdeck/issues/1833) | resolved-by-bead: extension rename (`workspace-ek8s5`) resolves bundle path from module, which fixes the cwd detection | `workspace-ek8s5` | [x] |
 | D3 | Blank pi conversation view in dashboard | [PAN-1827](https://github.com/eltmon/overdeck/issues/1827) | resolved-by-bead: conversation parser rename + 3-dispatcher fix (`workspace-4vixt`) wires up the ohmypi branch and eliminates blank rendering | `workspace-4vixt` | [x] |
-| D4 | Tool-call data / extra cost fields not captured | [PAN-1912](https://github.com/eltmon/overdeck/issues/1912) | split: tool-call data + extra usage fields resolved in `workspace-opaff` (bead 14); frontend Tools-toggle UI carried forward as filed follow-up (`workspace-r0gq1`) | `workspace-opaff` + follow-up | [x] |
+| D4 | Tool-call data / extra cost fields not captured | [PAN-1912](https://github.com/eltmon/overdeck/issues/1912) | split: tool-call data + extra usage fields resolved in `workspace-opaff` (bead 14); frontend Tools-toggle UI carried forward as [#2024](https://github.com/eltmon/overdeck/issues/2024) | `workspace-opaff` + [#2024](https://github.com/eltmon/overdeck/issues/2024) | [x] |
