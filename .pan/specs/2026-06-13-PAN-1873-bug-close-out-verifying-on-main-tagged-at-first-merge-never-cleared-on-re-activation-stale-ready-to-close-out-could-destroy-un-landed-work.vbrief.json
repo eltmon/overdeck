@@ -4,17 +4,17 @@
     "created": "2026-06-13T23:46:51Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1873: close-out re-verifies merge + refuses re-activated work (on the LIVE workflows.ts path), clears the stale verifying_on_main tag at the re-activation source, and makes readiness reflect computed safety",
-    "updated": "2026-06-13T23:54:15.866Z"
+    "updated": "2026-06-23T14:39:44.151Z"
   },
   "plan": {
     "id": "pan-1873",
     "title": "bug(close-out): verifying_on_main tagged at first merge, never cleared on re-activation — stale 'ready to close out' could destroy un-landed work",
-    "status": "proposed",
+    "status": "completed",
     "uid": "90fa1d19-3692-42a2-9dfc-f3403ef167bd",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T23:46:51Z",
-    "updated": "2026-06-13T23:54:15.866Z",
+    "updated": "2026-06-23T14:39:44.151Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1873",
@@ -389,5 +389,5 @@
       "canonicalFilename": "2026-06-13-PAN-1873-bug-close-out-verifying-on-main-tagged-at-first-merge-never-cleared-on-re-activation-stale-ready-to-close-out-could-destroy-un-landed-work.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
