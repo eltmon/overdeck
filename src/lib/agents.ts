@@ -5041,6 +5041,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     if (compactSeed) {
       console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+    } else if (piDeadRecovery) {
+      console.log(`[agents] Respawned ${normalizedId} fresh because the prior Pi process was dead (archived session ${sessionId})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after dead Pi process (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
     } else if (!shouldResumeSavedSession) {
       console.log(`[agents] Respawned ${normalizedId} fresh because session origin drifted (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
