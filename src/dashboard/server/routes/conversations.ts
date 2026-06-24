@@ -922,6 +922,10 @@ export async function handleConversationMessage(
     return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
   }
 
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
   const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
   if (!message) {
     return jsonResponse({ error: 'Message is required' }, { status: 400 });

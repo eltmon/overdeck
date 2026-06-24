@@ -98,6 +98,11 @@ interface ConversationPanelProps {
    */
   hideToolCalls?: boolean;
   onToggleHideToolCalls?: () => void;
+  /** When provided in embedded mode, shows a resume/action bar instead of the
+   *  composer. Use when the session is ended and the parent wants a custom CTA. */
+  onEmbeddedResume?: () => void;
+  /** Label for the embedded resume button. Defaults to "Resume Session". */
+  embeddedResumeLabel?: string;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -144,6 +149,8 @@ export function ConversationPanel({
   onTargetMessageHandled,
   hideToolCalls: controlledHideToolCalls,
   onToggleHideToolCalls,
+  onEmbeddedResume,
+  embeddedResumeLabel,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -956,9 +963,10 @@ export function ConversationPanel({
           {(effectiveViewMode === 'conversation' || !showTerminal) && (
             <ConversationView
               conversation={conversation}
-              onResume={!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined}
+              onResume={onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
+              resumeLabel={embeddedResumeLabel}
               roundMarkers={roundMarkers}
               roundMetadata={roundMetadata}
               turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
@@ -1128,6 +1136,8 @@ interface ConversationViewProps {
   onResume?: () => void;
   onArchive?: () => void;
   resumePending?: boolean;
+  /** Override label for the resume button. Defaults to "Resume Session". */
+  resumeLabel?: string;
   /** ModelPicker component to render next to the Resume button */
   modelPicker?: React.ReactNode;
   /** Optional round-divider markers forwarded to the MessagesTimeline. */
@@ -1155,7 +1165,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1361,7 +1371,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
               <>
                 {modelPicker}
                 <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
-                  {resumePending ? 'Resuming…' : 'Resume Session'}
+                  {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
                 </button>
               </>
             )}
@@ -1429,7 +1439,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
             onClick={onResume}
             disabled={resumePending}
           >
-            {resumePending ? 'Resuming…' : 'Resume Session'}
+            {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
           </button>
         </div>
       ) : (

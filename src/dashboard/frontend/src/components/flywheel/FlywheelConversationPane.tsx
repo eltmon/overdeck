@@ -426,7 +426,12 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
           viewMode === 'terminal' ? (
             <XTerminal sessionName={FLYWHEEL_CONVERSATION_NAME} />
           ) : (
-            <ConversationPanel conversation={conversation} embedded />
+            <ConversationPanel
+              conversation={conversation}
+              embedded
+              onEmbeddedResume={!conversation.sessionAlive ? () => startMutation.mutate() : undefined}
+              embeddedResumeLabel={startMutation.isPending ? 'Starting…' : 'Start New Run'}
+            />
           )
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">
