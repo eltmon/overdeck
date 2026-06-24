@@ -1341,3 +1341,89 @@ strike-pan-1897 (PAN-2017, prompt never delivered), strike-pan-1900 (work done, 
   3. `pan restart --resume` — revive the deacon reconciler (PAN-1879 now makes this possible) → auto-rebases PAN-1832/#2003 + PAN-1919/#1950 and resumes stopped convoys. **THE single highest-leverage action.**
   4. UAT + merge MIN-846.
 - **Recurring gotchas confirmed this run:** (1) deacon.log is at `~/.overdeck/logs/deacon.log` (moved); an alive patrol in no-resume mode looks identical to a dead one. (2) Strikes touching shared test-infra (no-loss-matrix, infra.test) expose pre-existing gaps — the red looks like the strike broke it but the strike just ran the test. (3) Aborted strikes strand (PAN-2022); tight single-area strikes land; test-heavy strikes risk workspace-deps aborts (workaround: the frontend-symlink trick). (4) gh auth 401 is transient (retry). (5) bot-state `chore(records)`/`chore(beads)` commits accumulate ahead of origin when auto-push fails safely — a clean FF push of them unblocks strike merges.
+
+## RUN-5 (2026-06-24) tick 1 (~00:41–00:55Z) — main GREEN, deacon STILL no-resume; closed 2, launched 4 scoped strikes
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Orchestrator is actually
+**pi/glm-5.2** (task-config header said `claude-code`, but latest.json + this session are pi/glm-5.2 —
+reporting ground truth). Reporting harness discrepancy as an openQuestion.
+
+- **Main GREEN** (last 3 CI runs `success` on `2bfca965`/`98ee6fd1`/`622291ae`; local HEAD `db5ad541e`).
+  No red-main P0 this tick. RAM 14.8/64 GB, swap CLEAR (0/8.2) — ample headroom to scale strikes.
+- **Deacon STILL frozen on `OVERDECK_NO_RESUME=1`** (verified THREE ways: `ps` cmdline lacks the flag
+  but `/proc/358390/environ` shows `OVERDECK_NO_RESUME=1`; deacon.log fires
+  `OVERDECK_NO_RESUME=1 — skipping reconcileAgentLiveness` every 60s, latest 1 min ago; dashboard
+  auto-restart watchdog FAILED — "deacon patrol heartbeat stale for 240s, manual intervention required").
+  This is the RUN-4 cohort-drain blocker, **still operator-gated**. The two conflicting ready PRs
+  (PAN-1832/#2003, PAN-1919/#1950) cannot auto-rebase while it holds. `pan restart --resume` is outside
+  flywheel authority (effectively pan resume — forbidden; reverses a deliberate operator state held since
+  RUN-3). Surfaced as the #1 urgent openQuestion/suggestion. Did NOT restart unilaterally.
+- **Closed out 2 verifying-on-main + merged** (cohort drain, low-risk; both verified merged on main + CI green):
+  PAN-2023 (`98ee6fd1f` "Fix headless tmux session size" — the 67x1 pane bug) + PAN-2011
+  (`a443997b2` "launcher-pinned session" — the conversation/terminal tab mismatch). `pan close` succeeded
+  for both; only noise was the known harmless `'in-planning' label not found` (rename fallout).
+- **Launched 4 scoped substrate strikes** (all codex/gpt-5.5 provider-default, all spawned with healthy
+  `[codex-launcher]`/`[claude-invoke]` lines — NO PAN-2017 spawn-delivery failures):
+  - `pan strike PAN-2015` — review-restart JSON.parse (restores the flywheel's ONLY convoy-recovery verb;
+    deterministic, immediately reproducible). strike traced it to a response body written twice
+    (`readJsonBody` in specialists/workspaces) — running focused tests.
+  - `pan strike PAN-2038` — `pan done` workspace fallback (deacon already has the exact `findWorkspacePath`
+    fallback pattern to copy into `done.ts`). Wrote a regression test in done.test.ts.
+  - `pan strike PAN-2040` — activity feed rendering `actionStatus` token instead of `summary` (display-only).
+  - `pan strike PAN-2039` — `pan sync` stranding 62 shipped skills (stale pre-manifest install treated as
+    `user-owned`, never adopted; sync already backs up the target tree, so adopting is safe).
+- **Stranded-strike state from RUN-4 is PARTIALLY cleared:** the 4 agent state dirs
+  (strike-pan-1897/1900/1935/2011) are GONE and no strike-pan-* tmux sessions remain — so re-striking no
+  longer collides on the session/state front. BUT stale residue persists: `pan review pending` still lists
+  strike-pan-1897/1900/1935/2014/2015 as pending reviews (DB rows), `workspaces/feature-2038` + branches
+  `strike/pan-1900` + `strike/pan-1935` (remote too) remain. The review_status rows are harmless noise;
+  the orphan workspaces/branches are cleanup candidates (no `pan workspace discard`/`git branch -D` from
+  this role unless they block a strike — they didn't block 2038/2039).
+- **Cohort status (unchanged from RUN-4 — all operator-gated):** PAN-1832/#2003 + PAN-1919/#1950 (deacon
+  rebase, blocked by no-resume), MIN-846 (readyForMerge, human UAT+merge). Flywheel cannot drain these
+  without the deacon restart or operator UAT — both genuinely operator-owned.
+- **NEXT TICK:** monitor the 4 strikes → each lands on main → verify green CI → `pan close`; if any
+  self-aborts (too broad / approval stall), launch `pan plan --auto` same tick (follow-through rule).
+  Watch strike-pan-2040 (codex "Reviewing approval request" — possible PAN-1896 approval-friction stall).
+  Re-emit status each tick; keep the no-resume openQuestion surfaced.
+
+## RUN-5 tick 2 (~01:11Z) — 5 closed; dirty primary tree blocks ~50% of strikes; pivot to planning
+
+- **Closed 5 this run** (all verified merged on origin/main + green CI before close): PAN-2023 (`98ee6fd1f`),
+  PAN-2011 (`a443997b2`), PAN-2015 (`82c540f83`), PAN-2038 (`f1bf77e95`), PAN-2040 (`60d7021c3` — already
+  fixed by a conversation; my strike correctly DECLINED to push a duplicate). `pan close` clean on all;
+  only noise was the harmless `'in-planning' label not found`.
+- **DURABLE LESSON — a dirty primary main worktree blocks strikes (PAN-1929 family, operational debt).**
+  strike-pan-2039 AND strike-pan-1893 both REFUSED to edit/push because "primary main is dirty and ahead
+  of origin" (their safety guard against the PAN-1929 commit-mixing hazard). The dirty WIP is ACTIVE
+  CONVERSATION work in the shared primary repo (cost-reconciler `src/lib/costs/reconciler.ts`, PAN-1989
+  ohmypi `.pan/continues` + spec, cockpit/activity-feed frontend) — NOT flywheel-owned, so I must not
+  commit/discard it. Meanwhile strike-pan-2015/2038 LANDED fine (they committed before the tree dirtied,
+  or their check passed). Net: ~50% strike block rate while the primary tree is dirty.
+  **Pivot: `pan plan --auto` is the RELIABLE forward-motion path** — plans + work agents run in workspaces
+  (worktrees), unaffected by the primary tree's dirt. Strikes need a clean primary main to merge through.
+- **The "divergence" was TRANSIENT and self-healing.** Local main briefly looked 12-ahead/diverged from
+  origin; after origin advanced (strikes landing) + pushing the regenerable bot-state `chore(records)`/
+  `chore(state)` commits (clean FF, recoverable — the RUN-4 pattern), local returned to ahead=0/FF-able.
+  The bot-state commits re-accumulate after every close-out (the not-yet-deployed PAN-1929 auto-push
+  hazard); pushing them is safe hygiene. Pushed twice this run.
+- **strike self-abort → plan follow-through WORKS.** strike-pan-1901 self-aborted ("issue is plan-worthy,
+  not a quick strike — .pan vBRIEF JSON is more complex than the union driver"). Launched `pan plan
+  PAN-1901 --auto` same-tick; planning-pan-1901 is doing excellent deep analysis (confirmed `bd` has no
+  merge-driver subcommand, investigating union driver + `.pan/specs`(233f)/`.pan/continues`(147f)
+  conflict behavior + auto-commit.ts). The plan path caught what the strike correctly declined.
+- **PAN-1864 planned BUT BEADLESS (substrate gap).** planning-pan-1864 finalized → `proposed` (label
+  `planned` added) but spec.vbrief.json has NO beads field (only vBRIEFInfo + plan). This is the
+  PAN-1647/1509/1410 class (auto-promote produces beadless specs). `pan start` would spawn a work agent
+  with nothing to do. Did NOT start work. Surfaced as investigate.
+- **Two stranded strikes (PAN-2022 class), both fix-complete on their branches:** strike-pan-2039 (sync
+  skills fix, 1 commit, tests pass — blocked on dirty tree then session-collision) + strike-pan-1893
+  (toUpperCase crash — refused dirty tree, no edits). Each needs operator `pan kill strike-pan-X` to
+  clear the session before a clean re-strike. Primary tree is now synced so a re-strike would land.
+- **minAgents met via planning** (planning-pan-1901 + planning-pan-1994). Deacon still frozen (no-resume),
+  so review-pipeline work can't advance to merge either — the reliable landing path right now is strikes
+  on a clean tree + close-outs of already-merged work. RAM 18.8/64 GB, swap clear. Main GREEN (`f21b03fb5`).
+- **NEXT TICK:** monitor planning-pan-1901/1994 → proposed; if primary tree gets cleaned (conversations
+  commit/discard), resume scoped strikes (1893/2039 re-strike after operator pan kill, + new ones).
+  Keep surfacing the no-resume + dirty-tree blockers. Re-emit status each tick.
