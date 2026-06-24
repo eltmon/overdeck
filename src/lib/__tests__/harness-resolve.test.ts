@@ -20,6 +20,17 @@ vi.mock('../providers.js', () => ({
 }));
 vi.mock('../config-yaml.js', () => ({ loadConfigSync: configMock.loadConfigSync }));
 vi.mock('../agents.js', () => ({ getProviderAuthMode: vi.fn(async () => 'apikey') }));
+// Make `command -v omp` succeed so hasHarnessBinary('ohmypi') returns true in all tests.
+// Tests that never reach the binary check (they throw earlier) are unaffected.
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    exec: vi.fn((cmd: string, callback: (err: null | Error, stdout: string, stderr: string) => void) => {
+      callback(null, '/usr/local/bin/omp', '');
+    }),
+  };
+});
 
 describe('resolveHarness — PAN-1871: no silent CLIProxy fallback for non-native models', () => {
   beforeEach(async () => {
@@ -109,12 +120,9 @@ describe('resolveHarness — PAN-1984: provider-default-only (explicit/role over
     vi.mocked(await import('../harness-policy.js')).canUseHarnessSync = vi.fn(() => ({ allowed: true }));
 
     const { resolveHarness } = await import('../harness-resolve.js');
-    // omp binary not on PATH in test → falls back gracefully (kimi is CLIProxy only in real life;
-    // for this test just confirm ohmypi is attempted as the resolved harness, not pi).
-    // We cannot assert the final value because hasHarnessBinary may return false for omp in CI,
-    // but we CAN assert getBuiltInDefaultHarness was called and returned 'ohmypi'.
-    const result = await resolveHarness({ model: 'kimi-k2.7-code' });
-    // Either ohmypi (omp present) or an error (omp absent, CLIProxy guard fires).
-    expect(['ohmypi', 'claude-code']).toContain(result);
+    // child_process.exec is mocked above to make `command -v omp` succeed,
+    // so hasHarnessBinary('ohmypi') returns true and resolveHarness reaches
+    // `return winner` — confirming the built-in default is 'ohmypi', not 'pi'.
+    await expect(resolveHarness({ model: 'kimi-k2.7-code' })).resolves.toBe('ohmypi');
   });
 });
