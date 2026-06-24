@@ -12,7 +12,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: [path.resolve(__dirname, './src/test-setup.ts')],
+    // canvas-setup.ts must load first — it stubs canvas before test-setup.ts
+    // imports @xterm/xterm (which probes canvas on import). See PAN-1989.
+    setupFiles: [
+      path.resolve(__dirname, './src/canvas-setup.ts'),
+      path.resolve(__dirname, './src/test-setup.ts'),
+    ],
     include: [
       path.resolve(__dirname, 'src/**/__tests__/**/*.test.{ts,tsx}'),
       path.resolve(__dirname, 'src/**/*.{test,spec}.{ts,tsx}'),
