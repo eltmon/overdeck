@@ -102,16 +102,15 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T07:57:33.172Z",
+  "updated": "2026-06-24T13:49:36.203Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T07:57:33.145Z",
-    "verificationNotes": "Verification FAILED at test (1200005ms):\n\nnfig --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✗ ad-hoc state write under src/lib/pan-dir/ outside the approved writer or legacy exception list:\nsrc/lib/pan-dir/evil.ts:4:  return fs.writeFileString(path, content);\nRoute durable mutations through src/lib/pan-dir/record.ts or update the allowlist/legacy list.\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✗ state.json written outside writeAgentStateJsonSync:\nsrc/lib/agents.ts:8: state.json write outside writeAgentStateJsonSync\n✗ ad-hoc write to the workspace/project continue file outside legacy exceptions:\nsrc/lib/evil.ts:3:  writeFileSync(continuePath, '{}');\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n(node:2494322) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
+    "updatedAt": "2026-06-24T13:49:36.157Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
@@ -120,10 +119,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-opus-4-8": {
-            "input": 951,
-            "output": 45345,
-            "cacheRead": 3593186,
-            "cacheWrite": 67331
+            "input": 30050,
+            "output": 100835,
+            "cacheRead": 13812904,
+            "cacheWrite": 157106
           },
           "anthropic/claude-sonnet-4-6": {
             "input": 54,
@@ -171,10 +170,10 @@
       },
       "totals": {
         "anthropic/claude-opus-4-8": {
-          "input": 21470,
-          "output": 187854,
-          "cacheRead": 13583140,
-          "cacheWrite": 1268957
+          "input": 50569,
+          "output": 243344,
+          "cacheRead": 23802858,
+          "cacheWrite": 1358732
         },
         "anthropic/claude-sonnet-4-6": {
           "input": 1769,
@@ -202,8 +201,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 103.444164,
-        "pricingAsOf": "2026-06-24T07:57:33.171Z"
+        "usd": 110.647866,
+        "pricingAsOf": "2026-06-24T13:49:36.203Z"
       }
     },
     "merges": [
