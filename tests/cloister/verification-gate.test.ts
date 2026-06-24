@@ -138,15 +138,18 @@ describe('runQualityGates — SSH remote support', () => {
     expect(cmd).toContain(`cd ${workspacePath}/frontend &&`);
   });
 
-  it('passes 5-minute timeout to each execAsync call for SSH', async () => {
+  it('passes the per-gate command timeout to each execAsync call for SSH', async () => {
     await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
     }));
 
-    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    // Must match the per-gate command timeout in validation.ts (PAN-1989: raised to 20m
+    // so a near-total-rename changeset whose `vitest --changed` selects ~the whole suite
+    // can finish instead of being killed mid-run).
+    const PER_GATE_TIMEOUT_MS = 20 * 60 * 1000;
     for (const call of execMock.mock.calls) {
-      expect(call[1]).toMatchObject({ timeout: FIVE_MINUTES_MS });
+      expect(call[1]).toMatchObject({ timeout: PER_GATE_TIMEOUT_MS });
     }
   });
 
