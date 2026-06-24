@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, getOverdeckHome, packageRoot, sessionFilePath } from './paths.js';
+import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
@@ -2471,6 +2471,11 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
         ...event,
       }));
     }
+    // PAN-1989: also persist the id durably so a dashboard restart / reboot can
+    // recover the resume pointer from disk instead of only from runtime state.
+    if (patch.claudeSessionId) {
+      appendSessionIdToHistory(agentId, patch.claudeSessionId);
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
@@ -2550,6 +2555,38 @@ export function saveSessionId(agentId: string, sessionId: string): void {
 }
 
 /**
+ * PAN-1989: durably record a Claude session id in the agent's append-only
+ * sessions.json the moment the dashboard learns it.
+ *
+ * The heartbeat hook also appends here, but only on the FIRST PostToolUse — so a
+ * session that boots and is stopped before running any tool (e.g. kickoff never
+ * delivered, or a reboot mid-run) leaves NO durable resume pointer. Its only
+ * copy then lives in the ephemeral runtime `claudeSessionId`, which is lost on a
+ * dashboard restart or reboot, leaving the agent "not resumable" even though its
+ * transcript is intact on disk. Calling this from saveAgentRuntimeState (the
+ * server-side SessionStart choke point) makes the pointer survive both. The
+ * append-only list may accumulate aborted/empty ids; getLatestSessionId picks
+ * the freshest one with a real transcript, so empties never shadow the truth.
+ * De-dupes; never throws.
+ */
+export function appendSessionIdToHistory(agentId: string, sessionId: string): void {
+  if (!sessionId || !sessionId.trim()) return;
+  try {
+    const dir = getAgentDir(agentId);
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, 'sessions.json');
+    let list: string[] = [];
+    if (existsSync(file)) {
+      const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+      if (Array.isArray(parsed)) list = parsed.filter((v): v is string => typeof v === 'string');
+    }
+    if (list.includes(sessionId)) return;
+    list.push(sessionId);
+    writeFileSync(file, JSON.stringify(list));
+  } catch { /* non-fatal — bookkeeping only */ }
+}
+
+/**
  * Get saved Claude session ID
  */
 export function getSessionId(agentId: string): string | null {
@@ -2599,6 +2636,31 @@ function resolveCodexThreadIdSync(agentId: string): string | null {
   return null;
 }
 
+/**
+ * Sync mirror of jsonl-resolver.ts's pickFreshestSessionId: from a list of
+ * candidate session ids, return the one whose JSONL transcript has the most
+ * recent mtime, skipping ids with no file on disk. Falls back to the last
+ * appended id when none have a transcript (e.g. workspace moved). Returns null
+ * only when there are no usable candidates.
+ */
+function pickFreshestExistingSessionIdSync(agentId: string, candidates: unknown[]): string | null {
+  const valid = candidates.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  if (valid.length === 0) return null;
+  const workspace = getAgentStateSync(agentId)?.workspace;
+  if (workspace) {
+    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
+    let best: { id: string; mtimeMs: number } | null = null;
+    for (const id of valid) {
+      try {
+        const s = statSync(join(projectDir, `${id}.jsonl`));
+        if (!best || s.mtimeMs > best.mtimeMs) best = { id, mtimeMs: s.mtimeMs };
+      } catch { /* no JSONL for this id — skip */ }
+    }
+    if (best) return best.id;
+  }
+  return valid[valid.length - 1] ?? null;
+}
+
 export function getLatestSessionIdSync(agentId: string): string | null {
   // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
   //    returning it would make resumeAgent target a non-existent thread and codex would drift into
@@ -2610,13 +2672,18 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   const fromSessionFile = getSessionId(agentId);
   if (fromSessionFile) return fromSessionFile;
 
-  // 2. sessions.json (written by heartbeat hook — last entry is most recent)
+  // 2. sessions.json (append-only list of session ids the agent has used).
+  //    The array can hold aborted/empty ids (e.g. a fresh session that never
+  //    produced a transcript), so we can't trust "last entry" — pick the id
+  //    whose JSONL is freshest on disk, matching resolveClaudeSessionId
+  //    (jsonl-resolver.ts). Falls back to last-appended when none exist on disk.
   const sessionsFile = join(getAgentDir(agentId), 'sessions.json');
   try {
     if (existsSync(sessionsFile)) {
       const sessions = JSON.parse(readFileSync(sessionsFile, 'utf8'));
       if (Array.isArray(sessions) && sessions.length > 0) {
-        return sessions[sessions.length - 1];
+        const picked = pickFreshestExistingSessionIdSync(agentId, sessions);
+        if (picked) return picked;
       }
     }
   } catch { /* non-fatal */ }
