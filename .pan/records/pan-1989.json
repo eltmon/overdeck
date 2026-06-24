@@ -102,16 +102,17 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T03:03:53.802Z",
+  "updated": "2026-06-24T03:08:02.762Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "blocked",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T03:03:53.734Z",
-    "reviewNotes": "ohmypi conversations still load the retired pi extension",
+    "updatedAt": "2026-06-24T03:08:02.529Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (300007ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:01:23.424Z"
   },
@@ -134,8 +135,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 184680,
-            "output": 26719,
+            "input": 195562,
+            "output": 31155,
             "cacheRead": 7424,
             "cacheWrite": 0
           }
@@ -150,10 +151,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1382,
-            "output": 424983,
-            "cacheRead": 173411860,
-            "cacheWrite": 2208426
+            "input": 1400,
+            "output": 428440,
+            "cacheRead": 175773558,
+            "cacheWrite": 2217050
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -171,14 +172,14 @@
           "cacheWrite": 1215918
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1436,
-          "output": 441943,
-          "cacheRead": 179634800,
-          "cacheWrite": 2325394
+          "input": 1454,
+          "output": 445400,
+          "cacheRead": 181996498,
+          "cacheWrite": 2334018
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 184680,
-          "output": 26719,
+          "input": 195562,
+          "output": 31155,
           "cacheRead": 7424,
           "cacheWrite": 0
         },
@@ -190,8 +191,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 86.28729799999999,
-        "pricingAsOf": "2026-06-24T03:03:53.801Z"
+        "usd": 87.080056,
+        "pricingAsOf": "2026-06-24T03:08:02.761Z"
       }
     },
     "merges": [
