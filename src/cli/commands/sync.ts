@@ -79,6 +79,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log(
         `  ${chalk.green(`${count('new')} new`)}, ` +
           `${chalk.blue(`${count('symlink')} update`)}, ` +
+          `${chalk.cyan(`${count('adopted')} adopted (legacy pre-manifest installs)`)}, ` +
           `${chalk.dim(`${count('exists')} unchanged`)}, ` +
           `${chalk.yellow(`${count('conflict')} user-modified (skipped)`)}`,
       );
@@ -215,7 +216,10 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // Distribute bundled skills + agents into the user's Claude Code home.
   const spinner = ora('Distributing skills and agents to ~/.claude/...').start();
   const result = executeSyncSync({ force: options.force, diff: options.diff });
-  const totalSynced = result.created.length + result.updated.length;
+  const totalSynced = result.created.length + result.updated.length + result.adopted.length;
+  const adoptionSummary = result.adopted.length > 0
+    ? `, ${result.adopted.length} adopted (legacy pre-manifest installs)`
+    : '';
 
   // Show diffs if requested
   if (result.diffs.length > 0) {
@@ -238,7 +242,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   if (result.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${totalSynced} items to ~/.claude/, ${result.conflicts.length} user-modified (skipped)`);
+    spinner.warn(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary}, ${result.conflicts.length} user-modified (skipped)`);
     console.log('');
     console.log(chalk.yellow('Modified since Overdeck installed:'));
     for (const name of result.conflicts) {
@@ -247,9 +251,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log('');
     console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
   } else if (result.skipped.length > 0) {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/ (${result.skipped.length} unchanged or user-owned)`);
+    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary} (${result.skipped.length} unchanged or user-owned)`);
   } else {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/`);
+    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary}`);
   }
 
   // Render the layered context into harness CLAUDE.md files (PAN-1201).
