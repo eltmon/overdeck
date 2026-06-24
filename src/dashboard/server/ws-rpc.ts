@@ -153,10 +153,18 @@ function streamFullParseSnapshots(
   );
 }
 
-function streamResolvedFullParseSnapshots(
+export function streamResolvedFullParseSnapshots(
   resolve: () => Promise<string | null>,
   parse: (file: string) => Promise<ParseResult>,
   model: string | null,
+  // When true, "no transcript file resolved yet" is treated as an EMPTY (ready)
+  // conversation rather than a still-discovering one. Interactive pi/codex
+  // conversations write no transcript until their first turn, so a brand-new
+  // one that is alive and simply waiting for the user's first message would
+  // otherwise sit on "Discovering conversation…" forever. resolve() returns
+  // null ONLY when no transcript exists on disk (a resumed conversation already
+  // has its file), so emitting an empty snapshot here never blanks real history.
+  unresolvedMeansEmpty = false,
 ): Stream.Stream<ConversationEvent, PanRpcError> {
   return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
     Effect.acquireRelease(
@@ -169,6 +177,10 @@ function streamResolvedFullParseSnapshots(
         let parsing = false;
         let pendingReparse = false;
         let sessionFile: string | null = null;
+        // Whether we've already emitted the empty/ready snapshot for an
+        // unresolved interactive conversation, so the 2s discovery poll doesn't
+        // re-offer it on every tick.
+        let announcedEmpty = false;
         // Lock onto a transcript only once we've actually parsed content from it.
         // A brand-new pi/codex conversation can briefly resolve to an empty
         // placeholder transcript while the real session is written under a
@@ -241,6 +253,18 @@ function streamResolvedFullParseSnapshots(
           try {
             const resolved = await resolve();
             if (!resolved) {
+              // No transcript on disk yet. For an interactive conversation that
+              // means it is brand-new and waiting for its first turn — show the
+              // ready (empty) state like claude-code, not an endless
+              // "Discovering…" spinner. Emit once; keep polling so the first
+              // turn's transcript switches us to showing real content.
+              if (unresolvedMeansEmpty) {
+                if (!sessionFile && !announcedEmpty) {
+                  announcedEmpty = true;
+                  offer({ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true });
+                }
+                return;
+              }
               // Only announce "discovering" before we've ever resolved a file, so
               // we don't blank an already-shown (empty) snapshot.
               if (!sessionFile) offer({ kind: 'discovering' });
@@ -857,6 +881,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                 () => resolvePiSessionPath(conv.tmuxSession),
                 parsePiConversationMessages,
                 conv.model ?? null,
+                true,
               );
             }
 
@@ -865,6 +890,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                 () => resolveCodexRolloutPath(conv.tmuxSession),
                 parseCodexConversationMessages,
                 conv.model ?? null,
+                true,
               );
             }
 
