@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-23T23:13:48Z · model: glm-4.7 · open: 552_
+_Last sequenced: 2026-06-24T02:36:37Z · model: glm-4.7 · open: 547_
 
 
 | rank | issue | size | importance | condition | depends-on | why |
@@ -12,7 +12,6 @@ _Last sequenced: 2026-06-23T23:13:48Z · model: glm-4.7 · open: 552_
 | 6 | PAN-2014 | M | critical | ok |  | Deacon patrol loop stops but cloister status still reports Running -> silent pipeline freeze. Substrate. |
 | 7 | PAN-1224 | M | high | ok |  | ship/close-out must restart the running dashboard so merged code goes live. Pinned bug. |
 | 8 | PAN-1992 | M | high | ok |  | Migrate all panopticon.db references to overdeck.db across skills; re-verify. Pinned. |
-| 9 | PAN-2015 | S | high | ok |  | pan review restart throws JSON parse error - the flywheel only convoy-recovery verb is broken. |
 | 10 | PAN-806 | L | critical | ok | PAN-804 | Epic B: work agents must never touch git (pan work done owns rebase). Critical safety. |
 | 11 | PAN-807 | L | critical | ok | PAN-804 | Epic C: pre-flight workspace sanity on spawn; stop hard-resetting local branches (data-loss risk). |
 | 12 | PAN-804 | L | high | ok |  | Epic D: archaeological repo audit + pre-1.0 cleanup (dangling commits, branch drift). Execute FIRST. |
@@ -93,7 +92,6 @@ _Last sequenced: 2026-06-23T23:13:48Z · model: glm-4.7 · open: 552_
 | 87 | PAN-1209 | S | medium | ok |  | PAN-1052 bead projection disagrees with bd state |
 | 88 | PAN-1130 | S | medium | ok |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
 | 89 | PAN-1131 | S | medium | ok |  | Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle') |
-| 90 | PAN-2038 | M | high | ok |  | pan done cannot resolve conversation-created workspaces (no findWorkspacePath fallback) -> review blocked. |
 | 91 | PAN-1830 | S | medium | ok |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
 | 92 | PAN-1862 | L | medium | ok |  | feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review |
 | 93 | PAN-244 | S | medium | ok |  | Deep-wipe leaves local branch and worktree metadata behind |
@@ -552,9 +550,6 @@ _Last sequenced: 2026-06-23T23:13:48Z · model: glm-4.7 · open: 552_
 | 545 | PAN-802 | S | low | ok |  | Resume on conversation session forks instead of resuming |
 | 546 | PAN-826 | L | low | ok |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
 | 547 | PAN-863 | S | low | ok |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
-| 548 | PAN-2011 | S | medium | ok |  | Conversation vs Terminal tab mismatch - agents route uses mtime resolver, not launcher-pinned session-id. Pinned in-pipeline. |
-| 549 | PAN-2023 | M | medium | ok |  | Fresh headless spawn gets a 67x1 tmux pane -> kickoff delivery fails, agent idles forever. Pinned in-pipeline. |
-| 550 | PAN-2040 | S | low | ok |  | Memory activity feed shows bare lifecycle tokens (done/in_progress/blocked) instead of the observation summary. |
 | 551 | PAN-1698 | M | medium | stale |  | bug(ci): main is RED — model-count + schema-version + substrate-smoke test expectations stale (blocks every verify/ship/strike gate) |
 | 552 | PAN-1783 | M | medium | stale |  | bug(ci): main is RED — Command Deck resource-strip Playwright fixture still expects old workspace title |
 
@@ -587,10 +582,6 @@ Pinned in-pipeline (verifying-on-main). Bug: merged code wasn't actually live be
 ### PAN-1992 (rank 8)
 
 Pinned in-pipeline (verifying-on-main). Rename fallout: every skill/db reference to the old 'panopticon.db' name must move to 'overdeck.db' so the rename is consistent end-to-end. Merged and verifying; pinned.
-
-### PAN-2015 (rank 9)
-
-New high-impact bug: pan review restart is the one explicitly-authorized drive-through verb for stalled review convoys, and it deterministically throws a JSON parse error on every issue. Without it the flywheel cannot drive through any PAN-1614-class stall; it can only surface them.
 
 ### PAN-806 (rank 10)
 
@@ -880,6 +871,10 @@ PAN-1416 shipped the cwd guard but not the port lockfile or pan doctor check —
 
 Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so searching for an earlier error/file appears to find nothing. Needs an in-page search that scans the full transcript, not just the viewport.
 
+### PAN-955 (rank 82)
+
+When the devcontainer template changes, existing workspaces are pinned to the old render with no warning/migration (observed: api service bound to no port because cmd was stale). Versioning + stale detection + re-render keeps workspaces current.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -887,10 +882,10 @@ Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so sear
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-23T23:13:48Z",
+  "generatedAt": "2026-06-24T02:36:37Z",
   "model": "glm-4.7",
   "pass": "incremental",
-  "openCount": 552,
+  "openCount": 547,
   "nodes": [
     {
       "issue": "PAN-1919",
@@ -992,19 +987,6 @@ Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so sear
       "dependsOn": [],
       "why": "Migrate all panopticon.db references to overdeck.db across skills; re-verify. Pinned.",
       "rationale": "Pinned in-pipeline (verifying-on-main). Rename fallout: every skill/db reference to the old 'panopticon.db' name must move to 'overdeck.db' so the rename is consistent end-to-end. Merged and verifying; pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2015",
-      "rank": 9,
-      "size": "S",
-      "importance": "high",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan review restart throws JSON parse error - the flywheel only convoy-recovery verb is broken.",
-      "rationale": "New high-impact bug: pan review restart is the one explicitly-authorized drive-through verb for stalled review convoys, and it deterministically throws a JSON parse error on every issue. Without it the flywheel cannot drive through any PAN-1614-class stall; it can only surface them.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2056,19 +2038,6 @@ Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so sear
       "condition": "ok",
       "dependsOn": [],
       "why": "Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle')",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2038",
-      "rank": 90,
-      "size": "M",
-      "importance": "high",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan done cannot resolve conversation-created workspaces (no findWorkspacePath fallback) -> review blocked.",
-      "rationale": "New substrate bug: pan done resolves the workspace only from work-agent state, so supervised conversation workspaces (no agent) fail at the review-artifact step and block the normal review pipeline, forcing manual push + PR. Ranked in the mid bug tier alongside the pan-start crash family.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7599,45 +7568,6 @@ Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so sear
       "planning": "auto"
     },
     {
-      "issue": "PAN-2011",
-      "rank": 548,
-      "size": "S",
-      "importance": "medium",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Conversation vs Terminal tab mismatch - agents route uses mtime resolver, not launcher-pinned session-id. Pinned in-pipeline.",
-      "rationale": "New in-pipeline bug (merged, verifying-on-main): the agents conversation route still guesses the session by mtime instead of the launcher-pinned --session-id that the conversations route already uses. Pinned; rank informational while verifying.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2023",
-      "rank": 549,
-      "size": "M",
-      "importance": "medium",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fresh headless spawn gets a 67x1 tmux pane -> kickoff delivery fails, agent idles forever. Pinned in-pipeline.",
-      "rationale": "New in-pipeline bug (merged, verifying-on-main): a fresh spawn with no attached client stays at a 1-row pane, so the PTY supervisor echo-confirmation never matches and every kickoff bounces; this is what stranded the PAN-1989 spawn. Pinned; rank informational while verifying.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2040",
-      "rank": 550,
-      "size": "S",
-      "importance": "low",
-      "score": 12,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Memory activity feed shows bare lifecycle tokens (done/in_progress/blocked) instead of the observation summary.",
-      "rationale": "New small UI bug: memory-class rows in the activity feed render bare action-status tokens instead of the observation summary, reading as nonsense next to operational events. Display reads the wrong field of the memory observation.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1698",
       "rank": 551,
       "size": "M",
@@ -7944,25 +7874,18 @@ Browser Ctrl+F can't find text in unmounted virtualized transcript rows, so sear
       "confidence": 0.5
     },
     {
-      "from": "PAN-2015",
-      "to": "PAN-1861",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-2038",
-      "to": "PAN-262",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-2039",
       "to": "PAN-1508",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.45
+    },
+    {
+      "from": "PAN-1994",
+      "to": "PAN-1982",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
