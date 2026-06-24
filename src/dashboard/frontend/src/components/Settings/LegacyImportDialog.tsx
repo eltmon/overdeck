@@ -67,6 +67,10 @@ export function LegacyImportDialog({ open, onClose }: LegacyImportDialogProps) {
         ? `/api/settings/legacy-import/conversations?path=${encodeURIComponent(customPath)}`
         : '/api/settings/legacy-import/conversations';
       const res = await fetch(url);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error((errBody as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
       const body = (await res.json()) as PreviewResponse | PreviewNotFound;
       if (!body.found) {
         setPhase({
@@ -102,6 +106,10 @@ export function LegacyImportDialog({ open, onClose }: LegacyImportDialogProps) {
         headers,
         body: JSON.stringify({ path, names: [...selected] }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
       const result = (await res.json()) as ImportResult;
       setPhase({ kind: 'done', result });
     } catch (err) {

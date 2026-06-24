@@ -115,6 +115,23 @@ describe('LegacyImportDialog', () => {
     expect(body.path).toBe('/p.db');
   });
 
+  it('shows error state when POST returns non-ok status', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeJsonResponse({ found: true, path: '/p.db', conversations: [PREVIEW_ROW] }))
+      .mockResolvedValueOnce(makeJsonResponse({ message: 'Unauthorized' }, false));
+
+    render(<LegacyImportDialog open={true} onClose={() => {}} />);
+
+    await waitFor(() => screen.getByTestId('import-button'));
+    fireEvent.click(screen.getByTestId('import-button'));
+
+    // Should show the custom-path-input (not-found/error state) rather than crashing or showing summary
+    await waitFor(() => {
+      expect(screen.queryByTestId('import-summary')).toBeNull();
+      expect(screen.getByTestId('custom-path-input')).toBeTruthy();
+    });
+  });
+
   it('select-all / select-none controls work', async () => {
     mockFetch.mockResolvedValue(
       makeJsonResponse({ found: true, path: '/p.db', conversations: [PREVIEW_ROW] }),
