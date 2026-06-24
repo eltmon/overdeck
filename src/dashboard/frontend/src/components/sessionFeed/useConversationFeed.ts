@@ -14,7 +14,7 @@ export interface ConversationFeedRow {
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
-  harness?: 'claude-code' | 'pi' | 'codex' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | null;
   archivedAt?: string | null;
   messageCount?: number;
 }
@@ -77,7 +77,7 @@ export function useConversationFeed(): UseConversationFeedResult {
 
 function mapHarnessToAgent(harness: ConversationFeedRow['harness']): 'claude_code' | 'pi' | 'codex' | 'unknown' {
   if (harness === 'claude-code') return 'claude_code';
-  if (harness === 'pi') return 'pi';
+  if (harness === 'ohmypi') return 'pi';
   if (harness === 'codex') return 'codex';
   return 'unknown';
 }

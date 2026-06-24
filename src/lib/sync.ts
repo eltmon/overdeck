@@ -583,9 +583,9 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`global: ${err?.message ?? err}`);
   }
 
-  // PAN-1566: Global layer → ~/.overdeck/context/pi-global.md
+  // PAN-1566/PAN-1989: Global layer → ~/.overdeck/context/pi-global.md (ohmypi harness)
   try {
-    const piManaged = renderGlobalLayer('pi', isDevMode());
+    const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
     const existingPi = existsSync(piGlobalFile) ? readFileSync(piGlobalFile, 'utf-8') : '';
     if (piManaged.trim() !== existingPi.trim()) {
@@ -619,7 +619,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     if (!existsSync(config.path)) continue;
     try {
       const claudeManaged = renderProjectLayer(config.path, 'claude-code');
-      const piManaged = renderProjectLayer(config.path, 'pi');
+      const piManaged = renderProjectLayer(config.path, 'ohmypi');
       if (!claudeManaged && !piManaged) continue;
       let wrote = false;
       if (claudeManaged) {

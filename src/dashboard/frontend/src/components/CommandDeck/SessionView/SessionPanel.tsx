@@ -432,8 +432,8 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         )}
 
         {view === 'terminal' && (
-          session.harness === 'pi' ? (
-            // Pi agents run as `pi --mode rpc`: there is no interactive TUI. The
+          (session.harness === 'ohmypi' || session.harness === 'pi') ? (
+            // ohmypi/Pi agents run as `omp --mode rpc`: there is no interactive TUI. The
             // tmux pane carries the raw JSON-RPC wire protocol (one JSON object
             // per streamed event), which is unreadable as a terminal. Point the
             // operator at the Conversation tab, which renders the same transcript

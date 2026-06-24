@@ -99,6 +99,15 @@
         "moonshine-sidecar": "bin/moonshine-sidecar",
       },
     },
+    "packages/ohmypi-extension": {
+      "name": "@overdeck/ohmypi-extension",
+      "version": "0.0.1",
+      "devDependencies": {
+        "tsdown": "^0.21.7",
+        "typescript": "catalog:",
+        "vitest": "^4.1.6",
+      },
+    },
     "packages/pi-extension": {
       "name": "@overdeck/pi-extension",
       "version": "0.0.1",
@@ -637,6 +646,8 @@
     "@overdeck/desktop": ["@overdeck/desktop@workspace:apps/desktop"],
 
     "@overdeck/frontend": ["@overdeck/frontend@workspace:src/dashboard/frontend"],
+
+    "@overdeck/ohmypi-extension": ["@overdeck/ohmypi-extension@workspace:packages/ohmypi-extension"],
 
     "@overdeck/pi-extension": ["@overdeck/pi-extension@workspace:packages/pi-extension"],
 

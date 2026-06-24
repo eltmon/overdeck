@@ -44,7 +44,7 @@ describe('shared ModelPicker branding', () => {
     await user.click(screen.getByRole('button', { name: /Claude Code/i }));
 
     expect(screen.getAllByLabelText('Claude Code logo').length).toBeGreaterThan(1);
-    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
   });
 });

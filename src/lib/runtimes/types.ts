@@ -13,11 +13,13 @@
 /**
  * Supported runtime types for agent execution.
  *
- * PAN-636 widened this union to include 'pi' alongside Claude Code. Reads of
- * AgentSnapshot.runtime should go through getHarness() from @overdeck/contracts
- * so unknown or legacy values normalize to 'claude-code'.
+ * PAN-636 widened this union to include 'pi' alongside Claude Code.
+ * PAN-1989 narrowed the set back to three values: 'pi' is no longer a writable
+ * RuntimeName. Legacy 'pi' strings from DB / state.json are normalized to 'ohmypi'
+ * by normalizeHarness() on read. normalizeHarness still accepts the raw string
+ * 'pi' as input so old rows round-trip safely.
  */
-export type RuntimeName = 'claude-code' | 'pi' | 'codex';
+export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex';
 
 /**
  * Health state of an agent

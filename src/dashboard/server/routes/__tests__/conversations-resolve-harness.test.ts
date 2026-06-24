@@ -10,7 +10,7 @@ import { resolveAllowedHarness } from '../conversations.js';
 
 describe('resolveAllowedHarness (PAN-1842)', () => {
   it('returns claude-code when no model is provided', async () => {
-    expect(await resolveAllowedHarness('pi', null)).toBe('claude-code');
+    expect(await resolveAllowedHarness('ohmypi', null)).toBe('claude-code');
     expect(await resolveAllowedHarness(undefined, undefined)).toBe('claude-code');
     expect(resolveHarnessMock).not.toHaveBeenCalled();
   });
@@ -18,7 +18,7 @@ describe('resolveAllowedHarness (PAN-1842)', () => {
   it('routes non-Anthropic models through resolveHarness so provider defaults apply', async () => {
     resolveHarnessMock.mockImplementation(async ({ explicit, model }) => {
       if (model === 'gpt-5.5') return explicit ?? 'codex';
-      if (model === 'kimi-k2.6') return explicit ?? 'pi';
+      if (model === 'kimi-k2.6') return explicit ?? 'ohmypi';
       return 'claude-code';
     });
 
@@ -27,12 +27,12 @@ describe('resolveAllowedHarness (PAN-1842)', () => {
     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'gpt-5.5', explicit: undefined });
 
     const kimiDefault = await resolveAllowedHarness('not-a-harness', 'kimi-k2.6');
-    expect(kimiDefault).toBe('pi');
+    expect(kimiDefault).toBe('ohmypi');
     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: undefined });
 
-    const explicitPi = await resolveAllowedHarness('pi', 'kimi-k2.6');
-    expect(explicitPi).toBe('pi');
-    expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: 'pi' });
+    const explicitOhmypi = await resolveAllowedHarness('ohmypi', 'kimi-k2.6');
+    expect(explicitOhmypi).toBe('ohmypi');
+    expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: 'ohmypi' });
   });
 
   it('falls back to claude-code when resolveHarness throws', async () => {

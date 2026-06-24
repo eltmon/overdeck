@@ -234,7 +234,7 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
   for (const conv of activeConvs) {
     if (!conv.cwd) continue;
     if (!conv.claudeSessionId) continue;
-    if (conv.harness === 'pi' || conv.harness === 'codex') continue;
+    if (conv.harness === 'ohmypi' || conv.harness === 'codex') continue;
     const list = cwdGroups.get(conv.cwd) ?? [];
     list.push(conv);
     cwdGroups.set(conv.cwd, list);

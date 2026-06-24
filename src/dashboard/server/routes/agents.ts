@@ -134,6 +134,7 @@ import {
 } from '../../../lib/agent-enrichment.js';
 import { parseEntireConversation } from '../services/conversation-service.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import { readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath, resolveAgentHarness } from './jsonl-resolver.js';
 import type { ConversationResponse } from '@overdeck/contracts';
@@ -1040,10 +1041,10 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
   try {
     const harness = await resolveAgentHarness(id);
 
-    if (harness === 'pi') {
+    if (harness === 'ohmypi') {
       const sessionFile = await resolvePiSessionPath(id);
       if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parsePiConversationMessages(sessionFile);
+      const result = await parseOhmypiConversationMessages(sessionFile);
       return { ...result, streaming: false };
     }
 
@@ -2203,7 +2204,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message } = body as {
       model?: string;
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
       graceful?: boolean;
       message?: string;
     };
@@ -2374,7 +2375,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
 
@@ -2436,7 +2437,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     // We don't go through HTTP — we call the spawn primitives directly so
     // the caller gets a single 200 with both wipe and spawn confirmed.
     const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-4-6';
-    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (harness) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
@@ -3426,9 +3427,9 @@ const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'pi' | 'codex' | null =
-      bodyHarness === 'pi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | null =
+      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))

@@ -7,7 +7,7 @@ import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'pi' | 'codex';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex';
 
 export interface LauncherConfig {
   role: Role;
@@ -202,7 +202,7 @@ function buildChannelsArgs(config: LauncherConfig): string {
 
 function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
   if (!config.useSupervisor) return cmd;
-  if (config.harness === 'pi' || config.reviewSignal) return cmd;
+  if (config.harness === 'ohmypi' || config.reviewSignal) return cmd;
   if (!config.supervisorScriptPath) {
     throw new Error('LauncherConfig.supervisorScriptPath is required when useSupervisor=true');
   }
@@ -413,8 +413,8 @@ function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
   if (config.spawnMode === 'conversation') {
-    if (config.harness === 'pi') {
-      return buildPiCommand(config, false);
+    if (config.harness === 'ohmypi') {
+      return buildOhmypiCommand(config, false);
     }
     if (config.harness === 'codex') {
       return buildCodexCommand(config, false);
@@ -501,8 +501,8 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (config.harness === 'pi') {
-    return buildPiCommand(config, useExec);
+  if (config.harness === 'ohmypi') {
+    return buildOhmypiCommand(config, useExec);
   }
   if (config.harness === 'codex') {
     return buildCodexCommand(config, useExec);
@@ -560,6 +560,82 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   const wrapped = wrapWithSupervisor(config, cmd.trim());
   parts.push(useExec ? `exec ${wrapped}` : wrapped);
   return parts;
+}
+
+/**
+ * Build an oh-my-pi (omp) command line (PAN-1989).
+ *
+ * RPC mode (work-agents):
+ *   omp --mode rpc \
+ *      --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      --extension <piExtensionPath> \
+ *      [--resume <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"] \
+ *      <> <piFifoPath>
+ *
+ * TUI mode (conversations):
+ *   omp --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      [--extension <piExtensionPath>] \
+ *      [--resume <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"]
+ *
+ * Contract differences from pi (docs/ohmypi-contract.md):
+ * - Binary is `omp`, not `pi`
+ * - `--no-context-files` is REMOVED (flag does not exist in omp)
+ * - `--resume <id>` replaces `--session <id>`
+ */
+function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const piMode = config.piMode ?? 'rpc';
+  if (!config.piSessionDir) {
+    throw new Error('ohmypi launcher requires piSessionDir');
+  }
+  if (piMode === 'rpc') {
+    if (!config.piExtensionPath) {
+      throw new Error('ohmypi launcher (rpc mode) requires piExtensionPath');
+    }
+    if (!config.piFifoPath) {
+      throw new Error('ohmypi launcher (rpc mode) requires piFifoPath');
+    }
+  }
+
+  const tokens: string[] = ['omp'];
+  if (piMode === 'rpc') {
+    tokens.push('--mode', 'rpc');
+  }
+  if (config.model) {
+    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
+  }
+  tokens.push('--session-dir', shellQuote(config.piSessionDir));
+  if (config.piExtensionPath) {
+    tokens.push('--extension', shellQuote(config.piExtensionPath));
+  }
+  // NOTE: --no-context-files is intentionally absent — removed in omp (docs/ohmypi-contract.md).
+
+  for (const file of systemPromptFiles(config)) {
+    tokens.push('--append-system-prompt', `"$(cat ${shellQuote(file)} 2>/dev/null)"`);
+  }
+
+  if (config.resumeSessionId) {
+    tokens.push('--resume', shellQuote(config.resumeSessionId));
+  }
+  if (config.extraArgs) {
+    tokens.push(config.extraArgs);
+  }
+  if (config.promptFile) {
+    tokens.push('--append-system-prompt', '"$prompt"');
+  } else if (config.promptInline) {
+    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
+  }
+
+  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
+
+  if (piMode === 'rpc') {
+    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)}`;
+  }
+
+  return [useExec ? `exec ${cmd}` : cmd];
 }
 
 /**

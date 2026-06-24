@@ -86,7 +86,7 @@ import { registerTtsCommands } from './commands/tts.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { registerConversationsCommands } from './commands/conversations/index.js';
-import { registerPiAuthCommands } from './commands/pi-auth.js';
+import { registerOhmypiAuthCommands } from './commands/ohmypi-auth.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
@@ -594,8 +594,8 @@ registerAdminCommands(program);
 // Register conversations commands (pan conversations scan, search, list, show, cost, enrich)
 registerConversationsCommands(program);
 
-// Register pi-auth commands (pan pi-auth status|login)
-registerPiAuthCommands(program);
+// Register ohmypi-auth commands (pan ohmypi-auth status|login; pan pi-auth is a deprecated alias)
+registerOhmypiAuthCommands(program);
 
 // Register install command
 registerInstallCommand(program);

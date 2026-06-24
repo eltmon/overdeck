@@ -74,10 +74,10 @@ describe('PAN-1919 no-loss audit', () => {
   });
 
   it('record carries harness/model from state.json', () => {
-    writeAgentHarnessModelSync(project(), ISSUE_ID, 'pi', 'kimi-k2.7-code');
+    writeAgentHarnessModelSync(project(), ISSUE_ID, 'ohmypi', 'kimi-k2.7-code');
 
     const record = readIssueRecordSync(project(), ISSUE_ID);
-    expect(record?.harness).toBe('pi');
+    expect(record?.harness).toBe('ohmypi');
     expect(record?.model).toBe('kimi-k2.7-code');
   });
 

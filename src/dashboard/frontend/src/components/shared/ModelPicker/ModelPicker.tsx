@@ -12,16 +12,16 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 
 
-export type Harness = 'claude-code' | 'pi' | 'codex';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
   { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
-  { id: 'pi', label: 'Pi', description: 'Alternative harness for non-Anthropic models' },
+  { id: 'ohmypi', label: 'oh-my-pi', description: 'Alternative harness for non-Anthropic models (omp binary)' },
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
 ];
 
-export const PI_TOS_BLOCK_REASON = 'Pi cannot run Anthropic models when authenticated via Claude Code subscription. Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
+export const PI_TOS_BLOCK_REASON = 'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
 
 export type HarnessDecision = { allowed: boolean; reason?: string };
 export type HarnessPolicyDecisions = Record<string, Partial<Record<Harness, HarnessDecision>>>;
@@ -412,7 +412,7 @@ function pickModelForHarness(
   const allowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
 
   // Hardcoded preferences match HARNESS_DEFAULT_MODEL in the chat picker.
-  const preferred = newHarness === 'pi' ? 'gpt-5.4' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-4-6';
+  const preferred = newHarness === 'ohmypi' ? 'gpt-5.5' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-4-6';
   if (allModels.some((m) => m.id === preferred) && allowed(preferred)) return preferred;
 
   const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;

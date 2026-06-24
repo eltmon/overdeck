@@ -29,6 +29,10 @@ vi.mock('../../services/pi-conversation-parser.js', () => ({
   isPiSessionFile: vi.fn(() => false),
 }));
 
+vi.mock('../../services/ohmypi-conversation-parser.js', () => ({
+  parseOhmypiConversationMessages: vi.fn(),
+}));
+
 vi.mock('../../services/codex-conversation-parser.js', () => ({
   parseCodexConversationMessages: vi.fn(),
 }));
@@ -54,6 +58,7 @@ import { buildConversationResponse } from '../agents.js';
 import { getAgentJsonlPath, getAgentWorkspace } from '../../../../lib/agent-enrichment.js';
 import { parseEntireConversation } from '../../services/conversation-service.js';
 import { parsePiConversationMessages } from '../../services/pi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { resolveAgentHarness, readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath } from '../jsonl-resolver.js';
 import { existsSync } from 'node:fs';
@@ -62,6 +67,7 @@ const mockGetAgentJsonlPath = vi.mocked(getAgentJsonlPath);
 const mockGetAgentWorkspace = vi.mocked(getAgentWorkspace);
 const mockParseEntireConversation = vi.mocked(parseEntireConversation);
 const mockParsePiConversationMessages = vi.mocked(parsePiConversationMessages);
+const mockParseOhmypiConversationMessages = vi.mocked(parseOhmypiConversationMessages);
 const mockParseCodexConversationMessages = vi.mocked(parseCodexConversationMessages);
 const mockResolveAgentHarness = vi.mocked(resolveAgentHarness);
 const mockReadLauncherPinnedSessionId = vi.mocked(readLauncherPinnedSessionId);
@@ -199,34 +205,34 @@ describe('buildConversationResponse', () => {
     expect(mockParseEntireConversation).toHaveBeenCalledWith(mtimePath);
   });
 
-  // ── pi harness (PAN-2012) ─────────────────────────────────────────────────
+  // ── ohmypi harness (PAN-2012) ─────────────────────────────────────────────────
 
-  it('routes pi agents through parsePiConversationMessages', async () => {
+  it('routes ohmypi agents through parseOhmypiConversationMessages', async () => {
     const piPath = '/home/testuser/.overdeck/agents/agent-PAN-473/2026-06-23T10:00:00_abc.jsonl';
-    mockResolveAgentHarness.mockResolvedValue('pi');
+    mockResolveAgentHarness.mockResolvedValue('ohmypi');
     mockResolvePiSessionPath.mockResolvedValue(piPath);
     mockExistsSync.mockReturnValue(true);
-    mockParsePiConversationMessages.mockResolvedValue({
+    mockParseOhmypiConversationMessages.mockResolvedValue({
       messages: [{ role: 'assistant', content: 'Starting — how can I help you?' } as never],
       ...PARSE_RESULT_BASE,
     });
 
     const result = await buildConversationResponse('agent-PAN-473');
 
-    expect(mockParsePiConversationMessages).toHaveBeenCalledWith(piPath);
+    expect(mockParseOhmypiConversationMessages).toHaveBeenCalledWith(piPath);
     expect(mockParseEntireConversation).not.toHaveBeenCalled();
     expect(result.messages).toHaveLength(1);
     expect(result.streaming).toBe(false);
   });
 
-  it('returns empty for pi agent when session file not found', async () => {
-    mockResolveAgentHarness.mockResolvedValue('pi');
+  it('returns empty for ohmypi agent when session file not found', async () => {
+    mockResolveAgentHarness.mockResolvedValue('ohmypi');
     mockResolvePiSessionPath.mockResolvedValue(null);
 
     const result = await buildConversationResponse('agent-PAN-473');
 
     expect(result).toEqual(EMPTY);
-    expect(mockParsePiConversationMessages).not.toHaveBeenCalled();
+    expect(mockParseOhmypiConversationMessages).not.toHaveBeenCalled();
   });
 
   // ── codex harness ─────────────────────────────────────────────────────────

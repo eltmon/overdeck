@@ -31,7 +31,7 @@ vi.mock('../../paths.js', async (importOriginal) => ({
 import { RuntimeRegistry, setGlobalRegistry, getGlobalRegistry } from '../index.js'
 import type { AgentRuntimeSync } from '../types.js'
 
-function stubRuntime(name: 'claude-code' | 'pi'): AgentRuntimeSync {
+function stubRuntime(name: 'claude-code' | 'pi' | 'ohmypi'): AgentRuntimeSync {
   return {
     name,
     getSessionPath: () => null,
@@ -73,15 +73,21 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
     const fresh = new RuntimeRegistry()
     fresh.register(stubRuntime('claude-code'))
     fresh.register(stubRuntime('pi'))
+    fresh.register(stubRuntime('ohmypi'))
     setGlobalRegistry(fresh)
   })
   afterEach(() => {
     if (savedRegistry) setGlobalRegistry(savedRegistry)
   })
 
-  it('returns the pi runtime when state.harness === "pi" (AC1)', () => {
+  it('normalizes legacy pi harness to ohmypi runtime (PAN-1989)', () => {
     writeAgentState('agent-pi-1', { harness: 'pi' })
-    expect(getGlobalRegistry().getRuntimeForAgent('agent-pi-1')?.name).toBe('pi')
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-pi-1')?.name).toBe('ohmypi')
+  })
+
+  it('returns the ohmypi runtime when state.harness === "ohmypi" (PAN-1989)', () => {
+    writeAgentState('agent-ohmypi-1', { harness: 'ohmypi' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-ohmypi-1')?.name).toBe('ohmypi')
   })
 
   it('returns the claude-code runtime when state.harness === "claude-code" (AC1)', () => {

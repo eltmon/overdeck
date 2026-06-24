@@ -7,7 +7,7 @@ import { PROVIDER_BRANDS } from '../shared/branding';
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
-type Harness = 'claude-code' | 'pi' | 'codex';
+type Harness = 'claude-code' | 'ohmypi' | 'codex';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 

@@ -20,9 +20,9 @@ describe('IssueAgentCard harness badge (PAN-636 workspace-dbf)', () => {
     expect(SRC).toMatch(/data-testid="agent-harness-badge"[\s\S]*?\{getHarness\(agent\)\}/)
   })
 
-  it('badge styling differentiates pi from claude-code so a mixed-harness pipeline is readable at a glance', () => {
-    // Pi gets a distinct background tint vs claude-code so the user can tell harnesses
+  it('badge styling differentiates ohmypi from claude-code so a mixed-harness pipeline is readable at a glance', () => {
+    // ohmypi gets a distinct background tint vs claude-code so the user can tell harnesses
     // apart on a single board (decision tracked in continue.json D3).
-    expect(SRC).toMatch(/getHarness\(agent\)\s*===\s*['"]pi['"]/)
+    expect(SRC).toMatch(/getHarness\(agent\)\s*===\s*['"]ohmypi['"]/)
   })
 })
