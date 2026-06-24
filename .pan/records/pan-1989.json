@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T06:27:29.641Z",
+  "updated": "2026-06-24T07:57:33.172Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
@@ -110,8 +110,8 @@
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T06:27:29.542Z",
-    "verificationNotes": "Verification FAILED at test (1200018ms):\n\nnfig --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n✗ ad-hoc state write under src/lib/pan-dir/ outside the approved writer or legacy exception list:\nsrc/lib/pan-dir/evil.ts:4:  return fs.writeFileString(path, content);\nRoute durable mutations through src/lib/pan-dir/record.ts or update the allowlist/legacy list.\n✗ state.json written outside writeAgentStateJsonSync:\nsrc/lib/agents.ts:8: state.json write outside writeAgentStateJsonSync\n✗ ad-hoc write to the workspace/project continue file outside legacy exceptions:\nsrc/lib/evil.ts:3:  writeFileSync(continuePath, '{}');\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n(node:2204904) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
+    "updatedAt": "2026-06-24T07:57:33.145Z",
+    "verificationNotes": "Verification FAILED at test (1200005ms):\n\nnfig --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✗ ad-hoc state write under src/lib/pan-dir/ outside the approved writer or legacy exception list:\nsrc/lib/pan-dir/evil.ts:4:  return fs.writeFileString(path, content);\nRoute durable mutations through src/lib/pan-dir/record.ts or update the allowlist/legacy list.\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✗ state.json written outside writeAgentStateJsonSync:\nsrc/lib/agents.ts:8: state.json write outside writeAgentStateJsonSync\n✗ ad-hoc write to the workspace/project continue file outside legacy exceptions:\nsrc/lib/evil.ts:3:  writeFileSync(continuePath, '{}');\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n(node:2494322) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 103.444164,
-        "pricingAsOf": "2026-06-24T06:27:29.641Z"
+        "pricingAsOf": "2026-06-24T07:57:33.171Z"
       }
     },
     "merges": [
