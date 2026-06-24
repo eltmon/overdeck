@@ -120,7 +120,7 @@ export async function spawnSequencerAgent(
   await mkdir(dirname(manifestPath), { recursive: true });
   await writeFile(manifestPath, JSON.stringify(input.manifest, null, 2), 'utf-8');
 
-  const model = determineModel({ role: 'sequencer', model: opts.model });
+  const model = determineModel({ role: 'sequencer', model: opts.model, spawnKey: 'sequencer:global' });
   const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
 
   return spawnRun(SEQUENCER_AGENT_ID, 'sequencer', {
