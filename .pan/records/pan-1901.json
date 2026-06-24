@@ -1,23 +1,138 @@
 {
   "issueId": "PAN-1901",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Fix = change `.gitattributes` to `.beads/issues.jsonl merge=union` (git BUILT-IN driver, needs no merge.<name>.driver config so it can never go inert). Verified empirically this session in isolated /tmp repos: divergent single-line appends on two branches merge clean via union (ort auto-merge), no conflict markers, all lines preserved; the same scenario with the default driver CONFLICTS.",
+      "recordedAt": "2026-06-14T22:15:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Accuracy correction: the `merge=beads` line predates PAN-1841 (added in beads-init commit 7e3d6f68d8). PAN-1841's real fix is commit e236b02ffa = the code-level resolveMainPreferredSyncConflicts in src/lib/cloister/merge-agent.ts, scoped to the sync-main path ONLY. The issue's attribution is wrong but its technical claim (the attribute is inert) is correct. This explains why tick-12 still conflicted.",
+      "recordedAt": "2026-06-14T22:15:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Single-JSON `.pan/*.vbrief.json` files (.pan/specs/, .pan/continues/) get NO content-merge driver. union corrupts single JSON objects; an ours/theirs driver cannot express 'main-preferred' because ours/theirs flip between `git merge origin/main` (ours=branch) and rebase (ours=main). Their conflict handling stays with resolveMainPreferredSyncConflicts (sync-main) + PAN-1124 immutability. Out of scope for PAN-1901.",
+      "recordedAt": "2026-06-14T22:15:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "The guard test asserts the TIGHT invariant (only `.beads/issues.jsonl` -> union; no *.vbrief.json / .pan/specs/ / .pan/continues/ path carries any content-merge driver), so it mechanically blocks BOTH regression classes: re-introducing an inert custom driver, and union-corrupting a single-JSON file. A doc comment alone is rejected per the 'enforce mechanically, do not rely on restraint' rule.",
+      "recordedAt": "2026-06-14T22:15:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "No `pan doctor` check and no `git config merge.*.driver` wiring is added. bd has no merge driver (`bd merge` does not exist; only merge-slot/duplicates), and any config-based driver reproduces the inert-fix bug (verified unset on the primary main repo). union is built-in and self-contained in the committed `.gitattributes`.",
+      "recordedAt": "2026-06-14T22:15:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "union concatenates both sides' UNIQUE lines. If both sides edit the SAME issue's line differently, union keeps BOTH lines (two lines, same id, different content).",
+      "mitigation": "This is expected and acceptable — `bd` reconciles duplicate IDs on load (operator-confirmed in the issue comment). Do NOT try to dedup in git or post-process the JSONL."
+    },
+    {
+      "id": "H2",
+      "summary": "Applying `merge=union` (or any content driver) to a single-JSON `.pan/*.vbrief.json` file corrupts it (interleaved hunks -> invalid JSON).",
+      "mitigation": "Only attribute `.beads/issues.jsonl`. The guard test (W2 case 3) MUST fail if any *.vbrief.json / .pan/specs/ / .pan/continues/ path is given a merge driver. Do not broaden the attribute."
+    },
+    {
+      "id": "H3",
+      "summary": "The existing resolveMainPreferredSyncConflicts (merge-agent.ts) still runs in sync-main and treats `.beads`, `.pan/specs`, `.pan/continues` as main-preferred.",
+      "mitigation": "union only REMOVES `.beads/issues.jsonl` from the conflict set there (strictly better); the resolver's 'all conflicts must be pipeline-owned' bail logic is unchanged. Do NOT remove or alter that resolver (NFR-2)."
+    },
+    {
+      "id": "H4",
+      "summary": "Tests that run real `git merge` could accidentally operate on the live workspace repo.",
+      "mitigation": "Create isolated temp git repos (mktemp / os.tmpdir), mirroring the scaffolding in src/lib/pan-dir/__tests__/auto-commit.test.ts. Never run `git merge` against the workspace. No fake-timer needed (git ops, not delays)."
+    },
+    {
+      "id": "H5",
+      "summary": "This issue does NOT make `.pan` state fully safe; single-JSON files stay unprotected in non-sync-main merge paths (Flywheel raw merge, uat-assemble-deps.ts:48, verification-runner.ts:92) and the immutability it leans on is violated today (PAN-1728).",
+      "mitigation": "Scope is the beads half only. Keep the residual gap explicit in NonGoals; do not silently imply the state-merge problem is solved. Related: PAN-1728, PAN-1650, PAN-1758, PAN-1770."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-14T21:47:53.347Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1901",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "timestamp": "2026-06-14T22:15:00.000Z",
+      "reason": "planning",
+      "note": "Auto-planning complete: 2 beads (W1 .gitattributes union change, W2 guard tests). union fix verified empirically in /tmp. Single-JSON .pan files bounded out with technical justification.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": [],
   "created": "2026-06-24T01:04:59.067Z",
-  "updated": "2026-06-24T01:09:27.084Z",
+  "updated": "2026-06-24T01:21:25.848Z",
   "pipeline": {
     "issueId": "PAN-1901",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T01:04:59.067Z"
+    "updatedAt": "2026-06-24T01:21:06.293Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 12916,
+            "output": 137,
+            "cacheRead": 16236,
+            "cacheWrite": 48462
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 8243,
+            "output": 380,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 14384,
+            "output": 54022,
+            "cacheRead": 2368215,
+            "cacheWrite": 153271
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 27300,
+          "output": 54159,
+          "cacheRead": 2384451,
+          "cacheWrite": 201733
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 8243,
+          "output": 380,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 3.943536,
+        "pricingAsOf": "2026-06-24T01:21:06.321Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-4-6"
 }
