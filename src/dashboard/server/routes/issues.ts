@@ -891,7 +891,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       probe = false,
       harness = 'claude-code',
     } = body as any;
-    const requestedHarness = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 

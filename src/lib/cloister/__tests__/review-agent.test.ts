@@ -142,14 +142,14 @@ describe('spawnReviewRoleForIssue', () => {
       workspace: '/tmp/pan-review-harness',
       branch: 'feature/pan-1194',
       model: 'gpt-5.5',
-      harness: 'pi',
+      harness: 'ohmypi',
     }));
 
     expect(result.success).toBe(true);
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',
-      expect.objectContaining({ model: 'gpt-5.5', harness: 'pi', workspace: '/tmp/pan-review-harness' }),
+      expect.objectContaining({ model: 'gpt-5.5', harness: 'ohmypi', workspace: '/tmp/pan-review-harness' }),
     );
   });
 });

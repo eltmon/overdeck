@@ -17,6 +17,7 @@ import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
@@ -855,10 +856,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // streaming for pi/codex here.
             if (!conv && /^(agent-|planning-|specialist-)/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              if (harness === 'pi') {
+              if (harness === 'ohmypi') {
                 return streamResolvedFullParseSnapshots(
                   () => resolvePiSessionPath(input.conversationName),
-                  parsePiConversationMessages,
+                  parseOhmypiConversationMessages,
                   null,
                 );
               }
@@ -876,10 +877,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            if (conv.harness === 'pi') {
+            if (conv.harness === 'ohmypi') {
               return streamResolvedFullParseSnapshots(
                 () => resolvePiSessionPath(conv.tmuxSession),
-                parsePiConversationMessages,
+                parseOhmypiConversationMessages,
                 conv.model ?? null,
                 true,
               );

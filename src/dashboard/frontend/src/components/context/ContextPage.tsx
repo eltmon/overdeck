@@ -10,7 +10,7 @@ import {
 } from '../../lib/contextApi';
 
 type SelectedLayerKind = ContextLayerTarget['kind'];
-type PreviewTab = 'claude-code' | 'pi' | 'fullPrompt';
+type PreviewTab = 'claude-code' | 'ohmypi' | 'fullPrompt';
 
 function targetKey(target: ContextLayerTarget): string {
   switch (target.kind) {
@@ -391,7 +391,7 @@ export function ContextPage() {
             <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
               {([
                 ['claude-code', 'Claude Code output'],
-                ['pi', 'Pi output'],
+                ['ohmypi', 'oh-my-pi output'],
                 ['fullPrompt', 'Full injected prompt'],
               ] as const).map(([tab, label]) => (
                 <button

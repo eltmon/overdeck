@@ -94,7 +94,7 @@ export function ComposerFooter({
   // call — silently rewriting the conversation's runtime. Default to
   // 'claude-code' (the safe runtime) when the conversation has no stored
   // harness; do NOT consult localStorage.
-  const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
+  const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   // `sending`, pending images, and their upload pump live in the module-level
   // composerStore, keyed by conversation name (the same key drafts use). The
@@ -413,7 +413,7 @@ export function ComposerFooter({
     // back. In-flight uploads attach to their owning conversation; the send's
     // own finally clears its sending flag by submitConversationName.
     setModel(conversation.model ?? getDefaultConversationModel());
-    setHarness(conversation.harness ?? 'claude-code');
+    setHarness((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
     // Do NOT clear the editor here. The inner LexicalComposer is keyed by
     // conversation.name, so it already remounts on a conversation switch and
     // seeds the new conversation's saved draft via initialConfig. Calling

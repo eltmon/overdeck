@@ -10,13 +10,13 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
     expect(shouldStreamConversationMessages(base({ id: 42, harness: null }))).toBe(true);
   });
 
-  it('streams real pi/codex DB conversations via full JSONL snapshots', () => {
-    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'pi' }))).toBe(true);
+  it('streams real ohmypi/codex DB conversations via full JSONL snapshots', () => {
+    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'ohmypi' }))).toBe(true);
     expect(shouldStreamConversationMessages(base({ id: 42, harness: 'codex' }))).toBe(true);
   });
 
-  it('streams a synthetic pi work-agent session', () => {
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-1908', harness: 'pi' }))).toBe(true);
+  it('streams a synthetic ohmypi work-agent session', () => {
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-1908', harness: 'ohmypi' }))).toBe(true);
   });
 
   it('streams a synthetic codex agent session', () => {
@@ -28,17 +28,17 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: null }))).toBe(false);
   });
 
-  it('streams planning/specialist pi sessions too', () => {
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'planning-pan-1908', harness: 'pi' }))).toBe(true);
+  it('streams planning/specialist ohmypi sessions too', () => {
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'planning-pan-1908', harness: 'ohmypi' }))).toBe(true);
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'specialist-x-merge', harness: 'codex' }))).toBe(true);
   });
 
   it('does not stream a non-agent synthetic name', () => {
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'draft-123', harness: 'pi' }))).toBe(false);
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'draft-123', harness: 'ohmypi' }))).toBe(false);
   });
 
   it('never streams a dead session', () => {
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-1908', harness: 'pi', sessionAlive: false }))).toBe(false);
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-1908', harness: 'ohmypi', sessionAlive: false }))).toBe(false);
     expect(shouldStreamConversationMessages(base({ id: 42, harness: 'claude-code', endedAt: '2026-01-01T00:00:00Z' }))).toBe(false);
   });
 });

@@ -57,6 +57,9 @@ export interface SessionUsage {
     inputTokens: number;
     outputTokens: number;
     messageCount: number;
+    // Optional per-model cache token counts (ohmypi/omp sessions; absent for Claude Code sessions)
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
   }>;
 }
 

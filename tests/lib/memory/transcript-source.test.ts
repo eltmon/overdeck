@@ -73,7 +73,7 @@ describe('ClaudeCodeTranscriptSource', () => {
       listAgents: async () => [
         agent({ id: 'agent-inactive', tmuxActive: false }),
         agent({ id: 'agent-stopped', status: 'stopped' }),
-        agent({ id: 'agent-pi', harness: 'pi' }),
+        agent({ id: 'agent-pi', harness: 'ohmypi' }),
         agent({ id: 'agent-review', role: 'review' }),
         agent({ id: 'agent-missing', sessionId: undefined }),
         agent({ id: 'agent-subagent', sessionId: 'subagent-session' }),
@@ -115,7 +115,7 @@ describe('PiTranscriptSource', () => {
   it('resolves active Pi work-agent transcripts from Pi session metadata', async () => {
     const source = new PiTranscriptSource({
       listAgents: async () => [
-        agent({ id: 'agent-pi', harness: 'pi', sessionId: 'pi-session' }),
+        agent({ id: 'agent-pi', harness: 'ohmypi', sessionId: 'pi-session' }),
         agent({ id: 'agent-claude', harness: 'claude-code', sessionId: 'claude-session' }),
       ],
       resolveTranscriptPath: async (_agent, sessionId) => `/tmp/${sessionId}.jsonl`,
@@ -133,9 +133,9 @@ describe('PiTranscriptSource', () => {
         runId: 'agent-pi',
         sessionId: 'pi-session',
         agentRole: 'work',
-        agentHarness: 'pi',
+        agentHarness: 'ohmypi',
       },
-      harness: 'pi',
+      harness: 'ohmypi',
       size: 123,
       mtimeMs: 456,
     }]);

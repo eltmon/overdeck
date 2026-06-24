@@ -115,7 +115,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
 }
 
 export class PiTranscriptSource implements TranscriptSource {
-  readonly harness = 'pi';
+  readonly harness = 'ohmypi';
 
   private readonly listAgents: () => Promise<RunningAgent[]>;
   private readonly readSessionId: (agent: RunningAgent) => Promise<string | null>;
@@ -133,7 +133,7 @@ export class PiTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'pi')
+        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'ohmypi')
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);
@@ -174,7 +174,7 @@ export class PiTranscriptSource implements TranscriptSource {
       sessionId,
       transcriptPath,
       identity: buildMemoryIdentity(agent, sessionId),
-      harness: 'pi',
+      harness: 'ohmypi',
       size: fileStat.size,
       mtimeMs: fileStat.mtimeMs,
     };

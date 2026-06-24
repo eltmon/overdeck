@@ -35,13 +35,13 @@ describe('AgentDock', () => {
     expect(screen.queryByRole('button', { name: /Claude Code/ })).toBeNull()
   })
 
-  it('renders harness marks for claude-code, codex, and pi agents', () => {
+  it('renders harness marks for claude-code, codex, and ohmypi agents', () => {
     render(
       <AgentDock
         agents={[
           { id: 'claude-code', label: 'Claude Code' },
           { id: 'codex', label: 'Codex' },
-          { id: 'pi', label: 'Pi' },
+          { id: 'ohmypi', label: 'oh-my-pi' },
         ]}
         onSelectAgent={() => {}}
       />,
@@ -49,7 +49,7 @@ describe('AgentDock', () => {
 
     expect(screen.getByLabelText('Claude Code logo')).toHaveAttribute('viewBox', '0 0 256 257')
     expect(screen.getByLabelText('Codex logo')).toHaveAttribute('viewBox', '0 0 256 260')
-    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument()
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument()
     expect(screen.getByText('π')).toBeInTheDocument()
     expect(screen.queryByTestId('agent-icon-bot')).toBeNull()
   })

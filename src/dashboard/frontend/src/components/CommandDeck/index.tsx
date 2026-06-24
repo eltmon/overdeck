@@ -1100,7 +1100,7 @@ export function CommandDeck({
   // can open/focus an agent tab on it.
   const createDeckConversation = useCallback(
     (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
-      const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
+      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
       return createConversationForProject(projectKey, harness, message, viewMode);

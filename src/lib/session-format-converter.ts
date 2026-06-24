@@ -190,7 +190,7 @@ function shortId(): string {
   const raw = await readFile(opts.sourceSessionFile, 'utf-8');
   let turns: TranscriptTurn[];
   switch (opts.fromHarness) {
-    case 'pi':
+    case 'ohmypi':
       turns = extractPiTranscript(raw);
       break;
     case 'codex':
@@ -228,7 +228,7 @@ function shortId(): string {
     return { sessionId: threadId, targetSessionFile };
   }
 
-  if (opts.toHarness === 'pi') {
+  if (opts.toHarness === 'ohmypi') {
     const sessionId = randomUUID();
     const agentDir = join(homedir(), '.overdeck', 'agents', opts.tmuxSession);
     const sessionDir = join(agentDir, 'sessions');

@@ -7,7 +7,7 @@ import { getAgentRuntimeBaseCommand } from '../agents.js'
 // behavior was a single-arg getAgentRuntimeBaseCommand(model) that returned
 // the same strings produced today by the harness='claude-code' branch.
 //
-// AC4: harness='pi' produces a `pi --mode rpc ...` command.
+// AC4: harness='ohmypi' produces a `omp --mode rpc ...` command.
 
 // PAN-982 widened the signature to (model, agentName?, agentType?, harness?).
 // The `harness` slot is now the 4th positional. We pass undefined for the
@@ -34,16 +34,16 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
     expect(cmd).toBe("claude --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
   })
 
-  it('pi harness emits a `pi --mode rpc --model <model>` command (AC4)', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'pi')
-    expect(cmd).toBe("pi --mode rpc --model 'claude-sonnet-4-6'")
+  it('ohmypi harness emits a `omp --mode rpc --model <model>` command (AC4)', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'ohmypi')
+    expect(cmd).toBe("omp --mode rpc --model 'claude-sonnet-4-6'")
   })
 
-  it('pi harness emits no claude permission flags', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('gpt-5.4-mini', undefined, undefined, 'pi')
+  it('ohmypi harness emits no claude permission flags', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('gpt-5.4-mini', undefined, undefined, 'ohmypi')
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/--permission-mode/)
-    expect(cmd).toMatch(/^pi --mode rpc /)
+    expect(cmd).toMatch(/^omp --mode rpc /)
   })
 
   it('codex harness returns "codex" base command — no permission flags (AC10)', async () => {

@@ -15,8 +15,8 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../src/lib/cost-parsers/pi-parser.js', () => ({
-  parsePiSessionSync: vi.fn(),
+vi.mock('../../../../src/lib/cost-parsers/ohmypi-parser.js', () => ({
+  parseOhmypiSessionSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
@@ -34,7 +34,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
 });
 
 import { existsSync, readdirSync } from 'node:fs';
-import { parsePiSessionSync } from '../../../../src/lib/cost-parsers/pi-parser.js';
+import { parseOhmypiSessionSync } from '../../../../src/lib/cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
 import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
 import { CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
@@ -127,11 +127,11 @@ function makeSessionUsage(sessionFile: string, model = 'claude-sonnet-4-6') {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('CostWriter.reconcile — pi source', () => {
+describe('CostWriter.reconcile — ohmypi source', () => {
   beforeEach(() => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    vi.mocked(parsePiSessionSync).mockReturnValue(null);
+    vi.mocked(parseOhmypiSessionSync).mockReturnValue(null);
   });
 
   afterEach(() => vi.clearAllMocks());
@@ -145,13 +145,13 @@ describe('CostWriter.reconcile — pi source', () => {
     );
 
     const result = await Effect.runPromise(
-      CostWriter.use((w) => w.reconcile({ source: 'pi' })).pipe(Effect.provide(layer)),
+      CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
     );
 
     expect(result).toEqual({ imported: 0 });
   });
 
-  it('imports one pi session and returns { imported: 1 }', async () => {
+  it('imports one ohmypi session and returns { imported: 1 }', async () => {
     const agentDir = '/fake/pan/agents';
     const sessionFile = '/fake/pan/agents/agent-1/sessions/sess.jsonl';
 
@@ -163,7 +163,7 @@ describe('CostWriter.reconcile — pi source', () => {
       return [];
     });
 
-    vi.mocked(parsePiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
+    vi.mocked(parseOhmypiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
 
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
     const layer = CostWriterLive.pipe(
@@ -171,14 +171,14 @@ describe('CostWriter.reconcile — pi source', () => {
     );
 
     const result = await Effect.runPromise(
-      CostWriter.use((w) => w.reconcile({ source: 'pi' })).pipe(Effect.provide(layer)),
+      CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
     );
 
     expect(result).toEqual({ imported: 1 });
     expect(insertedValues).toHaveLength(1);
     const row = insertedValues[0] as Record<string, unknown>;
     expect(row.agentId).toBe('agent-1');
-    expect(row.sessionType).toBe('pi');
+    expect(row.sessionType).toBe('ohmypi');
     expect(row.sourceFile).toBe(sessionFile);
     expect(row.cost).toBe(0.04);  // cost_v2 preferred over cost
   });
@@ -193,7 +193,7 @@ describe('CostWriter.reconcile — pi source', () => {
       return [];
     });
 
-    vi.mocked(parsePiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
+    vi.mocked(parseOhmypiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
 
     const { dbLayer, busLayer, archiveLayer, rows, insertedValues } = makeTestLayer();
 
@@ -205,7 +205,7 @@ describe('CostWriter.reconcile — pi source', () => {
     );
 
     const result = await Effect.runPromise(
-      CostWriter.use((w) => w.reconcile({ source: 'pi' })).pipe(Effect.provide(layer)),
+      CostWriter.use((w) => w.reconcile({ source: 'ohmypi' })).pipe(Effect.provide(layer)),
     );
 
     expect(result).toEqual({ imported: 0 });

@@ -76,7 +76,7 @@ describe("context dashboard contracts", () => {
           hasUserContent: true,
         },
         {
-          harness: "pi",
+          harness: "ohmypi",
           layerKind: "project",
           projectKey: "overdeck",
           label: "overdeck · AGENTS.md",
@@ -89,26 +89,27 @@ describe("context dashboard contracts", () => {
     })
 
     expect(parsed.layers.map((layer) => layer.kind)).toEqual(["global", "project", "workspace"])
-    expect(parsed.targets.map((target) => target.harness)).toEqual(["claude-code", "pi"])
+    expect(parsed.targets.map((target) => target.harness)).toEqual(["claude-code", "ohmypi"])
     expect(parsed.targets[0].hasUserContent).toBe(true)
   })
 
   it("names harness previews with shared harness values and fullPrompt", () => {
     const harnesses: readonly Harness[] = CONTEXT_PREVIEW_HARNESSES
-    expect(harnesses).toEqual(["claude-code", "pi"])
+    expect(harnesses).toEqual(["claude-code", "ohmypi", "codex"])
 
     const parsed = decodePreviewResponse({
       operation: "preview",
       previews: {
         "claude-code": "Claude Code rendered context",
-        pi: "Pi rendered context",
+        ohmypi: "oh-my-pi rendered context",
+        codex: "Codex rendered context",
         fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],
     })
 
     expect(parsed.previews["claude-code"]).toBe("Claude Code rendered context")
-    expect(parsed.previews.pi).toBe("Pi rendered context")
+    expect(parsed.previews.ohmypi).toBe("oh-my-pi rendered context")
     expect(parsed.previews.fullPrompt).toBe("Overdeck injected prompt audit")
   })
 

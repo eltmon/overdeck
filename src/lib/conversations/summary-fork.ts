@@ -230,7 +230,7 @@ export async function authorHandoffExternal(
   // tool vs Pi's lowercase `write` tool, with harness-specific phrasing about
   // how the model should call it. Both templates share the same H2 contract,
   // and the file-on-disk read below is harness-independent.
-  const templateName = effectiveHarness === 'pi' ? 'handoff-external-pi.md' : 'handoff-external.md';
+  const templateName = effectiveHarness === 'ohmypi' ? 'handoff-external-pi.md' : 'handoff-external.md';
   const template = await readFile(join(packageRoot, 'roles', templateName), 'utf-8');
 
   // The source's harness decides how the transcript is read/serialized; the

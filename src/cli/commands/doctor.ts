@@ -14,18 +14,18 @@ import {
   COMMANDS_DIR,
   AGENTS_DIR,
   CLAUDE_DIR,
-  packageRoot,
+  ohmypiExtensionCandidates,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
-import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
+import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 
-// Minimum supported Pi binary version for the Pi harness (PAN-636).
-// Bump in lockstep with packages/pi-extension API surface compatibility.
-export const SUPPORTED_PI_VERSION_MIN = '0.73.0';
+// Minimum supported omp version for the ohmypi harness (PAN-1989).
+// omp uses a different version lineage from pi. Baselined at 16.1.16 (verified).
+export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 
 const execAsync = promisify(exec);
 
@@ -71,91 +71,92 @@ function readCodexVersion(): string | null {
   }
 }
 
-export function checkPi(strict: boolean): CheckResult[] {
+function readOmpVersion(): string | null {
+  // omp prints `omp/X.Y.Z` to stdout. Merge stderr for safety.
+  try {
+    const out = execSync('omp --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    // Match `omp/X.Y.Z` or a bare semver.
+    const m = out.match(/omp\/(\d+\.\d+\.\d+)/) ?? out.match(/(\d+\.\d+\.\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+export function checkOhmypi(strict: boolean): CheckResult[] {
   const out: CheckResult[] = [];
-  if (!checkCommand('pi')) {
+  if (!checkCommand('omp')) {
     out.push({
-      name: 'Pi Coding Agent',
+      name: 'oh-my-pi (omp)',
       status: strict ? 'error' : 'warn',
-      message: 'Not installed (optional alternative harness)',
-      fix: 'Install: npm install -g @mariozechner/pi-coding-agent',
+      message: 'Not installed (ohmypi harness unavailable)',
+      fix: 'Install: npm install -g @oh-my-pi/pi-coding-agent',
     });
     return out;
   }
 
-  const version = readPiVersion();
+  const version = readOmpVersion();
   if (!version) {
     out.push({
-      name: 'Pi Coding Agent',
+      name: 'oh-my-pi (omp)',
       status: 'warn',
-      message: 'Detected but `pi --version` did not return a version string',
-      fix: 'Reinstall: npm install -g @mariozechner/pi-coding-agent',
+      message: 'Detected but `omp --version` did not return a version string',
+      fix: 'Reinstall: npm install -g @oh-my-pi/pi-coding-agent@latest',
     });
-  } else if (compareSemver(version, SUPPORTED_PI_VERSION_MIN) < 0) {
+  } else if (compareSemver(version, SUPPORTED_OMP_VERSION_MIN) < 0) {
     out.push({
-      name: 'Pi Coding Agent',
-      status: 'error',
-      message: `v${version} (too old — requires >= ${SUPPORTED_PI_VERSION_MIN})`,
-      fix: 'Upgrade: npm install -g @mariozechner/pi-coding-agent@latest',
+      name: 'oh-my-pi (omp)',
+      status: strict ? 'error' : 'warn',
+      message: `v${version} (too old — requires >= ${SUPPORTED_OMP_VERSION_MIN})`,
+      fix: 'Upgrade: npm install -g @oh-my-pi/pi-coding-agent@latest',
     });
   } else {
     out.push({
-      name: 'Pi Coding Agent',
+      name: 'oh-my-pi (omp)',
       status: 'ok',
       message: `v${version}`,
     });
   }
 
-  const extensionDist = join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js');
-  if (!existsSync(extensionDist)) {
+  const extensionCandidates = ohmypiExtensionCandidates();
+  const extensionPresent = extensionCandidates.some((p) => existsSync(p));
+  if (!extensionPresent) {
     out.push({
-      name: 'Pi Extension Bundle',
+      name: 'ohmypi Extension Bundle',
       status: 'warn',
-      message: 'packages/pi-extension/dist/index.js not found',
-      fix: 'Build it: cd packages/pi-extension && npm run build',
+      message: 'ohmypi extension bundle not found',
+      fix: 'Build it: npm run build:ohmypi-extension && npm run build (or, in a checkout: cd packages/ohmypi-extension && npm run build)',
     });
   } else {
     out.push({
-      name: 'Pi Extension Bundle',
+      name: 'ohmypi Extension Bundle',
       status: 'ok',
-      message: 'packages/pi-extension/dist/index.js present',
+      message: 'ohmypi extension bundle present',
     });
   }
 
-  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x Pi conversations. Only
-  // surfaced when a credential exists — users who never use codex aren't
-  // bothered. Expiry is a sync read; `pan pi-auth status` does the live
-  // refresh check.
-  const codexCred = readPiCodexCredential();
+  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x ohmypi conversations.
+  // Only surfaced when a credential exists. Expiry is a sync read;
+  // `pan ohmypi-auth status` does the live refresh check.
+  const codexCred = readOhmypiCodexCredential();
   if (codexCred) {
     const mins = Math.round((codexCred.expires - Date.now()) / 60_000);
     if (mins > 1) {
       out.push({
-        name: 'Pi ChatGPT/Codex auth',
+        name: 'ohmypi ChatGPT/Codex auth',
         status: 'ok',
         message: `openai-codex token valid (${mins > 120 ? `~${Math.round(mins / 60)}h` : `~${mins}m`})`,
       });
     } else {
       out.push({
-        name: 'Pi ChatGPT/Codex auth',
+        name: 'ohmypi ChatGPT/Codex auth',
         status: 'warn',
         message: 'openai-codex token expired',
-        fix: 'Refresh/re-auth: pan pi-auth status (auto-refresh) or pan pi-auth login',
+        fix: 'Refresh/re-auth: pan ohmypi-auth status (auto-refresh) or pan ohmypi-auth login',
       });
     }
   }
   return out;
-}
-
-function readPiVersion(): string | null {
-  // Pi prints its version to stderr, not stdout — merge both streams.
-  try {
-    const out = execSync('pi --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
-    const m = out.match(/(\d+\.\d+\.\d+)/);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
 }
 
 export interface CheckResult {
@@ -656,10 +657,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     }
   }
 
-  // Pi Coding Agent (alternative harness — PAN-636).
-  // Pi is optional: missing → warn (or error under --strict). When installed, version
-  // is compared against SUPPORTED_PI_VERSION_MIN and the bundled extension is checked.
-  for (const c of checkPi(options.strict ?? false)) checks.push(c);
+  // oh-my-pi / omp (ohmypi harness — PAN-1989, replaces pi PAN-636).
+  // omp is optional: missing → warn (or error under --strict). When installed, version
+  // is compared against SUPPORTED_OMP_VERSION_MIN and the bundled extension is checked.
+  for (const c of checkOhmypi(options.strict ?? false)) checks.push(c);
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);

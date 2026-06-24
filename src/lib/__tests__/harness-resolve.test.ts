@@ -20,6 +20,17 @@ vi.mock('../providers.js', () => ({
 }));
 vi.mock('../config-yaml.js', () => ({ loadConfigSync: configMock.loadConfigSync }));
 vi.mock('../agents.js', () => ({ getProviderAuthMode: vi.fn(async () => 'apikey') }));
+// Make `command -v omp` succeed so hasHarnessBinary('ohmypi') returns true in all tests.
+// Tests that never reach the binary check (they throw earlier) are unaffected.
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    exec: vi.fn((cmd: string, callback: (err: null | Error, stdout: string, stderr: string) => void) => {
+      callback(null, '/usr/local/bin/omp', '');
+    }),
+  };
+});
 
 describe('resolveHarness — PAN-1871: no silent CLIProxy fallback for non-native models', () => {
   beforeEach(async () => {
@@ -97,5 +108,21 @@ describe('resolveHarness — PAN-1984: provider-default-only (explicit/role over
 
     const { resolveHarness } = await import('../harness-resolve.js');
     await expect(resolveHarness({ model: 'claude-sonnet-4-6', explicit: 'pi', role: 'work' })).resolves.toBe('claude-code');
+  });
+
+  it('AC(PAN-1989): provider that previously defaulted to pi now resolves to ohmypi via built-in default', async () => {
+    // kimi → built-in default ohmypi (was pi before PAN-1989).
+    providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('ohmypi');
+    configMock.loadConfigSync.mockReturnValue({ config: {} });
+
+    // Mock policy to allow ohmypi (kimi is non-Anthropic, so no ToS block).
+    vi.mocked(await import('../harness-policy.js')).canUseHarnessSync = vi.fn(() => ({ allowed: true }));
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    // child_process.exec is mocked above to make `command -v omp` succeed,
+    // so hasHarnessBinary('ohmypi') returns true and resolveHarness reaches
+    // `return winner` — confirming the built-in default is 'ohmypi', not 'pi'.
+    await expect(resolveHarness({ model: 'kimi-k2.7-code' })).resolves.toBe('ohmypi');
   });
 });

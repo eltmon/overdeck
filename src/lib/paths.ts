@@ -99,6 +99,49 @@ export function resolvePackageRootForDir(dir: string): string {
 export const packageRoot = resolvePackageRootForDir(currentDir);
 
 /**
+ * Candidate locations for the vendored ohmypi (omp) extension bundle, in
+ * resolution order (PAN-1989). The primary location is the copy shipped
+ * under `dist/extensions/` — present in packed installs (the `files` array
+ * ships `dist/`) AND in any built dev checkout (`build-cli.mjs` copies
+ * it there). The fallback is the raw source build under `packages/`, used
+ * only when running via tsx before a CLI build.
+ */
+export function ohmypiExtensionCandidates(): string[] {
+  return [
+    join(packageRoot, 'dist', 'extensions', 'ohmypi.js'),
+    join(packageRoot, 'packages', 'ohmypi-extension', 'dist', 'index.js'),
+  ];
+}
+
+/** Candidate locations for the legacy pi extension bundle (same scheme). */
+export function piExtensionCandidates(): string[] {
+  return [
+    join(packageRoot, 'dist', 'extensions', 'pi.js'),
+    join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js'),
+  ];
+}
+
+/**
+ * Resolve the ohmypi (omp) extension bundle to the first existing candidate,
+ * or `null` when no build is present. Callers that require the bundle (agent
+ * spawn) should throw with a build hint on null.
+ */
+export function resolveOhmypiExtensionPath(): string | null {
+  for (const candidate of ohmypiExtensionCandidates()) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** Resolve the legacy pi extension bundle to the first existing candidate. */
+export function resolvePiExtensionPath(): string | null {
+  for (const candidate of piExtensionCandidates()) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
  * Root of Overdeck's own bundled sync sources (PAN-1201).
  *
  * Everything `pan sync` distributes from the package itself lives under this

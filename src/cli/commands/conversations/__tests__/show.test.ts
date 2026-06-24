@@ -162,7 +162,7 @@ describe('showAction', () => {
       claudeSessionId: '99999999-aaaa-bbbb-cccc-dddddddddddd',
       model: 'glm-5.2',
       title: 'A conversation with no scanned session',
-      harness: 'pi',
+      harness: 'ohmypi',
     });
 
     const { showAction } = await import('../show.js');
@@ -176,7 +176,7 @@ describe('showAction', () => {
     expect(parsed.id).toBe(conv.id);
     expect(parsed.conversation.title).toBe('A conversation with no scanned session');
     expect(parsed.conversation.model).toBe('glm-5.2');
-    expect(parsed.conversation.harness).toBe('pi');
+    expect(parsed.conversation.harness).toBe('ohmypi');
     // No bridged session row exists.
     expect(parsed.session).toBeNull();
   });
