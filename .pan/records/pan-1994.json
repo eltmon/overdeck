@@ -1,25 +1,45 @@
 {
   "issueId": "PAN-1994",
   "schemaVersion": 2,
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:26:57.538Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:27:01.449Z"
+    }
+  ],
   "feedback": [],
   "created": "2026-06-24T01:12:28.512Z",
-  "updated": "2026-06-24T02:26:57.541Z",
+  "updated": "2026-06-24T02:31:46.665Z",
   "pipeline": {
     "issueId": "PAN-1994",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T01:32:51.529Z"
+    "updatedAt": "2026-06-24T02:31:23.278Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (45527ms):\n\ntoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m167|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mmessages)\u001b[33m.\u001b[39m\u001b[34mtoHaveLength\u001b[39m(\u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-conversation.test.ts\u001b[2m > \u001b[22mbuildConversationResponse\u001b[2m > \u001b[22mfalls back to mtime-based pick when launcher has no pinned ID\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ '/some/mtime/session.jsonl' ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/agents-conversation.test.ts:\u001b[2m184:43\u001b[22m\u001b[39m\n    \u001b[90m182|\u001b[39m\n    \u001b[90m183|\u001b[39m     \u001b[34mexpect\u001b[39m(mockGetAgentJsonlPath)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m184|\u001b[39m     expect(mockParseConversationMessages).toHaveBeenCalledWith(mtimePa…\n    \u001b[90m   |\u001b[39m                                           \u001b[31m^\u001b[39m\n    \u001b[90m185|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m186|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-conversation.test.ts\u001b[2m > \u001b[22mbuildConversationResponse\u001b[2m > \u001b[22mfalls back to mtime-based pick when pinned file does not exist on disk\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ '/some/mtime/session.jsonl' ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/agents-conversation.test.ts:\u001b[2m199:43\u001b[22m\u001b[39m\n    \u001b[90m197|\u001b[39m\n    \u001b[90m198|\u001b[39m     \u001b[34mexpect\u001b[39m(mockGetAgentJsonlPath)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m199|\u001b[39m     expect(mockParseConversationMessages).toHaveBeenCalledWith(mtimePa…\n    \u001b[90m   |\u001b[39m                                           \u001b[31m^\u001b[39m\n    \u001b[90m200|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m201|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯\u001b[22m\u001b[39m\n\n",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2041",
+    "reviewRequestedAt": "2026-06-24T02:28:58.639Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 6772,
-            "output": 166,
+            "input": 13513,
+            "output": 509,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -31,12 +51,20 @@
             "cacheRead": 4428981,
             "cacheWrite": 206790
           }
+        },
+        "work": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 233,
+            "output": 80753,
+            "cacheRead": 27243431,
+            "cacheWrite": 542975
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 6772,
-          "output": 166,
+          "input": 13513,
+          "output": 509,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -45,16 +73,24 @@
           "output": 64709,
           "cacheRead": 4428981,
           "cacheWrite": 206790
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 233,
+          "output": 80753,
+          "cacheRead": 27243431,
+          "cacheWrite": 542975
         }
       },
       "costAtCloseOut": {
-        "usd": 5.21595,
-        "pricingAsOf": "2026-06-24T01:32:51.546Z"
+        "usd": 16.637126,
+        "pricingAsOf": "2026-06-24T02:31:23.295Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2041"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }

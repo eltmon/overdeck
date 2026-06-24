@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1994",
   "created": "2026-06-24T01:12:28.308Z",
-  "updated": "2026-06-24T22:11:00.000Z",
-  "gitState": { "branch": "feature/pan-1994", "sha": "6fdf8e0be", "dirty": true },
+  "updated": "2026-06-24T02:28:58.638Z",
+  "gitState": {
+    "branch": "feature/pan-1994",
+    "sha": "6fdf8e0be",
+    "dirty": true
+  },
   "decisions": [
     {
       "id": "D1",
@@ -50,6 +54,11 @@
       "reason": "end",
       "note": "Investigated root causes of both bugs. Bug 1: lifecycle.transitionTo gated on source==='linear' in issues.ts — removed guard to fix GitHub label cleanup on re-plan. Bug 2: reconcileStaleMergeStatus fires postMergeLifecycle concurrently with planning spawn — added active-agent guard to skip re-fire when planning/work agent is running. Typecheck and full test suite (700+32 tests) pass.",
       "agentModel": "claude-sonnet-4-6"
+    },
+    {
+      "timestamp": "2026-06-24T02:28:58.628Z",
+      "reason": "end",
+      "note": "No deviations. Fixed two root causes of cross-issue label/pause contamination on re-plan: (1) Removed source==='linear' guard on lifecycle.transitionTo(id, 'in_planning') in the start-planning route — GitHub issues now get stale label cleanup (merged, verifying-on-main, etc.) when re-planning starts. (2) Added active-agent guard in reconcileStaleMergeStatus to skip postMergeLifecycle re-fire when a planning or work agent is already running/starting for the issue, preventing the deacon reconciler from pausing an in-progress planning session with the prior merge cycle's pause reason."
     }
   ],
   "feedback": []
