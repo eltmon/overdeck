@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, sessionFilePath } from './paths.js';
+import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
@@ -191,10 +191,10 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
 }> {
   const paths = piFifoPaths(agentId);
   await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const piExtensionPath = resolve(process.cwd(), 'packages/pi-extension/dist/index.js');
-  if (!existsSync(piExtensionPath)) {
+  const piExtensionPath = resolvePiExtensionPath();
+  if (!piExtensionPath) {
     throw new Error(
-      `Pi extension not built. Run: cd packages/pi-extension && npm run build\n(expected: ${piExtensionPath})`
+      `Pi extension not built. Run: npm run build\n(looked for dist/extensions/pi.js and packages/pi-extension/dist/index.js under ${packageRoot})`
     );
   }
   // PAN-1048 review feedback 006 (S1): thread the resolved role/workhorse model
@@ -221,10 +221,10 @@ async function getOhmypiLauncherFields(agentId: string, model: string): Promise<
 }> {
   const paths = ohmypiFifoPaths(agentId);
   await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const ohmypiExtensionPath = resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js');
-  if (!existsSync(ohmypiExtensionPath)) {
+  const ohmypiExtensionPath = resolveOhmypiExtensionPath();
+  if (!ohmypiExtensionPath) {
     throw new Error(
-      `ohmypi extension not built. Run: cd packages/ohmypi-extension && npm run build\n(expected: ${ohmypiExtensionPath})`
+      `ohmypi extension not built. Run: npm run build\n(looked for dist/extensions/ohmypi.js and packages/ohmypi-extension/dist/index.js under ${packageRoot})`
     );
   }
   return {

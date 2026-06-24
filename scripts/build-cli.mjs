@@ -78,6 +78,28 @@ const copyCloisterPrompts = () => {
   copyMatching(cloisterPromptsSrc, cliPromptsDir, (name) => name.endsWith('.md'));
 };
 
+// PAN-1989: ship the vendored pi/ohmypi extension bundles inside dist/ so
+// packed installs (npm pack) include them — package.json's `files` array ships
+// dist/ but NOT packages/. Runtime resolution (src/lib/paths.ts) looks for these
+// copies first, falling back to the raw packages/ build in a dev checkout.
+const copyExtensionBundles = () => {
+  const extDstDir = join(distDir, 'extensions');
+  mkdirSync(extDstDir, { recursive: true });
+  const bundles = [
+    ['ohmypi-extension/dist/index.js', 'ohmypi.js'],
+    ['pi-extension/dist/index.js', 'pi.js'],
+  ];
+  for (const [src, dst] of bundles) {
+    const srcPath = join(projectRoot, 'packages', src);
+    if (!existsSync(srcPath)) {
+      throw new Error(
+        `[build-cli] extension bundle missing: ${srcPath} (run npm run build:ohmypi-extension && npm run build:pi-extension first)`,
+      );
+    }
+    cpSync(srcPath, join(extDstDir, dst));
+  }
+};
+
 try {
   if (existsSync(dashboardDir)) {
     mkdirSync(preservedRoot, { recursive: true });
@@ -94,6 +116,7 @@ try {
 
   copyCloisterPrompts();
   copyCavemanAssets();
+  copyExtensionBundles();
 } finally {
   rmSync(preservedRoot, { recursive: true, force: true });
 }

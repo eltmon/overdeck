@@ -14,7 +14,7 @@ import {
   COMMANDS_DIR,
   AGENTS_DIR,
   CLAUDE_DIR,
-  packageRoot,
+  ohmypiExtensionCandidates,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
@@ -118,19 +118,20 @@ export function checkOhmypi(strict: boolean): CheckResult[] {
     });
   }
 
-  const extensionDist = join(packageRoot, 'packages', 'ohmypi-extension', 'dist', 'index.js');
-  if (!existsSync(extensionDist)) {
+  const extensionCandidates = ohmypiExtensionCandidates();
+  const extensionPresent = extensionCandidates.some((p) => existsSync(p));
+  if (!extensionPresent) {
     out.push({
       name: 'ohmypi Extension Bundle',
       status: 'warn',
-      message: 'packages/ohmypi-extension/dist/index.js not found',
-      fix: 'Build it: cd packages/ohmypi-extension && npm run build',
+      message: 'ohmypi extension bundle not found',
+      fix: 'Build it: npm run build:ohmypi-extension && npm run build (or, in a checkout: cd packages/ohmypi-extension && npm run build)',
     });
   } else {
     out.push({
       name: 'ohmypi Extension Bundle',
       status: 'ok',
-      message: 'packages/ohmypi-extension/dist/index.js present',
+      message: 'ohmypi extension bundle present',
     });
   }
 

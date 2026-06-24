@@ -147,7 +147,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
 import { getEventStore } from '../event-store.js';
 import {
   generateSummaryForFork,
@@ -1450,7 +1450,7 @@ export async function spawnConversationSession(
       piFields = {
         harness: 'ohmypi',
         piMode: 'tui',
-        piExtensionPath: resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
+        piExtensionPath: resolveOhmypiExtensionPath() ?? resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
         piSessionDir,
         resumeSessionId: storedPiSessionId || undefined,
       };

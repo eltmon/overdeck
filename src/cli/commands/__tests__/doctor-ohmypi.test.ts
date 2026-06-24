@@ -100,13 +100,18 @@ describe('doctor checkOhmypi (PAN-1989)', () => {
     expect(omp.status).toBe('error')
   })
 
-  it('AC: reports ohmypi-extension bundle presence', () => {
+  it('AC: reports warn when the ohmypi extension bundle is missing', () => {
     execSyncMock.mockImplementation((cmd: string) => {
       if (cmd.startsWith('which omp')) return '/usr/local/bin/omp\n'
       if (cmd.startsWith('omp --version')) return `omp/${SUPPORTED_OMP_VERSION_MIN}\n`
       throw new Error(`unexpected command: ${cmd}`)
     })
-    existsSyncMock.mockImplementation((p: string) => !p.endsWith('packages/ohmypi-extension/dist/index.js'))
+    // Both candidate locations must be absent for the bundle to count as missing
+    // (shipped dist/extensions/ohmypi.js and the dev packages/ build).
+    existsSyncMock.mockImplementation((p: string) =>
+      !p.endsWith('dist/extensions/ohmypi.js') &&
+      !p.endsWith('packages/ohmypi-extension/dist/index.js'),
+    )
 
     const results = checkOhmypi(false)
     const ext = results.find((r) => r.name === 'ohmypi Extension Bundle')!
