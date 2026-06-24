@@ -16,6 +16,9 @@ const {
   runQualityGatesMock,
   writeFeedbackFileMock,
   messageAgentMock,
+  setAgentPausedMock,
+  stopAgentMock,
+  markWorkspaceStuckMock,
   findProjectByPathMock,
   existsSyncMock,
 } = vi.hoisted(() => ({
@@ -26,6 +29,9 @@ const {
   runQualityGatesMock: vi.fn(),
   writeFeedbackFileMock: vi.fn(),
   messageAgentMock: vi.fn(),
+  setAgentPausedMock: vi.fn(),
+  stopAgentMock: vi.fn(),
+  markWorkspaceStuckMock: vi.fn(),
   findProjectByPathMock: vi.fn(),
   existsSyncMock: vi.fn(),
 }));
@@ -64,6 +70,7 @@ vi.mock('../../src/lib/review-status.js', () => ({
   getReviewStatusSync: getReviewStatusMock,
   setReviewStatus: setReviewStatusMock,
   setReviewStatusSync: setReviewStatusMock,
+  markWorkspaceStuck: markWorkspaceStuckMock,
 }));
 
 vi.mock('../../src/lib/cloister/validation.js', () => ({
@@ -81,6 +88,8 @@ vi.mock('../../src/lib/cloister/feedback-writer.js', () => ({
 
 vi.mock('../../src/lib/agents.js', () => ({
   messageAgent: messageAgentMock,
+  setAgentPaused: setAgentPausedMock,
+  stopAgent: stopAgentMock,
 }));
 
 vi.mock('../../src/lib/projects.js', () => ({
@@ -137,6 +146,8 @@ describe('runVerificationForIssue', () => {
     runQualityGatesMock.mockReturnValue(Effect.succeed(makePassedResults()));
     writeFeedbackFileMock.mockReturnValue(Effect.succeed({ success: true, relativePath: '.pan/feedback/001-verification-failed.md' }));
     messageAgentMock.mockResolvedValue(undefined);
+    setAgentPausedMock.mockReturnValue(Effect.succeed({}));
+    stopAgentMock.mockReturnValue(Effect.succeed(undefined));
     findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
     existsSyncMock.mockImplementation((p: string) => p.endsWith('/.git'));
   });
@@ -336,6 +347,43 @@ describe('runVerificationForIssue', () => {
       const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
 
       expect(result.outcome).toBe('failed');
+    });
+
+    it('marks the issue stuck and pauses the work agent after the final failed attempt', async () => {
+      getReviewStatusMock.mockReturnValue({ verificationCycleCount: VERIFICATION_MAX_CYCLES - 1 });
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result).toMatchObject({
+        outcome: 'failed',
+        failedCheck: 'lint',
+        cycleCount: VERIFICATION_MAX_CYCLES,
+        maxCycles: VERIFICATION_MAX_CYCLES,
+      });
+      expect(markWorkspaceStuckMock).toHaveBeenCalledWith(
+        issueId,
+        'verification_stuck',
+        expect.objectContaining({
+          failedCheck: 'lint',
+          cycleCount: VERIFICATION_MAX_CYCLES,
+          maxCycles: VERIFICATION_MAX_CYCLES,
+        })
+      );
+      expect(setAgentPausedMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('needs-you: verification stuck'),
+        true
+      );
+      expect(stopAgentMock).toHaveBeenCalledWith(`agent-${issueId.toLowerCase()}`);
+      expect(writeFeedbackFileMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          markdownBody: expect.stringContaining('NEEDS-YOU: Verification stuck'),
+        })
+      );
+      expect(messageAgentMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.not.stringContaining('Do NOT stop until')
+      );
     });
   });
 
