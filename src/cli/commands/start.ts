@@ -835,10 +835,16 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 
+  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
+  const normalizedId = id.toLowerCase();
+  const agentId = `agent-${normalizedId}`;
+  const existingAgentState = getAgentStateSync(agentId);
+  const spawnModel = options.model || existingAgentState?.model;
+
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.
-  const requestedHarness = await resolveExplicitHarnessFlag(options.harness, options.model);
+  const requestedHarness = await resolveExplicitHarnessFlag(options.harness, spawnModel);
 
   // PAN-1845: validate --tier early so an invalid tier fails before any
   // workspace setup. The CLI flag overrides config.remote.resiliency_tier for
@@ -860,7 +866,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
       process.exit(1);
     }
-    const workModel = resolveRoleModel('work', options.model || undefined, yamlConfig);
+    const workModel = resolveRoleModel('work', spawnModel || undefined, yamlConfig);
     const supportedEfforts = getModelEffortLevelsSync(workModel);
     if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
       process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
@@ -868,10 +874,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
-  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
-  const normalizedId = id.toLowerCase();
-  const agentId = `agent-${normalizedId}`;
-  const existingAgentState = getAgentStateSync(agentId);
   const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
   if (existingAgentState?.paused === true && !options.force) {
     process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
@@ -1303,7 +1305,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       issueId: id,
       workspace,
       harness: requestedHarness,
-      model: options.model,
+      model: spawnModel,
       role: 'work',
       prompt,
       allowHost: options.host,
