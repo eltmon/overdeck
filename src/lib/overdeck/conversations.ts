@@ -1368,8 +1368,8 @@ export function hasOtherActiveConversationOnTmuxSession(_tmuxSession: string, _e
   return false;
 }
 
-export function updateSpawnError(_name: string, _error: string | null): void {
-  // overdeck does not persist spawn-error cache state.
+export function updateSpawnError(name: string, error: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET spawn_error = ? WHERE name = ?`).run(error, name);
 }
 
 export function clearStuckForks(): number {
