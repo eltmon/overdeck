@@ -2871,11 +2871,11 @@ export async function buildCavemanExports(
  */
 const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
 
-export function determineModel(options: { model?: string; role?: Role } = {}): string {
+export function determineModel(options: { model?: string; role?: Role; spawnKey?: string } = {}): string {
   const modelOverride = normalizeModelOverrideSync(options.model);
   const resolved = modelOverride
     ? modelOverride
-    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config, options.spawnKey));
 
   // Work-agent safety net: a config pin (or smart-selection) must not spawn a
   // work agent on a model that is known to wedge for the work role. Fail loudly
@@ -3388,7 +3388,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
-  const selectedModel = determineModel({ model: options.model, role });
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${issueId}` });
 
   if (role === 'work') {
     return spawnAgent({
@@ -3717,7 +3717,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   // Determine model based on role configuration
-  const selectedModel = determineModel({ model: options.model, role });
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${options.issueId}` });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local

@@ -587,7 +587,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       settingsModel = modelOverride;
       modelSource = 'modelOverride';
     } else {
-      settingsModel = resolveModel('plan', undefined, loadConfigSync().config);
+      settingsModel = resolveModel('plan', undefined, loadConfigSync().config, `plan:${issue.identifier}`);
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
