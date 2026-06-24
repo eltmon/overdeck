@@ -3,14 +3,15 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-24T18:21:02.856Z",
-  "updated": "2026-06-24T18:32:18.639Z",
+  "updated": "2026-06-24T18:32:28.516Z",
   "pipeline": {
     "issueId": "PAN-2047",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T18:32:18.586Z"
+    "updatedAt": "2026-06-24T18:32:28.474Z",
+    "testNotes": "Skipped: issue is already merged"
   },
   "closeOut": {
     "usage": {
@@ -34,7 +35,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-06-24T18:32:18.639Z"
+        "pricingAsOf": "2026-06-24T18:32:28.515Z"
       }
     },
     "merges": [],
