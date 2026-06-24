@@ -1,0 +1,112 @@
+{
+  "issueId": "PAN-1994",
+  "schemaVersion": 2,
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:26:57.538Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:27:01.449Z"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-06-24T01:12:28.512Z",
+  "updated": "2026-06-24T03:13:38.549Z",
+  "pipeline": {
+    "issueId": "PAN-1994",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "merging",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-24T03:13:38.502Z",
+    "reviewNotes": "No blocking findings in updated review",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2041",
+    "reviewedAtCommit": "6781a38c743942cebaecd26293bdfcd8a6518896",
+    "lastVerifiedCommit": "6781a38c743942cebaecd26293bdfcd8a6518896",
+    "reviewRequestedAt": "2026-06-24T02:37:17.611Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 22332,
+            "output": 2095,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18259,
+            "output": 64709,
+            "cacheRead": 4428981,
+            "cacheWrite": 206790
+          }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 51,
+            "output": 1664,
+            "cacheRead": 597076,
+            "cacheWrite": 135510
+          }
+        },
+        "work": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 269,
+            "output": 94841,
+            "cacheRead": 31375693,
+            "cacheWrite": 648869
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 22332,
+          "output": 2095,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18259,
+          "output": 64709,
+          "cacheRead": 4428981,
+          "cacheWrite": 206790
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 51,
+          "output": 1664,
+          "cacheRead": 597076,
+          "cacheWrite": 135510
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 269,
+          "output": 94841,
+          "cacheRead": 31375693,
+          "cacheWrite": 648869
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 18.722802,
+        "pricingAsOf": "2026-06-24T03:13:38.548Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2041"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}

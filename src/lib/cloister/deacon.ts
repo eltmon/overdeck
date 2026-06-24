@@ -3423,16 +3423,34 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       }
 
       if (isMerged) {
+        // PAN-1994: Skip the entire reconcile (including setReviewStatusSync) if
+        // a planning or work agent is actively running. Setting mergeStatus=merged
+        // while a fresh re-plan is in progress would contaminate the new pipeline
+        // cycle with stale prior-merge state. Leave staleMergeReconciled unset so
+        // the next patrol re-evaluates once the active agent has finished.
+        const issueLower = issueId.toLowerCase();
+        const planState = getAgentStateSync(`planning-${issueLower}`);
+        const workState = getAgentStateSync(`agent-${issueLower}`);
+        const hasActiveAgent =
+          planState?.status === 'running' || planState?.status === 'starting' ||
+          workState?.status === 'running' || workState?.status === 'starting';
+
+        if (hasActiveAgent) {
+          console.log(`[deacon] ${issueId}: active agent in progress — deferring stale-merge reconcile (PAN-1994)`);
+          continue;
+        }
+
         setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
         staleMergeReconciled.add(issueId);
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
-        // PAN-1027: also run the post-merge handoff so labels get cleaned, work agent
-        // tmux session is killed, beads compacted, etc. Without this the dashboard knows
-        // the issue is merged but the GitHub labels stay stale ("in-progress"/"in-review")
-        // and orphaned tmux sessions leak memory. skipDeploy avoids respawning the server
-        // — it's a best-effort reconciliation, not a fresh merge.
+
+        // PAN-1027: also run the post-merge handoff so labels get cleaned, work
+        // agent tmux session is killed, beads compacted, etc. Without this the
+        // dashboard knows the issue is merged but GitHub labels stay stale
+        // ("in-progress"/"in-review") and orphaned tmux sessions leak memory.
+        // skipDeploy avoids respawning the server — best-effort reconciliation.
         try {
           const { postMergeLifecycle } = await import('./merge-agent.js');
           postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true }).catch(err =>
