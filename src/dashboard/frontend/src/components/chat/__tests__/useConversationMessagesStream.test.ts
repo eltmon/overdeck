@@ -90,7 +90,7 @@ describe('shouldStreamConversationMessages', () => {
   it('streams live Claude Code conversations and legacy null-harness conversations', () => {
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'claude-code' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: null })).toBe(true);
-    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'pi' })).toBe(true);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'ohmypi' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'ohmypi' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'codex' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: -1, sessionAlive: true, harness: 'claude-code' })).toBe(false);
@@ -110,7 +110,7 @@ describe('shouldStreamConversationMessages', () => {
   });
 
   it('still gates synthetic agent sessions (id < 0) on a live session', () => {
-    expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: false, harness: 'pi' })).toBe(false);
-    expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: true, harness: 'pi' })).toBe(true);
+    expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: false, harness: 'ohmypi' })).toBe(false);
+    expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: true, harness: 'ohmypi' })).toBe(true);
   });
 });

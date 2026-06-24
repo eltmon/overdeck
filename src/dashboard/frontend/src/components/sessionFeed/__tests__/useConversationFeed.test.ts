@@ -89,7 +89,7 @@ describe('mapConversationsToFeedEntries', () => {
   it('maps harness values to feed agents', () => {
     const entries = mapConversationsToFeedEntries([
       conversation({ name: 'claude', harness: 'claude-code' }),
-      conversation({ name: 'pi', harness: 'pi' }),
+      conversation({ name: 'pi', harness: 'ohmypi' }),
       conversation({ name: 'unknown', harness: null }),
     ]);
 

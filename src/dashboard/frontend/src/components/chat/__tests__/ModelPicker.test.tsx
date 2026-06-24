@@ -107,13 +107,13 @@ describe('chat ModelPicker live harness labels', () => {
     await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
 
     expect(within(screen.getByRole('button', { name: /^Claude Code/i })).queryByText('Experimental')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('button', { name: /^Pi/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^oh-my-pi/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Codex/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
-    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /^Pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
+    expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 
   it('renders provider logos from the shared registry for every known provider', async () => {
@@ -139,12 +139,12 @@ describe('chat ModelPicker live harness labels', () => {
       <ModelPicker
         value="claude-sonnet-4-6"
         onChange={vi.fn()}
-        harness="pi"
+        harness="ohmypi"
         onHarnessChange={vi.fn()}
       />,
     );
 
-    expect(await screen.findByTitle('Pi harness active')).toContainElement(screen.getByLabelText('Pi logo'));
+    expect(await screen.findByTitle('oh-my-pi harness active')).toContainElement(screen.getByLabelText('oh-my-pi logo'));
 
     rerender(
       <ModelPicker
