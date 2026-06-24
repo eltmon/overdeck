@@ -1427,3 +1427,79 @@ reporting ground truth). Reporting harness discrepancy as an openQuestion.
 - **NEXT TICK:** monitor planning-pan-1901/1994 → proposed; if primary tree gets cleaned (conversations
   commit/discard), resume scoped strikes (1893/2039 re-strike after operator pan kill, + new ones).
   Keep surfacing the no-resume + dirty-tree blockers. Re-emit status each tick.
+
+## RUN-5 tick 3+ consolidation (~01:26–01:50Z) — 5 closed; 2 fixes produced; systemic ceiling = frozen deacon
+
+**Run output so far:**
+- **5 issues CLOSED** (all verified merged on origin/main + green CI before close): PAN-2023, PAN-2011,
+  PAN-2015, PAN-2038, PAN-2040. PAN-2040 was already fixed by a conversation (`60d7021c3`); my strike
+  correctly DECLINED to push a duplicate (good collision-avoidance).
+- **2 substrate fixes PRODUCED on branches** (done work, pre-staged for when the pipeline unfreezes):
+  - **PAN-1901** (beads `merge=union` driver): work agent DONE — `feature/pan-1901` has
+    `a3abeb393 fix(gitattributes): switch .beads/issues.jsonl to built-in merge=union driver` +
+    `5cf119bc8 test(beads): union-merge + gitattributes-invariant tests` (4 tests pass). Empirically
+    validated: `merge=union` resolves divergent JSONL appends conflict-free (exit 0) vs default conflict.
+    **STRANDED**: agent session EXITED with status=`running`/reviewStatus=`None` — it completed both
+    beads but did NOT run `pan done` (no PR, not in review). `pan done` is not a flywheel-allowed verb,
+    so could not advance it. Needs operator `pan done PAN-1901` (or the agent re-engaged) + deacon
+    unfrozen to merge.
+  - **PAN-1994** (plan-inherits-state corruption): work agent RUNNING (bead workspace-w8xv5). Planning
+    found the DECISIVE root cause: `verifyMergedBeforeLifecycle('PAN-1982')` runs
+    `gh pr list --head feature/pan-1982` → no PR → false merge detection that contaminates a fresh
+    `plan --auto` issue with another issue's `merged`/`verifying-on-main`/paused state. Plus
+    `reconstruction.ts:61` derives canonical `verifying_on_main` from `mergeStatus === 'merged'`.
+- **PAN-1864** (deterministic synthesis): planned → proposed, but the plan has only **1 item**
+  ("Add regression test for synthesizeReviewFromReports") — UNDER-SCOPED for a critical fix that needs
+  the deterministic-synthesis IMPLEMENTATION. Did NOT spawn work. Needs plan expansion.
+
+**THE systemic ceiling = frozen deacon.** OVERDECK_NO_RESUME=1 (PID 358390, verified) blocks:
+(a) auto-rebase of the 2 conflicting ready PRs (PAN-1832/#2003, PAN-1919/#1950),
+(b) ALL convoy resumes / review dispatch (so every work-agent branch — PAN-1901 now, PAN-1994 soon —
+    piles at the frozen review gate and cannot merge), and
+(c) recovery of stopped agents. `pan restart --resume` is outside flywheel authority (forbidden
+pan-resume equivalent; a deliberate operator state held since RUN-3). Clearing it is the single
+highest-leverage action — it drains the cohort AND unjams the entire review queue.
+
+**DURABLE LESSONS this run:**
+1. **`pan start` beads-recovery WORKS now (PAN-1647 fix is live).** Earlier state-file guidance ("pan
+   start --auto beads-recovery is broken — prefer pan plan --auto") is STALE for the finalize→start
+   path: `pan start PAN-1901` recovered "2 tasks" / `pan start PAN-1994` recovered 1, from `plan.items`
+   in spec.vbrief.json (the beads aren't inline — they materialize into `.beads/` at `pan start` via
+   `createBeadsFromVBrief`). BUT note the COUNT MISMATCH: 1901's plan had 19 `plan.items` → only 2 beads
+   materialized; 1994's 19 items → 1 bead. Partial materialization (PAN-1410 family) — worth a look, but
+   the agents are productive on what materialized.
+2. **A dirty primary main worktree blocks ~50% of strikes** (PAN-1929 family). strike-pan-2039 + 1893
+   REFUSED to edit/push ("primary main is dirty and ahead") while strike-pan-2015/2038 landed fine
+   (committed before the tree dirtied). The dirty WIP is ACTIVE CONVERSATION work in the shared primary
+   repo (cost-reconciler, PAN-1989 ohmypi spec, cockpit/activity-feed frontend) — not flywheel-owned.
+   **`pan plan --auto` + work agents are the RELIABLE path** while the primary tree is dirty (they run
+   in workspaces, unaffected). The "divergence" itself is transient/self-healing — origin advances as
+   strikes land, and pushing the regenerable `chore(records)`/`chore(state)` bot-state commits (clean FF)
+   re-syncs local. Pushed bot-state twice this run.
+3. **Strike self-abort → `pan plan --auto` follow-through works cleanly.** strike-pan-1901 self-aborted
+   ("plan-worthy, .pan vBRIEF JSON more complex than union"); launched plan same-tick; planning did
+   rigorous empirical analysis. The plan path caught what the strike correctly declined.
+4. **Work agent can complete beads but EXIT without `pan done`** (PAN-1901: session exited,
+   reviewStatus=None, no PR). A role-gap: the per-bead workflow completed but the final `pan done`
+   transition didn't fire. Observed once; surface if it recurs.
+
+**Cohort (unchanged, all operator-gated — the un-drained set):**
+- PAN-1832/#2003 + PAN-1919/#1950 — conflicting, need deacon rebase (blocked by no-resume).
+- MIN-846 — readyForMerge, need human UAT + merge (require_uat=true).
+Plus this run's stranded work: PAN-1901 (fix on branch, needs `pan done`), strike-pan-2039 + 1893
+(need operator `pan kill` to re-strike cleanly on the now-synced tree — both fix-complete/no-edits).
+
+**Run NOT reported.** Cohort is NOT drained (operator-gated) + active work in flight (agent-pan-1994).
+`pan flywheel report` would falsely declare complete. Run left ACTIVE.
+
+### OPERATOR checklist (unblocks, in leverage order)
+1. **`pan restart --resume`** — clear OVERDECK_NO_RESUME (PID 358390). Revives the deacon reconciler →
+   auto-rebases PAN-1832/#2003 + PAN-1919/#1950, resumes stopped convoys, AND unjams the review queue
+   (PAN-1901, soon PAN-1994 branches can then merge). **THE single highest-leverage action.** (PAN-1879
+   makes this possible; the flags landed RUN-4 but need `pan reload` + this restart to activate.)
+2. **`pan reload`** — deploy this run's + prior landed-but-not-live fixes.
+3. **`pan done PAN-1901`** — the fix is complete on `feature/pan-1901` but the agent exited without
+   submitting; transition it into review (then it merges once the deacon is unfrozen).
+4. **`pan kill strike-pan-2039 strike-pan-1893`** — clear the 2 stranded strike sessions (PAN-2022);
+   PAN-2039's fix is ready (re-strike lands on the synced tree), PAN-1893 re-strikes clean.
+5. **UAT + merge MIN-846.**
