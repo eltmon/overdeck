@@ -1503,3 +1503,36 @@ Plus this run's stranded work: PAN-1901 (fix on branch, needs `pan done`), strik
 4. **`pan kill strike-pan-2039 strike-pan-1893`** — clear the 2 stranded strike sessions (PAN-2022);
    PAN-2039's fix is ready (re-strike lands on the synced tree), PAN-1893 re-strikes clean.
 5. **UAT + merge MIN-846.**
+
+## RUN-7 tick 1 (2026-06-24 ~03:15Z) — RED MAIN: filed+struck PAN-2043 (stale-test class); 3 operator work agents live
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Harness claude-code/opus-4.8.
+
+- **MAIN CI RED** on `57fb20c` (failure, completed). 4 failing assertions / 7174 passed in
+  `src/dashboard/server/routes/__tests__/agents-conversation.test.ts > buildConversationResponse`
+  (`expected vi.fn() to be called... Number of calls: 0`). Root cause = **PAN-1857 stale-test class**:
+  commit `a443997b2` intentionally switched the claude-code path to `parseEntireConversation`
+  (agents.ts:1080, to avoid dropping recent turns of >10MB transcripts, PAN-1989) but the test still
+  mocks/asserts the old `parseConversationMessages`. Prod is correct; test mocks are stale.
+  Filed **PAN-2043** (P0, bug+critical+blocks-main) + `pan strike PAN-2043` → `strike-pan-2043`
+  (codex/gpt-5.5, provider-default routing). Strike is being careful: running the FULL `npm test`,
+  correctly distinguishing deliberate guard fixtures (`evil.ts`, boundary-gate) from its parser-mock
+  change before committing. Single highest-value action — greening main reopens the merge gate.
+- **3 operator-started work agents LIVE** (all `flywheelRunId=None`, exempt from governor reaping):
+  PAN-1901 (ctx 64%, PR #2042 merge-conflict), PAN-1989 (ctx 49%, self-instructing to fix failing
+  check + push + request review), + PAN-1989-review convoy (4 reviewers, **flowing** — synthesis.md
+  not yet written but parent active; the PAN-1861/1864 synthesis wedge is NOT acutely blocking here).
+  PAN-1994's work/test sessions ended this tick (finished pushing) — likely reached next phase.
+- **Ghost agent families** (state=running, no tmux session): PAN-1832 (work+review+test) and
+  PAN-1919 (work+review+test) — stale at the merge gate, both PRs have merge_conflict + failing
+  (red-main) checks. Not reapable by orchestrator (no `pan kill`). Surface for operator re-engagement
+  after main greens; rebase should clear conflicts.
+- **Launch posture: HELD.** `auto_pickup_backlog=false` restricts to in-flight + pipeline-unblockers.
+  All in-flight issues have agents (live or ghost-at-gate). PAN-1864 (deterministic synthesis) is the
+  best pipeline-unblocker candidate but the wedge isn't live (PAN-1989 review flowing) — holding to
+  avoid a redundant strike. Capacity is NOT idle in a way the toggle permits filling; the real
+  bottlenecks are red main (strike fixing) + the operator UAT/close-out gate (require_uat=true).
+- **Awaiting close-out/UAT: 6** Verifying-on-main PAN issues — operator gate (default rec: operator
+  clears them; flipping UAT off would delegate close-out but that's the operator's call).
+- Main `57fb20c` (RED). RAM 12.6/64 GB, **swap 0**. 4 productive agents + 1 strike. Run ACTIVE.
