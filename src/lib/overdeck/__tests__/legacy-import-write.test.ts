@@ -297,6 +297,27 @@ describe('importLegacyConversations (orchestration)', () => {
     expect(row.handoff_target_conv_id).toBeNull();
   });
 
+  it('skips and reports agent/planning/specialist names even when explicitly requested', async () => {
+    const { importLegacyConversations } = await import('../legacy-import.js');
+    const { getOverdeckDatabaseSync } = await import('../infra.js');
+
+    seedLegacy([
+      { name: 'agent-work-pan-2044', created_at: '2024-01-01T00:00:00.000Z' },
+      { name: 'planning-pan-2044', created_at: '2024-01-01T00:00:00.000Z' },
+      { name: 'user-session', created_at: '2024-01-01T00:00:00.000Z' },
+    ]);
+
+    const result = importLegacyConversations(LEGACY_DB_PATH, ['agent-work-pan-2044', 'planning-pan-2044', 'user-session']);
+    expect(result.imported).toContain('user-session');
+    expect(result.imported).not.toContain('agent-work-pan-2044');
+    expect(result.imported).not.toContain('planning-pan-2044');
+    expect(result.skipped.map((s) => s.name)).toContain('agent-work-pan-2044');
+    expect(result.skipped.map((s) => s.name)).toContain('planning-pan-2044');
+
+    const db = getOverdeckDatabaseSync();
+    expect(db.prepare(`SELECT id FROM conversations WHERE name = 'agent-work-pan-2044'`).get()).toBeUndefined();
+  });
+
   it('carries favorites for imported conversations', async () => {
     const { importLegacyConversations } = await import('../legacy-import.js');
     const { listFavoritedIds } = await import('../conversations.js');

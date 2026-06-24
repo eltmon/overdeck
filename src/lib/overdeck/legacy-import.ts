@@ -171,6 +171,11 @@ export function importLegacyConversations(path: string, names: string[]): Import
 
   // pass 1: insert non-existing rows
   for (const row of legacyRows) {
+    if (isAgentConversationName(row.name)) {
+      result.skipped.push({ name: row.name, reason: 'agent/planning/specialist conversation excluded from import' });
+      continue;
+    }
+
     const createdAtMs = parseIsoToMs(row.created_at);
     if (createdAtMs === null) {
       result.failed.push({ name: row.name, reason: `unparseable created_at: ${String(row.created_at)}` });
