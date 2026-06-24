@@ -77,15 +77,15 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:15:38.290Z",
-  "updated": "2026-06-24T17:04:36.709Z",
+  "updated": "2026-06-24T17:05:23.589Z",
   "pipeline": {
     "issueId": "PAN-1832",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T16:59:26.120Z",
+    "updatedAt": "2026-06-24T17:04:59.796Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -93,8 +93,7 @@
         "detectedAt": "2026-06-24T16:59:26.120Z"
       }
     ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2003",
-    "reviewedAtCommit": "effabf9e4fa341ee0c59f914e10fbace92818fcd"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2003"
   },
   "closeOut": {
     "usage": {
@@ -168,7 +167,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.332213,
-        "pricingAsOf": "2026-06-24T16:59:26.138Z"
+        "pricingAsOf": "2026-06-24T17:04:59.817Z"
       }
     },
     "merges": [
@@ -177,7 +176,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "pending-work-spawn",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "distribution-editor": "completed",
     "distribution-editor.ac1": "completed",
