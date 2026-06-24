@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2044",
   "created": "2026-06-24T16:25:24.065Z",
-  "updated": "2026-06-24T18:14:24.820Z",
+  "updated": "2026-06-24T18:36:37.731Z",
   "gitState": {
     "branch": "main",
     "sha": "a1d01b2b9",
@@ -116,15 +116,12 @@
       "reason": "feedback",
       "note": "[2026-06-24T18:14Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-06-24T18:14:24.820Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T18:36:37.731Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-24T18:14:24Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2044\n\nLegacyImportDialog treats failed import responses as successful summaries and can crash\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2044 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }
