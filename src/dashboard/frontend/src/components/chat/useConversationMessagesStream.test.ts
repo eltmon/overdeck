@@ -39,6 +39,6 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
 
   it('never streams a dead session', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-1908', harness: 'pi', sessionAlive: false }))).toBe(false);
-    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'claude-code', sessionAlive: false }))).toBe(false);
+    expect(shouldStreamConversationMessages(base({ id: 42, harness: 'claude-code', endedAt: '2026-01-01T00:00:00Z' }))).toBe(false);
   });
 });

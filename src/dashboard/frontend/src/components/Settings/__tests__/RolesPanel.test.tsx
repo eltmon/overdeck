@@ -122,7 +122,7 @@ describe('RolesPanel', () => {
     renderPanel();
 
     const cards = await screen.findAllByTestId('role-card');
-    expect(cards).toHaveLength(7);
+    expect(cards).toHaveLength(8);
     expect(cards.map((card) => within(card).getByRole('heading', { level: 4 }).textContent)).toEqual([
       'Plan',
       'Work',
@@ -131,6 +131,7 @@ describe('RolesPanel', () => {
       'Test',
       'Ship',
       'Flywheel',
+      'Sequencer',
     ]);
 
     expect(screen.getByLabelText('Plan model')).toHaveValue('workhorse:expensive');
