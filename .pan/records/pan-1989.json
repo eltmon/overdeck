@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T04:09:56.550Z",
+  "updated": "2026-06-24T04:14:22.411Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
@@ -110,9 +110,9 @@
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T04:09:56.509Z",
+    "updatedAt": "2026-06-24T04:14:22.359Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (300011ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
+    "verificationNotes": "Verification FAILED at test (300010ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
@@ -151,10 +151,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1591,
-            "output": 483707,
-            "cacheRead": 197531096,
-            "cacheWrite": 2703015
+            "input": 1597,
+            "output": 484199,
+            "cacheRead": 198009525,
+            "cacheWrite": 2704883
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -172,10 +172,10 @@
           "cacheWrite": 1215918
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1645,
-          "output": 500667,
-          "cacheRead": 203754036,
-          "cacheWrite": 2819983
+          "input": 1651,
+          "output": 501159,
+          "cacheRead": 204232465,
+          "cacheWrite": 2821851
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 239458,
@@ -191,8 +191,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 96.259265,
-        "pricingAsOf": "2026-06-24T04:09:56.549Z"
+        "usd": 96.417198,
+        "pricingAsOf": "2026-06-24T04:14:22.410Z"
       }
     },
     "merges": [
