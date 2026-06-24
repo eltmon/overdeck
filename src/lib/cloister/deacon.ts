@@ -346,6 +346,22 @@ export function saveState(state: DeaconState): void {
 }
 
 /**
+ * Clear the persisted patrol heartbeat at dashboard startup so the supervisor
+ * watchdog gives the first deacon patrol its normal startup grace window.
+ */
+export function resetPatrolHeartbeatForStartup(): void {
+  try {
+    if (!existsSync(STATE_FILE)) return;
+
+    const state = loadState();
+    delete state.lastPatrol;
+    saveState(state);
+  } catch {
+    // Non-fatal: worst case the watchdog still sees the stale heartbeat.
+  }
+}
+
+/**
  * Get health state for a specialist, creating if needed
  */
 function getSpecialistState(

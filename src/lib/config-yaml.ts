@@ -384,6 +384,59 @@ export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 export type ModelRef = string;
 export const PARENT_MODEL_REF = 'parent';
 
+export interface WeightedModelRef {
+  model: ModelRef;
+  weight: number;
+}
+
+/** Top-level role model: either a scalar model string or a weighted distribution list. */
+export type RoleModelRef = ModelRef | WeightedModelRef[];
+
+/** 32-bit FNV-1a hash — deterministic, no Math.random / Date.now. */
+export function fnv1a32(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Pick a model from a weighted distribution using a deterministic spawn key.
+ * Weights are relative (need not sum to 100). {a:7, b:3} and {a:70, b:30} produce
+ * identical per-key picks. Throws if no entry has weight > 0.
+ */
+export function pickWeightedModelRef(entries: WeightedModelRef[], spawnKey: string): ModelRef {
+  let totalWeight = 0;
+  for (const e of entries) {
+    if (e.weight > 0) totalWeight += e.weight;
+  }
+  if (totalWeight <= 0) {
+    throw new Error('pickWeightedModelRef: all entries have weight <= 0');
+  }
+  // Normalize hash to [0, 1) so proportional weight sets produce identical picks.
+  // (7/10 and 70/100 are the same IEEE-754 double, giving the same bands.)
+  const posF = fnv1a32(spawnKey) / 0x100000000;
+  let cumFraction = 0;
+  for (const e of entries) {
+    if (e.weight <= 0) continue;
+    cumFraction += e.weight / totalWeight;
+    if (posF < cumFraction) return e.model;
+  }
+  // Floating-point accumulation may leave the final band slightly below 1.0; fall through.
+  return entries[entries.length - 1].model;
+}
+
+/** Return the model with the highest weight; first entry wins on a tie. */
+export function representativeModelRef(entries: WeightedModelRef[]): ModelRef {
+  let best = entries[0];
+  for (let i = 1; i < entries.length; i++) {
+    if (entries[i].weight > best.weight) best = entries[i];
+  }
+  return best.model;
+}
+
 /**
  * Canonical workhorse slot list. Anything outside this set is rejected by
  * config-load validation (PAN-1048 review feedback 003 / REQ-18).
@@ -401,7 +454,7 @@ export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xh
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
-  model: ModelRef;
+  model: RoleModelRef;
   harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   /**
@@ -480,6 +533,8 @@ function cloneRoles(roles: RolesConfig): RolesConfig {
   for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfig]>) {
     cloned[role] = {
       ...roleConfig,
+      // Shallow-clone the distribution array so later mutations can't alias the cloned config.
+      model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
       sub: roleConfig.sub ? { ...roleConfig.sub } : undefined,
     };
   }
@@ -1655,18 +1710,29 @@ export function resolveModel(
   role: Role,
   subRole?: string,
   config: Pick<NormalizedConfig, 'roles' | 'workhorses'> = {},
+  spawnKey?: string,
 ): ModelId {
   const roleConfig = config.roles?.[role];
   const rawSubModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
   const subModel = rawSubModel === PARENT_MODEL_REF ? undefined : rawSubModel;
   const roleModel = roleConfig?.model;
-  const ref = subModel ?? roleModel ?? DEFAULT_MODEL_REFS[role];
-  const fieldPath = subModel
-    ? `roles.${role}.sub.${subRole}.model`
-    : roleModel
-      ? `roles.${role}.model`
-      : `defaults.${role}.model`;
-  return derefWorkhorse(ref, config, fieldPath);
+
+  // Sub-role model takes precedence; never sample the parent distribution for a sub-role.
+  if (subModel) {
+    const fieldPath = `roles.${role}.sub.${subRole}.model`;
+    return derefWorkhorse(subModel, config, fieldPath);
+  }
+
+  if (Array.isArray(roleModel)) {
+    const picked = spawnKey
+      ? pickWeightedModelRef(roleModel, spawnKey)
+      : representativeModelRef(roleModel);
+    return derefWorkhorse(picked, config, `roles.${role}.model`);
+  }
+
+  const scalarRef = roleModel ?? DEFAULT_MODEL_REFS[role];
+  const fieldPath = roleModel ? `roles.${role}.model` : `defaults.${role}.model`;
+  return derefWorkhorse(scalarRef, config, fieldPath);
 }
 
 function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
@@ -1723,6 +1789,20 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
 }
 
 function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
+  if (Array.isArray(roleConfig.model)) {
+    if (roleConfig.model.length === 0) {
+      throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
+    }
+    for (let i = 0; i < roleConfig.model.length; i++) {
+      const entry = roleConfig.model[i];
+      if (!entry.model || typeof entry.model !== 'string') {
+        throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
+      }
+      if (!Number.isInteger(entry.weight) || entry.weight <= 0) {
+        throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
+      }
+    }
+  }
   if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex') {
     throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
   }
@@ -1760,7 +1840,12 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
     validateRoleFields(role, roleConfig);
-    if (roleConfig.model) {
+    if (Array.isArray(roleConfig.model)) {
+      // Validate each distribution entry's model ref is resolvable.
+      for (let i = 0; i < roleConfig.model.length; i++) {
+        derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
+      }
+    } else if (roleConfig.model) {
       const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
       if (roleConfig.effort !== undefined) {
         const supported = getModelEffortLevelsSync(resolvedModel);

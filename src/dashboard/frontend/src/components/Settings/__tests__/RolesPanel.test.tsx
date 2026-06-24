@@ -162,7 +162,7 @@ describe('RolesPanel', () => {
     await screen.findAllByTestId('role-card');
     // Harness is derived from each role's model provider; the per-role harness chooser was
     // removed so the operator can no longer pick a harness that the backend would ignore.
-    for (const role of ['Plan', 'Work', 'Strike', 'Review', 'Test', 'Ship', 'Flywheel']) {
+    for (const role of ['Plan', 'Work', 'Strike', 'Review', 'Test', 'Ship', 'Flywheel', 'Sequencer']) {
       expect(screen.queryByLabelText(`${role} harness`)).toBeNull();
     }
     // The model chooser for each role remains.

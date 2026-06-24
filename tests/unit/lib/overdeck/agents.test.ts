@@ -351,6 +351,24 @@ describe('AC1 — AgentsResolver reads from agents table (no state.json scan)', 
     expect(result).toHaveLength(1);
     expect(result[0]!.role).toBe('sequencer');
   });
+
+  it('list({}) decodes persisted error and waiting statuses without crashing the resolver', async () => {
+    const { fdb, dbLayer } = makeFakeDb();
+    const { tmuxLayer } = makeFakeTmux();
+    fdb.agentRows.push(makeAgentRow('agent-pan-error', { status: 'error' }));
+    fdb.agentRows.push(makeAgentRow('agent-pan-waiting', { status: 'waiting' }));
+
+    const layer = AgentsResolverLive.pipe(
+      Layer.provide(dbLayer),
+      Layer.provide(tmuxLayer),
+    );
+
+    const result = await Effect.runPromise(
+      AgentsResolver.use((r) => r.list({})).pipe(Effect.provide(layer)),
+    );
+
+    expect(result.map((agent) => agent.status)).toEqual(['error', 'waiting']);
+  });
 });
 
 // ── AC2: switchModel — source-first ordering ──────────────────────────────────

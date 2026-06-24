@@ -370,8 +370,8 @@ function overdeckStatusToLegacy(
   status: OverdeckAgent['status'],
 ): AgentStatus {
   if (status === 'crashed') return 'error';
-  // 'idle' = agent is alive but waiting (tool-call paused, AUQ, etc.)
-  if (status === 'idle') return 'running';
+  // 'idle'/'waiting' = agent is alive but waiting (tool-call paused, AUQ, etc.)
+  if (status === 'idle' || status === 'waiting') return 'running';
   return status; // 'starting' | 'running' | 'stopped' are 1:1
 }
 

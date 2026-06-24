@@ -8,6 +8,7 @@ import {
   saveConfig,
   loadState,
   saveState,
+  resetPatrolHeartbeatForStartup,
   checkMassDeath,
   isDeaconRunning,
   getDeaconStatus,
@@ -151,6 +152,30 @@ describe('Deacon State Management', () => {
     const final = loadState();
     expect(final.specialists['review-agent']).toBeDefined();
     expect(final.specialists['merge-agent']).toBeDefined();
+  });
+
+  it('clears persisted lastPatrol for dashboard startup without losing state', () => {
+    const state: DeaconState = {
+      specialists: {
+        'review-agent': {
+          specialistName: 'review-agent',
+          consecutiveFailures: 1,
+          forceKillCount: 0,
+        },
+      },
+      patrolCycle: 7,
+      recentDeaths: ['2026-06-24T08:00:00.000Z'],
+      lastPatrol: '2026-06-24T08:01:00.000Z',
+    };
+    saveState(state);
+
+    resetPatrolHeartbeatForStartup();
+
+    const loaded = loadState();
+    expect(loaded.lastPatrol).toBeUndefined();
+    expect(loaded.patrolCycle).toBe(7);
+    expect(loaded.recentDeaths).toEqual(['2026-06-24T08:00:00.000Z']);
+    expect(loaded.specialists['review-agent']).toEqual(state.specialists['review-agent']);
   });
 });
 
