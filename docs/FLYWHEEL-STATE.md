@@ -1329,3 +1329,15 @@ strike-pan-1897 (PAN-2017, prompt never delivered), strike-pan-1900 (work done, 
 - **Strand pile unchanged (4):** strike-pan-1897/1900/1935/2011 — all need operator `pan kill` (PAN-2022). PAN-2011's fix is ready (aborted on transient red, now resolved).
 - **Fired strike-pan-1909** (pan plan done handoff hangs) to keep minAgents met.
 - **NEXT:** monitor 1909; OPERATOR actions unchanged: `pan kill` the 4 stranded; `pan reload` (deploy 1879/1929/2009/1882); `pan restart --resume` (revive deacon → auto-rebase 1832/#2003 + 1919/#1950); UAT+merge MIN-846.
+
+## RUN-4 (Overdeck-era) FINAL (2026-06-23 ~17:53–18:10Z) — 22 issues closed; consolidating at ctx limit
+
+- **PAN-1909, PAN-1875, PAN-2007 all LANDED+closed** this final stretch (16 strikes total via pan close). PAN-1909 used a clever **frontend-symlink verify trick** (symlink primary repo's `frontend/node_modules` into a detached main-verify worktree) to get past the workspace-deps gap that stranded PAN-1935 — a reusable workaround for future test-heavy strikes.
+- **FINAL RUN TALLY: 22 issues closed** (16 substrate strikes via `pan close` + 3 critical "main RED" via `gh issue close` with test-run evidence + 3 RUN-3 carried-in). 2 substrate bugs filed (PAN-2017 spawn-delivery, PAN-2022 aborted-strike re-strike collision). 1 P0 red-main caught and triaged (PAN-1928 run exposed the pre-existing resume-all no-loss-matrix gap; fixed by `4eee86d7bd`).
+- **Consolidating at high ctx** rather than starting a strike I couldn't monitor to close-out. The next session should: (a) continue tight strikes from the remaining substrate backlog, (b) close out any newly-landed strikes, (c) drive the operator-gated unblocks below.
+- **OPERATOR UNBLOCKS (unchanged, the real cohort drainers):**
+  1. `pan kill strike-pan-1897 strike-pan-1900 strike-pan-1935 strike-pan-2011` — clear the 4 stranded strikes (PAN-2022); PAN-2011's fix is ready (its abort reason is resolved on main).
+  2. `pan reload` — deploy this run's landed-but-not-live fixes (PAN-1879 no-resume flags, PAN-1929 rebase-hazard, PAN-2009 pi-resume, PAN-1882 strike-workspace reaper, PAN-1909 plan-done hang, PAN-2007 specialist-session-keepalive, PAN-1875 flywheel-stop).
+  3. `pan restart --resume` — revive the deacon reconciler (PAN-1879 now makes this possible) → auto-rebases PAN-1832/#2003 + PAN-1919/#1950 and resumes stopped convoys. **THE single highest-leverage action.**
+  4. UAT + merge MIN-846.
+- **Recurring gotchas confirmed this run:** (1) deacon.log is at `~/.overdeck/logs/deacon.log` (moved); an alive patrol in no-resume mode looks identical to a dead one. (2) Strikes touching shared test-infra (no-loss-matrix, infra.test) expose pre-existing gaps — the red looks like the strike broke it but the strike just ran the test. (3) Aborted strikes strand (PAN-2022); tight single-area strikes land; test-heavy strikes risk workspace-deps aborts (workaround: the frontend-symlink trick). (4) gh auth 401 is transient (retry). (5) bot-state `chore(records)`/`chore(beads)` commits accumulate ahead of origin when auto-push fails safely — a clean FF push of them unblocks strike merges.
