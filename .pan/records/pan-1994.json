@@ -1,23 +1,60 @@
 {
   "issueId": "PAN-1994",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-06-24T01:12:28.512Z",
-  "updated": "2026-06-24T01:12:28.512Z",
+  "updated": "2026-06-24T02:26:57.541Z",
   "pipeline": {
     "issueId": "PAN-1994",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T01:12:28.512Z"
+    "updatedAt": "2026-06-24T01:32:51.529Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 6772,
+            "output": 166,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18259,
+            "output": 64709,
+            "cacheRead": 4428981,
+            "cacheWrite": 206790
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 6772,
+          "output": 166,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18259,
+          "output": 64709,
+          "cacheRead": 4428981,
+          "cacheWrite": 206790
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 5.21595,
+        "pricingAsOf": "2026-06-24T01:32:51.546Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-4-6"
 }
