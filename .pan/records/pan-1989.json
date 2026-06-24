@@ -102,17 +102,15 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T05:01:24.406Z",
+  "updated": "2026-06-24T05:07:14.990Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T05:01:24.375Z",
-    "reviewNotes": "packed installs still omit the ohmypi extension",
-    "verificationNotes": "Verification FAILED at test (300009ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
+    "updatedAt": "2026-06-24T05:07:14.966Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
@@ -121,10 +119,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-opus-4-8": {
-            "input": 592,
-            "output": 17795,
-            "cacheRead": 1393866,
-            "cacheWrite": 24661
+            "input": 696,
+            "output": 21671,
+            "cacheRead": 1892309,
+            "cacheWrite": 32624
           },
           "anthropic/claude-sonnet-4-6": {
             "input": 54,
@@ -172,10 +170,10 @@
       },
       "totals": {
         "anthropic/claude-opus-4-8": {
-          "input": 21111,
-          "output": 160304,
-          "cacheRead": 11383820,
-          "cacheWrite": 1226287
+          "input": 21215,
+          "output": 164180,
+          "cacheRead": 11882263,
+          "cacheWrite": 1234250
         },
         "anthropic/claude-sonnet-4-6": {
           "input": 1769,
@@ -203,8 +201,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 100.940191,
-        "pricingAsOf": "2026-06-24T05:01:24.406Z"
+        "usd": 101.336602,
+        "pricingAsOf": "2026-06-24T05:07:14.990Z"
       }
     },
     "merges": [
@@ -212,8 +210,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "harness": "pi",
+  "model": "glm-5.2",
   "statusOverrides": {
     "widen-union": "completed",
     "widen-union.ac1": "completed",
