@@ -1450,7 +1450,7 @@ export async function spawnConversationSession(
       piFields = {
         harness: 'ohmypi',
         piMode: 'tui',
-        piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
+        piExtensionPath: resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
         piSessionDir,
         resumeSessionId: storedPiSessionId || undefined,
       };
