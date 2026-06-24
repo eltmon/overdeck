@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1994",
   "created": "2026-06-24T01:12:28.308Z",
-  "updated": "2026-06-24T02:28:58.638Z",
+  "updated": "2026-06-24T02:37:17.610Z",
   "gitState": {
     "branch": "feature/pan-1994",
     "sha": "6fdf8e0be",
@@ -59,6 +59,11 @@
       "timestamp": "2026-06-24T02:28:58.628Z",
       "reason": "end",
       "note": "No deviations. Fixed two root causes of cross-issue label/pause contamination on re-plan: (1) Removed source==='linear' guard on lifecycle.transitionTo(id, 'in_planning') in the start-planning route — GitHub issues now get stale label cleanup (merged, verifying-on-main, etc.) when re-planning starts. (2) Added active-agent guard in reconcileStaleMergeStatus to skip postMergeLifecycle re-fire when a planning or work agent is already running/starting for the issue, preventing the deacon reconciler from pausing an in-progress planning session with the prior merge cycle's pause reason."
+    },
+    {
+      "timestamp": "2026-06-24T02:37:17.600Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": []
