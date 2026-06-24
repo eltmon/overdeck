@@ -15,7 +15,7 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parsePiSessionSync } from '../cost-parsers/pi-parser.js';
+import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 
@@ -540,7 +540,7 @@ export const CostWriterLive = Layer.effect(
           for (const sessionFile of sessionFiles) {
             const session = yield* Effect.sync(() =>
               source === 'ohmypi'
-                ? parsePiSessionSync(sessionFile)
+                ? parseOhmypiSessionSync(sessionFile)
                 : parseCodexSessionSync(sessionFile),
             );
             if (!session) continue;

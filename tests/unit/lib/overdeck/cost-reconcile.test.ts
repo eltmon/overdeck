@@ -15,8 +15,8 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../src/lib/cost-parsers/pi-parser.js', () => ({
-  parsePiSessionSync: vi.fn(),
+vi.mock('../../../../src/lib/cost-parsers/ohmypi-parser.js', () => ({
+  parseOhmypiSessionSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cost-parsers/codex-parser.js', () => ({
@@ -34,7 +34,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
 });
 
 import { existsSync, readdirSync } from 'node:fs';
-import { parsePiSessionSync } from '../../../../src/lib/cost-parsers/pi-parser.js';
+import { parseOhmypiSessionSync } from '../../../../src/lib/cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
 import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
 import { CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
@@ -131,7 +131,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
   beforeEach(() => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    vi.mocked(parsePiSessionSync).mockReturnValue(null);
+    vi.mocked(parseOhmypiSessionSync).mockReturnValue(null);
   });
 
   afterEach(() => vi.clearAllMocks());
@@ -163,7 +163,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       return [];
     });
 
-    vi.mocked(parsePiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
+    vi.mocked(parseOhmypiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
 
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
     const layer = CostWriterLive.pipe(
@@ -193,7 +193,7 @@ describe('CostWriter.reconcile — ohmypi source', () => {
       return [];
     });
 
-    vi.mocked(parsePiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
+    vi.mocked(parseOhmypiSessionSync).mockReturnValue(makeSessionUsage(sessionFile));
 
     const { dbLayer, busLayer, archiveLayer, rows, insertedValues } = makeTestLayer();
 
