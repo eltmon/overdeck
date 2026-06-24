@@ -2471,11 +2471,6 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
         ...event,
       }));
     }
-    // PAN-1989: also persist the id durably so a dashboard restart / reboot can
-    // recover the resume pointer from disk instead of only from runtime state.
-    if (patch.claudeSessionId) {
-      appendSessionIdToHistory(agentId, patch.claudeSessionId);
-    }
   }
 
   if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
@@ -2552,38 +2547,6 @@ export function saveSessionId(agentId: string, sessionId: string): void {
   mkdirSync(dir, { recursive: true });
 
   writeFileSync(join(dir, 'session.id'), sessionId);
-}
-
-/**
- * PAN-1989: durably record a Claude session id in the agent's append-only
- * sessions.json the moment the dashboard learns it.
- *
- * The heartbeat hook also appends here, but only on the FIRST PostToolUse — so a
- * session that boots and is stopped before running any tool (e.g. kickoff never
- * delivered, or a reboot mid-run) leaves NO durable resume pointer. Its only
- * copy then lives in the ephemeral runtime `claudeSessionId`, which is lost on a
- * dashboard restart or reboot, leaving the agent "not resumable" even though its
- * transcript is intact on disk. Calling this from saveAgentRuntimeState (the
- * server-side SessionStart choke point) makes the pointer survive both. The
- * append-only list may accumulate aborted/empty ids; getLatestSessionId picks
- * the freshest one with a real transcript, so empties never shadow the truth.
- * De-dupes; never throws.
- */
-export function appendSessionIdToHistory(agentId: string, sessionId: string): void {
-  if (!sessionId || !sessionId.trim()) return;
-  try {
-    const dir = getAgentDir(agentId);
-    mkdirSync(dir, { recursive: true });
-    const file = join(dir, 'sessions.json');
-    let list: string[] = [];
-    if (existsSync(file)) {
-      const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-      if (Array.isArray(parsed)) list = parsed.filter((v): v is string => typeof v === 'string');
-    }
-    if (list.includes(sessionId)) return;
-    list.push(sessionId);
-    writeFileSync(file, JSON.stringify(list));
-  } catch { /* non-fatal — bookkeeping only */ }
 }
 
 /**
