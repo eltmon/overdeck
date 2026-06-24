@@ -414,28 +414,32 @@ function getSessionStatusTitle({
 
 /**
  * PAN-2053: read-only "why this model" header for the Start/Restart submenu.
- * Shown only when the agent's role uses a weighted model distribution — it
- * replaces the bare `Currently: …` label with the resolved model, the role's
- * weight bars, and the deterministic FNV-1a derivation that selected it. No
- * affordance here mutates anything; the picker below still does restart-with-model.
+ * Always rendered in place of the bare `Currently: …` label. For a WEIGHTED role
+ * it shows the resolved model, the role's weight bars, and the deterministic
+ * FNV-1a derivation that selected it; for a SCALAR (single-model) role it shows
+ * the resolved model and a "no distribution" note. No affordance here mutates
+ * anything; the picker below still does restart-with-model.
  */
 function ModelOriginPanel({
   origin,
+  resolvedModel,
   roleLabel,
   currentHarness,
 }: {
-  origin: ModelOrigin;
+  origin?: ModelOrigin;
+  resolvedModel?: string | null;
   roleLabel: string;
   currentHarness?: string | null;
 }) {
-  const positive = origin.distribution.filter((d) => d.weight > 0);
-  const chosen = origin.distribution.find((d) => d.chosen);
+  const resolved = origin?.resolved ?? resolvedModel ?? 'unknown';
+  const positive = origin ? origin.distribution.filter((d) => d.weight > 0) : [];
+  const chosen = origin?.distribution.find((d) => d.chosen);
   return (
     <div className="mx-1 mb-1 mt-0.5 rounded-md border border-primary/30 bg-primary/[0.08] px-2.5 py-2">
       <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Model</div>
       <div className="mt-1 flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--tw-shadow-color)] shadow-emerald-400/70" />
-        <span className="truncate font-mono text-xs text-foreground">{origin.resolved}</span>
+        <span className="truncate font-mono text-xs text-foreground">{resolved}</span>
         {currentHarness ? (
           <span className="shrink-0 text-[9px] text-muted-foreground">· {currentHarness}</span>
         ) : null}
@@ -443,39 +447,48 @@ function ModelOriginPanel({
           resolved
         </span>
       </div>
-      <div className="mt-1 text-[10px] text-muted-foreground">
-        Drawn from the <span className="font-medium text-foreground/80">{roleLabel}</span> role distribution
-      </div>
-      <div className="mt-1.5 space-y-1">
-        {positive.map((d) => {
-          const pct = Math.round((d.hi - d.lo) * 100);
-          return (
-            <div key={d.model} className="flex items-center gap-1.5">
-              <span className={`w-[104px] shrink-0 truncate font-mono text-[10px] ${d.chosen ? 'text-emerald-300' : 'text-muted-foreground'}`}>
-                {d.model}
-              </span>
-              <span className="h-1.5 flex-1 overflow-hidden rounded bg-white/10">
-                <span
-                  className={`block h-full rounded ${d.chosen ? 'bg-emerald-400' : 'bg-primary/70'}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </span>
-              <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-1.5 rounded bg-black/30 px-1.5 py-1 font-mono text-[9.5px] leading-snug text-muted-foreground">
-        <span className="text-sky-300">fnv1a32(&quot;{origin.spawnKey}&quot;)</span>
-        {' '}={' '}
-        <span className="text-amber-300">{origin.hash01.toFixed(2)}</span>
-        {chosen ? (
-          <>
-            {' '}→ band [{chosen.lo.toFixed(2)}–{chosen.hi.toFixed(2)}] →{' '}
-            <span className="text-emerald-300">{origin.resolved}</span>
-          </>
-        ) : null}
-      </div>
+      {origin ? (
+        <>
+          <div className="mt-1 text-[10px] text-muted-foreground">
+            Drawn from the <span className="font-medium text-foreground/80">{roleLabel}</span> role distribution
+          </div>
+          <div className="mt-1.5 space-y-1">
+            {positive.map((d) => {
+              const pct = Math.round((d.hi - d.lo) * 100);
+              return (
+                <div key={d.model} className="flex items-center gap-1.5">
+                  <span className={`w-[104px] shrink-0 truncate font-mono text-[10px] ${d.chosen ? 'text-emerald-300' : 'text-muted-foreground'}`}>
+                    {d.model}
+                  </span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded bg-white/10">
+                    <span
+                      className={`block h-full rounded ${d.chosen ? 'bg-emerald-400' : 'bg-primary/70'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </span>
+                  <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 rounded bg-black/30 px-1.5 py-1 font-mono text-[9.5px] leading-snug text-muted-foreground">
+            <span className="text-sky-300">fnv1a32(&quot;{origin.spawnKey}&quot;)</span>
+            {' '}={' '}
+            <span className="text-amber-300">{origin.hash01.toFixed(2)}</span>
+            {chosen ? (
+              <>
+                {' '}→ band [{chosen.lo.toFixed(2)}–{chosen.hi.toFixed(2)}] →{' '}
+                <span className="text-emerald-300">{origin.resolved}</span>
+              </>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <div className="mt-1 text-[10px] text-muted-foreground">
+          Fixed <span className="font-medium text-foreground/80">{roleLabel}</span> role model — no weighted distribution.
+          {' '}Add weights in <span className="text-foreground/80">Settings → Roles</span> to spread across providers.
+        </div>
+      )}
     </div>
   );
 }
@@ -503,25 +516,20 @@ function RestartModelSubmenu({
   const defaultLabel = defaultModel
     ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
     : 'default';
-  // PAN-1985: render the trigger as just the action ("Restart All") and put
-  // the current harness+model as a non-clickable status row at the top of
-  // the submenu. The previous "(gpt-5.5)" suffix on the trigger read as
-  // "restart with gpt-5.5" — ambiguous and easy to misread.
-  const currentSummary = currentHarness && currentModel
-    ? `${currentHarness} + ${currentModel}`
-    : currentHarness ?? currentModel ?? null;
 
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger>{label ?? 'Restart'}</ContextMenuSubTrigger>
       <ContextMenuSubContent>
-        {/* PAN-2053: weighted-role agents get the read-only MODEL derivation block;
-            scalar-role agents keep the simple "Currently:" label. */}
-        {modelOrigin ? (
-          <ModelOriginPanel origin={modelOrigin} roleLabel={roleLabel ?? 'role'} currentHarness={currentHarness} />
-        ) : currentSummary ? (
-          <ContextMenuLabel>Currently: {currentSummary}</ContextMenuLabel>
-        ) : null}
+        {/* PAN-2053: read-only MODEL header — weight bars + FNV-1a derivation for
+            weighted roles, resolved model + "no distribution" note for scalar roles.
+            Replaces the old bare "Currently: …" label (PAN-1985). */}
+        <ModelOriginPanel
+          origin={modelOrigin}
+          resolvedModel={currentModel}
+          roleLabel={roleLabel ?? 'role'}
+          currentHarness={currentHarness}
+        />
         <ContextMenuItem onSelect={() => onRestart()}>
           <span className="flex-1">Default role config</span>
           <span className="ml-2 shrink-0 text-[10px] opacity-50">uses {defaultLabel}</span>
