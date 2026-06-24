@@ -402,6 +402,36 @@ export function fnv1a32(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * MurmurHash3 32-bit finalizer — an avalanche/bit-mixing step.
+ *
+ * WHY this exists (PAN-2055): raw `fnv1a32(key) / 2^32` distributes terribly for
+ * structured, common-prefix keys like `work:PAN-1901`, `work:PAN-1919`, … — FNV's
+ * HIGH-order bits (which dominate the /2^32 normalization) barely avalanche between
+ * near-identical inputs, so sequential issue keys cluster into the same weight band.
+ * Measured over 161 sequential `work:PAN-19xx` keys against a 1/1/1 distribution the
+ * raw hash gave kimi 68% / glm 30% / gpt 2% — i.e. the load-spreading was broken.
+ * Running the FNV output through this finalizer first restores ~uniform spread
+ * (≈33/33/33). Deterministic; pure bit ops.
+ */
+export function fmix32(h: number): number {
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/**
+ * Deterministically map a spawn key to a well-distributed value in [0, 1). FNV-1a
+ * for the per-character mixing, then a MurmurHash3 finalizer (`fmix32`) so the high
+ * bits avalanche — see `fmix32` for why the finalizer is required.
+ */
+export function hashKeyToUnitInterval(key: string): number {
+  return fmix32(fnv1a32(key)) / 0x100000000;
+}
+
 /** One entry of a weighted pick, with the half-open hash band [lo, hi) it owns. */
 export interface WeightedBand {
   /** The entry's model ref (NOT dereffed — may be a `workhorse:*` ref). */
@@ -441,9 +471,11 @@ export function deriveWeightedPick(entries: WeightedModelRef[], spawnKey: string
   if (totalWeight <= 0) {
     throw new Error('deriveWeightedPick: all entries have weight <= 0');
   }
-  // Normalize hash to [0, 1) so proportional weight sets produce identical picks.
-  // (7/10 and 70/100 are the same IEEE-754 double, giving the same bands.)
-  const hash01 = fnv1a32(spawnKey) / 0x100000000;
+  // Map the key to a well-distributed [0, 1) value (FNV-1a + fmix32 avalanche).
+  // The finalizer is essential: raw fnv1a32/2^32 clusters common-prefix issue keys
+  // into one band and breaks load-spreading (PAN-2055). Proportional weight sets
+  // still give identical picks (7/10 and 70/100 are the same double → same bands).
+  const hash01 = hashKeyToUnitInterval(spawnKey);
   const bands: WeightedBand[] = [];
   let cumFraction = 0;
   let chosenIdx = -1;

@@ -285,6 +285,29 @@ describe('weighted model pick derivation (PAN-2053)', () => {
     expect(pick.hash01).toBeLessThan(chosen[0].hi);
   });
 
+  it('spreads near-uniformly across sequential common-prefix keys (PAN-2055)', () => {
+    // Regression: raw fnv1a32/2^32 clustered `work:PAN-19xx` keys into one band
+    // (kimi 68% / glm 30% / gpt 2% over this range). With the fmix32 finalizer the
+    // 1/1/1 distribution must spread roughly evenly — no band may exceed 50%.
+    const entries = [
+      { model: 'kimi-k2.7-code', weight: 1 },
+      { model: 'glm-5.2', weight: 1 },
+      { model: 'gpt-5.5', weight: 1 },
+    ];
+    const counts: Record<string, number> = {};
+    let total = 0;
+    for (let n = 1900; n <= 2060; n++) {
+      const m = pickWeightedModelRef(entries, `work:PAN-${n}`);
+      counts[m] = (counts[m] ?? 0) + 1;
+      total++;
+    }
+    for (const model of entries.map((e) => e.model)) {
+      const share = (counts[model] ?? 0) / total;
+      expect(share, `${model} share ${(share * 100).toFixed(0)}%`).toBeGreaterThan(0.2);
+      expect(share, `${model} share ${(share * 100).toFixed(0)}%`).toBeLessThan(0.5);
+    }
+  });
+
   it('computeModelOrigin returns null for a scalar role', () => {
     expect(computeModelOrigin('review', 'review:PAN-1832', weighted)).toBeNull();
   });

@@ -477,7 +477,7 @@ function ModelOriginPanel({
           <div className="mt-1.5 space-y-1.5">{positive.map((d) => bar(d))}</div>
           {chosenBand ? (
             <div className="mt-2 rounded-sm bg-foreground/[0.04] px-1.5 py-1 font-mono text-[10px] leading-snug text-muted-foreground">
-              fnv1a32(&quot;{origin.spawnKey}&quot;) = {origin.hash01.toFixed(2)} → band [{chosenBand.lo.toFixed(2)}–{chosenBand.hi.toFixed(2)}] → <span className="text-foreground">{origin.resolved}</span>
+              hash(&quot;{origin.spawnKey}&quot;) = {origin.hash01.toFixed(2)} → band [{chosenBand.lo.toFixed(2)}–{chosenBand.hi.toFixed(2)}] → <span className="text-foreground">{origin.resolved}</span>
             </div>
           ) : null}
         </>
