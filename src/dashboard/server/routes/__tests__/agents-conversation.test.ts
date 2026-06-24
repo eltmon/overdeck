@@ -131,7 +131,7 @@ describe('buildConversationResponse', () => {
     expect(result.byteOffset).toBe(1024);
   });
 
-  it('returns empty result and logs error when parseConversationMessages throws', async () => {
+  it('returns empty result and logs error when parseEntireConversation throws', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAgentJsonlPath.mockReturnValue(Effect.succeed('/some/path/session.jsonl'));
     mockExistsSync.mockReturnValue(true);
