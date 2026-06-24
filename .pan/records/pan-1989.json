@@ -102,15 +102,16 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T05:24:19.805Z",
+  "updated": "2026-06-24T05:28:26.887Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T05:24:18.858Z",
+    "updatedAt": "2026-06-24T05:28:26.852Z",
+    "verificationNotes": "Verification FAILED at test (71549ms):\n\not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n✗ ad-hoc state write under src/lib/pan-dir/ outside the approved writer or legacy exception list:\nsrc/lib/pan-dir/evil.ts:4:  return fs.writeFileString(path, content);\nRoute durable mutations through src/lib/pan-dir/record.ts or update the allowlist/legacy list.\n✗ state.json written outside writeAgentStateJsonSync:\nsrc/lib/agents.ts:8: state.json write outside writeAgentStateJsonSync\n✗ ad-hoc write to the workspace/project continue file outside legacy exceptions:\nsrc/lib/evil.ts:3:  writeFileSync(continuePath, '{}');\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n(node:1925833) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/cloister/verification-gate.test.ts > runQualityGates — SSH remote support > passes 5-minute timeout to each execAsync call for SSH\nAssertionError: expected { cwd: undefined, …(3) } to match object { timeout: 300000 }\n(155 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n-   \"timeout\": 300000,\n+   \"timeout\": 600000,\n  }\n\n ❯ tests/cloister/verification-gate.test.ts:149:23\n    147|     const FIVE_MINUTES_MS = 5 * 60 * 1000;\n    148|     for (const call of execMock.mock.calls) {\n    149|       expect(call[1]).toMatchObject({ timeout: FIVE_MINUTES_MS });\n       |                       ^\n    150|     }\n    151|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
@@ -202,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 102.320457,
-        "pricingAsOf": "2026-06-24T05:24:19.805Z"
+        "pricingAsOf": "2026-06-24T05:28:26.886Z"
       }
     },
     "merges": [
