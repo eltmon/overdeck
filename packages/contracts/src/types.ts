@@ -546,6 +546,31 @@ export const ReviewerRoundMetadata = Schema.Struct({
 })
 export type ReviewerRoundMetadata = typeof ReviewerRoundMetadata.Type
 
+// One row of a weighted-distribution model origin (PAN-2053). `lo`/`hi` are the
+// half-open hash band [lo, hi) the entry owns; `chosen` marks the selected one.
+export const ModelOriginEntry = Schema.Struct({
+  model: Schema.String,
+  weight: Schema.Number,
+  lo: Schema.Number,
+  hi: Schema.Number,
+  chosen: Schema.Boolean,
+})
+export type ModelOriginEntry = typeof ModelOriginEntry.Type
+
+// Read-only "why this model" derivation shown in the agent right-click MODEL
+// inspector (PAN-2053). Present only when the agent's role uses a weighted
+// distribution; absent for scalar/single-model roles.
+export const ModelOrigin = Schema.Struct({
+  // The exact spawn key whose hash selected the model (`${role}:${issueId}`).
+  spawnKey: Schema.String,
+  // The chosen model id — equals what the agent actually spawned with.
+  resolved: Schema.String,
+  // fnv1a32(spawnKey) / 2^32, normalized to [0, 1).
+  hash01: Schema.Number,
+  distribution: Schema.Array(ModelOriginEntry),
+})
+export type ModelOrigin = typeof ModelOrigin.Type
+
 export const SessionNode = Schema.Struct({
   type: SessionNodeType,
   role: Schema.optional(Schema.String),
@@ -575,6 +600,9 @@ export const SessionNode = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
+  // PAN-2053: read-only model-origin for the right-click MODEL inspector. Set
+  // only when the agent's role uses a weighted model distribution.
+  modelOrigin: Schema.optional(ModelOrigin),
 })
 export type SessionNode = typeof SessionNode.Type
 

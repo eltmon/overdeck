@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@overdeck/contracts';
+import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot, ModelOrigin } from '@overdeck/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
@@ -412,6 +412,74 @@ function getSessionStatusTitle({
   return details.join(' ');
 }
 
+/**
+ * PAN-2053: read-only "why this model" header for the Start/Restart submenu.
+ * Shown only when the agent's role uses a weighted model distribution — it
+ * replaces the bare `Currently: …` label with the resolved model, the role's
+ * weight bars, and the deterministic FNV-1a derivation that selected it. No
+ * affordance here mutates anything; the picker below still does restart-with-model.
+ */
+function ModelOriginPanel({
+  origin,
+  roleLabel,
+  currentHarness,
+}: {
+  origin: ModelOrigin;
+  roleLabel: string;
+  currentHarness?: string | null;
+}) {
+  const positive = origin.distribution.filter((d) => d.weight > 0);
+  const chosen = origin.distribution.find((d) => d.chosen);
+  return (
+    <div className="mx-1 mb-1 mt-0.5 rounded-md border border-primary/30 bg-primary/[0.08] px-2.5 py-2">
+      <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Model</div>
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--tw-shadow-color)] shadow-emerald-400/70" />
+        <span className="truncate font-mono text-xs text-foreground">{origin.resolved}</span>
+        {currentHarness ? (
+          <span className="shrink-0 text-[9px] text-muted-foreground">· {currentHarness}</span>
+        ) : null}
+        <span className="ml-auto shrink-0 rounded border border-emerald-400/40 px-1 py-px text-[8px] uppercase tracking-wide text-emerald-300">
+          resolved
+        </span>
+      </div>
+      <div className="mt-1 text-[10px] text-muted-foreground">
+        Drawn from the <span className="font-medium text-foreground/80">{roleLabel}</span> role distribution
+      </div>
+      <div className="mt-1.5 space-y-1">
+        {positive.map((d) => {
+          const pct = Math.round((d.hi - d.lo) * 100);
+          return (
+            <div key={d.model} className="flex items-center gap-1.5">
+              <span className={`w-[104px] shrink-0 truncate font-mono text-[10px] ${d.chosen ? 'text-emerald-300' : 'text-muted-foreground'}`}>
+                {d.model}
+              </span>
+              <span className="h-1.5 flex-1 overflow-hidden rounded bg-white/10">
+                <span
+                  className={`block h-full rounded ${d.chosen ? 'bg-emerald-400' : 'bg-primary/70'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </span>
+              <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 rounded bg-black/30 px-1.5 py-1 font-mono text-[9.5px] leading-snug text-muted-foreground">
+        <span className="text-sky-300">fnv1a32(&quot;{origin.spawnKey}&quot;)</span>
+        {' '}={' '}
+        <span className="text-amber-300">{origin.hash01.toFixed(2)}</span>
+        {chosen ? (
+          <>
+            {' '}→ band [{chosen.lo.toFixed(2)}–{chosen.hi.toFixed(2)}] →{' '}
+            <span className="text-emerald-300">{origin.resolved}</span>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function RestartModelSubmenu({
   defaultModel,
   currentHarness,
@@ -419,6 +487,8 @@ function RestartModelSubmenu({
   groups,
   label,
   onRestart,
+  modelOrigin,
+  roleLabel,
 }: {
   defaultModel: string | null;
   currentHarness?: string | null;
@@ -427,6 +497,8 @@ function RestartModelSubmenu({
   harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
   onRestart: (model?: string, harness?: Harness) => void;
+  modelOrigin?: ModelOrigin;
+  roleLabel?: string;
 }) {
   const defaultLabel = defaultModel
     ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
@@ -443,7 +515,11 @@ function RestartModelSubmenu({
     <ContextMenuSub>
       <ContextMenuSubTrigger>{label ?? 'Restart'}</ContextMenuSubTrigger>
       <ContextMenuSubContent>
-        {currentSummary ? (
+        {/* PAN-2053: weighted-role agents get the read-only MODEL derivation block;
+            scalar-role agents keep the simple "Currently:" label. */}
+        {modelOrigin ? (
+          <ModelOriginPanel origin={modelOrigin} roleLabel={roleLabel ?? 'role'} currentHarness={currentHarness} />
+        ) : currentSummary ? (
           <ContextMenuLabel>Currently: {currentSummary}</ContextMenuLabel>
         ) : null}
         <ContextMenuItem onSelect={() => onRestart()}>
@@ -692,6 +768,8 @@ export function SessionNode({
             groups={groups}
             harnessPolicy={harnessPolicy}
             label={restartLabel}
+            modelOrigin={session.modelOrigin}
+            roleLabel={session.role ?? session.type}
             onRestart={(model, harness) => onRestartSession!(session.sessionId, issueId!, session.type, session.role, model, harness)}
           />
         )}

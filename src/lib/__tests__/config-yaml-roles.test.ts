@@ -4,8 +4,11 @@ import {
   DEFAULT_MODEL_REFS,
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
+  computeModelOrigin,
   derefWorkhorse,
+  deriveWeightedPick,
   mergeConfigs,
+  pickWeightedModelRef,
   resolveModel,
   stripProjectTtsEndpoint,
   type NormalizedConfig,
@@ -242,6 +245,64 @@ describe('role model configuration', () => {
       mid: 'gpt-5.4-mini',
     });
     expect(resolveModel('work', undefined, config)).toBe('gpt-5.4-mini');
+  });
+});
+
+describe('weighted model pick derivation (PAN-2053)', () => {
+  const weighted: Pick<NormalizedConfig, 'workhorses' | 'roles'> = {
+    workhorses: WORKHORSES,
+    roles: {
+      work: { model: [
+        { model: 'workhorse:mid', weight: 70 },
+        { model: 'gpt-5.5', weight: 30 },
+      ] },
+      review: { model: 'workhorse:expensive' }, // scalar — no distribution to explain
+    },
+  };
+
+  it('deriveWeightedPick.chosen always equals pickWeightedModelRef', () => {
+    const entries = weighted.roles!.work!.model as Array<{ model: string; weight: number }>;
+    for (let i = 0; i < 200; i++) {
+      const key = `work:PAN-${i}`;
+      expect(deriveWeightedPick(entries, key).chosen).toBe(pickWeightedModelRef(entries, key));
+    }
+  });
+
+  it('bands are contiguous, cover [0,1), and exactly one is chosen', () => {
+    const entries = weighted.roles!.work!.model as Array<{ model: string; weight: number }>;
+    const pick = deriveWeightedPick(entries, 'work:PAN-1832');
+    // contiguous: each band starts where the previous ended
+    let cursor = 0;
+    for (const b of pick.bands) {
+      expect(b.lo).toBeCloseTo(cursor, 10);
+      cursor = b.hi;
+    }
+    expect(cursor).toBeCloseTo(1, 10);
+    // exactly one chosen, and it owns the band hash01 falls into
+    const chosen = pick.bands.filter((b) => b.chosen);
+    expect(chosen).toHaveLength(1);
+    expect(pick.hash01).toBeGreaterThanOrEqual(chosen[0].lo);
+    expect(pick.hash01).toBeLessThan(chosen[0].hi);
+  });
+
+  it('computeModelOrigin returns null for a scalar role', () => {
+    expect(computeModelOrigin('review', 'review:PAN-1832', weighted)).toBeNull();
+  });
+
+  it('computeModelOrigin derefs workhorse refs and matches resolveModel', () => {
+    const spawnKey = 'work:PAN-1832';
+    const origin = computeModelOrigin('work', spawnKey, weighted);
+    expect(origin).not.toBeNull();
+    expect(origin!.spawnKey).toBe(spawnKey);
+    // resolved equals what the agent would actually spawn with for this exact key
+    expect(origin!.resolved).toBe(resolveModel('work', undefined, weighted, spawnKey));
+    // workhorse:mid is dereffed to the real model id for display
+    expect(origin!.distribution[0].model).toBe(derefWorkhorse('workhorse:mid', weighted));
+    expect(origin!.distribution[1].model).toBe('gpt-5.5');
+    // exactly one entry chosen, and it names the resolved model
+    const chosen = origin!.distribution.filter((d) => d.chosen);
+    expect(chosen).toHaveLength(1);
+    expect(chosen[0].model).toBe(origin!.resolved);
   });
 });
 

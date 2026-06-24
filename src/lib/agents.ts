@@ -937,6 +937,13 @@ export interface AgentState {
   /** Unified role primitive (PAN-1048). */
   role: Role;
   model: string;
+  /**
+   * The exact spawn key fed to the weighted-distribution model picker at spawn
+   * (`${role}:${issueId}`), persisted so the dashboard MODEL inspector (PAN-2053)
+   * can show the faithful FNV-1a derivation without re-guessing the key's form.
+   * Undefined for scalar-role agents and for agents spawned before PAN-2053.
+   */
+  modelSpawnKey?: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
@@ -3388,7 +3395,8 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
-  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${issueId}` });
+  const modelSpawnKey = `${role}:${issueId}`;
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
 
   if (role === 'work') {
     return spawnAgent({
@@ -3442,6 +3450,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     harness: resolvedHarness,
     role,
     model: selectedModel,
+    modelSpawnKey,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
@@ -3717,7 +3726,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   // Determine model based on role configuration
-  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${options.issueId}` });
+  const modelSpawnKey = `${role}:${options.issueId}`;
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
@@ -3753,6 +3763,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     harness: resolvedHarness,
     role,
     model: selectedModel,
+    modelSpawnKey,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,

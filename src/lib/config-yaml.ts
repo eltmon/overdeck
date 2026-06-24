@@ -402,30 +402,83 @@ export function fnv1a32(s: string): number {
   return h >>> 0;
 }
 
+/** One entry of a weighted pick, with the half-open hash band [lo, hi) it owns. */
+export interface WeightedBand {
+  /** The entry's model ref (NOT dereffed — may be a `workhorse:*` ref). */
+  model: ModelRef;
+  weight: number;
+  /** Band start in [0, 1). */
+  lo: number;
+  /** Band end in (0, 1]. A spawn key whose hash01 falls in [lo, hi) selects this entry. */
+  hi: number;
+  /** True for the single entry the spawn key selected. */
+  chosen: boolean;
+}
+
+/** The full, inspectable result of a weighted pick — what selected the model and why. */
+export interface WeightedPick {
+  /** The selected model ref (same value `pickWeightedModelRef` returns). */
+  chosen: ModelRef;
+  /** `fnv1a32(spawnKey) / 2^32`, normalized to [0, 1). */
+  hash01: number;
+  /** Every entry, in declaration order, with its band and the chosen flag. */
+  bands: WeightedBand[];
+}
+
 /**
- * Pick a model from a weighted distribution using a deterministic spawn key.
- * Weights are relative (need not sum to 100). {a:7, b:3} and {a:70, b:30} produce
- * identical per-key picks. Throws if no entry has weight > 0.
+ * Deterministically pick a model from a weighted distribution AND return the full
+ * derivation (hash, per-entry bands, winner) so it can be shown read-only in the UI.
+ *
+ * This is the single source of truth for the weighted-pick math: `pickWeightedModelRef`
+ * delegates to it, so the band a key falls into here is exactly the model that gets
+ * spawned. Weights are relative (need not sum to 100). Throws if no entry has weight > 0.
  */
-export function pickWeightedModelRef(entries: WeightedModelRef[], spawnKey: string): ModelRef {
+export function deriveWeightedPick(entries: WeightedModelRef[], spawnKey: string): WeightedPick {
   let totalWeight = 0;
   for (const e of entries) {
     if (e.weight > 0) totalWeight += e.weight;
   }
   if (totalWeight <= 0) {
-    throw new Error('pickWeightedModelRef: all entries have weight <= 0');
+    throw new Error('deriveWeightedPick: all entries have weight <= 0');
   }
   // Normalize hash to [0, 1) so proportional weight sets produce identical picks.
   // (7/10 and 70/100 are the same IEEE-754 double, giving the same bands.)
-  const posF = fnv1a32(spawnKey) / 0x100000000;
+  const hash01 = fnv1a32(spawnKey) / 0x100000000;
+  const bands: WeightedBand[] = [];
   let cumFraction = 0;
-  for (const e of entries) {
-    if (e.weight <= 0) continue;
+  let chosenIdx = -1;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e.weight <= 0) {
+      // Zero-weight entries occupy an empty band; they can never be selected.
+      bands.push({ model: e.model, weight: e.weight, lo: cumFraction, hi: cumFraction, chosen: false });
+      continue;
+    }
+    const lo = cumFraction;
     cumFraction += e.weight / totalWeight;
-    if (posF < cumFraction) return e.model;
+    const hi = cumFraction;
+    const isChosen = chosenIdx === -1 && hash01 < hi;
+    if (isChosen) chosenIdx = i;
+    bands.push({ model: e.model, weight: e.weight, lo, hi, chosen: isChosen });
   }
-  // Floating-point accumulation may leave the final band slightly below 1.0; fall through.
-  return entries[entries.length - 1].model;
+  if (chosenIdx === -1) {
+    // Floating-point accumulation may leave the final band slightly below 1.0; fall
+    // through to the last entry — matches the original pickWeightedModelRef semantics.
+    chosenIdx = entries.length - 1;
+    bands[chosenIdx].chosen = true;
+  }
+  return { chosen: entries[chosenIdx].model, hash01, bands };
+}
+
+/**
+ * Pick a model from a weighted distribution using a deterministic spawn key.
+ * Weights are relative (need not sum to 100). {a:7, b:3} and {a:70, b:30} produce
+ * identical per-key picks. Throws if no entry has weight > 0.
+ *
+ * Thin wrapper over `deriveWeightedPick` so selection and its explanation can never drift.
+ */
+export function pickWeightedModelRef(entries: WeightedModelRef[], spawnKey: string): ModelRef {
+  return deriveWeightedPick(entries, spawnKey).chosen;
 }
 
 /** Return the model with the highest weight; first entry wins on a tie. */
@@ -1733,6 +1786,71 @@ export function resolveModel(
   const scalarRef = roleModel ?? DEFAULT_MODEL_REFS[role];
   const fieldPath = roleModel ? `roles.${role}.model` : `defaults.${role}.model`;
   return derefWorkhorse(scalarRef, config, fieldPath);
+}
+
+/** One row of a model-origin distribution: a dereffed model with its band and chosen flag. */
+export interface ModelOriginEntry {
+  /** The actual model id (workhorse refs already dereffed for display). */
+  model: ModelId;
+  weight: number;
+  lo: number;
+  hi: number;
+  chosen: boolean;
+}
+
+/**
+ * Read-only explanation of why a weighted-role agent resolved to its model:
+ * the spawn key, the FNV-1a hash, and the weight bands. Surfaced in the dashboard
+ * right-click MODEL inspector (PAN-2053). `null` for scalar/single-model roles.
+ */
+export interface ModelOriginData {
+  /** The exact spawn key whose hash selected the model (`${role}:${issueId}`). */
+  spawnKey: string;
+  /** The chosen model id (dereffed) — equals what determineModel produced for this key. */
+  resolved: ModelId;
+  /** `fnv1a32(spawnKey) / 2^32` in [0, 1). */
+  hash01: number;
+  /** Every distribution entry, dereffed, with its band and the chosen flag. */
+  distribution: ModelOriginEntry[];
+}
+
+/**
+ * Explain which model a `role` agent drew from its role's WEIGHTED distribution,
+ * and why, given the EXACT `spawnKey` the agent spawned with. Returns `null` when
+ * the role uses a scalar model (nothing to explain) — the caller should then just
+ * show the resolved model with no bars/hash.
+ *
+ * Faithfulness: `spawnKey` must be the real key persisted on the agent's state at
+ * spawn (`AgentState.modelSpawnKey`), not a guess — the FNV-1a hash is sensitive to
+ * its exact form (e.g. issue-id casing). Read-only: never mutates anything.
+ *
+ * The distribution is read from the LIVE config (an operator edit since spawn is
+ * reflected); the resolved model still derives from the same key, so the highlighted
+ * band stays internally consistent with `resolved`.
+ */
+export function computeModelOrigin(
+  role: Role,
+  spawnKey: string,
+  config: Pick<NormalizedConfig, 'roles' | 'workhorses'>,
+): ModelOriginData | null {
+  const roleModel = config.roles?.[role]?.model;
+  if (!Array.isArray(roleModel)) return null;
+
+  const pick = deriveWeightedPick(roleModel, spawnKey);
+  const fieldPath = `roles.${role}.model`;
+  const distribution: ModelOriginEntry[] = pick.bands.map((b) => ({
+    model: derefWorkhorse(b.model, config, fieldPath),
+    weight: b.weight,
+    lo: b.lo,
+    hi: b.hi,
+    chosen: b.chosen,
+  }));
+  return {
+    spawnKey,
+    resolved: derefWorkhorse(pick.chosen, config, fieldPath),
+    hash01: pick.hash01,
+    distribution,
+  };
 }
 
 function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
