@@ -1,216 +1,55 @@
 {
   "version": "1",
-  "issueId": "PAN-1866",
-  "created": "2026-06-19T18:48:04.302Z",
-  "updated": "2026-06-20T20:48:39.323Z",
-  "gitState": {
-    "branch": "feature/pan-1866",
-    "sha": "36308d7cea",
-    "dirty": true
-  },
+  "issueId": "PAN-1994",
+  "created": "2026-06-24T01:12:28.308Z",
+  "updated": "2026-06-24T22:11:00.000Z",
+  "gitState": { "branch": "feature/pan-1994", "sha": "6fdf8e0be", "dirty": true },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Source of truth = .pan/backlog/sequence.md (repo-tracked markdown, auto-committed via queueAutoCommit). SQLite backlog_sequence is a disposable cache, fully rebuildable from the md.",
-      "recordedAt": "2026-06-19T18:54:56Z"
+      "summary": "Bug 1 (labels): lifecycle.transitionTo(id, 'in_planning') in issues.ts start-planning route was gated on issue.source === 'linear' — GitHub issues never got the in_planning transition, so stale merged/verifying-on-main labels from prior pipeline runs were never cleaned up on re-plan. Fix: remove the source guard and call it for all tracker types.",
+      "recordedAt": "2026-06-24T22:11:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "The Sequencer runs as a tmux-hosted role agent via spawnRun(runId,'sequencer',{agentId:'sequencer-runner',...}), mirroring spawnFlywheelAgent (src/lib/cloister/flywheel.ts:117). There is NO direct-LLM-API path for role runs in this codebase; all roles are tmux Claude sessions.",
-      "recordedAt": "2026-06-19T18:54:56Z"
+      "summary": "Bug 2 (pause): reconcileStaleMergeStatus() in deacon.ts calls postMergeLifecycle(issueId, ..., {skipDeploy: true}) as an unawaited Promise for issues where a prior PR is merged but mergeStatus !== 'merged' in review_status (e.g., reset by resetPipelineVerdictsForWorkStartSync). This races with an in-progress planning spawn, pausing planning-pan-XXXX concurrently with it starting. Fix: check for active planning/work agents before calling postMergeLifecycle — if an agent is running/starting, skip the re-fire (the new agent is in progress and pausing it would contaminate its state with the prior merge cycle).",
+      "recordedAt": "2026-06-24T22:11:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "Chunked map-reduce (NFR-6) is realized INSIDE the agent session: the backlog input gives a compact manifest + a batched body accessor; the prompt instructs the agent to read issue bodies in batches against a running shortlist, never inlining all 522 bodies in one prompt. Incremental reads only the prior sequence.md + changed bodies.",
-      "recordedAt": "2026-06-19T18:54:56Z"
-    },
-    {
-      "id": "D4",
-      "summary": "New configurable role 'sequencer' (default workhorse:expensive -> claude-opus-4-8) added to Role union (agents.ts), DEFAULT_MODEL_REFS + DEFAULT_ROLES (config-yaml.ts), and the RolesPanel.tsx ROLES array; model resolved at spawn via determineModel({role:'sequencer'}) -> resolveModel -> derefWorkhorse.",
-      "recordedAt": "2026-06-19T18:54:56Z"
-    },
-    {
-      "id": "D5",
-      "summary": "Reuse the existing vBRIEF DAG stack (ReactFlow 11 + @dagrejs/dagre, TB layout) from PlanDAG.tsx for the new Backlog page; new IssueNode component, zero new viz dependency (NFR-2).",
-      "recordedAt": "2026-06-19T18:54:56Z"
-    },
-    {
-      "id": "D6",
-      "summary": "in-pipeline is computed server-side from review_status (non-pending) OR live workspace/branch/agent presence, mirroring derivePipelineState's inputs; derivePipelineState itself is a frontend helper and must NOT be imported into the server.",
-      "recordedAt": "2026-06-19T18:54:56Z"
-    },
-    {
-      "id": "D7",
-      "summary": "Operator pickup gate 'blocked' reuses the existing parked-label mechanism (BLOCKER_LABELS in src/lib/cloister/auto-merge-eligibility.ts) so the existing Flywheel skip honors it immediately; no parallel hold system.",
-      "recordedAt": "2026-06-19T18:54:56Z"
-    },
-    {
-      "id": "D8",
-      "summary": "On-demand pass buttons (Creation/Incremental/Review) are the acceptance-critical MVP. The debounced delta auto-trigger + periodic review cadence is the lowest-priority bead (follow-up wire-up) and may land last per the PRD ('not a blocker').",
-      "recordedAt": "2026-06-19T18:54:56Z"
-    },
-    {
-      "id": "D9",
-      "summary": "Three orthogonal per-issue axes replace needs-design/needs-discussion: planning policy {skip/auto/interactive} = how to plan; pickup gate {auto/ready/blocked} = whether/when the Flywheel may pick; condition {ok/needs-refinement/stale} = state of the issue itself. A legacy parked label reads as planning:interactive.",
-      "recordedAt": "2026-06-19T18:54:56Z"
+      "summary": "The pause reason 'awaiting close-out (verify on main)' is generic text used for ANY issue post-merge. The original bug report interpreted it as coming from PAN-1866, but the investigation shows it comes from PAN-1982's own prior pipeline run via the deacon reconciler firing postMergeLifecycle('PAN-1982', ...) concurrently with planning spawn.",
+      "recordedAt": "2026-06-24T22:11:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "NFR-6 context window: the full open backlog is ~370k tokens (522 issues x ~715 tok) and exceeds one context window. A Creation/Review pass that inlines all bodies in one prompt will blow the window.",
-      "mitigation": "collectOpenBacklog returns a compact manifest + a batched body accessor; roles/sequencer.md forbids inlining the whole backlog and mandates batched reads against a running shortlist; a chunking test asserts N bodies -> K batches, not 1."
-    },
-    {
-      "id": "H2",
-      "summary": "NFR-5 file-size budget: naive triplicated rationale (table + prose + JSON) reaches ~120k tokens for 522 issues.",
-      "mitigation": "Store rationale once: full paragraph only for the active top tier (~80), one-line why (<=140 chars) for the tail; writer enforces; a footprint test asserts <= ~65k tokens at 522 nodes."
-    },
-    {
-      "id": "H3",
-      "summary": "FR-14 Flywheel executor must keep the existing author/assignee security filter so it never picks an unsolicited third-party issue when reading from the sequence.",
-      "mitigation": "Reuse the existing security filter in flywheel.ts; explicit AC asserts a security-filtered issue is never selected; review.security verifies."
-    },
-    {
-      "id": "H4",
-      "summary": "Pinned in-pipeline issues must never be re-ranked/re-ordered/rewritten across re-sequences; only their live flags/condition refresh.",
-      "mitigation": "roles/sequencer.md instructs read-but-never-rewrite for the pinned set; incremental-preserve test asserts a pinned issue keeps rank/rationale when a sibling moves."
-    },
-    {
-      "id": "H5",
-      "summary": "Operator-owned fields (gate, planning) and operator-sourced edges must survive every re-sequence verbatim; an AI pass must not clobber them.",
-      "mitigation": "Parser/writer round-trip preserves them; sequencer prompt copies operator fields/edges verbatim and only re-derives github-ref / recomputes ai-inferred edges; round-trip + preserve tests."
-    },
-    {
-      "id": "H6",
-      "summary": "queueAutoCommit only commits when the current branch is main (auto-commit.ts checks branch==main). sequence.md is a main-side runtime artifact written by the sequencer agent, distinct from THIS feature's implementation which lands via the normal feature-branch review pipeline.",
-      "mitigation": "Follow the drafts.ts/specs.ts precedent (they queueAutoCommit and the debounced flush gates on main); do not assume sequence.md commits from inside a feature worktree."
-    },
-    {
-      "id": "H7",
-      "summary": "derivePipelineState lives in the frontend (issuePipelineState.ts); importing frontend code into the Effect server would break the build.",
-      "mitigation": "Compute in-pipeline server-side from review_status + workspace/agent signals; do not import the frontend helper into routes/backlog.ts."
-    },
-    {
-      "id": "H8",
-      "summary": "SQLite schema bump must be forward-only and additive; breaking earlier migrations or existing tables corrupts the cache DB for all projects.",
-      "mitigation": "CREATE TABLE IF NOT EXISTS in initSchema + an additive `if (currentVersion < 57)` migration block; bump SCHEMA_VERSION 56->57; drop-and-rebuild equivalence test."
+      "summary": "The deacon's staleMergeReconciled Set suppresses re-firing once per server session. When there IS an active agent and we skip postMergeLifecycle, we still add to staleMergeReconciled, so the reconciler will never re-fire for that issue in this session.",
+      "mitigation": "This is intentional. If a new agent is running, the pipeline will handle lifecycle transitions. setReviewStatusSync(mergeStatus: 'merged') is still called unconditionally so the state is accurate."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Implementation complete. Both fixes committed. Run pan done PAN-1994.",
+    "beadId": "workspace-w8xv5",
+    "filesToRead": [
+      "src/dashboard/server/routes/issues.ts",
+      "src/lib/cloister/deacon.ts"
+    ]
+  },
   "beadsMapping": {},
-  "agentModel": "agent:claude-opus-4-8",
+  "agentModel": "claude-sonnet-4-6",
   "sessionHistory": [
     {
-      "timestamp": "2026-06-19T18:54:56Z",
+      "timestamp": "2026-06-24T01:12:28.308Z",
       "reason": "planning",
-      "note": "Auto-planning session for PAN-1866 Backlog Sequencer. Verified all PRD codebase references; decomposed the 8 PRD work items into 19 beads; recorded spawn-mechanism and chunking decisions (D2/D3) as the main inferred architecture choices.",
-      "agentModel": "agent:claude-opus-4-8"
+      "note": "Planning session started for PAN-1994",
+      "agentModel": "claude-opus-4-8"
     },
     {
-      "timestamp": "2026-06-19T20:14:23.917Z",
+      "timestamp": "2026-06-24T22:11:00.000Z",
       "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-19T20:25:12.350Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-19T20:34:48.368Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-19T20:53:02.927Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-19T21:05:43.687Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T14:36:48.725Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T14:52:36.033Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T15:26:38.009Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T15:35:07.793Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T15:42:38.407Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T15:56:50.213Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T16:09:04.120Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T16:22:58.798Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T16:33:57.500Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T16:40:40.380Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T16:53:08.650Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T16:58:41.236Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T17:05:33.462Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T19:59:32.040Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T20:02:57.532Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-06-20T20:48:39.320Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
+      "note": "Investigated root causes of both bugs. Bug 1: lifecycle.transitionTo gated on source==='linear' in issues.ts — removed guard to fix GitHub label cleanup on re-plan. Bug 2: reconcileStaleMergeStatus fires postMergeLifecycle concurrently with planning spawn — added active-agent guard to skip re-fire when planning/work agent is running. Typecheck and full test suite (700+32 tests) pass.",
+      "agentModel": "claude-sonnet-4-6"
     }
   ],
   "feedback": []

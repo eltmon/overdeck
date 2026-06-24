@@ -1035,12 +1035,13 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       return Promise.resolve();
     });
 
-    if (issue.source === 'linear') {
-      // Transition to "In Planning" state — emits issue.transitioned which
-      // reactive Cloister consumes. State.json was written above so the
-      // observer can see role: 'plan' before mapping in_planning → plan role.
-      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
-    }
+    // Transition to "In Planning" state — emits issue.transitioned which
+    // reactive Cloister consumes. State.json was written above so the
+    // observer can see role: 'plan' before mapping in_planning → plan role.
+    // PAN-1994: call for ALL tracker types (not just linear). For GitHub
+    // issues this cleans up stale labels (merged, verifying-on-main, etc.)
+    // left by a prior pipeline cycle when re-planning starts.
+    yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
 
     yield* eventStore.append({
       type: 'workspace.created',
