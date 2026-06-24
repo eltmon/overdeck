@@ -73,7 +73,7 @@
   ],
   "feedback": [],
   "created": "2026-06-24T01:04:59.067Z",
-  "updated": "2026-06-24T02:26:56.902Z",
+  "updated": "2026-06-24T02:31:49.363Z",
   "pipeline": {
     "issueId": "PAN-1901",
     "reviewStatus": "pending",
@@ -134,5 +134,15 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "statusOverrides": {
+    "gitattributes-merge-tests": "completed",
+    "gitattributes-merge-tests.ac1": "completed",
+    "gitattributes-merge-tests.ac2": "completed",
+    "gitattributes-merge-tests.ac3": "completed",
+    "gitattributes-union": "completed",
+    "gitattributes-union.ac1": "completed",
+    "gitattributes-union.ac2": "completed",
+    "gitattributes-union.ac3": "completed"
+  }
 }
