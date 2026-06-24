@@ -555,7 +555,7 @@ describe('AgentState role persistence', () => {
     await expect(assertWorkspaceStackHealthyForSpawn(undefined as any, 'work')).resolves.toBeUndefined();
   });
 
-  it('PAN-2009: fresh-launches a stopped Pi agent when the prior Pi process is dead', async () => {
+  it('PAN-2009: fresh-launches a stopped ohmypi agent when the prior ohmypi process is dead', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-dead-pi-resume-'));
     const agentId = 'agent-pan-2009-review';
     const createSessionAsync = vi.fn(async () => {
@@ -565,7 +565,7 @@ describe('AgentState role persistence', () => {
       }));
     });
     const killSessionAsync = vi.fn(async () => undefined);
-    const writePiCommandSync = vi.fn();
+    const writeOhmypiCommandSync = vi.fn();
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     vi.doMock('../workspace/stack-health.js', () => ({
@@ -593,17 +593,17 @@ describe('AgentState role persistence', () => {
         activity: 'stopped',
         lastActivity: '2026-06-23T00:00:00.000Z',
         sessionModel: 'claude-sonnet-4-6',
-        sessionHarness: 'pi',
+        sessionHarness: 'ohmypi',
       })),
       isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
     }));
     vi.doMock('../harness-resolve.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../harness-resolve.js')),
-      resolveHarness: vi.fn(async () => 'pi'),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
     }));
-    vi.doMock('../runtimes/pi-fifo.js', async (importOriginal) => ({
-      ...((await importOriginal()) as typeof import('../runtimes/pi-fifo.js')),
-      writePiCommandSync,
+    vi.doMock('../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../runtimes/ohmypi-fifo.js')),
+      writeOhmypiCommandSync,
     }));
 
     const { resumeAgent, saveAgentStateSync } = await import('../agents.js');
@@ -611,7 +611,7 @@ describe('AgentState role persistence', () => {
       id: agentId,
       issueId: 'PAN-2009',
       workspace,
-      harness: 'pi',
+      harness: 'ohmypi',
       role: 'review',
       model: 'claude-sonnet-4-6',
       status: 'stopped',
@@ -626,7 +626,7 @@ describe('AgentState role persistence', () => {
 
     expect(killSessionAsync).toHaveBeenCalled();
     expect(createSessionAsync).toHaveBeenCalled();
-    expect(writePiCommandSync).toHaveBeenCalledWith(
+    expect(writeOhmypiCommandSync).toHaveBeenCalledWith(
       agentId,
       expect.objectContaining({ type: 'prompt', message: expect.stringContaining('continue review') }),
     );
