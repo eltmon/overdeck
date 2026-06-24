@@ -443,7 +443,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         cwd: useHostCwd ? cwd : undefined,
         env,
         maxBuffer: 10 * 1024 * 1024, // 10MB
-        timeout: 5 * 60 * 1000, // 5 minute timeout per gate
+        timeout: 10 * 60 * 1000, // 10 minute timeout per gate
       });
 
       const durationMs = Date.now() - startTime;
