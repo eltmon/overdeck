@@ -119,7 +119,7 @@ import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
 import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
-import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
+import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
 import { detectAwaitingInputForAgent, parseCodexApprovalPrompt } from '../../../lib/agent-input-detection.js';
@@ -1421,10 +1421,10 @@ export async function spawnConversationSession(
       // fail here with an actionable message. Stays silent (fail-open) when
       // the auth state can't be determined (e.g. omp's OAuth module is absent).
       if (getProviderForModelSync(model).name === 'openai') {
-        const auth = await getPiCodexAuthStatus({ refreshIfExpired: true });
+        const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
           throw new Error(
-            'Pi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
+            'ohmypi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
             'Re-authenticate with `pan pi-auth login`, then retry.',
           );
         }
