@@ -60,7 +60,11 @@ export type AgentId = typeof AgentId.Type;
 export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer']);
 export type Role = typeof Role.Type;
 
-export const Status = Schema.Literals(['starting', 'running', 'idle', 'stopped', 'crashed']);
+// PAN-1979: a too-narrow Role enum crashed the AgentsResolver list decode
+// on real `strike`/`flywheel` rows, taking down dashboard boot. Same class for
+// Status: planning writes 'error' on spawn failure (spawn-planning-session.ts),
+// so it must be in the enum or a single failed planning row bricks boot decode.
+export const Status = Schema.Literals(['starting', 'running', 'idle', 'stopped', 'crashed', 'error']);
 export type Status = typeof Status.Type;
 
 export const DeliveryMethod = Schema.Literals(['auto', 'supervisor', 'channels', 'tmux']);
