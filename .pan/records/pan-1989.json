@@ -102,16 +102,16 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T04:56:40.460Z",
+  "updated": "2026-06-24T04:58:36.151Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T04:56:39.869Z",
-    "reviewNotes": "ohmypi conversation launch still checks Pi OAuth",
+    "updatedAt": "2026-06-24T04:58:36.099Z",
+    "reviewNotes": "production build still omits the ohmypi extension",
     "verificationNotes": "Verification FAILED at test (303890ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
@@ -157,10 +157,10 @@
             "cacheWrite": 106526
           },
           "anthropic/claude-sonnet-4-6": {
-            "input": 1692,
-            "output": 496379,
-            "cacheRead": 207434733,
-            "cacheWrite": 2739393
+            "input": 1701,
+            "output": 496914,
+            "cacheRead": 208215200,
+            "cacheWrite": 2741488
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -178,10 +178,10 @@
           "cacheWrite": 1218299
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1746,
-          "output": 513339,
-          "cacheRead": 213657673,
-          "cacheWrite": 2856361
+          "input": 1755,
+          "output": 513874,
+          "cacheRead": 214438140,
+          "cacheWrite": 2858456
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 252053,
@@ -203,8 +203,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 99.805165,
-        "pricingAsOf": "2026-06-24T04:56:40.459Z"
+        "usd": 100.055213,
+        "pricingAsOf": "2026-06-24T04:58:36.151Z"
       }
     },
     "merges": [
