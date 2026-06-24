@@ -7,7 +7,11 @@ vi.mock('../../agents.js', () => ({
   getProviderEnvForModel: async () => ({}),
 }));
 
-import { serializeConversationTranscript, sanitizeTitle } from '../transcript-summary.js';
+import {
+  fallbackTranscriptTitle,
+  sanitizeTitle,
+  serializeConversationTranscript,
+} from '../transcript-summary.js';
 
 describe('serializeConversationTranscript', () => {
   it('labels user and assistant turns', () => {
@@ -70,5 +74,35 @@ describe('sanitizeTitle', () => {
     expect(sanitizeTitle(null)).toBe('');
     expect(sanitizeTitle(undefined)).toBe('');
     expect(sanitizeTitle('   ')).toBe('');
+  });
+});
+
+describe('fallbackTranscriptTitle', () => {
+  it('uses the latest user turn', () => {
+    const transcript = [
+      'User: Fix the flaky dashboard title generation',
+      '',
+      'Assistant: I will inspect the route.',
+      '',
+      'User: Failed to regenerate title: claude invocation timed out after 90000ms',
+    ].join('\n');
+
+    expect(fallbackTranscriptTitle(transcript)).toBe(
+      'Failed to regenerate title claude invocation timed out',
+    );
+  });
+
+  it('strips markup and keeps a compact title', () => {
+    const transcript = [
+      'User: please summarize `src/lib/conversations/transcript-summary.ts` and https://example.com/details',
+    ].join('\n');
+
+    expect(fallbackTranscriptTitle(transcript)).toBe(
+      'summarize src/lib/conversations/transcript-summary.ts',
+    );
+  });
+
+  it('returns empty for transcripts without titleable text', () => {
+    expect(fallbackTranscriptTitle('[… middle of the conversation omitted for length …]')).toBe('');
   });
 });

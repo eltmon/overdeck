@@ -165,6 +165,7 @@ import {
 import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
 import {
   CONVERSATION_TITLE_MODEL,
+  fallbackTranscriptTitle,
   serializeConversationTranscript,
   summarizeFirstMessageTitle,
   summarizeTranscriptTitle,
@@ -1863,6 +1864,10 @@ function scheduleTitleRefinement(conversationName: string): void {
 /** Conversations with a retitle currently running — guards against double-clicks. */
 const retitleInFlight = new Set<string>();
 const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
+
+function isClaudeInvocationTimeout(error: unknown): boolean {
+  return error instanceof Error && /claude invocation timed out after \d+ms/.test(error.message);
+}
 
 interface ConversationAboutSummary {
   summary: string;
@@ -4662,7 +4667,19 @@ const postConversationRetitleRoute = HttpRouter.add(
         try {
           const model = configuredTitleModel();
           console.log(`[claude-invoke] purpose=conversation-retitle | model=${model} | conversation=${name} | transcriptChars=${transcript.length}`);
-          const title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
+          let title: string;
+          try {
+            title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
+          } catch (error: unknown) {
+            if (!isClaudeInvocationTimeout(error)) {
+              throw error;
+            }
+            title = fallbackTranscriptTitle(transcript);
+            if (!title) {
+              throw error;
+            }
+            console.warn(`[conversations] retitle timed out for "${name}"; using deterministic fallback title "${title}"`);
+          }
           if (!title) {
             return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
           }
