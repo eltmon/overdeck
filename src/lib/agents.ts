@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, getOverdeckHome, packageRoot, sessionFilePath } from './paths.js';
+import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
@@ -31,7 +31,7 @@ import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
-import { createConversation, getConversationByName, reactivateConversationForSpawn } from './overdeck/conversations.js';
+import { createConversation, getConversationByName, reactivateConversationForSpawn, normalizeHarness } from './overdeck/conversations.js';
 import { getOverdeckAgentStateSync, listOverdeckAgentStatesSync, saveOverdeckAgentStateSync } from './overdeck/agent-state-sync.js';
 import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from './overdeck/agent-record-sync.js';
 import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from './overdeck/agent-rollback-state.js';
@@ -44,8 +44,10 @@ import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
 import { resolveHarness } from './harness-resolve.js';
+import { resetPipelineVerdictsForWorkStartSync } from './review-status.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
+import { createOhmypiFifo, ohmypiFifoPaths, writeOhmypiCommandSync, OhmypiNotReady } from './runtimes/ohmypi-fifo.js';
 import { Effect } from 'effect';
 import { FsError, TmuxError } from './errors.js';
 import { assertIssueHasBeads, BeadsMissingError } from './beads-query.js';
@@ -117,8 +119,8 @@ async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName |
   }
   files.push(await ensureSessionContextBriefingFile());
 
-  // PAN-1566: Pi also receives the rendered global context layer.
-  if (harness === 'pi') {
+  // PAN-1566: ohmypi also receives the rendered global context layer.
+  if (harness === 'ohmypi') {
     const { piGlobalContextFile } = await import('./context-layers/index.js');
     const globalFile = piGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -152,7 +154,7 @@ function isNodeNotFound(error: unknown): boolean {
  * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
  */
 async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
-  const expectedProcessNames = harness === 'pi' ? new Set(['pi']) : harness === 'codex' ? new Set(['codex']) : new Set(['claude']);
+  const expectedProcessNames = harness === 'ohmypi' ? new Set(['omp']) : harness === 'codex' ? new Set(['codex']) : new Set(['claude']);
   const queue: string[] = [rootPid];
   const seen = new Set<string>();
   while (queue.length > 0) {
@@ -181,7 +183,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 
 }
 
 async function getPiLauncherFields(agentId: string, model: string): Promise<{
-  harness: 'pi';
+  harness: 'ohmypi';
   piExtensionPath: string;
   piFifoPath: string;
   piSessionDir: string;
@@ -189,10 +191,10 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
 }> {
   const paths = piFifoPaths(agentId);
   await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const piExtensionPath = resolve(process.cwd(), 'packages/pi-extension/dist/index.js');
-  if (!existsSync(piExtensionPath)) {
+  const piExtensionPath = resolvePiExtensionPath();
+  if (!piExtensionPath) {
     throw new Error(
-      `Pi extension not built. Run: cd packages/pi-extension && npm run build\n(expected: ${piExtensionPath})`
+      `Pi extension not built. Run: npm run build\n(looked for dist/extensions/pi.js and packages/pi-extension/dist/index.js under ${packageRoot})`
     );
   }
   // PAN-1048 review feedback 006 (S1): thread the resolved role/workhorse model
@@ -202,9 +204,33 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
   // a Pi-backed role silently fell back to Pi's default model and ignored the
   // configured workhorse model entirely.
   return {
-    harness: 'pi',
+    harness: 'ohmypi',
     piExtensionPath,
     piFifoPath: await Effect.runPromise(createPiFifo(agentId)),
+    piSessionDir: paths.agentDir,
+    model,
+  };
+}
+
+async function getOhmypiLauncherFields(agentId: string, model: string): Promise<{
+  harness: 'ohmypi';
+  piExtensionPath: string;
+  piFifoPath: string;
+  piSessionDir: string;
+  model: string;
+}> {
+  const paths = ohmypiFifoPaths(agentId);
+  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
+  const ohmypiExtensionPath = resolveOhmypiExtensionPath();
+  if (!ohmypiExtensionPath) {
+    throw new Error(
+      `ohmypi extension not built. Run: npm run build\n(looked for dist/extensions/ohmypi.js and packages/ohmypi-extension/dist/index.js under ${packageRoot})`
+    );
+  }
+  return {
+    harness: 'ohmypi',
+    piExtensionPath: ohmypiExtensionPath,
+    piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
     model,
   };
@@ -254,6 +280,16 @@ function getCodexLauncherFields(agentId: string, model: string, workspacePath?: 
  */
 async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
   const { readyPath } = piFifoPaths(agentId);
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    if (existsSync(readyPath)) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+async function waitForOhmypiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+  const { readyPath } = ohmypiFifoPaths(agentId);
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
     if (existsSync(readyPath)) return true;
@@ -318,7 +354,7 @@ async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promis
       runId: agentId,
       sessionId: agentId,
       agentRole: agentState.role ?? 'work',
-      agentHarness: agentState.harness ?? 'pi',
+      agentHarness: agentState.harness ?? 'claude-code',
     };
     const { injectPromptTimeMemory } = await import('./memory/injection.js');
     const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
@@ -354,7 +390,7 @@ export async function injectPiConversationMemory(
       runId: opts.conversationName,
       sessionId: opts.conversationName,
       agentRole: 'work',
-      agentHarness: 'pi',
+      agentHarness: 'ohmypi',
     };
     const { injectPromptTimeMemory } = await import('./memory/injection.js');
     const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
@@ -383,6 +419,22 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
+    }
+    throw err;
+  }
+}
+
+async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+  const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
+  const ready = await waitForOhmypiAgentReady(agentId, timeoutSec);
+  if (!ready) {
+    throw new Error(`ohmypi agent ${agentId} did not become ready within ${timeoutSec}s`);
+  }
+  try {
+    writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
+  } catch (err) {
+    if (err instanceof OhmypiNotReady) {
+      throw new Error(`ohmypi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
     }
     throw err;
   }
@@ -423,12 +475,12 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
  * Build the base command that the launcher will exec for an agent.
  *
  * The `harness` parameter (PAN-636) selects between Claude Code (default)
- * and Pi. When `harness === 'pi'` the function short-circuits to a
- * `pi --mode rpc --model <model>` line; the launcher generator then layers
+ * and ohmypi/Pi. When `harness === 'ohmypi'` the function short-circuits to a
+ * `omp --mode rpc --model <model>` line; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
  * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
  * --name) and `agentDefinition` (PAN-982: --agent) parameters only apply to the
- * Claude Code path — Pi has no agent-definition system.
+ * Claude Code path — ohmypi has no agent-definition system.
  */
 export async function getAgentRuntimeBaseCommand(
   model: string,
@@ -439,8 +491,8 @@ export async function getAgentRuntimeBaseCommand(
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
-  if (harness === 'pi') {
-    return `pi --mode rpc --model ${quotedModel}`;
+  if (harness === 'ohmypi') {
+    return `omp --mode rpc --model ${quotedModel}`;
   }
   if (harness === 'codex') {
     // buildCodexCommand in launcher-generator builds the full Codex command;
@@ -526,7 +578,7 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
   return `roles/${role}.md`;
 }
 
-/** Build a Claude/Pi base command for role-based runs. */
+/** Build a Claude/ohmypi base command for role-based runs. */
 export async function getRoleRuntimeBaseCommand(
   model: string,
   agentName: string,
@@ -537,8 +589,8 @@ export async function getRoleRuntimeBaseCommand(
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
-  if (harness === 'pi') {
-    return `pi --mode rpc --model ${quotedModel}`;
+  if (harness === 'ohmypi') {
+    return `omp --mode rpc --model ${quotedModel}`;
   }
   if (harness === 'codex') {
     return `codex`;
@@ -2357,9 +2409,7 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
     currentTool: snap.currentTool,
     claudeSessionId: snap.claudeSessionId,
     sessionModel: snap.sessionModel,
-    sessionHarness: (snap.sessionHarness === 'claude-code' || snap.sessionHarness === 'pi' || snap.sessionHarness === 'codex')
-      ? snap.sessionHarness
-      : undefined,
+    sessionHarness: normalizeHarness(snap.sessionHarness ?? null) ?? undefined,
     currentIssue: snap.currentIssue,
     resolution: snap.resolution as AgentResolution | undefined,
     resolutionCount: snap.resolutionCount,
@@ -2598,6 +2648,31 @@ function resolveCodexThreadIdSync(agentId: string): string | null {
   return null;
 }
 
+/**
+ * Sync mirror of jsonl-resolver.ts's pickFreshestSessionId: from a list of
+ * candidate session ids, return the one whose JSONL transcript has the most
+ * recent mtime, skipping ids with no file on disk. Falls back to the last
+ * appended id when none have a transcript (e.g. workspace moved). Returns null
+ * only when there are no usable candidates.
+ */
+function pickFreshestExistingSessionIdSync(agentId: string, candidates: unknown[]): string | null {
+  const valid = candidates.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  if (valid.length === 0) return null;
+  const workspace = getAgentStateSync(agentId)?.workspace;
+  if (workspace) {
+    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
+    let best: { id: string; mtimeMs: number } | null = null;
+    for (const id of valid) {
+      try {
+        const s = statSync(join(projectDir, `${id}.jsonl`));
+        if (!best || s.mtimeMs > best.mtimeMs) best = { id, mtimeMs: s.mtimeMs };
+      } catch { /* no JSONL for this id — skip */ }
+    }
+    if (best) return best.id;
+  }
+  return valid[valid.length - 1] ?? null;
+}
+
 export function getLatestSessionIdSync(agentId: string): string | null {
   // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
   //    returning it would make resumeAgent target a non-existent thread and codex would drift into
@@ -2609,13 +2684,18 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   const fromSessionFile = getSessionId(agentId);
   if (fromSessionFile) return fromSessionFile;
 
-  // 2. sessions.json (written by heartbeat hook — last entry is most recent)
+  // 2. sessions.json (append-only list of session ids the agent has used).
+  //    The array can hold aborted/empty ids (e.g. a fresh session that never
+  //    produced a transcript), so we can't trust "last entry" — pick the id
+  //    whose JSONL is freshest on disk, matching resolveClaudeSessionId
+  //    (jsonl-resolver.ts). Falls back to last-appended when none exist on disk.
   const sessionsFile = join(getAgentDir(agentId), 'sessions.json');
   try {
     if (existsSync(sessionsFile)) {
       const sessions = JSON.parse(readFileSync(sessionsFile, 'utf8'));
       if (Array.isArray(sessions) && sessions.length > 0) {
-        return sessions[sessions.length - 1];
+        const picked = pickFreshestExistingSessionIdSync(agentId, sessions);
+        if (picked) return picked;
       }
     }
   } catch { /* non-fatal */ }
@@ -2778,9 +2858,8 @@ export async function buildCavemanExports(
  */
 /**
  * Models that are known-broken for autonomous *work* agents and must never be
- * used to spawn one, even if a project pins them in config. The gate falls back
- * to WORK_AGENT_FALLBACK_MODEL (loudly) for the work role when the model wasn't
- * an explicit per-spawn override.
+ * used to spawn one, even if a project pins them in config. The gate fails
+ * loudly for the work role when the model wasn't an explicit per-spawn override.
  *
  * Empty as of PAN-1584: gpt-5.5 used to wedge at launch with CLIProxy "System
  * messages are not allowed", which was a stale CLIProxyAPI binary (6.9.45)
@@ -2791,8 +2870,6 @@ export async function buildCavemanExports(
  * re-verified in this pass — re-add 'gpt-5.5' here if a Pi init hang resurfaces.)
  */
 const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
-/** Safe fallback when a work agent's resolved model is work-broken. */
-const WORK_AGENT_FALLBACK_MODEL = 'claude-sonnet-4-6';
 
 export function determineModel(options: { model?: string; role?: Role; spawnKey?: string } = {}): string {
   const modelOverride = normalizeModelOverrideSync(options.model);
@@ -2801,16 +2878,16 @@ export function determineModel(options: { model?: string; role?: Role; spawnKey?
     : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config, options.spawnKey));
 
   // Work-agent safety net: a config pin (or smart-selection) must not spawn a
-  // work agent on a model that is known to wedge for the work role. Fall back
-  // loudly rather than launch a dead agent. Only applies to the work role and
-  // only when the model wasn't an explicit, deliberate per-spawn override.
+  // work agent on a model that is known to wedge for the work role. Fail loudly
+  // rather than launch a dead agent or silently substitute another model. Only
+  // applies to the work role and only when the model wasn't an explicit,
+  // deliberate per-spawn override.
   const role = options.role ?? 'work';
   if (role === 'work' && !modelOverride && WORK_AGENT_BROKEN_MODELS.has(resolved)) {
-    console.warn(
-      `[determineModel] resolved work model "${resolved}" is known-broken for work agents; ` +
-      `falling back to "${WORK_AGENT_FALLBACK_MODEL}". Update roles.work.model in config to silence this.`,
+    throw new Error(
+      `Resolved work model "${resolved}" is known-broken for work agents. ` +
+      'Set roles.work.model to a working model in config.yaml, or pass an explicit --model override.',
     );
-    return WORK_AGENT_FALLBACK_MODEL;
   }
 
   return resolved;
@@ -2973,12 +3050,12 @@ export async function buildAgentLaunchConfig(opts: {
   // tool permissions) if it always points at roles/work.md.
   const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;
 
-  // PAN-1055: pi harness needs --session-dir + fifo redirect threaded into
-  // the launcher; getPiLauncherFields() resolves them from the agent state
+  // PAN-1055: ohmypi harness needs --session-dir + fifo redirect threaded into
+  // the launcher; getOhmypiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
-  const piLauncherFields = opts.harness === 'pi'
-    ? await getPiLauncherFields(opts.agentId, model)
+  const piLauncherFields = opts.harness === 'ohmypi'
+    ? await getOhmypiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = opts.harness === 'codex'
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
@@ -3016,14 +3093,14 @@ export async function buildAgentLaunchConfig(opts: {
       setTerminalEnv: true,
       providerExports,
       // PAN-1048 + PAN-1055: claude-code resumes load the role-specific
-      // frontmatter (roleAgentDefinitionPath); pi resumes route through
-      // getAgentRuntimeBaseCommand which short-circuits to the pi rpc form.
-      baseCommand: opts.harness === 'pi' || opts.harness === 'codex'
+      // frontmatter (roleAgentDefinitionPath); ohmypi/codex resumes route through
+      // getAgentRuntimeBaseCommand which short-circuits to the omp rpc form.
+      baseCommand: opts.harness === 'ohmypi' || opts.harness === 'codex'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
         : `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
       resumeSessionId: opts.resumeSessionId,
-      model: opts.harness === 'pi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
-      extraArgs: opts.harness === 'pi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,
+      model: opts.harness === 'ohmypi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: opts.harness === 'ohmypi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
       extraEnvExports: opts.extraEnvExports,
       useSupervisor: opts.useSupervisor,
@@ -3381,7 +3458,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // their prompt via tmux after Claude boots (same as the orchestrator/test/
   // ship), not on stdin to a headless `claude --print`.
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
+  const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -3412,14 +3489,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const providerExports = await getProviderExportsForModel(selectedModel);
   const providerEnv = await getProviderEnvForModel(selectedModel);
 
-  // PAN-1048 review feedback 005 (S1): when the resolved harness is Pi, thread
-  // the per-agent Pi launcher fields (--session-dir, --extension, FIFO
+  // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
+  // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScript so the role launcher emits the
-  // correct `pi --mode rpc` command instead of a malformed Claude command.
-  // Without this, a config'd `roles.review.harness: pi` produced a launcher
+  // correct `omp --mode rpc` command instead of a malformed Claude command.
+  // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.
-  const piLauncherFields = resolvedHarness === 'pi'
-    ? await getPiLauncherFields(agentId, selectedModel)
+  const piLauncherFields = resolvedHarness === 'ohmypi'
+    ? await getOhmypiLauncherFields(agentId, selectedModel)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
     ? getCodexLauncherFields(agentId, selectedModel, workspace)
@@ -3549,9 +3626,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
-        await writePiAgentPrompt(agentId, prompt);
+        await writeOhmypiAgentPrompt(agentId, prompt);
       } catch (err) {
-        console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+        console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
     } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui) {
       // PAN-1594: wait for the hook-written ready.json (session-start hook),
@@ -3690,6 +3767,16 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
   if (role === 'work') {
+    try {
+      const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
+      if (resetStatus) {
+        const { resetPostMergeState } = await import('./cloister/merge-agent.js');
+        resetPostMergeState(options.issueId);
+      }
+    } catch (err) {
+      console.warn(`[agents] Could not reset stale pipeline verdicts for ${options.issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
       console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
     });
@@ -3889,15 +3976,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     : null;
 
   // Send the initial prompt after the interactive prompt is ready.
-  if (prompt && resolvedHarness === 'pi') {
+  if (prompt && resolvedHarness === 'ohmypi') {
     try {
-      await writePiAgentPrompt(agentId, prompt);
+      await writeOhmypiAgentPrompt(agentId, prompt);
       if (role === 'work') {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);
       }
     } catch (err) {
-      console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (role === 'work') {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
         return state;
@@ -4498,8 +4585,8 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       agentState.hostOverride === true,
       agentState.workspace,
     );
-    const fallbackPiFields = fallbackHarness === 'pi'
-      ? await getPiLauncherFields(normalizedId, resumeModel)
+    const fallbackPiFields = fallbackHarness === 'ohmypi'
+      ? await getOhmypiLauncherFields(normalizedId, resumeModel)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
@@ -4803,14 +4890,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     logAgentLifecycleSync(normalizedId, `compact recovery: respawning fresh session (seed=${seedResult.summarized ? 'summary' : 'reseed-only'})`);
   }
 
-  // PAN-2009: capture whether the Pi process is actually alive BEFORE we kill any
-  // zombie session below. A DEAD pi process cannot be resumed by session id —
-  // `pi --resume` against a cleaned-up session never writes ready.json (the "did
+  // PAN-2009: capture whether the ohmypi process is actually alive BEFORE we kill any
+  // zombie session below. A DEAD omp process cannot be resumed by session id —
+  // `omp --resume` against a cleaned-up session never writes ready.json (the "did
   // not become ready within 30s" hang) — and there is no live transcript to
   // protect, so it must be fresh-launched (recovery, not rotation). A live
-  // (suspended) pi process stays on the normal resume path.
-  const piProcessWasAlive = agentState.harness === 'pi'
-    ? await hasAgentRuntimeInSession(normalizedId, 'pi')
+  // (suspended) omp process stays on the normal resume path.
+  const piProcessWasAlive = agentState.harness === 'ohmypi'
+    ? await hasAgentRuntimeInSession(normalizedId, 'ohmypi')
     : false;
 
   // Kill any zombie tmux session (crashed agent left behind)
@@ -4876,16 +4963,16 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // never reuse a session across a harness change.
       resumeDriftReasons.push(`legacy harness ${priorHarness}→${effectiveHarness} (PAN-1797 re-default)`);
     }
-    // PAN-2009: a dead Pi process is fresh-launchable recovery — force a fresh
-    // session (no `pi --resume`, which would hang waiting for ready.json) instead
+    // PAN-2009: a dead ohmypi process is fresh-launchable recovery — force a fresh
+    // session (no `omp --resume`, which would hang waiting for ready.json) instead
     // of a doomed resume-by-id. This is NOT session rotation (no live session or
     // transcript exists to protect), so it is exempt from the PAN-1980 refusal
-    // below — it adds no compact seed and no drift reason. Live (suspended) pi and
+    // below — it adds no compact seed and no drift reason. Live (suspended) omp and
     // compact/drift resumes are unaffected.
-    const piDeadRecovery = effectiveHarness === 'pi' && !piProcessWasAlive
+    const piDeadRecovery = effectiveHarness === 'ohmypi' && !piProcessWasAlive
       && !compactSeed && resumeDriftReasons.length === 0;
     if (piDeadRecovery) {
-      logAgentLifecycleSync(normalizedId, 'resumeAgent: dead Pi process — fresh-launching for recovery instead of pi --resume (PAN-2009)');
+      logAgentLifecycleSync(normalizedId, 'resumeAgent: dead ohmypi process — fresh-launching for recovery instead of omp --resume (PAN-2009)');
     }
     const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0 && !piDeadRecovery;
     // PAN-1980: refuse to rotate to a new session. A resume that would need a
@@ -4975,16 +5062,16 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Caller-supplied message wins.
 
     let messageDelivered = false;
-    if (effectiveHarness === 'pi') {
-      // Pi does not fire the Claude SessionStart hook; wait for ready.json and
+    if (effectiveHarness === 'ohmypi') {
+      // ohmypi does not fire the Claude SessionStart hook; wait for ready.json and
       // deliver the auto-continue prompt through the FIFO JSONL protocol.
       try {
-        await writePiAgentPrompt(normalizedId, effectiveMessage);
+        await writeOhmypiAgentPrompt(normalizedId, effectiveMessage);
         messageDelivered = true;
         if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
+        console.error(`[resumeAgent] ohmypi prompt delivery failed: ${msg}`);
       }
     } else if (effectiveHarness === 'codex') {
       const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:codex-continue', resilientDeliveryMethod(agentState.deliveryMethod));
@@ -5030,6 +5117,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     if (compactSeed) {
       console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+    } else if (piDeadRecovery) {
+      console.log(`[agents] Respawned ${normalizedId} fresh because the prior Pi process was dead (archived session ${sessionId})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after dead Pi process (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
     } else if (!shouldResumeSavedSession) {
       console.log(`[agents] Respawned ${normalizedId} fresh because session origin drifted (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
@@ -5178,15 +5268,15 @@ export async function restartAgent(
     }));
 
     const prompt = message || `You are resuming work on ${agentState.issueId}. Read .pan/continue.json for context and pick up where you left off.`;
-    if (effectiveHarness === 'pi') {
-      // Pi does not fire the Claude SessionStart hook and does not read tmux
+    if (effectiveHarness === 'ohmypi') {
+      // ohmypi does not fire the Claude SessionStart hook and does not read tmux
       // input — wait for ready.json and write the continue prompt through the
       // FIFO JSONL protocol.
       try {
-        await writePiAgentPrompt(normalizedId, prompt);
+        await writeOhmypiAgentPrompt(normalizedId, prompt);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[restartAgent] Pi prompt delivery failed for ${normalizedId}: ${msg}`);
+        console.error(`[restartAgent] ohmypi prompt delivery failed for ${normalizedId}: ${msg}`);
       }
     } else {
       const ready = await waitForPromptReady(normalizedId, effectiveHarness, 30);
@@ -5296,9 +5386,7 @@ export async function recoverAgent(
   // Check if already running — session may exist with only a bare shell
   // after Claude exited (zombie session). Kill it and recover.
   if (sessionExistsSync(normalizedId)) {
-    const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code' || state.harness === 'codex')
-      ? state.harness
-      : 'claude-code';
+    const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
     if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
       return state;
     }
@@ -5338,25 +5426,23 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code' || state.harness === 'codex')
-    ? state.harness
-    : 'claude-code';
+  const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
   saveAgentStateSync(state);
 
-  if (recoveryHarness === 'pi') {
-    // PAN-1055: Pi cannot consume the recovery prompt as a positional shell
-    // argument the way the Claude direct command path does — Pi reads JSONL
-    // commands from its FIFO. Build a real Pi launcher (extension path,
+  if (recoveryHarness === 'ohmypi') {
+    // PAN-1055: ohmypi cannot consume the recovery prompt as a positional shell
+    // argument the way the Claude direct command path does — ohmypi reads JSONL
+    // commands from its FIFO. Build a real ohmypi launcher (extension path,
     // --session-dir, FIFO redirect) via buildAgentLaunchConfig, then deliver
-    // the recovery prompt through the FIFO once Pi reports ready.
+    // the recovery prompt through the FIFO once omp reports ready.
     const { launcherContent, providerEnv: piProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model: state.model,
       workspace: state.workspace,
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
-      harness: 'pi',
+      harness: 'ohmypi',
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
@@ -5371,14 +5457,14 @@ export async function recoverAgent(
       },
     }));
     try {
-      await writePiAgentPrompt(normalizedId, recoveryPrompt);
+      await writeOhmypiAgentPrompt(normalizedId, recoveryPrompt);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[recoverAgent] Pi recovery prompt delivery failed for ${normalizedId}: ${msg}`);
+      console.error(`[recoverAgent] ohmypi recovery prompt delivery failed for ${normalizedId}: ${msg}`);
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (pi)`);
+    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
     return state;
   }
 

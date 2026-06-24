@@ -455,7 +455,7 @@ export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
   model: RoleModelRef;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   /**
    * Target minimum concurrent agents the role should keep launched. The
@@ -714,6 +714,8 @@ export interface YamlConfig {
  * existing default behaviour when the flag is off.
  */
 export interface ExperimentalConfig {
+  /** Show experimental dashboard surfaces in navigation and direct routes. */
+  experimentalFeatures?: boolean;
   /**
    * Use Claude Code Channels (research-preview MCP capability) for prompt delivery
    * to eligible work agents. When enabled, eligible agents receive prompts via a
@@ -724,6 +726,12 @@ export interface ExperimentalConfig {
   claudeCodeChannelsMcp?: boolean;
   /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
   streamdownRenderer?: boolean;
+  /**
+   * Show the advanced harness selector and all explicit harness/model choices in
+   * dashboard model pickers. Default false: pickers use each provider's default
+   * harness and hide the permutation matrix.
+   */
+  showHarnessModelPermutations?: boolean;
 }
 
 /**
@@ -968,12 +976,16 @@ export interface NormalizedConfig {
  * Normalized experimental flags — every flag has a concrete boolean value.
  */
 export interface NormalizedExperimentalConfig {
+  /** Whether experimental dashboard surfaces are visible. */
+  experimentalFeatures: boolean;
   /** Whether Claude Code Channels prompt delivery is enabled for eligible work agents. */
   claudeCodeChannels: boolean;
   /** Whether legacy Claude Code Channels MCP wiring is enabled for new spawns. */
   claudeCodeChannelsMcp: boolean;
   /** Whether dashboard chat markdown renders through Streamdown. */
   streamdownRenderer: boolean;
+  /** Whether model pickers expose explicit harness/model permutations. */
+  showHarnessModelPermutations: boolean;
 }
 
 /**
@@ -1238,9 +1250,11 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     agentBlockCount: 10,
   },
   experimental: {
+    experimentalFeatures: false,
     claudeCodeChannels: false,
     claudeCodeChannelsMcp: false,
     streamdownRenderer: false,
+    showHarnessModelPermutations: false,
   },
   claude: {
     permissionMode: 'auto',
@@ -1280,8 +1294,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
   }
 }
 
@@ -1789,8 +1803,8 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
       }
     }
   }
-  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi' && roleConfig.harness !== 'codex') {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
+  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex') {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
   }
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
@@ -1926,9 +1940,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
     },
     experimental: {
+      experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
       claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
       streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
+      showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations,
     },
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
@@ -2346,6 +2362,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
 
     if (config.experimental) {
+      if (typeof config.experimental.experimentalFeatures === 'boolean') {
+        result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
+      }
       if (typeof config.experimental.claudeCodeChannels === 'boolean') {
         result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
       }
@@ -2354,6 +2373,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (typeof config.experimental.streamdownRenderer === 'boolean') {
         result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+      }
+      if (typeof config.experimental.showHarnessModelPermutations === 'boolean') {
+        result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
       }
     }
 

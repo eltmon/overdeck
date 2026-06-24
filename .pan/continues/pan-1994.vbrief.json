@@ -1,0 +1,40 @@
+{
+  "version": "1",
+  "issueId": "PAN-1994",
+  "created": "2026-06-24T02:26:57.538Z",
+  "updated": "2026-06-24T03:14:59.837Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "claude-sonnet-4-6",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:26:57.538Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:27:01.449Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-24T02:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-24T02:31:13.301Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-24T02:31Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-24T02:31:17.828Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T02:39:35.854Z"
+    }
+  ],
+  "feedback": []
+}

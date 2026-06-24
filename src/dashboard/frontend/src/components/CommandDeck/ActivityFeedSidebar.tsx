@@ -5,6 +5,7 @@ import { useDashboardStore } from '../../lib/store';
 import { bucketByTime, type TimeBucketKey } from '../../lib/timeBuckets';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { NotificationClassBadge } from '../NotificationClassBadge';
+import { ActionStatusChip } from '../ActionStatusChip';
 
 const BUCKET_LABELS: Record<TimeBucketKey, string> = {
   justNow: 'Just Now',
@@ -125,8 +126,9 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
                         <div className="flex items-start gap-2">
                           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-foreground">{observation.actionStatus}</p>
+                            <p className="truncate font-medium text-foreground" title={observation.summary}>{observation.summary}</p>
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+                              {observation.actionStatus ? <ActionStatusChip status={observation.actionStatus} /> : null}
                               <span className="truncate">{observation.workspaceId} · {observation.issueId}</span>
                               <span aria-hidden="true">·</span>
                               <time dateTime={observation.timestamp} className="shrink-0">

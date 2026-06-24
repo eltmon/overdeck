@@ -67,12 +67,17 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    ```bash
    npm run typecheck && npm test
    ```
-7. **Report success.** Print:
+7. **Run the strike post-merge handoff**:
+   ```bash
+   pan done <id> --strike
+   ```
+   This applies the `merged` and `verifying-on-main` labels so the normal close-out tail can process the issue, while still skipping review-pipeline dispatch. Do not run plain `pan done`.
+8. **Report success.** Print:
    - The commits that landed
    - The output of typecheck/test (pass/fail)
    - A one-line summary of what shipped
 
-Do NOT call `pan done`. The strike role does NOT use the review pipeline.
+Do NOT call plain `pan done`. The strike role does NOT use the review pipeline; `pan done --strike` is only the post-merge lifecycle handoff.
 
 ## Signal the flywheel before you stall
 

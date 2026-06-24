@@ -1,0 +1,388 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-24T16:25:24.065Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2044: interactive Settings → Experimental importer to copy selected conversations from the legacy panopticon.db into overdeck.db",
+    "updated": "2026-06-24T16:32:42.024Z"
+  },
+  "plan": {
+    "id": "pan-2044",
+    "title": "UI: import conversations from old panopticon.db into overdeck.db (Settings → Experimental)",
+    "status": "proposed",
+    "uid": "fedee69f-a0f9-4784-a5e8-762a410fa04f",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-24T16:25:24.065Z",
+    "updated": "2026-06-24T16:32:42.024Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2044",
+        "label": "PAN-2044",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2044.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "migration",
+      "settings",
+      "experimental",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "There is no granular, on-demand way to move conversations from the pre-rebrand ~/.panopticon/panopticon.db into the live ~/.overdeck/overdeck.db. The only existing path is the CLI flag `pan up --seed-from-legacy`, which is all-or-nothing, runs once at server startup, and whose consuming logic survives only in built dist (not in src). A user who wants to carry over a curated subset of old conversations — preserving titles, cost/token history, archival state, JSONL linkage, and favorites — cannot do it from the UI.",
+      "Proposal": "Add an interactive importer surfaced as a button in Settings → Experimental. A dialog lists conversations read from the legacy DB (read-only), excludes agent/planning/specialist sessions, and lets the user pick a subset (default all-selected) and import them into overdeck.db. Implementation is one deletable module `src/lib/overdeck/legacy-import.ts` (read-only preview + two-pass import orchestration + favorites carry-over) plus two small non-destructive write-door additions in `src/lib/overdeck/conversations.ts`, a one-line read-only option on the shared SQLite driver, two settings endpoints, and a dialog modeled on ReindexConfirmDialog. The issue under-specifies two things that this plan decides: (A) neither existing write door can carry the import — `createConversation` is destructive and lossy, `ConversationWriter.create` cannot pass claudeSessionId — so a purpose-built non-destructive `importLegacyConversation` is added to the same write-door module; (B) the shared driver has no read-only open, so `OpenDatabaseOptions` gains a `readOnly?` flag (the value already flows through to node:sqlite).",
+      "NonGoals": "- Importing or mutating any backing JSONL transcript file — DB metadata only (sacred-JSONL invariant).\n- Re-pointing the singleton overdeck DB handle at the legacy DB — the legacy DB is opened on its own read-only handle.\n- Carrying over non-'conversation' legacy favorites (e.g. type='project').\n- Importing projects, cost_events, or any table other than conversations / conversation_files / favorites.\n- Removing or refactoring the existing `pan up --seed-from-legacy` CLI path or `getLegacyHome()` (their removal is a separate cutover task).\n- A configurable column-mapping or a generic table-import framework — the mapping is fixed to conversations.\n- Reading a live pre-rebrand panopticon.db on the dev machine (it will not exist here; tests use a fixture built from the legacy DDL)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Dialog checkboxes default to ALL conversations selected (Q4 resolved), with Select-all / Select-none controls.",
+        "rationale": "Matches the issue author's stated default and the 'carry all conversations over' intent. A trivially reversible UI default; planning does not block an autonomous run on it."
+      },
+      {
+        "summary": "Add a purpose-built non-destructive write-door function `importLegacyConversation` (+ `setImportedConversationLinks`) to src/lib/overdeck/conversations.ts rather than reusing createConversation or ConversationWriter.create.",
+        "rationale": "createConversation (conversations.ts:1153) DELETEs same-name rows and hardcodes status='active'/archived_at=NULL, dropping created_at/cost/tokens/ended/FK columns — violating AC5 and the mapping. ConversationWriter.create (415) is non-destructive but takes fewer fields and cannot pass claudeSessionId (AC6). Extending the writer keeps the single-source-of-truth tenet; the route never writes the tables directly."
+      },
+      {
+        "summary": "Add `readOnly?: boolean` to OpenDatabaseOptions in src/lib/database/driver.ts to open the legacy DB read-only via the shared driver.",
+        "rationale": "AC8 wants the source read read-only through the shared driver, but OpenDatabaseOptions only had `allowExtension`. The whole options object already flows to `new DatabaseSync(path, options)` and node:sqlite honors `readOnly`, so the type addition is sufficient for the Node-only dashboard server."
+      },
+      {
+        "summary": "existsSync(path) check before opening; missing DB returns a not-found result (no throw).",
+        "rationale": "A read-only open of a missing file throws; checking first yields AC2's friendly 'No legacy database found' state and the manual path picker."
+      },
+      {
+        "summary": "Two-pass insert: insert all selected conversations with NULL FK columns, then a second pass sets handoff_target_conv_id/cleared_to_conv_id from the rowid→uuid map (NULL + warning when the target was not imported).",
+        "rationale": "Avoids foreign-key violations regardless of PRAGMA foreign_keys, and deterministically remaps the legacy INTEGER rowid FKs to the new UUIDs."
+      },
+      {
+        "summary": "Idempotency by name first, then by claude_session_id/locator via getConversationByClaudeSessionId; skip-and-report, never delete or overwrite.",
+        "rationale": "AC5 forbids relying on createConversation's destructive DELETE. Skip-and-report preserves existing overdeck rows and is safe across re-imports."
+      },
+      {
+        "summary": "A legacy row with empty/unparseable created_at fails that single row (reason recorded), never a zero-timestamp insert; other rows proceed.",
+        "rationale": "created_at is NOT NULL in both schemas; the issue mapping requires fail-the-row over inserting a bogus zero."
+      },
+      {
+        "summary": "status is copied through (null → derive 'ended' if archived else 'active'); the liveness oracle reconciles any imported 'active' row to 'ended' on its next poll.",
+        "rationale": "Imports are historical and have no live tmux session; copy-through is honest to the mapping and self-corrects without special-casing."
+      }
+    ],
+    "items": [
+      {
+        "id": "driver-readonly-option",
+        "title": "Add a read-only open option to the shared SQLite driver",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T16:25:24.065Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2044",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/database/driver.ts add `readOnly?: boolean` to the OpenDatabaseOptions interface (currently `{ allowExtension?: boolean }` at :29). No other change is required for the Node path: openDatabase (:286) already passes the whole `options` object to `new DatabaseSync(path, options)` (:293) and node:sqlite honors `readOnly`. The dashboard server is Node-22-only, so the bun branch (:288, which ignores options) is not exercised by the legacy importer. Add a co-located unit test that opens a temp fixture DB read-only and asserts writes throw."
+        },
+        "items": [
+          {
+            "id": "driver-readonly-option.ac1",
+            "title": "OpenDatabaseOptions in src/lib/database/driver.ts contains an optional readOnly boolean field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-readonly-option.ac2",
+            "title": "A unit test calls openDatabase(fixturePath, { readOnly: true }), asserts a SELECT succeeds, and asserts a write statement (INSERT or CREATE TABLE) against the handle throws.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-import-read",
+        "title": "Read-only legacy-conversation preview module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T16:25:24.065Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2044",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/legacy-import.ts exporting previewLegacyConversations(path). It opens the legacy DB via openDatabase(path, { readOnly: true }) on its OWN handle (never getDatabase()/getOverdeckDatabaseSync()), reads the legacy `conversations` table (DDL at src/lib/database/schema.ts:471), excludes every name matched by isAgentConversationName (conversations.ts:797 — agent-/planning-/specialist-), and returns PreviewRow[] = { name, title, createdAt, model, lastActivityAt|null, messageCount|null, hasFavorite, claudeSessionId|null, alreadyImported }. hasFavorite is derived by reading the legacy `favorites` table (schema.ts:516) for type='conversation' item_id=name. alreadyImported is true when getConversationUuidByName(name) (conversations.ts:916) returns a row. Provide a not-found result shape (no throw) when the path is missing, so the endpoint can render AC2. Close the legacy handle when done. Add a fixture-based unit test that builds a temp legacy DB from the legacy DDL, seeds agent and non-agent rows + a favorite, and asserts the preview shape and exclusion."
+        },
+        "items": [
+          {
+            "id": "legacy-import-read.ac1",
+            "title": "src/lib/overdeck/legacy-import.ts exports previewLegacyConversations(path) that opens the legacy DB via openDatabase(path, { readOnly: true }) on its own handle and never calls getDatabase()/getOverdeckDatabaseSync().",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-read.ac2",
+            "title": "Given a fixture legacy DB seeded from the legacy conversations DDL, previewLegacyConversations returns one row per non-agent conversation and excludes every name matched by isAgentConversationName (agent-/planning-/specialist-).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-read.ac3",
+            "title": "Each preview row includes name, title, createdAt, model, hasFavorite (true when a legacy favorites row of type 'conversation' matches the name), and alreadyImported (true when a same-name conversation already exists in overdeck.db).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-read.ac4",
+            "title": "When path points at a non-existent file, the module returns a not-found result without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-import-write",
+        "title": "Non-destructive import write door + two-pass orchestration + favorites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T16:25:24.065Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2044",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "legacy-import-endpoints"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "acJustification": "This is one cohesive write-door change — the non-destructive insert, full column mapping, idempotency-not-DELETE, two-pass FK remap, and favorites carry-over are interdependent and cannot be reviewed or merged in working intermediate slices; each AC pins a distinct observable behavior of that single change."
+        },
+        "narrative": {
+          "Action": "Add to src/lib/overdeck/conversations.ts (the write door): (1) importLegacyConversation(mapped) — a NON-destructive insert that mints a fresh randomUUID(), inserts the full mapped column set (created_at ms, archived_at, status [null→derive], ended_at, last_attached_at, total_cost, total_tokens, fork_status, fork_retry_count, session_file, title, title_source, delivery_method, tmux_session, spawn_error, handoff_doc_path) with FK columns NULL, and — when claudeSessionId is present — inserts the conversation_files locator row (reuse the existing `INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)` shape from :1196-1201). It must NOT DELETE any existing row. Returns { uuid, legacyRowid }. (2) setImportedConversationLinks(uuid, { handoffTargetUuid, clearedToUuid }) — UPDATE conversations SET handoff_target_conv_id=?, cleared_to_conv_id=? WHERE id=?. Then in src/lib/overdeck/legacy-import.ts add importLegacyConversations(path, names): read the selected legacy rows (reuse the read helper from legacy-import-read), map legacy→new per the PRD mapping table (parse ISO TEXT → epoch ms via new Date(iso).getTime()), and run two passes — pass 1 inserts via importLegacyConversation building a { legacyRowid → newUuid } map and skipping any name already present (by name, then by claude_session_id via getConversationByClaudeSessionId, conversations.ts:961); pass 2 calls setImportedConversationLinks remapping legacy rowid FKs to new UUIDs (NULL + warning when the target was not imported). Carry favorites: for each imported conversation whose name has a legacy type='conversation' favorite, call setFavorite('conversation', name) (conversations.ts:1391). A row with empty/unparseable created_at goes to failed[] with a reason and is not inserted. Return { imported: string[], skipped: {name,reason}[], failed: {name,reason}[], warnings: {name,reason}[], favoritesCarried: number }. Tests use a fixture legacy DB plus an in-memory overdeck DB (initSchema)."
+        },
+        "items": [
+          {
+            "id": "legacy-import-write.ac1",
+            "title": "conversations.ts exports a non-destructive importLegacyConversation(mapped) that inserts without deleting any existing row and registers a conversation_files locator when claudeSessionId is present; a fixture test asserts created_at (ISO→ms), archived_at, status, ended_at, total_cost, total_tokens, title, title_source round-trip to the new row and the conversation_files locator equals the legacy claude_session_id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-write.ac2",
+            "title": "importLegacyConversations skips and reports (in skipped[]) any selected name already present in overdeck.db (matched by name, or by claude_session_id via getConversationByClaudeSessionId) — no duplicate row, no overwrite; a test pre-creates a same-named conversation and asserts it is unchanged after import.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-write.ac3",
+            "title": "The import path preserves existing overdeck rows: it issues no DELETE against the conversations table and does not route through createConversation (verified by a test and/or a grep over the import module).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-write.ac4",
+            "title": "handoff_target_conv_id and cleared_to_conv_id are remapped from legacy rowids to the imported targets' new UUIDs when those targets are also imported, and set NULL with a per-row warning when the target was not imported — a fixture test covers both branches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-write.ac5",
+            "title": "A legacy row with an empty or unparseable created_at fails that row with a recorded reason in failed[], and no zero-timestamp row is inserted into overdeck.db.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-write.ac6",
+            "title": "For each imported conversation whose name matches a legacy type='conversation' favorite, the import creates a favorite via setFavorite and favoritesCarried records the count; legacy favorites of other types are ignored — fixture test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-import-endpoints",
+        "title": "Settings endpoints: legacy-import preview (GET) and import (POST)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T16:25:24.065Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2044",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/settings.ts add two Effect HttpRouter.add routes following the existing pattern (GET example :780, POST with auth :806) and register both in settingsRouteLayer (:1078). GET /api/settings/legacy-import/conversations?path= : resolve path (default join(getLegacyHome(),'panopticon.db')); when the file is missing return jsonResponse({ found:false, defaultPath, message:`No legacy database found at ${path}` }); else return jsonResponse({ found:true, path, conversations: previewLegacyConversations(path) }). Parse the query param via new URL(request.url,'http://localhost').searchParams.get('path'). POST /api/settings/legacy-import/conversations : call rejectUnsafeDashboardMutationRequest(request) first; read body via readJsonBody; call importLegacyConversations(path, names); return jsonResponse({ imported, skipped, failed, warnings, favoritesCarried }). Add a route-level test (fixture legacy DB + in-memory overdeck DB) asserting the GET preview list and the POST summary."
+        },
+        "items": [
+          {
+            "id": "legacy-import-endpoints.ac1",
+            "title": "GET /api/settings/legacy-import/conversations returns { found:false, defaultPath, message } when no DB exists at the resolved path and { found:true, path, conversations } (via previewLegacyConversations) when one does; ?path= overrides the default join(getLegacyHome(),'panopticon.db').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-endpoints.ac2",
+            "title": "POST /api/settings/legacy-import/conversations with body { path, names } calls importLegacyConversations and returns { imported, skipped, failed, warnings, favoritesCarried }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-endpoints.ac3",
+            "title": "The POST route calls rejectUnsafeDashboardMutationRequest(request) and returns its auth-error response when the dashboard CSRF token is absent, before any import runs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-endpoints.ac4",
+            "title": "Both routes are added to settingsRouteLayer in settings.ts and a route-level test exercises the GET preview against a fixture path and the POST import summary.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-import-dialog",
+        "title": "Experimental settings button + LegacyImportDialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-24T16:25:24.065Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2044",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/Settings/LegacyImportDialog.tsx modeled on ReindexConfirmDialog.tsx (raw `fixed inset-0 … role=\"dialog\" aria-modal` modal, no dialog library). On open it GETs /api/settings/legacy-import/conversations and renders the preview rows with per-row checkboxes (default ALL selected), Select-all / Select-none controls, and a primary 'Import N conversations' button that POSTs the selected names with headers from dashboardMutationJsonHeaders(). Rows whose alreadyImported is true render disabled with an 'already imported' tag. On success it shows a summary (imported / skipped / failed-with-reasons / favorites carried) and a link/button to the Conversations panel. When the GET returns { found:false } it shows 'No legacy database found at <path>' with a manual path input that re-runs the preview. Wire a button (not a toggle) into the Experimental section of SettingsPage.tsx (<section id=\"experimental\">, ~:3995) with const [legacyImportOpen,setLegacyImportOpen]=useState(false) and render <LegacyImportDialog open={legacyImportOpen} onClose={…}/>. Add a frontend component test (renders rows, select-all toggles, import POST + summary)."
+        },
+        "items": [
+          {
+            "id": "legacy-import-dialog.ac1",
+            "title": "A button labeled 'Import conversations from old Panopticon' renders in the Experimental section of SettingsPage.tsx and opens LegacyImportDialog (state legacyImportOpen).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-dialog.ac2",
+            "title": "The dialog renders preview rows from the GET endpoint with per-row checkboxes that default to all-selected, plus Select-all / Select-none controls; alreadyImported rows render disabled with an 'already imported' tag.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-dialog.ac3",
+            "title": "The 'Import N conversations' button POSTs the selected names with dashboardMutationJsonHeaders() and, on success, shows a summary of imported / skipped / failed (with reasons) / favorites carried plus a link to the Conversations panel.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-import-dialog.ac4",
+            "title": "When the GET response is { found:false }, the dialog shows 'No legacy database found at <path>' with a manual path input that re-runs the preview.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "driver-readonly-option",
+        "to": "legacy-import-read",
+        "type": "blocks"
+      },
+      {
+        "from": "legacy-import-read",
+        "to": "legacy-import-write",
+        "type": "blocks"
+      },
+      {
+        "from": "legacy-import-write",
+        "to": "legacy-import-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "legacy-import-endpoints",
+        "to": "legacy-import-dialog",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-24-PAN-2044-ui-import-conversations-from-old-panopticon-db-into-overdeck-db-settings-experimental.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

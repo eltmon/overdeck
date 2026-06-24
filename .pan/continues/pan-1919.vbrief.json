@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-21T06:33:30.531Z",
+  "updated": "2026-06-21T06:44:36.785Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -186,15 +186,17 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-21T06:33:30.531Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-21T06:35:30.270Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T06:44:36.785Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-21T06:33:06Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1919\n\nroles/work.md still allows direct project-root record edits\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1919 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }

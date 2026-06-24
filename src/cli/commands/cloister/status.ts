@@ -24,8 +24,32 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(chalk.bold('\n🔔 Cloister Agent Watchdog\n'));
 
   // Service status
-  const runningStatus = status.running ? chalk.green('Running') : chalk.red('Stopped');
+  const patrolStatus = status.patrol?.status;
+  const runningStatus =
+    patrolStatus === 'running'
+      ? chalk.green('Running')
+      : patrolStatus === 'starting'
+        ? chalk.yellow('Starting')
+        : patrolStatus === 'stale'
+          ? chalk.red('Stale')
+          : status.running
+            ? chalk.yellow('Starting')
+            : chalk.red('Stopped');
   console.log(`Status: ${runningStatus}`);
+
+  if (status.patrol) {
+    if (status.patrol.status === 'stale') {
+      const age = status.patrol.secondsSinceLastPatrol;
+      const ageLabel = age === null ? 'unknown age' : `${age}s ago`;
+      console.log(`Patrol heartbeat: ${chalk.red('stale')} (last patrol ${ageLabel}; expected within ${status.patrol.staleAfterSeconds}s)`);
+    } else if (status.patrol.lastPatrol) {
+      const age = status.patrol.secondsSinceLastPatrol;
+      const ageLabel = age === null ? 'unknown age' : `${age}s ago`;
+      console.log(`Patrol heartbeat: ${ageLabel}`);
+    } else if (status.patrol.status === 'starting') {
+      console.log(`Patrol heartbeat: ${chalk.yellow('waiting for first patrol')}`);
+    }
+  }
 
   if (status.lastCheck) {
     const lastCheck = new Date(status.lastCheck);

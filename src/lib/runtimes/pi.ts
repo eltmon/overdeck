@@ -134,8 +134,10 @@ function resolveLatestPiSessionId(agentId: string): string | null {
   return parsed?.sessionId ?? null
 }
 
-export class PiRuntimeSync implements AgentRuntimeSync {
-  readonly name = 'pi' as const
+// PAN-1989: Pi is legacy; no longer implements AgentRuntimeSync (removed from
+// RuntimeName union). Class is kept for backward-compat exports only.
+export class PiRuntimeSync {
+  readonly name: string = 'pi'
 
   /** Resolve the latest Pi session JSONL for an agent. Pi nests files under
    *  <agentDir>/sessions/<encoded-cwd>/<timestamp>_<id>.jsonl, but we tolerate
@@ -359,7 +361,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     const launcherScript = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
-      harness: 'pi',
+      harness: 'ohmypi',
       piExtensionPath,
       piFifoPath: fifoPath,
       piSessionDir: sessionDir,
@@ -385,7 +387,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     return {
       id: agentId,
       sessionId: readyData?.sessionId ?? 'unknown',
-      runtime: 'pi',
+      runtime: 'ohmypi',
       model: config.model ?? 'unknown',
       workspace: config.workspace,
       startedAt: new Date(),
@@ -439,8 +441,9 @@ export function createPiRuntimeSync(): PiRuntimeSync {
  * TmuxError). PiSpawnTimeout is preserved as the legacy Error class; Effect
  * callers receive ProcessTimeoutError instead.
  */
-export class PiRuntime implements AgentRuntime {
-  readonly name = 'pi' as const
+// PAN-1989: legacy — does not implement AgentRuntime (see PiRuntimeSync comment above).
+export class PiRuntime {
+  readonly name: string = 'pi'
   private readonly inner: PiRuntimeSync
 
   constructor(inner: PiRuntimeSync = new PiRuntimeSync()) {

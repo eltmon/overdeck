@@ -326,7 +326,7 @@ const postCostsReconcileRoute = HttpRouter.add(
   '/api/costs/reconcile',
   httpHandler(Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
-      try: () => reconcile(),
+      try: () => Effect.runPromise(reconcile()),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     console.log(

@@ -89,6 +89,40 @@ describe('GitHubTracker.transitionIssue(in_review)', () => {
   });
 });
 
+describe('GitHubTracker.transitionIssue(in_progress)', () => {
+  let addLabelsMock: ReturnType<typeof vi.fn>;
+  let removeLabelMock: ReturnType<typeof vi.fn>;
+  let getLabelMock: ReturnType<typeof vi.fn>;
+  let tracker: GitHubTracker;
+
+  beforeEach(() => {
+    addLabelsMock = vi.fn().mockResolvedValue({});
+    removeLabelMock = vi.fn().mockResolvedValue({});
+    getLabelMock = vi.fn().mockResolvedValue({});
+
+    tracker = new GitHubTracker('fake-token', 'owner', 'repo');
+    (tracker as any).octokit = {
+      issues: {
+        addLabels: addLabelsMock,
+        removeLabel: removeLabelMock,
+        getLabel: getLabelMock,
+        createLabel: vi.fn().mockResolvedValue({}),
+      },
+    };
+  });
+
+  it('removes stale verifying-on-main label when work restarts', async () => {
+    await Effect.runPromise(tracker.transitionIssue('1', 'in_progress'));
+
+    expect(addLabelsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ labels: ['in-progress'] }),
+    );
+    expect(removeLabelMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'verifying-on-main' }),
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // LinearTracker — in_review name-based state lookup
 // ---------------------------------------------------------------------------

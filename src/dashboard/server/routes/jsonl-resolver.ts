@@ -241,7 +241,7 @@ export async function resolvePiSessionPath(
 ): Promise<string | null> {
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
-  const NON_TRANSCRIPT = new Set(['cost-events.jsonl', 'activity.jsonl']);
+  const NON_TRANSCRIPT = new Set(['cost-events.jsonl', 'activity.jsonl', 'pending-events.jsonl']);
   let best: { path: string; mtime: number } | null = null;
   for (const dir of [join(agentDir, 'sessions'), agentDir]) {
     let entries: string[];
@@ -280,7 +280,7 @@ export async function resolveJsonlPath(
   if (harness === 'codex') {
     return resolveCodexRolloutPath(agentId, opts);
   }
-  if (harness === 'pi') {
+  if (harness === 'pi' || harness === 'ohmypi') {
     return resolvePiSessionPath(agentId, opts);
   }
 

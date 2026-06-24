@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill, completePlanningFilesToStage } from '../issues.js';
+import {
+  completePlanningArtifacts,
+  completePlanningAutoSpawn,
+  completePlanningAutoSpawnAndKill,
+  completePlanningFilesToStage,
+  completePlanningWorkspaceGitAddCommands,
+} from '../issues.js';
 import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
@@ -82,6 +88,31 @@ afterEach(() => {
 });
 
 describe('completePlanningArtifacts', () => {
+  it('stages workspace planning artifacts without force-adding .pan', () => {
+    const issueId = 'PAN-1931';
+    const { workspacePath } = makeProject(issueId);
+    mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
+    mkdirSync(join(workspacePath, '.pan', 'specs'), { recursive: true });
+    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    writeFileSync(join(workspacePath, '.gitignore'), [
+      '.pan/continue.json',
+      '.pan/spec.vbrief.json',
+      '',
+    ].join('\n'));
+    writeFileSync(join(workspacePath, '.pan', 'drafts', 'PAN-1931.md'), '# Draft\n');
+    writeFileSync(join(workspacePath, '.pan', 'specs', 'PAN-1931.vbrief.json'), '{}\n');
+    writeFileSync(join(workspacePath, '.pan', 'continue.json'), '{}\n');
+    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), '{}\n');
+    writeFileSync(join(workspacePath, '.beads', 'issues.jsonl'), '{}\n');
+
+    const commands = completePlanningWorkspaceGitAddCommands(workspacePath);
+    expect(commands).toEqual([
+      ['add', '.pan/'],
+      ['add', '.beads/'],
+    ]);
+    expect(commands.flat()).not.toContain('-f');
+  });
+
   it('includes codebase map changes in the main-side promote commit pathspec', async () => {
     const issueId = 'PAN-1150';
     const { projectPath } = makeProject(issueId);

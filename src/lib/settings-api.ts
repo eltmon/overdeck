@@ -217,12 +217,16 @@ export interface ApiSettingsConfig {
     rally?: string;
   };
   experimental?: {
+    /** Show experimental dashboard surfaces in navigation and direct routes. */
+    experimentalFeatures?: boolean;
     /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
     /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
     claudeCodeChannelsMcp?: boolean;
     /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
     streamdownRenderer?: boolean;
+    /** Show explicit harness/model permutations in dashboard model pickers. */
+    showHarnessModelPermutations?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.
@@ -276,19 +280,7 @@ export function getDefaultConversationModelApi(): ModelId {
 
   if (config.defaultConversationModel) return resolveModelIdSync(config.defaultConversationModel);
 
-  if (config.enabledProviders.has('openai')) return resolveModelIdSync('gpt-5.5');
-  if (config.enabledProviders.has('minimax')) return resolveModelIdSync('minimax-m2.7-highspeed');
-  if (config.enabledProviders.has('google')) return resolveModelIdSync('gemini-3.1-pro-preview');
-  if (config.enabledProviders.has('kimi')) return resolveModelIdSync('kimi-k2.5');
-  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.2');
-  if (config.enabledProviders.has('mimo')) return resolveModelIdSync('mimo-v2.5-pro');
-  if (config.enabledProviders.has('nous')) return resolveModelIdSync('qwen/qwen3.6-plus');
-  if (config.enabledProviders.has('dashscope')) return resolveModelIdSync('qwen3-coder-plus');
-  if (config.enabledProviders.has('openrouter')) {
-    const fav = config.openrouterFavorites[0];
-    if (fav) return resolveModelIdSync(fav);
-  }
-  return resolveModelIdSync('claude-sonnet-4-6');
+  throw new Error('No default model configured — set models.default_conversation_model');
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer'];
@@ -489,8 +481,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    errors.push(`${fieldPath}.harness must be claude-code, pi, codex, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -733,9 +725,11 @@ export function loadSettingsApi(): ApiSettingsConfig {
     },
     tracker_keys: config.trackerKeys,
     experimental: {
+      experimentalFeatures: config.experimental?.experimentalFeatures ?? false,
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
       claudeCodeChannelsMcp: config.experimental?.claudeCodeChannelsMcp ?? false,
       streamdownRenderer: config.experimental?.streamdownRenderer ?? false,
+      showHarnessModelPermutations: config.experimental?.showHarnessModelPermutations ?? false,
     },
     claude: {
       // Defensive — older test mocks of loadConfig may not include `claude`;
@@ -926,9 +920,11 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
       ? {
+          experimentalFeatures: settings.experimental.experimentalFeatures,
           claudeCodeChannels: settings.experimental.claudeCodeChannels,
           claudeCodeChannelsMcp: settings.experimental.claudeCodeChannelsMcp,
           streamdownRenderer: settings.experimental.streamdownRenderer,
+          showHarnessModelPermutations: settings.experimental.showHarnessModelPermutations,
         }
       : undefined,
     claude: settings.claude?.permissionMode
@@ -1105,8 +1101,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, codex, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, or empty string`);
         }
       }
     }
@@ -1182,7 +1178,10 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (typeof settings.experimental !== 'object' || settings.experimental === null) {
       errors.push('experimental must be an object');
     } else {
-      const experimental = settings.experimental as { claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown; streamdownRenderer?: unknown };
+      const experimental = settings.experimental as { experimentalFeatures?: unknown; claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown; streamdownRenderer?: unknown; showHarnessModelPermutations?: unknown };
+      if (experimental.experimentalFeatures !== undefined && typeof experimental.experimentalFeatures !== 'boolean') {
+        errors.push('experimental.experimentalFeatures must be a boolean');
+      }
       if (experimental.claudeCodeChannels !== undefined && typeof experimental.claudeCodeChannels !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
       }
@@ -1191,6 +1190,9 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       }
       if (experimental.streamdownRenderer !== undefined && typeof experimental.streamdownRenderer !== 'boolean') {
         errors.push('experimental.streamdownRenderer must be a boolean');
+      }
+      if (experimental.showHarnessModelPermutations !== undefined && typeof experimental.showHarnessModelPermutations !== 'boolean') {
+        errors.push('experimental.showHarnessModelPermutations must be a boolean');
       }
     }
   }

@@ -80,7 +80,7 @@ export const selectGodViewActivityFeed = (s: ActivityFeedState): GodViewActivity
       timestamp: observation.timestamp,
       source: 'memory',
       level: 'success',
-      message: observation.actionStatus ?? observation.summary,
+      message: observation.summary,
     }));
 
   return [...observations, ...activity]

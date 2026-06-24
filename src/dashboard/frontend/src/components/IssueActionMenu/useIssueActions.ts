@@ -110,10 +110,11 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'Planning is available only before a plan exists and before the issue is done.';
     case 'startAgent':
       return 'Start agent is available after planning when no agent is running.';
+    case 'rebuildAndStart':
+      return 'Rebuild & start is available after planning when no agent is running and a workspace exists.';
     case 'tell':
     case 'stopAgent':
     case 'pause':
-    case 'switchModel':
       return 'This action requires a running agent.';
     case 'resumeSession':
     case 'resetSession':
@@ -162,7 +163,6 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'autoPlan',
   'startSkipPlanning',
   'tell',
-  'switchModel',
   'inspectBead',
   'open',
   'upload',

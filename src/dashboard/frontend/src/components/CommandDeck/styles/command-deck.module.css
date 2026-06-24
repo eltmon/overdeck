@@ -4132,8 +4132,8 @@
   margin: 0 8px 12px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--card) 92%, var(--primary) 8%);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--card) 96%, var(--primary) 4%);
 }
 
 .voiceWidgetHeader,
@@ -4160,14 +4160,14 @@
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--background);
 }
 
 .voiceModeButton,
 .voiceModeActive {
   border: 0;
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
@@ -4242,7 +4242,7 @@
 .voiceStartButton,
 .voiceStopButton,
 .voiceSecondaryButton,
-.voiceSendButton {
+.voiceInsertButton {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -4255,7 +4255,7 @@
 }
 
 .voiceStartButton,
-.voiceSendButton {
+.voiceInsertButton {
   background: var(--primary);
   color: var(--primary-foreground);
   border-color: var(--primary);
@@ -4270,6 +4270,11 @@
 .voiceSecondaryButton {
   background: var(--background);
   color: var(--muted-foreground);
+}
+
+.voiceInsertButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ─── Composer Image Strip ──────────────────────────────────────────────────── */

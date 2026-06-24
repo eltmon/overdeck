@@ -443,7 +443,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         cwd: useHostCwd ? cwd : undefined,
         env,
         maxBuffer: 10 * 1024 * 1024, // 10MB
-        timeout: 5 * 60 * 1000, // 5 minute timeout per gate
+        timeout: 20 * 60 * 1000, // 20 minute timeout per gate (PAN-1989: a near-total rename makes `vitest --changed` select ~the whole suite — 715 root + 166 frontend test files — which exceeds 10 min)
       });
 
       const durationMs = Date.now() - startTime;

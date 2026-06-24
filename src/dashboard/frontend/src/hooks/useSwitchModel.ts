@@ -10,7 +10,7 @@ interface SwitchModelResult {
 export function useSwitchModel(agentId: string | undefined, issueId: string) {
   const queryClient = useQueryClient();
 
-  const switchMutation = useMutation<SwitchModelResult, Error, { model: string; message?: string; harness?: 'claude-code' | 'pi' | 'codex' }>({
+  const switchMutation = useMutation<SwitchModelResult, Error, { model: string; message?: string; harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' }>({
     mutationFn: async ({ model, message, harness }) => {
       if (!agentId) throw new Error('No agent to switch');
 

@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ListOrdered, GitFork, RefreshCw, Filter, Play } from 'lucide-react';
+import { ListOrdered, GitFork, RefreshCw, Filter, Play, Trash2 } from 'lucide-react';
 import { BacklogDAG, RationaleSidePanel, type SequenceNode } from '../components/backlog/BacklogDAG';
+import { BacklogForecast } from '../components/backlog/BacklogForecast';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface SequenceEdge {
@@ -15,9 +16,13 @@ interface SequenceResponse {
   edges: SequenceEdge[];
 }
 
-type View = 'list' | 'dag';
+type View = 'list' | 'dag' | 'forecast';
 type ImportanceFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type ConditionFilter = 'all' | 'ok' | 'needs-refinement' | 'stale';
+
+interface BacklogSequencerPageProps {
+  onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
+}
 
 const CONDITION_BADGE_CLASS: Record<string, string> = {
   ok:                  'border border-[color-mix(in_srgb,var(--success)_32%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success-foreground)]',
@@ -36,6 +41,28 @@ const IMPORTANCE_DOT: Record<string, string> = {
   high:     'bg-[var(--warning)]',
   medium:   'bg-[var(--color-neutral-400)]',
   low:      'bg-[var(--muted-foreground)] opacity-60',
+};
+
+// Filter-chip styling. The pills/banner previously used dark-tuned raw colors
+// (bg-*-900/20 + text-*-400) that read muddy in light mode; these are style-guide
+// signal tints (semantic tokens + color-mix) that work in both themes. NOTE: the
+// class strings must be literals so Tailwind's JIT generates them — never build the
+// arbitrary color-mix values dynamically.
+const CHIP_BASE = 'inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors';
+const CHIP_OFF = 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[color-mix(in_srgb,var(--color-fg)_25%,transparent)]';
+const CHIP_ON = {
+  info:    'border-[color-mix(in_srgb,var(--info)_45%,transparent)] bg-[color-mix(in_srgb,var(--info)_12%,transparent)] text-[var(--info-foreground)]',
+  success: 'border-[color-mix(in_srgb,var(--success)_45%,transparent)] bg-[color-mix(in_srgb,var(--success)_12%,transparent)] text-[var(--success-foreground)]',
+  warning: 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning-foreground)]',
+  danger:  'border-[color-mix(in_srgb,var(--destructive)_45%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_12%,transparent)] text-[var(--destructive-foreground)]',
+  neutral: 'border-[color-mix(in_srgb,var(--color-fg)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-fg)_8%,transparent)] text-[var(--color-fg)]',
+};
+const CHIP_DOT = {
+  info:    'bg-[var(--info-foreground)]',
+  success: 'bg-[var(--success-foreground)]',
+  warning: 'bg-[var(--warning-foreground)]',
+  danger:  'bg-[var(--destructive-foreground)]',
+  neutral: 'bg-[var(--color-fg-muted)]',
 };
 
 const TIER_LABEL: Record<string, string> = {
@@ -60,7 +87,7 @@ function scoreTier(rank: number, total: number): string {
 
 const DAG_NODE_BUDGET = 150;
 
-export function BacklogSequencerPage() {
+export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProps = {}) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('dag');
   const [importanceFilter, setImportanceFilter] = useState<ImportanceFilter>('all');
@@ -70,6 +97,7 @@ export function BacklogSequencerPage() {
   const [showStale, setShowStale] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [spawning, setSpawning] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('incremental');
   const [showPassPicker, setShowPassPicker] = useState(false);
   const [spawnError, setSpawnError] = useState<string | null>(null);
@@ -88,6 +116,31 @@ export function BacklogSequencerPage() {
     refetchInterval: 60_000,
   });
 
+  // Live sequencer-pass progress (PAN-2005). Polls every 3s; the sequence query is
+  // refetched when a pass finishes so the new ranking appears without a manual refresh.
+  const { data: seqStatus } = useQuery<{ running: boolean; total: number; processed: number; startedAt: string | null }>({
+    queryKey: ['sequencer-status'],
+    queryFn: async () => {
+      const res = await fetch('/api/backlog/sequencer-status');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 3000,
+  });
+  const seqRunning = seqStatus?.running ?? false;
+  const prevSeqRunning = useRef(false);
+  useEffect(() => {
+    if (prevSeqRunning.current && !seqRunning) refetch();
+    prevSeqRunning.current = seqRunning;
+  }, [seqRunning, refetch]);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!seqRunning) return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [seqRunning]);
+  const seqElapsed = seqStatus?.startedAt ? Math.max(0, Math.floor((nowTs - new Date(seqStatus.startedAt).getTime()) / 1000)) : 0;
+
   const allNodes = data?.nodes ?? [];
   const staleNodes = useMemo(() => allNodes.filter((n) => n.condition === 'stale'), [allNodes]);
   const refineNodes = useMemo(() => allNodes.filter((n) => n.condition === 'needs-refinement'), [allNodes]);
@@ -103,7 +156,7 @@ export function BacklogSequencerPage() {
   }, [allNodes]);
 
   const inPipelineCount = useMemo(() => allNodes.filter((n) => n.inPipeline).length, [allNodes]);
-  const readyCount = useMemo(() => allNodes.filter((n) => n.ready).length, [allNodes]);
+  const readyCount = useMemo(() => allNodes.filter((n) => n.state?.ready ?? false).length, [allNodes]);
   const hasPrdCount = useMemo(() => allNodes.filter((n) => n.hasPrd).length, [allNodes]);
 
   const filteredNodes = useMemo(() => {
@@ -112,7 +165,9 @@ export function BacklogSequencerPage() {
       if (importanceFilter !== 'all' && n.importance !== importanceFilter) return false;
       if (conditionFilter !== 'all' && n.condition !== conditionFilter) return false;
       if (inPipelineOnly && !n.inPipeline) return false;
-      if (readyOnly && n.gate !== 'ready') return false;
+      // PAN-2006: "Ready" = the Definition-of-Ready state (ready label), not the
+      // promote gate. (The old check compared gate==='ready', so it filtered nothing.)
+      if (readyOnly && !(n.state?.ready ?? false)) return false;
       if (hasPrdOnly && !n.hasPrd) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -184,6 +239,29 @@ export function BacklogSequencerPage() {
     }
   }
 
+  async function handleClearSequence() {
+    if (clearing || spawning) return;
+    if (!window.confirm('Delete the backlog sequencing? This removes the ranked sequence (sequence.md + cache) and any operator gate overrides. A re-sequence pass regenerates it.')) return;
+    setClearing(true);
+    setSpawnError(null);
+    try {
+      const res = await fetch('/api/backlog/sequence/clear', {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+      });
+      if (!res.ok) {
+        let message = `Request failed (HTTP ${res.status})`;
+        try { const body = await res.json(); if (body?.error) message = String(body.error); } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      setTimeout(() => refetch(), 500);
+    } catch (err) {
+      setSpawnError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setClearing(false);
+    }
+  }
+
   async function handleDraftPrd(issueId: string) {
     await fetch(`/api/issues/${issueId}/start-planning`, {
       method: 'POST',
@@ -222,9 +300,9 @@ export function BacklogSequencerPage() {
   }
 
   const conditionBadge = (condition: string) =>
-    CONDITION_BADGE_CLASS[condition] ?? 'bg-gray-700 text-gray-400';
+    CONDITION_BADGE_CLASS[condition] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]';
   const gateBadge = (gate: string) =>
-    GATE_BADGE_CLASS[gate] ?? 'bg-gray-700 text-gray-400';
+    GATE_BADGE_CLASS[gate] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]';
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-fg)]">
@@ -233,7 +311,7 @@ export function BacklogSequencerPage() {
         <div className="min-w-[280px] flex-1">
           <div className="flex items-center gap-2">
             <ListOrdered className="w-4 h-4 text-[var(--color-accent)]" />
-            <h1 className="font-display text-[22px] leading-tight font-semibold tracking-normal text-[var(--color-fg)]">
+            <h1 className="font-display text-[22px] leading-tight font-medium tracking-normal text-[var(--color-fg)]">
               Backlog Sequencer
               {allNodes.length > 0 && (
                 <span className="ml-2 font-mono text-sm font-normal text-[var(--color-fg-muted)]">· {allNodes.length} open</span>
@@ -261,6 +339,13 @@ export function BacklogSequencerPage() {
             <GitFork className="w-3 h-3" />
             DAG
           </button>
+          <button
+            onClick={() => setView('forecast')}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'forecast' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+          >
+            <Play className="w-3 h-3" />
+            Forecast
+          </button>
         </div>
 
         {/* Filter toggle */}
@@ -285,13 +370,22 @@ export function BacklogSequencerPage() {
         {/* Run pass button */}
         <div className="relative ml-auto flex items-center gap-1">
           <button
+            onClick={handleClearSequence}
+            disabled={clearing || spawning || seqRunning}
+            className="px-2.5 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:text-[var(--destructive)] hover:border-[color-mix(in_srgb,var(--destructive)_40%,transparent)] disabled:opacity-50"
+            title="Delete the backlog sequencing (sequence.md + cache). Re-sequence regenerates it."
+          >
+            <Trash2 className="w-3 h-3" />
+            {clearing ? 'Clearing…' : 'Clear'}
+          </button>
+          <button
             onClick={handleRunPass}
-            disabled={spawning}
+            disabled={spawning || seqRunning}
             className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] disabled:opacity-50"
             title={`Run ${spawnPass} pass`}
           >
             <Play className="w-3 h-3" />
-            {spawning ? 'Sequencing…' : 'Re-sequence'}
+            {spawning || seqRunning ? 'Sequencing…' : 'Re-sequence'}
           </button>
           <button
             onClick={() => setShowPassPicker((p) => !p)}
@@ -322,14 +416,29 @@ export function BacklogSequencerPage() {
         </button>
       </div>
 
+      {/* Sequencer pass in-progress banner */}
+      {seqRunning && (
+        <div className="shrink-0 flex items-center gap-2 px-5 py-2 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--info)_28%,transparent)] text-xs">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--info-foreground)]" />
+          <span className="text-[var(--info-foreground)] font-medium">Sequencing pass running</span>
+          <span className="text-[var(--color-fg)]">
+            ranked <b className="font-mono">{seqStatus?.processed ?? 0}</b> / <b className="font-mono">{seqStatus?.total ?? '…'}</b> issues
+          </span>
+          <span className="text-[var(--color-fg-muted)] tabular-nums">
+            · {Math.floor(seqElapsed / 60)}m {String(seqElapsed % 60).padStart(2, '0')}s
+          </span>
+          <span className="ml-auto text-[var(--color-fg-muted)]">the new sequence appears automatically when it finishes</span>
+        </div>
+      )}
+
       {/* Spawn error banner */}
       {spawnError && (
-        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-red-900/20 border-b border-red-900/40 text-xs">
-          <span className="text-red-400 font-semibold">Run pass failed</span>
-          <span className="text-red-300 truncate flex-1">{spawnError}</span>
+        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--destructive)_26%,transparent)] text-xs">
+          <span className="text-[var(--destructive-foreground)] font-medium">Run pass failed</span>
+          <span className="text-[var(--color-fg-muted)] truncate flex-1">{spawnError}</span>
           <button
             onClick={() => setSpawnError(null)}
-            className="px-2 py-0.5 rounded bg-red-900/40 text-red-400 hover:bg-red-800/60 shrink-0"
+            className="px-2 py-0.5 rounded border border-[color-mix(in_srgb,var(--destructive)_32%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_16%,transparent)] text-[var(--destructive-foreground)] hover:bg-[color-mix(in_srgb,var(--destructive)_26%,transparent)] shrink-0"
           >
             Dismiss
           </button>
@@ -390,7 +499,7 @@ export function BacklogSequencerPage() {
       {/* Candidates-to-close summary */}
       {showStale && staleNodes.length > 0 && (
         <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3">
-          <div className="text-xs font-semibold text-[var(--color-fg-muted)] mb-2">Candidates to close ({staleNodes.length})</div>
+          <div className="text-xs font-medium text-[var(--color-fg-muted)] mb-2">Candidates to close ({staleNodes.length})</div>
           <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
             {staleNodes.map((n) => (
               <div key={n.issueId} className="flex items-center gap-2 text-xs">
@@ -398,7 +507,7 @@ export function BacklogSequencerPage() {
                 <span className="text-[var(--color-fg-muted)] truncate flex-1">{n.why}</span>
                 <button
                   onClick={() => handleCloseIssue(n.issueId)}
-                  className="px-2 py-0.5 rounded text-[10px] bg-red-900/40 text-red-400 hover:bg-red-800/60 shrink-0"
+                  className="px-2 py-0.5 rounded text-[10px] border border-[color-mix(in_srgb,var(--destructive)_32%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_14%,transparent)] text-[var(--destructive-foreground)] hover:bg-[color-mix(in_srgb,var(--destructive)_24%,transparent)] shrink-0"
                 >
                   Close
                 </button>
@@ -410,12 +519,12 @@ export function BacklogSequencerPage() {
 
       {/* Needs-refinement banner */}
       {refineNodes.length > 0 && (
-        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-yellow-900/20 border-b border-yellow-900/40 text-xs">
-          <span className="text-yellow-400 font-semibold">⚠ {refineNodes.length} need refinement</span>
-          <span className="text-yellow-700">{refineNodes.slice(0, 5).map((n) => n.issueId).join(', ')}{refineNodes.length > 5 ? ` +${refineNodes.length - 5}` : ''}</span>
+        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--warning)_26%,transparent)] text-xs">
+          <span className="text-[var(--warning-foreground)] font-medium">⚠ {refineNodes.length} need refinement</span>
+          <span className="text-[var(--color-fg-muted)]">{refineNodes.slice(0, 5).map((n) => n.issueId).join(', ')}{refineNodes.length > 5 ? ` +${refineNodes.length - 5}` : ''}</span>
           <button
             onClick={() => handleDraftPrd(refineNodes[0]!.issueId)}
-            className="ml-auto px-2 py-0.5 rounded bg-yellow-900/40 text-yellow-400 hover:bg-yellow-800/60 shrink-0"
+            className="ml-auto px-2 py-0.5 rounded border border-[color-mix(in_srgb,var(--warning)_32%,transparent)] bg-[color-mix(in_srgb,var(--warning)_16%,transparent)] text-[var(--warning-foreground)] hover:bg-[color-mix(in_srgb,var(--warning)_26%,transparent)] shrink-0"
           >
             Draft PRD →
           </button>
@@ -426,53 +535,53 @@ export function BacklogSequencerPage() {
       {allNodes.length > 0 && (
         <div className="flex flex-wrap gap-2 px-6 py-2.5 border-b border-[var(--color-border)] shrink-0">
           <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-fg-muted)]">
-            <b className="text-[var(--color-fg)] font-semibold font-mono">{allNodes.length}</b> open issues
+            <b className="text-[var(--color-fg)] font-medium font-mono">{allNodes.length}</b> open issues
           </span>
           <button
             onClick={() => setInPipelineOnly((p) => !p)}
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${inPipelineOnly ? 'border-blue-500/60 bg-blue-900/20 text-blue-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-blue-500/40'}`}
+            className={`${CHIP_BASE} ${inPipelineOnly ? CHIP_ON.info : CHIP_OFF}`}
           >
-            <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-            In pipeline <b className="font-mono font-semibold text-[var(--color-fg)]">{inPipelineCount}</b>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.info}`} />
+            In pipeline <b className="font-mono font-medium text-[var(--color-fg)]">{inPipelineCount}</b>
           </button>
           <button
             onClick={() => setReadyOnly((p) => !p)}
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${readyOnly ? 'border-emerald-500/60 bg-emerald-900/20 text-emerald-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-emerald-500/40'}`}
+            className={`${CHIP_BASE} ${readyOnly ? CHIP_ON.success : CHIP_OFF}`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            Ready <b className="font-mono font-semibold text-[var(--color-fg)]">{readyCount}</b>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.success}`} />
+            Ready <b className="font-mono font-medium text-[var(--color-fg)]">{readyCount}</b>
           </button>
           <button
             onClick={() => setHasPrdOnly((p) => !p)}
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${hasPrdOnly ? 'border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] text-[var(--color-accent)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[var(--color-border)]/80'}`}
+            className={`${CHIP_BASE} ${hasPrdOnly ? CHIP_ON.neutral : CHIP_OFF}`}
           >
-            <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
-            Has PRD <b className="font-mono font-semibold text-[var(--color-fg)]">{hasPrdCount}</b>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.neutral}`} />
+            Has PRD <b className="font-mono font-medium text-[var(--color-fg)]">{hasPrdCount}</b>
           </button>
           {refineNodes.length > 0 && (
             <button
               onClick={() => setConditionFilter((p) => (p === 'needs-refinement' ? 'all' : 'needs-refinement'))}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${conditionFilter === 'needs-refinement' ? 'border-yellow-500/60 bg-yellow-900/20 text-yellow-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-yellow-500/40'}`}
+              className={`${CHIP_BASE} ${conditionFilter === 'needs-refinement' ? CHIP_ON.warning : CHIP_OFF}`}
             >
-              <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-              ⚠ Needs refinement <b className="font-mono font-semibold text-[var(--color-fg)]">{refineNodes.length}</b>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.warning}`} />
+              ⚠ Needs refinement <b className="font-mono font-medium text-[var(--color-fg)]">{refineNodes.length}</b>
             </button>
           )}
           {staleNodes.length > 0 && (
             <button
               onClick={() => setConditionFilter((p) => (p === 'stale' ? 'all' : 'stale'))}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${conditionFilter === 'stale' ? 'border-gray-400/60 bg-gray-800 text-gray-300' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-gray-500/40'}`}
+              className={`${CHIP_BASE} ${conditionFilter === 'stale' ? CHIP_ON.neutral : CHIP_OFF}`}
             >
-              <span className="w-2 h-2 rounded-full bg-gray-500 opacity-50 shrink-0" />
-              ⊘ Stale candidates <b className="font-mono font-semibold text-[var(--color-fg)]">{staleNodes.length}</b>
+              <span className={`w-2 h-2 rounded-full opacity-60 shrink-0 ${CHIP_DOT.neutral}`} />
+              ⊘ Stale candidates <b className="font-mono font-medium text-[var(--color-fg)]">{staleNodes.length}</b>
             </button>
           )}
           <button
             onClick={() => setTierFilter((p) => (p === 'now' ? null : 'now'))}
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors ${tierFilter === 'now' ? 'border-red-500/60 bg-red-900/20 text-red-400' : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-red-500/40'}`}
+            className={`${CHIP_BASE} ${tierFilter === 'now' ? CHIP_ON.danger : CHIP_OFF}`}
           >
-            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-            Tier 1 · Now <b className="font-mono font-semibold text-[var(--color-fg)]">{tierCounts.now}</b>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.danger}`} />
+            Tier 1 · Now <b className="font-mono font-medium text-[var(--color-fg)]">{tierCounts.now}</b>
           </button>
         </div>
       )}
@@ -481,10 +590,10 @@ export function BacklogSequencerPage() {
       {allNodes.length > 0 && (
         <div className="flex gap-2 px-6 py-3 border-b border-[var(--color-border)] shrink-0">
           {([
-            { key: 'now',     emoji: '🔴', label: 'Now',     count: tierCounts.now,     sub: 'act on these first',  accent: 'border-l-red-500',    ring: 'ring-red-500/50' },
-            { key: 'next',    emoji: '🟠', label: 'Next',    count: tierCounts.next,    sub: 'queued behind Now',   accent: 'border-l-orange-500', ring: 'ring-orange-500/50' },
-            { key: 'later',   emoji: '🔵', label: 'Later',   count: tierCounts.later,   sub: 'planned horizon',     accent: 'border-l-blue-400',   ring: 'ring-blue-400/50' },
-            { key: 'someday', emoji: '⚪', label: 'Someday', count: tierCounts.someday, sub: 'long tail',           accent: 'border-l-gray-600',   ring: 'ring-gray-500/50' },
+            { key: 'now',     emoji: '🔴', label: 'Now',     count: tierCounts.now,     sub: 'act on these first',  accent: 'border-l-[var(--destructive)]', ring: 'ring-[color-mix(in_srgb,var(--destructive)_50%,transparent)]' },
+            { key: 'next',    emoji: '🟠', label: 'Next',    count: tierCounts.next,    sub: 'queued behind Now',   accent: 'border-l-[var(--warning)]',     ring: 'ring-[color-mix(in_srgb,var(--warning)_50%,transparent)]' },
+            { key: 'later',   emoji: '🔵', label: 'Later',   count: tierCounts.later,   sub: 'planned horizon',     accent: 'border-l-[var(--info)]',        ring: 'ring-[color-mix(in_srgb,var(--info)_50%,transparent)]' },
+            { key: 'someday', emoji: '⚪', label: 'Someday', count: tierCounts.someday, sub: 'long tail',           accent: 'border-l-[color-mix(in_srgb,var(--color-fg)_30%,transparent)]', ring: 'ring-[color-mix(in_srgb,var(--color-fg)_30%,transparent)]' },
           ] as const).map((t) => (
             <button
               key={t.key}
@@ -492,7 +601,7 @@ export function BacklogSequencerPage() {
               className={`flex-1 min-w-[140px] flex flex-col gap-0.5 px-3.5 py-2.5 border border-l-4 ${t.accent} rounded-lg bg-[var(--color-surface)] text-left hover:bg-[var(--color-surface-hover)] transition-colors shadow-sm ${tierFilter === t.key ? `ring-1 ${t.ring} border-[var(--color-border)]` : 'border-[var(--color-border)]'}`}
             >
               <span className="text-xs text-[var(--color-fg)]">{t.emoji} {t.label}</span>
-              <span className="font-mono text-lg font-semibold text-[var(--color-fg)] leading-tight">{t.count}</span>
+              <span className="font-mono text-lg font-medium text-[var(--color-fg)] leading-tight">{t.count}</span>
               <span className="text-[10px] text-[var(--color-fg-muted)]">{t.sub}</span>
             </button>
           ))}
@@ -502,7 +611,7 @@ export function BacklogSequencerPage() {
       {/* Focus note */}
       {tierFilter && allNodes.length > 0 && (
         <div className="flex items-center gap-2 px-5 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0 text-xs text-[var(--color-fg-muted)]">
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-widest bg-[var(--color-accent)] text-[var(--color-fg)]">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-widest bg-[var(--color-accent)] text-[var(--color-fg)]">
             Showing {TIER_LABEL[tierFilter]}
           </span>
           <span>
@@ -521,7 +630,7 @@ export function BacklogSequencerPage() {
             </div>
           )}
           {error && (
-            <div className="flex items-center justify-center h-32 text-red-400 text-sm">
+            <div className="flex items-center justify-center h-32 text-[var(--destructive-foreground)] text-sm">
               {String(error)}
             </div>
           )}
@@ -547,15 +656,15 @@ export function BacklogSequencerPage() {
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
                   <tr className="text-[var(--color-fg-muted)]">
-                    <th className="text-right px-3 py-2 font-medium w-8">#</th>
-                    <th className="text-left px-2 py-2 font-medium w-6">●</th>
-                    <th className="text-left px-2 py-2 font-medium w-28">Issue</th>
-                    <th className="text-center px-2 py-2 font-medium w-16">Tier</th>
-                    <th className="text-left px-2 py-2 font-medium">Why</th>
-                    <th className="text-center px-2 py-2 font-medium w-14">Size</th>
-                    <th className="text-center px-2 py-2 font-medium w-24">Condition</th>
-                    <th className="text-center px-2 py-2 font-medium w-20">Gate</th>
-                    <th className="text-center px-2 py-2 font-medium w-14">Score</th>
+                    <th className="text-right px-3 py-2 font-medium w-8 cursor-help" title="Pickup rank — lower means the Flywheel works it sooner">#</th>
+                    <th className="text-left px-2 py-2 font-medium w-6 cursor-help" title="Importance — red = critical, orange = high, gray = medium, dim = low">●</th>
+                    <th className="text-left px-2 py-2 font-medium w-28 cursor-help" title="Issue ID. Markers: ▶ in pipeline · ⚠ needs refinement · P has PRD · ✓ planned (spec + beads)">Issue</th>
+                    <th className="text-center px-2 py-2 font-medium w-16 cursor-help" title="Tier band by rank: Now · Next · Later · Someday">Tier</th>
+                    <th className="text-left px-2 py-2 font-medium cursor-help" title="One-line rationale for this ranking (from the sequencer)">Why</th>
+                    <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Estimated effort: XS / S / M / L / XL">Size</th>
+                    <th className="text-center px-2 py-2 font-medium w-24 cursor-help" title="AI condition: ok · needs-refinement (vague spec) · stale (likely close)">Condition</th>
+                    <th className="text-center px-2 py-2 font-medium w-20 cursor-help" title="Operator pickup gate: auto (normal) · promote (jump queue) · vetoed (never pick)">Gate</th>
+                    <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Impact score (0–100) the sequencer assigned">Score</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -568,27 +677,34 @@ export function BacklogSequencerPage() {
                       <tr
                         key={node.issueId}
                         onClick={() => setSelectedNode((p) => (p?.issueId === node.issueId ? null : node))}
-                        className={`border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${isSelected ? 'bg-[var(--color-surface)] ring-inset ring-1 ring-[var(--color-accent)]' : ''}`}
+                        className={`transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${
+                          isSelected
+                            ? 'bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] ring-inset ring-1 ring-[var(--color-accent)]'
+                            : 'even:bg-[color-mix(in_srgb,var(--color-fg)_3%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-fg)_9%,transparent)]'
+                        }`}
                       >
-                        <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
+                        <td className={`text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums border-l-2 ${node.inPipeline ? 'border-l-[var(--info)]' : 'border-l-transparent'}`}>
                           {node.rank}
                         </td>
                         <td className="px-2 py-2">
-                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-gray-700'}`} />
+                          <span
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-[var(--color-fg-muted)]'}`}
+                            title={`Importance: ${node.importance}`}
+                          />
                         </td>
                         <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
                           {node.issueId}
                           {node.inPipeline && (
-                            <span className="ml-1 text-[9px] text-green-400 align-top">▶</span>
+                            <span className="ml-1 text-[9px] text-[var(--info-foreground)] align-top" title="In pipeline — active work / review / test">▶</span>
                           )}
                           {isRefine && (
-                            <span className="ml-1 text-[9px] text-yellow-400 align-top">⚠</span>
+                            <span className="ml-1 text-[9px] text-[var(--warning-foreground)] align-top" title="Needs refinement — vague/underspecified">⚠</span>
                           )}
                           {node.hasPrd && (
-                            <span className="ml-1 text-[9px] text-blue-400 align-top" title="Has PRD">P</span>
+                            <span className="ml-1 text-[9px] text-[var(--info-foreground)] align-top" title="Has PRD">P</span>
                           )}
                           {node.ready && (
-                            <span className="ml-1 text-[9px] text-emerald-400 align-top" title="Has spec — ready for work">✓</span>
+                            <span className="ml-1 text-[9px] text-[var(--success-foreground)] align-top" title="Has spec — ready for work">✓</span>
                           )}
                         </td>
                         <td className="px-2 py-2 text-center">
@@ -596,20 +712,26 @@ export function BacklogSequencerPage() {
                             {TIER_LABEL[tier]}
                           </span>
                         </td>
-                        <td className={`px-2 py-2 text-[var(--color-fg-muted)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
+                        <td className={`px-2 py-2 text-[var(--color-fg)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
                           {node.why}
                         </td>
                         <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
                           {node.size}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}
+                            title={node.condition === 'needs-refinement' ? 'Needs refinement — vague/underspecified' : node.condition === 'stale' ? 'Stale — likely a candidate to close' : 'OK — well-specified'}
+                          >
                             {node.condition === 'needs-refinement' ? '⚠ refine' : node.condition === 'stale' ? '⊘ stale' : node.condition}
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
-                            {node.gate === 'ready' ? '📌' : node.gate === 'blocked' ? '⛔' : node.gate}
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}
+                            title={node.gate === 'ready' ? (node.inPipeline ? 'Auto (in-pipeline pin)' : 'Promoted — jumps the queue') : node.gate === 'blocked' ? 'Vetoed — never auto-picked' : 'Auto — normal eligibility'}
+                          >
+                            {node.gate === 'ready' ? (node.inPipeline ? 'auto' : '📌') : node.gate === 'blocked' ? '⛔' : node.gate}
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
@@ -639,8 +761,18 @@ export function BacklogSequencerPage() {
                   onSelectNode={(n) => setSelectedNode(n)}
                   onGateChange={handleGateChange}
                   onPlanningChange={handlePlanningChange}
+                  onIssueAction={onIssueAction}
                 />
               </div>
+            </div>
+          )}
+
+          {!isLoading && !error && allNodes.length > 0 && view === 'forecast' && (
+            <div className="flex-1 min-h-0">
+              <BacklogForecast
+                className="w-full h-full"
+                onSelectIssue={(id) => setSelectedNode(allNodes.find((nn) => nn.issueId === id) ?? null)}
+              />
             </div>
           )}
         </div>
@@ -652,6 +784,7 @@ export function BacklogSequencerPage() {
             onClose={() => setSelectedNode(null)}
             onGateChange={handleGateChange}
             onPlanningChange={handlePlanningChange}
+            onIssueAction={onIssueAction}
           />
         )}
       </div>

@@ -17,6 +17,7 @@ import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
@@ -143,6 +144,161 @@ function streamFullParseSnapshots(
         }
         return {
           stop: () => {
+            if (debounce) { clearTimeout(debounce); debounce = null; }
+            if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
+          },
+        };
+      }),
+      (handle) => Effect.sync(() => handle.stop()),
+    ),
+  );
+}
+
+export function streamResolvedFullParseSnapshots(
+  resolve: () => Promise<string | null>,
+  parse: (file: string) => Promise<ParseResult>,
+  model: string | null,
+  // When true, "no transcript file resolved yet" is treated as an EMPTY (ready)
+  // conversation rather than a still-discovering one. Interactive pi/codex
+  // conversations write no transcript until their first turn, so a brand-new
+  // one that is alive and simply waiting for the user's first message would
+  // otherwise sit on "Discovering conversation…" forever. resolve() returns
+  // null ONLY when no transcript exists on disk (a resumed conversation already
+  // has its file), so emitting an empty snapshot here never blanks real history.
+  unresolvedMeansEmpty = false,
+): Stream.Stream<ConversationEvent, PanRpcError> {
+  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
+    Effect.acquireRelease(
+      Effect.promise(async () => {
+        let stopped = false;
+        let resolving = false;
+        let discoveryTimer: ReturnType<typeof setInterval> | null = null;
+        let debounce: ReturnType<typeof setTimeout> | null = null;
+        let watcher: ReturnType<typeof fsWatch> | null = null;
+        let parsing = false;
+        let pendingReparse = false;
+        let sessionFile: string | null = null;
+        // Whether we've already emitted the empty/ready snapshot for an
+        // unresolved interactive conversation, so the 2s discovery poll doesn't
+        // re-offer it on every tick.
+        let announcedEmpty = false;
+        // Lock onto a transcript only once we've actually parsed content from it.
+        // A brand-new pi/codex conversation can briefly resolve to an empty
+        // placeholder transcript while the real session is written under a
+        // different (session-id) filename. The old code stopped discovery at the
+        // FIRST resolved file and tailed that empty file forever — so the panel
+        // showed the empty "How can I help you?" state until a manual refresh
+        // re-subscribed. We keep re-resolving (and switch to the newest file)
+        // until content appears, which also covers a watcher that misses appends.
+        let hasContent = false;
+
+        const stopDiscovery = () => {
+          if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
+        };
+
+        const offer = (event: ConversationEvent) => {
+          try {
+            Queue.offerUnsafe(queue, event);
+          } catch {
+            // Queue shut down (client disconnected) — ignore.
+          }
+        };
+
+        const emit = async (): Promise<void> => {
+          if (!sessionFile || stopped) return;
+          if (parsing) { pendingReparse = true; return; }
+          parsing = true;
+          try {
+            const result = await parse(sessionFile);
+            if (result.messages.length > 0 && !hasContent) {
+              // Real content arrived — lock onto this file and stop polling.
+              hasContent = true;
+              stopDiscovery();
+            }
+            offer({
+              kind: 'messages' as const,
+              messages: result.messages,
+              workLog: result.workLog,
+              streaming: result.streaming,
+              snapshot: true,
+              proposedPlan: result.proposedPlan,
+              compactBoundaries:
+                result.compactBoundaries && result.compactBoundaries.length > 0
+                  ? result.compactBoundaries
+                  : undefined,
+              contextUsage: contextUsageFromParseResult(result, model),
+            });
+          } catch {
+            // Transient parse failure (read during a write) — the next change
+            // event re-parses cleanly.
+          } finally {
+            parsing = false;
+            if (pendingReparse) { pendingReparse = false; void emit(); }
+          }
+        };
+
+        const watchFile = (file: string) => {
+          try {
+            watcher = fsWatch(file, () => {
+              if (debounce) return;
+              debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
+            });
+          } catch {
+            // If the watcher can't attach, the discovery poll still re-parses.
+          }
+        };
+
+        const tryResolve = async (): Promise<void> => {
+          if (stopped || resolving || hasContent) return;
+          resolving = true;
+          try {
+            const resolved = await resolve();
+            if (!resolved) {
+              // No transcript on disk yet. For an interactive conversation that
+              // means it is brand-new and waiting for its first turn — show the
+              // ready (empty) state like claude-code, not an endless
+              // "Discovering…" spinner. Emit once; keep polling so the first
+              // turn's transcript switches us to showing real content.
+              if (unresolvedMeansEmpty) {
+                if (!sessionFile && !announcedEmpty) {
+                  announcedEmpty = true;
+                  offer({ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true });
+                }
+                return;
+              }
+              // Only announce "discovering" before we've ever resolved a file, so
+              // we don't blank an already-shown (empty) snapshot.
+              if (!sessionFile) offer({ kind: 'discovering' });
+              return;
+            }
+            if (resolved !== sessionFile) {
+              // First resolution, or a newer transcript appeared — point the
+              // watcher at it and re-parse.
+              if (watcher) { try { watcher.close(); } catch { /* ignore */ } watcher = null; }
+              sessionFile = resolved;
+              await emit();
+              if (!stopped) watchFile(resolved);
+            } else {
+              // Same (still-empty) file resolved — re-parse in case it grew
+              // without firing a watch event (some FS/watch combos miss appends).
+              await emit();
+            }
+          } finally {
+            resolving = false;
+          }
+        };
+
+        await tryResolve();
+        if (!hasContent) {
+          // Keep polling until the transcript has real content. Cheap readdir+stat
+          // every 2s; self-stops via stopDiscovery() the moment content is parsed.
+          discoveryTimer = setInterval(() => { void tryResolve(); }, 2000);
+        }
+
+        return {
+          stop: () => {
+            stopped = true;
+            if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
             if (debounce) { clearTimeout(debounce); debounce = null; }
             if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
           },
@@ -700,22 +856,46 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // streaming for pi/codex here.
             if (!conv && /^(agent-|planning-|specialist-)/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              if (harness === 'pi') {
-                const file = yield* Effect.promise(() => resolvePiSessionPath(input.conversationName));
-                return file
-                  ? streamFullParseSnapshots(file, parsePiConversationMessages, null)
-                  : conversationDiscoveringStream();
+              if (harness === 'ohmypi') {
+                return streamResolvedFullParseSnapshots(
+                  () => resolvePiSessionPath(input.conversationName),
+                  parseOhmypiConversationMessages,
+                  null,
+                );
               }
               if (harness === 'codex') {
-                const file = yield* Effect.promise(() => resolveCodexRolloutPath(input.conversationName));
-                return file
-                  ? streamFullParseSnapshots(file, parseCodexConversationMessages, null)
-                  : conversationDiscoveringStream();
+                return streamResolvedFullParseSnapshots(
+                  () => resolveCodexRolloutPath(input.conversationName),
+                  parseCodexConversationMessages,
+                  null,
+                );
               }
               return conversationDiscoveringStream();
             }
 
-            if (!conv || (conv.harness !== 'claude-code' && conv.harness != null)) {
+            if (!conv) {
+              return conversationDiscoveringStream();
+            }
+
+            if (conv.harness === 'ohmypi') {
+              return streamResolvedFullParseSnapshots(
+                () => resolvePiSessionPath(conv.tmuxSession),
+                parseOhmypiConversationMessages,
+                conv.model ?? null,
+                true,
+              );
+            }
+
+            if (conv.harness === 'codex') {
+              return streamResolvedFullParseSnapshots(
+                () => resolveCodexRolloutPath(conv.tmuxSession),
+                parseCodexConversationMessages,
+                conv.model ?? null,
+                true,
+              );
+            }
+
+            if (conv.harness !== 'claude-code' && conv.harness != null) {
               return conversationDiscoveringStream();
             }
 

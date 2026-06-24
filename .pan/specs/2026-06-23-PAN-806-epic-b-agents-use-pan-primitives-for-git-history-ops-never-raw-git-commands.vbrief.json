@@ -1,0 +1,312 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-23T08:55:20.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-806: Epic B: Agents use pan primitives for git history ops — never raw git commands",
+    "updated": "2026-06-23T09:02:50.649Z"
+  },
+  "plan": {
+    "id": "pan-806",
+    "title": "Epic B: Agents use pan primitives for git history ops — never raw git commands",
+    "status": "proposed",
+    "uid": "545677a9-e305-45b0-8a0c-0a8a135ab50e",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-23T08:55:20.000Z",
+    "updated": "2026-06-23T09:02:50.649Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/806",
+        "label": "PAN-806",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/698",
+        "label": "PAN-698 (triggering incident)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-806.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "git-safety",
+      "agent-guards",
+      "launcher",
+      "prompts",
+      "stabilization"
+    ],
+    "narratives": {
+      "Problem": "Work agents can run raw history-rewriting git (rebase / reset --hard / stash), which during PAN-698 led an agent to attempt a destructive `mv .pan/ .planning/ .claude/skills/ /tmp/` after a hardcoded raw `git rebase origin/main` instruction hit a dirty worktree with no safe exit. The invariant: agents never touch git history — commits are fine; rebasing, hard-resetting, and stashing are not. All sync/submit flows go through pan primitives (pan sync-main = merge, pan done = owns the rebase).",
+      "Proposal": "Three layers. (1) Primary control: remove the contradictory raw restart-rebase block from work.md (:241-246) and add an explicit permitted/forbidden git table; the rest of work.md already forbids stash/rebase/reset in prose. (2) Mechanical enforcement: a pre-rebase git hook installed at worktree creation into the git-RESOLVED hooks path (this repo uses Husky core.hooksPath=.husky/_, so .git/hooks is dead), plus a per-agent PATH wrapper in the launcher that blocks rebase/reset --hard/stash for every harness. (3) Foundation: a sentinel env var OVERDECK_PAN_GIT_OP=1 that pan sets around its own internal rebase (rebase-helper.ts, the pan done path) so both guards let it through — without this the guards would brick pan done. Guards gate on OVERDECK_AGENT_ID so humans are unaffected.",
+      "NonGoals": "- Editing the /rebase-and-submit skill: it is User-scoped (SKILLS-INVENTORY.md:109) with no source in this repo; a commit here cannot change it. work.md already carries the correct guidance.\n- Blocking rebase/reset/stash for human developers: guards gate on OVERDECK_AGENT_ID and the agent-only wrapped PATH; humans on main or in a workspace are unaffected.\n- Blocking git merge or git push (including pan done's --force-with-lease): permitted operations.\n- Changing pan sync-main's merge-based implementation: already correct (auto-commit + git merge), unaffected by the guards.\n- A full live end-to-end review-cycle integration test: flaky/expensive; coverage comes from the B1 sentinel test plus the B3/B4 guard tests.\n- Server-side stash/reset modules (stashes.ts, safety/dangerous-git-ops.ts, cloister/validation.ts): they run outside the agent's wrapped PATH.\n- Remote (Fly.io) worktree hook install: remote workspaces are created by the Fly provider, not createWorktree; the launcher PATH wrapper still applies where the generator runs."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Added a new sentinel env var OVERDECK_PAN_GIT_OP that pan sets around its own internal rebase.",
+        "rationale": "The PRD's two guard mechanisms, as written, would block pan done's internal `git rebase` (done.ts:357 -> rebase-helper.ts:97 runs in the agent's wrapped PATH and fires the pre-rebase hook), bricking the submit flow. The sentinel is the minimal correct fix and the contract both guards bypass."
+      },
+      {
+        "summary": "pre-rebase hook installs into `git rev-parse --git-path hooks`, not .git/hooks/.",
+        "rationale": "This repo sets core.hooksPath=.husky/_ (Husky v9), so git ignores .git/hooks entirely; the PRD's path would never fire. The resolved path is correct for both husky and plain-git projects."
+      },
+      {
+        "summary": "Hook install moved from start.ts to workspace-manager.ts createWorktree.",
+        "rationale": "createWorktree (after `git worktree add`) is the single real worktree-creation chokepoint, covering pan start, the dashboard start route, and strike agents."
+      },
+      {
+        "summary": "Dropped the /rebase-and-submit skill edits.",
+        "rationale": "It is a User-scoped skill with no source in this repo (SKILLS-INVENTORY.md:109); this branch cannot modify it. Recorded as a NonGoal."
+      },
+      {
+        "summary": "PATH wrapper scoped to issue-bound agent sessions (not conversation panels), guard dir deterministic per-agent (not mktemp).",
+        "rationale": "Keeps human-supervised conversations and pan internals working; a deterministic dir under the agent state dir lets stopAgentSync clean it up reliably."
+      }
+    ],
+    "items": [
+      {
+        "id": "rebase-helper-sentinel",
+        "title": "Set OVERDECK_PAN_GIT_OP sentinel in rebase-helper so pan done is never self-blocked",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:55:20.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-806",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "prerebase-hook-install",
+            "git-path-wrapper"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/rebase-helper.ts add the literal env var OVERDECK_PAN_GIT_OP=1 to the execAsync env of every history-op git call (the rebase at :97, the rebase --abort at :107, the merge fallback at :114, and the rebase --continue at :192 — i.e. extend the existing `{ ...process.env, GIT_EDITOR: 'true' }` objects, and add the sentinel to the abort/merge calls too). This is the sentinel both guards (prerebase-hook-install, git-path-wrapper) bypass on; the var name must be byte-identical there. Without it, pan done Step 0's internal rebase (done.ts:357) would be blocked once the guards are live. Cover with a unit test that mocks execAsync and asserts the sentinel."
+        },
+        "items": [
+          {
+            "id": "rebase-helper-sentinel.ac1",
+            "title": "A unit test mocking execAsync asserts that the `git rebase` (and rebase --continue) invocation's env contains OVERDECK_PAN_GIT_OP='1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebase-helper-sentinel.ac2",
+            "title": "The change preserves the existing GIT_EDITOR='true' env entry and the literal sentinel key is exactly OVERDECK_PAN_GIT_OP (a test asserts both keys coexist on the rebase call's env)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workmd-prompt-fix",
+        "title": "Replace work.md's raw restart-rebase block with pan sync-main; add permitted/forbidden git table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:55:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-806",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/prompts/work.md, replace the `0. Rebase onto latest main` step (:241-246, the `git fetch origin main && git rebase origin/main` block with rebase --continue/--abort guidance) with a restart instruction that runs `pan sync-main {{ISSUE_ID}}` (merge-based, no force-push, delegates conflicts) and explicitly says never run git rebase yourself. Then add a short permitted/forbidden git-operations table near the existing git-rules block (:44-53). This is the primary control; the mechanical guards are defense-in-depth. Leave the already-correct prose at :46/:48/:50 intact."
+        },
+        "items": [
+          {
+            "id": "workmd-prompt-fix.ac1",
+            "title": "work.md no longer contains the substring `git rebase origin/main`; the restart step instead instructs `pan sync-main {{ISSUE_ID}}`. A prompt-content test asserts the absence and the presence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workmd-prompt-fix.ac2",
+            "title": "work.md contains a permitted/forbidden git table that lists rebase, reset --hard, and stash as forbidden and add/commit/status/fetch/push as permitted (a test asserts the forbidden terms appear in the table region)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prerebase-hook-install",
+        "title": "Install a pre-rebase hook at worktree creation (git-resolved hooks path, agent-gated)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:55:20.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-806",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/workspace-manager.ts createWorktree (after `git worktree add`, near the beads-redirect setup ~:342-375), resolve the hooks dir via `git rev-parse --git-path hooks` (relative -> join under targetPath) and write an executable (0755) `pre-rebase` hook. NOT .git/hooks/ — this repo's core.hooksPath=.husky/_ makes that dead; the resolved path is correct for husky and plain-git. The hook: `[ \"$OVERDECK_PAN_GIT_OP\" = \"1\" ] && exit 0` (sentinel bypass), then if OVERDECK_AGENT_ID is set, print pan sync-main/pan done guidance to stderr and exit 1, else exit 0 (human shells unaffected). Prefer extracting `installPreRebaseHook(targetPath)` so a test can call it directly."
+        },
+        "items": [
+          {
+            "id": "prerebase-hook-install.ac1",
+            "title": "After createWorktree, the worktree contains an executable `pre-rebase` file at the path returned by `git rev-parse --git-path hooks` (a test asserts the file exists with the 0755 mode bit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prerebase-hook-install.ac2",
+            "title": "With OVERDECK_AGENT_ID set and no sentinel, running `git rebase` in the worktree exits 1 and prints the pan sync-main / pan done guidance to stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prerebase-hook-install.ac3",
+            "title": "With OVERDECK_PAN_GIT_OP=1 set (or with OVERDECK_AGENT_ID unset), running `git rebase` in the worktree is allowed and the hook exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-path-wrapper",
+        "title": "Add a per-agent PATH wrapper to the launcher that blocks rebase/reset --hard/stash",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:55:20.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-806",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-generator.ts generateLauncherScriptSync, after the Overdeck env exports (:268-281) and before cd/command, emit — only for issue-bound agent sessions (overdeckEnv.agentId present and not a conversation panel; mirror the existing overdeckEnv gate) — shell that: captures real git before mutating PATH (`_OVERDECK_REAL_GIT=\"$(command -v git)\"`), mkdir -p a DETERMINISTIC per-agent guard dir baked in at generation time (<AGENTS_DIR>/agent-<id>/git-guard), writes <guardDir>/git (a heredoc with the real-git path substituted literally) that: bypasses all subcommands when OVERDECK_PAN_GIT_OP=1, else blocks `rebase`, `reset` with a `--hard` arg, and `stash` with a clear stderr error, and execs real git for everything else; chmods it +x; and prepends `export PATH=\"<guardDir>:$PATH\"`. Applies to every harness (one generator). Update the launcher-generator.test.ts inline snapshots that now include the block."
+        },
+        "items": [
+          {
+            "id": "git-path-wrapper.ac1",
+            "title": "generateLauncherScriptSync output for an issue-bound work agent contains the real-git capture, the guard-dir git wrapper, and `export PATH=\"...git-guard:$PATH\"`; output for a conversation panel contains none of it (assertions via toContain / not.toContain)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-path-wrapper.ac2",
+            "title": "Exercising the generated wrapper script in a temp dir: `git rebase`, `git reset --hard`, and `git stash` each exits 1 with an error on stderr, while the wrapper passes `git status`, `git add`, and `git fetch` through to the real git binary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-path-wrapper.ac3",
+            "title": "With OVERDECK_PAN_GIT_OP=1 in the environment, the wrapper passes every subcommand (including rebase/reset --hard/stash) through to the real git binary (exit status comes from real git, no block)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-path-wrapper.ac4",
+            "title": "After updating the inline snapshots in src/lib/__tests__/launcher-generator.test.ts, the snapshot diff versus the prior snapshots contains only the added guard block (no unrelated launcher lines change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-dir-cleanup",
+        "title": "Remove the per-agent git guard dir on agent stop",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:55:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-806",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts stopAgentSync (:4267), remove the agent's deterministic guard dir (<AGENTS_DIR>/agent-<id>/git-guard — the same literal path git-path-wrapper bakes into the launcher) with a guarded rmSync({ recursive: true, force: true }) that does not throw when the dir is absent."
+        },
+        "items": [
+          {
+            "id": "guard-dir-cleanup.ac1",
+            "title": "A test that creates <AGENTS_DIR>/agent-<id>/git-guard then calls stopAgentSync(id) asserts the guard dir no longer exists afterward",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-dir-cleanup.ac2",
+            "title": "stopAgentSync does not throw when the guard dir is absent (cleanup uses force/recursive and swallows ENOENT) — a test calls it for an agent with no guard dir and asserts no error is thrown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rebase-helper-sentinel",
+        "to": "prerebase-hook-install",
+        "type": "blocks"
+      },
+      {
+        "from": "rebase-helper-sentinel",
+        "to": "git-path-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "git-path-wrapper",
+        "to": "guard-dir-cleanup",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-23-PAN-806-epic-b-agents-use-pan-primitives-for-git-history-ops-never-raw-git-commands.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

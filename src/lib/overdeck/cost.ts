@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
-import { and, desc, eq, gte, like, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
@@ -15,7 +15,7 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parsePiSessionSync } from '../cost-parsers/pi-parser.js';
+import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
 
@@ -434,7 +434,7 @@ export class CostWriter extends Context.Service<
     readonly record: (event: CostEvent) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
-      source?: 'claude' | 'pi' | 'codex' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'wal';
     }) => Effect.Effect<{ imported: number }, CostIngestError>;
     // Full rebuild from archive; recomputes cost from tokens
     readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>;
@@ -451,20 +451,24 @@ export const CostWriterLive = Layer.effect(
     const archive = yield* CostArchive;
     const bus = yield* EventBus;
 
-    // Dedup by requestId or sourceFile: pi/codex sessions carry a file path but no requestId,
-    // so the UNIQUE(request_id) constraint doesn't catch re-imports of the same file.
+    // Dedup: prefer the precise requestId when present; fall back to sourceFile
+    // only for events with no requestId (codex / background-AI dumps that carry
+    // a file path but no request id). Using OR(requestId, sourceFile) is wrong —
+    // it collapses every event that shares a sourceFile (e.g. all events
+    // reconciled from one pi transcript) down to a single row, silently dropping
+    // the rest (PAN-1935).
     const checkDuplicate = (e: CostEvent) =>
       Effect.gen(function* () {
         if (e.requestId == null && e.sourceFile == null) return false;
-        const conditions = [
-          e.requestId != null ? eq(costEventsTable.requestId, e.requestId) : undefined,
-          e.sourceFile != null ? eq(costEventsTable.sourceFile, e.sourceFile) : undefined,
-        ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined);
+        const condition =
+          e.requestId != null
+            ? eq(costEventsTable.requestId, e.requestId)
+            : eq(costEventsTable.sourceFile, e.sourceFile as string);
         const existing = yield* Effect.promise(() =>
           q
             .select({ id: costEventsTable.id })
             .from(costEventsTable)
-            .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+            .where(condition)
             .limit(1),
         );
         return (existing as unknown[]).length > 0;
@@ -510,10 +514,10 @@ export const CostWriterLive = Layer.effect(
     // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
-    const reconcile = (opts?: { source?: 'claude' | 'pi' | 'codex' | 'wal' }) =>
+    const reconcile = (opts?: { source?: 'claude' | 'ohmypi' | 'codex' | 'wal' }) =>
       Effect.gen(function* () {
         const source = opts?.source ?? 'claude';
-        if (source !== 'pi' && source !== 'codex') return { imported: 0 };
+        if (source !== 'ohmypi' && source !== 'codex') return { imported: 0 };
 
         const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
@@ -527,7 +531,7 @@ export const CostWriterLive = Layer.effect(
 
         for (const agentName of agentNames) {
           const sessionRoot =
-            source === 'pi'
+            source === 'ohmypi'
               ? join(agentsDir, agentName, 'sessions')
               : join(agentsDir, agentName, 'codex-home', 'sessions');
 
@@ -535,8 +539,8 @@ export const CostWriterLive = Layer.effect(
 
           for (const sessionFile of sessionFiles) {
             const session = yield* Effect.sync(() =>
-              source === 'pi'
-                ? parsePiSessionSync(sessionFile)
+              source === 'ohmypi'
+                ? parseOhmypiSessionSync(sessionFile)
                 : parseCodexSessionSync(sessionFile),
             );
             if (!session) continue;
@@ -667,7 +671,7 @@ export const CostApi = HttpApiGroup.make('costs')
   .add(
     HttpApiEndpoint.post('reconcile', '/costs/reconcile', {
       payload: Schema.Struct({
-        source: Schema.optional(Schema.Literals(['claude', 'pi', 'codex', 'wal'])),
+        source: Schema.optional(Schema.Literals(['claude', 'ohmypi', 'codex', 'wal'])),
       }),
       success: Schema.Struct({ imported: Schema.Number }),
       error:   CostIngestError,

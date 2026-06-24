@@ -223,7 +223,13 @@ export function createEventStore(db: DbAdapter): EventStore {
         }
         db.exec('COMMIT');
       } catch (err) {
-        db.exec('ROLLBACK');
+        // Best-effort rollback. If BEGIN IMMEDIATE itself failed (e.g. the DB
+        // was busy/locked), no transaction is active and an unconditional
+        // ROLLBACK throws "cannot rollback - no transaction is active". Because
+        // this runs inside a setTimeout, that throw is uncaught and crashes the
+        // whole dashboard. A failed batch flush must only reject + log, never
+        // take the process down. Mirrors the guard in agent-projection.ts.
+        try { db.exec('ROLLBACK'); } catch { /* no active transaction — nothing to roll back */ }
         // Reject all pending promises
         for (const q of batch) {
           q.resolve(0);

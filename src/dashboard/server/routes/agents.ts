@@ -132,7 +132,11 @@ import {
   computeAgentEnrichment,
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
-import { parseConversationMessages } from '../services/conversation-service.js';
+import { parseEntireConversation } from '../services/conversation-service.js';
+import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
+import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
+import { readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath, resolveAgentHarness } from './jsonl-resolver.js';
 import type { ConversationResponse } from '@overdeck/contracts';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -1027,14 +1031,54 @@ const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], st
 /**
  * Resolve and parse an agent's conversation JSONL file.
  * Exported for unit testing — the Effect route layer is not directly unit-testable.
+ *
+ * Dispatches on harness so Pi and Codex agents get their native parsers (PAN-2012).
+ * For claude-code agents, tries the launcher-pinned --session-id first (the exact
+ * session the Terminal tab attaches to) before falling back to mtime-based pick
+ * (PAN-2011). This makes the Conversation tab match the Terminal tab by construction.
  */
 export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
   try {
-    const jsonlPath = await Effect.runPromise(getAgentJsonlPathShared(id));
-    if (!jsonlPath || !existsSync(jsonlPath)) {
-      return EMPTY_CONVERSATION;
+    const harness = await resolveAgentHarness(id);
+
+    if (harness === 'ohmypi') {
+      const sessionFile = await resolvePiSessionPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parseOhmypiConversationMessages(sessionFile);
+      return { ...result, streaming: false };
     }
-    const result = await parseConversationMessages(jsonlPath);
+
+    if (harness === 'codex') {
+      const sessionFile = await resolveCodexRolloutPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parseCodexConversationMessages(sessionFile);
+      return { ...result, streaming: false };
+    }
+
+    // claude-code (default): try launcher-pinned session ID first (ground truth),
+    // then fall back to mtime-based pick.
+    let jsonlPath: string | null = null;
+    const pinnedSessionId = await readLauncherPinnedSessionId(id);
+    if (pinnedSessionId) {
+      const workspace = await Effect.runPromise(getAgentWorkspaceShared(id));
+      if (workspace) {
+        const candidate = join(
+          homedir(), '.claude', 'projects',
+          encodeClaudeProjectDir(workspace),
+          `${pinnedSessionId}.jsonl`,
+        );
+        if (existsSync(candidate)) jsonlPath = candidate;
+      }
+    }
+    if (!jsonlPath) {
+      jsonlPath = await Effect.runPromise(getAgentJsonlPathShared(id));
+    }
+
+    if (!jsonlPath || !existsSync(jsonlPath)) return EMPTY_CONVERSATION;
+    // parseEntireConversation, not parseConversationMessages: a single parse caps
+    // at MAX_READ_BYTES (10 MB) and would drop the most recent turns of a larger
+    // transcript (PAN-1989). This one-shot endpoint must return the whole file.
+    const result = await parseEntireConversation(jsonlPath);
     // Force streaming: false — tmux session is dead, any "streaming" state is stale
     return { ...result, streaming: false };
   } catch (err) {
@@ -2160,7 +2204,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message } = body as {
       model?: string;
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
       graceful?: boolean;
       message?: string;
     };
@@ -2331,7 +2375,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
 
@@ -2393,7 +2437,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     // We don't go through HTTP — we call the spawn primitives directly so
     // the caller gets a single 200 with both wipe and spawn confirmed.
     const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-4-6';
-    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (harness) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
@@ -3384,9 +3428,9 @@ const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'pi' | 'codex' | null =
-      bodyHarness === 'pi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | null =
+      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
@@ -3977,11 +4021,9 @@ const postAgentDeliveryMethodRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/agents/:id/switch-model ────────────────────────────────
-// Prepares an agent to restart on a different model:
-//   1. Stops the agent if running
-//   2. Clears saved session (session.id, sessions.json, claudeSessionId in runtime.json)
-//   3. Updates model in state.json
-// The caller (frontend) is responsible for spawning a fresh agent via POST /api/agents.
+// Pipeline agent models are fixed at spawn. Changing a model tears down the
+// live session and discards context, so this route is retained only as a
+// server-side compatibility rejection for older clients.
 
 const postAgentSwitchModelRoute = HttpRouter.add(
   'POST',
@@ -3989,71 +4031,9 @@ const postAgentSwitchModelRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
-    const eventStore = yield* EventStoreService;
-
-    const { model: rawNewModel } = body as { model?: string; message?: string };
-    let newModel: string;
-    try {
-      newModel = requireModelOverrideSync(rawNewModel);
-    } catch (err) {
-      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
-    }
-
-    const agentState = yield* getAgentState(id);
-    if (!agentState) {
-      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
-    }
-
-    const previousModel = agentState.model ?? '';
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
-
-    // Stop running agent if alive
-    if (lifecycle.hasLiveTmuxSession) {
-      yield* stopAgent(id);
-      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
-      // append in one SQLite transaction. stopAgent already saved state, but
-      // repeating the upsert here makes the event append atomic.
-      const stateAfterStop = yield* getAgentState(id);
-      if (stateAfterStop) {
-        yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
-          type: 'agent.stopped',
-          timestamp: new Date().toISOString(),
-          payload: { agentId: id, issueId: stateAfterStop.issueId || agentState.issueId },
-        });
-      }
-    }
-
-    const agentDir = getAgentDir(id);
-
-    // Clear session tracking files
-    yield* Effect.promise(() => rm(join(agentDir, 'session.id'), { force: true }));
-    yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true }));
-
-    // Clear claudeSessionId from runtime.json (preserve other fields)
-    const runtimeFile = join(agentDir, 'runtime.json');
-    if (existsSync(runtimeFile)) {
-      try {
-        const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'));
-        const runtime = JSON.parse(runtimeContent);
-        delete runtime.claudeSessionId;
-        yield* Effect.promise(() => writeFile(runtimeFile, JSON.stringify(runtime, null, 2)));
-      } catch { /* non-fatal */ }
-    }
-
-    // Kill zombie tmux session if exists
-    yield* killSession(id).pipe(Effect.catch(() => Effect.void));
-
-    // Update model in agent state
-    try {
-      const state = getAgentStateSync(id);
-      if (state) saveAgentStateSync({ ...state, model: newModel });
-    } catch { /* non-fatal */ }
-
-    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.model_switched', { previousModel, newModel }));
-    invalidateAgentsCache();
-
-    return jsonResponse({ success: true, agentId: id, previousModel, newModel });
+    return jsonResponse({
+      error: `Agent ${id} model is locked once the agent is spawned`,
+    }, { status: 409 });
   })),
 );
 

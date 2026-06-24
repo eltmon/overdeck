@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
+import type { AgentState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -19,6 +20,7 @@ import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
 import type { MergeSet } from '../../lib/merge-set.js';
 
 interface DoneOptions {
@@ -33,6 +35,10 @@ interface DoneOptions {
    * entry and exit cleanly.
    */
   strike?: boolean;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
@@ -213,21 +219,88 @@ async function isMergeSetMergedIntoTargets(
   return true;
 }
 
+export async function verifyStrikeBranchMergedIntoMain(issueId: string, projectPath: string): Promise<string> {
+  const branchName = `strike/${issueId.toLowerCase()}`;
+
+  await execAsync('git fetch origin main', {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    timeout: 60000,
+  });
+
+  await execAsync(`git rev-parse --verify ${shellQuote(branchName)}`, {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    timeout: 10000,
+  });
+
+  await execAsync(`git merge-base --is-ancestor ${shellQuote(branchName)} origin/main`, {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    timeout: 10000,
+  });
+
+  return `${branchName} is contained in origin/main`;
+}
+
+async function resolveDoneWorkspace(
+  issueId: string,
+  agentId: string,
+): Promise<{ agentState: AgentState | null; workspacePath: string | null }> {
+  const { getAgentStateSync } = await import('../../lib/agents.js');
+  const agentState = getAgentStateSync(agentId) ?? null;
+  const agentWorkspace = agentState?.workspace;
+  if (agentWorkspace && existsSync(agentWorkspace)) {
+    return { agentState, workspacePath: agentWorkspace };
+  }
+
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const workspacePath = resolved
+    ? findWorkspacePath(resolved.projectPath, issueId.toLowerCase())
+    : null;
+
+  return { agentState, workspacePath };
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
 
   // Strike-agent shape: the strike already merged to main and verified there,
-  // so there is no review pipeline to dispatch. Emit an activity event and exit.
+  // so there is no review pipeline to dispatch. Run the same post-merge
+  // lifecycle handoff the PR merge path uses, after verifying the strike branch
+  // is actually contained in origin/main.
   if (options.strike) {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved?.projectPath) {
+      console.error(chalk.red(`Could not resolve project for ${issueId}; cannot run strike post-merge handoff.`));
+      process.exit(1);
+    }
+
+    const branchName = `strike/${issueId.toLowerCase()}`;
+    try {
+      const reason = await verifyStrikeBranchMergedIntoMain(issueId, resolved.projectPath);
+      console.log(chalk.green(`✓ Verified strike merge: ${reason}`));
+
+      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+      await postMergeLifecycle(issueId, resolved.projectPath, branchName, {
+        skipDeploy: true,
+        allowVerifiedNoPrMerge: true,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`Strike post-merge handoff refused for ${issueId}: ${message}`));
+      process.exit(1);
+    }
+
     emitActivityEntrySync({
       source: 'strike',
       level: 'info',
       issueId,
-      message: `Strike ${issueId} reported done${options.comment ? `: ${options.comment}` : ''}`,
+      message: `Strike ${issueId} post-merge handoff completed${options.comment ? `: ${options.comment}` : ''}`,
     });
-    console.log(chalk.green(`✓ Strike ${issueId} acknowledged (review pipeline skipped)`));
+    console.log(chalk.green(`✓ Strike ${issueId} handed off to verifying-on-main (review pipeline skipped)`));
     return;
   }
 
@@ -289,9 +362,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
-    const { getAgentStateSync } = await import('../../lib/agents.js');
-    const agentState = getAgentStateSync(agentId);
-    const workspacePath = agentState?.workspace;
+    const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
     if (workspacePath && existsSync(workspacePath)) {
       // Commit any stale workspace orchestration artifacts from a previous interrupted
@@ -366,9 +437,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // `--ours`. Any other conflicts abort the rebase and surface a clear
     // error; the agent must resolve them and re-run `pan done`.
     {
-      const { getAgentStateSync } = await import('../../lib/agents.js');
-      const rebaseAgentState = getAgentStateSync(agentId);
-      const rebaseWorkspacePath = rebaseAgentState?.workspace;
+      const { workspacePath: rebaseWorkspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
       if (rebaseWorkspacePath && existsSync(rebaseWorkspacePath)) {
         const { ensureMergeSetForIssueSync } = await import('../../lib/merge-set.js');
@@ -445,9 +514,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
 
     // Step 2: Create review artifacts immediately and persist merge-set state.
-    const { getAgentStateSync, saveAgentStateSync } = await import('../../lib/agents.js');
-    const existingState = getAgentStateSync(agentId);
-    const workspacePath = existingState?.workspace;
+    const { saveAgentStateSync } = await import('../../lib/agents.js');
+    const { agentState: existingState, workspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
     if (!workspacePath || !existsSync(workspacePath)) {
       throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);

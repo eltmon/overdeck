@@ -16,7 +16,9 @@ import {
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
-import { resolveLiveFlywheelRunId } from '../../dashboard/server/services/flywheel-run-state.js';
+import { resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
+import { buildClassifyLookups } from '../backlog/lookups.js';
+import { computeCohort } from '../backlog/pickup.js';
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
@@ -29,7 +31,7 @@ export interface FlywheelLifecycleOptions {
   briefPath?: string;
   prompt?: string;
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   minAgents?: number;
   maxAgents?: number;
@@ -132,7 +134,7 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline });
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true });
           let nextLine: string;
           let pickInstruction: string;
           if (!nextPick) {
@@ -200,14 +202,34 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
   return hostname.includes('devcontainer') || hostname.startsWith('api-feature-') || hostname.startsWith('workspace-');
 }
 
+/**
+ * Resume prompt. PAN-2006 FR-8: re-attach the standing brief on resume so its
+ * directives (pipeline-unblock override, never-block, red-main-first) survive a
+ * resume + context compaction — the pre-PAN-2006 resume prompt only pointed at
+ * FLYWHEEL-STATE.md and a long-running orchestrator could drift off-brief.
+ */
+export function buildFlywheelResumePrompt(configSection: string, briefContent?: string): string {
+  const base =
+    'FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior ' +
+    'state. Check `docs/FLYWHEEL-STATE.md` and the latest status snapshot for context.';
+  const brief = briefContent
+    ? `\n\n--- Standing brief (re-read it — it governs pickup, unblocking, and never-block) ---\n\n${briefContent}`
+    : '';
+  return `${base}${configSection}${brief}`;
+}
+
 export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
-  const briefContent = options.briefPath ? await readFile(options.briefPath, 'utf8') : undefined;
+  const workspace = options.workspace ?? process.cwd();
+  // Re-read the brief on every spawn (fresh AND resume) so its directives survive
+  // resume/compaction. Default to the standard brief path when none is supplied.
+  const briefPath = options.briefPath ?? join(workspace, 'docs', 'flywheel-brief.md');
+  const briefContent = await readFile(briefPath, 'utf8').catch(() => undefined);
   const prompt = options.resumeSessionId
-    ? `FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior state. Check \`docs/FLYWHEEL-STATE.md\` and the latest status snapshot for context.${flywheelRunConfigurationSection(options)}`
+    ? buildFlywheelResumePrompt(flywheelRunConfigurationSection(options), briefContent)
     : (options.prompt ?? defaultFlywheelPrompt(runId, options, briefContent));
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
-    workspace: options.workspace ?? process.cwd(),
+    workspace,
     prompt,
     model: options.model,
     harness: options.harness,
@@ -245,6 +267,21 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
   const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions(options));
   setFlywheelActiveRunId(runId);
   setFlywheelGloballyPaused(false);
+
+  // PAN-2006 WI-7: freeze the run's cohort (in-flight ∪ current+next wave) at start.
+  // The Run is complete once this cohort drains; mid-run pickups don't extend it.
+  // Best-effort — a missing/unparseable sequence just means no cohort gate yet.
+  try {
+    const workspace = options.workspace ?? process.cwd();
+    const seqPath = join(workspace, '.pan', 'backlog', 'sequence.md');
+    if (existsSync(seqPath)) {
+      const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+      if (parsed.ok) {
+        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5));
+      }
+    }
+  } catch { /* cohort snapshot is best-effort */ }
+
   return agent;
 }
 

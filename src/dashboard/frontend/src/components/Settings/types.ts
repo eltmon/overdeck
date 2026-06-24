@@ -4,7 +4,7 @@
 export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'pi' | 'codex';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex';
 export type HarnessOverride = Harness | '';
 
 export interface ProvidersConfig {
@@ -187,12 +187,16 @@ export interface SettingsConfig {
     };
   };
   experimental?: {
+    /** Show experimental dashboard surfaces in navigation and direct routes. */
+    experimentalFeatures?: boolean;
     /** Use Claude Code Channels delivery for conversations/messages. */
     claudeCodeChannels?: boolean;
     /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
     claudeCodeChannelsMcp?: boolean;
     /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
     streamdownRenderer?: boolean;
+    /** Show explicit harness/model permutations in dashboard model pickers. */
+    showHarnessModelPermutations?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.

@@ -30,6 +30,8 @@ const mockSetReviewStatus = vi.fn();
 const mockGetReviewStatus = vi.fn().mockReturnValue(null);
 const mockGetDashboardApiUrl = vi.fn().mockReturnValue('http://localhost:3000');
 const mockGetVBriefACStatus = vi.fn().mockReturnValue(null);
+const mockResolveProjectFromIssue = vi.fn();
+const mockFindWorkspacePath = vi.fn();
 
 // execFile mock delegates to mockExecFn so tests that only set up exec
 // implementations also cover the bd list calls done-preflight makes via execFile.
@@ -97,6 +99,14 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatus,
 }));
 
+vi.mock('../../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+}));
+
+vi.mock('../../../../src/lib/lifecycle/archive-planning.js', () => ({
+  findWorkspacePath: mockFindWorkspacePath,
+}));
+
 vi.mock('../../../../src/lib/config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../../src/lib/config.js')>()),
   getDashboardApiUrl: mockGetDashboardApiUrl,
@@ -139,6 +149,10 @@ beforeEach(() => {
   mockGetReviewStatus.mockReset();
   mockGetReviewStatus.mockReturnValue(null);
   mockSetReviewStatus.mockClear();
+  mockResolveProjectFromIssue.mockReset();
+  mockResolveProjectFromIssue.mockReturnValue(null);
+  mockFindWorkspacePath.mockReset();
+  mockFindWorkspacePath.mockReturnValue(null);
 });
 
 function makeAgentState(workspace: string) {
@@ -148,6 +162,19 @@ function makeAgentState(workspace: string) {
     workspace,
     status: 'running',
     lastActivity: new Date().toISOString(),
+  };
+}
+
+function settleDoneCommand(donePromise: Promise<void>) {
+  let resolved = false;
+  donePromise.finally(() => { resolved = true; });
+  return {
+    async wait() {
+      while (!resolved) {
+        await vi.advanceTimersByTimeAsync(2000);
+      }
+      await donePromise;
+    },
   };
 }
 
@@ -308,6 +335,40 @@ describe('doneCommand shadow mode', () => {
     while (!resolved1) { await vi.advanceTimersByTimeAsync(2000); }
     await donePromise;
 
+    expect(mockUpdateShadowState).toHaveBeenCalledWith('PAN-714', 'in_review', 'pan done');
+  });
+
+  it('uses the conventional workspace fallback when agent state has no workspace', async () => {
+    const projectPath = join(tempDir, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-714');
+    mkdirSync(workspacePath, { recursive: true });
+    mkdirSync(join(workspacePath, '.git'));
+
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-714',
+      issueId: 'PAN-714',
+      status: 'running',
+      lastActivity: new Date().toISOString(),
+    });
+    mockResolveProjectFromIssue.mockReturnValue({ projectPath, projectKey: 'overdeck' });
+    mockFindWorkspacePath.mockReturnValue(workspacePath);
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      if (cmd.includes('bd list')) {
+        cb(null, { stdout: '[]', stderr: '' });
+      } else {
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    const donePromise = doneCommand('PAN-714');
+    await settleDoneCommand(donePromise).wait();
+
+    expect(mockResolveProjectFromIssue).toHaveBeenCalledWith('PAN-714');
+    expect(mockFindWorkspacePath).toHaveBeenCalledWith(projectPath, 'pan-714');
+    expect(mockCreateReviewArtifactsForIssue).toHaveBeenCalledWith('PAN-714', workspacePath);
     expect(mockUpdateShadowState).toHaveBeenCalledWith('PAN-714', 'in_review', 'pan done');
   });
 });

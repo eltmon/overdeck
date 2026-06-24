@@ -45,7 +45,7 @@ describe('ConversationFeedCard', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByText('π')).toBeInTheDocument();
   });
 

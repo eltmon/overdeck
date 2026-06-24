@@ -28,6 +28,9 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../cloister/issue-closed.js');
     vi.doUnmock('../cloister/specialists.js');
     vi.doUnmock('../transcript-landing.js');
+    vi.doUnmock('../agent-runtime-mirror.js');
+    vi.doUnmock('../runtimes/pi-fifo.js');
+    vi.doUnmock('../harness-resolve.js');
     delete process.env.OVERDECK_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });
@@ -550,6 +553,90 @@ describe('AgentState role persistence', () => {
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
 
     await expect(assertWorkspaceStackHealthyForSpawn(undefined as any, 'work')).resolves.toBeUndefined();
+  });
+
+  it('PAN-2009: fresh-launches a stopped ohmypi agent when the prior ohmypi process is dead', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-dead-pi-resume-'));
+    const agentId = 'agent-pan-2009-review';
+    const createSessionAsync = vi.fn(async () => {
+      writeFileSync(join(tempHome, 'agents', agentId, 'ready.json'), JSON.stringify({
+        agentId,
+        sessionId: 'fresh-pi-session',
+      }));
+    });
+    const killSessionAsync = vi.fn(async () => undefined);
+    const writeOhmypiCommandSync = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-23T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../projects.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../projects.js')),
+      resolveProjectFromIssueSync: vi.fn(() => null),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(true)),
+      sessionExistsSync: vi.fn(() => true),
+      killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../agent-runtime-mirror.js', () => ({
+      getRuntimeSnapshot: vi.fn(() => Effect.succeed({
+        activity: 'stopped',
+        lastActivity: '2026-06-23T00:00:00.000Z',
+        sessionModel: 'claude-sonnet-4-6',
+        sessionHarness: 'ohmypi',
+      })),
+      isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
+    }));
+    vi.doMock('../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../runtimes/ohmypi-fifo.js')),
+      writeOhmypiCommandSync,
+    }));
+
+    const { resumeAgent, saveAgentStateSync } = await import('../agents.js');
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-2009',
+      workspace,
+      harness: 'ohmypi',
+      role: 'review',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: '2026-06-23T00:00:00.000Z',
+    } as any);
+    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-pi-session');
+
+    await expect(resumeAgent(agentId, 'continue review')).resolves.toMatchObject({
+      success: true,
+      messageDelivered: true,
+    });
+
+    expect(killSessionAsync).toHaveBeenCalled();
+    expect(createSessionAsync).toHaveBeenCalled();
+    expect(writeOhmypiCommandSync).toHaveBeenCalledWith(
+      agentId,
+      expect.objectContaining({ type: 'prompt', message: expect.stringContaining('continue review') }),
+    );
+    const launcher = readFileSync(join(tempHome, 'agents', agentId, 'launcher.sh'), 'utf-8');
+    expect(launcher).not.toContain('--resume');
+    expect(existsSync(join(tempHome, 'agents', agentId, 'session.id'))).toBe(false);
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('prior Pi process was dead'));
+
+    consoleSpy.mockRestore();
+    rmSync(workspace, { recursive: true, force: true });
   });
 
   it('treats state.json without a valid role as missing', async () => {

@@ -96,6 +96,31 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
   await writeFile(join(root, 'src', 'FlywheelStatusDetails.ts'), 'import React from \'react\'; export function FlywheelStatusDetails() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'MergeQueueCard.ts'), 'import React from \'react\'; export function MergeQueueCard() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'MergePolicySection.ts'), 'import React from \'react\'; export function MergePolicySection() { return React.createElement(\'div\'); }\n');
+  await writeFile(join(root, 'src', 'scheduler.ts'), `
+    export const unstable_ImmediatePriority = 1;
+    export const unstable_UserBlockingPriority = 2;
+    export const unstable_NormalPriority = 3;
+    export const unstable_LowPriority = 4;
+    export const unstable_IdlePriority = 5;
+    export function unstable_now() { return Date.now(); }
+    export function unstable_scheduleCallback(_priority: number, callback: () => void) {
+      const id = setTimeout(callback, 0);
+      return { id };
+    }
+    export function unstable_cancelCallback(task: { id?: ReturnType<typeof setTimeout> } | null) {
+      if (task?.id !== undefined) clearTimeout(task.id);
+    }
+    export function unstable_shouldYield() { return false; }
+    export function unstable_requestPaint() {}
+    export function unstable_getCurrentPriorityLevel() { return unstable_NormalPriority; }
+    export function unstable_runWithPriority(_priority: number, callback: () => unknown) { return callback(); }
+    export function unstable_next(callback: () => unknown) { return callback(); }
+    export function unstable_wrapCallback(callback: () => unknown) { return callback; }
+    export function unstable_continueExecution() {}
+    export function unstable_pauseExecution() {}
+    export function unstable_getFirstCallbackNode() { return null; }
+    export function unstable_forceFrameRate() {}
+  `);
   await writeFile(join(root, 'src', 'main.ts'), `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
@@ -123,9 +148,14 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
       jsxFactory: 'React.createElement',
       jsxFragment: 'React.Fragment',
     },
+    optimizeDeps: {
+      force: true,
+      include: ['react', 'react-dom/client', 'scheduler'],
+    },
     resolve: {
       preserveSymlinks: true,
       alias: [
+        { find: 'scheduler', replacement: join(root, 'src', 'scheduler.ts') },
         { find: '@tanstack/react-query', replacement: join(root, 'src', 'reactQuery.ts') },
         { find: /(^|\/)lib\/wsTransport$/, replacement: join(root, 'src', 'wsTransport.ts') },
         { find: /(^|\/)components\/flywheel\/FlywheelConversationPane$/, replacement: join(root, 'src', 'FlywheelConversationPane.ts') },

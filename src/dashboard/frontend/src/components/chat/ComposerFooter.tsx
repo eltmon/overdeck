@@ -36,26 +36,6 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
-async function switchModel(
-  conversationName: string,
-  model: string,
-  agentId?: string,
-  harness?: Harness,
-): Promise<void> {
-  const endpoint = agentId
-    ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
-    : `/api/conversations/${encodeURIComponent(conversationName)}/switch-model`;
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, harness }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Failed to switch model (${res.status})${body ? `: ${body}` : ''}`);
-  }
-}
-
 async function sendConversationMessage(
   conversationName: string,
   message: string,
@@ -114,7 +94,7 @@ export function ComposerFooter({
   // call — silently rewriting the conversation's runtime. Default to
   // 'claude-code' (the safe runtime) when the conversation has no stored
   // harness; do NOT consult localStorage.
-  const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
+  const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   // `sending`, pending images, and their upload pump live in the module-level
   // composerStore, keyed by conversation name (the same key drafts use). The
@@ -131,6 +111,7 @@ export function ComposerFooter({
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
+  const [voiceAutoStartToken, setVoiceAutoStartToken] = useState(0);
   const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
   const editorRef = useRef<LexicalEditor | null>(null);
   const previousConversationNameRef = useRef(conversation.name);
@@ -140,6 +121,7 @@ export function ComposerFooter({
   currentConversationNameRef.current = conversation.name;
 
   const isDisabled = !conversation.sessionAlive || sending;
+  const canEditModelBeforeStart = !agentId && !conversation.sessionAlive && !conversation.claudeSessionId;
   const isEmpty = text.trim() === '';
 
   // Images are pasted/dropped into the active composer, so conversation.name is
@@ -166,75 +148,29 @@ export function ComposerFooter({
     removeImageForConversation(conversation.name, id);
   }, [removeImageForConversation, conversation.name]);
 
-  // Changing harness is a runtime switch — the new harness wraps a different
-  // binary (claude vs pi). Just updating local state would diverge the UI from
-  // the running tmux session. Reuse switch-model (which already accepts harness
-  // and handles kill+respawn) so the conversation is truly rebound. Persist to
-  // the global localStorage default *only* — the per-conversation harness is
-  // now owned by the backend.
+  // Existing sessions are model-locked. This handler is only reachable while
+  // composing before a session exists, so it updates local draft defaults only.
   const handleHarnessChange = useCallback((newHarness: Harness) => {
     if (newHarness === harness) return;
     setHarness(newHarness);
     saveStoredHarness(newHarness);
-    if (conversation.sessionAlive) {
-      const switchConversationName = conversation.name;
-      setSendingFor(switchConversationName, true);
-      void switchModel(switchConversationName, model, agentId, newHarness)
-        .catch((err: unknown) => {
-          console.error('[ComposerFooter] Failed to switch harness:', err);
-          toast.error(err instanceof Error ? err.message : 'Failed to switch harness');
-          // Roll back the optimistic state change so the UI matches the server.
-          setHarness(harness);
-        })
-        .finally(() => {
-          setSendingFor(switchConversationName, false);
-        });
-    }
-  }, [agentId, conversation.name, conversation.sessionAlive, harness, model, setSendingFor]);
+  }, [harness]);
 
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     saveStoredModel(newModel);
-    if (conversation.sessionAlive) {
-      const switchConversationName = conversation.name;
-      setSendingFor(switchConversationName, true);
-      void switchModel(switchConversationName, newModel, agentId, harness)
-        .catch((err: unknown) => {
-          console.error('[ComposerFooter] Failed to switch model:', err);
-          toast.error(err instanceof Error ? err.message : 'Failed to switch model');
-        })
-        .finally(() => {
-          setSendingFor(switchConversationName, false);
-        });
-    }
-  }, [agentId, conversation.name, conversation.sessionAlive, harness, setSendingFor]);
+  }, []);
 
   /**
-   * Atomic model+harness swap. Used by the picker's auto-resolve flow when
-   * a single click would otherwise fire two switch-model API calls that race
-   * on the tmux session lifecycle (PAN-1067).
+   * Atomic model+harness swap. Used by the picker's auto-resolve flow before a
+   * runtime session exists.
    */
   const handleComboChange = useCallback((newModel: string, _effortLevels: readonly string[], newHarness: Harness) => {
     setModel(newModel);
     saveStoredModel(newModel);
     setHarness(newHarness);
     saveStoredHarness(newHarness);
-    if (conversation.sessionAlive) {
-      const switchConversationName = conversation.name;
-      setSendingFor(switchConversationName, true);
-      void switchModel(switchConversationName, newModel, agentId, newHarness)
-        .catch((err: unknown) => {
-          console.error('[ComposerFooter] Failed to switch model+harness:', err);
-          toast.error(err instanceof Error ? err.message : 'Failed to switch model+harness');
-          // Roll back to keep UI in sync with backend on failure.
-          setModel(model);
-          setHarness(harness);
-        })
-        .finally(() => {
-          setSendingFor(switchConversationName, false);
-        });
-    }
-  }, [agentId, conversation.name, conversation.sessionAlive, harness, model, setSendingFor]);
+  }, []);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
     if (sending) {
@@ -477,7 +413,7 @@ export function ComposerFooter({
     // back. In-flight uploads attach to their owning conversation; the send's
     // own finally clears its sending flag by submitConversationName.
     setModel(conversation.model ?? getDefaultConversationModel());
-    setHarness(conversation.harness ?? 'claude-code');
+    setHarness((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
     // Do NOT clear the editor here. The inner LexicalComposer is keyed by
     // conversation.name, so it already remounts on a conversation switch and
     // seeds the new conversation's saved draft via initialConfig. Calling
@@ -507,6 +443,21 @@ export function ComposerFooter({
     setText((existing) => [existing.trim(), trimmed].filter(Boolean).join(existing.trim() ? '\n' : ''));
     editor.focus();
   }, []);
+
+  useEffect(() => {
+    const handleVoiceShortcut = (event: KeyboardEvent) => {
+      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const usesModifier = isMac ? event.metaKey : event.ctrlKey;
+      if (!usesModifier || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 'm') return;
+      if (isDisabled) return;
+      event.preventDefault();
+      setIsVoiceWidgetOpen(true);
+      setVoiceAutoStartToken((token) => token + 1);
+    };
+
+    window.addEventListener('keydown', handleVoiceShortcut);
+    return () => window.removeEventListener('keydown', handleVoiceShortcut);
+  }, [isDisabled]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
@@ -568,7 +519,7 @@ export function ComposerFooter({
             value={model}
             onChange={handleModelChange}
             onComboChange={handleComboChange}
-            disabled={isDisabled}
+            disabled={isDisabled || !canEditModelBeforeStart}
             harness={harness}
             onHarnessChange={handleHarnessChange}
           />
@@ -598,7 +549,7 @@ export function ComposerFooter({
             onClick={() => setIsVoiceWidgetOpen((open) => !open)}
             disabled={isDisabled}
             type="button"
-            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input'}
+            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
           >
             {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
@@ -621,6 +572,7 @@ export function ComposerFooter({
             onInsert={insertVoiceText}
             onSendDirect={(voiceText) => void handleSubmit(voiceText)}
             onStateChange={setVoiceState}
+            autoStartToken={voiceAutoStartToken}
           />
         )}
       </div>

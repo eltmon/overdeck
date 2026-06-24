@@ -219,6 +219,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
       { encoding: 'utf-8', timeout: 15000 },
     );
+    if (!stdout.trim()) return;
     const pr = JSON.parse(stdout) as {
       mergeable?: string | null;
       mergeStateStatus?: string | null;

@@ -38,6 +38,10 @@ const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
 }));
 
+const ohmypiFifoMocks = vi.hoisted(() => ({
+  writeOhmypiCommand: vi.fn(),
+}));
+
 const transcriptLandingMocks = vi.hoisted(() => ({
   snapshotCount: 0,
   landed: false,
@@ -100,6 +104,25 @@ vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   },
   writePiCommand: piFifoMocks.writePiCommand,
   writePiCommandSync: piFifoMocks.writePiCommand,
+}));
+
+vi.mock('../../src/lib/runtimes/ohmypi-fifo.js', () => ({
+  OhmypiNotReady: class OhmypiNotReady extends Error {},
+  createOhmypiFifo: vi.fn((agentId: string) => Effect.sync(() => {
+    const dir = join(process.env.OVERDECK_HOME ?? tmpdir(), 'agents', agentId);
+    mkdirSync(dir, { recursive: true });
+    return join(dir, 'rpc.in');
+  })),
+  ohmypiFifoPaths: (agentId: string) => {
+    const dir = join(process.env.OVERDECK_HOME ?? tmpdir(), 'agents', agentId);
+    return {
+      agentDir: dir,
+      readyPath: join(dir, 'ready.json'),
+      fifoPath: join(dir, 'rpc.in'),
+    };
+  },
+  writeOhmypiCommand: ohmypiFifoMocks.writeOhmypiCommand,
+  writeOhmypiCommandSync: ohmypiFifoMocks.writeOhmypiCommand,
 }));
 
 // Mock tmux module to avoid actual session creation
@@ -296,14 +319,14 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     // mocked tmux runtime. Keep PTY-supervisor wiring out of scope so the tests
     // remain hermetic when run directly without a prior `npm run build`.
     process.env.OVERDECK_DOCKER_WORKSPACE = '1';
-    // The pi harness is normally guarded by `command -v pi`. Several tests
-    // exercise the pi resume/delivery path, so provide a harmless stub binary
+    // The ohmypi harness is normally guarded by `command -v omp`. Several tests
+    // exercise the ohmypi resume/delivery path, so provide a harmless stub binary
     // on PATH for the duration of this test. This keeps harness resolution
-    // deterministic regardless of whether the real `pi` CLI is installed on
+    // deterministic regardless of whether the real `omp` CLI is installed on
     // the runner (PAN-1859).
     const piBinDir = join(testOverdeckHome, 'bin');
     mkdirSync(piBinDir, { recursive: true });
-    const piStub = join(piBinDir, 'pi');
+    const piStub = join(piBinDir, 'omp');
     writeFileSync(piStub, '#!/bin/sh\nexit 0\n');
     chmodSync(piStub, 0o755);
     process.env.PATH = `${piBinDir}${delimiter}${process.env.PATH}`;
@@ -337,6 +360,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     const beadsQuery = await import('../../src/lib/beads-query.js');
     vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValue(Effect.void);
     piFifoMocks.writePiCommand.mockClear();
+    ohmypiFifoMocks.writeOhmypiCommand.mockClear();
   });
 
   afterEach(async () => {
@@ -632,16 +656,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     }, 15_000);
 
-    it('resumeAgent delivers the continue prompt through the Pi FIFO for pi work agents', async () => {
+    it('resumeAgent delivers the continue prompt through the Pi FIFO for ohmypi work agents', async () => {
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-pi-continue';
       writeResumableWorkAgent(agentId, true);
-      // Provider-default-only (PAN-1984): a Pi work agent is one whose model's provider
-      // resolves to pi. Drive that through the per-provider default rather than a
+      // Provider-default-only (PAN-1984): an ohmypi work agent is one whose model's provider
+      // resolves to ohmypi. Drive that through the per-provider default rather than a
       // (now-ignored) explicit state.harness. The mid workhorse is an Anthropic model,
-      // and the session origin is pi so there is no resume drift.
-      configMocks.providerHarnesses = { anthropic: 'pi' };
-      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
+      // and the session origin is ohmypi so there is no resume drift.
+      configMocks.providerHarnesses = { anthropic: 'ohmypi' };
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'ohmypi');
       vi.mocked(tmux.createSession).mockImplementationOnce((createdAgentId: string) => Effect.sync(() => {
         const agentDir = getAgentDir(createdAgentId);
         mkdirSync(agentDir, { recursive: true });
@@ -651,7 +675,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const result = await resumeAgent(agentId);
 
       expect(result).toEqual({ success: true, messageDelivered: true });
-      expect(piFifoMocks.writePiCommand).toHaveBeenCalledWith(
+      expect(ohmypiFifoMocks.writeOhmypiCommand).toHaveBeenCalledWith(
         agentId,
         expect.objectContaining({
           type: 'prompt',
@@ -711,9 +735,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('refuses to rotate the session when the resolved harness differs from session origin (PAN-1980)', async () => {
       const agentId = 'agent-pan-resume-harness-drift';
       writeResumableWorkAgent(agentId, true);
-      // Origin harness is pi, but provider-default-only (PAN-1984) resolves the agent's
+      // Origin harness is ohmypi, but provider-default-only (PAN-1984) resolves the agent's
       // Anthropic model to claude-code — so the resolved harness drifts from the origin.
-      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'ohmypi');
 
       const result = await resumeAgent(agentId);
 
@@ -772,8 +796,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it.each([
       ['new model', { model: 'claude-haiku-4-5' }],
-      ['new harness', { harness: 'pi' as const }],
-      ['new model and harness', { model: 'claude-haiku-4-5', harness: 'pi' as const }],
+      ['new harness', { harness: 'ohmypi' as const }],
+      ['new model and harness', { model: 'claude-haiku-4-5', harness: 'ohmypi' as const }],
     ])('restartAgent with %s starts fresh without --resume', async (_label, opts) => {
       const agentId = `agent-pan-restart-${_label.replaceAll(' ', '-')}`;
       writeResumableWorkAgent(agentId, true);
@@ -1043,28 +1067,28 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const tmux = await import('../../src/lib/tmux.js');
       const binDir = join(testOverdeckHome, 'bin');
       mkdirSync(binDir, { recursive: true });
-      const fakePi = join(binDir, 'pi');
+      const fakePi = join(binDir, 'omp');
       writeFileSync(fakePi, '#!/bin/sh\nexit 0\n');
       chmodSync(fakePi, 0o755);
       process.env.PATH = `${binDir}:${originalPath ?? ''}`;
       resetHarnessResolveCachesForTests();
-      // Provider-default-only (PAN-1984): drive the test role onto Pi via the per-provider
+      // Provider-default-only (PAN-1984): drive the test role onto ohmypi via the per-provider
       // default (its model is Anthropic), not a per-role harness override.
-      configMocks.providerHarnesses = { anthropic: 'pi' };
+      configMocks.providerHarnesses = { anthropic: 'ohmypi' };
       vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
       }));
-      vi.mocked(tmux.capturePane).mockReturnValueOnce(Effect.succeed('pi rpc mode'));
+      vi.mocked(tmux.capturePane).mockReturnValueOnce(Effect.succeed('omp rpc mode'));
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
         workspace: testWorkspace,
         prompt: 'run the tests',
       });
 
-      expect(state.harness).toBe('pi');
-      expect(piFifoMocks.writePiCommand).toHaveBeenCalledWith(
+      expect(state.harness).toBe('ohmypi');
+      expect(ohmypiFifoMocks.writeOhmypiCommand).toHaveBeenCalledWith(
         'agent-pan-pi-prompt-1-test',
         expect.objectContaining({ type: 'prompt', message: 'run the tests' }),
       );

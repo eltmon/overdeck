@@ -1,16 +1,32 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
-import { applyIssueParkedLabel } from '../../../lib/backlog/label-ops.js';
+import {
+  applyIssueVetoedLabel, removeIssueVetoedLabel,
+  applyIssueReadyLabel, removeIssueReadyLabel,
+  applyIssueParkedLabel, removeIssueParkedLabel,
+  applyIssueBlocksMainLabel, removeIssueBlocksMainLabel,
+} from '../../../lib/backlog/label-ops.js';
+import {
+  normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats,
+  type ForecastNode, type LaneBlock,
+} from '../../../lib/backlog/pickup.js';
+import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
-import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
-import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
+import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
+import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
+import { resolvePiSessionPath } from './jsonl-resolver.js';
+import {
+  clearFinishedSequencerRun,
+  getSequencerRunStatus,
+  spawnSequencerAgent,
+} from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 
 const readJsonBody = Effect.gen(function* () {
@@ -84,6 +100,10 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         } catch { /* issue service not ready — titles are optional */ }
 
+        // Per-issue pipeline state from the shared classifier (single source of truth)
+        // so the editor drawer can read/toggle ready / parked / vetoed / blocks-main.
+        const lookups = buildClassifyLookups(projectRoot);
+
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
           const reviewStatus = getReviewStatusSync(issueUpper);
@@ -92,6 +112,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
           const ready = specIssues.has(issueUpper) && issuesWithBeads.has(issueUpper);
+          const state = classifyIssue({ issue: r.issueId, gate: r.gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
           return {
             issueId: r.issueId,
             title: titleByIssue.get(issueUpper),
@@ -107,6 +128,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             inPipeline,
             hasPrd,
             ready,
+            state,
           };
         });
 
@@ -143,6 +165,7 @@ const postBacklogRegenerateRoute = HttpRouter.add(
       // into tracker `Issue` objects (their human ref is `identifier`, not `ref`).
       const issues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
       try {
+        await clearFinishedSequencerRun(projectRoot);
         const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
         return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
       } catch (err) {
@@ -182,11 +205,14 @@ const postBacklogGateRoute = HttpRouter.add(
     if (authError) return authError;
     const body = yield* readJsonBody;
     const issueId = String(body['issueId'] ?? '');
-    const gate = String(body['gate'] ?? '');
+    const rawGate = String(body['gate'] ?? '');
 
     if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
-    if (!['auto', 'ready', 'blocked'].includes(gate))
-      return yield* Effect.fail(new Error('gate must be auto, ready, or blocked') as never);
+    // Accept the PAN-2006 vocabulary (auto/promote/vetoed) and the legacy
+    // spellings (ready/blocked) as aliases during the cutover.
+    if (!['auto', 'promote', 'vetoed', 'ready', 'blocked'].includes(rawGate))
+      return yield* Effect.fail(new Error('gate must be auto, promote, or vetoed') as never);
+    const gate = normalizeGate(rawGate); // 'auto' | 'promote' | 'vetoed'
 
     return yield* Effect.promise(async () => {
       const projectRoot = process.cwd();
@@ -201,12 +227,15 @@ const postBacklogGateRoute = HttpRouter.add(
       const node = doc.nodes.find((n) => n.issue.toUpperCase() === issueId.toUpperCase());
       if (!node) throw new Error(`issue ${issueId} not found in sequence`);
 
-      node.gate = gate as 'auto' | 'ready' | 'blocked';
+      // sequence.md keeps the legacy NodeGate spelling (auto/ready/blocked) to avoid a
+      // schema migration; promote→ready, vetoed→blocked. The vocabulary is normalized on read.
+      node.gate = gate === 'vetoed' ? 'blocked' : gate === 'promote' ? 'ready' : 'auto';
       writeSequenceMd(projectRoot, doc, { operatorEdit: true });
 
-      if (gate === 'blocked') {
-        await applyIssueParkedLabel(issueId);
-      }
+      // Mirror the hard veto to the `vetoed` GitHub label so it's visible + queryable
+      // and honored by pickFromSequence; clear it when the gate is relaxed.
+      if (gate === 'vetoed') await applyIssueVetoedLabel(issueId);
+      else await removeIssueVetoedLabel(issueId);
 
       return jsonResponse({ status: 'ok', issueId, gate });
     });
@@ -251,6 +280,177 @@ const postBacklogPlanningRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/backlog/forecast ─────────────────────────────────────────
+// PAN-2005: the pickup forecast (waves / lanes / cohort / stats) computed entirely
+// from the shared pickup module so the UI can never diverge from the Flywheel.
+
+const getBacklogForecastRoute = HttpRouter.add(
+  'GET',
+  '/api/backlog/forecast',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const n = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get('n') ?? '5', 10) || 5));
+    return yield* Effect.try({
+      try: () => {
+        const projectRoot = process.cwd();
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        if (!existsSync(seqPath)) {
+          return jsonResponse({ n, stats: null, inFlight: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [] });
+        }
+        const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+        if (!parsed.ok) throw new Error(`parse error: ${parsed.error}`);
+        const nodes = parsed.doc.nodes;
+        const lk = buildClassifyLookups(projectRoot);
+
+        // Per-issue display meta (title/importance/score/why) to enrich the module's
+        // ForecastNode (which only carries issue/rank/size/state).
+        const titleByIssue = new Map<string, string>();
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getSharedIssueService } = require('../services/issue-service-singleton.js') as typeof import('../services/issue-service-singleton.js');
+          for (const issue of getSharedIssueService().getIssues() as Array<Record<string, unknown>>) {
+            const id = typeof issue['identifier'] === 'string' ? issue['identifier'].toUpperCase() : '';
+            const title = typeof issue['title'] === 'string' ? issue['title'] : '';
+            if (id && title) titleByIssue.set(id, title);
+          }
+        } catch { /* titles optional */ }
+        const metaById = new Map(nodes.map((x) => [x.issue, x]));
+        const enrich = (f: ForecastNode) => {
+          const m = metaById.get(f.issue);
+          return {
+            ...f,
+            title: titleByIssue.get(f.issue.toUpperCase()) ?? '',
+            importance: m?.importance ?? 'medium',
+            score: m?.score ?? 0,
+            why: m?.why ?? '',
+          };
+        };
+
+        const inFlight = nodes
+          .map((x) => ({ issue: x.issue, rank: x.rank, size: x.size, state: classifyIssue(x, lk) }))
+          .filter((x) => x.state.inPipeline)
+          .sort((a, b) => a.rank - b.rank)
+          .map(enrich);
+        const waves = computeWaves(nodes, lk, n).map((w) => w.map(enrich));
+        const lanesRaw = computeLanes(nodes, lk, n);
+        const lanes = {
+          makespan: lanesRaw.makespan,
+          blocks: lanesRaw.blocks.map((b: LaneBlock) => ({ ...enrich(b), lane: b.lane, start: b.start, end: b.end })),
+        };
+        const cohort = computeCohort(nodes, lk, n);
+        const stats = computeStats(nodes, lk);
+
+        return jsonResponse({ n, stats, inFlight, waves, lanes, cohort });
+      },
+      catch: (err) => new Error(String(err)),
+    });
+  })),
+);
+
+// ─── Route: POST /api/backlog/sequence/labels — editor toggles (PAN-2006 WI-8) ─
+
+const postBacklogLabelsRoute = HttpRouter.add(
+  'POST',
+  '/api/backlog/sequence/labels',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+    const issueId = String(body['issueId'] ?? '');
+    if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
+
+    return yield* Effect.promise(async () => {
+      if (typeof body['ready'] === 'boolean') await (body['ready'] ? applyIssueReadyLabel : removeIssueReadyLabel)(issueId);
+      if (typeof body['parked'] === 'boolean') await (body['parked'] ? applyIssueParkedLabel : removeIssueParkedLabel)(issueId);
+      if (typeof body['blocksMain'] === 'boolean') await (body['blocksMain'] ? applyIssueBlocksMainLabel : removeIssueBlocksMainLabel)(issueId);
+      return jsonResponse({ status: 'ok', issueId });
+    });
+  })),
+);
+
+// ─── Route: POST /api/backlog/sequence/clear — delete the sequencing ──────────
+// Removes the ranked sequence (sequence.md + the disposable DB cache). Recoverable:
+// a re-sequence pass regenerates it. The operator gate fields live in sequence.md, so
+// clearing also drops operator overrides — intentional ("delete the sequencing").
+
+const postBacklogClearRoute = HttpRouter.add(
+  'POST',
+  '/api/backlog/sequence/clear',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    return yield* Effect.try({
+      try: () => {
+        const projectRoot = process.cwd();
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        // Clear the cache under the project key recorded in the md (if parseable).
+        if (existsSync(seqPath)) {
+          const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+          if (parsed.ok) clearBacklogSequence(parsed.doc.project);
+          rmSync(seqPath, { force: true });
+        }
+        return jsonResponse({ status: 'ok', cleared: true });
+      },
+      catch: (err) => new Error(String(err)),
+    });
+  })),
+);
+
+// ─── Route: GET /api/backlog/sequencer-status — live pass progress ────────────
+// The sequencer is a single LLM pass with no per-issue telemetry, so "processed" is a
+// best-effort count of distinct issue ids the agent has emitted in its OUTPUT (assistant
+// messages) so far — the input manifest (which lists all ids) is excluded. total = the
+// manifest the pass is ranking. Lets the UI show a live "ranking X of Y" indicator.
+
+const getSequencerStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/backlog/sequencer-status',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+      const projectRoot = process.cwd();
+      // The one-shot sequencer session lingers after it finishes, so "alive" alone
+      // would falsely read as running. A pass is done once it writes a fresh
+      // sequence.md (mtime >= startedAt) or its runtime is idle.
+      const { running, startedAt } = getSequencerRunStatus(projectRoot);
+
+      let total = 0;
+      const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');
+      if (existsSync(manifestPath)) {
+        try {
+          const m = JSON.parse(readFileSync(manifestPath, 'utf-8')) as unknown;
+          const arr = Array.isArray(m) ? m : ((m as { issues?: unknown[]; nodes?: unknown[] })?.issues ?? (m as { nodes?: unknown[] })?.nodes ?? []);
+          total = Array.isArray(arr) ? arr.length : 0;
+        } catch { /* manifest unreadable */ }
+      }
+
+      let processed = 0;
+      if (running) {
+        try {
+          const tx = await resolvePiSessionPath(SEQUENCER_AGENT_ID);
+          if (tx && existsSync(tx)) {
+            const ids = new Set<string>();
+            for (const line of readFileSync(tx, 'utf-8').split('\n')) {
+              if (!line) continue;
+              try {
+                const j = JSON.parse(line) as { message?: { role?: string; content?: unknown } };
+                if (j.message?.role !== 'assistant') continue;
+                const c = typeof j.message.content === 'string' ? j.message.content : JSON.stringify(j.message.content);
+                for (const id of c.match(/[A-Z]{2,}-\d+/g) ?? []) ids.add(id);
+              } catch { /* skip non-JSON line */ }
+            }
+            processed = total > 0 ? Math.min(ids.size, total) : ids.size;
+          }
+        } catch { /* transcript not resolvable — leave processed at 0 */ }
+      }
+
+      return jsonResponse({ running, total, processed, startedAt });
+    });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const backlogRouteLayer = Layer.mergeAll(
@@ -258,6 +458,10 @@ export const backlogRouteLayer = Layer.mergeAll(
   postBacklogRegenerateRoute,
   postBacklogGateRoute,
   postBacklogPlanningRoute,
+  getBacklogForecastRoute,
+  postBacklogLabelsRoute,
+  postBacklogClearRoute,
+  getSequencerStatusRoute,
 );
 
 export default backlogRouteLayer;

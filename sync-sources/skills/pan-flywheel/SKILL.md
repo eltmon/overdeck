@@ -1,6 +1,6 @@
 ---
 name: pan-flywheel
-description: "pan flywheel — start, pause, resume, inspect, emit, and report on the singleton Fix-All Flywheel orchestrator"
+description: "pan flywheel — start, pause, resume, stop, inspect, emit, and report on the singleton Fix-All Flywheel orchestrator"
 triggers:
   - pan flywheel
   - flywheel orchestrator

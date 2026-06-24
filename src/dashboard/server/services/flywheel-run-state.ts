@@ -1,4 +1,5 @@
 import type { Dirent } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -118,6 +119,41 @@ export function getFlywheelRunsDir(options: FlywheelRunStateOptions = {}): strin
 
 export function getFlywheelRunDir(runId: string, options: FlywheelRunStateOptions = {}): string {
   return join(getFlywheelRunsDir(options), parseFlywheelRunId(runId));
+}
+
+// ─── Run cohort (PAN-2006 WI-7: drain-to-quiescence) ──────────────────────────
+// A Run commits to draining a frozen cohort snapshotted at start: everything
+// in-flight ∪ the auto-pickable issues in the current + next wave. The Run is
+// complete when every cohort member reaches a terminal state; issues picked up
+// mid-run (e.g. unblockers) do NOT extend the cohort.
+
+/** Persist the run's cohort (issue ids) at run start. */
+export function saveRunCohort(runId: string, issueIds: readonly string[], options: FlywheelRunStateOptions = {}): void {
+  const dir = getFlywheelRunDir(runId, options);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'cohort.json'), JSON.stringify({ issueIds: [...issueIds], snapshotAt: new Date().toISOString() }, null, 2), 'utf-8');
+}
+
+/** Load the run's cohort issue ids, or null when no snapshot exists. */
+export function loadRunCohort(runId: string, options: FlywheelRunStateOptions = {}): string[] | null {
+  const path = join(getFlywheelRunDir(runId, options), 'cohort.json');
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as { issueIds?: unknown };
+    return Array.isArray(parsed.issueIds) ? parsed.issueIds.filter((x): x is string => typeof x === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when every cohort member is terminal (the Run has drained). Returns false
+ * when there is no cohort snapshot or it is empty (nothing to declare drained).
+ */
+export function isCohortDrained(runId: string, isTerminal: (issueId: string) => boolean, options: FlywheelRunStateOptions = {}): boolean {
+  const cohort = loadRunCohort(runId, options);
+  if (!cohort || cohort.length === 0) return false;
+  return cohort.every((id) => isTerminal(id));
 }
 
 export async function nextFlywheelRunId(options: FlywheelRunStateOptions = {}): Promise<FlywheelRunId> {

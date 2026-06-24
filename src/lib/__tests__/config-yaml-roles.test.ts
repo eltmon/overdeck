@@ -32,7 +32,7 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
         },
       },
       test: { model: 'gemini-3.1-pro-preview' },
-      ship: { model: 'workhorse:mid', harness: 'pi' },
+      ship: { model: 'workhorse:mid', harness: 'ohmypi' },
       flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     },
   };
@@ -64,6 +64,19 @@ describe('role model configuration', () => {
     for (const role of Object.keys(expected) as Role[]) {
       expect(resolveModel(role, undefined, config)).toBe(expected[role]);
     }
+  });
+
+  it('honors configured roles.plan.model through the configured expensive workhorse', () => {
+    const { config } = mergeConfigs({
+      workhorses: {
+        expensive: 'gpt-5.5',
+      },
+      roles: {
+        plan: { model: 'workhorse:expensive' },
+      },
+    });
+
+    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.5');
   });
 
   it('uses sub-role overrides before role-level model refs', () => {
@@ -157,7 +170,7 @@ describe('role model configuration', () => {
     const { config } = mergeConfigs({
       roles: {
         flywheel: {
-          harness: 'pi',
+          harness: 'ohmypi',
           model: 'claude-sonnet-4-6',
           effort: 'medium',
           maxAgents: 4,
@@ -167,7 +180,7 @@ describe('role model configuration', () => {
     });
 
     expect(config.roles?.flywheel).toEqual({
-      harness: 'pi',
+      harness: 'ohmypi',
       model: 'claude-sonnet-4-6',
       effort: 'medium',
       minAgents: 4,

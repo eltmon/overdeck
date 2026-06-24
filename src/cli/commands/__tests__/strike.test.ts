@@ -45,7 +45,8 @@ describe('strikeCommand', () => {
     expect(prompt).toContain('strike/pan-1234');
     expect(prompt).toContain('/tmp/feature-pan-1234-strike');
     expect(prompt).toContain('merge fast-forward to `main`');
-    // Strike must explicitly not call pan done
-    expect(prompt).toContain('Do NOT call `pan done`');
+    expect(prompt).toContain('pan done PAN-1234 --strike');
+    // Strike must explicitly not call the normal review-pipeline form.
+    expect(prompt).toContain('Do NOT call plain `pan done`');
   });
 });

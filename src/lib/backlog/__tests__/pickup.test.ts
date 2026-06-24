@@ -10,6 +10,7 @@ import {
   computeCohort,
   computeStats,
   pickableQueue,
+  selectUnblockTargets,
   effortOf,
   type ClassifyLookups,
 } from '../pickup.js';
@@ -151,6 +152,33 @@ describe('computeCohort', () => {
     expect(cohort).toContain('P1');
     expect(cohort).toContain('P2');
     expect(cohort).not.toContain('P3');
+  });
+});
+
+describe('selectUnblockTargets', () => {
+  it('returns blocks-main issues in rank order, capped, never vetoed or in-flight', () => {
+    const nodes = [
+      node({ issue: 'BM-LOW', rank: 9 }),
+      node({ issue: 'BM-HIGH', rank: 3 }),
+      node({ issue: 'BM-VETO', rank: 1 }),
+      node({ issue: 'BM-FLIGHT', rank: 2 }),
+      node({ issue: 'PLAIN', rank: 4 }),
+    ];
+    const lk = lookups({
+      'BM-LOW': { labels: ['blocks-main'] },
+      'BM-HIGH': { labels: ['blocks-main'] },
+      'BM-VETO': { labels: ['blocks-main', 'vetoed'] }, // vetoed wins — excluded
+      'BM-FLIGHT': { labels: ['blocks-main'], inPipeline: true }, // already running — excluded
+      'PLAIN': {},
+    });
+    const targets = selectUnblockTargets(nodes, lk, { cap: 2 });
+    expect(targets.map((t) => t.issue)).toEqual(['BM-HIGH', 'BM-LOW']);
+  });
+
+  it('respects the cap', () => {
+    const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 }), node({ issue: 'C', rank: 3 })];
+    const lk = lookups({ A: { labels: ['blocks-main'] }, B: { labels: ['blocks-main'] }, C: { labels: ['blocks-main'] } });
+    expect(selectUnblockTargets(nodes, lk, { cap: 1 }).map((t) => t.issue)).toEqual(['A']);
   });
 });
 

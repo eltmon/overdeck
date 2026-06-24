@@ -185,6 +185,12 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-streamdown-toggle"');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleStreamdownToggle(!formData.experimental?.streamdownRenderer)');
   });
+
+  it('surfaces the harness/model permutations toggle in provider settings', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('Show all harness/model permutations');
+    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="show-harness-model-permutations-toggle"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {

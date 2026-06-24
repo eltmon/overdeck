@@ -12888,6 +12888,45 @@ const DEFAULT_PRICING = [
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-5.2",
+		inputPer1k: .0014,
+		outputPer1k: .0044,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-5.1",
+		inputPer1k: .0014,
+		outputPer1k: .0044,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-4.7",
+		inputPer1k: 5e-4,
+		outputPer1k: .002,
+		cacheReadPer1k: 5e-5,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-4.7-flash",
+		inputPer1k: 1e-4,
+		outputPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "kimi-k2.7-code",
+		inputPer1k: 95e-5,
+		outputPer1k: .004,
+		cacheReadPer1k: 19e-5,
+		currency: "USD"
 	}
 ];
 /**
@@ -28701,7 +28740,6 @@ function cloneRoles(roles) {
 	const cloned = {};
 	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
 		...roleConfig,
-		model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
 		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
 	};
 	return cloned;
@@ -28865,9 +28903,11 @@ const DEFAULT_CONFIG = {
 		agentBlockCount: 10
 	},
 	experimental: {
+		experimentalFeatures: false,
 		claudeCodeChannels: false,
 		claudeCodeChannelsMcp: false,
-		streamdownRenderer: false
+		streamdownRenderer: false,
+		showHarnessModelPermutations: false
 	},
 	claude: { permissionMode: "auto" },
 	codex: { permissionMode: "auto-review" }
@@ -28894,7 +28934,7 @@ function normalizeProviderConfig(providerConfig, fallbackKey) {
 	};
 }
 function validateProviderHarness(provider, harness) {
-	if (harness !== void 0 && harness !== "claude-code" && harness !== "pi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
 }
 function applyProviderHarness(result, provider, harness) {
 	validateProviderHarness(provider, harness);
@@ -29127,15 +29167,7 @@ function mergeRoleConfig(result, config) {
 	}
 }
 function validateRoleFields(role, roleConfig) {
-	if (Array.isArray(roleConfig.model)) {
-		if (roleConfig.model.length === 0) throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
-		for (let i = 0; i < roleConfig.model.length; i++) {
-			const entry = roleConfig.model[i];
-			if (!entry.model || typeof entry.model !== "string") throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
-			if (!Number.isInteger(entry.weight) || entry.weight <= 0) throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
-		}
-	}
-	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "pi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
+	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
 	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
 	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
 	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
@@ -29150,8 +29182,7 @@ function validateRoleModelRefs(config) {
 	}
 	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
 		validateRoleFields(role, roleConfig);
-		if (Array.isArray(roleConfig.model)) for (let i = 0; i < roleConfig.model.length; i++) derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
-		else if (roleConfig.model) {
+		if (roleConfig.model) {
 			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
 			if (roleConfig.effort !== void 0) {
 				const supported = getModelEffortLevelsSync(resolvedModel);
@@ -29229,9 +29260,11 @@ function mergeConfigs(...configs) {
 			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
 		},
 		experimental: {
+			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
 			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
 			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
-			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer
+			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
+			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
 		},
 		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
 		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
@@ -29436,9 +29469,11 @@ function mergeConfigs(...configs) {
 			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
 		}
 		if (config.experimental) {
+			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
 			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
 			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
 			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+			if (typeof config.experimental.showHarnessModelPermutations === "boolean") result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
 		}
 		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
 		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;

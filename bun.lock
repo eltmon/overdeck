@@ -61,7 +61,7 @@
     },
     "apps/desktop": {
       "name": "@overdeck/desktop",
-      "version": "0.21.0",
+      "version": "0.30.2",
       "bin": {
         "overdeck-desktop": "./bin/overdeck.mjs",
       },
@@ -82,7 +82,7 @@
     },
     "packages/contracts": {
       "name": "@overdeck/contracts",
-      "version": "0.21.0",
+      "version": "0.30.2",
       "dependencies": {
         "effect": "4.0.0-beta.73",
       },
@@ -97,6 +97,15 @@
       "version": "0.1.0",
       "bin": {
         "moonshine-sidecar": "bin/moonshine-sidecar",
+      },
+    },
+    "packages/ohmypi-extension": {
+      "name": "@overdeck/ohmypi-extension",
+      "version": "0.0.1",
+      "devDependencies": {
+        "tsdown": "^0.21.7",
+        "typescript": "catalog:",
+        "vitest": "^4.1.6",
       },
     },
     "packages/pi-extension": {
@@ -637,6 +646,8 @@
     "@overdeck/desktop": ["@overdeck/desktop@workspace:apps/desktop"],
 
     "@overdeck/frontend": ["@overdeck/frontend@workspace:src/dashboard/frontend"],
+
+    "@overdeck/ohmypi-extension": ["@overdeck/ohmypi-extension@workspace:packages/ohmypi-extension"],
 
     "@overdeck/pi-extension": ["@overdeck/pi-extension@workspace:packages/pi-extension"],
 

@@ -17,6 +17,7 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
 import { isPiSessionFile, parsePiConversationMessages } from './pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
 
 type ModelCapability = (typeof MODEL_CAPABILITIES)[keyof typeof MODEL_CAPABILITIES];
 
@@ -261,7 +262,34 @@ export async function parseConversationMessages(
   priorState?: ParseState,
 ): Promise<ParseResult> {
   // Read only new content from the byte offset — avoids re-reading the entire JSONL every tick
-  const fileStats = await stat(sessionFile);
+  let fileStats: Awaited<ReturnType<typeof stat>>;
+  try {
+    fileStats = await stat(sessionFile);
+  } catch {
+    // The transcript file does not exist yet — a freshly-spawned conversation
+    // whose runtime has not written its first JSONL line. Treat this as an empty
+    // transcript (0 messages) instead of throwing, so a live subscriber can
+    // attach the instant the conversation row exists and self-populate once the
+    // file appears (watchConversation polls until it does). Mirrors the empty
+    // result the truncation branch below returns.
+    return {
+      messages: [],
+      workLog: [],
+      byteOffset: 0,
+      streaming: false,
+      totalCost: 0,
+      totalTokens: 0,
+      latestAssistantUsage: null,
+      contextBoundaryOffset: 0,
+      contextActiveBytes: 0,
+      pendingToolUse: priorState?.pendingToolUse ?? new Map(),
+      unresolvedResults: priorState?.unresolvedResults ?? new Map(),
+      lastSequence: priorState?.lastSequence ?? 0,
+      mtimeMs: 0,
+      permissionMode: priorState?.permissionMode,
+      fileEditsByAssistantId: new Map(),
+    };
+  }
   const fileSize = fileStats.size;
 
   // File was truncated or rotated since last read — signal reset to caller
@@ -869,6 +897,69 @@ export async function parseConversationMessages(
 }
 
 /**
+ * Parse an ENTIRE JSONL transcript, regardless of size.
+ *
+ * `parseConversationMessages(file)` reads at most MAX_READ_BYTES (10 MB) in a
+ * single call, so a one-shot full parse of a larger file silently returns only
+ * its first 10 MB — i.e. the OLDEST messages, dropping the most recent turns
+ * (PAN-1989: a 14.5 MB work-agent transcript rendered only up to its ~10 MB
+ * mark, hiding the final ~3 hours of work). The live WebSocket panel never hit
+ * this because it advances `byteOffset` tick-by-tick; the one-shot
+ * `GET /api/agents/:id/conversation` endpoint does not.
+ *
+ * This loops the same parser in 10 MB chunks until it stops advancing,
+ * threading ParseState across boundaries (identical to watchConversation's
+ * carry-over) and accumulating messages, workLog, compact boundaries, and
+ * cost/token totals. Per-chunk totals are safe to sum because `countedUsageIds`
+ * is threaded, so a response split across a read boundary is counted once.
+ */
+export async function parseEntireConversation(sessionFile: string): Promise<ParseResult> {
+  let offset = 0;
+  let priorState: ParseState | undefined;
+  const messages: ChatMessage[] = [];
+  const workLog: WorkLogEntry[] = [];
+  const compactBoundaries: CompactBoundary[] = [];
+  let totalCost = 0;
+  let totalTokens = 0;
+  let last: ParseResult | null = null;
+
+  // Bounded loop: at 10 MB/chunk this covers a 10 GB transcript. The real exit
+  // is "byteOffset stopped advancing" (EOF or an incomplete trailing line).
+  for (let guard = 0; guard < 1024; guard++) {
+    const result = await parseConversationMessages(sessionFile, offset, priorState);
+    messages.push(...result.messages);
+    workLog.push(...result.workLog);
+    if (result.compactBoundaries?.length) compactBoundaries.push(...result.compactBoundaries);
+    totalCost += result.totalCost;
+    totalTokens += result.totalTokens;
+    last = result;
+
+    if (result.byteOffset <= offset) break; // no progress → EOF
+    offset = result.byteOffset;
+    priorState = {
+      pendingToolUse: result.pendingToolUse,
+      unresolvedResults: result.unresolvedResults,
+      lastSequence: result.lastSequence,
+      planToolUseIds: result.planToolUseIds,
+      proposedPlan: result.proposedPlan,
+      latestAssistantUsage: result.latestAssistantUsage,
+      contextBoundaryOffset: result.contextBoundaryOffset,
+      permissionMode: result.permissionMode,
+      fileEditsByAssistantId: result.fileEditsByAssistantId,
+      pendingAssistantId: result.pendingAssistantId,
+      orphanToolUseIds: result.orphanToolUseIds,
+      countedUsageIds: result.countedUsageIds,
+    };
+  }
+
+  if (!last) return parseConversationMessages(sessionFile, 0);
+
+  // Take terminal state (byteOffset, boundary offsets, pending maps, mtime, …)
+  // from the final chunk; replace the accumulating fields with the full totals.
+  return { ...last, messages, workLog, compactBoundaries, totalCost, totalTokens };
+}
+
+/**
  * PAN-1635: a conversation whose JSONL hasn't been written in this long is no
  * longer "working" — even if its last entry is a trailing user/meta line (e.g. a
  * post-compaction summary whose follow-up prompt was eaten by the compaction).
@@ -894,7 +985,9 @@ export async function summarizeConversationActivity(
 
   const parsed = options.harness === 'codex'
     ? await parseCodexConversationMessages(sessionFile)
-    : options.harness === 'pi' || isPiSessionFile(sessionFile)
+    : options.harness === 'ohmypi' || isOhmypiSessionFile(sessionFile)
+      ? await parseOhmypiConversationMessages(sessionFile)
+      : options.harness === 'pi' || isPiSessionFile(sessionFile)
       ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
       // re-reading potentially megabytes of history on every list enrichment tick.

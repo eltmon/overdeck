@@ -180,7 +180,7 @@ describe('FleetAgentsView', () => {
     expect(within(menu).getByTestId('issue-action-untroubled')).toHaveTextContent('Clear troubled gate');
     expect(within(menu).getByTestId('issue-action-recoverAgent')).toHaveTextContent('Recover agent');
     expect(within(menu).getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
-    expect(within(menu).getByTestId('issue-action-switchModel')).toHaveTextContent('Switch model');
+    expect(within(menu).queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();

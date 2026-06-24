@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1832",
   "created": "2026-06-21T00:17:45.903Z",
-  "updated": "2026-06-21T05:08:14.242Z",
+  "updated": "2026-06-21T09:59:10.390Z",
   "gitState": {
     "branch": "feature/pan-1832",
     "sha": "f04a38ddc9",
@@ -131,6 +131,116 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-21T05:08:14.242Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T08:23Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-21T08:23:07.179Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T08:23:07.221Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-21T08:28:58.632Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-21T08:29:37.368Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T09:02Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-21T09:02:15.279Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T09:02:15.308Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-21T09:11:43.823Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-21T09:13:58.141Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T09:29Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-21T09:29:45.018Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T09:29:45.053Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-21T09:35:48.454Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T09:42Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-21T09:42:57.957Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T09:42:57.983Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-21T09:45:57.940Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-21T09:46:27.918Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T09:47Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-21T09:47:28.284Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T09:47:28.312Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-21T09:49:15.703Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-21T09:50Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-21T09:50:12.873Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T09:50:12.904Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-21T09:54:07.963Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-21T09:59:10.390Z"
     }
   ],
   "feedback": []

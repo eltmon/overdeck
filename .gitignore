@@ -198,3 +198,8 @@ __pycache__/
 
 # Generated at Vercel build by vercel.json (cp scripts/install.sh → site/install)
 /site/install
+
+# Installed skill sync target (e.g. the `impeccable` skill) — generated, not source
+/.agents/
+# Test-run output logs (e2e/unit/playwright/dashboard) — generated per run
+/reports/

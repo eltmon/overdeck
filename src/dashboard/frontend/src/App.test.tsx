@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DialogProvider } from './components/DialogProvider';
 import App, {
   SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY,
   buildConversationUrl,
@@ -160,7 +161,9 @@ function renderApp() {
 
   render(
     <QueryClientProvider client={client}>
-      <App />
+      <DialogProvider>
+        <App />
+      </DialogProvider>
     </QueryClientProvider>,
   );
 }
@@ -368,6 +371,14 @@ describe('App primary routing', () => {
     window.history.replaceState(null, '', '/context');
     renderApp();
     expect(screen.getByTestId('context-page')).toBeInTheDocument();
+  });
+
+  it('redirects direct experimental routes to Home when experimental features are off', async () => {
+    window.history.replaceState(null, '', '/agents');
+    renderApp();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
   });
 });
 

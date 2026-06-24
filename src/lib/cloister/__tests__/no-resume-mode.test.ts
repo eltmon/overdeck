@@ -4,13 +4,16 @@ const BASE_TIME = new Date('2026-05-17T12:00:00.000Z');
 
 describe('no-resume mode', () => {
   let originalNoResume: string | undefined;
+  let originalResume: string | undefined;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(BASE_TIME);
     vi.resetModules();
     originalNoResume = process.env.OVERDECK_NO_RESUME;
+    originalResume = process.env.OVERDECK_RESUME;
     delete process.env.OVERDECK_NO_RESUME;
+    delete process.env.OVERDECK_RESUME;
   });
 
   afterEach(() => {
@@ -18,6 +21,8 @@ describe('no-resume mode', () => {
     vi.resetModules();
     if (originalNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
     else process.env.OVERDECK_NO_RESUME = originalNoResume;
+    if (originalResume === undefined) delete process.env.OVERDECK_RESUME;
+    else process.env.OVERDECK_RESUME = originalResume;
   });
 
   it('reflects OVERDECK_NO_RESUME changes after module import', async () => {
@@ -29,6 +34,22 @@ describe('no-resume mode', () => {
     expect(getNoResumeMode()).toEqual({ active: true, since: BASE_TIME.toISOString() });
 
     delete process.env.OVERDECK_NO_RESUME;
+    expect(getNoResumeMode()).toEqual({ active: false, since: null });
+  });
+
+  it('disableNoResumeMode clears no-resume and opts into resume for this session', async () => {
+    const { getNoResumeMode, disableNoResumeMode } = await import('../no-resume-mode.js');
+
+    process.env.OVERDECK_NO_RESUME = '1';
+    expect(getNoResumeMode()).toEqual({ active: true, since: BASE_TIME.toISOString() });
+
+    disableNoResumeMode();
+
+    // Mirrors the resume-enabled branch of applyBootGateEnv (boot-gates.ts):
+    // delete OVERDECK_NO_RESUME, set OVERDECK_RESUME=1.
+    expect(process.env.OVERDECK_NO_RESUME).toBeUndefined();
+    expect(process.env.OVERDECK_RESUME).toBe('1');
+    // getNoResumeMode reads the env live, so the banner goes inactive immediately.
     expect(getNoResumeMode()).toEqual({ active: false, since: null });
   });
 

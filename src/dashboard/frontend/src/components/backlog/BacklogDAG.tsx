@@ -16,9 +16,21 @@ import dagre from '@dagrejs/dagre';
 
 // ── Types ──
 
+export interface PipelineState {
+  ready: boolean;
+  planned: boolean;
+  parked: boolean;
+  vetoed: boolean;
+  blocksMain: boolean;
+  inPipeline: boolean;
+  gate: 'auto' | 'promote' | 'vetoed';
+}
+
 export interface SequenceNode {
   issueId: string;
   title?: string;
+  /** PAN-2006 pipeline state from the shared classifier (editor controls). */
+  state?: PipelineState;
   rank: number;
   size: string;
   importance: string;
@@ -116,7 +128,10 @@ function IssueNode({ data }: { data: IssueNodeData }) {
   if (node.condition === 'needs-refinement') cls.push('cond-refine');
   if (node.condition === 'stale') cls.push('cond-stale');
   if (node.gate === 'blocked') cls.push('gate-blocked');
-  if (node.gate === 'ready') cls.push('gate-promoted');
+  // gate=ready on an in-flight issue is the sequencer auto-PINNING active work, not an
+  // operator promotion — only badge a real (idle) operator promote.
+  const isPromoted = node.gate === 'ready' && !node.inPipeline;
+  if (isPromoted) cls.push('gate-promoted');
 
   return (
     <div className={cls.join(' ')} onClick={() => onSelect(node)}>
@@ -127,8 +142,8 @@ function IssueNode({ data }: { data: IssueNodeData }) {
       </div>
       <div className="title">{node.title || node.why}</div>
       <div className="chips">
-        {node.gate === 'ready' && <span className="chip promoted">📌 PROMOTED</span>}
-        {node.gate === 'blocked' && <span className="chip held">⛔ HELD</span>}
+        {isPromoted && <span className="chip promoted">📌 PROMOTED</span>}
+        {node.gate === 'blocked' && <span className="chip held">⛔ VETOED</span>}
         {node.inPipeline && <span className="chip verb work"><span className="pulsedot" />in pipeline</span>}
         {node.condition === 'needs-refinement' && <span className="chip refine">⚠ REFINE</span>}
         {node.condition === 'stale' && <span className="chip stale">⊘ STALE</span>}
@@ -199,9 +214,9 @@ const PLAN_HINT: Record<string, string> = {
 
 // Pickup-gate hint shown under the segmented control (verbatim from the mockup).
 const GATE_HINT: Record<string, string> = {
-  ready: 'Promoted: eligible for auto-pickup now, even ahead of heuristics (operator or Flywheel emergency-promote).',
-  blocked: 'Held: the Flywheel will not auto-pick this.',
-  auto: 'Auto: normal eligibility (ready · not blocked · passes the security filter).',
+  ready: 'Promote: jump the queue ahead of rank (and auto-plan it if it has no spec yet).',
+  blocked: 'Vetoed: an absolute NO — never auto-picked, planned, or struck, even to unblock the pipeline.',
+  auto: 'Auto: normal eligibility (Ready · Planned · not parked · not vetoed).',
 };
 
 type FlagKind = 'pipeline' | 'refine' | 'stale' | 'ready' | 'prd' | 'none';
@@ -219,7 +234,7 @@ function buildPanelFlags(node: SequenceNode): Array<{ label: string; kind: FlagK
 
 function panelChipStyle(kind: FlagKind): CSSProperties {
   const base: CSSProperties = {
-    fontSize: 9, fontWeight: 500, letterSpacing: '0.04em', padding: '1px 6px',
+    fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', padding: '1px 6px',
     borderRadius: 'var(--radius-sm, 4px)', border: '1px solid', lineHeight: '15px', whiteSpace: 'nowrap',
   };
   switch (kind) {
@@ -238,7 +253,7 @@ const META_GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'auto 1
 const META_KEY: CSSProperties = { color: 'var(--muted-foreground)' };
 const META_VAL: CSSProperties = { color: 'var(--foreground)', textAlign: 'right' };
 const SECTION_LABEL: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 7 };
-const SECTION_HINT: CSSProperties = { fontSize: 11, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
+const SECTION_HINT: CSSProperties = { fontSize: 12, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
 
 function SegControl({
   value,
@@ -260,7 +275,7 @@ function SegControl({
             style={{
               flex: 1,
               padding: '3px 6px',
-              fontSize: 9,
+              fontSize: 10,
               fontWeight: isActive ? 700 : 400,
               border: 'none',
               cursor: 'pointer',
@@ -277,27 +292,81 @@ function SegControl({
   );
 }
 
+// PAN-2006: a labelled on/off switch for the editor drawer's pipeline-state controls.
+function ToggleRow({ label, hint, on, color, onChange }: {
+  label: string; hint: string; on: boolean; color: string; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, margin: '9px 0' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 10, color: 'var(--muted-foreground)', lineHeight: 1.4, marginTop: 2 }}>{hint}</div>
+      </div>
+      <button
+        onClick={() => onChange(!on)}
+        aria-pressed={on}
+        style={{
+          flexShrink: 0, width: 38, height: 22, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative',
+          background: on ? `color-mix(in srgb, ${color} 60%, transparent)` : 'var(--input)', transition: 'background 0.15s',
+        }}
+      >
+        <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }} />
+      </button>
+    </div>
+  );
+}
+
 export interface RationaleSidePanelProps {
   node: SequenceNode;
   onClose: () => void;
   onGateChange: (issueId: string, gate: string) => Promise<void>;
   onPlanningChange: (issueId: string, planning: string) => Promise<void>;
+  /** PAN-2005: open the issue in the browser / overlay / cockpit panel. */
+  onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
+
+// Small nav-button style for the drawer's "open issue" row (style-guide: 10px
+// uppercase action link, weight 500, themed border).
+const NAV_BTN: CSSProperties = {
+  flex: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  fontWeight: 500,
+  padding: '5px 6px',
+  borderRadius: 6,
+  cursor: 'pointer',
+  border: '1px solid var(--border)',
+  background: 'var(--accent)',
+  color: 'var(--foreground)',
+};
 
 export function RationaleSidePanel({
   node,
   onClose,
   onGateChange,
   onPlanningChange,
+  onIssueAction,
 }: RationaleSidePanelProps) {
   const [gate, setGate] = useState(node.gate);
   const [planning, setPlanning] = useState(node.planning);
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(!!node.state?.ready);
+  const [parked, setParked] = useState(!!node.state?.parked);
+  const [blocksMain, setBlocksMain] = useState(!!node.state?.blocksMain);
+  const planned = !!node.state?.planned;
 
   useEffect(() => {
     setGate(node.gate);
     setPlanning(node.planning);
-  }, [node.issueId, node.gate, node.planning]);
+    setReady(!!node.state?.ready);
+    setParked(!!node.state?.parked);
+    setBlocksMain(!!node.state?.blocksMain);
+  }, [node.issueId, node.gate, node.planning, node.state]);
 
   async function handleGateChange(v: string) {
     setGate(v);
@@ -309,6 +378,21 @@ export function RationaleSidePanel({
     setPlanning(v);
     setBusy(true);
     try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
+  }
+
+  // PAN-2006 WI-10: toggle ready / parked / blocks-main labels via the editor write-door.
+  async function toggleLabel(field: 'ready' | 'parked' | 'blocksMain', value: boolean) {
+    if (field === 'ready') setReady(value);
+    if (field === 'parked') setParked(value);
+    if (field === 'blocksMain') setBlocksMain(value);
+    setBusy(true);
+    try {
+      await fetch('/api/backlog/sequence/labels', {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ issueId: node.issueId, [field]: value }),
+      });
+    } finally { setBusy(false); }
   }
 
   const flags = buildPanelFlags(node);
@@ -333,7 +417,7 @@ export function RationaleSidePanel({
         </span>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}
         >
           ×
         </button>
@@ -342,7 +426,16 @@ export function RationaleSidePanel({
       {/* Identity */}
       <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{node.issueId}</div>
       {node.title && (
-        <div style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 14px' }}>{node.title}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 10px' }}>{node.title}</div>
+      )}
+
+      {/* PAN-2005: three ways to open the issue — cockpit panel, overlay, browser */}
+      {onIssueAction && (
+        <div style={{ display: 'flex', gap: 6, margin: `${node.title ? 0 : 10}px 0 14px` }}>
+          <button style={NAV_BTN} onClick={() => onIssueAction(node.issueId, 'panel')} title="Open the full issue cockpit (deep-linked tab)">⛶ Panel</button>
+          <button style={NAV_BTN} onClick={() => onIssueAction(node.issueId, 'modal')} title="Open the issue overlay (quick peek, stays on this page)">▢ Overlay</button>
+          <button style={NAV_BTN} onClick={() => onIssueAction(node.issueId, 'browser')} title="Open the issue on GitHub in a new tab">↗ GitHub</button>
+        </div>
       )}
 
       {/* Metrics — importance + impact score */}
@@ -376,6 +469,38 @@ export function RationaleSidePanel({
         </div>
       )}
 
+      {/* Pipeline state — operator controls (PAN-2006) */}
+      {node.state && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
+          <div style={SECTION_LABEL}>Pipeline state · operator controls {busy && '…'}</div>
+          <ToggleRow
+            label="Ready" color="var(--success)" on={ready}
+            hint="Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate)."
+            onChange={(v) => toggleLabel('ready', v)}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '9px 0' }}>
+            <span style={{ fontSize: 12, fontWeight: 500 }}>Planned</span>
+            <span style={{
+              fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 5, border: '1px solid',
+              ...(planned
+                ? { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }
+                : { color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 34%, transparent)', background: 'color-mix(in srgb, var(--warning) 9%, transparent)' }),
+            }}>{planned ? '✓ has spec + beads' : '✗ no spec'}</span>
+            <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>derived</span>
+          </div>
+          <ToggleRow
+            label="Blocks main 🔴" color="var(--destructive)" on={blocksMain}
+            hint="Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed)."
+            onChange={(v) => toggleLabel('blocksMain', v)}
+          />
+          <ToggleRow
+            label="Park" color="var(--warning)" on={parked}
+            hint="Defer — needs human design/discussion; excluded from auto-pickup, reversible."
+            onChange={(v) => toggleLabel('parked', v)}
+          />
+        </div>
+      )}
+
       {/* Planning policy */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
         <div style={SECTION_LABEL}>Planning · AI-suggested, operator-overridable</div>
@@ -398,8 +523,8 @@ export function RationaleSidePanel({
           value={gate}
           options={[
             { value: 'auto', label: 'Auto' },
-            { value: 'ready', label: '✓ Ready', activeColor: '#15803d' },
-            { value: 'blocked', label: '⛔ Block', activeColor: '#b91c1c' },
+            { value: 'ready', label: '📌 Promote', activeColor: '#15803d' },
+            { value: 'blocked', label: '⛔ Vetoed', activeColor: '#b91c1c' },
           ]}
           onChange={handleGateChange}
         />
@@ -407,7 +532,7 @@ export function RationaleSidePanel({
       </div>
 
       {/* AI rationale */}
-      <div style={{ fontSize: 13, lineHeight: 1.6, color: 'color-mix(in srgb, var(--foreground) 88%, transparent)', borderTop: '1px solid var(--border)', paddingTop: 13 }}>
+      <div style={{ fontSize: 12, lineHeight: 1.6, color: 'color-mix(in srgb, var(--foreground) 88%, transparent)', borderTop: '1px solid var(--border)', paddingTop: 13 }}>
         <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 6 }}>
           AI rationale · from sequence.md
         </div>
@@ -427,6 +552,8 @@ interface BacklogDAGProps {
   onSelectNode?: (n: SequenceNode | null) => void;
   onGateChange?: (issueId: string, gate: string) => Promise<void>;
   onPlanningChange?: (issueId: string, planning: string) => Promise<void>;
+  /** PAN-2005: open the selected issue in the browser / overlay / cockpit panel. */
+  onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
 
 export function BacklogDAG({
@@ -436,6 +563,7 @@ export function BacklogDAG({
   onSelectNode,
   onGateChange,
   onPlanningChange,
+  onIssueAction,
 }: BacklogDAGProps) {
   const queryClient = useQueryClient();
   const [internalSelectedNode, setInternalSelectedNode] = useState<SequenceNode | null>(null);
@@ -543,9 +671,9 @@ export function BacklogDAG({
         .bk-dag-root .node.gate-blocked { opacity: .82; }
         .bk-dag-root .node.gate-promoted { border-top: 2px solid color-mix(in srgb, var(--primary) 60%, transparent); }
         .bk-dag-root .node .row1 { display: flex; align-items: center; gap: 7px; }
-        .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 600; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
+        .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 500; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
         .bk-dag-root .node .iid { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
-        .bk-dag-root .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 600; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 15px; }
+        .bk-dag-root .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 500; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 15px; }
         .bk-dag-root .node .title { font-size: 12.5px; font-weight: 500; color: var(--foreground); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .bk-dag-root .node .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
         .bk-dag-root .chip { font-size: 9px; font-weight: 500; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; border: 1px solid; line-height: 14px; }
@@ -587,6 +715,7 @@ export function BacklogDAG({
           onClose={handleClose}
           onGateChange={handleGateChange}
           onPlanningChange={handlePlanningChange}
+          onIssueAction={onIssueAction}
         />
       )}
     </div>

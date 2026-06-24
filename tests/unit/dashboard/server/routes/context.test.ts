@@ -105,9 +105,9 @@ describe('dashboard context routes helpers', () => {
       '{{#harness:claude}}',
       'Claude guidance.',
       '{{/harness:claude}}',
-      '{{#harness:pi}}',
-      'Pi guidance.',
-      '{{/harness:pi}}',
+      '{{#harness:ohmypi}}',
+      'Ohmypi guidance.',
+      '{{/harness:ohmypi}}',
     ].join('\n');
 
     const response = await previewContextLayers(projects, { kind: 'global' }, [{
@@ -117,10 +117,10 @@ describe('dashboard context routes helpers', () => {
 
     expect(response.previews['claude-code']).toContain('Shared guidance.');
     expect(response.previews['claude-code']).toContain('Claude guidance.');
-    expect(response.previews['claude-code']).not.toContain('Pi guidance.');
-    expect(response.previews.pi).toContain('Shared guidance.');
-    expect(response.previews.pi).toContain('Pi guidance.');
-    expect(response.previews.pi).not.toContain('Claude guidance.');
+    expect(response.previews['claude-code']).not.toContain('Ohmypi guidance.');
+    expect(response.previews.ohmypi).toContain('Shared guidance.');
+    expect(response.previews.ohmypi).toContain('Ohmypi guidance.');
+    expect(response.previews.ohmypi).not.toContain('Claude guidance.');
     expect(response.previews.fullPrompt).toContain('Private harness base prompt: Unavailable');
     expect(syncRunner).not.toHaveBeenCalled();
     await expect(exists(globalFile)).resolves.toBe(false);

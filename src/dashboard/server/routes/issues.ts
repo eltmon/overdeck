@@ -34,7 +34,7 @@ import { promisify } from 'node:util';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
 
-import { Effect, Layer, Option, Stream } from 'effect';
+import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
@@ -61,8 +61,9 @@ import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
-import { GitHubClient } from '../services/github-client.js';
+import { GitHubClient, type GitHubClientError, type GitHubClientShape, type GitHubIssue } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
+import { TrackerApiError } from '../services/typed-errors.js';
 import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { getAgentState, getAgentStateSync, saveAgentStateSync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
@@ -236,6 +237,17 @@ export function completePlanningFilesToStage(projectPath: string, proposedFilena
   return filesToStage;
 }
 
+export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string[][] {
+  const commands: string[][] = [];
+  if (existsSync(join(gitRoot, '.pan'))) {
+    commands.push(['add', '.pan/']);
+  }
+  if (existsSync(join(gitRoot, '.beads'))) {
+    commands.push(['add', '.beads/']);
+  }
+  return commands;
+}
+
 function getInternalDashboardOrigin(): string {
   const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   return process.env['OVERDECK_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
@@ -353,6 +365,37 @@ export async function completePlanningAutoSpawnAndKill(options: {
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
+
+const START_PLANNING_GITHUB_FETCH_ATTEMPTS = 5;
+const START_PLANNING_GITHUB_FETCH_BACKOFF_MS = [250, 500, 750, 1000];
+
+function getGitHubIssueForStartPlanning(
+  github: GitHubClientShape,
+  owner: string,
+  repo: string,
+  number: number,
+  issueId: string,
+  attempt = 1,
+): Effect.Effect<GitHubIssue, GitHubClientError> {
+  return github.getIssue(owner, repo, number).pipe(
+    Effect.catchTag('IssueNotFound', (err) => {
+      if (attempt >= START_PLANNING_GITHUB_FETCH_ATTEMPTS) {
+        return Effect.fail(new TrackerApiError({
+          tracker: 'github',
+          message: `could not fetch ${issueId.toUpperCase()} from GitHub after ${START_PLANNING_GITHUB_FETCH_ATTEMPTS} attempts`,
+          cause: err,
+        }));
+      }
+
+      const delayMs = START_PLANNING_GITHUB_FETCH_BACKOFF_MS[
+        Math.min(attempt - 1, START_PLANNING_GITHUB_FETCH_BACKOFF_MS.length - 1)
+      ] ?? 1000;
+      return Effect.sleep(Duration.millis(delayMs)).pipe(
+        Effect.flatMap(() => getGitHubIssueForStartPlanning(github, owner, repo, number, issueId, attempt + 1)),
+      );
+    }),
+  );
+}
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -848,7 +891,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       probe = false,
       harness = 'claude-code',
     } = body as any;
-    const requestedHarness = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
@@ -900,7 +943,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     if (trackerTypeForIssue === 'github' && githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       const { owner, repo, number } = githubCheck as { owner: string; repo: string; number: number };
-      const ghIssue = yield* github.getIssue(owner, repo, number);
+      const ghIssue = yield* getGitHubIssueForStartPlanning(github, owner, repo, number, id);
 
       const ghConfig = getGitHubConfig();
       const repoConfig = ghConfig?.repos.find((r: any) => r.owner === owner && r.repo === repo);
@@ -992,12 +1035,13 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       return Promise.resolve();
     });
 
-    if (issue.source === 'linear') {
-      // Transition to "In Planning" state — emits issue.transitioned which
-      // reactive Cloister consumes. State.json was written above so the
-      // observer can see role: 'plan' before mapping in_planning → plan role.
-      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
-    }
+    // Transition to "In Planning" state — emits issue.transitioned which
+    // reactive Cloister consumes. State.json was written above so the
+    // observer can see role: 'plan' before mapping in_planning → plan role.
+    // PAN-1994: call for ALL tracker types (not just linear). For GitHub
+    // issues this cleans up stale labels (merged, verifying-on-main, etc.)
+    // left by a prior pipeline cycle when re-planning starts.
+    yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
 
     yield* eventStore.append({
       type: 'workspace.created',
@@ -1420,11 +1464,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
       }
 
-      if (existsSync(join(gitRoot, '.pan'))) {
-        await execFileAsync('git', ['add', '-f', '.pan/'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-      if (existsSync(join(gitRoot, '.beads'))) {
-        await execFileAsync('git', ['add', '.beads/'], { cwd: gitRoot, encoding: 'utf-8' });
+      for (const args of completePlanningWorkspaceGitAddCommands(gitRoot)) {
+        await execFileAsync('git', args, { cwd: gitRoot, encoding: 'utf-8' });
       }
 
       try {

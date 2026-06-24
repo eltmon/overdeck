@@ -90,8 +90,27 @@ describe('shouldStreamConversationMessages', () => {
   it('streams live Claude Code conversations and legacy null-harness conversations', () => {
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'claude-code' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: null })).toBe(true);
-    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'pi' })).toBe(false);
-    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: false, harness: null })).toBe(false);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'ohmypi' })).toBe(true);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'ohmypi' })).toBe(true);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'codex' })).toBe(true);
     expect(shouldStreamConversationMessages({ id: -1, sessionAlive: true, harness: 'claude-code' })).toBe(false);
+  });
+
+  it('streams a freshly-created real conversation that is still spawning (sessionAlive:false, not ended)', () => {
+    // The reload bug: a new conversation reports sessionAlive:false until its
+    // background spawn finishes. It must still stream so the feed self-populates
+    // the instant the runtime writes — without a page reload.
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: false, harness: 'claude-code' })).toBe(true);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: false, harness: null })).toBe(true);
+  });
+
+  it('does NOT stream an ended conversation — historical view uses the one-shot HTTP path', () => {
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: false, harness: 'claude-code', endedAt: '2026-06-23T00:00:00.000Z' })).toBe(false);
+    expect(shouldStreamConversationMessages({ id: 1, sessionAlive: true, harness: 'claude-code', endedAt: '2026-06-23T00:00:00.000Z' })).toBe(false);
+  });
+
+  it('still gates synthetic agent sessions (id < 0) on a live session', () => {
+    expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: false, harness: 'ohmypi' })).toBe(false);
+    expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: true, harness: 'ohmypi' })).toBe(true);
   });
 });

@@ -60,7 +60,7 @@ type SettingsResponse = {
     plan?: {
       model?: string;
       // PAN-1055: per-role harness override surfaced through Settings → Roles.
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
     };
   };
 };
@@ -127,14 +127,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const defaultPlanningModel = resolveSettingsModelRef(
     settingsQuery.data?.roles?.plan?.model,
     settingsQuery.data?.workhorses,
-  ) || 'claude-opus-4-8';
+  );
   // PAN-1055: Honor the role-level harness override so PlanDialog opens with
   // the harness configured for the plan role under Settings → Roles.
   const defaultPlanningHarness = settingsQuery.data?.roles?.plan?.harness;
 
   useEffect(() => {
     if (harnessOverrideTouched.current) return;
-    if (defaultPlanningHarness === 'pi' || defaultPlanningHarness === 'claude-code' || defaultPlanningHarness === 'codex') {
+    if (defaultPlanningHarness === 'ohmypi' || defaultPlanningHarness === 'claude-code' || defaultPlanningHarness === 'codex') {
       setHarnessOverride(defaultPlanningHarness);
     }
   }, [defaultPlanningHarness]);
@@ -191,7 +191,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     staleTime: 60000,
   });
 
-  const effectivePlanningModel = modelOverride || defaultPlanningModel;
+  const effectivePlanningModel = modelOverride || defaultPlanningModel || '';
   const planningHarnessDecision = canUsePickerHarness(
     harnessOverride,
     effectivePlanningModel,

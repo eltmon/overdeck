@@ -240,7 +240,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
-      json: async () => ({ success: true, message: 'ok' }),
+      text: async () => JSON.stringify({ success: true, message: 'ok' }),
     })));
     delete process.env.OVERDECK_AGENT_ID;
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -346,6 +346,33 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
     expect(fetch).toHaveBeenCalledWith('http://dashboard.test/api/specialists/overdeck/PAN-9999/review/restart', expect.any(Object));
+  });
+
+  it('does not fail pan review restart when an accepted response is not JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      text: async () => 'true unexpected trailer',
+    })));
+    const { reviewRestartCommand } = await import('../review-restart.js');
+
+    await reviewRestartCommand('9999');
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Review restarted for PAN-9999'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('non-JSON response'));
+  });
+
+  it('prints non-JSON pan review restart failures without a JSON parse error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      text: async () => 'true unexpected trailer',
+    })));
+    const { reviewRestartCommand } = await import('../review-restart.js');
+
+    await expect(reviewRestartCommand('9999')).rejects.toThrow('process.exit:1');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('true unexpected trailer'));
+    expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Unexpected non-whitespace character'));
   });
 
   it('prints the shared unresolved-ID error path for pan kill', async () => {

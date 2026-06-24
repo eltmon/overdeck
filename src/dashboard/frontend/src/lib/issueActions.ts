@@ -35,8 +35,8 @@ export type IssueActionKey =
   | 'untroubled'
   | 'recoverAgent'
   | 'resumeSession'
-  | 'switchModel'
   | 'syncMain'
+  | 'rebuildAndStart'
   | 'inspectBead'
   | 'reopen'
   | 'closeOut'
@@ -155,6 +155,12 @@ const isMerged = (state: IssueActionState) => state.isMerged === true || state.r
 const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
 const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);
 const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && state.hasBeads && !isMerged(state) && !isDoneOrCanceled(state);
+// Rebuild & start: the recovery path for the `stack-unhealthy` spawn block.
+// Available wherever a normal start is viable AND a workspace exists (rebuild
+// operates on the workspace's Docker stack). Mirrors `canStartAgent` so it is a
+// drop-in alternative when `pan start`'s autonomous rebuild is on cooldown or
+// exhausted (see src/lib/agents.ts SPAWN_STACK_REBUILD_*).
+const canRebuildAndStart = (state: IssueActionState) => hasWorkspace(state) && canStartAgent(state);
 const canStartWithoutPlanning = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && isTodo(state) && !isMerged(state);
 // PAN-1517: `hasParallelizablePlan` removed alongside the `swarm` action entry —
 // parallelism is now an in-context concern owned by the work agent (see
@@ -227,8 +233,8 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'untroubled', label: 'Clear troubled gate', panVerb: 'untroubled', endpoint: '/api/agents/:agentId/untroubled', enabledWhen: isTroubled, phasePrimary: [], kind: 'safe', group: 'agent' },
   { key: 'recoverAgent', label: 'Recover agent', panVerb: 'recover', endpoint: '/api/agents/:agentId/recover', enabledWhen: canRecoverAgent, phasePrimary: phasePrimary('recoverAgent'), kind: 'safe', group: 'agent' },
   { key: 'resumeSession', label: 'Resume session', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'switchModel', label: 'Switch model', panVerb: null, endpoint: null, enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
+  { key: 'rebuildAndStart', label: 'Rebuild & start', panVerb: 'workspace rebuild && start', endpoint: '/api/workspaces/:id/rebuild-and-start', enabledWhen: canRebuildAndStart, phasePrimary: [], kind: 'safe', group: 'workspace' },
   { key: 'inspectBead', label: 'Inspect bead', panVerb: 'inspect --bead', endpoint: '/api/issues/:id/beads/:beadId/inspect', enabledWhen: canInspectBead, phasePrimary: [], kind: 'dialog', group: 'review' },
   { key: 'reopen', label: 'Reopen', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'danger' },
   { key: 'closeOut', label: 'Close out', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },

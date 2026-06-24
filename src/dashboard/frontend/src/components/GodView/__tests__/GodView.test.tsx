@@ -81,7 +81,7 @@ describe('GodView selectors', () => {
           agentHarness: 'claude-code',
           gitBranch: 'feature/pan-1052',
           sourceTranscriptOffset: 1,
-          actionStatus: 'Wired memory observation stream',
+          actionStatus: 'in_progress',
           narrative: 'Memory observation events update the sidebar feed.',
           summary: 'Memory observation stream updates sidebar.',
           files: [],
@@ -95,7 +95,7 @@ describe('GodView selectors', () => {
     expect(selectGodViewActivityFeed(state)[0]).toMatchObject({
       agentId: 'feature-pan-1052',
       issueId: 'PAN-1052',
-      message: 'Wired memory observation stream',
+      message: 'Memory observation stream updates sidebar.',
     });
   });
 

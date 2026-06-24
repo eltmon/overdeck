@@ -1,0 +1,1213 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-23T08:16:42.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1989: Replace Pi harness with oh-my-pi (omp) and evaluate advanced features",
+    "updated": "2026-06-24T14:04:33.166Z"
+  },
+  "plan": {
+    "id": "pan-1989",
+    "title": "Replace Pi harness with oh-my-pi (omp) and evaluate advanced features",
+    "status": "running",
+    "uid": "88b45a5d-661f-47e9-a31d-abb5f1cb57a8",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 12,
+    "created": "2026-06-23T08:16:42.000Z",
+    "updated": "2026-06-24T14:04:33.166Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1989",
+        "label": "PAN-1989",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1989.md",
+        "label": "PRD draft",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/can1357/oh-my-pi",
+        "label": "oh-my-pi upstream",
+        "type": "reference"
+      },
+      {
+        "uri": "https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent",
+        "label": "@oh-my-pi/pi-coding-agent",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "harness",
+      "migration",
+      "ohmypi",
+      "pi",
+      "no-loss-audit",
+      "research"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has first-class Pi support across runtime, FIFO RPC, a vendored extension, cost/conversation parsing, harness routing/policy, settings/auth, docs, dashboard, and tests. We are moving to oh-my-pi (binary omp, package @oh-my-pi/pi-coding-agent), a superset FORK of the same pi-mono. The runtime contract (--mode rpc, extension model, JSONL session shape) is largely preserved, but the binary name (pi->omp, no alias), npm package, config/auth dir (~/.pi->~/.omp), and extension import package all change — so this is not a string-rename and requires a verified no-loss audit plus real-output verification. Four in-flight Pi defects (PAN-1859 RED-main resume->FIFO test, PAN-1833 extension cwd detection, PAN-1827 blank pi conversation view, PAN-1912 hidden tool-call detail) must be explicitly dispositioned, not dropped.",
+      "Proposal": "Clean rename pi->ohmypi with read-only back-compat for legacy 'pi' rows/paths, executed as widen->migrate->narrow so every intermediate commit stays green. A gated foundation bead installs omp, captures a real --mode rpc transcript as a parser fixture, and records the exact pi->omp contract (binary/package/flags/paths/extension-import/hook-names/session-format) in docs/ohmypi-contract.md; downstream beads consume the contract instead of guessing. Land parity plus two bounded low-risk wins (additional routable providers; extra observability/cost + tool-call data), deferring all higher-risk omp features to filed follow-ups. Resolve PAN-1859/1833/1827 in their owning beads; split PAN-1912 (data here, UI carried forward).",
+      "NonGoals": "- Adopting LSP/DAP tools, hashline edits, subagents, browser/search, ACP, or model-control UIs in this issue — each becomes a filed follow-up once parity is proven.\n- Keeping the pi binary/@mariozechner/pi-coding-agent package as a runnable harness — omp replaces it; 'pi' survives only as a legacy read alias.\n- Running Pi and omp side-by-side as co-equal harnesses.\n- Rebuilding the frontend Tools show/hide toggle UI (PAN-1912 UI half) — carried forward as a filed follow-up; only the tool-call data is in scope.\n- Destructively migrating existing harness='pi' DB rows — they normalize to 'ohmypi' on read; the DB is a rebuildable cache.\n- Changing the ToS policy posture — the single blocked cell (harness + Anthropic + subscription) is preserved, re-keyed to 'ohmypi'."
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "omp-contract",
+        "title": "Install omp, capture a real RPC transcript, and record the pi->omp contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "runtime-fifo",
+            "extension-pkg",
+            "cost-parser",
+            "conv-parser",
+            "auth-paths",
+            "doctor",
+            "provider-expansion",
+            "research-doc"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Run `npm i -g @oh-my-pi/pi-coding-agent`; verify `omp --version`. Run a real `omp --mode rpc` session and capture its session JSONL. Commit the captured transcript as a fixture used by the cost/conversation parser beads. Author docs/ohmypi-contract.md mapping every pi surface to its omp equivalent: binary (omp), package, all CLI flags discovered from `omp --help`/subcommand help (session-dir, extension load, model, provider, resume, --mode rpc/rpc-ui), the config/auth directory (~/.omp/agent), the extension import package + exact hook names from the installed package's TypeScript types, and the real session JSONL shape vs Pi v3 {type:session,version:3}. For any pi flag without an obvious omp equivalent, record the discovered fallback (env var or alternate flag) — never guess downstream."
+        },
+        "items": [
+          {
+            "id": "omp-contract.ac1",
+            "title": "Given omp installed globally, `omp --version` exits 0 and prints a version string recorded in docs/ohmypi-contract.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "omp-contract.ac2",
+            "title": "The bead commits a real captured `omp --mode rpc` session transcript as a parser test fixture under the cost/conversation parser test dirs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "omp-contract.ac3",
+            "title": "docs/ohmypi-contract.md records each pi CLI flag (mode rpc, session-dir, extension, model, provider, resume) mapped to its verified omp flag or a recorded fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "omp-contract.ac4",
+            "title": "docs/ohmypi-contract.md records the extension import package + hook names and the config/auth path (~/.omp/agent), each cited from the installed package or real output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "omp-contract.ac5",
+            "title": "docs/ohmypi-contract.md states whether the omp session JSONL preserves Pi v3 shape and documents any divergence the parsers must handle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-enumeration",
+        "title": "Write the no-loss audit enumeration of the current Pi surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Author docs/ohmypi-no-loss-audit.md enumerating every current Pi surface item (the 20 surface rows + 4 defect rows from the PRD audit table), each with a disposition column (preserve/replace/retire) and an empty 'home in omp surface' / 'verified' column the migration beads fill in. Map PAN-1859/1833/1827/1912 to resolved-by-bead vs carried-forward."
+        },
+        "items": [
+          {
+            "id": "audit-enumeration.ac1",
+            "title": "docs/ohmypi-no-loss-audit.md contains a row for every Pi surface item (runtime, fifo, launcher, extension, parsers, auth, policy, routing, doctor, settings, docs, frontend, tests, union types), each with a disposition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-enumeration.ac2",
+            "title": "The audit records, for each of PAN-1859/1833/1827/1912, a resolving bead or an explicit carried-forward follow-up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-enumeration.ac3",
+            "title": "Each audit row contains an unfilled 'verified' marker that the closing audit-gate bead later checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "widen-union",
+        "title": "Widen the harness union to include 'ohmypi' and add the legacy normalizer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "runtime-fifo",
+            "extension-pkg",
+            "launcher-omp",
+            "cost-parser",
+            "conv-parser",
+            "auth-paths",
+            "policy-routing",
+            "frontend-labels",
+            "narrow-union"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'ohmypi' to both unions — RuntimeName (src/lib/runtimes/types.ts:20) and Harness (packages/contracts/src/types.ts:49) — producing a transient 4-value set 'claude-code'|'pi'|'ohmypi'|'codex'. EXTEND the existing normalizeHarness() at src/lib/overdeck/conversations.ts:851 (today: harness==='pi'||'claude-code'||'codex' ? harness : null) to map legacy 'pi'->'ohmypi' and accept 'ohmypi' — do NOT add a parallel normalizer (single write door per domain). Route the inline duplicate harness validation at src/lib/database/conversations-db.ts:142 through normalizeHarness() so both paths share one source of truth and both accept 'ohmypi' / normalize legacy 'pi' on read. No comparison sites are removed yet; the build stays green."
+        },
+        "items": [
+          {
+            "id": "widen-union.ac1",
+            "title": "Both RuntimeName and Harness unions accept 'ohmypi' and typecheck passes with the transient 4-value set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-union.ac2",
+            "title": "normalizeHarness('pi') returns 'ohmypi' and normalizeHarness('ohmypi'|'claude-code'|'codex') returns the input unchanged, covered by a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-union.ac3",
+            "title": "Given an 'ohmypi' row both validation sites (canonical normalizeHarness at overdeck/conversations.ts:851 and the inline check at conversations-db.ts:142, now routed through it) accept it, and given a legacy 'pi' row both resolve it to 'ohmypi' on read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-union.ac4",
+            "title": "Given the transient 4-value union, `npm run typecheck` exits 0 and no harness comparison site breaks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-fifo",
+        "title": "Rename the runtime + FIFO to ohmypi and land a green resume->FIFO test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename src/lib/runtimes/pi.ts->ohmypi.ts (PiRuntimeSync/PiRuntime->OhmypiRuntimeSync/OhmypiRuntime) and pi-fifo.ts->ohmypi-fifo.ts (createPiFifo/writePiCommandSync->ohmypi equivalents), updating the registry dispatch at runtimes/index.ts:82 to construct the runtime when harness==='ohmypi'. Preserve spawn/kill/heartbeat/usage/resume behavior. Fix the currently-RED resume->FIFO delivery path so the renamed test (resumeAgent delivers the continue prompt through the ohmypi FIFO) passes. Resolves PAN-1859."
+        },
+        "items": [
+          {
+            "id": "runtime-fifo.ac1",
+            "title": "The runtime registry returns the OhmypiRuntime when state.harness==='ohmypi', covered by a registry-dispatch test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-fifo.ac2",
+            "title": "Given a resumed agent, resumeAgent writes the continue prompt through the ohmypi FIFO (write command invoked), making the previously-failing PAN-1859 test green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-fifo.ac3",
+            "title": "Spawn preserves ready.json readiness signaling and kill preserves the abort->SIGTERM->SIGKILL ladder, covered by the renamed runtime tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-fifo.ac4",
+            "title": "No source file imports the old pi.ts/pi-fifo.ts paths after the rename; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extension-pkg",
+        "title": "Rename the vendored extension to ohmypi and resolve its bundle path from the module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "launcher-omp",
+            "doctor"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename packages/pi-extension->packages/ohmypi-extension (@overdeck/pi-extension->@overdeck/ohmypi-extension). Repoint the extension's import of the harness extension API to omp's package and align the hook names (session_start, tool_execution_end, turn_end) and the pan-done slash command per docs/ohmypi-contract.md. Update build scripts (build:pi-extension->build:ohmypi-extension in package.json and pretest). Resolve the extension dist bundle path from the module/package location rather than process.cwd() so non-repo-root invocations work. Resolves PAN-1833."
+        },
+        "items": [
+          {
+            "id": "extension-pkg.ac1",
+            "title": "The extension package is named @overdeck/ohmypi-extension and `npm run build:ohmypi-extension` produces packages/ohmypi-extension/dist/index.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-pkg.ac2",
+            "title": "When loaded, the extension registers session_start, tool_execution_end, and turn_end handlers and the pan-done slash command against omp's extension API",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-pkg.ac3",
+            "title": "Given pan start invoked from a non-repo-root directory, the extension bundle path resolves from the module location and does not report 'extension not built' (PAN-1833 regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-pkg.ac4",
+            "title": "When a session starts, the extension creates ready.json, validated by an extension unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-omp",
+        "title": "Build the omp launcher command with contract-mapped flags",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename buildPiCommand->buildOhmypiCommand in src/lib/launcher-generator.ts; spawn the omp binary with the contract-mapped flags for RPC mode (work agents: --mode rpc + session-dir + extension + stdin fifo) and TUI mode (conversations: model + session-dir). Update the wrapWithSupervisor harness check (launcher-generator.ts:205) from 'pi' to 'ohmypi'. Preserve provider/env exports and the rpc.in fifo redirection."
+        },
+        "items": [
+          {
+            "id": "launcher-omp.ac1",
+            "title": "buildOhmypiCommand emits an `omp --mode rpc` invocation with the contract-mapped session-dir, extension, and fifo redirection for work agents, covered by a launcher test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-omp.ac2",
+            "title": "buildOhmypiCommand emits an omp TUI invocation with model + session-dir for conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-omp.ac3",
+            "title": "wrapWithSupervisor preserves prior behavior: it skips supervisor wrapping when harness==='ohmypi' exactly as it did for 'pi'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-omp.ac4",
+            "title": "The generated launcher script contains `omp` and contains no `pi --mode` invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-parser",
+        "title": "Rename the cost parser and verify it against the real omp fixture",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename src/lib/cost-parsers/pi-parser.ts->ohmypi-parser.ts (parsePiSessionSync->parseOhmypiSessionSync) and update src/lib/memory/transcript-source.ts:136 harness filter to 'ohmypi'. Re-point parsing at the real omp transcript shape per the contract; preserve leaf->root active-branch traversal, per-model cost breakdown, and inline usage.cost aggregation. Add a unit test that parses the committed real omp fixture."
+        },
+        "items": [
+          {
+            "id": "cost-parser.ac1",
+            "title": "parseOhmypiSessionSync parses the committed real omp transcript fixture and returns non-zero usage with a per-model breakdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-parser.ac2",
+            "title": "Cost aggregation walks the latest leaf to root and produces a summed inline usage.cost without double-counting across compaction, exercised by a test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-parser.ac3",
+            "title": "Given ohmypi work-agent sessions, transcript-source.ts includes them (harness==='ohmypi') in the in-memory snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-parser",
+        "title": "Rename the conversation parser + 3 dispatchers and fix blank pi/ohmypi rendering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename pi-conversation-parser.ts->ohmypi-conversation-parser.ts (isPiSessionFile->isOhmypiSessionFile, parsePiConversationMessages->parseOhmypiConversationMessages). Update all three dispatcher surfaces — jsonl-resolver.ts session-path resolve, conversations.ts /messages dispatch, and the parser dispatch — to route ohmypi sessions; keep the path-pattern detector matching legacy on-disk Pi session paths so old transcripts still render. Update ws-rpc.ts:803 delivery, useConversationMessagesStream.ts streamability, and smart-compaction.ts harness checks to 'ohmypi'. Resolves PAN-1827 (conversation view no longer blank for pi/ohmypi sessions)."
+        },
+        "items": [
+          {
+            "id": "conv-parser.ac1",
+            "title": "Given an ohmypi session file, the /messages dispatcher routes to parseOhmypiConversationMessages and returns a non-empty ChatMessage list (PAN-1827 regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-parser.ac2",
+            "title": "Given an ohmypi path and a legacy on-disk pi path, isOhmypiSessionFile returns true for each, so existing transcripts still render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-parser.ac3",
+            "title": "The jsonl-resolver resolves the latest ohmypi session path for an agent, covered by a resolver test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-parser.ac4",
+            "title": "Given harness==='ohmypi', ws-rpc delivery and stream streamability detection behave exactly as they did for 'pi'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auth-paths",
+        "title": "Rename auth helpers to omp paths and the auth command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename src/lib/pi-codex-auth.ts->ohmypi-codex-auth.ts; change getPiAuthPath() to ~/.omp/agent/auth.json per the contract; load omp's OAuth module (replacing the @earendil-works/pi-ai dynamic import) for refresh/device-code login, wrapped so a missing module degrades gracefully. Rename the CLI command src/cli/commands/pi-auth.ts -> `pan ohmypi-auth <status|login>`, keeping `pan pi-auth` registered as a hidden deprecated alias for one release. Update any wrapper skill referencing pi-auth in the same commit (skills lint)."
+        },
+        "items": [
+          {
+            "id": "auth-paths.ac1",
+            "title": "The auth helper persists and reads the codex credential at ~/.omp/agent/auth.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-paths.ac2",
+            "title": "`pan ohmypi-auth status` reports auth status and exits non-zero when the credential is missing/expired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-paths.ac3",
+            "title": "`pan pi-auth` still resolves (deprecated alias) and forwards to the ohmypi-auth handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-paths.ac4",
+            "title": "Given a missing or relocated omp OAuth module, the helper falls back to status 'unavailable' rather than throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-routing",
+        "title": "Re-key the ToS gate and routing/binary check to ohmypi",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/harness-policy.ts re-key the single blocked cell from 'pi'+anthropic+subscription to 'ohmypi'+anthropic+subscription, preserving the block and its fallback-to-claude-code posture. In src/lib/harness-resolve.ts change the binary availability check from `command -v pi` to `command -v omp` and update built-in provider defaults and providerHarnesses normalization that mapped providers to 'pi' so they map to 'ohmypi'. Keep harness-policy.test.ts asserting the blocked cell."
+        },
+        "items": [
+          {
+            "id": "policy-routing.ac1",
+            "title": "canUseHarnessSync('ohmypi', <anthropic model>, 'subscription') returns allowed:false, and the test suite asserts this is the only blocked cell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-routing.ac2",
+            "title": "resolveHarness checks `command -v omp` for ohmypi availability and falls back to claude-code when omp is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-routing.ac3",
+            "title": "Given a provider that previously defaulted to 'pi', the built-in default now resolves to 'ohmypi', exercised by a resolve test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor",
+        "title": "Add the checkOhmypi doctor check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace checkPi with checkOhmypi in src/cli/commands/doctor.ts: check the omp binary (command -v omp), parse `omp --version` and compare against a min version baselined for omp per the contract (omp versioning is a distinct lineage from pi 0.79), verify the packages/ohmypi-extension/dist/index.js bundle exists, and report the ~/.omp codex auth credential status with expiry. Keep this CLI-only (execSync acceptable here; never import into server-reachable code). Strict mode exits non-zero on missing/too-old."
+        },
+        "items": [
+          {
+            "id": "doctor.ac1",
+            "title": "Given omp absent, `pan doctor` reports an actionable 'omp not installed' status with the install command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor.ac2",
+            "title": "Given omp older than the baselined minimum, `pan doctor` reports a too-old status; `pan doctor --strict` exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor.ac3",
+            "title": "`pan doctor` shows the ohmypi-extension bundle presence and the ~/.omp codex auth status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-labels",
+        "title": "Show ohmypi / oh-my-pi in dashboard harness pickers and labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the harness picker option in PlanDialog.tsx and the conversation row/menu components (CommandDeck/ConversationRow.tsx, ConversationActionMenu.tsx) plus any harness label/icon map so the harness value is 'ohmypi' and the displayed label is 'oh-my-pi'. The POST start-planning/start payloads send 'ohmypi'."
+        },
+        "items": [
+          {
+            "id": "frontend-labels.ac1",
+            "title": "The harness picker shows an 'ohmypi' option labelled 'oh-my-pi' and sends harness:'ohmypi' on start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-labels.ac2",
+            "title": "Given an ohmypi session or a normalized legacy pi session, conversation rows/menus render the 'oh-my-pi' label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-labels.ac3",
+            "title": "No frontend component renders the literal harness label 'Pi' for a new ohmypi session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-expansion",
+        "title": "Low-risk win: surface omp's additional routable providers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "From the contract/research provider matrix, add a BOUNDED set of omp's additional routable providers to the providers registry (src/lib/providers.ts PROVIDERS) and routing so getProviderForModelSync resolves them, defaulting each to the ohmypi harness. Do NOT add model-control UIs or per-provider tuning — only registry/routing entries. List exactly which providers were added in the bead's commit message."
+        },
+        "items": [
+          {
+            "id": "provider-expansion.ac1",
+            "title": "The PROVIDERS registry gains the bounded set of omp providers, and getProviderForModelSync resolves a model id from each new provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-expansion.ac2",
+            "title": "Each newly added provider defaults to the ohmypi harness via the built-in provider defaults, covered by a resolve test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-expansion.ac3",
+            "title": "The diff contains only PROVIDERS registry/routing entries and no new model-control UI component, keeping the change bounded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observability-toolcalls",
+        "title": "Low-risk win: capture extra omp usage/cost fields and tool-call detail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Using the real omp fixture, capture any additional observability fields omp emits beyond Pi (e.g. cache-hit, reasoning tokens, tool-call traces) in the cost parser output and the extension cost events, and ensure the conversation parser preserves tool-call name+arguments+result detail so the work-log shows tools (PAN-1912 data half). Keep this additive — do not change existing field semantics. The frontend Tools show/hide TOGGLE is NOT built here; it is carried forward as a filed follow-up."
+        },
+        "items": [
+          {
+            "id": "observability-toolcalls.ac1",
+            "title": "parseOhmypiSessionSync produces the additional omp usage/cost fields present in the real fixture (e.g. cache/reasoning tokens) and preserves existing field semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observability-toolcalls.ac2",
+            "title": "The conversation parser emits tool-call name, arguments, and result for ohmypi transcripts so the work-log renders tool detail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observability-toolcalls.ac3",
+            "title": "The diff contains no frontend Tools show/hide toggle component; the toggle is left to a filed follow-up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "narrow-union",
+        "title": "Narrow the harness union back to three values (drop writable 'pi')",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Remove 'pi' from the writable RuntimeName/Harness unions, returning them to 'claude-code'|'ohmypi'|'codex'. Keep 'pi' only as an accepted input string inside normalizeHarness() (legacy reads). Fix every residual `=== 'pi'` comparison the compiler now flags by routing through normalizeHarness or switching to 'ohmypi'. Run typecheck to confirm no writable 'pi' producer remains."
+        },
+        "items": [
+          {
+            "id": "narrow-union.ac1",
+            "title": "RuntimeName and Harness unions are exactly 'claude-code'|'ohmypi'|'codex'; typecheck passes with zero residual writable 'pi' comparisons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-union.ac2",
+            "title": "normalizeHarness still accepts the legacy string 'pi' and returns 'ohmypi', covered by the existing normalizer test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-union.ac3",
+            "title": "Given a legacy harness='pi' DB row, it resolves to an ohmypi conversation end to end (no blank or broken row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-gate",
+        "title": "Closing no-loss audit gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Complete the 'verified' column of docs/ohmypi-no-loss-audit.md and add an executable check (a test or a checklist asserted in review) that fails if any Pi surface row lacks a home (preserved/replaced/retired with rationale) or any of the four defects is undispositioned. Assert there is no remaining runnable 'pi' harness path and no @mariozechner/pi-coding-agent runtime dependency."
+        },
+        "items": [
+          {
+            "id": "audit-gate.ac1",
+            "title": "Every row in docs/ohmypi-no-loss-audit.md contains a filled 'verified' disposition (preserved, replaced, or retired-with-rationale)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-gate.ac2",
+            "title": "An executable audit check fails if any surface row is unaccounted for or any of PAN-1859/1833/1827/1912 is undispositioned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-gate.ac3",
+            "title": "A grep-based check fails if any runnable `pi --mode` launch path or @mariozechner/pi-coding-agent runtime import remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Update harness docs to omp install/use",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Update configuration/harnesses.mdx and reference/harness-landscape.mdx to describe installing (`npm i -g @oh-my-pi/pi-coding-agent`) and using omp, the ohmypi harness picker locations, `pan ohmypi-auth`, the ToS gate (re-keyed), and troubleshooting — replacing stale @mariozechner/pi-coding-agent and `pi` binary guidance. Reference the new file paths (ohmypi.ts, ohmypi-fifo.ts, ohmypi-parser.ts)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "harnesses.mdx contains the `npm i -g @oh-my-pi/pi-coding-agent` install step, the omp binary, `pan ohmypi-auth`, and the re-keyed ToS gate, and contains no stale @mariozechner reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "harness-landscape.mdx contains an oh-my-pi entry as the supported alternative harness and references the ohmypi implementation files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "research-doc",
+        "title": "Author the omp capabilities research deliverable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Author docs/ohmypi-capabilities.md: (1) the full omp model/provider matrix (40+ providers across frontier APIs, coding plans, and local), with model-id/provider-prefix/auth-mode/context/reasoning-control/tool-capability notes — NOT scoped to GPT-5.5; (2) concrete Overdeck improvements grouped by model-routing, role-defaults, runtime-delivery, observability/cost, dashboard-UX, and agent-reliability; (3) a Proposed-Follow-ups table, each row tied to the models/providers/workflows it improves and a suggested priority. Include the carried-forward PAN-1912 frontend Tools-toggle as a row."
+        },
+        "items": [
+          {
+            "id": "research-doc.ac1",
+            "title": "docs/ohmypi-capabilities.md contains the omp model/provider matrix covering all provider categories (not just OpenAI/GPT-5.5)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "research-doc.ac2",
+            "title": "The doc contains concrete Overdeck improvements grouped by routing, role-defaults, runtime-delivery, observability/cost, dashboard-UX, and reliability",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "research-doc.ac3",
+            "title": "The doc contains a Proposed-Follow-ups table where each row records the omp feature, the workflows/models/providers it improves, and a priority",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-followups",
+        "title": "File follow-up GitHub issues for advanced omp features",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-23T08:16:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "For each row of the Proposed-Follow-ups table in docs/ohmypi-capabilities.md (including the carried-forward PAN-1912 frontend Tools-toggle), run `gh issue create` with a title, a body tying it to the models/providers/workflows it improves and a link back to PAN-1989, and an appropriate label. Record the created issue numbers back into docs/ohmypi-capabilities.md and the no-loss audit's carried-forward rows."
+        },
+        "items": [
+          {
+            "id": "file-followups.ac1",
+            "title": "The bead creates a GitHub issue for each Proposed-Follow-ups row; each issue body references PAN-1989 and the workflows/models it improves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-followups.ac2",
+            "title": "The bead creates a follow-up issue for the carried-forward PAN-1912 frontend Tools show/hide toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-followups.ac3",
+            "title": "The bead records the created issue numbers back into docs/ohmypi-capabilities.md and the no-loss audit carried-forward rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "omp-contract",
+        "to": "runtime-fifo",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "extension-pkg",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "cost-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "conv-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "auth-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "provider-expansion",
+        "type": "blocks"
+      },
+      {
+        "from": "omp-contract",
+        "to": "research-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "runtime-fifo",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "extension-pkg",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "launcher-omp",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "cost-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "conv-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "auth-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "policy-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-union",
+        "to": "frontend-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-fifo",
+        "to": "launcher-omp",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-pkg",
+        "to": "launcher-omp",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-pkg",
+        "to": "doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "auth-paths",
+        "to": "doctor",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-routing",
+        "to": "provider-expansion",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-parser",
+        "to": "observability-toolcalls",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-parser",
+        "to": "observability-toolcalls",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-fifo",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-pkg",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-omp",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-parser",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-parser",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "auth-paths",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-routing",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-labels",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-expansion",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "observability-toolcalls",
+        "to": "narrow-union",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-enumeration",
+        "to": "audit-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "narrow-union",
+        "to": "audit-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-omp",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "auth-paths",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "research-doc",
+        "to": "file-followups",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-gate",
+        "to": "file-followups",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-23-PAN-1989-replace-pi-harness-with-oh-my-pi-omp-and-evaluate-advanced-features.vbrief.json"
+    }
+  },
+  "status": "active"
+}

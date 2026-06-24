@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Overview default — spec (item #9)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .add{color:var(--success-foreground)} .del{color:var(--destructive-foreground)}
+  .wrap{max-width:1080px;margin:26px auto;padding:0 22px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:8px;max-width:780px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:20px 0 8px;display:flex;align-items:center;gap:8px}
+  .pill2{font-size:9px;border:1px solid var(--border);border-radius:5px;padding:1px 6px} .pill2.bad{color:var(--destructive-foreground)} .pill2.ok{color:var(--success-foreground)}
+
+  /* a faux header strip so the "already shown here" point is visible */
+  .hdr{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:10px 13px;margin-bottom:10px}
+  .hdr .steps{display:flex;gap:6px;margin-bottom:8px}
+  .hdr .st{flex:1;height:5px;border-radius:99px;background:color-mix(in srgb,var(--muted-foreground) 18%,transparent)}
+  .hdr .st.done{background:var(--success)} .hdr .st.active{background:var(--info)} .hdr .st.bad{background:var(--destructive)}
+  .hdr .gates{display:flex;flex-wrap:wrap;gap:7px}
+  .gate{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
+  .gate .d{width:6px;height:6px;border-radius:50%;background:var(--muted-foreground)} .gate.ok .d{background:var(--success)} .gate.bad .d{background:var(--destructive)}
+  .hdrnote{font-size:10px;color:var(--muted-foreground);margin-top:6px}
+
+  .card{border:1px solid var(--border);border-radius:14px;background:var(--card)}
+  .twoup{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media(max-width:820px){.twoup{grid-template-columns:1fr}}
+  .ph{padding:11px 14px;border-bottom:1px solid var(--border);font-size:12.5px;display:flex;align-items:center;justify-content:space-between}
+  .pb{padding:6px 14px 12px}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);font-size:12.5px} .kv:last-child{border-bottom:none} .kv .muted{color:var(--muted-foreground)} .kv .bad{color:var(--destructive-foreground)}
+  .dup{outline:2px dashed color-mix(in srgb,var(--destructive) 45%,transparent);outline-offset:2px;border-radius:6px}
+
+  /* blocker spotlight — full border + tint, NOT a left stripe */
+  .spot{border:1px solid color-mix(in srgb,var(--destructive) 34%,transparent);background:color-mix(in srgb,var(--destructive) 6%,var(--card));border-radius:14px;padding:13px 15px}
+  .spot .lead{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--destructive-foreground)}
+  .spot .desc{margin-top:6px;font-size:12.5px}
+  .spot .acts{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+  .btn{border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;color:var(--foreground)} .btn.pri{background:var(--primary);color:#fff;border-color:transparent}
+
+  /* AFTER: lean "now" line */
+  .now{border:1px solid var(--border);border-radius:14px;background:var(--card);padding:13px 15px}
+  .now .line{display:flex;align-items:center;gap:9px;font-size:13px}
+  .now .dot{width:9px;height:9px;border-radius:50%;flex:none} .now .dot.info{background:var(--info)} .now .dot.ok{background:var(--success)} .now .dot.bad{background:var(--destructive)}
+  .now .agent{font-family:var(--mono);font-size:11.5px;color:var(--info-foreground);border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent);border-radius:6px;padding:1px 6px}
+  .now .next{margin-top:9px;font-size:12.5px} .now .next .muted{color:var(--muted-foreground)}
+  .now .links{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+  .now .lk{font-size:11.5px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:7px;padding:4px 9px;cursor:pointer}
+
+  /* recent activity (last 3 → Timeline) */
+  .recent{margin-top:12px}
+  .recent .rh{display:flex;align-items:center;justify-content:space-between;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-bottom:6px}
+  .ev{display:flex;gap:9px;align-items:baseline;padding:5px 0;font-size:12.5px}
+  .ev .d{width:7px;height:7px;border-radius:50%;background:var(--muted-foreground);flex:none;position:relative;top:4px} .ev .d.info{background:var(--info)} .ev .d.ok{background:var(--success)} .ev .d.bad{background:var(--destructive)}
+  .ev .w{margin-left:auto;font-size:10.5px;color:var(--muted-foreground);white-space:nowrap}
+
+  .notes{margin-top:20px;border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+  .notes h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .moves{display:grid;grid-template-columns:230px 1fr;gap:5px 14px;font-size:12.5px}
+  .moves .f{color:var(--foreground)} .moves .t{color:var(--muted-foreground)}
+  .q{border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)} .q li{font-size:12.5px;margin:7px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Overview default — item #9</h1>
+  <div class="sub">The Overview is the landing when nothing is selected. Today its two cards re-print the header. #9 strips them to what the header/lane/rail <i>don't</i> already show: the blocker, what's happening right now, the next action, and a few recent events.</div>
+
+  <!-- the header these cards duplicate -->
+  <div class="lbl">the header (already on screen, above Overview)</div>
+  <div class="hdr">
+    <div class="steps"><span class="st done"></span><span class="st active"></span><span class="st bad"></span><span class="st"></span><span class="st bad"></span><span class="st"></span><span class="st"></span></div>
+    <div class="gates">
+      <span class="gate bad"><span class="d"></span> Review blocked</span>
+      <span class="gate"><span class="d"></span> Test pending</span>
+      <span class="gate"><span class="d"></span> Verification pending</span>
+      <span class="gate bad"><span class="d"></span> CI 4/5</span>
+      <span class="gate ok"><span class="d"></span> PR mergeable</span>
+      <span class="gate"><span class="d"></span> Merge-ready no</span>
+    </div>
+    <div class="hdrnote">↑ phase + every gate already live here</div>
+  </div>
+
+  <div class="lbl"><span class="pill2 bad">before</span> Overview today — the Now / Issue cards (dashed = duplicates of the header)</div>
+  <div class="twoup">
+    <div class="card"><div class="ph">Now</div><div class="pb">
+      <div class="kv dup"><span class="muted">Phase</span><span>Review (failed)</span></div>
+      <div class="kv dup"><span class="muted">Review</span><span class="bad">blocked</span></div>
+      <div class="kv dup"><span class="muted">Test</span><span>pending</span></div>
+      <div class="kv"><span class="muted">Next action</span><span>work agent fixes → re-review</span></div>
+    </div></div>
+    <div class="card"><div class="ph">Issue</div><div class="pb">
+      <div class="kv dup"><span class="muted">Pull request</span><span>#1975 · mergeable</span></div>
+      <div class="kv dup"><span class="muted">CI checks</span><span>4/5 passed</span></div>
+      <div class="kv"><span class="muted">Diff</span><span><span class="add">+5039</span> <span class="del">−42</span> · 61 files</span></div>
+      <div class="kv dup"><span class="muted">Verification</span><span>pending</span></div>
+      <div class="kv dup"><span class="muted">Merge-ready</span><span class="bad">no</span></div>
+    </div></div>
+  </div>
+
+  <div class="lbl"><span class="pill2 ok">after</span> Overview — blocker + what's happening + next action + recent activity (nothing the header already shows)</div>
+  <div class="spot">
+    <div class="lead">⚠ Review blocked — action required</div>
+    <div class="desc">Requirements reviewer: Flywheel auto-picks interactive planning issues despite the FR-17 human gate.</div>
+    <div class="acts"><button class="btn pri">Restart review</button><button class="btn">Tell work agent</button><button class="btn">View PR</button></div>
+  </div>
+  <div class="now" style="margin-top:12px">
+    <div class="line"><span class="dot info"></span> <span class="agent">work · sonnet-4-6</span> is fixing the blocker — last commit 2 min ago</div>
+    <div class="next"><span class="muted">Next:</span> work agent fixes → re-review · <span class="muted">diff so far</span> <span class="add">+5039</span> <span class="del">−42</span> · 61 files</div>
+    <div class="links"><span class="lk">Open work agent ↗</span><span class="lk">Open diff →</span><span class="lk">Open PR ↗</span></div>
+    <div class="recent">
+      <div class="rh"><span>Recent activity</span><span style="text-transform:none;letter-spacing:0">→ Timeline</span></div>
+      <div class="ev"><span class="d info"></span> Editing <span class="mono">select.ts</span> — FR-17 gate <span class="w">now</span></div>
+      <div class="ev"><span class="d ok"></span> Committed <span class="mono">a3f9c1</span> · 4 files <span class="w">7m</span></div>
+      <div class="ev"><span class="d bad"></span> Review → blocked (FR-17) <span class="w">41m</span></div>
+    </div>
+  </div>
+
+  <div class="lbl">after · other states (no blocker)</div>
+  <div class="twoup">
+    <div class="now"><div class="line"><span class="dot ok"></span> Review &amp; tests passed — <b>ready to merge</b></div><div class="next"><span class="muted">Next:</span> merge to main → close out</div><div class="links"><span class="lk">Merge</span><span class="lk">Open diff →</span></div></div>
+    <div class="now"><div class="line"><span class="dot info"></span> Verification running — typecheck ✓ lint ✓, tests in progress</div><div class="next"><span class="muted">Next:</span> tests pass → ready for merge</div><div class="links"><span class="lk">Watch tests ↗</span></div></div>
+  </div>
+
+  <div class="notes">
+    <h3>What's removed (and where it already lives)</h3>
+    <div class="moves">
+      <span class="f">Phase</span><span class="t">→ header pipeline bar</span>
+      <span class="f">Review · Test · Verification · CI · PR · Merge-ready</span><span class="t">→ header gates row</span>
+      <span class="f">Pull request #</span><span class="t">→ header PR/CI fact</span>
+      <span class="f">Diff +/− · files</span><span class="t">kept (as one inline line + "Open diff →"); full tree in Code</span>
+      <span class="f">Next action</span><span class="t">kept (not shown anywhere else)</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>Decisions before I build</h3>
+    <ul>
+      <li><b>1. Replace the two KV cards</b> with: blocker spotlight (when blocked) + a lean "Now" panel (one status line + next action + quick links). Good?</li>
+      <li><b>2. Recent activity</b> — show the last 3 events with a <code>→ Timeline</code> link, or drop it and keep Overview to just blocker + Now? (It's a 3-row teaser of Timeline, not the full feed.)</li>
+      <li><b>3. The one surviving fact</b> is <b>Diff +/− · files</b> (not in the header) — keep it inline on the Now panel, OK?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

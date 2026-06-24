@@ -30,11 +30,7 @@ import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
-import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
-import {
-  decideSwitchStrategy,
-  getEffectiveTargetWindow,
-} from '../../../lib/conversations/switch-strategy.js';
+import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -123,7 +119,7 @@ import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
 import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
-import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
+import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
 import { detectAwaitingInputForAgent, parseCodexApprovalPrompt } from '../../../lib/agent-input-detection.js';
@@ -144,15 +140,14 @@ import { resolveConversationMessageLocator } from '../services/conversation-mess
 import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
-  maybeCompactBeforeRespawn,
   compactConversationNative,
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome } from '../../../lib/paths.js';
-import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
 import { getEventStore } from '../event-store.js';
 import {
   generateSummaryForFork,
@@ -171,6 +166,7 @@ import {
 import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
 import {
   CONVERSATION_TITLE_MODEL,
+  fallbackTranscriptTitle,
   serializeConversationTranscript,
   summarizeFirstMessageTitle,
   summarizeTranscriptTitle,
@@ -330,91 +326,7 @@ function shellQuote(str: string): string {
 }
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
-const DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW = 200_000;
-const SWITCH_MODEL_STATUSLINE_TIMEOUT_MS = 5_000;
-const SWITCH_MODEL_STATUSLINE_POLL_MS = 250;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
-
-function modelCapabilityForModel(model: string | null | undefined) {
-  if (!model) return undefined;
-  const resolvedModel = resolveModelIdSync(model);
-  return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
-    ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
-    : undefined;
-}
-
-function registryContextWindowForModel(model: string | null | undefined): number {
-  return modelCapabilityForModel(model)?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
-}
-
-function displayNameForModel(model: string): string {
-  return modelCapabilityForModel(model)?.displayName ?? model;
-}
-
-async function isCliproxyRoutedModel(model: string | null | undefined): Promise<boolean> {
-  if (!model) return false;
-  return getProviderForModelSync(model).name === 'openai'
-    && (await getProviderAuthMode(model)) === 'subscription';
-}
-
-function providerRoutingSignature(exports: string): string {
-  return exports
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith('unset '))
-    .join('\n');
-}
-
-async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
-  if (!targetModel || currentModel === targetModel) return false;
-
-  const targetSignature = providerRoutingSignature(await getProviderExportsForModel(targetModel));
-  if (!currentModel) return targetSignature !== '';
-
-  const currentSignature = providerRoutingSignature(await getProviderExportsForModel(currentModel));
-  return currentSignature !== targetSignature;
-}
-
-const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
-
-function normalizePaneLine(line: string): string {
-  return line.replace(ANSI_ESCAPE_PATTERN, '').trim().toLowerCase();
-}
-
-function modelStatuslinePrefix(line: string): string {
-  return line.startsWith('statusline:') ? line.slice('statusline:'.length).trimStart() : line;
-}
-
-function hasStatuslineModelConfirmation(pane: string, targetModel: string): boolean {
-  const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
-  const targetModelId = targetModel.toLowerCase();
-  const expectedWithId = `${targetDisplayName} (${targetModelId})`;
-
-  for (const rawLine of pane.split(/\r?\n/)) {
-    const line = normalizePaneLine(rawLine);
-    if (!line || line.includes('/model')) continue;
-
-    const modelLine = modelStatuslinePrefix(line);
-    if (modelLine === targetModelId || modelLine.startsWith(`${targetModelId} `)) return true;
-    if (modelLine === expectedWithId || modelLine.startsWith(`${expectedWithId} `)) return true;
-  }
-
-  return false;
-}
-
-async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < SWITCH_MODEL_STATUSLINE_TIMEOUT_MS) {
-    const pane = await Effect.runPromise(
-      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
-    );
-    if (hasStatuslineModelConfirmation(pane, targetModel)) {
-      return true;
-    }
-    await new Promise(r => setTimeout(r, SWITCH_MODEL_STATUSLINE_POLL_MS));
-  }
-  return false;
-}
 
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
@@ -426,7 +338,7 @@ export async function resolveAllowedHarness(requested: unknown, model?: string |
   // command, so persist the matching default harness as the effective value.
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
   try {
     return await resolveHarness({ model, explicit });
   } catch {
@@ -543,6 +455,8 @@ async function getCachedMessages(
     // because a Codex path (.../agents/<id>/codex-home/sessions/...) also
     // matches the Pi detector's substrings.
     result = await parseCodexConversationMessages(sessionFile);
+  } else if (isOhmypiSessionFile(sessionFile)) {
+    result = await parseOhmypiConversationMessages(sessionFile);
   } else if (isPiSessionFile(sessionFile)) {
     result = await parsePiConversationMessages(sessionFile);
   } else if (isSpecialist) {
@@ -756,13 +670,19 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // both. resolvePiSessionPath is the canonical resolver shared with the non-DB
   // specialist fallback below; it checks both locations and skips the
   // cost-events.jsonl / activity.jsonl sidecars.
-  if (conv.harness === 'pi') {
-    return resolvePiSessionPath(conv.tmuxSession);
+  if (conv.harness === 'ohmypi') {
+    const piPath = await resolvePiSessionPath(conv.tmuxSession);
+    // If the ohmypi path resolves, use it. If not, fall through to the claude-code
+    // path — the harness field may be stale (agent was re-run under claude-code
+    // after the conversation record was created with harness='ohmypi').
+    if (piPath) return piPath;
   }
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
   // The thread-id stored in codex-thread-id is the session identifier.
   if (conv.harness === 'codex') {
-    return resolveCodexRolloutPath(conv.tmuxSession);
+    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
+    if (codexPath) return codexPath;
+    // Fall through if codex path not found — same stale-harness recovery.
   }
   // claude-code: the launcher pins `--session-id <id>` (or `--resume <id>`) — the
   // EXACT session the live tmux pane runs. Resolving from that pinned id makes the
@@ -1074,9 +994,9 @@ export async function handleConversationMessage(
   let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
 
   // PAN-1546: Claude conversations get prompt-time memory via the in-Claude
-  // UserPromptSubmit hook; Pi has no such hook, so inject server-side here for
-  // issue-linked Pi conversations (no-op otherwise).
-  if (harness === 'pi') {
+  // UserPromptSubmit hook; ohmypi has no such hook, so inject server-side here for
+  // issue-linked ohmypi conversations (no-op otherwise).
+  if (harness === 'ohmypi') {
     deliveredMessage = await injectPiConversationMemory(
       { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
       deliveredMessage,
@@ -1173,7 +1093,7 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
-  return conv.deliveryMethod ?? (harness === 'pi' ? 'tmux' : 'auto');
+  return conv.deliveryMethod ?? (harness === 'ohmypi' ? 'tmux' : 'auto');
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
@@ -1463,7 +1383,7 @@ export async function spawnConversationSession(
   let providerExportsStr = '';
   let providerEnv: Record<string, string> = {};
   let piFields: {
-    harness: 'pi';
+    harness: 'ohmypi';
     piMode: 'tui';
     piExtensionPath: string;
     piSessionDir: string;
@@ -1494,18 +1414,18 @@ export async function spawnConversationSession(
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
     providerEnv = await getProviderEnvForModel(model);
 
-    if (harness === 'pi') {
-      // Preflight: Pi GPT-5.x conversations authenticate with the user's
-      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, Pi
+    if (harness === 'ohmypi') {
+      // Preflight: ohmypi GPT-5.x conversations authenticate with the user's
+      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, omp
       // fails mid-session with the opaque "No API key for provider:
       // openai-codex". Proactively refresh it, and if it can't be revived,
       // fail here with an actionable message. Stays silent (fail-open) when
-      // the auth state can't be determined (e.g. Pi's OAuth module is absent).
+      // the auth state can't be determined (e.g. omp's OAuth module is absent).
       if (getProviderForModelSync(model).name === 'openai') {
-        const auth = await getPiCodexAuthStatus({ refreshIfExpired: true });
+        const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
         if (auth.status === 'missing' || auth.status === 'expired') {
           throw new Error(
-            'Pi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
+            'ohmypi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
             'Re-authenticate with `pan pi-auth login`, then retry.',
           );
         }
@@ -1529,9 +1449,9 @@ export async function spawnConversationSession(
         ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
         : undefined;
       piFields = {
-        harness: 'pi',
+        harness: 'ohmypi',
         piMode: 'tui',
-        piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
+        piExtensionPath: resolveOhmypiExtensionPath() ?? resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
         piSessionDir,
         resumeSessionId: storedPiSessionId || undefined,
       };
@@ -1587,7 +1507,7 @@ export async function spawnConversationSession(
   // provider. The user's pi auth (`~/.pi/agent/auth.json`) determines
   // whether the call actually succeeds.
   let launcherModel = model;
-  if (harness === 'pi' && model) {
+  if (harness === 'ohmypi' && model) {
     const piProvider = piProviderForModel(model);
     if (piProvider) launcherModel = `${piProvider}/${model}`;
   }
@@ -1947,6 +1867,10 @@ function scheduleTitleRefinement(conversationName: string): void {
 /** Conversations with a retitle currently running — guards against double-clicks. */
 const retitleInFlight = new Set<string>();
 const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
+
+function isClaudeInvocationTimeout(error: unknown): boolean {
+  return error instanceof Error && /claude invocation timed out after \d+ms/.test(error.message);
+}
 
 interface ConversationAboutSummary {
   summary: string;
@@ -2602,7 +2526,7 @@ const postConversationRoute = HttpRouter.add(
             await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
             console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
-            if (harness === 'pi') {
+            if (harness === 'ohmypi') {
               await waitForPiTuiReady(tmuxSession);
             } else if (harness !== 'codex') {
               // Bounded by waitForClaudeReady's existing 30s timeout.
@@ -2790,7 +2714,7 @@ const postConversationResumeRoute = HttpRouter.add(
         try {
           await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
           await waitForTmuxSession(conv.tmuxSession);
-          if (harness === 'pi') {
+          if (harness === 'ohmypi') {
             await waitForPiTuiReady(conv.tmuxSession);
           } else if (harness !== 'codex') {
             await waitForReadySignal(conv.tmuxSession, 30);
@@ -2811,9 +2735,8 @@ const postConversationResumeRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
 //
-// Kill the current session (if alive), update the model in the DB, and resume.
-// Used by the model picker in the sidebar to switch models without going through
-// the full resume flow.
+// Update the model/harness only for a brand-new conversation before any runtime
+// session exists. Once a conversation has a session id, the model is locked.
 
 const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
@@ -2833,6 +2756,12 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
+        if (conv.claudeSessionId) {
+          return jsonResponse(
+            { error: 'Conversation model is locked once a conversation has started' },
+            { status: 409 },
+          );
+        }
 
         const model = typeof body['model'] === 'string' && body['model'].trim()
           ? body['model'].trim()
@@ -2846,7 +2775,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
         const requestedHarness = body['harness'];
         let harness: RuntimeName = currentHarness;
-        if (requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
+        if (requestedHarness === 'ohmypi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
           if (requestedHarness !== currentHarness) {
             const policyModel = model ?? conv.model ?? '';
             const decision = canUseHarnessSync(
@@ -2874,137 +2803,16 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
 
-        // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.claudeSessionId;
+        if (model) setConversationModel(name, model);
+        if (harnessChanged) setConversationHarness(name, harness);
 
-        // Resolve the transcript before the kill→spawn gap so the route can decide
-        // whether compaction is actually needed for the target window.
-        const sessionFile = await resolveSessionFile(conv);
-        const cwd = conv.cwd;
-        const tmuxSession = conv.tmuxSession;
-        const effort = conv.effort ?? undefined;
-        const issueId = conv.issueId ?? undefined;
-        const targetModel = model ?? conv.model ?? undefined;
-        const providerRoutingChanged = await hasProviderRoutingChanged(conv.model, targetModel);
-        const contextUsage = sessionFile && existsSync(sessionFile)
-          ? await computeContextUsage(sessionFile, conv.model ?? targetModel ?? null)
-          : null;
-        const contextTokens = contextUsage?.estimatedTokens ?? 0;
-        const currentObservedCeiling = Math.max(contextUsage?.maxObservedInputTokens ?? 0, contextTokens);
-        const effectiveTargetWindow = getEffectiveTargetWindow({
-          registryWindow: registryContextWindowForModel(targetModel),
-          currentObservedCeiling,
-          cliproxyRouted: await isCliproxyRoutedModel(targetModel),
-          providerRoutingChanged,
+        const updated = getConversationByName(name) ?? conv;
+        return jsonResponse({
+          ...updated,
+          model: model ?? updated.model,
+          harness,
+          sessionAlive: false,
         });
-        const switchStrategy = decideSwitchStrategy({
-          harnessChanged,
-          providerRoutingChanged,
-          contextTokens,
-          effectiveTargetWindow,
-        });
-
-        if (harness === 'claude-code' && switchStrategy.useModelCommand && targetModel) {
-          if (model) setConversationModel(name, model);
-          try {
-            await deliverAgentMessage(
-              tmuxSession,
-              `/model ${targetModel}`,
-              'conversation-switch-model',
-              resolveConversationDeliveryMethod(conv),
-            );
-            if (await waitForModelStatusline(tmuxSession, targetModel)) {
-              markConversationActive(name);
-              return jsonResponse({ ...conv, status: 'active', model: targetModel, harness, reattached: false, sessionAlive: true });
-            }
-            console.warn(`[conversations] switch-model Tier 1 statusline verification timed out for ${name}; falling back to respawn`);
-          } catch (deliveryErr: unknown) {
-            const msg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
-            console.warn(`[conversations] switch-model Tier 1 delivery failed for ${name}; falling back to respawn: ${msg}`);
-          }
-        }
-
-        // Mark the session as mid-respawn BEFORE killing it so terminal
-        // WS reconnects landing in the kill→spawn gap don't get a fatal
-        // 4404. The marker is cleared in the `finally` below regardless
-        // of which branch returns or throws.
-        const respawn = markRespawnPending(tmuxSession);
-        try {
-          // Tier 1 (/model in-session) is wired by the follow-up bead. Until then,
-          // every switch still respawns; the tier decision already owns whether
-          // this respawn compacts.
-          await Effect.runPromise(killSession(tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-          // Persist the new model and harness
-          if (model) setConversationModel(name, model);
-          if (harnessChanged) setConversationHarness(name, harness);
-
-          // Only resume if the session JSONL actually exists — Claude Code's --resume
-          // fails with "No conversation found" if the file is missing (e.g., first
-          // model switch on a fresh conversation or cross-provider switch).
-          let resumeSessionId = oldSessionId ?? randomUUID();
-          let canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
-          if (oldSessionId && !canResume) {
-            console.error(
-              `[conversations] SESSION-LOST ${name} harness=${currentHarness} ` +
-              `claudeSessionId=${oldSessionId} resolved=${sessionFile ?? 'null'} — ` +
-              `switch-model will start a fresh session`,
-            );
-          }
-
-          if (harnessChanged) {
-            // Runtime change: convert the existing transcript into the target
-            // harness's format so history carries over. Native (Claude-format)
-            // compaction must NOT run here — it would write Claude records into a
-            // Pi JSONL (or vice versa). The converter produces a fresh session in
-            // the target format and returns its session id.
-            if (canResume && sessionFile) {
-              try {
-                const result = await Effect.runPromise(convertConversationTranscript({
-                  fromHarness: currentHarness,
-                  toHarness: harness,
-                  sourceSessionFile: sessionFile,
-                  cwd,
-                  tmuxSession,
-                }));
-                resumeSessionId = result.sessionId;
-                canResume = true;
-                if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
-                // For Codex, result.sessionId is the thread-id; persisted separately by initCodexHome/writeThreadId.
-              } catch (convErr) {
-                const cm = convErr instanceof Error ? convErr.message : String(convErr);
-                console.error(`[conversations] SESSION-CONVERT-FAILED ${name} ${currentHarness}->${harness}: ${cm}`);
-                canResume = false;
-              }
-            } else {
-              // No source transcript to convert — start the new harness fresh.
-              canResume = false;
-            }
-          } else if (harness === 'claude-code') {
-            // Same harness, Claude Code: native (Claude-format) compaction is correct
-            // only when the tier decision says the active context will not fit.
-            const compactionFork = await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
-            if (compactionFork) {
-              resumeSessionId = compactionFork.forkedSessionId;
-              setConversationClaudeSessionId(name, compactionFork.forkedSessionId);
-            }
-          }
-          // Pi staying on Pi: skip native compaction — it is Claude-format only and
-          // would corrupt the Pi JSONL. Pi manages its own context.
-
-          await spawnConversationSession(tmuxSession, cwd, resumeSessionId, model, effort, issueId, canResume, harness);
-          await waitForTmuxSession(tmuxSession);
-          if (harness === 'pi') {
-            await waitForPiTuiReady(tmuxSession);
-          } else if (harness !== 'codex') {
-            await waitForReadySignal(tmuxSession, 30);
-          }
-
-          markConversationActive(name);
-          return jsonResponse({ ...conv, status: 'active', model, harness, reattached: false, sessionAlive: true });
-        } finally {
-          respawn.done();
-        }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
@@ -3078,7 +2886,7 @@ const getConversationMessagesRoute = HttpRouter.add(
                   sessionFile = rollout;
                   setSpecialistSessionCache(name, rollout);
                 }
-              } else if (agentHarness === 'pi') {
+              } else if (agentHarness === 'ohmypi') {
                 const piSession = await resolvePiSessionPath(name);
                 if (piSession) {
                   sessionFile = piSession;
@@ -3912,7 +3720,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
 
-  if (conv.harness === 'pi') {
+  if (conv.harness === 'ohmypi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
     await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
     return;
@@ -3973,11 +3781,11 @@ export async function runForkPipeline(
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
   if (forkMode === 'plain') {
-    if (conv.harness === 'pi' || conv.harness === 'codex') {
+    if (conv.harness === 'ohmypi' || conv.harness === 'codex') {
       // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-      // Pi and Codex cannot consume Claude JSONL, so a plain fork would silently start
+      // ohmypi and Codex cannot consume Claude JSONL, so a plain fork would silently start
       // empty while the pipeline reported success. The summary-fork route already
-      // rejects launchHarness='pi'/'codex'; this guard is defense in depth.
+      // rejects launchHarness='ohmypi'/'codex'; this guard is defense in depth.
       throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
     }
     const tmuxAlive = await forkSessionExists(conv.tmuxSession);
@@ -4358,9 +4166,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
           ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
           : undefined;
-        if (forkMode === 'plain' && (launchHarness === 'pi' || launchHarness === 'codex')) {
+        if (forkMode === 'plain' && (launchHarness === 'ohmypi' || launchHarness === 'codex')) {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-          // Pi and Codex cannot consume Claude JSONL history, so a plain fork would silently
+          // ohmypi and Codex cannot consume Claude JSONL history, so a plain fork would silently
           // start an empty session. Summary forks are fine.
           return jsonResponse({
             error: `Plain forks cannot launch under ${launchHarness} — it cannot consume Claude session history. Use a summary fork instead.`,
@@ -4862,7 +4670,19 @@ const postConversationRetitleRoute = HttpRouter.add(
         try {
           const model = configuredTitleModel();
           console.log(`[claude-invoke] purpose=conversation-retitle | model=${model} | conversation=${name} | transcriptChars=${transcript.length}`);
-          const title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
+          let title: string;
+          try {
+            title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
+          } catch (error: unknown) {
+            if (!isClaudeInvocationTimeout(error)) {
+              throw error;
+            }
+            title = fallbackTranscriptTitle(transcript);
+            if (!title) {
+              throw error;
+            }
+            console.warn(`[conversations] retitle timed out for "${name}"; using deterministic fallback title "${title}"`);
+          }
           if (!title) {
             return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
           }

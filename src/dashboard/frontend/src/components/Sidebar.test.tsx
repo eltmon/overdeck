@@ -15,7 +15,7 @@ vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }> } = {}) {
+function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }>; experimentalFeatures?: boolean } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -32,6 +32,12 @@ function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; st
     }
     if (url === '/api/flywheel/runs?limit=10') {
       return Response.json(runs);
+    }
+    if (url === '/api/conversations' || url === '/api/registered-projects') {
+      return Response.json([]);
+    }
+    if (url === '/api/settings') {
+      return Response.json({ experimental: { experimentalFeatures: options.experimentalFeatures ?? false } });
     }
     return Response.json({});
   });
@@ -115,13 +121,43 @@ describe('Sidebar navigation', () => {
     expect(onTabChange).toHaveBeenCalledWith('command-deck');
   });
 
-  it('includes Context in System navigation without removing sibling pages', () => {
-    const { onTabChange } = renderSidebar({ activeTab: 'context' });
+  it('hides experimental navigation pages by default', () => {
+    renderSidebar({ activeTab: 'context' });
 
-    expect(screen.getByTestId('sidebar-skills')).toBeInTheDocument();
+    expect(screen.queryByTestId('sidebar-agents')).toBeNull();
+    expect(screen.queryByTestId('sidebar-autopreso')).toBeNull();
+    expect(screen.queryByTestId('sidebar-resources')).toBeNull();
+    expect(screen.queryByTestId('sidebar-activity')).toBeNull();
+    expect(screen.queryByTestId('sidebar-sessions')).toBeNull();
+    expect(screen.queryByTestId('sidebar-metrics')).toBeNull();
+    expect(screen.queryByTestId('sidebar-costs')).toBeNull();
+    expect(screen.queryByTestId('sidebar-health')).toBeNull();
+    expect(screen.queryByTestId('sidebar-skills')).toBeNull();
+    expect(screen.queryByTestId('sidebar-god-view')).toBeNull();
     expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-settings')).toBeInTheDocument();
+  });
+
+  it('shows experimental navigation pages when enabled', async () => {
+    renderSidebar({ activeTab: 'context', experimentalFeatures: true });
+
+    expect(await screen.findByTestId('sidebar-agents')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-autopreso')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-resources')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-activity')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-sessions')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-metrics')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-costs')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-health')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-skills')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-god-view')).toBeInTheDocument();
+  });
+
+  it('includes Context in System navigation without requiring experimental pages', () => {
+    const { onTabChange } = renderSidebar({ activeTab: 'context' });
+
+    expect(screen.getByTestId('sidebar-context')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-settings')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('sidebar-context'));
     expect(onTabChange).toHaveBeenCalledWith('context');

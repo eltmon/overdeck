@@ -11,6 +11,7 @@ import { Effect } from 'effect';
 
 const syncMainMock = vi.hoisted(() => vi.fn());
 const spawnAgentMock = vi.hoisted(() => vi.fn());
+const getAgentStateSyncMock = vi.hoisted(() => vi.fn());
 const execSyncMock = vi.hoisted(() => vi.fn());
 const execFileSyncMock = vi.hoisted(() => vi.fn());
 const resolveProjectFromIssueSyncMock = vi.hoisted(() => vi.fn());
@@ -28,7 +29,7 @@ vi.mock('../../../lib/agents.js', async () => {
   return {
     ...actual,
     spawnAgent: spawnAgentMock,
-    getAgentStateSync: vi.fn(() => null),
+    getAgentStateSync: getAgentStateSyncMock,
     clearAgentPausedSync: vi.fn(),
   };
 });
@@ -76,20 +77,26 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
   let tmpDir: string;
   let exitSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'pan-1872-start-'));
-    const workspacePath = join(tmpDir, 'workspaces', 'feature-pan-1872');
+  function createWorkspace(issueId: string) {
+    const workspacePath = join(tmpDir, 'workspaces', `feature-${issueId.toLowerCase()}`);
     mkdirSync(workspacePath, { recursive: true });
     // Provide a beads JSONL fallback so the async bd list retry path counts a
     // task even though this test does not exercise the bd CLI.
     mkdirSync(join(workspacePath, '.beads'), { recursive: true });
     writeFileSync(
       join(workspacePath, '.beads', 'issues.jsonl'),
-      JSON.stringify({ id: 'bead-1', title: 'Implement issue', labels: ['pan-1872'] }) + '\n',
+      JSON.stringify({ id: 'bead-1', title: 'Implement issue', labels: [issueId.toLowerCase()] }) + '\n',
     );
+    return workspacePath;
+  }
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'pan-1872-start-'));
+    createWorkspace('PAN-1872');
 
     syncMainMock.mockReset();
     spawnAgentMock.mockReset();
+    getAgentStateSyncMock.mockReset();
     execSyncMock.mockReset();
     execFileSyncMock.mockReset();
     resolveProjectFromIssueSyncMock.mockReset();
@@ -115,6 +122,7 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
       return '';
     });
 
+    getAgentStateSyncMock.mockReturnValue(null);
     spawnAgentMock.mockResolvedValue({ id: 'agent-pan-1872' });
     vbriefLifecycleMocks.transitionVBriefOnMain.mockReturnValue(Effect.succeed({
       fromDir: 'proposed',
@@ -163,6 +171,39 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
       'active',
       'approved',
       'scope: approve PAN-1872 vBRIEF',
+    );
+  });
+
+  it('reuses a stopped agent model when sync-main conflicts before spawning', async () => {
+    createWorkspace('PAN-1491');
+    getAgentStateSyncMock.mockReturnValue({
+      id: 'agent-pan-1491',
+      issueId: 'PAN-1491',
+      workspace: join(tmpDir, 'workspaces', 'feature-pan-1491'),
+      harness: 'claude-code',
+      model: 'gpt-5.5',
+      role: 'work',
+      status: 'stopped',
+    });
+    syncMainMock.mockResolvedValue({
+      success: false,
+      conflictFiles: ['roles/flywheel.md', 'tests/integration/agent-spawning.test.ts'],
+      reason: 'Sync-main produced 2 conflict(s) in PAN-1491: roles/flywheel.md, tests/integration/agent-spawning.test.ts. Resolve manually in the workspace, then re-run sync-main.',
+    });
+
+    const { issueCommand } = await import('../start.js');
+
+    await issueCommand('PAN-1491', {
+      force: true,
+    } as any);
+
+    expect(syncMainMock).toHaveBeenCalledWith(expect.any(String), 'PAN-1491');
+    expect(spawnAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: 'PAN-1491',
+        model: 'gpt-5.5',
+        role: 'work',
+      }),
     );
   });
 });

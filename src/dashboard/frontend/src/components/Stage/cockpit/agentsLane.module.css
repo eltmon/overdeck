@@ -69,4 +69,15 @@
 .resRow .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .resRow .dot.ok { background: var(--success); }
 .resRow .dot.off { background: var(--muted-foreground); }
+/* standalone dot (summary line, item #8) */
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.resLink { color: var(--info-foreground); font-size: 11px; }
+.resLink:hover { text-decoration: underline; }
+.resActions { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 6px 2px; }
+.resBtn {
+  border: 1px solid var(--border); background: var(--card); border-radius: 7px;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--foreground);
+}
+.resBtn:hover { background: var(--accent); }
+.resBtn:disabled { opacity: 0.5; cursor: default; }
 .resSub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); padding: 7px 6px 2px; }

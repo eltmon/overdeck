@@ -54,6 +54,7 @@ import {
   stopDeacon,
   isDeaconRunning,
   getDeaconStatus,
+  assessDeaconPatrolFreshness,
   getLastPatrolResult,
   getDeaconLogs,
   runPatrol,
@@ -556,6 +557,10 @@ export interface CloisterStatus {
   config: CloisterConfig;
   summary: HealthSummary;
   agentsNeedingAttention: string[];
+  patrol: ReturnType<typeof assessDeaconPatrolFreshness> & {
+    loopRunning: boolean;
+    patrolIntervalMs: number;
+  };
 }
 
 /**
@@ -1817,12 +1822,24 @@ export class CloisterService {
     const summary = generateHealthSummary(agentHealths);
     const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
 
+    const deaconStatus = getDeaconStatus();
+    const patrol = assessDeaconPatrolFreshness({
+      isRunning: deaconStatus.isRunning,
+      lastPatrol: deaconStatus.state.lastPatrol,
+      patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
+    });
+
     const status: CloisterStatus = {
       running: this.isRunning(),
       lastCheck: this.lastCheck,
       config: this.config,
       summary,
       agentsNeedingAttention: needsAttention,
+      patrol: {
+        ...patrol,
+        loopRunning: deaconStatus.isRunning,
+        patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
+      },
     };
 
     this._statusCache = status;

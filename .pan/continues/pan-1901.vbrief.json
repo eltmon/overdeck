@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1901",
   "created": "2026-06-14T21:47:53.347Z",
-  "updated": "2026-06-14T22:15:00.000Z",
-  "gitState": { "branch": "feature/pan-1901", "sha": "eb8f8cf99a", "dirty": false },
+  "updated": "2026-06-24T02:26:44.539Z",
+  "gitState": {
+    "branch": "feature/pan-1901",
+    "sha": "eb8f8cf99a",
+    "dirty": false
+  },
   "decisions": [
     {
       "id": "D1",
@@ -73,6 +77,11 @@
       "reason": "planning",
       "note": "Auto-planning complete: 2 beads (W1 .gitattributes union change, W2 guard tests). union fix verified empirically in /tmp. Single-JSON .pan files bounded out with technical justification.",
       "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:26:44.539Z"
     }
   ],
   "feedback": []

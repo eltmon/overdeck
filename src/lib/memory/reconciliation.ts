@@ -125,7 +125,7 @@ function checkpointIdentity(checkpoint: TranscriptCheckpoint): MemoryIdentity {
 
 function inferCheckpointHarness(transcriptPath: string): string {
   if (transcriptPath.includes('/.overdeck/agents/') && transcriptPath.includes('/sessions/')) {
-    return 'pi';
+    return 'ohmypi';
   }
   if (transcriptPath.includes('/codex-home/sessions/') && transcriptPath.includes('rollout-')) {
     return 'codex';

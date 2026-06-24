@@ -237,6 +237,15 @@ export interface DeaconState {
   containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
 }
 
+export type DeaconPatrolHealth = 'running' | 'starting' | 'stale' | 'stopped';
+
+export interface DeaconPatrolFreshness {
+  status: DeaconPatrolHealth;
+  lastPatrol: string | null;
+  secondsSinceLastPatrol: number | null;
+  staleAfterSeconds: number;
+}
+
 /**
  * Result of a health check
  */
@@ -3369,17 +3378,24 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       const branch = `feature/${issueId.toLowerCase()}`;
       let isMerged = false;
 
-      // Check 1: regular merge — branch tip is an ancestor of main
+      // Check 1: diagnostic only. Branch topology alone is not proof of a
+      // completed pipeline merge: a branch created at main with no
+      // implementation commits also satisfies merge-base --is-ancestor. Keep
+      // the stale-merge reconciler PR-backed so re-planning cannot
+      // phantom-merge an already planned issue.
       try {
-        await execFileAsync('git', ['merge-base', '--is-ancestor', branch, 'main'], {
-          cwd: project.projectPath,
-        });
-        isMerged = true;
+        const [branchTip, mainTip] = await Promise.all([
+          execFileAsync('git', ['rev-parse', branch], { cwd: project.projectPath }),
+          execFileAsync('git', ['rev-parse', 'main'], { cwd: project.projectPath }),
+        ]);
+        if (branchTip.stdout.trim() === mainTip.stdout.trim()) {
+          console.log(`[deacon] ${issueId}: branch ${branch} points at main; not treating zero-commit branch as merged`);
+        }
       } catch {
-        // Not a regular merge ancestor — try squash-merge detection
+        // Branch is absent/unreadable — leave merge detection to the PR API.
       }
 
-      // Check 2: squash merge — query GitHub for PR mergedAt/mergeCommit. The
+      // Check 2: query GitHub for PR mergedAt/mergeCommit. The
       // old regex-based detection (`\(PAN-XXXX[ )]` against `git log --pretty=%s`)
       // matched ANY commit that mentioned the issue in a trailer, not just
       // genuine squash merges. That's how PAN-977/945/913/544/457 got
@@ -3407,16 +3423,34 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       }
 
       if (isMerged) {
+        // PAN-1994: Skip the entire reconcile (including setReviewStatusSync) if
+        // a planning or work agent is actively running. Setting mergeStatus=merged
+        // while a fresh re-plan is in progress would contaminate the new pipeline
+        // cycle with stale prior-merge state. Leave staleMergeReconciled unset so
+        // the next patrol re-evaluates once the active agent has finished.
+        const issueLower = issueId.toLowerCase();
+        const planState = getAgentStateSync(`planning-${issueLower}`);
+        const workState = getAgentStateSync(`agent-${issueLower}`);
+        const hasActiveAgent =
+          planState?.status === 'running' || planState?.status === 'starting' ||
+          workState?.status === 'running' || workState?.status === 'starting';
+
+        if (hasActiveAgent) {
+          console.log(`[deacon] ${issueId}: active agent in progress — deferring stale-merge reconcile (PAN-1994)`);
+          continue;
+        }
+
         setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
         staleMergeReconciled.add(issueId);
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
-        // PAN-1027: also run the post-merge handoff so labels get cleaned, work agent
-        // tmux session is killed, beads compacted, etc. Without this the dashboard knows
-        // the issue is merged but the GitHub labels stay stale ("in-progress"/"in-review")
-        // and orphaned tmux sessions leak memory. skipDeploy avoids respawning the server
-        // — it's a best-effort reconciliation, not a fresh merge.
+
+        // PAN-1027: also run the post-merge handoff so labels get cleaned, work
+        // agent tmux session is killed, beads compacted, etc. Without this the
+        // dashboard knows the issue is merged but GitHub labels stay stale
+        // ("in-progress"/"in-review") and orphaned tmux sessions leak memory.
+        // skipDeploy avoids respawning the server — best-effort reconciliation.
         try {
           const { postMergeLifecycle } = await import('./merge-agent.js');
           postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true }).catch(err =>
@@ -7003,5 +7037,52 @@ export function getDeaconStatus(): {
     isRunning: isDeaconRunning(),
     config: loadConfig(),
     state: loadState(),
+  };
+}
+
+export function assessDeaconPatrolFreshness(
+  params: {
+    isRunning: boolean;
+    lastPatrol?: string;
+    patrolIntervalMs: number;
+    nowMs?: number;
+  }
+): DeaconPatrolFreshness {
+  const staleAfterSeconds = Math.ceil((params.patrolIntervalMs * 3) / 1000);
+  if (!params.isRunning) {
+    return {
+      status: 'stopped',
+      lastPatrol: params.lastPatrol ?? null,
+      secondsSinceLastPatrol: null,
+      staleAfterSeconds,
+    };
+  }
+
+  if (!params.lastPatrol) {
+    return {
+      status: 'starting',
+      lastPatrol: null,
+      secondsSinceLastPatrol: null,
+      staleAfterSeconds,
+    };
+  }
+
+  const nowMs = params.nowMs ?? Date.now();
+  const lastPatrolMs = Date.parse(params.lastPatrol);
+  if (!Number.isFinite(lastPatrolMs)) {
+    return {
+      status: 'stale',
+      lastPatrol: params.lastPatrol,
+      secondsSinceLastPatrol: null,
+      staleAfterSeconds,
+    };
+  }
+
+  const secondsSinceLastPatrol = Math.max(0, Math.floor((nowMs - lastPatrolMs) / 1000));
+  return {
+    status: secondsSinceLastPatrol > staleAfterSeconds ? 'stale' : 'running',
+    lastPatrol: params.lastPatrol,
+    secondsSinceLastPatrol,
+    staleAfterSeconds,
   };
 }

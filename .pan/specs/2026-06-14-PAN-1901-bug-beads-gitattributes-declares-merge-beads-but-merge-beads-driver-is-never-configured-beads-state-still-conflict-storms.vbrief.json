@@ -4,17 +4,17 @@
     "created": "2026-06-14T22:15:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1901: replace the inert `.beads/issues.jsonl merge=beads` attribute with the built-in `union` driver so beads state merges conflict-free with zero git config",
-    "updated": "2026-06-14T22:05:12.522Z"
+    "updated": "2026-06-24T01:21:26.268Z"
   },
   "plan": {
     "id": "pan-1901",
     "title": "bug(beads): .gitattributes declares 'merge=beads' but merge.beads.driver is never configured — .beads state still conflict-storms",
-    "status": "proposed",
+    "status": "running",
     "uid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-14T22:15:00.000Z",
-    "updated": "2026-06-14T22:05:12.522Z",
+    "updated": "2026-06-24T01:21:26.268Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1901",
@@ -164,5 +164,5 @@
       "canonicalFilename": "2026-06-14-PAN-1901-bug-beads-gitattributes-declares-merge-beads-but-merge-beads-driver-is-never-configured-beads-state-still-conflict-storms.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

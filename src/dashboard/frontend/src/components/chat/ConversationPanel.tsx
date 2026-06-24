@@ -155,7 +155,7 @@ export function ConversationPanel({
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   // See ComposerFooter for rationale — never seed an existing conversation's
   // harness from the global localStorage default.
-  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? 'claude-code');
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => (conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -188,7 +188,7 @@ export function ConversationPanel({
 
   useEffect(() => {
     if (conversation.harness && conversation.harness !== selectedHarness) {
-      setSelectedHarness(conversation.harness);
+      setSelectedHarness(conversation.harness === 'pi' ? 'ohmypi' : conversation.harness);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.harness]);
@@ -232,6 +232,11 @@ export function ConversationPanel({
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
   const headerLastMsg = headerMessages[headerMessages.length - 1];
+  const canSwitchConversationModel =
+    !agentId &&
+    !conversation.sessionAlive &&
+    !conversation.claudeSessionId &&
+    headerMessages.length === 0;
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
   // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
@@ -364,10 +369,8 @@ export function ConversationPanel({
 
   const switchModelMutation = useMutation({
     mutationFn: ({ model, harness }: { model: string; harness: Harness }) => {
-      const endpoint = agentId
-        ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
-        : `/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`;
-      return fetch(endpoint, {
+      if (agentId) throw new Error('Agent models are locked after spawn');
+      return fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, harness }),
@@ -976,11 +979,14 @@ export function ConversationPanel({
                   value={selectedModel}
                   harness={selectedHarness}
                   liveConversation={conversation.sessionAlive}
+                  disabled={!canSwitchConversationModel}
                   onHarnessChange={(harness) => {
+                    if (!canSwitchConversationModel) return;
                     setSelectedHarness(harness);
                     switchModelMutation.mutate({ model: selectedModel, harness });
                   }}
                   onChange={(modelId) => {
+                    if (!canSwitchConversationModel) return;
                     setSelectedModel(modelId);
                     switchModelMutation.mutate({ model: modelId, harness: selectedHarness });
                   }}

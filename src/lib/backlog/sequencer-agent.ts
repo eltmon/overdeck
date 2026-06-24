@@ -1,13 +1,29 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { AgentState } from '../agents.js';
-import { spawnRun, determineModel } from '../agents.js';
+import { Effect } from 'effect';
+import {
+  spawnRun,
+  determineModel,
+  listRunningAgentsSync,
+  getAgentStateSync,
+  getAgentRuntimeStateSync,
+  stopAgent,
+} from '../agents.js';
 import { collectOpenBacklog, normalizeBacklogIssues } from './backlog-input.js';
 import type { PassMode } from './types.js';
 import type { CollectOpenBacklogResult } from './backlog-input.js';
 
 export const SEQUENCER_AGENT_ID = 'sequencer-runner';
+
+export type SequencerRunStatus = {
+  alive: boolean;
+  running: boolean;
+  done: boolean;
+  startedAt: string | null;
+  doneReason: 'fresh-sequence' | 'idle' | null;
+};
 
 export type SpawnSequencerOptions = {
   projectRoot?: string;
@@ -22,6 +38,45 @@ export type SpawnSequencerOptions = {
    */
   issues?: ReadonlyArray<Record<string, unknown>>;
 };
+
+export function getSequencerRunStatus(projectRoot: string): SequencerRunStatus {
+  const alive = listRunningAgentsSync().some((a) => a.id === SEQUENCER_AGENT_ID && a.tmuxActive);
+  const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
+  const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+
+  let freshSequence = false;
+  if (alive && startedAt && existsSync(seqPath)) {
+    try {
+      freshSequence = statSync(seqPath).mtimeMs >= new Date(startedAt).getTime();
+    } catch {
+      /* stat failed */
+    }
+  }
+
+  const runtimeState = alive ? getAgentRuntimeStateSync(SEQUENCER_AGENT_ID)?.state ?? null : null;
+  const idle = runtimeState === 'idle' || runtimeState === 'stopped' || runtimeState === 'suspended';
+  const doneReason = freshSequence ? 'fresh-sequence' : idle ? 'idle' : null;
+  const done = alive && doneReason !== null;
+
+  return {
+    alive,
+    running: alive && !done,
+    done,
+    startedAt,
+    doneReason,
+  };
+}
+
+export async function clearFinishedSequencerRun(
+  projectRoot: string,
+  stop: () => Promise<void> = () => Effect.runPromise(stopAgent(SEQUENCER_AGENT_ID)),
+): Promise<SequencerRunStatus> {
+  const status = getSequencerRunStatus(projectRoot);
+  if (status.done) {
+    await stop();
+  }
+  return status;
+}
 
 export async function spawnSequencerAgent(
   pass: PassMode | 'auto',
@@ -116,7 +171,7 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 1. Re-read all issue bodies in batches of ${batchSize}. NEVER inline the entire backlog in one prompt. Do NOT concatenate all bodies — read them batch by batch against your running shortlist.
 2. Re-derive all ai-inferred and github-ref edges.
 3. Preserve operator edges verbatim.
-4. Never re-rank in-pipeline issues (inPipeline=true); pin them at rank 1 or their prior rank with gate=ready.
+4. Never re-rank in-pipeline issues (inPipeline=true); pin them at rank 1 or their prior rank. Leave gate=auto — do NOT set gate=ready (the gate is operator-only; in-pipeline is detected automatically).
 `,
   };
 
@@ -124,7 +179,7 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 ## Ranking rules (all passes)
 
 - Rank by IMPACT toward shipping, not raw priority signal. GitHub priority and issue age are inputs, not determinants.
-- NEVER re-rank in-pipeline issues (inPipeline: true in the manifest). Pin them with gate=ready.
+- NEVER re-rank in-pipeline issues (inPipeline: true in the manifest). Pin them at their rank; leave gate=auto (do NOT set gate=ready — gate is operator-only).
 - Assign condition to every issue: ok / needs-refinement / stale.
 - Every node's why field must be ≤ 140 characters (displayed in the ranked table).
 - Write full-paragraph rationale only for the active top tier (~top 80 nodes).

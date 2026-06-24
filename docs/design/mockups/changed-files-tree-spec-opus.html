@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Changed-files tree — spec (item #7)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* real tokens — light block from src/dashboard/frontend/src/index.css */
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264);
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .add{color:var(--success-foreground);font-variant-numeric:tabular-nums} .del{color:var(--destructive-foreground);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1180px;margin:26px auto;padding:0 22px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:18px;max-width:760px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:20px 0 8px}
+
+  /* the Code group panel */
+  .panel{border:1px solid var(--border);border-radius:16px;background:var(--card);overflow:hidden}
+  .ptop{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)}
+  .ptop .title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .ptop .sum{font-size:12.5px} .ptop .files{color:var(--muted-foreground)}
+  .ptop .acts{margin-left:auto;display:flex;gap:6px}
+  .btn{border:1px solid var(--border);background:var(--card);border-radius:8px;padding:5px 10px;font-size:11.5px;color:var(--foreground);cursor:pointer}
+  .btn:hover{background:var(--accent)}
+  .btn.pri{background:var(--primary);color:#fff;border-color:transparent}
+
+  .grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr)} @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .tree{border-right:1px solid var(--border);padding:6px;max-height:460px;overflow:auto} @media(max-width:880px){.tree{border-right:none;border-bottom:1px solid var(--border)}}
+
+  /* a row: caret | icon | name (flex) | bar | +adds −dels */
+  .row{display:grid;grid-template-columns:14px 16px minmax(0,1fr) 46px auto;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;width:100%;border:none;background:none;text-align:left;color:inherit;font:inherit}
+  .row:hover{background:var(--accent)}
+  .row.sel{background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .row .car{font-size:9px;color:var(--muted-foreground);text-align:center}
+  .row .ic{font-size:10px;text-align:center;color:var(--muted-foreground)}
+  .row .ftype{font-size:8.5px;font-family:var(--mono);color:var(--muted-foreground);border:1px solid var(--border);border-radius:4px;width:18px;height:15px;display:grid;place-items:center}
+  .row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .nm .dir{color:var(--muted-foreground)}
+  .row .cnt{font-size:11px;font-family:var(--mono);text-align:right;white-space:nowrap}
+  /* per-file change bar (proportion of adds vs dels) — meaningful, not decoration */
+  .bar{height:6px;border-radius:99px;background:var(--accent);overflow:hidden;display:flex}
+  .bar .g{background:var(--success)} .bar .r{background:var(--destructive)}
+  .ind1{padding-left:18px} .ind2{padding-left:34px}
+  .dirrow .nm{color:var(--foreground)}
+
+  /* diff pane */
+  .diff{display:flex;flex-direction:column;min-width:0;max-height:460px}
+  .dhead{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--border)}
+  .dhead .ftype{font-size:8.5px;font-family:var(--mono);color:var(--muted-foreground);border:1px solid var(--border);border-radius:4px;padding:1px 4px}
+  .dhead .path{font-family:var(--mono);font-size:11.5px}
+  .dhead .cnt{margin-left:auto;font-family:var(--mono);font-size:11px}
+  .dhead .mini{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--muted-foreground)}
+  .lines{font-family:var(--mono);font-size:11.5px;line-height:1.65;overflow:auto;flex:1}
+  .dl{display:flex;white-space:pre;padding:0 8px}
+  .dl .ln{width:34px;flex:none;text-align:right;padding-right:12px;color:var(--muted-foreground);opacity:.55;user-select:none}
+  /* full-row background tint for add/del — NOT a left stripe */
+  .dl.add{background:color-mix(in srgb,var(--success) 11%,transparent)} .dl.add .tx{color:var(--success-foreground)}
+  .dl.del{background:color-mix(in srgb,var(--destructive) 10%,transparent)} .dl.del .tx{color:var(--destructive-foreground)}
+  .dl.hunk{background:var(--card-2);color:var(--muted-foreground)} .dl.hunk .ln{opacity:0}
+  .dl .tx{color:var(--foreground)}
+  .empty{flex:1;display:grid;place-items:center;color:var(--muted-foreground);font-size:12px;text-align:center;padding:24px}
+
+  .states{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px} @media(max-width:880px){.states{grid-template-columns:1fr}}
+  .scard{border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+  .scard h4{margin:0 0 8px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .frow{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px}
+  .frow .ftype{font-size:8.5px;font-family:var(--mono);color:var(--muted-foreground);border:1px solid var(--border);border-radius:4px;padding:1px 4px}
+  .frow .tag{margin-left:auto;font-size:10px;color:var(--muted-foreground)}
+
+  .q{border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px;margin-top:18px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)} .q li{font-size:12.5px;margin:7px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Changed-files tree — item #7</h1>
+  <div class="sub">Lives inside the <b>Code</b> group. A collapsible folder tree of the PR's changed files (per-file +/−, a proportion bar), click a file → its diff on the right. Entry point: the header's <code>Diff +5039 −42 · 61 files</code> opens here. Data already exists — PR <code>files[]</code> for the tree, the unified diff string for the per-file patch.</div>
+
+  <div class="lbl">Code group — file tree + diff</div>
+  <div class="panel">
+    <div class="ptop">
+      <span class="title">Changed files</span>
+      <span class="sum"><b>61</b> <span class="files">files</span> · <span class="add">+5039</span> <span class="del">−42</span></span>
+      <span class="acts">
+        <button class="btn">Collapse all</button>
+        <button class="btn">Expand all</button>
+        <button class="btn pri">Open PR ↗</button>
+      </span>
+    </div>
+    <div class="grid">
+      <!-- tree -->
+      <div class="tree">
+        <button class="row dirrow"><span class="car">▾</span><span class="ic">📁</span><span class="nm">src/lib/<span class="dir">sequencer</span></span><span class="bar"><span class="g" style="width:99%"></span><span class="r" style="width:1%"></span></span><span class="cnt"><span class="add">+612</span> <span class="del">−4</span></span></button>
+        <button class="row sel ind1"><span class="car"></span><span class="ftype">TS</span><span class="nm">writeSequenceMd.ts</span><span class="bar"><span class="g" style="width:100%"></span></span><span class="cnt"><span class="add">+318</span></span></button>
+        <button class="row ind1"><span class="car"></span><span class="ftype">TS</span><span class="nm">parseSequenceMd.ts</span><span class="bar"><span class="g" style="width:100%"></span></span><span class="cnt"><span class="add">+204</span></span></button>
+        <button class="row ind1"><span class="car"></span><span class="ftype">TS</span><span class="nm">rank.ts</span><span class="bar"><span class="g" style="width:94%"></span><span class="r" style="width:6%"></span></span><span class="cnt"><span class="add">+90</span> <span class="del">−4</span></span></button>
+        <button class="row dirrow"><span class="car">▾</span><span class="ic">📁</span><span class="nm">src/lib/cloister/<span class="dir">flywheel</span></span><span class="bar"><span class="g" style="width:86%"></span><span class="r" style="width:14%"></span></span><span class="cnt"><span class="add">+86</span> <span class="del">−12</span></span></button>
+        <button class="row ind1"><span class="car"></span><span class="ftype">TS</span><span class="nm">select.ts</span><span class="bar"><span class="g" style="width:86%"></span><span class="r" style="width:14%"></span></span><span class="cnt"><span class="add">+74</span> <span class="del">−12</span></span></button>
+        <button class="row dirrow"><span class="car">▸</span><span class="ic">📁</span><span class="nm">src/dashboard/server/<span class="dir">routes</span></span><span class="bar"><span class="g" style="width:98%"></span><span class="r" style="width:2%"></span></span><span class="cnt"><span class="add">+260</span> <span class="del">−6</span></span></button>
+        <button class="row dirrow"><span class="car">▸</span><span class="ic">📁</span><span class="nm">src/dashboard/frontend/…/<span class="dir">backlog</span></span><span class="bar"><span class="g" style="width:100%"></span></span><span class="cnt"><span class="add">+3210</span></span></button>
+        <button class="row dirrow"><span class="car">▸</span><span class="ic">📁</span><span class="nm"><span class="dir">tests</span></span><span class="bar"><span class="g" style="width:97%"></span><span class="r" style="width:3%"></span></span><span class="cnt"><span class="add">+540</span> <span class="del">−16</span></span></button>
+        <button class="row"><span class="car"></span><span class="ftype">YML</span><span class="nm">projects.yaml</span><span class="bar"><span class="g" style="width:100%"></span></span><span class="cnt"><span class="add">+18</span></span></button>
+        <button class="row"><span class="car"></span><span class="ftype">{}</span><span class="nm">package.json</span><span class="bar"><span class="g" style="width:100%"></span></span><span class="cnt"><span class="add">+2</span></span></button>
+      </div>
+      <!-- diff -->
+      <div class="diff">
+        <div class="dhead">
+          <span class="ftype">TS</span><span class="path">src/lib/sequencer/writeSequenceMd.ts</span>
+          <span class="mini"><span class="add">+318</span> <span class="del">−0</span></span>
+          <span class="cnt"><button class="btn" style="padding:3px 8px">Next file ↓</button></span>
+        </div>
+        <div class="lines">
+          <div class="dl hunk"><span class="ln"></span><span class="tx">@@ -0,0 +1,18 @@  new file</span></div>
+          <div class="dl add"><span class="ln">1</span><span class="tx">+import { fence, longestBacktickRun } from './fence'</span></div>
+          <div class="dl add"><span class="ln">2</span><span class="tx">+</span></div>
+          <div class="dl add"><span class="ln">3</span><span class="tx">+export function writeSequenceMd(plan: SequencePlan): string {</span></div>
+          <div class="dl add"><span class="ln">4</span><span class="tx">+  const rows = plan.items.map((it, i) =&gt;</span></div>
+          <div class="dl add"><span class="ln">5</span><span class="tx">+    `| ${i + 1} | ${it.id} | ${it.score.toFixed(2)} | ${it.title} |`)</span></div>
+          <div class="dl add"><span class="ln">6</span><span class="tx">+  const json = JSON.stringify(plan, null, 2)</span></div>
+          <div class="dl add"><span class="ln">7</span><span class="tx">+  return [TABLE_HEAD, ...rows, '', fence(json)].join('\n')</span></div>
+          <div class="dl add"><span class="ln">8</span><span class="tx">+}</span></div>
+          <div class="dl"><span class="ln">9</span><span class="tx"> </span></div>
+          <div class="dl hunk"><span class="ln"></span><span class="tx">@@ rationale fence guard @@</span></div>
+          <div class="dl add"><span class="ln">10</span><span class="tx">+function fence(body: string) {</span></div>
+          <div class="dl add"><span class="ln">11</span><span class="tx">+  const ticks = longestBacktickRun(body) + 1</span></div>
+          <div class="dl add"><span class="ln">12</span><span class="tx">+  return '`'.repeat(Math.max(3, ticks)) + 'json\n' + body + '\n' + …</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lbl">edge cases the tree handles</div>
+  <div class="states">
+    <div class="scard">
+      <h4>non-text / no-diff files</h4>
+      <div class="frow"><span class="ftype">PNG</span> docs/design/card.png <span class="tag">binary · +0 −0</span></div>
+      <div class="frow"><span class="ftype">↻</span> oldName.ts → <span class="mono" style="font-size:11px">newName.ts</span> <span class="tag">renamed</span></div>
+      <div class="frow"><span class="ftype">TS</span> generated.d.ts <span class="tag">+4120 · collapsed</span></div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Binary → "no preview"; renamed → old→new path; huge diffs collapse with "load diff".</div>
+    </div>
+    <div class="scard">
+      <h4>diff pane · empty state</h4>
+      <div class="empty" style="min-height:90px;border:1px dashed var(--border);border-radius:10px">Select a file to view its diff<br><span class="muted">or “Open PR ↗” for the full review on GitHub</span></div>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>Decisions before I build</h3>
+    <ul>
+      <li><b>1. Layout:</b> tree-left (≈340px) / diff-right, side by side (as above). On a narrow pane it stacks (tree on top). OK?</li>
+      <li><b>2. Per-row content:</b> file-type chip · path · proportion bar · <code>+adds −dels</code>. Folders aggregate their children's totals and collapse. OK — or drop the proportion bar?</li>
+      <li><b>3. Diff:</b> <b>unified</b> (single column, full-row tints — no side-stripes), reusing the existing PR diff string. Split-view later if you want it.</li>
+      <li><b>4. Default selection:</b> open the first changed file's diff automatically (so the pane isn't empty), or start empty with the prompt? I lean auto-select first file.</li>
+      <li><b>5. Scope:</b> #7 is just this tree+diff inside Code; the CI check list (already in Code) stays above it. Good?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

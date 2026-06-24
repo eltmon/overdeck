@@ -2,6 +2,7 @@ import { AlertTriangle, Brush, CheckCircle2, ClipboardList, Rocket, Search, Ship
 import type { ComponentType } from 'react';
 import type { MemoryObservation, MemoryStatus, MemoryStatusPhase } from '@overdeck/contracts';
 import type { Issue } from '../../types';
+import { ActionStatusChip } from '../ActionStatusChip';
 
 export interface WorkspaceStatusStats {
   additions: number;
@@ -119,9 +120,10 @@ export function WorkspaceStatusCard({
         {recent.length === 0 ? (
           <li className="text-muted-foreground/70">No recent action status.</li>
         ) : recent.map((observation) => (
-          <li key={observation.id} className="flex gap-2">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-            <span className="min-w-0 truncate">{observation.actionStatus}</span>
+          <li key={observation.id} className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+            {observation.actionStatus ? <ActionStatusChip status={observation.actionStatus} /> : null}
+            <span className="min-w-0 truncate" title={observation.summary}>{observation.summary}</span>
           </li>
         ))}
       </ul>

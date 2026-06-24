@@ -195,7 +195,6 @@ describe('issue action CLI ↔ dashboard parity', () => {
     expect(clientOnlyActions.map((action) => action.key)).toEqual(expect.arrayContaining([
       'viewPr',
       'resetIssue',
-      'switchModel',
       'beads',
       'inference',
       'discussions',

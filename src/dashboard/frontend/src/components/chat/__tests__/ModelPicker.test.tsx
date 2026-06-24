@@ -8,7 +8,7 @@ vi.mock('sonner', () => ({
   toast: { message: vi.fn() },
 }));
 
-function installFetchMock() {
+function installFetchMock(options: { showHarnessModelPermutations?: boolean } = {}) {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
     const url = input.toString();
     if (url === '/api/settings/available-models') {
@@ -44,7 +44,23 @@ function installFetchMock() {
     }
     if (url === '/api/settings') {
       return new Response(JSON.stringify({
-        models: { default_conversation_model: 'claude-sonnet-4-6' },
+        models: {
+          default_conversation_model: 'claude-sonnet-4-6',
+          provider_harnesses: {},
+          provider_default_harnesses: {
+            anthropic: 'claude-code',
+            openai: 'codex',
+            google: 'ohmypi',
+            minimax: 'ohmypi',
+            zai: 'ohmypi',
+            kimi: 'ohmypi',
+            mimo: 'ohmypi',
+            openrouter: 'ohmypi',
+            nous: 'ohmypi',
+            dashscope: 'ohmypi',
+          },
+        },
+        experimental: { showHarnessModelPermutations: options.showHarnessModelPermutations ?? true },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url === '/api/settings/openrouter/models') {
@@ -91,13 +107,13 @@ describe('chat ModelPicker live harness labels', () => {
     await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
 
     expect(within(screen.getByRole('button', { name: /^Claude Code/i })).queryByText('Experimental')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('button', { name: /^Pi/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^oh-my-pi/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Codex/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
-    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /^Pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
+    expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 
   it('renders provider logos from the shared registry for every known provider', async () => {
@@ -118,17 +134,17 @@ describe('chat ModelPicker live harness labels', () => {
     }
   });
 
-  it('renders harness logos in active harness indicator chips', () => {
+  it('renders harness logos in active harness indicator chips', async () => {
     const { rerender } = render(
       <ModelPicker
         value="claude-sonnet-4-6"
         onChange={vi.fn()}
-        harness="pi"
+        harness="ohmypi"
         onHarnessChange={vi.fn()}
       />,
     );
 
-    expect(screen.getByTitle('Pi harness active')).toContainElement(screen.getByLabelText('Pi logo'));
+    expect(await screen.findByTitle('oh-my-pi harness active')).toContainElement(screen.getByLabelText('oh-my-pi logo'));
 
     rerender(
       <ModelPicker
@@ -139,7 +155,7 @@ describe('chat ModelPicker live harness labels', () => {
       />,
     );
 
-    expect(screen.getByTitle('Codex harness active')).toContainElement(screen.getByLabelText('Codex logo'));
+    expect(await screen.findByTitle('Codex harness active')).toContainElement(screen.getByLabelText('Codex logo'));
   });
 
   it('does not label harness rows experimental for the new-conversation composer', async () => {
@@ -157,5 +173,34 @@ describe('chat ModelPicker live harness labels', () => {
 
     expect(screen.queryByText('Experimental')).not.toBeInTheDocument();
     expect(screen.queryByText(/May lose fidelity/)).not.toBeInTheDocument();
+  });
+
+  it('hides harness rows by default and switches to the selected model provider default harness', async () => {
+    vi.unstubAllGlobals();
+    installFetchMock({ showHarnessModelPermutations: false });
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onHarnessChange = vi.fn();
+    const onComboChange = vi.fn();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={onChange}
+        harness="claude-code"
+        onHarnessChange={onHarnessChange}
+        onComboChange={onComboChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    expect(screen.queryByRole('button', { name: /^Pi/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Codex/i })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: /GPT-5\.5/i }));
+
+    expect(onComboChange).toHaveBeenCalledWith('gpt-5.5', [], 'codex');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onHarnessChange).not.toHaveBeenCalled();
   });
 });

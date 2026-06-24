@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stack surface — 4 concepts (item #8)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f5f6f8; --card-3:#eceef1; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-cost-foreground:#0e7490; --signal-review:#8b5cf6;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+    /* a darker neutral for the IDE status-bar concept */
+    --bar:#1c2230; --bar-fg:#cbd5e1; --bar-muted:#7c8aa0; --bar-line:#2b3340;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--card-2);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .wrap{max-width:1080px;margin:24px auto;padding:0 22px 60px}
+  h1{font-size:17px;margin:0 0 4px} .intro{color:var(--muted-foreground);font-size:12.5px;margin-bottom:6px;max-width:820px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .ok{background:var(--success)} .bad{background:var(--destructive)} .info{background:var(--info)} .warn{background:var(--warning)} .neu{background:var(--muted-foreground)}
+
+  .concept{margin-top:26px;border:1px solid var(--border);border-radius:16px;background:var(--card);overflow:hidden}
+  .chead{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .chead .n{font-size:9px;font-family:var(--mono);color:#fff;background:var(--primary);border-radius:5px;padding:2px 6px}
+  .chead h2{font-size:14px;margin:0} .chead .blurb{font-size:12px;color:var(--muted-foreground);flex:1;min-width:220px}
+  .stage{padding:20px 16px;background:var(--card-2);display:flex;justify-content:center}
+  .pros{display:flex;gap:22px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--border);font-size:12px}
+  .pros b{font-weight:500} .pros .p{color:var(--success-foreground)} .pros .c{color:var(--destructive-foreground)}
+
+  /* ===== A · lane drawer ===== */
+  .lane{width:262px;border:1px solid var(--border);border-radius:14px;background:var(--card);overflow:hidden}
+  .lane .lh{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);padding:9px 12px;border-bottom:1px solid var(--border)}
+  .lane .ag{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;padding:7px 10px;font-size:12.5px}
+  .lane .ag .i{width:14px;height:14px;border-radius:4px;display:grid;place-items:center;font-size:9px;color:#fff}
+  .lane .ag .m{font-size:10px;color:var(--muted-foreground)} .lane .ag .t{font-size:10px;color:var(--muted-foreground)}
+  .drawer{margin:6px;border:1px solid var(--border);border-radius:11px;background:var(--card)}
+  .dtog{display:flex;align-items:center;gap:8px;width:100%;border:none;background:none;cursor:pointer;font:inherit;color:inherit;padding:9px 11px;font-size:11px}
+  .dtog .ttl{color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.05em;font-size:10px}
+  .dtog .sm{margin-left:auto;color:var(--muted-foreground)}
+  .db{border-top:1px solid var(--border);padding:8px 11px}
+  .sec{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin:9px 0 5px}
+  .sec:first-child{margin-top:0}
+  .row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px}
+  .row .r{margin-left:auto;font-size:10px;color:var(--muted-foreground);font-family:var(--mono)}
+  .btn{border:1px solid var(--border);background:var(--card);border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer;color:var(--foreground)}
+  .btn.pri{background:var(--primary);color:#fff;border-color:transparent}
+  .acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+
+  /* ===== B · IDE status bar ===== */
+  .ide{width:100%;max-width:760px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card);position:relative}
+  .ide .canvas{height:150px;background:repeating-linear-gradient(135deg,var(--card) 0 14px,var(--card-2) 14px 28px);display:grid;place-items:center;color:var(--muted-foreground);font-size:11px}
+  .statusbar{display:flex;align-items:center;gap:0;background:var(--bar);color:var(--bar-fg);font-size:11px;font-family:var(--mono);height:30px}
+  .sb{display:flex;align-items:center;gap:6px;padding:0 11px;height:100%;border-right:1px solid var(--bar-line);white-space:nowrap;cursor:pointer}
+  .sb:hover{background:#232a3a} .sb .mut{color:var(--bar-muted)}
+  .sb.push{margin-left:auto;border-right:none;border-left:1px solid var(--bar-line)}
+  .pop{position:absolute;right:14px;bottom:38px;width:260px;background:var(--card);border:1px solid var(--border);border-radius:11px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:10px 12px}
+  .pop .ph{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-bottom:6px}
+
+  /* ===== C · header pill + popover ===== */
+  .hdr{width:100%;max-width:780px;position:relative}
+  .hbar{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:12px;background:var(--card);padding:11px 14px;font-size:12px;flex-wrap:wrap}
+  .fact{display:flex;align-items:center;gap:6px;color:var(--muted-foreground)} .fact .v{color:var(--foreground)} .fact .mono{font-size:11px}
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid color-mix(in srgb,var(--success) 32%,transparent);background:color-mix(in srgb,var(--success) 8%,transparent);color:var(--success-foreground);border-radius:6px;padding:3px 9px;font-size:11.5px;cursor:pointer}
+  .hpop{position:absolute;right:0;top:52px;width:300px;background:var(--card);border:1px solid var(--border);border-radius:13px;box-shadow:0 16px 40px rgba(0,0,0,.2);padding:13px 15px;z-index:5}
+  .hpop:before{content:"";position:absolute;top:-6px;right:30px;width:11px;height:11px;background:var(--card);border-left:1px solid var(--border);border-top:1px solid var(--border);transform:rotate(45deg)}
+
+  /* ===== D · topology blueprint ===== */
+  .blue{width:100%;max-width:560px;border:1px solid var(--border);border-radius:14px;background:
+     linear-gradient(var(--card-2),var(--card-2)) padding-box,
+     radial-gradient(circle at 1px 1px, color-mix(in srgb,black 7%,transparent) 1px, transparent 0) ;
+     background-size:auto, 16px 16px;background-position:center;padding:18px}
+  .bh{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .bh .t{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .flow{display:flex;align-items:center;gap:0;justify-content:center}
+  .node{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:9px 12px;min-width:104px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+  .node .nn{display:flex;align-items:center;gap:6px;font-size:12.5px}
+  .node .np{font-family:var(--mono);font-size:10px;color:var(--muted-foreground);margin-top:3px}
+  .node.bad{border-color:color-mix(in srgb,var(--destructive) 40%,transparent)}
+  .wire{width:34px;height:2px;background:var(--border);position:relative}
+  .wire.live{background:color-mix(in srgb,var(--success) 60%,var(--border))}
+  .wire:after{content:"▸";position:absolute;right:-4px;top:-8px;color:var(--muted-foreground);font-size:10px}
+  .legend{display:flex;gap:16px;justify-content:center;margin-top:14px;font-size:11px;color:var(--muted-foreground)}
+  .gitchip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--border);border-radius:8px;padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--muted-foreground)}
+
+  .foot{margin-top:26px;border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px}
+  .foot h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)}
+  .foot li{font-size:12.5px;margin:6px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stack surface — 4 concepts</h1>
+  <div class="intro">Four genuinely different ways to surface the workspace stack (containers · services · git · PRs · actions). Same honest data in each — health · status · uptime · ports, no cpu/mem, stack-level actions. Pick one (or a hybrid) and I'll build it.</div>
+
+  <!-- A -->
+  <div class="concept">
+    <div class="chead"><span class="n">A</span><h2>Lane drawer</h2><span class="blurb">Collapsible drawer pinned to the bottom of the Agents lane. In-context, quiet, collapsed by default.</span></div>
+    <div class="stage">
+      <div class="lane">
+        <div class="lh">Agents &amp; steps</div>
+        <div class="ag"><span class="i" style="background:var(--success)">✓</span><div><div>Plan</div><div class="m">opus · done</div></div><span class="t">2h</span></div>
+        <div class="ag"><span class="i" style="background:var(--info)">●</span><div><div>Work</div><div class="m">sonnet-4-6 · running</div></div><span class="t">now</span></div>
+        <div class="ag"><span class="i" style="background:var(--signal-review)">◆</span><div><div>Review</div><div class="m">convoy · 3 reviewers</div></div><span class="t">·</span></div>
+        <div class="ag" style="padding-left:22px"><span class="dot ok"></span><div><div style="font-size:12px">Security</div><div class="m">approved</div></div><span class="t"></span></div>
+        <div class="ag" style="padding-left:22px"><span class="dot bad"></span><div><div style="font-size:12px">Correctness</div><div class="m">blocked</div></div><span class="t"></span></div>
+        <div class="ag" style="padding-left:22px"><span class="dot neu"></span><div><div style="font-size:12px">Requirements</div><div class="m">pending</div></div><span class="t"></span></div>
+        <div class="ag"><span class="i" style="background:var(--success)">✓</span><div><div>Verification</div><div class="m">typecheck · lint · test</div></div><span class="t">passed</span></div>
+        <div class="ag"><span class="i" style="background:var(--muted-foreground)">○</span><div><div>Test</div><div class="m">pending</div></div><span class="t">·</span></div>
+        <div class="ag"><span class="i" style="background:var(--muted-foreground)">○</span><div><div>Ship</div><div class="m">queued</div></div><span class="t">·</span></div>
+        <div class="drawer">
+          <button class="dtog"><span class="ttl">▾ Stack</span><span class="sm"><span class="dot ok"></span> healthy</span></button>
+          <div class="db">
+            <div class="sec">Services</div>
+            <div class="row"><span>Frontend</span><span class="r" style="color:var(--info-foreground)">open ↗</span></div>
+            <div class="row"><span>API</span><span class="r" style="color:var(--info-foreground)">open ↗</span></div>
+            <div class="sec">Containers · 2</div>
+            <div class="row"><span class="dot ok"></span><span>frontend</span><span class="r">up 2h · :5173</span></div>
+            <div class="row"><span class="dot ok"></span><span>api</span><span class="r">up 2h · :3011</span></div>
+            <div class="sec">Git · PR</div>
+            <div class="row"><span class="mono" style="font-size:11px">feature/pan-1919</span><span class="r">+3 · #1950</span></div>
+            <div class="acts"><button class="btn">Rebuild</button><button class="btn">Sync main</button><button class="btn">Attach ↗</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pros"><span class="p"><b>+</b> in place, low effort, reuses existing renderer</span><span class="c"><b>−</b> cramped (≈240px); easy to miss when collapsed</span></div>
+  </div>
+
+  <!-- B -->
+  <div class="concept">
+    <div class="chead"><span class="n">B</span><h2>IDE status bar</h2><span class="blurb">A thin, always-visible strip across the bottom of the whole cockpit (VS Code-style). Live chips; click any → popover with detail + actions.</span></div>
+    <div class="stage">
+      <div class="ide">
+        <div class="canvas">cockpit content</div>
+        <div class="pop">
+          <div class="ph">api · exited (1)</div>
+          <div class="row"><span class="dot bad"></span><span>port 3011 in use</span></div>
+          <div class="acts"><button class="btn pri">Rebuild stack</button><button class="btn">Attach ↗</button></div>
+        </div>
+        <div class="statusbar">
+          <div class="sb"><span class="dot ok"></span> web <span class="mut">:5173</span></div>
+          <div class="sb"><span class="dot bad"></span> api <span class="mut">:3011 exited</span></div>
+          <div class="sb">⎇ feature/pan-1919 <span class="mut">+3 ✎</span></div>
+          <div class="sb">⇅ #1950 <span class="mut">conflicting</span></div>
+          <div class="sb push">⟳ rebuild</div>
+        </div>
+      </div>
+    </div>
+    <div class="pros"><span class="p"><b>+</b> always visible, live, terminal-native; zero clicks to read health</span><span class="c"><b>−</b> new full-width chrome; competes with other footers</span></div>
+  </div>
+
+  <!-- C -->
+  <div class="concept">
+    <div class="chead"><span class="n">C</span><h2>Header pill + popover</h2><span class="blurb">One “Stack” pill in the header facts row (next to Branch / PR / Cost). Click → a floating panel with the full stack. Zero permanent footprint.</span></div>
+    <div class="stage">
+      <div class="hdr">
+        <div class="hbar">
+          <span class="fact">⎇ <span class="v mono">feature/pan-1919</span></span>
+          <span class="fact">PR <span class="v">#1950</span></span>
+          <span class="fact">Cost <span class="v" style="color:var(--signal-cost-foreground)">$8.41</span></span>
+          <span class="pill"><span class="dot ok"></span> Stack · healthy ▾</span>
+        </div>
+        <div class="hpop">
+          <div class="ph" style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-bottom:8px">Stack · healthy</div>
+          <div class="row"><span class="dot ok"></span><span>frontend</span><span class="r">up 2h · :5173</span></div>
+          <div class="row"><span class="dot ok"></span><span>api</span><span class="r">up 2h · :3011</span></div>
+          <div class="sec">Services</div>
+          <div class="row"><span>Frontend ↗</span><span class="r">API ↗</span></div>
+          <div class="acts"><button class="btn">Rebuild</button><button class="btn">Sync main</button><button class="btn">Attach ↗</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="pros"><span class="p"><b>+</b> no footprint until needed; health glanceable in the header</span><span class="c"><b>−</b> hidden behind a click; popover positioning work</span></div>
+  </div>
+
+  <!-- D -->
+  <div class="concept">
+    <div class="chead"><span class="n">D</span><h2>Topology blueprint</h2><span class="blurb">A small architecture diagram — containers as health-colored nodes wired by their ports, git as a branch node. Reads as “infrastructure,” not a list.</span></div>
+    <div class="stage">
+      <div class="blue">
+        <div class="bh"><span class="t">Stack topology</span><span style="font-size:11px;color:var(--destructive-foreground)"><span class="dot bad"></span> 1 unhealthy</span></div>
+        <div class="flow">
+          <div class="node"><div class="nn"><span class="dot ok"></span> frontend</div><div class="np">:5173 · up 2h</div></div>
+          <div class="wire live"></div>
+          <div class="node bad"><div class="nn"><span class="dot bad"></span> api</div><div class="np">:3011 · exited</div></div>
+        </div>
+        <div class="legend"><span class="gitchip">⎇ feature/pan-1919 +3 ✎</span><span class="gitchip">⇅ #1950</span></div>
+        <div class="acts" style="justify-content:center;margin-top:14px"><button class="btn pri">Rebuild stack</button><button class="btn">Attach ↗</button></div>
+      </div>
+    </div>
+    <div class="pros"><span class="p"><b>+</b> distinctive, shows relationships at a glance</span><span class="c"><b>−</b> most build effort; topology is shallow with only 2 services</span></div>
+  </div>
+
+  <div class="foot">
+    <h3>How to choose</h3>
+    <ul>
+      <li><b>Quietest / least effort:</b> A (lane drawer) — what we scoped originally.</li>
+      <li><b>Most live / operator-cockpit feel:</b> B (status bar) — health is always on screen.</li>
+      <li><b>Cleanest cockpit:</b> C (header pill) — nothing until you ask for it.</li>
+      <li><b>Most distinctive:</b> D (topology) — but thin payoff with only 2 containers.</li>
+      <li><b>Hybrid worth considering:</b> C’s header pill <i>as the entry point</i> that opens A’s drawer content. Glanceable + roomy, no permanent lane space.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

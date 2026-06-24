@@ -274,7 +274,12 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
-async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<{ merged: boolean; reason: string }> {
+async function verifyMergedBeforeLifecycle(
+  issueId: string,
+  projectPath: string,
+  sourceBranch?: string,
+  options?: { allowVerifiedNoPrMerge?: boolean },
+): Promise<{ merged: boolean; reason: string }> {
   // PAN-1531: single merge oracle — GitHub PR API is the authoritative answer
   // for "is this PR merged." The prior ancestor-of-main and diff-fallback
   // heuristics were retired because they produced "the oracles disagree"
@@ -300,7 +305,10 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
       return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
     }
     if (prs.length === 0) {
-      return { merged: true, reason: `No PR found for ${branchName}; assuming post-merge cleanup already removed the source ref` };
+      if (options?.allowVerifiedNoPrMerge) {
+        return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
+      }
+      return { merged: false, reason: `No PR found for ${branchName}; refusing to infer merge from branch state alone` };
     }
     return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
   } catch (err: any) {
@@ -308,7 +316,12 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
   }
 }
 
-export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
+export async function postMergeLifecycle(
+  issueId: string,
+  projectPath: string,
+  sourceBranch?: string,
+  options?: { skipDeploy?: boolean; allowVerifiedNoPrMerge?: boolean },
+): Promise<void> {
   // PAN-1517: the per-slot swarm runtime is gone. Slot branches no longer exist
   // — parallelism is an in-context concern owned by the work agent (see
   // roles/work.md "Parallel work via subagents"). postMergeLifecycle fires only
@@ -345,7 +358,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       // Spec unreadable — proceed; the guard is best-effort.
     }
 
-    const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
+    const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch, options);
     if (!mergeVerification.merged) {
       console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
       return;

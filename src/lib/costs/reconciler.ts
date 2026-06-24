@@ -63,6 +63,48 @@ interface TranscriptEntry {
   };
 }
 
+/**
+ * Pi/oh-my-pi harness transcript entry (PAN-1935).
+ *
+ * Pi writes session transcripts to ~/.overdeck/agents/<id>/*.jsonl with a
+ * different shape than Claude Code: top-level `type: 'message'` rows whose
+ * `message.usage` uses short camelCase keys (`input`, `output`, `cacheRead`,
+ * `cacheWrite`) — NOT the Anthropic `input_tokens`/`cache_read_input_tokens`
+ * shape the Claude path expects. `message.provider` and `message.model` carry
+ * the real routed provider/model (e.g. zai/glm-5.2); `message.responseId` is
+ * the provider's unique response id, used for dedup.
+ */
+interface PiTranscriptEntry {
+  type?: string;
+  id?: string;
+  timestamp?: string;
+  message?: {
+    role?: string;
+    model?: string;
+    provider?: string;
+    responseId?: string;
+    usage?: {
+      input?: number;
+      output?: number;
+      cacheRead?: number;
+      cacheWrite?: number;
+      totalTokens?: number;
+    };
+  };
+}
+
+/**
+ * Map a pi-reported provider string to the AIProvider union used by the pricing
+ * layer. zai/kimi/minimax/mimo and anything unknown collapse to 'custom' (which
+ * is how these providers are keyed in DEFAULT_PRICING).
+ */
+function piProviderToAiProvider(provider?: string): AIProvider {
+  if (provider === 'anthropic') return 'anthropic';
+  if (provider === 'openai') return 'openai';
+  if (provider === 'google') return 'google';
+  return 'custom';
+}
+
 // ============== Path Helpers ==============
 
 function getAgentsDir(): string {
@@ -311,6 +353,174 @@ function extractCostEvents(
   return events;
 }
 
+/**
+ * Parse Pi/oh-my-pi transcript content and extract cost events (PAN-1935).
+ *
+ * Pi's `message.usage` uses short camelCase keys (`input`, `output`,
+ * `cacheRead`, `cacheWrite`) and the real model/provider live on `message`
+ * (not inferred from a Claude-style `model` field). Cost is always computed
+ * from tokens × pricing because pi reports `cost.total = 0` for non-Anthropic
+ * providers. Exported for unit testing.
+ */
+export function extractPiCostEvents(
+  content: string,
+  agentId: string,
+  issueId: string,
+  sessionType: string,
+  sessionId: string,
+): CostEvent[] {
+  const events: CostEvent[] = [];
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    let entry: PiTranscriptEntry;
+    try {
+      entry = JSON.parse(line) as PiTranscriptEntry;
+    } catch {
+      continue;
+    }
+    if (entry.type !== 'message') continue;
+    const usage = entry.message?.usage;
+    if (!usage) continue;
+
+    const inputTokens = usage.input ?? 0;
+    const outputTokens = usage.output ?? 0;
+    const cacheReadTokens = usage.cacheRead ?? 0;
+    const cacheWriteTokens = usage.cacheWrite ?? 0;
+    if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWriteTokens === 0) continue;
+
+    const model = entry.message?.model || 'unknown';
+    const provider = piProviderToAiProvider(entry.message?.provider);
+    // Strip any routing prefix (oai@/cx@/go@) for pricing lookup.
+    const pricingModel = model.replace(/^(?:oai|cx|go)@/, '');
+    const pricing = getPricingSync(provider, pricingModel);
+    if (!pricing) continue;
+
+    const tokenUsage: TokenUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, cacheTTL: '5m' };
+    const cost = calculateCostSync(tokenUsage, pricing);
+    // Prefer the provider response id for precise dedup; fall back to a
+    // session-scoped synthetic id so re-runs are idempotent.
+    const requestId = entry.message?.responseId ?? (entry.id ? `${sessionId}#${entry.id}` : undefined);
+    const timestamp = entry.timestamp || new Date().toISOString();
+
+    events.push({
+      ts: timestamp,
+      type: 'cost',
+      agentId,
+      issueId,
+      sessionType,
+      provider,
+      model,
+      input: inputTokens,
+      output: outputTokens,
+      cacheRead: cacheReadTokens,
+      cacheWrite: cacheWriteTokens,
+      cost,
+      requestId,
+      sessionId,
+    });
+  }
+  return events;
+}
+
+/**
+ * Pi session transcripts in an agent dir. Pi transcripts begin with a
+ * `{"type":"session","version":3,...}` header; we detect that and skip the
+ * sibling non-transcripts (activity.jsonl, cost-events.jsonl, pending-events).
+ */
+function findPiTranscriptFiles(agentDir: string): string[] {
+  let files: string[];
+  try {
+    files = readdirSync(agentDir).filter((f) => f.endsWith('.jsonl'));
+  } catch {
+    return [];
+  }
+  const transcripts: string[] = [];
+  for (const f of files) {
+    if (f === 'activity.jsonl' || f === 'cost-events.jsonl' || f === 'pending-events.jsonl') continue;
+    const full = join(agentDir, f);
+    try {
+      const fd = openSync(full, 'r');
+      const buf = Buffer.alloc(128);
+      const bytesRead = readSync(fd, buf, 0, 128, 0);
+      closeSync(fd);
+      const head = buf.toString('utf-8', 0, bytesRead);
+      if (/"type"\s*:\s*"session"/.test(head)) transcripts.push(full);
+    } catch {
+      // skip unreadable
+    }
+  }
+  return transcripts;
+}
+
+/**
+ * Sweep pi session transcripts under the per-agent dirs (~/.overdeck/agents)
+ * and import their cost events through the same Overdeck cost writer the Claude
+ * path uses (PAN-1935).
+ * Independent of the pi extension hook, so it captures cost even when the
+ * extension emits null usage or the wrong model label.
+ */
+export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
+  const result: ReconcileResult = {
+    sessionsScanned: 0,
+    sessionsWithNewData: 0,
+    eventsImported: 0,
+    duplicatesSkipped: 0,
+    errors: [],
+  };
+
+  const agentsDir = getAgentsDir();
+  if (!existsSync(agentsDir)) return result;
+
+  let agentDirs: string[];
+  try {
+    agentDirs = readdirSync(agentsDir);
+  } catch {
+    return result;
+  }
+
+  for (const agentDirName of agentDirs) {
+    const agentPath = join(agentsDir, agentDirName);
+
+    // Resolve issueId + sessionType from state.json (authoritative), falling
+    // back to inference from the directory name.
+    let issueId = inferIssueId(agentDirName) || 'UNKNOWN';
+    let sessionType = 'work';
+    const stateFile = join(agentPath, 'state.json');
+    if (existsSync(stateFile)) {
+      try {
+        const st = JSON.parse(readFileSync(stateFile, 'utf-8')) as { issueId?: string; role?: string };
+        if (st.issueId) issueId = st.issueId;
+        if (st.role) sessionType = st.role;
+      } catch {
+        // use inferred
+      }
+    }
+    if (agentDirName.startsWith('planning-')) sessionType = 'planning';
+
+    const transcripts = findPiTranscriptFiles(agentPath);
+    for (const transcriptPath of transcripts) {
+      const sessionId = basename(transcriptPath, '.jsonl');
+      result.sessionsScanned++;
+      try {
+        const content = readFileSync(transcriptPath, 'utf-8');
+        const events = extractPiCostEvents(content, agentDirName, issueId, sessionType, sessionId);
+        if (events.length === 0) continue;
+        result.sessionsWithNewData++;
+        const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
+        result.eventsImported += inserted;
+        result.duplicatesSkipped += duplicates;
+      } catch (err) {
+        result.errors.push({
+          path: transcriptPath,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
 function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCostEvent {
   return {
     ts: new Date(event.ts),
@@ -484,6 +694,15 @@ async function reconcilePromise(): Promise<ReconcileResult> {
       }
     }
   }
+
+  // PAN-1935: also sweep pi/oh-my-pi harness transcripts under
+  // ~/.overdeck/agents/*/ (the Claude scan above only covers ~/.claude/projects).
+  const piResult = await reconcilePiTranscripts();
+  result.sessionsScanned += piResult.sessionsScanned;
+  result.sessionsWithNewData += piResult.sessionsWithNewData;
+  result.eventsImported += piResult.eventsImported;
+  result.duplicatesSkipped += piResult.duplicatesSkipped;
+  result.errors.push(...piResult.errors);
 
   return result;
 }

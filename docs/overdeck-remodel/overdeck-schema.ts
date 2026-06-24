@@ -404,18 +404,15 @@ export const transcriptCheckpoints = sqliteTable("transcript_checkpoints", {
 /* ─────────────────────── MEMORY SEARCH STORE ───────────────────────
  * NOT in overdeck.db. This is a SEPARATE, per-project search database at
  * resolveMemoryRoot(projectId)/memory-search.db (paths.ts:64-65) — one per
- * project, not the single shared overdeck.db. Modeled here only to document the
- * Memory search domain end-to-end; it cannot FK into overdeck tables (different
- * DB) and is NOT counted in the overdeck.db table total.
+ * project, not the single shared overdeck.db. Its tables are created by
+ * src/lib/memory/fts-operations.ts, not by this overdeck.db Drizzle schema.
  *
  * The store has three objects (fts-operations.ts:50-98):
  *   - memory_fts — an FTS5 VIRTUAL table over the on-disk observation files.
- *     Drizzle does not model FTS5; it is created via raw SQL (like
- *     transcripts_fts above) and is not declared here.
- *   - reset_markers — modeled below. Drives search filtering: search.ts:121-128
+ *   - reset_markers — drives search filtering: search.ts:121-128
  *     excludes any observation older than the newest matching reset marker, so
  *     a reset hides prior memories without deleting them.
- *   - observation_index — modeled below. Maps each indexed observation id to its
+ *   - observation_index — maps each indexed observation id to its
  *     backing JSONL file + byte offset, so the FTS index can be rebuilt.
  *
  * REQUIRED PIECE (functional parity): an FTS rebuilder that reconstructs
@@ -424,26 +421,6 @@ export const transcriptCheckpoints = sqliteTable("transcript_checkpoints", {
  * — the observations still exist on disk but become unsearchable. This rebuilder
  * is the missing piece and must exist.
  */
-export const resetMarkers = sqliteTable("reset_markers", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  scope: text("scope").notNull(),                                // project|workspace|issue|session (search.ts:124-127)
-  scopeId: text("scope_id").notNull(),
-  fromTimestamp: integer("from_timestamp", { mode: "timestamp" }).notNull(), // cutoff: observations at/before this are hidden
-  reason: text("reason"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-}, (t) => [
-  index("reset_markers_scope_idx").on(t.scope, t.scopeId, t.fromTimestamp), // live idx_reset_markers_scope
-  index("reset_markers_created_at_idx").on(t.createdAt),         // live idx_reset_markers_created_at
-]);
-
-export const observationIndex = sqliteTable("observation_index", {
-  id: text("id").primaryKey(),                                   // observation id
-  observationPathJsonl: text("observation_path_jsonl").notNull(), // backing JSONL file
-  byteOffset: integer("byte_offset").notNull(),                  // offset within that file
-}, (t) => [
-  // live idx_observation_index_path_offset (fts-operations.ts:96-97)
-  index("observation_index_path_offset_idx").on(t.observationPathJsonl, t.byteOffset),
-]);
 
 /* ───────────────────────── OBSERVABILITY ───────────────────────────
  * Not a domain — a thin EventBus (disposable pub/sub transport). Tiered
@@ -486,7 +463,6 @@ export const statusHistory = sqliteTable("status_history", {
  * NOT in overdeck.db (live elsewhere): the sacred session files (disk),
  *   memory observation files (~/.overdeck/memory), cache.db, the cost
  *   events.jsonl archive, the git .pan/records. memory-search.db is also a
- *   separate per-project DB (not overdeck.db); its reset_markers /
- *   observation_index tables are MODELED above (MEMORY SEARCH STORE section)
- *   for documentation but are NOT counted in the overdeck.db table total.
+ *   separate per-project DB (not overdeck.db); its reset_markers and
+ *   observation_index tables are created by src/lib/memory/fts-operations.ts.
  * ──────────────────────────────────────────────────────────────────── */

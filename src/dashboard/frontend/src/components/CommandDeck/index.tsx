@@ -156,6 +156,11 @@ interface CommandDeckProps {
   /** PAN-1593: report the selected project's issue prefix (e.g. "PAN") so the
    * app-bar search can scope to it. Null when no single prefix is resolvable. */
   onProjectPrefixChange?: (prefix: string | null) => void;
+  /** PAN-2005: cockpit deep-link — open this issue's cockpit tab on mount/popstate. */
+  cockpitIssue?: { project: string; issue: string } | null;
+  /** PAN-2005: called when the selected issue changes so App can sync the URL
+   * to /command-deck/<project>/<issue>. */
+  onCockpitChange?: (projectKey: string | null, issueId: string | null) => void;
 }
 
 const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
@@ -171,6 +176,8 @@ export function CommandDeck({
   selectedProject = null,
   onSelectProject,
   onProjectPrefixChange,
+  cockpitIssue = null,
+  onCockpitChange,
 }: CommandDeckProps) {
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
@@ -461,6 +468,8 @@ export function CommandDeck({
   // Track the last deep-link ID we applied so we only navigate for *new* deep-links
   // (e.g. popstate), not on every conversations refetch.
   const appliedConvId = useRef<string | null>(null);
+  // PAN-2005: same idea for the issue cockpit deep-link (/command-deck/<proj>/<issue>).
+  const appliedCockpit = useRef<string | null>(null);
 
   // Resolve the registered project (by name) that owns a conversation's cwd,
   // or null when the conversation is unscoped — cwd not under any registered
@@ -583,6 +592,45 @@ export function CommandDeck({
       onConvIdChange(String(conv.id));
     }
   }, [selectedConversation, conversations, onConvIdChange, convId]);
+
+  // PAN-2005: apply the cockpit deep-link (/command-deck/<proj>/<issue>) on mount
+  // and popstate — select the project and open (or focus) the issue's cockpit tab.
+  useEffect(() => {
+    if (!cockpitIssue) return;
+    // Wait until deck keys are loaded so the project segment normalizes correctly
+    // on the FIRST apply (else we'd lock onto the raw repo key and never re-resolve).
+    if (registeredProjects.length === 0) return;
+    const key = `${cockpitIssue.project}/${cockpitIssue.issue}`;
+    if (key === appliedCockpit.current) return;
+    appliedCockpit.current = key;
+    // Normalize the URL's project segment to a real dashboard deck key — a stale
+    // or hand-built link may carry the tracker repo ("eltmon/panopticon-cli")
+    // instead of the deck key ("panopticon-cli"); the sync effect then self-corrects
+    // the URL once the feature is selected.
+    const seg = cockpitIssue.project;
+    const tail = seg.includes('/') ? seg.split('/').pop()! : seg;
+    const rp = registeredProjects.find(
+      (p) => p.key === seg || p.name === seg || p.key === tail || p.name === tail,
+    );
+    const deckKey = rp ? (rp.name ?? rp.key) : seg;
+    setSelectedFeature(cockpitIssue.issue);
+    setSelectedConversation(null);
+    onSelectProject?.(deckKey);
+    openIssueTabIn(deckKey, cockpitIssue.issue, cockpitIssue.issue);
+  }, [cockpitIssue, onSelectProject, openIssueTabIn, registeredProjects]);
+
+  // PAN-2005: sync the URL when the selected issue changes (tree click, etc.).
+  // Defined after the conversation-route sync above so the issue path wins when
+  // both fire on the same selection change (selecting a feature nulls the conv).
+  const prevFeatureRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!onCockpitChange) return;
+    if (selectedFeature === prevFeatureRef.current) return;
+    prevFeatureRef.current = selectedFeature;
+    if (selectedFeature && selectedProject) {
+      onCockpitChange(selectedProject, selectedFeature);
+    }
+  }, [selectedFeature, selectedProject, onCockpitChange]);
 
   // PAN-1561: selecting an issue from the tree opens (or focuses) an issue tab
   // in the current project's deck rather than replacing the whole content area.
@@ -1052,7 +1100,7 @@ export function CommandDeck({
   // can open/focus an agent tab on it.
   const createDeckConversation = useCallback(
     (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
-      const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
+      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
       return createConversationForProject(projectKey, harness, message, viewMode);

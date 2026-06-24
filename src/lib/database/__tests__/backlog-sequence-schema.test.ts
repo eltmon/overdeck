@@ -57,3 +57,32 @@ describe('backlog_sequence schema migration (PAN-1866)', { timeout: 30_000 }, ()
     expect(rsInfo.length).toBeGreaterThan(0);
   });
 });
+
+describe('upsertBacklogSequence full-sync (PAN-2010)', { timeout: 30_000 }, () => {
+  const node = (issue: string, rank: number) => ({
+    issue, rank, size: 'M', importance: 'high', score: 50,
+    condition: 'ok', dependsOn: [], why: 'why', gate: 'auto', planning: 'auto',
+  });
+  const doc = (nodes: ReturnType<typeof node>[], generatedAt: string) =>
+    ({ project: 'p', generatedAt, nodes, edges: [] }) as unknown as import('../../backlog/types.js').SequenceDoc;
+
+  it('purges rows for issues no longer in the sequence (closed / re-sequenced out)', async () => {
+    const { upsertBacklogSequence, getBacklogSequence } = await import('../backlog-sequence-db.js');
+
+    upsertBacklogSequence('p', doc([node('PAN-1', 1), node('PAN-2', 2), node('PAN-3', 3)], '2026-01-01T00:00:00Z'));
+    expect(getBacklogSequence('p').map((n) => n.issueId).sort()).toEqual(['PAN-1', 'PAN-2', 'PAN-3']);
+
+    // PAN-2 is closed → drops out of the next sequence. It must NOT linger in the cache.
+    upsertBacklogSequence('p', doc([node('PAN-1', 1), node('PAN-3', 2)], '2026-01-02T00:00:00Z'));
+    const after = getBacklogSequence('p').map((n) => n.issueId).sort();
+    expect(after).toEqual(['PAN-1', 'PAN-3']);
+    expect(after).not.toContain('PAN-2');
+  });
+
+  it('empties the cache for the project when the new sequence has no nodes', async () => {
+    const { upsertBacklogSequence, getBacklogSequence } = await import('../backlog-sequence-db.js');
+    upsertBacklogSequence('p', doc([node('PAN-1', 1)], '2026-01-01T00:00:00Z'));
+    upsertBacklogSequence('p', doc([], '2026-01-02T00:00:00Z'));
+    expect(getBacklogSequence('p')).toEqual([]);
+  });
+});
