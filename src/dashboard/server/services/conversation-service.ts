@@ -896,6 +896,69 @@ export async function parseConversationMessages(
 }
 
 /**
+ * Parse an ENTIRE JSONL transcript, regardless of size.
+ *
+ * `parseConversationMessages(file)` reads at most MAX_READ_BYTES (10 MB) in a
+ * single call, so a one-shot full parse of a larger file silently returns only
+ * its first 10 MB — i.e. the OLDEST messages, dropping the most recent turns
+ * (PAN-1989: a 14.5 MB work-agent transcript rendered only up to its ~10 MB
+ * mark, hiding the final ~3 hours of work). The live WebSocket panel never hit
+ * this because it advances `byteOffset` tick-by-tick; the one-shot
+ * `GET /api/agents/:id/conversation` endpoint does not.
+ *
+ * This loops the same parser in 10 MB chunks until it stops advancing,
+ * threading ParseState across boundaries (identical to watchConversation's
+ * carry-over) and accumulating messages, workLog, compact boundaries, and
+ * cost/token totals. Per-chunk totals are safe to sum because `countedUsageIds`
+ * is threaded, so a response split across a read boundary is counted once.
+ */
+export async function parseEntireConversation(sessionFile: string): Promise<ParseResult> {
+  let offset = 0;
+  let priorState: ParseState | undefined;
+  const messages: ChatMessage[] = [];
+  const workLog: WorkLogEntry[] = [];
+  const compactBoundaries: CompactBoundary[] = [];
+  let totalCost = 0;
+  let totalTokens = 0;
+  let last: ParseResult | null = null;
+
+  // Bounded loop: at 10 MB/chunk this covers a 10 GB transcript. The real exit
+  // is "byteOffset stopped advancing" (EOF or an incomplete trailing line).
+  for (let guard = 0; guard < 1024; guard++) {
+    const result = await parseConversationMessages(sessionFile, offset, priorState);
+    messages.push(...result.messages);
+    workLog.push(...result.workLog);
+    if (result.compactBoundaries?.length) compactBoundaries.push(...result.compactBoundaries);
+    totalCost += result.totalCost;
+    totalTokens += result.totalTokens;
+    last = result;
+
+    if (result.byteOffset <= offset) break; // no progress → EOF
+    offset = result.byteOffset;
+    priorState = {
+      pendingToolUse: result.pendingToolUse,
+      unresolvedResults: result.unresolvedResults,
+      lastSequence: result.lastSequence,
+      planToolUseIds: result.planToolUseIds,
+      proposedPlan: result.proposedPlan,
+      latestAssistantUsage: result.latestAssistantUsage,
+      contextBoundaryOffset: result.contextBoundaryOffset,
+      permissionMode: result.permissionMode,
+      fileEditsByAssistantId: result.fileEditsByAssistantId,
+      pendingAssistantId: result.pendingAssistantId,
+      orphanToolUseIds: result.orphanToolUseIds,
+      countedUsageIds: result.countedUsageIds,
+    };
+  }
+
+  if (!last) return parseConversationMessages(sessionFile, 0);
+
+  // Take terminal state (byteOffset, boundary offsets, pending maps, mtime, …)
+  // from the final chunk; replace the accumulating fields with the full totals.
+  return { ...last, messages, workLog, compactBoundaries, totalCost, totalTokens };
+}
+
+/**
  * PAN-1635: a conversation whose JSONL hasn't been written in this long is no
  * longer "working" — even if its last entry is a trailing user/meta line (e.g. a
  * post-compaction summary whose follow-up prompt was eaten by the compaction).

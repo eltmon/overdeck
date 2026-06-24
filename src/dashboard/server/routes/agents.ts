@@ -132,7 +132,7 @@ import {
   computeAgentEnrichment,
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
-import { parseConversationMessages } from '../services/conversation-service.js';
+import { parseEntireConversation } from '../services/conversation-service.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import { readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath, resolveAgentHarness } from './jsonl-resolver.js';
@@ -1074,7 +1074,10 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
     }
 
     if (!jsonlPath || !existsSync(jsonlPath)) return EMPTY_CONVERSATION;
-    const result = await parseConversationMessages(jsonlPath);
+    // parseEntireConversation, not parseConversationMessages: a single parse caps
+    // at MAX_READ_BYTES (10 MB) and would drop the most recent turns of a larger
+    // transcript (PAN-1989). This one-shot endpoint must return the whole file.
+    const result = await parseEntireConversation(jsonlPath);
     // Force streaming: false — tmux session is dead, any "streaming" state is stale
     return { ...result, streaming: false };
   } catch (err) {
