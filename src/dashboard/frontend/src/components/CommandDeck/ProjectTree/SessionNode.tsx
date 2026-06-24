@@ -431,9 +431,14 @@ function ModelOriginPanel({
   roleLabel: string;
   currentHarness?: string | null;
 }) {
-  const resolved = origin?.resolved ?? resolvedModel ?? 'unknown';
+  // Headline is ALWAYS the agent's actual running model (ground truth). `origin`
+  // explains the weighting mechanism; when the live distribution's pick differs
+  // from the running model (the role's distribution was edited after this agent
+  // spawned), we say so rather than misreport the model.
+  const resolved = resolvedModel ?? origin?.resolved ?? 'unknown';
   const positive = origin ? origin.distribution.filter((d) => d.weight > 0) : [];
   const chosen = origin?.distribution.find((d) => d.chosen);
+  const drift = origin != null && resolvedModel != null && origin.resolved !== resolvedModel;
   return (
     <div className="mx-1 mb-1 mt-0.5 rounded-md border border-primary/30 bg-primary/[0.08] px-2.5 py-2">
       <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Model</div>
@@ -482,6 +487,12 @@ function ModelOriginPanel({
               </>
             ) : null}
           </div>
+          {drift ? (
+            <div className="mt-1.5 text-[10px] leading-snug text-amber-300/90">
+              Spawned as <span className="font-mono">{resolved}</span> before this distribution was set —
+              new {roleLabel} agents follow the weights above.
+            </div>
+          ) : null}
         </>
       ) : (
         <div className="mt-1 text-[10px] text-muted-foreground">

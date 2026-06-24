@@ -33,8 +33,9 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
-import { getAgentRuntimeState, getAgentStateSync, listRunningAgents, type Role } from '../../../lib/agents.js';
-import { computeModelOrigin, loadConfigSync, type ModelOriginData } from '../../../lib/config-yaml.js';
+import { getAgentRuntimeState, getAgentStateSync, listRunningAgents } from '../../../lib/agents.js';
+import type { ModelOriginData } from '../../../lib/config-yaml.js';
+import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
@@ -180,25 +181,6 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
-
-/**
- * Map a session-node type to the pipeline Role whose model distribution it draws
- * from, for the PAN-2053 model inspector. Returns null for types that never sample
- * a top-level weighted role distribution: 'reviewer' (sub-role convoy member —
- * resolves via a sub-role scalar) and 'legacy'.
- */
-function sessionTypeToModelRole(type: string): Role | null {
-  switch (type) {
-    case 'work': return 'work';
-    case 'review': return 'review';
-    case 'test': return 'test';
-    case 'ship':
-    case 'merge': return 'ship';
-    case 'planning': return 'plan';
-    case 'strike': return 'strike';
-    default: return null;
-  }
-}
 
 // ─── Route: GET /api/command-deck/activity/:issueId ───────────────────────
 
@@ -635,22 +617,9 @@ export async function fetchActivityDataWithContext(
   });
 
   // PAN-2053: attach the read-only model-origin (weighted-distribution + FNV-1a
-  // derivation) for the right-click MODEL inspector. Non-null only when the agent's
-  // role draws from a weighted distribution; scalar roles get nothing to explain.
-  // Sub-role review convoy members ('reviewer') resolve via a sub-role scalar, never
-  // the weighted parent, so they are skipped.
-  try {
-    const { config } = loadConfigSync();
-    for (const section of sections) {
-      const role = sessionTypeToModelRole(section.type);
-      if (!role) continue;
-      const state = getAgentStateSync(section.sessionId);
-      // Prefer the exact key persisted at spawn; reconstruct for pre-PAN-2053 agents.
-      const spawnKey = state?.modelSpawnKey ?? `${role}:${state?.issueId ?? issueId}`;
-      const origin = computeModelOrigin(role, spawnKey, config);
-      if (origin) section.modelOrigin = origin;
-    }
-  } catch { /* config/state issues must never break the activity tree */ }
+  // derivation) for the right-click MODEL inspector. Shared with the project tree
+  // (projects.ts) so both surfaces stay in lock-step.
+  enrichSessionsWithModelOrigin(sections, issueId);
 
   // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};

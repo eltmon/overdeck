@@ -632,6 +632,15 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   const isActiveTrackerState = (state: string | null): boolean =>
     state === 'in_progress' || state === 'in_review' || state === 'started';
 
+  // PAN-2055: a CLOSED/done/canceled issue is terminal — the operator (or close-out)
+  // has declared it finished. Any workspace, feature branch, or *paused* work-agent
+  // tmux session left behind is stale close-out residue, not active pipeline work.
+  const isTerminalTrackerState = (state: string | null): boolean =>
+    state === 'closed' || state === 'done' || state === 'canceled' || state === 'completed';
+
+  const hasOpenPr = (issue: MutableResourceIssue): boolean =>
+    issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open');
+
   const isLiveResource = (issue: MutableResourceIssue): boolean => {
     if (issue.resourceDetails.remoteAgent) return true;
     if (issue.resourceDetails.tmuxSessions.length > 0) return true;
@@ -642,6 +651,13 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
 
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
+    // PAN-2055: drop terminal (closed/done/canceled) issues from the active resource
+    // tree even when leftover residue makes them look "live". Their paused agent /
+    // workspace / merged branch is debris to reap, not pipeline work — without this a
+    // merged + closed-out issue whose paused work-agent tmux session is still alive
+    // (isLiveResource → true) lingers forever as "merged — awaiting close-out". An
+    // OPEN PR is the one terminal-state case that still warrants attention.
+    .filter((issue) => !isTerminalTrackerState(issue.trackerState) || hasOpenPr(issue))
     .filter(
       (issue) =>
         issue.readyForMerge
