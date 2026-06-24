@@ -261,7 +261,34 @@ export async function parseConversationMessages(
   priorState?: ParseState,
 ): Promise<ParseResult> {
   // Read only new content from the byte offset — avoids re-reading the entire JSONL every tick
-  const fileStats = await stat(sessionFile);
+  let fileStats: Awaited<ReturnType<typeof stat>>;
+  try {
+    fileStats = await stat(sessionFile);
+  } catch {
+    // The transcript file does not exist yet — a freshly-spawned conversation
+    // whose runtime has not written its first JSONL line. Treat this as an empty
+    // transcript (0 messages) instead of throwing, so a live subscriber can
+    // attach the instant the conversation row exists and self-populate once the
+    // file appears (watchConversation polls until it does). Mirrors the empty
+    // result the truncation branch below returns.
+    return {
+      messages: [],
+      workLog: [],
+      byteOffset: 0,
+      streaming: false,
+      totalCost: 0,
+      totalTokens: 0,
+      latestAssistantUsage: null,
+      contextBoundaryOffset: 0,
+      contextActiveBytes: 0,
+      pendingToolUse: priorState?.pendingToolUse ?? new Map(),
+      unresolvedResults: priorState?.unresolvedResults ?? new Map(),
+      lastSequence: priorState?.lastSequence ?? 0,
+      mtimeMs: 0,
+      permissionMode: priorState?.permissionMode,
+      fileEditsByAssistantId: new Map(),
+    };
+  }
   const fileSize = fileStats.size;
 
   // File was truncated or rotated since last read — signal reset to caller

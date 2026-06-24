@@ -256,6 +256,23 @@ describe('parseConversationMessages', () => {
     expect(result.byteOffset).toBe(0);
   });
 
+  it('returns an empty result (does not throw) when the session file does not exist yet', async () => {
+    // A live subscriber may attach the instant a conversation row exists, before
+    // the runtime has written its first JSONL line. parseConversationMessages must
+    // treat a missing file as an empty transcript so the subscription stays healthy
+    // and self-populates once the file appears (the reload bug fix).
+    const enoent = Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+    mockStat.mockRejectedValueOnce(enoent);
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/not-written-yet.jsonl');
+
+    expect(result.messages).toEqual([]);
+    expect(result.workLog).toEqual([]);
+    expect(result.byteOffset).toBe(0);
+    expect(result.streaming).toBe(false);
+  });
+
   it('parses a user text message', async () => {
     const lines = [
       {

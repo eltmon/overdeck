@@ -108,29 +108,38 @@ export function applyConversationMessagesEvent(
   };
 }
 
-export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number }): boolean {
-  if (!conversation.sessionAlive) return false;
-  // Real DB conversations stream for every transcript-backed harness. Claude
-  // Code uses the incremental JSONL stream; pi/codex use full snapshot streams.
-  // Polling pi/codex every 2s is visibly stale during fast turns and can leave
-  // the Conversation view behind the Terminal view.
+export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): boolean {
+  // Real DB conversations (id >= 0) stream for every transcript-backed harness
+  // as soon as the row exists and the conversation has NOT ended. We intentionally
+  // do NOT gate on `sessionAlive`: a freshly-created conversation reports
+  // sessionAlive:false until its background spawn finishes, and gating here left
+  // the feed frozen (no stream, no HTTP poll) until a full page reload. The server's
+  // subscribe handler tolerates a not-yet-written session file (it polls until the
+  // transcript appears, then emits the full snapshot), so subscribing early is safe
+  // and self-heals the view the instant the runtime writes — no reload. Ended
+  // conversations stay on the one-shot HTTP path (historical view; no live tail).
+  // Claude Code uses the incremental JSONL stream; pi/codex use full snapshot
+  // streams — polling those every 2s is visibly stale during fast turns.
   if (conversation.id !== undefined && conversation.id >= 0) {
+    if (conversation.endedAt) return false;
     return conversation.harness === 'claude-code' ||
       conversation.harness === 'pi' ||
       conversation.harness === 'codex' ||
       conversation.harness == null;
   }
-  // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels).
+  // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels)
+  // have no conversations-table row and only stream while their session is live.
   // Only pi/codex stream here (PAN-1908): the server tails their transcript and
   // pushes snapshots. Claude work agents stay on the existing HTTP-poll path,
   // which already works — no need to add a server watcher for them.
+  if (!conversation.sessionAlive) return false;
   const name = conversation.name ?? '';
   const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
   const streamable = conversation.harness === 'pi' || conversation.harness === 'codex';
   return isAgentSession && streamable;
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number }): boolean {
+export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): boolean {
   const queryClient = useQueryClient();
   const enabled = shouldStreamConversationMessages(conversation);
 
