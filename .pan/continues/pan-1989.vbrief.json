@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1989",
   "created": "2026-06-23T08:05:04.484Z",
-  "updated": "2026-06-24T16:20:53.722Z",
+  "updated": "2026-06-24T16:58:48.590Z",
   "gitState": {
     "branch": "feature/pan-1989",
     "sha": "69b2ee48f",
@@ -341,6 +341,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-24T16:20:53.722Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T16:57:53.731Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-24T16:58Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-06-24T16:58:17.429Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T16:58:48.590Z"
     }
   ],
   "feedback": []

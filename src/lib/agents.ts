@@ -4810,9 +4810,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   const allowedRuntimeStates = ['suspended', 'idle'];
   const allowedAgentStatuses = ['stopped', 'completed'];
 
-  // Also allow resuming a "running" agent with no live tmux session — this happens after
-  // a system crash where tmux was killed but state.json was never updated to 'stopped'.
-  const isCrashed = agentState?.status === 'running' && !(await Effect.runPromise(sessionExists(normalizedId)));
+  // Also allow resuming a "running" OR "starting" agent with no live tmux session —
+  // this happens after a system crash where tmux was killed but state.json was never
+  // updated to 'stopped'. For 'starting' this is a spawn that got past model
+  // resolution but whose tmux session died mid-launch (the deacon patrol would
+  // normally heal starting→stopped after its grace window, but that requires the
+  // deacon to be running / not in OVERDECK_NO_RESUME mode). A non-placeholder
+  // 'starting' agent with a saved session is resumable exactly like a crashed
+  // 'running' agent; placeholder 'starting' agents (model starts with 'pending-')
+  // are still rejected below because they never produced a resumable session.
+  // The lifecycle UI model already treats runtime=stopped as isStopped, so this
+  // keeps the gate consistent with the Resume button that model enables.
+  const isCrashed = (agentState?.status === 'running' || agentState?.status === 'starting')
+    && !(await Effect.runPromise(sessionExists(normalizedId)));
 
   // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
   // context-wedged agent, which is typically status='running' with a LIVE (but
