@@ -1382,7 +1382,7 @@ export async function spawnConversationSession(
   let providerExportsStr = '';
   let providerEnv: Record<string, string> = {};
   let piFields: {
-    harness: 'pi';
+    harness: 'ohmypi';
     piMode: 'tui';
     piExtensionPath: string;
     piSessionDir: string;
@@ -1448,7 +1448,7 @@ export async function spawnConversationSession(
         ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
         : undefined;
       piFields = {
-        harness: 'pi',
+        harness: 'ohmypi',
         piMode: 'tui',
         piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
         piSessionDir,
