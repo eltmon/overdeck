@@ -12888,6 +12888,45 @@ const DEFAULT_PRICING = [
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-5.2",
+		inputPer1k: .0014,
+		outputPer1k: .0044,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-5.1",
+		inputPer1k: .0014,
+		outputPer1k: .0044,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-4.7",
+		inputPer1k: 5e-4,
+		outputPer1k: .002,
+		cacheReadPer1k: 5e-5,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-4.7-flash",
+		inputPer1k: 1e-4,
+		outputPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "kimi-k2.7-code",
+		inputPer1k: 95e-5,
+		outputPer1k: .004,
+		cacheReadPer1k: 19e-5,
+		currency: "USD"
 	}
 ];
 /**

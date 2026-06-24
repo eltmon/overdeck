@@ -127,6 +127,17 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'MiniMax-M2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M3', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
+  // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
+  // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.
+  { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
+  // GLM-4.7: approximate in/out split of the $1.5/M blended average — verify upstream.
+  { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0005, outputPer1k: 0.002, cacheReadPer1k: 0.00005, currency: 'USD' },
+  { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0.0001, outputPer1k: 0.0005, currency: 'USD' },
+  // Moonshot Kimi K2.7 Code (platform.moonshot.ai/docs/pricing/chat):
+  // $0.95/M in (cache-miss), $4.00/M out, $0.19/M in (cache-hit). PAN-1935.
+  { provider: 'custom', model: 'kimi-k2.7-code', inputPer1k: 0.00095, outputPer1k: 0.004, cacheReadPer1k: 0.00019, currency: 'USD' },
 ];
 
 // ============== Cost Calculation ==============

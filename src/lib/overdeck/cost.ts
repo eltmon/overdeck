@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
-import { and, desc, eq, gte, like, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
@@ -451,20 +451,24 @@ export const CostWriterLive = Layer.effect(
     const archive = yield* CostArchive;
     const bus = yield* EventBus;
 
-    // Dedup by requestId or sourceFile: pi/codex sessions carry a file path but no requestId,
-    // so the UNIQUE(request_id) constraint doesn't catch re-imports of the same file.
+    // Dedup: prefer the precise requestId when present; fall back to sourceFile
+    // only for events with no requestId (codex / background-AI dumps that carry
+    // a file path but no request id). Using OR(requestId, sourceFile) is wrong —
+    // it collapses every event that shares a sourceFile (e.g. all events
+    // reconciled from one pi transcript) down to a single row, silently dropping
+    // the rest (PAN-1935).
     const checkDuplicate = (e: CostEvent) =>
       Effect.gen(function* () {
         if (e.requestId == null && e.sourceFile == null) return false;
-        const conditions = [
-          e.requestId != null ? eq(costEventsTable.requestId, e.requestId) : undefined,
-          e.sourceFile != null ? eq(costEventsTable.sourceFile, e.sourceFile) : undefined,
-        ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined);
+        const condition =
+          e.requestId != null
+            ? eq(costEventsTable.requestId, e.requestId)
+            : eq(costEventsTable.sourceFile, e.sourceFile as string);
         const existing = yield* Effect.promise(() =>
           q
             .select({ id: costEventsTable.id })
             .from(costEventsTable)
-            .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+            .where(condition)
             .limit(1),
         );
         return (existing as unknown[]).length > 0;
