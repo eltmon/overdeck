@@ -22,7 +22,7 @@ vi.mock('../useGitFeed', () => ({
 
 const now = new Date('2026-05-23T01:05:00.000Z');
 
-function observation(id: string, timestamp: string, actionStatus: string | null, issueId = 'PAN-1389'): MemoryObservation {
+function observation(id: string, timestamp: string, actionStatus: string | null, issueId = 'PAN-1389', summary = 'Summary'): MemoryObservation {
   return {
     id,
     timestamp,
@@ -37,7 +37,7 @@ function observation(id: string, timestamp: string, actionStatus: string | null,
     sourceTranscriptOffset: 1,
     actionStatus,
     narrative: 'Narrative',
-    summary: 'Summary',
+    summary,
     files: [],
     tags: [],
     tokens: { prompt: 1, completion: 1, total: 2 },
@@ -160,8 +160,8 @@ describe('SessionFeedSidebar', () => {
     useDashboardStore.setState({
       observationsByIssueId: {
         'PAN-1389': [
-          observation('older', '2026-05-23T01:02:00.000Z', 'Older activity'),
-          observation('newer', '2026-05-23T01:04:00.000Z', 'Newer activity'),
+          observation('older', '2026-05-23T01:02:00.000Z', 'done', 'PAN-1389', 'Older activity'),
+          observation('newer', '2026-05-23T01:04:00.000Z', 'in_progress', 'PAN-1389', 'Newer activity'),
         ],
       },
     });
@@ -173,8 +173,8 @@ describe('SessionFeedSidebar', () => {
     expect(section).not.toBeNull();
     const entries = within(section as HTMLElement).getAllByRole('button');
     expect(entries.map((button) => button.textContent)).toEqual([
-      'Newer activityfeature-pan-1389 · PAN-1389·1m agoMemory',
-      'Older activityfeature-pan-1389 · PAN-1389·3m agoMemory',
+      'Newer activityfeature-pan-1389 · PAN-1389·1m agoin_progressMemory',
+      'Older activityfeature-pan-1389 · PAN-1389·3m agodoneMemory',
     ]);
     const badgeRow = within(entries[0]).getByTestId('notification-class-memory').parentElement;
     expect(badgeRow).toHaveTextContent('feature-pan-1389 · PAN-1389');
@@ -213,7 +213,7 @@ describe('SessionFeedSidebar', () => {
     act(() => {
       useDashboardStore.setState({
         observationsByIssueId: {
-          'PAN-1389': [observation('live', '2026-05-23T01:04:00.000Z', 'Live activity update')],
+          'PAN-1389': [observation('live', '2026-05-23T01:04:00.000Z', 'done', 'PAN-1389', 'Live activity update')],
         },
       });
     });
@@ -251,7 +251,7 @@ describe('SessionFeedSidebar', () => {
     window.addEventListener('popstate', onPopState);
     useDashboardStore.setState({
       observationsByIssueId: {
-        'PAN-1389': [observation('activity-nav', '2026-05-23T01:04:00.000Z', 'Navigate to activity')],
+        'PAN-1389': [observation('activity-nav', '2026-05-23T01:04:00.000Z', 'done', 'PAN-1389', 'Navigate to activity')],
       },
     });
 

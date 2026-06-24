@@ -24,7 +24,7 @@ const status: MemoryStatus = {
   tags: [],
 };
 
-function observation(id: string, timestamp: string, actionStatus: string | null): MemoryObservation {
+function observation(id: string, timestamp: string, actionStatus: string | null, summary = 'Summary'): MemoryObservation {
   return {
     id,
     timestamp,
@@ -39,7 +39,7 @@ function observation(id: string, timestamp: string, actionStatus: string | null)
     sourceTranscriptOffset: 1,
     actionStatus,
     narrative: 'Narrative',
-    summary: 'Summary',
+    summary,
     files: [],
     tags: [],
     tokens: { prompt: 1, completion: 1, total: 2 },
@@ -87,11 +87,11 @@ describe('WorkspaceStatusCard', () => {
         issue={issue}
         status={status}
         observations={[
-          observation('old', '2026-05-16T10:00:00.000Z', 'Old status'),
+          observation('old', '2026-05-16T10:00:00.000Z', 'done', 'Old summary'),
           observation('ignored', '2026-05-16T10:10:00.000Z', null),
-          observation('middle', '2026-05-16T10:20:00.000Z', 'Middle status'),
-          observation('newer', '2026-05-16T10:30:00.000Z', 'Newer status'),
-          observation('newest', '2026-05-16T10:40:00.000Z', 'Newest status'),
+          observation('middle', '2026-05-16T10:20:00.000Z', 'done', 'Middle summary'),
+          observation('newer', '2026-05-16T10:30:00.000Z', 'in_progress', 'Newer summary'),
+          observation('newest', '2026-05-16T10:40:00.000Z', 'blocked', 'Newest summary'),
         ]}
         stats={{ additions: 0, deletions: 0, commits: 0, prs: 0 }}
         onOpenWorkspaceHome={vi.fn()}
@@ -99,10 +99,12 @@ describe('WorkspaceStatusCard', () => {
     );
 
     const list = screen.getByTestId('workspace-status-observations');
-    expect(within(list).getByText('Newest status')).toBeInTheDocument();
-    expect(within(list).getByText('Newer status')).toBeInTheDocument();
-    expect(within(list).getByText('Middle status')).toBeInTheDocument();
-    expect(within(list).queryByText('Old status')).toBeNull();
+    expect(within(list).getByText('Newest summary')).toBeInTheDocument();
+    expect(within(list).getByText('Newer summary')).toBeInTheDocument();
+    expect(within(list).getByText('Middle summary')).toBeInTheDocument();
+    expect(within(list).getByText('blocked')).toBeInTheDocument();
+    expect(within(list).getByText('in_progress')).toBeInTheDocument();
+    expect(within(list).queryByText('Old summary')).toBeNull();
     expect(within(list).queryByText('ignored')).toBeNull();
   });
 

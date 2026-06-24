@@ -2,6 +2,7 @@ import { AlertTriangle, Brush, CheckCircle2, ClipboardList, Rocket, Search, Ship
 import type { ComponentType } from 'react';
 import type { MemoryObservation, MemoryStatus, MemoryStatusPhase } from '@overdeck/contracts';
 import type { Issue } from '../../types';
+import { ActionStatusChip } from '../ActionStatusChip';
 
 export interface WorkspaceStatusStats {
   additions: number;
@@ -19,6 +20,8 @@ interface WorkspaceStatusCardProps {
   now?: Date;
 }
 
+type ActionStatusObservation = MemoryObservation & { actionStatus: string };
+
 const PHASE_CONFIG: Record<MemoryStatusPhase, { label: string; color: string; icon: ComponentType<{ className?: string }> }> = {
   exploring: { label: 'Exploring', color: 'var(--primary)', icon: Search },
   planning: { label: 'Planning', color: 'var(--signal-review, var(--primary))', icon: ClipboardList },
@@ -28,14 +31,14 @@ const PHASE_CONFIG: Record<MemoryStatusPhase, { label: string; color: string; ic
   shipping: { label: 'Shipping', color: 'var(--primary)', icon: Rocket },
 };
 
-function recentActionObservations(observations: readonly MemoryObservation[]): MemoryObservation[] {
+function recentActionObservations(observations: readonly MemoryObservation[]): ActionStatusObservation[] {
   return observations
-    .filter((observation) => observation.actionStatus !== null)
+    .filter((observation): observation is ActionStatusObservation => observation.actionStatus !== null)
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, 3);
 }
 
-function isStale(observation: MemoryObservation | undefined, now: Date): boolean {
+function isStale(observation: ActionStatusObservation | undefined, now: Date): boolean {
   if (!observation) return false;
   const timestamp = Date.parse(observation.timestamp);
   return !Number.isNaN(timestamp) && now.getTime() - timestamp > 60 * 60 * 1000;
@@ -119,9 +122,10 @@ export function WorkspaceStatusCard({
         {recent.length === 0 ? (
           <li className="text-muted-foreground/70">No recent action status.</li>
         ) : recent.map((observation) => (
-          <li key={observation.id} className="flex gap-2">
+          <li key={observation.id} className="flex items-center gap-2">
             <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-            <span className="min-w-0 truncate">{observation.actionStatus}</span>
+            <span className="min-w-0 flex-1 truncate">{observation.summary}</span>
+            <ActionStatusChip status={observation.actionStatus} className="shrink-0" />
           </li>
         ))}
       </ul>

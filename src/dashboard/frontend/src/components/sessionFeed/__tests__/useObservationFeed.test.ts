@@ -15,9 +15,9 @@ function observation(overrides: Partial<MemoryObservation>): MemoryObservation {
     agentHarness: 'claude-code',
     gitBranch: 'feature/pan-1389',
     sourceTranscriptOffset: 0,
-    actionStatus: 'Building selector',
+    actionStatus: 'in_progress',
     narrative: 'The agent is building the selector.',
-    summary: 'Building selector',
+    summary: 'Building selector summary',
     files: [],
     tags: [],
     tokens: { prompt: 1, completion: 1, total: 2 },
@@ -38,6 +38,19 @@ describe('createObservationFeedSelector', () => {
     });
 
     expect(entries.map((entry) => entry.id)).toEqual(['obs-1', 'obs-2']);
+  });
+
+  it('uses observation summary as the headline and actionStatus as the status label', () => {
+    const selector = createObservationFeedSelector();
+
+    const [entry] = selector({
+      observationsByIssueId: {
+        'PAN-1': [observation({ actionStatus: 'done', summary: 'Selector now renders useful memory summaries.' })],
+      },
+    });
+
+    expect(entry?.headline).toBe('Selector now renders useful memory summaries.');
+    expect(entry?.statusLabel).toBe('done');
   });
 
   it('filters out observations with null actionStatus', () => {

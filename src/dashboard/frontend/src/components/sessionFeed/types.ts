@@ -35,6 +35,7 @@ export interface ActivitySessionFeedEntry extends SessionFeedEntryBase {
   activityClass?: 'operational' | 'memory';
   headline: string;
   summary: string;
+  statusLabel?: string;
   narrative?: string;
   files?: readonly string[];
   tags?: readonly string[];

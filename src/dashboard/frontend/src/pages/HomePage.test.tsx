@@ -60,7 +60,7 @@ function makeObservation(overrides: Partial<MemoryObservation> = {}): MemoryObse
     agentHarness: 'claude-code',
     gitBranch: 'feature/pan-1204',
     sourceTranscriptOffset: 1,
-    actionStatus: 'Rendering workspace card',
+    actionStatus: 'in_progress',
     narrative: 'Narrative',
     summary: 'Summary',
     files: [],
@@ -185,7 +185,8 @@ describe('HomePage', () => {
     const card = await screen.findByRole('button', { name: /open pan-1204 workspace overview/i });
     expect(within(card).getByText('Home workspace cards are in progress')).toBeInTheDocument();
     expect(within(card).getByText('Building')).toBeInTheDocument();
-    expect(within(card).getByText('Rendering workspace card')).toBeInTheDocument();
+    expect(within(card).getByText('Summary')).toBeInTheDocument();
+    expect(within(card).getByTestId('action-status-chip')).toHaveTextContent('in_progress');
     expect(within(card).getByText('+0')).toBeInTheDocument();
     expect(within(card).getByText('-0')).toBeInTheDocument();
     expect(within(card).getAllByText('1')).toHaveLength(2);
@@ -212,13 +213,13 @@ describe('HomePage', () => {
       observationsByIssueId: {
         'PAN-1204': [
           makeObservation({ id: 'ignored', timestamp: '2026-05-25T11:59:00.000Z', actionStatus: null }),
-          makeObservation({ id: 'just-now-old', timestamp: '2026-05-25T11:10:00.000Z', actionStatus: 'Older just now', summary: 'Old summary' }),
-          makeObservation({ id: 'just-now-new', timestamp: '2026-05-25T11:55:00.000Z', actionStatus: 'Newer just now', summary: 'New summary' }),
-          makeObservation({ id: 'today', timestamp: '2026-05-25T09:00:00.000Z', actionStatus: 'Earlier today' }),
-          makeObservation({ id: 'yesterday', timestamp: '2026-05-24T09:00:00.000Z', actionStatus: 'Yesterday work' }),
-          makeObservation({ id: 'week', timestamp: '2026-05-21T09:00:00.000Z', actionStatus: 'This week work' }),
-          makeObservation({ id: 'month', timestamp: '2026-05-10T09:00:00.000Z', actionStatus: 'This month work' }),
-          makeObservation({ id: 'older', timestamp: '2026-04-10T09:00:00.000Z', actionStatus: 'Older work' }),
+          makeObservation({ id: 'just-now-old', timestamp: '2026-05-25T11:10:00.000Z', actionStatus: 'done', summary: 'Old summary' }),
+          makeObservation({ id: 'just-now-new', timestamp: '2026-05-25T11:55:00.000Z', actionStatus: 'done', summary: 'New summary' }),
+          makeObservation({ id: 'today', timestamp: '2026-05-25T09:00:00.000Z', actionStatus: 'done', summary: 'Earlier today' }),
+          makeObservation({ id: 'yesterday', timestamp: '2026-05-24T09:00:00.000Z', actionStatus: 'done', summary: 'Yesterday work' }),
+          makeObservation({ id: 'week', timestamp: '2026-05-21T09:00:00.000Z', actionStatus: 'done', summary: 'This week work' }),
+          makeObservation({ id: 'month', timestamp: '2026-05-10T09:00:00.000Z', actionStatus: 'done', summary: 'This month work' }),
+          makeObservation({ id: 'older', timestamp: '2026-04-10T09:00:00.000Z', actionStatus: 'done', summary: 'Older work' }),
         ],
       },
     });
@@ -234,8 +235,8 @@ describe('HomePage', () => {
     expect(screen.queryByText('ignored')).not.toBeInTheDocument();
 
     const entries = within(screen.getByTestId('home-activity-bucket-justNow')).getAllByRole('listitem');
-    expect(entries[0]).toHaveTextContent('Newer just now');
-    expect(entries[1]).toHaveTextContent('Older just now');
+    expect(entries[0]).toHaveTextContent('New summary');
+    expect(entries[1]).toHaveTextContent('Old summary');
   });
 
   it('renders activity observation identity, summary, narrative, files, and tags', async () => {
@@ -246,7 +247,7 @@ describe('HomePage', () => {
           id: 'rich-activity',
           issueId: 'PAN-1204',
           workspaceId: 'workspace-3k8n',
-          actionStatus: 'Verified Home route',
+          actionStatus: 'completed',
           summary: 'Rendered Home verification coverage',
           narrative: 'Read observationsByIssueId without parsing JSONL transcripts.',
           files: ['src/dashboard/frontend/src/pages/HomePage.tsx'],
@@ -259,7 +260,7 @@ describe('HomePage', () => {
 
     const feed = await screen.findByTestId('home-activity-feed');
     expect(feed).toHaveTextContent('workspace-3k8n · PAN-1204');
-    expect(feed).toHaveTextContent('Verified Home route');
+    expect(feed).toHaveTextContent('completed');
     expect(feed).toHaveTextContent('Rendered Home verification coverage');
     expect(feed).toHaveTextContent('Read observationsByIssueId without parsing JSONL transcripts.');
     expect(feed).toHaveTextContent('src/dashboard/frontend/src/pages/HomePage.tsx');

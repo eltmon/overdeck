@@ -1,4 +1,5 @@
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { ActionStatusChip } from '../ActionStatusChip';
 import { NotificationClassBadge } from '../NotificationClassBadge';
 import type { ActivitySessionFeedEntry } from './types';
 
@@ -30,6 +31,7 @@ export function ActivityFeedCard({ entry, onSelect, now = new Date() }: Activity
                 {formatRelativeTime(entry.timestamp, now)}
               </time>
             </div>
+            {entry.statusLabel ? <ActionStatusChip status={entry.statusLabel} className="shrink-0" /> : null}
             <NotificationClassBadge kind={entry.activityClass ?? 'operational'} className="shrink-0" />
           </div>
         </div>

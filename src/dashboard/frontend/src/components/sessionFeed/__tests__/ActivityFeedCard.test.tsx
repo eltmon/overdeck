@@ -10,8 +10,9 @@ function entry(overrides: Partial<ActivitySessionFeedEntry> = {}): ActivitySessi
     timestamp: '2026-05-23T01:00:00.000Z',
     workspaceId: 'workspace-a',
     issueId: 'PAN-1389',
-    headline: 'Building selector',
+    headline: 'Building selector summary',
     summary: 'The agent is building the selector.',
+    statusLabel: 'in_progress',
     ...overrides,
   };
 }
@@ -20,7 +21,8 @@ describe('ActivityFeedCard', () => {
   it('renders headline and workspace/issue subtext', () => {
     render(<ActivityFeedCard entry={entry()} onSelect={vi.fn()} now={new Date('2026-05-23T01:05:00.000Z')} />);
 
-    expect(screen.getByText('Building selector')).toBeTruthy();
+    expect(screen.getByText('Building selector summary')).toBeTruthy();
+    expect(screen.getByTestId('action-status-chip')).toHaveTextContent('in_progress');
     expect(screen.getByText('workspace-a · PAN-1389')).toBeTruthy();
   });
 

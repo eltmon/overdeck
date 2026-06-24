@@ -4,6 +4,7 @@ import type { DashboardState } from '../../lib/store';
 import { useDashboardStore } from '../../lib/store';
 import { bucketByTime, type TimeBucketKey } from '../../lib/timeBuckets';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { ActionStatusChip } from '../ActionStatusChip';
 import { NotificationClassBadge } from '../NotificationClassBadge';
 
 const BUCKET_LABELS: Record<TimeBucketKey, string> = {
@@ -26,17 +27,19 @@ const BUCKET_ORDER: readonly TimeBucketKey[] = [
 
 const EMPTY_OBSERVATIONS: readonly MemoryObservation[] = [];
 
+type ActionStatusObservation = MemoryObservation & { actionStatus: string };
+
 export function createActionStatusObservationSelector(issueId: string) {
   let lastSource: readonly MemoryObservation[] | undefined;
-  let lastResult: MemoryObservation[] | undefined;
+  let lastResult: ActionStatusObservation[] | undefined;
 
-  return (state: Pick<DashboardState, 'observationsByIssueId'>): MemoryObservation[] => {
+  return (state: Pick<DashboardState, 'observationsByIssueId'>): ActionStatusObservation[] => {
     const source = state.observationsByIssueId[issueId] ?? EMPTY_OBSERVATIONS;
     if (source === lastSource && lastResult) return lastResult;
 
     lastSource = source;
     lastResult = source
-      .filter((observation) => observation.actionStatus !== null)
+      .filter((observation): observation is ActionStatusObservation => observation.actionStatus !== null)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     return lastResult;
   };
@@ -50,9 +53,9 @@ export function createActionStatusObservationSelector(issueId: string) {
  */
 export function createActionStatusObservationSelectorForIssues(issueIds: readonly string[]) {
   let lastSources: ReadonlyArray<readonly MemoryObservation[]> | undefined;
-  let lastResult: MemoryObservation[] | undefined;
+  let lastResult: ActionStatusObservation[] | undefined;
 
-  return (state: Pick<DashboardState, 'observationsByIssueId'>): MemoryObservation[] => {
+  return (state: Pick<DashboardState, 'observationsByIssueId'>): ActionStatusObservation[] => {
     const sources = issueIds.map((id) => state.observationsByIssueId[id] ?? EMPTY_OBSERVATIONS);
     const unchanged =
       lastSources !== undefined &&
@@ -63,7 +66,7 @@ export function createActionStatusObservationSelectorForIssues(issueIds: readonl
     lastSources = sources;
     lastResult = sources
       .flat()
-      .filter((observation) => observation.actionStatus !== null)
+      .filter((observation): observation is ActionStatusObservation => observation.actionStatus !== null)
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     return lastResult;
   };
@@ -125,7 +128,7 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
                         <div className="flex items-start gap-2">
                           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-foreground">{observation.actionStatus}</p>
+                            <p className="truncate font-medium text-foreground">{observation.summary}</p>
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
                               <span className="truncate">{observation.workspaceId} · {observation.issueId}</span>
                               <span aria-hidden="true">·</span>
@@ -133,7 +136,8 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
                                 {formatRelativeTime(observation.timestamp, now)}
                               </time>
                             </div>
-                            <div className="mt-1 flex justify-end">
+                            <div className="mt-1 flex justify-end gap-1">
+                              <ActionStatusChip status={observation.actionStatus} />
                               <NotificationClassBadge kind="memory" />
                             </div>
                           </div>

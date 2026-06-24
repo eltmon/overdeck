@@ -4,7 +4,7 @@ import type { MemoryObservation } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { ActivityFeedSidebar, createActionStatusObservationSelector } from './ActivityFeedSidebar';
 
-function observation(id: string, timestamp: string, actionStatus: string | null, issueId = 'PAN-1052'): MemoryObservation {
+function observation(id: string, timestamp: string, actionStatus: string | null, issueId = 'PAN-1052', summary = 'Summary'): MemoryObservation {
   return {
     id,
     timestamp,
@@ -19,7 +19,7 @@ function observation(id: string, timestamp: string, actionStatus: string | null,
     sourceTranscriptOffset: 1,
     actionStatus,
     narrative: 'Narrative',
-    summary: 'Summary',
+    summary,
     files: [],
     tags: [],
     tokens: { prompt: 1, completion: 1, total: 2 },
@@ -39,7 +39,7 @@ describe('ActivityFeedSidebar', () => {
   it('renders only observations with non-null actionStatus', () => {
     seedObservations({
       'PAN-1052': [
-        observation('visible', '2026-05-16T11:55:00.000Z', 'Implemented the activity sidebar'),
+        observation('visible', '2026-05-16T11:55:00.000Z', 'done', 'PAN-1052', 'Implemented the activity sidebar'),
         observation('hidden', '2026-05-16T11:54:00.000Z', null),
       ],
     });
@@ -47,6 +47,7 @@ describe('ActivityFeedSidebar', () => {
     render(<ActivityFeedSidebar issueId="PAN-1052" now={new Date('2026-05-16T12:00:00.000Z')} />);
 
     expect(screen.getByText('Implemented the activity sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('action-status-chip')).toHaveTextContent('done');
     expect(screen.queryByText('hidden')).toBeNull();
   });
 
@@ -65,15 +66,16 @@ describe('ActivityFeedSidebar', () => {
     expect(screen.queryByTestId('activity-feed-bucket-older')).toBeNull();
   });
 
-  it('shows actionStatus, workspace and issue label, and relative time for each item', () => {
+  it('shows summary, action status chip, workspace and issue label, and relative time for each item', () => {
     seedObservations({
-      'PAN-1052': [observation('recent', '2026-05-16T11:30:00.000Z', 'Wired sidebar bucket rendering')],
+      'PAN-1052': [observation('recent', '2026-05-16T11:30:00.000Z', 'completed', 'PAN-1052', 'Wired sidebar bucket rendering')],
     });
 
     render(<ActivityFeedSidebar issueId="PAN-1052" now={new Date('2026-05-16T12:00:00.000Z')} />);
 
     const bucket = screen.getByTestId('activity-feed-bucket-justNow');
     expect(within(bucket).getByText('Wired sidebar bucket rendering')).toBeInTheDocument();
+    expect(within(bucket).getByTestId('action-status-chip')).toHaveTextContent('completed');
     expect(within(bucket).getByText('feature-pan-1052 · PAN-1052')).toBeInTheDocument();
     expect(within(bucket).getByText('30m ago')).toBeInTheDocument();
   });
@@ -81,9 +83,9 @@ describe('ActivityFeedSidebar', () => {
   it('renders the three most recent action statuses under Just Now in newest-first order', () => {
     seedObservations({
       'PAN-1052': [
-        observation('oldest', '2026-05-16T11:45:00.000Z', 'Completed turn 1'),
-        observation('newest', '2026-05-16T11:59:00.000Z', 'Completed turn 3'),
-        observation('middle', '2026-05-16T11:52:00.000Z', 'Completed turn 2'),
+          observation('oldest', '2026-05-16T11:45:00.000Z', 'done', 'PAN-1052', 'Completed turn 1'),
+          observation('newest', '2026-05-16T11:59:00.000Z', 'done', 'PAN-1052', 'Completed turn 3'),
+          observation('middle', '2026-05-16T11:52:00.000Z', 'done', 'PAN-1052', 'Completed turn 2'),
         observation('hidden', '2026-05-16T11:58:00.000Z', null),
       ],
     });
