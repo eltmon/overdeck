@@ -1,0 +1,491 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-24T04:35:04.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1934: verification gate drives agents through up to 10 retry cycles on an unfixable check (no operator escalation, invisible burn)",
+    "updated": "2026-06-24T04:44:24.664Z"
+  },
+  "plan": {
+    "id": "pan-1934",
+    "title": "Verification gate: cap retries at 3 and escalate to the operator instead of looping silently",
+    "status": "proposed",
+    "uid": "ae44abe5-f694-4ae1-ac95-290feef1b61c",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-24T04:35:04.000Z",
+    "updated": "2026-06-24T04:44:24.664Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1934",
+        "label": "PAN-1934",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1934.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "verification-gate",
+      "reliability",
+      "cost-control"
+    ],
+    "narratives": {
+      "Problem": "The verification gate (src/lib/cloister/verification-runner.ts) caps retries at VERIFICATION_MAX_CYCLES=10 and, on reaching the cap, sets verificationStatus:'skipped' and lets the work advance to review/merge with a broken check. Every failure writes a feedback file that tells the agent 'Do NOT stop ... keep working'. There is no no-progress detection and no operator escalation, so an agent that broke a check it cannot fix grinds through up to 10 full-suite runs (~28s each) of invisible token burn. The documented PAN-174 behaviour (CLAUDE.md:309, docs/SPECIALIST_WORKFLOW.md:560 - 'after 3 consecutive failures, verification is bypassed') disagrees with the code, and the doc even names a nonexistent file (verification-gate.ts).",
+      "Proposal": "Lower the cap to 3 (matching the docs). Add a pure decideVerificationDisposition() seam and a shared handleVerificationFailure() helper used by all four failure branches. On the escalation condition (cap reached, OR the same gate failing on >=2 consecutive cycles via a new persisted verificationLastFailedCheck) the gate pauses+stops the agent (async stopAgent/setAgentPaused), marks the workspace stuck (markWorkspaceStuck - the existing needs-you surface), and writes a STOP feedback file, returning a new outcome:'escalated'. The pre-run guard returns 'escalated' (never the old silent 'skipped'), and verificationSatisfied() treats 'escalated' as not-satisfied so escalated work cannot ride the merge gate. The three callers in workspaces.ts stop advancing on 'escalated'. Docs and the dashboard are aligned (cap 3, escalation surfaced).",
+      "NonGoals": "- Per-test-name no-progress tracking (gate-name granularity only).\n- Changing the quality_gates command set or what counts as a failing check.\n- The untracked pi/kimi cost-accounting sibling issue.\n- A configurable per-project cap (the cap stays a hardcoded constant).\n- Auto-resuming an escalated agent (operator intervenes via the existing unstick/unpause flow).\n- A new pipeline event type or a new needs-you UI surface beyond the existing stuck surface."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Cap = 3 cycles.",
+        "rationale": "The issue allows '<=3'; 3 aligns the constant with the already-documented number (CLAUDE.md:309) - the least-surprise choice."
+      },
+      {
+        "summary": "No-progress threshold = 2 (same gate on 2 consecutive cycles escalates).",
+        "rationale": "Catches the incident (a repeatedly-failing test gate) one cycle before the hard cap while staying conservative."
+      },
+      {
+        "summary": "No-progress granularity = gate name, not individual test name.",
+        "rationale": "Robust and matches the incident (the 'test' gate kept failing); per-test parsing of vitest output is fragile and out of scope."
+      },
+      {
+        "summary": "Reuse existing primitives via async/Effect variants: markWorkspaceStuck + setAgentPaused + stopAgent.",
+        "rationale": "Matches pan pause semantics and the existing operator surfaces; the async variants are server-safe (the runner runs in the dashboard server)."
+      },
+      {
+        "summary": "Apply escalation to all four failure branches, not only the test gate.",
+        "rationale": "Sync-target, quality-gate, vbrief-conflicts and vbrief-ac are the same hazard class; one shared helper is the root-cause fix, not a half-fix."
+      },
+      {
+        "summary": "Escalated blocks merge; pre-run guard returns 'escalated' not 'skipped'.",
+        "rationale": "The entire bug is broken work advancing silently; escalated work must be held until a human intervenes."
+      },
+      {
+        "summary": "verificationLastFailedCheck persisted on the review-status record (DB cache); tolerates cache-rebuild loss.",
+        "rationale": "It is a within-sequence hint; on loss the logic falls back to the hard cap. Avoids journaling churn."
+      },
+      {
+        "summary": "No new pipeline event type.",
+        "rationale": "Visibility comes from verificationStatus:'escalated' plus the existing stuck/status_changed surface; avoids contract churn."
+      }
+    ],
+    "items": [
+      {
+        "id": "last-failed-check-field",
+        "title": "Persist verificationLastFailedCheck on the review-status record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an optional verificationLastFailedCheck field to the ReviewStatus record so the gate can detect when the same check fails on consecutive cycles. Add `verificationLastFailedCheck?: string` to the ReviewStatus interface in src/lib/review-status.ts (near :52); add a `try { db.exec('ALTER TABLE review_status ADD COLUMN verification_last_failed_check TEXT'); } catch {}` line to the migration block in src/lib/database/schema.ts (alongside the existing review_status ALTER TABLE statements at :1084-1143); and wire the column into the INSERT column list + value binding and the rowToReviewStatus SELECT mapper in src/lib/database/review-status-db.ts (:44-116, :399-456). The field is written/read via setReviewStatusSync/getReviewStatusSync."
+        },
+        "items": [
+          {
+            "id": "last-failed-check-field.ac1",
+            "title": "The ReviewStatus interface in src/lib/review-status.ts contains an optional verificationLastFailedCheck string field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-failed-check-field.ac2",
+            "title": "The schema migration creates the verification_last_failed_check TEXT column on review_status inside a try/catch, matching the existing review_status migration block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-failed-check-field.ac3",
+            "title": "Calling setReviewStatusSync(issueId, { verificationLastFailedCheck: 'test' }) then getReviewStatusSync(issueId) returns verificationLastFailedCheck equal to 'test' (the field round-trips through the DB mapper).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalated-status",
+        "title": "Add the escalated verification status and block it from the merge gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1934",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "escalation-handler",
+            "handle-escalated-in-callers",
+            "surface-escalation-frontend"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Introduce 'escalated' as a verificationStatus value and make it block merge. Add the literal \"escalated\" to VerificationStatusValue in packages/contracts/src/types.ts:39; add 'escalated' to the verificationStatus union in src/lib/review-status.ts:52; and change verificationSatisfied() (src/lib/review-status.ts:122) to return false when verificationStatus is 'escalated' as well as 'failed'. No DB schema change is needed - verification_status is already a TEXT column. Rebuild packages/contracts (npm run build in packages/contracts) after the literal change so the frontend type picks it up."
+        },
+        "items": [
+          {
+            "id": "escalated-status.ac1",
+            "title": "VerificationStatusValue in packages/contracts/src/types.ts contains the literal escalated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalated-status.ac2",
+            "title": "verificationSatisfied({ verificationStatus: 'escalated' }) returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalated-status.ac3",
+            "title": "mergeGateEligibility() with verificationStatus 'escalated' returns eligible false (escalated work is rejected from the merge gate).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalated-status.ac4",
+            "title": "A unit test asserts both that 'failed' still blocks and that 'escalated' now blocks verificationSatisfied and mergeGateEligibility.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cap-and-decision-fn",
+        "title": "Lower the cap to 3 and add the pure decideVerificationDisposition seam",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts change `export const VERIFICATION_MAX_CYCLES = 10` to `= 3`, and add `export const NO_PROGRESS_REPEAT_THRESHOLD = 2`. Add and export a pure function decideVerificationDisposition({ newCycleCount, failedCheck, lastFailedCheck }) returning { disposition: 'escalate' | 'retry', reason: string }: escalate when newCycleCount >= VERIFICATION_MAX_CYCLES, OR when failedCheck === lastFailedCheck && newCycleCount >= NO_PROGRESS_REPEAT_THRESHOLD; otherwise retry. Add a co-located unit test (tests/cloister/verification-disposition.test.ts). This function has no I/O and no delays - it needs no timers."
+        },
+        "items": [
+          {
+            "id": "cap-and-decision-fn.ac1",
+            "title": "verification-runner.ts contains exported constants VERIFICATION_MAX_CYCLES set to 3 and NO_PROGRESS_REPEAT_THRESHOLD set to 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cap-and-decision-fn.ac2",
+            "title": "decideVerificationDisposition returns disposition escalate when newCycleCount >= 3 (hard cap), regardless of failedCheck.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cap-and-decision-fn.ac3",
+            "title": "decideVerificationDisposition returns escalate when failedCheck equals lastFailedCheck and newCycleCount >= 2 (no-progress), and returns retry when newCycleCount equals 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cap-and-decision-fn.ac4",
+            "title": "decideVerificationDisposition returns retry when newCycleCount equals 2 but failedCheck differs from lastFailedCheck (a moving target waits for the hard cap).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalation-handler",
+        "title": "Escalate (pause + stuck) on the failure path instead of looping; make the pre-run guard sticky",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1934",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "handle-escalated-in-callers"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "This is the single cohesive behavioral change (escalation handler + the four converted failure branches + the sticky pre-run guard); its six ACs each pin a distinct observable behavior of that one change and splitting it would leave an inconsistent intermediate (some branches escalating, others still looping)."
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts: (1) add 'escalated' to the VerificationRunnerOutcome union as { outcome: 'escalated'; failedCheck: string; cycleCount: number; maxCycles: number }. (2) Extract a shared async helper handleVerificationFailure({ issueId, workspacePath, failedCheck, summary, retryFeedbackBody }) used by all four failure branches (sync-target :224, quality-gate :352, vbrief-conflicts :399, vbrief-ac :433). It reads prev = getReviewStatusSync(issueId), computes newCycleCount = (prev?.verificationCycleCount ?? 0) + 1, calls decideVerificationDisposition({ newCycleCount, failedCheck, lastFailedCheck: prev?.verificationLastFailedCheck }), and persists verificationCycleCount + verificationLastFailedCheck. On 'retry' it keeps today's behaviour (verificationStatus:'failed', writeFeedbackFile with the retry body, messageAgent, return { outcome:'failed', ... }). On 'escalate' it sets verificationStatus:'escalated'; writes a feedback file whose body instructs the agent to STOP (it must NOT contain the phrase 'do NOT stop'); calls markWorkspaceStuck(issueId, 'verification_unfixable', { failedCheck, cycleCount: newCycleCount }); then setAgentPaused(agent-<issueId-lowercase>, reason, true) and stopAgent(agent-<issueId-lowercase>) via Effect.runPromise (the async primitives from agents.ts - NEVER stopAgentSync); any messageAgent is best-effort in try/catch and runs before stopAgent; returns { outcome:'escalated', failedCheck, cycleCount:newCycleCount, maxCycles:VERIFICATION_MAX_CYCLES }. (3) Repurpose the pre-run guard (:192-199): when prev.verificationStatus === 'escalated' OR (prev?.verificationCycleCount ?? 0) >= VERIFICATION_MAX_CYCLES, return { outcome:'escalated', ... } without running quality gates (replaces the old { outcome:'skipped' }). Update tests/cloister/verification-runner.test.ts: change the circuit-breaker test to expect 'escalated'; add markWorkspaceStuck to the review-status.js mock and setAgentPaused+stopAgent to the agents.js mock; add a no-progress test (same 'test' failure on cycle 2 -> escalated) and a first-failure test (cycle 1 -> 'failed', no pause/stop)."
+        },
+        "items": [
+          {
+            "id": "escalation-handler.ac1",
+            "title": "VerificationRunnerOutcome includes an outcome 'escalated' variant carrying failedCheck, cycleCount and maxCycles, returned when escalation fires.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-handler.ac2",
+            "title": "When the same gate fails on the second consecutive cycle, runVerificationForIssue returns outcome escalated and the runner calls markWorkspaceStuck, setAgentPaused, and stopAgent (asserted via mocks).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-handler.ac3",
+            "title": "The escalation feedback file body instructs the agent to STOP and contains no occurrence of the phrase Do NOT stop.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-handler.ac4",
+            "title": "The pre-run guard returns outcome escalated (not skipped) and does not call runQualityGates when verificationCycleCount >= VERIFICATION_MAX_CYCLES or verificationStatus is already escalated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-handler.ac5",
+            "title": "A single first-time failure (cycle 1, no prior failed check) returns outcome failed and does NOT call setAgentPaused or stopAgent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-handler.ac6",
+            "title": "The verification-runner pause path imports only the async stopAgent and setAgentPaused from agents.js, and a grep over the file produces no match for stopAgentSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handle-escalated-in-callers",
+        "title": "Stop advancing on outcome escalated at the three verification call sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces.ts handle outcome === 'escalated' at all three runVerificationForIssue call sites, mirroring the existing 'failed' handling but without advancing. Review-dispatch (the :3870 block): on escalated, completePendingOperation with an escalation note and return without spawning the review role. pan review request (the :4296 block): on escalated, return jsonResponse({ success:false, escalated:true, failedCheck, cycleCount, maxCycles, message:'Verification escalated to operator - agent paused' }) and do not dispatch review. Post-rebase merge-verify (the :5685 block): treat escalated the same as failed (set mergeStatus:'failed', readyForMerge:false, do not proceed to merge)."
+        },
+        "items": [
+          {
+            "id": "handle-escalated-in-callers.ac1",
+            "title": "The review-dispatch path does not spawn the review role when runVerificationForIssue returns outcome escalated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handle-escalated-in-callers.ac2",
+            "title": "The pan review request path returns a response with escalated true and does not dispatch review when verification escalates.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handle-escalated-in-callers.ac3",
+            "title": "The post-rebase merge-verify path sets mergeStatus failed and readyForMerge false and does not merge when verification returns escalated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-docs",
+        "title": "Align the docs with cap=3 and escalation, and fix the stale file reference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "acJustification": "A docs-correction bead; its observable behaviors are the corrected statements and the corrected file reference.",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the CLAUDE.md 'Verification Gate (PAN-174)' section (:304-309) to state that after 3 consecutive failures the gate escalates (pauses the agent and marks the workspace stuck for operator attention) and blocks the work from merge, rather than being 'bypassed'. Update docs/SPECIALIST_WORKFLOW.md:560 the same way and replace the nonexistent 'src/lib/cloister/verification-gate.ts' reference with 'src/lib/cloister/verification-runner.ts'."
+        },
+        "items": [
+          {
+            "id": "update-docs.ac1",
+            "title": "CLAUDE.md states the gate escalates (pauses the agent and marks the workspace stuck) after 3 cycles and no longer says verification is bypassed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-docs.ac2",
+            "title": "docs/SPECIALIST_WORKFLOW.md contains a reference to src/lib/cloister/verification-runner.ts and no longer contains the string verification-gate.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-docs.ac3",
+            "title": "Each doc contains the number 3 as the documented cap, matching the VERIFICATION_MAX_CYCLES constant.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "surface-escalation-frontend",
+        "title": "Surface the escalated verification status in the dashboard and align the default cap",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-24T04:35:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1934",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Render the new 'escalated' verification status distinctly in the cockpit and align the frontend cap default. In src/dashboard/frontend/src/components/Stage/cockpit/ReviewVerificationCard.tsx make the Build-gate Step render a distinct non-green (failed-like) state for verificationStatus 'escalated' and show the stuck reason when present. Change DEFAULT_VERIFICATION_MAX_CYCLES from 10 to 3 in src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/ReviewPipelineSection.tsx. Ensure the frontend verificationStatus type (workspace-types.ts / queries.ts) accepts 'escalated' (it derives from the contracts literal, so rebuilding contracts in the escalated-status bead covers it). Follow the dashboard style guide (no decorative color; amber/red are 'a human must act')."
+        },
+        "items": [
+          {
+            "id": "surface-escalation-frontend.ac1",
+            "title": "ReviewVerificationCard renders the Build-gate Step in a distinct non-green (failed-like) state when verificationStatus equals escalated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "surface-escalation-frontend.ac2",
+            "title": "When an issue is escalated and stuck, the cockpit shows the stuck reason to the operator.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "surface-escalation-frontend.ac3",
+            "title": "ReviewPipelineSection.tsx contains DEFAULT_VERIFICATION_MAX_CYCLES set to 3.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "last-failed-check-field",
+        "to": "escalation-handler",
+        "type": "blocks"
+      },
+      {
+        "from": "escalated-status",
+        "to": "escalation-handler",
+        "type": "blocks"
+      },
+      {
+        "from": "escalated-status",
+        "to": "handle-escalated-in-callers",
+        "type": "blocks"
+      },
+      {
+        "from": "escalated-status",
+        "to": "surface-escalation-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "cap-and-decision-fn",
+        "to": "escalation-handler",
+        "type": "blocks"
+      },
+      {
+        "from": "cap-and-decision-fn",
+        "to": "update-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-handler",
+        "to": "handle-escalated-in-callers",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-24-PAN-1934-verification-gate-cap-retries-at-3-and-escalate-to-the-operator-instead-of-looping-silently.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
