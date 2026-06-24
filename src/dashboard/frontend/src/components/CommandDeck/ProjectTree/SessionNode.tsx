@@ -413,12 +413,17 @@ function getSessionStatusTitle({
 }
 
 /**
- * PAN-2053: read-only "why this model" header for the Start/Restart submenu.
- * Always rendered in place of the bare `Currently: …` label. For a WEIGHTED role
- * it shows the resolved model, the role's weight bars, and the deterministic
- * FNV-1a derivation that selected it; for a SCALAR (single-model) role it shows
- * the resolved model and a "no distribution" note. No affordance here mutates
- * anything; the picker below still does restart-with-model.
+ * PAN-2053: read-only "why this model" header for the Start/Restart submenu,
+ * shown in place of the bare `Currently: …` label. Three cases:
+ *  - SCALAR role        → resolved model + "no distribution" note.
+ *  - WEIGHTED, matched  → the live hash derivation genuinely explains this agent
+ *                         (its running model === the spawn key's current pick):
+ *                         weight bars + FNV-1a derivation, running model highlighted.
+ *  - WEIGHTED, drifted  → the agent runs a model the current weights wouldn't pick
+ *                         (the distribution was edited after it spawned): show the
+ *                         current weights for context, but do NOT pretend the hash
+ *                         selected this model.
+ * Read-only; monochrome per the dashboard style guide. No affordance mutates.
  */
 function ModelOriginPanel({
   origin,
@@ -431,74 +436,66 @@ function ModelOriginPanel({
   roleLabel: string;
   currentHarness?: string | null;
 }) {
-  // Headline is ALWAYS the agent's actual running model (ground truth). `origin`
-  // explains the weighting mechanism; when the live distribution's pick differs
-  // from the running model (the role's distribution was edited after this agent
-  // spawned), we say so rather than misreport the model.
+  // Headline is ALWAYS the agent's actual running model (ground truth).
   const resolved = resolvedModel ?? origin?.resolved ?? 'unknown';
   const positive = origin ? origin.distribution.filter((d) => d.weight > 0) : [];
-  const chosen = origin?.distribution.find((d) => d.chosen);
-  const drift = origin != null && resolvedModel != null && origin.resolved !== resolvedModel;
+  // "matched" = the live distribution's pick for this key IS the running model, so
+  // the FNV-1a derivation truly explains it. Otherwise the agent predates the weights.
+  const matched = origin != null && resolvedModel != null && origin.resolved === resolvedModel;
+  const drifted = origin != null && !matched;
+  const chosenBand = origin?.distribution.find((d) => d.chosen);
+
+  const bar = (d: ModelOrigin['distribution'][number], highlight: boolean) => {
+    const pct = Math.round((d.hi - d.lo) * 100);
+    return (
+      <div key={d.model} className="flex items-center gap-2">
+        <span className={`w-[108px] shrink-0 truncate font-mono text-[10px] ${highlight ? 'text-foreground' : 'text-muted-foreground'}`}>
+          {d.model}
+        </span>
+        <span className="h-1 flex-1 overflow-hidden rounded-sm bg-foreground/10">
+          <span className={`block h-full rounded-sm ${highlight ? 'bg-foreground/45' : 'bg-foreground/20'}`} style={{ width: `${pct}%` }} />
+        </span>
+        <span className="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
+      </div>
+    );
+  };
+
   return (
-    <div className="mx-1 mb-1 mt-0.5 rounded-md border border-primary/30 bg-primary/[0.08] px-2.5 py-2">
-      <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Model</div>
-      <div className="mt-1 flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--tw-shadow-color)] shadow-emerald-400/70" />
+    <div className="mx-1 mb-1 mt-0.5 rounded-md border border-border bg-foreground/[0.03] px-2.5 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Model</div>
+      <div className="mt-1 flex items-baseline gap-1.5">
         <span className="truncate font-mono text-xs text-foreground">{resolved}</span>
         {currentHarness ? (
-          <span className="shrink-0 text-[9px] text-muted-foreground">· {currentHarness}</span>
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">· {currentHarness}</span>
         ) : null}
-        <span className="ml-auto shrink-0 rounded border border-emerald-400/40 px-1 py-px text-[8px] uppercase tracking-wide text-emerald-300">
-          resolved
-        </span>
       </div>
-      {origin ? (
+
+      {!origin ? (
+        <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          Fixed <span className="font-mono">{roleLabel}</span> role model — no weighted distribution. Add
+          weights in Settings → Roles to spread across providers.
+        </div>
+      ) : (
         <>
-          <div className="mt-1 text-[10px] text-muted-foreground">
-            Drawn from the <span className="font-medium text-foreground/80">{roleLabel}</span> role distribution
+          <div className="mt-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {matched ? `${roleLabel} distribution` : `current ${roleLabel} weights`}
           </div>
-          <div className="mt-1.5 space-y-1">
-            {positive.map((d) => {
-              const pct = Math.round((d.hi - d.lo) * 100);
-              return (
-                <div key={d.model} className="flex items-center gap-1.5">
-                  <span className={`w-[104px] shrink-0 truncate font-mono text-[10px] ${d.chosen ? 'text-emerald-300' : 'text-muted-foreground'}`}>
-                    {d.model}
-                  </span>
-                  <span className="h-1.5 flex-1 overflow-hidden rounded bg-white/10">
-                    <span
-                      className={`block h-full rounded ${d.chosen ? 'bg-emerald-400' : 'bg-primary/70'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </span>
-                  <span className="w-7 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
-                </div>
-              );
-            })}
+          <div className="mt-1.5 space-y-1.5">
+            {positive.map((d) => bar(d, matched && d.model === resolved))}
           </div>
-          <div className="mt-1.5 rounded bg-black/30 px-1.5 py-1 font-mono text-[9.5px] leading-snug text-muted-foreground">
-            <span className="text-sky-300">fnv1a32(&quot;{origin.spawnKey}&quot;)</span>
-            {' '}={' '}
-            <span className="text-amber-300">{origin.hash01.toFixed(2)}</span>
-            {chosen ? (
-              <>
-                {' '}→ band [{chosen.lo.toFixed(2)}–{chosen.hi.toFixed(2)}] →{' '}
-                <span className="text-emerald-300">{origin.resolved}</span>
-              </>
-            ) : null}
-          </div>
-          {drift ? (
-            <div className="mt-1.5 text-[10px] leading-snug text-amber-300/90">
-              Spawned as <span className="font-mono">{resolved}</span> before this distribution was set —
-              new {roleLabel} agents follow the weights above.
+          {matched && chosenBand ? (
+            <div className="mt-2 rounded-sm bg-foreground/[0.04] px-1.5 py-1 font-mono text-[10px] leading-snug text-muted-foreground">
+              fnv1a32(&quot;{origin.spawnKey}&quot;) = {origin.hash01.toFixed(2)} → band [{chosenBand.lo.toFixed(2)}–{chosenBand.hi.toFixed(2)}] → <span className="text-foreground">{origin.resolved}</span>
+            </div>
+          ) : null}
+          {drifted ? (
+            <div className="mt-2 text-[11px] leading-snug text-muted-foreground">
+              Running <span className="font-mono">{resolved}</span>, which the current {roleLabel} weights
+              don&apos;t include — this agent spawned before they were set. New {roleLabel} agents draw from
+              the weights above.
             </div>
           ) : null}
         </>
-      ) : (
-        <div className="mt-1 text-[10px] text-muted-foreground">
-          Fixed <span className="font-medium text-foreground/80">{roleLabel}</span> role model — no weighted distribution.
-          {' '}Add weights in <span className="text-foreground/80">Settings → Roles</span> to spread across providers.
-        </div>
       )}
     </div>
   );
