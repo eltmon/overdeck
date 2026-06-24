@@ -219,7 +219,7 @@ describe('buildConversationResponse', () => {
 
     const result = await buildConversationResponse('agent-PAN-473');
 
-    expect(mockParsePiConversationMessages).toHaveBeenCalledWith(piPath);
+    expect(mockParseOhmypiConversationMessages).toHaveBeenCalledWith(piPath);
     expect(mockParseEntireConversation).not.toHaveBeenCalled();
     expect(result.messages).toHaveLength(1);
     expect(result.streaming).toBe(false);

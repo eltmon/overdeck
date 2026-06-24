@@ -669,11 +669,11 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // both. resolvePiSessionPath is the canonical resolver shared with the non-DB
   // specialist fallback below; it checks both locations and skips the
   // cost-events.jsonl / activity.jsonl sidecars.
-  if (conv.harness === 'pi') {
+  if (conv.harness === 'ohmypi') {
     const piPath = await resolvePiSessionPath(conv.tmuxSession);
-    // If the pi path resolves, use it. If not, fall through to the claude-code
+    // If the ohmypi path resolves, use it. If not, fall through to the claude-code
     // path — the harness field may be stale (agent was re-run under claude-code
-    // after the conversation record was created with harness='pi').
+    // after the conversation record was created with harness='ohmypi').
     if (piPath) return piPath;
   }
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
