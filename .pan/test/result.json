@@ -1,4 +1,4 @@
 {
   "status": "passed",
-  "notes": "All quality gates pass. TypeScript compilation (root tsc --noEmit covering src/**/*): clean. Vite production build: clean. Unit tests: 7128 passed, 51 skipped. Two pre-existing failures in tests/lib/memory/worker-pool.test.ts and src/lib/backlog/__tests__/spawn-sequencer.test.ts are unrelated to PAN-1832 and existed before this branch. The TypeScript error at RolesPanel.tsx:291 that blocked the previous test run is resolved by the `model: patch.model as ModelRef` cast at line 298 (commit 4e2a43a91)."
+  "notes": "Verification gates passed: npm run typecheck (✓ no errors), npm run lint (✓ clean), npm test (✓ 7148 tests passed, 696 files passed, 0 failures). Build successful. All 6 beads implemented: types/sampler, resolve-sampling, config-load-validation, settings-api-validation, thread-spawn-key, frontend-types-and-display, distribution-editor. RolesPanel assertion stale fix (Sequencer role card count 7→8) committed and verified. Weighted distribution logic confirmed in config-yaml.ts, settings-api.ts, RolesPanel.tsx. API responds correctly. Dashboard builds and serves settings."
 }
