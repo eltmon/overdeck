@@ -639,6 +639,91 @@ describe('AgentState role persistence', () => {
     rmSync(workspace, { recursive: true, force: true });
   });
 
+  it('resumes a status=starting agent whose tmux session died (runtime=stopped desync)', async () => {
+    // Regression: an agent stuck in status='starting' (spawn got past model
+    // resolution but tmux died mid-launch) with a dead session produces
+    // runtime=stopped, status=starting. The deacon patrol would normally heal
+    // starting→stopped, but only if it is running / not in OVERDECK_NO_RESUME.
+    // The lifecycle UI model treats runtime=stopped as isStopped (enabling the
+    // Resume button), but resumeAgent's gate only treated status='running' as
+    // crashed — so status='starting' was bricked with
+    // "Cannot resume agent in state: runtime=stopped, status=starting".
+    // Fix: isCrashed now also covers status='starting' with no live session.
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-starting-resume-'));
+    const agentId = 'agent-pan-2031-review';
+    const createSessionAsync = vi.fn(async () => {
+      writeFileSync(join(tempHome, 'agents', agentId, 'ready.json'), JSON.stringify({
+        agentId,
+        sessionId: 'fresh-session',
+      }));
+    });
+    const killSessionAsync = vi.fn(async () => undefined);
+    const writeOhmypiCommandSync = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-23T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../projects.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../projects.js')),
+      resolveProjectFromIssueSync: vi.fn(() => null),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../agent-runtime-mirror.js', () => ({
+      getRuntimeSnapshot: vi.fn(() => Effect.succeed({
+        activity: 'stopped',
+        lastActivity: '2026-06-23T00:00:00.000Z',
+        sessionModel: 'claude-sonnet-4-6',
+        sessionHarness: 'ohmypi',
+      })),
+      isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
+    }));
+    vi.doMock('../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../runtimes/ohmypi-fifo.js')),
+      writeOhmypiCommandSync,
+    }));
+
+    const { resumeAgent, saveAgentStateSync } = await import('../agents.js');
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-2031',
+      workspace,
+      harness: 'ohmypi',
+      role: 'review',
+      model: 'claude-sonnet-4-6',
+      status: 'starting', // <-- the stuck state from the bug report
+      startedAt: '2026-06-23T00:00:00.000Z',
+    } as any);
+    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-session');
+
+    const result = await resumeAgent(agentId, 'continue review');
+
+    // Before the fix this returned
+    // { success: false, error: 'Cannot resume agent in state: runtime=stopped, status=starting' }
+    expect(result).toMatchObject({ success: true, messageDelivered: true });
+    expect(result.error).toBeUndefined();
+    expect(createSessionAsync).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
   it('treats state.json without a valid role as missing', async () => {
     const { getAgentStateSync } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
