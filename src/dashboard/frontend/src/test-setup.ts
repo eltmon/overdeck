@@ -35,5 +35,7 @@ Object.defineProperty(window, 'matchMedia', {
 // Prevent xterm from trying to mount into jsdom — jsdom doesn't support canvas
 // or the deprecated MediaQueryList.addListener that xterm.js uses for DPR tracking.
 // Tests only check React UI elements (settings panel etc), not terminal content.
+// (The canvas getContext stub lives in ./canvas-setup.ts, which loads first so
+// it is in place before the @xterm/xterm import above probes canvas.)
 Terminal.prototype.open = () => {};
 
