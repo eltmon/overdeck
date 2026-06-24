@@ -102,15 +102,16 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-23T22:53:18.515Z",
+  "updated": "2026-06-24T02:47:29.613Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-23T22:53:18.495Z",
+    "updatedAt": "2026-06-24T02:47:29.592Z",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/conversations.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-23T22:40:09.931Z"
   },
@@ -119,22 +120,22 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-opus-4-8": {
-            "input": 232,
-            "output": 7266,
-            "cacheRead": 747990,
-            "cacheWrite": 13192
+            "input": 258,
+            "output": 8687,
+            "cacheRead": 1074373,
+            "cacheWrite": 14292
           },
           "anthropic/claude-sonnet-4-6": {
-            "input": 1,
-            "output": 121,
-            "cacheRead": 77377,
-            "cacheWrite": 156
+            "input": 54,
+            "output": 16960,
+            "cacheRead": 6222940,
+            "cacheWrite": 116968
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 124946,
-            "output": 17621,
+            "input": 161325,
+            "output": 21381,
             "cacheRead": 7424,
             "cacheWrite": 0
           }
@@ -149,10 +150,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1293,
-            "output": 399019,
-            "cacheRead": 164517559,
-            "cacheWrite": 2082197
+            "input": 1321,
+            "output": 404815,
+            "cacheRead": 166782976,
+            "cacheWrite": 2161774
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -164,20 +165,20 @@
       },
       "totals": {
         "anthropic/claude-opus-4-8": {
-          "input": 20751,
-          "output": 149775,
-          "cacheRead": 10737944,
-          "cacheWrite": 1214818
+          "input": 20777,
+          "output": 151196,
+          "cacheRead": 11064327,
+          "cacheWrite": 1215918
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1294,
-          "output": 399140,
-          "cacheRead": 164594936,
-          "cacheWrite": 2082353
+          "input": 1375,
+          "output": 421775,
+          "cacheRead": 173005916,
+          "cacheWrite": 2278742
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 124946,
-          "output": 17621,
+          "input": 161325,
+          "output": 21381,
           "cacheRead": 7424,
           "cacheWrite": 0
         },
@@ -189,8 +190,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 80.015743,
-        "pricingAsOf": "2026-06-23T22:53:18.515Z"
+        "usd": 83.820987,
+        "pricingAsOf": "2026-06-24T02:47:29.613Z"
       }
     },
     "merges": [
