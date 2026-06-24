@@ -385,6 +385,43 @@ describe('runVerificationForIssue', () => {
         expect.not.stringContaining('Do NOT stop until')
       );
     });
+
+    it('escalates early when the same required gate fails in consecutive cycles', async () => {
+      getReviewStatusMock.mockReturnValue({
+        verificationCycleCount: 1,
+        verificationStatus: 'failed',
+        verificationNotes: 'Verification FAILED at lint (200ms):\n\nprevious error output',
+      });
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result).toMatchObject({
+        outcome: 'failed',
+        failedCheck: 'lint',
+        cycleCount: 2,
+        maxCycles: VERIFICATION_MAX_CYCLES,
+      });
+      expect(markWorkspaceStuckMock).toHaveBeenCalledWith(
+        issueId,
+        'verification_stuck',
+        expect.objectContaining({
+          failedCheck: 'lint',
+          cycleCount: 2,
+          maxCycles: VERIFICATION_MAX_CYCLES,
+        })
+      );
+      expect(setAgentPausedMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('needs-you: verification stuck'),
+        true
+      );
+      expect(stopAgentMock).toHaveBeenCalledWith(`agent-${issueId.toLowerCase()}`);
+      expect(writeFeedbackFileMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          markdownBody: expect.stringContaining('NEEDS-YOU: Verification stuck'),
+        })
+      );
+    });
   });
 
   describe('infrastructure error', () => {

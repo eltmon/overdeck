@@ -27,6 +27,7 @@ import type { TemplatePlaceholders } from '../workspace-config.js';
 const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
+const NO_PROGRESS_REPEAT_THRESHOLD = 2;
 
 export type VerificationRunnerOutcome =
   | { outcome: 'passed' }
@@ -56,6 +57,25 @@ interface SyncResult {
 
 function isFinalVerificationAttempt(cycleCount: number): boolean {
   return cycleCount >= VERIFICATION_MAX_CYCLES;
+}
+
+function isRepeatFailedCheck(
+  status: ReturnType<typeof getReviewStatusSync> | null | undefined,
+  failedCheck: string,
+): boolean {
+  return (
+    status?.verificationStatus === 'failed' &&
+    status.verificationNotes?.startsWith(`Verification FAILED at ${failedCheck} `) === true
+  );
+}
+
+function shouldEscalateVerificationFailure(
+  status: ReturnType<typeof getReviewStatusSync> | null | undefined,
+  failedCheck: string,
+  cycleCount: number,
+): boolean {
+  if (isFinalVerificationAttempt(cycleCount)) return true;
+  return cycleCount >= NO_PROGRESS_REPEAT_THRESHOLD && isRepeatFailedCheck(status, failedCheck);
 }
 
 function buildFinalFailureInstructions(issueId: string): string {
@@ -229,7 +249,8 @@ function getSyncTargetBranch(
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
-  const currentCycles = getReviewStatusSync(issueId)?.verificationCycleCount ?? 0;
+  const currentStatus = getReviewStatusSync(issueId);
+  const currentCycles = currentStatus?.verificationCycleCount ?? 0;
 
   if (currentCycles >= VERIFICATION_MAX_CYCLES) {
     const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} cycles exceeded — skipping verification`;
@@ -274,7 +295,7 @@ function getSyncTargetBranch(
             verificationMaxCycles: VERIFICATION_MAX_CYCLES,
           });
 
-          if (isFinalVerificationAttempt(newCycleCount)) {
+          if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
             await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
           }
 
@@ -291,7 +312,7 @@ function getSyncTargetBranch(
               const agentId = `agent-${issueId.toLowerCase()}`;
               const hasConflicts = failures.some(f => f.hasConflicts);
               const repoList = isPolyrepo ? failures.map(f => f.repoName).join(', ') : basename(workspacePath);
-              const msg = isFinalVerificationAttempt(newCycleCount)
+              const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
                 ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
                 : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the sync issues, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
               await messageAgent(agentId, msg);
@@ -411,11 +432,13 @@ function getSyncTargetBranch(
         verificationMaxCycles: VERIFICATION_MAX_CYCLES,
       });
 
-      if (isFinalVerificationAttempt(newCycleCount)) {
+      const shouldEscalate = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount);
+
+      if (shouldEscalate) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
 
-      const feedbackBody = isFinalVerificationAttempt(newCycleCount)
+      const feedbackBody = shouldEscalate
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
         : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until \`pan review request\` has completed successfully.`;
 
@@ -430,7 +453,7 @@ function getSyncTargetBranch(
         }));
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = isFinalVerificationAttempt(newCycleCount)
+          const msg = shouldEscalate
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await messageAgent(agentId, msg);
@@ -461,10 +484,10 @@ function getSyncTargetBranch(
           verificationCycleCount: newCycleCount,
           verificationMaxCycles: VERIFICATION_MAX_CYCLES,
         });
-        if (isFinalVerificationAttempt(newCycleCount)) {
+        if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
-        const feedbackBody = isFinalVerificationAttempt(newCycleCount)
+        const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
           ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
           : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in vBRIEF spec BEFORE resubmitting\n\n1. Open the vBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
         try {
@@ -478,7 +501,7 @@ function getSyncTargetBranch(
           }));
           if (fileResult.success) {
             const agentId = `agent-${issueId.toLowerCase()}`;
-            const msg = isFinalVerificationAttempt(newCycleCount)
+            const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
               ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
               : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await messageAgent(agentId, msg);
@@ -513,11 +536,11 @@ function getSyncTargetBranch(
         verificationCycleCount: newCycleCount,
         verificationMaxCycles: VERIFICATION_MAX_CYCLES,
       });
-      if (isFinalVerificationAttempt(newCycleCount)) {
+      if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
 
-      const feedbackBody = isFinalVerificationAttempt(newCycleCount)
+      const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
         : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with \`bd close\` — AC statuses sync from closed beads automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
 
@@ -532,7 +555,7 @@ function getSyncTargetBranch(
         }));
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = isFinalVerificationAttempt(newCycleCount)
+          const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await messageAgent(agentId, msg);
