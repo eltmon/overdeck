@@ -102,19 +102,19 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T03:18:10.008Z",
+  "updated": "2026-06-24T03:31:28.328Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T03:18:09.609Z",
+    "updatedAt": "2026-06-24T03:31:28.306Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (301035ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
+    "verificationNotes": "Verification FAILED at test (78935ms):\n\ns:2272:10\u001b[90m)\u001b[39m\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1989/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2955:64\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts\u001b[2m > \u001b[22m\u001b[2mhandleForkPipelineFailure\u001b[2m > \u001b[22m\u001b[2mmarks the fork failed and ended for a non-Error rejection value\n\u001b[22m\u001b[39m[fork-pipeline] Failed for fork-2: string failure\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-conversation.test.ts\u001b[2m > \u001b[22mbuildConversationResponse\u001b[2m > \u001b[22mroutes ohmypi agents through parseOhmypiConversationMessages\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ Array(1) ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/agents-conversation.test.ts:\u001b[2m222:45\u001b[22m\u001b[39m\n    \u001b[90m220|\u001b[39m     \u001b[35mconst\u001b[39m result \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mbuildConversationResponse\u001b[39m(\u001b[32m'agent-PAN-473'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m221|\u001b[39m\n    \u001b[90m222|\u001b[39m     expect(mockParsePiConversationMessages).toHaveBeenCalledWith(piPat…\n    \u001b[90m   |\u001b[39m                                             \u001b[31m^\u001b[39m\n    \u001b[90m223|\u001b[39m     \u001b[34mexpect\u001b[39m(mockParseEntireConversation)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m224|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mmessages)\u001b[33m.\u001b[39m\u001b[34mtoHaveLength\u001b[39m(\u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
-    "reviewRequestedAt": "2026-06-24T03:01:23.424Z"
+    "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
   "closeOut": {
     "usage": {
@@ -135,8 +135,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 197493,
-            "output": 32349,
+            "input": 210945,
+            "output": 37150,
             "cacheRead": 7424,
             "cacheWrite": 0
           }
@@ -151,10 +151,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1429,
-            "output": 434291,
-            "cacheRead": 180055835,
-            "cacheWrite": 2229365
+            "input": 1488,
+            "output": 455386,
+            "cacheRead": 186200393,
+            "cacheWrite": 2482354
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -172,14 +172,14 @@
           "cacheWrite": 1215918
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1483,
-          "output": 451251,
-          "cacheRead": 186278775,
-          "cacheWrite": 2346333
+          "input": 1542,
+          "output": 472346,
+          "cacheRead": 192423333,
+          "cacheWrite": 2599322
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 197493,
-          "output": 32349,
+          "input": 210945,
+          "output": 37150,
           "cacheRead": 7424,
           "cacheWrite": 0
         },
@@ -191,8 +191,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 88.498771,
-        "pricingAsOf": "2026-06-24T03:18:10.007Z"
+        "usd": 91.60745,
+        "pricingAsOf": "2026-06-24T03:31:28.327Z"
       }
     },
     "merges": [
