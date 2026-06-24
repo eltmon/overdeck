@@ -1,0 +1,50 @@
+{
+  "version": "1",
+  "issueId": "PAN-1994",
+  "created": "2026-06-24T02:26:57.538Z",
+  "updated": "2026-06-24T02:31:17.828Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "claude-sonnet-4-6",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:26:57.538Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-24T02:27:01.449Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-24T02:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-24T02:31:13.301Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-24T02:31Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-24T02:31:17.828Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-24T02:31:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1994\n\nActive replanning still gets stale mergeStatus=merged before the guard\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1994 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-24T02:31:17Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1994 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (45527ms):\n\ntoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m167|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mmessages)\u001b[33m.\u001b[39m\u001b[34mtoHaveLength\u001b[39m(\u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-conversation.test.ts\u001b[2m > \u001b[22mbuildConversationResponse\u001b[2m > \u001b[22mfalls back to mtime-based pick when launcher has no pinned ID\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ '/some/mtime/session.jsonl' ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/agents-conversation.test.ts:\u001b[2m184:43\u001b[22m\u001b[39m\n    \u001b[90m182|\u001b[39m\n    \u001b[90m183|\u001b[39m     \u001b[34mexpect\u001b[39m(mockGetAgentJsonlPath)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m184|\u001b[39m     expect(mockParseConversationMessages).toHaveBeenCalledWith(mtimePa…\n    \u001b[90m   |\u001b[39m                                           \u001b[31m^\u001b[39m\n    \u001b[90m185|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m186|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-conversation.test.ts\u001b[2m > \u001b[22mbuildConversationResponse\u001b[2m > \u001b[22mfalls back to mtime-based pick when pinned file does not exist on disk\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ '/some/mtime/session.jsonl' ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/agents-conversation.test.ts:\u001b[2m199:43\u001b[22m\u001b[39m\n    \u001b[90m197|\u001b[39m\n    \u001b[90m198|\u001b[39m     \u001b[34mexpect\u001b[39m(mockGetAgentJsonlPath)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m199|\u001b[39m     expect(mockParseConversationMessages).toHaveBeenCalledWith(mtimePa…\n    \u001b[90m   |\u001b[39m                                           \u001b[31m^\u001b[39m\n    \u001b[90m200|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m201|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯\u001b[22m\u001b[39m\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1994 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1994 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
+}
