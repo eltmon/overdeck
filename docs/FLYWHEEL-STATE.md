@@ -1536,3 +1536,35 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
 - **Awaiting close-out/UAT: 6** Verifying-on-main PAN issues — operator gate (default rec: operator
   clears them; flipping UAT off would delegate close-out but that's the operator's call).
 - Main `57fb20c` (RED). RAM 12.6/64 GB, **swap 0**. 4 productive agents + 1 strike. Run ACTIVE.
+
+## RUN-7 ticks 2-5 (2026-06-24 ~03:23-03:48Z) — red main GREENED; pipeline gate-bound; PAN-1989 verification-gate timeout stall
+
+- **PAN-2043 (red main) merged + closed.** Strike `46baa4a38` greens main (CI success); closed via `pan close PAN-2043`
+  (verify-merged gate passed). The red-main had blocked the entire merge gate (every PR inherited the failing test).
+  Diff was a clean stale-mock rename (`parseConversationMessages`→`parseEntireConversation`, PAN-1857 class) — commit
+  `a443997b2` had switched the claude-code path to `parseEntireConversation` (PAN-1989 >10MB transcript fix) but the test
+  still mocked the old fn.
+- **Stale-red inheritance is distinguishable from a real PR failure by branch-behind count.** PAN-1901 PR #2042 `test`
+  FAILURE looked like the PR's own break, but `git rev-list --count HEAD..origin/main` = 12-behind and
+  `merge-base --is-ancestor 46baa4a38 HEAD` = NO → the branch lacks the PAN-2043 fix → red check is inherited stale-red,
+  not the PR's work (which was review-APPROVED). Contrast PAN-1989: 0-behind main, so ITS test failure is REAL (ohmypi).
+  **LESSON: to classify a PR's red `test`, check (branch-behind-main) + (contains-the-fix-on-main) + (review verdict),
+  not just the check color.**
+- **PAN-1989 is the live instance of PAN-1934** (verification gate burns retries on an unfixable check). The ohmypi fix
+  LANDED (`36c261456 fix(conversations): restore ohmypi harness check reverted by rebase`), CI build/smoke/mintlify
+  SUCCESS, but the LOCAL verification gate times out: 300s gate vs 854s `--no-file-parallelism` suite run. The work agent
+  is on attempt ~7/10 re-requesting review with "tests pass on CI, gate timeout is machine-config." The gate has no
+  path to accept a CI-green-but-locally-timeout result. Candidate fix (PAN-1934): raise the local gate timeout for
+  `--no-file-parallelism`, or let CI-green satisfy the gate.
+- **Approved-but-stranded pattern (3 issues):** PAN-1901 (stale-red), PAN-1832 + PAN-1919 (merge_conflict) — all three
+  are review/test-PASSED (deacon `completed marker exists and review/test passed`) but can't reach readyForMerge due
+  to conflict/stale-red. Orchestrator cannot `pan sync-main`/rebase (forbidden). Operator rebase or admin-merge (main
+  is GREEN) is the only unblock. This is the primary remaining pipeline friction.
+- **Phantom `agent-1989` deacon entry** (no state dir, only `agent-pan-1989`) makes the deacon look for a double-nested
+  `workspaces/feature-pan-1989/workspaces/feature-1989` path and skip reconciliation. Cosmetic (the real agent runs
+  fine); not filed.
+- **Launch posture: HELD all run.** `auto_pickup_backlog=false` + no acute pipeline-unblocker eligible (synthesis wedge
+  PAN-1861/1864 not acute — feedback mirror bridge delivered PAN-1989's verdict despite no synthesis.md; PAN-1864 not
+  ready/blocks-main). 3 operator-started work agents (`flywheelRunId=None`, exempt from reaping) covered all in-flight
+  work. The flywheel's own contribution this run = the PAN-2043 red-main strike + close.
+- Main GREEN `2b4009be`. RAM 13/64 GB, swap 0. Run ACTIVE — cohort (PAN-1989/1901/1994) not yet drained.
