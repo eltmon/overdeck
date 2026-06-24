@@ -459,7 +459,7 @@ function findPiTranscriptFiles(agentDir: string): string[] {
  * Independent of the pi extension hook, so it captures cost even when the
  * extension emits null usage or the wrong model label.
  */
-async function scanPiTranscripts(): Promise<ReconcileResult> {
+export async function reconcilePiTranscripts(): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
     sessionsWithNewData: 0,
@@ -697,7 +697,7 @@ async function reconcilePromise(): Promise<ReconcileResult> {
 
   // PAN-1935: also sweep pi/oh-my-pi harness transcripts under
   // ~/.overdeck/agents/*/ (the Claude scan above only covers ~/.claude/projects).
-  const piResult = await scanPiTranscripts();
+  const piResult = await reconcilePiTranscripts();
   result.sessionsScanned += piResult.sessionsScanned;
   result.sessionsWithNewData += piResult.sessionsWithNewData;
   result.eventsImported += piResult.eventsImported;

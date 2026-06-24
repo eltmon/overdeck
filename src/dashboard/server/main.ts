@@ -50,6 +50,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
+import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -431,6 +432,9 @@ void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message
 startTranscriptPoller();
 console.log('[overdeck] Memory transcript poller started');
 
+startCostReconcileService();
+console.log('[overdeck] Cost reconciler started');
+
 const conversationSearchWatcher = startConversationSearchWatcher();
 console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
@@ -501,6 +505,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsPlayback();
   stopAutoMergeExecutor();
   stopTranscriptPoller();
+  stopCostReconcileService();
   stopRestartAnnouncer();
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
