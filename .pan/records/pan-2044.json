@@ -87,33 +87,37 @@
   ],
   "feedback": [],
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-06-24T17:41:58.925Z",
+  "updated": "2026-06-24T18:03:34.916Z",
   "pipeline": {
     "issueId": "PAN-2044",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T17:41:58.902Z",
-    "inspectNotes": "Spec fidelity: importLegacyConversation and setImportedConversationLinks correctly added to conversations.ts (non-destructive INSERT OR IGNORE, randomUUID, full column mapping, conversation_files locator on claudeSessionId). importLegacyConversations in legacy-import.ts implements two-pass orchestration: pass 1 skips-by-name and skips-by-claude_session_id then inserts; pass 2 remaps FK rowids to UUIDs with NULL+warning for unresolved targets. Favorites carry-over via setFavorite. failed[] for unparseable created_at. No DELETE in import path. All 6 ACs covered by fixture tests."
+    "updatedAt": "2026-06-24T17:53:06.871Z",
+    "reviewNotes": "POST import can import agent/planning/specialist legacy conversations despite the exclusion requirement",
+    "verificationNotes": "Acceptance criteria check FAILED — 20/20 AC incomplete:\n\n### Add a read-only open option to the shared SQLite driver (2/2 incomplete)\n  - [ ] OpenDatabaseOptions in src/lib/database/driver.ts contains an optional readOnly boolean field.\n  - [ ] A unit test calls openDatabase(fixturePath, { readOnly: true }), asserts a SELECT succeeds, and asserts a write statement (INSERT or CREATE TABLE) against the handle throws.\n\n### Read-only legacy-conversation preview module (4/4 incomplete)\n  - [ ] src/lib/overdeck/legacy-import.ts exports previewLegacyConversations(path) that opens the legacy DB via openDatabase(path, { readOnly: true }) on its own handle and never calls getDatabase()/getOverdeckDatabaseSync().\n  - [ ] Given a fixture legacy DB seeded from the legacy conversations DDL, previewLegacyConversations returns one row per non-agent conversation and excludes every name matched by isAgentConversationName (agent-/planning-/specialist-).\n  - [ ] Each preview row includes name, title, createdAt, model, hasFavorite (true when a legacy favorites row of type 'conversation' matches the name), and alreadyImported (true when a same-name conversation already exists in overdeck.db).\n  - [ ] When path points at a non-existent file, the module returns a not-found result without throwing.\n\n### Non-destructive import write door + two-pass orchestration + favorites (6/6 incomplete)\n  - [ ] conversations.ts exports a non-destructive importLegacyConversation(mapped) that inserts without deleting any existing row and registers a conversation_files locator when claudeSessionId is present; a fixture test asserts created_at (ISO→ms), archived_at, status, ended_at, total_cost, total_tokens, title, title_source round-trip to the new row and the conversation_files locator equals the legacy claude_session_id.\n  - [ ] importLegacyConversations skips and reports (in skipped[]) any selected name already present in overdeck.db (matched by name, or by claude_session_id via getConversationByClaudeSessionId) — no duplicate row, no overwrite; a test pre-creates a same-named conversation and asserts it is unchanged after import.\n  - [ ] The import path preserves existing overdeck rows: it issues no DELETE against the conversations table and does not route through createConversation (verified by a test and/or a grep over the import module).\n  - [ ] handoff_target_conv_id and cleared_to_conv_id are remapped from legacy rowids to the imported targets' new UUIDs when those targets are also imported, and set NULL with a per-row warning when the target was not imported — a fixture test covers both branches.\n  - [ ] A legacy row with an empty or unparseable created_at fails that row with a recorded reason in failed[], and no zero-timestamp row is inserted into overdeck.db.\n  - [ ] For each imported conversation whose name matches a legacy type='conversation' favorite, the import creates a favorite via setFavorite and favoritesCarried records the count; legacy favorites of other types are ignored — fixture test.\n\n### Settings endpoints: legacy-import preview (GET) and import (POST) (4/4 incomplete)\n  - [ ] GET /api/settings/legacy-import/conversations returns { found:false, defaultPath, message } when no DB exists at the resolved path and { found:true, path, conversations } (via previewLegacyConversations) when one does; ?path= overrides the default join(getLegacyHome(),'panopticon.db').\n  - [ ] POST /api/settings/legacy-import/conversations with body { path, names } calls importLegacyConversations and returns { imported, skipped, failed, warnings, favoritesCarried }.\n  - [ ] The POST route calls rejectUnsafeDashboardMutationRequest(request) and returns its auth-error response when the dashboard CSRF token is absent, before any import runs.\n  - [ ] Both routes are added to settingsRouteLayer in settings.ts and a route-level test exercises the GET preview against a fixture path and the POST import summary.\n\n### Experimental settings button + LegacyImportDialog (4/4 incomplete)\n  - [ ] A button labeled 'Import conversations from old Panopticon' renders in the Experimental section of SettingsPage.tsx and opens LegacyImportDialog (state legacyImportOpen).\n  - [ ] The dialog renders preview rows from the GET endpoint with per-row checkboxes that default to all-selected, plus Select-all / Select-none controls; alreadyImported rows render disabled with an 'already imported' tag.\n  - [ ] The 'Import N conversations' button POSTs the selected names with dashboardMutationJsonHeaders() and, on success, shows a summary of imported / skipped / failed (with reasons) / favorites carried plus a link to the Conversations panel.\n  - [ ] When the GET response is { found:false }, the dialog shows 'No legacy database found at <path>' with a manual path input that re-runs the preview.",
+    "inspectNotes": "Spec fidelity: importLegacyConversation and setImportedConversationLinks correctly added to conversations.ts (non-destructive INSERT OR IGNORE, randomUUID, full column mapping, conversation_files locator on claudeSessionId). importLegacyConversations in legacy-import.ts implements two-pass orchestration: pass 1 skips-by-name and skips-by-claude_session_id then inserts; pass 2 remaps FK rowids to UUIDs with NULL+warning for unresolved targets. Favorites carry-over via setFavorite. failed[] for unparseable created_at. No DELETE in import path. All 6 ACs covered by fixture tests.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
+    "reviewRequestedAt": "2026-06-24T17:50:03.264Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "inspect-deep": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 54,
-            "output": 15126,
-            "cacheRead": 4885292,
-            "cacheWrite": 93977
+            "input": 55,
+            "output": 15212,
+            "cacheRead": 4996365,
+            "cacheWrite": 94171
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 6072,
-            "output": 260,
+            "input": 8132,
+            "output": 394,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -128,23 +132,23 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 119,
-            "output": 37897,
-            "cacheRead": 12852858,
-            "cacheWrite": 257144
+            "input": 169,
+            "output": 52788,
+            "cacheRead": 18238782,
+            "cacheWrite": 360374
           }
         }
       },
       "totals": {
         "anthropic/claude-sonnet-4-6": {
-          "input": 173,
-          "output": 53023,
-          "cacheRead": 17738150,
-          "cacheWrite": 351121
+          "input": 224,
+          "output": 68000,
+          "cacheRead": 23235147,
+          "cacheWrite": 454545
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 6072,
-          "output": 260,
+          "input": 8132,
+          "output": 394,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -156,13 +160,42 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 14.461307,
-        "pricingAsOf": "2026-06-24T17:41:58.925Z"
+        "usd": 16.723051,
+        "pricingAsOf": "2026-06-24T17:53:06.901Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2048"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "driver-readonly-option": "completed",
+    "driver-readonly-option.ac1": "completed",
+    "driver-readonly-option.ac2": "completed",
+    "legacy-import-read": "completed",
+    "legacy-import-read.ac1": "completed",
+    "legacy-import-read.ac2": "completed",
+    "legacy-import-read.ac3": "completed",
+    "legacy-import-read.ac4": "completed",
+    "legacy-import-write": "completed",
+    "legacy-import-write.ac1": "completed",
+    "legacy-import-write.ac2": "completed",
+    "legacy-import-write.ac3": "completed",
+    "legacy-import-write.ac4": "completed",
+    "legacy-import-write.ac5": "completed",
+    "legacy-import-write.ac6": "completed",
+    "legacy-import-endpoints": "completed",
+    "legacy-import-endpoints.ac1": "completed",
+    "legacy-import-endpoints.ac2": "completed",
+    "legacy-import-endpoints.ac3": "completed",
+    "legacy-import-endpoints.ac4": "completed",
+    "legacy-import-dialog": "completed",
+    "legacy-import-dialog.ac1": "completed",
+    "legacy-import-dialog.ac2": "completed",
+    "legacy-import-dialog.ac3": "completed",
+    "legacy-import-dialog.ac4": "completed"
+  }
 }
