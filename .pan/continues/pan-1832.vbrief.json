@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1832",
   "created": "2026-06-21T00:17:45.903Z",
-  "updated": "2026-06-21T09:59:10.390Z",
+  "updated": "2026-06-24T17:28:05.660Z",
   "gitState": {
     "branch": "feature/pan-1832",
     "sha": "f04a38ddc9",
@@ -241,6 +241,26 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-21T09:59:10.390Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T17:16:30.252Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-24T17:17Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-24T17:17:57.472Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T17:17:58.360Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-24T17:28:05.660Z"
     }
   ],
   "feedback": []

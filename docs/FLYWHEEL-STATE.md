@@ -1568,3 +1568,52 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
   ready/blocks-main). 3 operator-started work agents (`flywheelRunId=None`, exempt from reaping) covered all in-flight
   work. The flywheel's own contribution this run = the PAN-2043 red-main strike + close.
 - Main GREEN `2b4009be`. RAM 13/64 GB, swap 0. Run ACTIVE — cohort (PAN-1989/1901/1994) not yet drained.
+
+## RUN-11 tick 1 (2026-06-24 ~18:24Z) — dashboard DOWN (status='error' schema crash); pan plan --auto broken; drained 8 verifying-on-main; 2 strikes launched
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Harness ohmypi/glm-5.2.
+
+- **Main GREEN** at `db2f6cb08` (CI success `617cbba`). RAM 35/64 GB, swap 0.7/8.2 GB.
+  Cloister auto-start enabled (Status: Starting after supervisor restart).
+
+- **P0 OUTAGE — dashboard server crashed on agent `status='error'` (PAN-2049, filed).** The dashboard's
+  `decodeAgentRow` schema only accepts `starting|running|idle|stopped|crashed` — NOT `error` or `waiting`.
+  Two failed `pan plan --auto` launches (PAN-2022, PAN-2017) wrote `status='error'` rows to the `agents`
+  table. The dashboard server process stayed alive but never bound port 3011 — ALL API calls returned
+  connection-refused (`curl → 000`). This blocked `pan plan/start`, `pan flywheel emit-status`, and all
+  dashboard-dependent operations. **Emergency recovery:** deleted the 2 cruft rows (my own failed-launch
+  cruft — empty model, no state dir) + the supervisor auto-restarted the server → API back to 200.
+  **DURABLE LESSON: an agent row with an unrecognized status enum value is a fatal dashboard crash.**
+  The `FlywheelAgentStatus` schema in contracts already includes `error` + `waiting`, but the dashboard
+  agent-row decoder is a narrower enum that drifted. Strike-pan-2049 is fixing it.
+
+- **P0 — `pan plan --auto` / `pan start --auto` is deterministically broken (PAN-2050, filed).** The
+  auto-plan flow writes `.pan/records/pan-XXXX.json` to the workspace path BEFORE `git worktree add`,
+  creating the directory, which makes `git worktree add` fail with "already exists". Confirmed
+  deterministic: BEFORE the command the dir doesn't exist; AFTER, it contains only `.pan/records/`.
+  Also leaves phantom `status='running'` agent DB rows + zombie tmux sessions (the agent registers +
+  session spawns before workspace creation fails). **Workaround: `pan strike` works** (different
+  workspace path `feature-pan-XXXX-strike`, different worktree creation code `ensureStrikeWorktree`).
+  Until PAN-2050 is fixed, ALL normal pipeline launches (plan→work→review→test→ship) are blocked —
+  only strikes (direct-to-main) can launch new work.
+
+- **Drained 8 verifying-on-main issues** via `pan close --force` (verify-merged gate passed on all):
+  PAN-1994, PAN-1989, PAN-1934, PAN-1849, PAN-1224, PAN-1992, PAN-1893, PAN-1823. All confirmed merged
+  on origin/main. Cleared the entire close-out backlog.
+
+- **Launched 2 strikes** (the working launch path while plan/start is broken):
+  - `pan strike PAN-2047` → `strike-pan-2047` (gpt-5.5, deacon lastPatrol watchdog restart loop —
+    FLOWING: read issue, explored deacon.ts/main.ts/service.ts, implementing fix + regression test,
+    already ran /review).
+  - `pan strike PAN-2049` → `strike-pan-2049` (gpt-5.5, dashboard status='error' schema fix — just started).
+  Both are flywheel-initiated pipeline-unblockers (strike mechanism bugs that block pipeline movement).
+
+- **Merge gate (operator-owned):** PAN-1832 (PR #2003, review+test passed) + MIN-846 (review+test passed).
+  Both readyForMerge but `require_uat_before_merge=true` — operator UAT + merge needed. Main is GREEN.
+
+- **Dueling dashboard servers were present** (2× `dist/dashboard/server.js` PIDs) before the crash; the
+  supervisor restarted a single clean instance after I killed the crashed process.
+
+- Main GREEN `db2f6cb08`. RAM 35/64 GB, swap 0.7. Run ACTIVE — 2 strikes in flight, merge gate
+  operator-owned.
