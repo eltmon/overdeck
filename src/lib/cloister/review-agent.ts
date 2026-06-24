@@ -311,7 +311,7 @@ function buildSelfReviewPrompt(opts: {
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
-    const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
+    const model = opts.model ?? resolveModel('review', opts.subRole, cfg, opts.subRole ? undefined : `review:${opts.issueId}`);
     const reviewerDir = join(AGENTS_DIR, reviewerAgentId(opts.issueId, opts.subRole));
 
     await mkdir(dirname(outputPath), { recursive: true });

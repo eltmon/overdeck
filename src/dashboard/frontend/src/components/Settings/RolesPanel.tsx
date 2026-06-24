@@ -7,6 +7,8 @@ import { PROVIDER_BRANDS } from '../shared/branding';
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
+interface WeightedModelRef { model: ModelRef; weight: number; }
+type RoleModelRef = ModelRef | WeightedModelRef[];
 type Harness = 'claude-code' | 'ohmypi' | 'codex';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
@@ -16,7 +18,7 @@ interface RoleSubConfig {
 }
 
 interface RoleConfig {
-  model?: ModelRef;
+  model?: RoleModelRef;
   harness?: Harness;
   effort?: Effort;
   maxAgents?: number;
@@ -26,7 +28,7 @@ interface RoleConfig {
 
 type RolesConfig = Partial<Record<RoleId, RoleConfig>>;
 type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
-type RoleConfigPatch = Omit<RoleConfig, 'harness'> & { harness?: Harness | null };
+type RoleConfigPatch = Omit<RoleConfig, 'harness' | 'model'> & { harness?: Harness | null; model?: RoleModelRef; };
 type RolesConfigPayload = Partial<Record<RoleId, RoleConfigPatch>>;
 
 interface SettingsResponse {
@@ -173,8 +175,16 @@ async function fetchClaudeAuth(): Promise<ClaudeAuthStatus> {
   return res.json();
 }
 
-function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): ModelRef {
+function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): RoleModelRef {
   return settings?.roles?.[role.id]?.model ?? role.defaultModel;
+}
+
+function distributionSummaryText(entries: WeightedModelRef[]): string {
+  const total = entries.reduce((sum, e) => sum + e.weight, 0);
+  if (total === 0) return 'distribution';
+  return entries
+    .map((e) => `${Math.round((e.weight / total) * 100)}% ${e.model}`)
+    .join(' / ');
 }
 
 function getSubRoleModel(
@@ -285,7 +295,7 @@ async function saveRoleConfig(role: RoleId, patch: RoleConfigPatch, subRole?: st
           ...(currentRole.sub ?? {}),
           [subRole]: {
             ...(currentRole.sub?.[subRole] ?? {}),
-            model: patch.model,
+            model: patch.model as ModelRef,
           },
         },
       }
@@ -389,6 +399,8 @@ function getFlywheelConfig(settings: SettingsResponse | undefined): Pick<RoleCon
 export function RolesPanel() {
   const queryClient = useQueryClient();
   const [expandedRoles, setExpandedRoles] = useState<Partial<Record<RoleId, boolean>>>({});
+  const [distributionMode, setDistributionMode] = useState<Partial<Record<RoleId, boolean>>>({});
+  const [draftDistributions, setDraftDistributions] = useState<Partial<Record<RoleId, WeightedModelRef[]>>>({});
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -451,11 +463,53 @@ export function RolesPanel() {
       ) : (
         <div className="space-y-3">
           {ROLES.map((role) => {
-            const roleModel = getRoleModel(settings, role);
-            const tooltip = modelRefTooltip(roleModel, workhorses);
+            const savedRoleModel = getRoleModel(settings, role);
+            const savedIsDistribution = Array.isArray(savedRoleModel);
+            const isInDistributionMode = distributionMode[role.id] ?? savedIsDistribution;
+            const draftRows: WeightedModelRef[] = draftDistributions[role.id] ?? (
+              savedIsDistribution
+                ? (savedRoleModel as WeightedModelRef[])
+                : [{ model: savedRoleModel as ModelRef, weight: 1 }]
+            );
+            const scalarSavedModel = savedIsDistribution ? undefined : savedRoleModel as ModelRef;
+            // When the parent role is a distribution, give sub-roles a concrete representative
+            // so their "Parent" option shows a meaningful inherited model.
+            const parentModelRefForSubRoles: ModelRef | undefined = savedIsDistribution
+              ? (savedRoleModel as WeightedModelRef[]).reduce(
+                  (best, e) => (e.weight > best.weight ? e : best),
+                  (savedRoleModel as WeightedModelRef[])[0],
+                ).model
+              : scalarSavedModel;
+            const tooltip = scalarSavedModel ? modelRefTooltip(scalarSavedModel, workhorses) : undefined;
             const isExpanded = !!expandedRoles[role.id];
             const canExpand = !!role.subRoles?.length;
             const flywheelConfig = role.id === 'flywheel' ? getFlywheelConfig(settings) : null;
+            const draftTotal = draftRows.reduce((s, e) => s + (e.weight > 0 ? e.weight : 0), 0);
+
+            const setDraftRows = (rows: WeightedModelRef[]) =>
+              setDraftDistributions((prev) => ({ ...prev, [role.id]: rows }));
+            const enterDistributionMode = () => {
+              const initial: WeightedModelRef[] = savedIsDistribution
+                ? (savedRoleModel as WeightedModelRef[])
+                : [{ model: savedRoleModel as ModelRef, weight: 1 }];
+              setDraftDistributions((prev) => ({ ...prev, [role.id]: initial }));
+              setDistributionMode((prev) => ({ ...prev, [role.id]: true }));
+            };
+            const exitDistributionMode = () => {
+              const representative = draftRows.reduce(
+                (best, e) => (e.weight > best.weight ? e : best),
+                draftRows[0] ?? { model: role.defaultModel, weight: 0 },
+              ).model;
+              saveMutation.mutate({ role: role.id, patch: { model: representative } });
+              setDistributionMode((prev) => ({ ...prev, [role.id]: false }));
+              setDraftDistributions((prev) => { const n = { ...prev }; delete n[role.id]; return n; });
+            };
+            const saveDistribution = () => {
+              const valid = draftRows.filter((e) => e.weight > 0);
+              if (valid.length === 0) return;
+              saveMutation.mutate({ role: role.id, patch: { model: valid } });
+              setDraftDistributions((prev) => { const n = { ...prev }; delete n[role.id]; return n; });
+            };
 
             return (
               <div key={role.id} data-testid="role-card" className="rounded-lg border border-border bg-background/40 p-3">
@@ -471,7 +525,9 @@ export function RolesPanel() {
                           className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                           title={tooltip}
                         >
-                          Default: {displayModelRef(roleModel)}
+                          {savedIsDistribution
+                            ? `Distribution: ${distributionSummaryText(savedRoleModel as WeightedModelRef[])}`
+                            : `Default: ${displayModelRef(scalarSavedModel!)}`}
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-snug text-muted-foreground">{role.description}</p>
@@ -494,16 +550,105 @@ export function RolesPanel() {
                   </div>
                   <div className="md:w-80">
                     <div className="space-y-3">
-                      <ModelPicker
-                        label={`${role.name} model`}
-                        value={roleModel}
-                        workhorses={workhorses}
-                        providerGroups={providerGroups}
-                        providers={settings?.models?.providers}
-                        claudeAuth={claudeAuthQuery.data}
-                        disabled={saveMutation.isPending}
-                        onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
-                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-foreground">Model</span>
+                        <button
+                          type="button"
+                          className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50"
+                          disabled={saveMutation.isPending}
+                          onClick={isInDistributionMode ? exitDistributionMode : enterDistributionMode}
+                        >
+                          {isInDistributionMode ? 'Use single model' : 'Use distribution'}
+                        </button>
+                      </div>
+
+                      {isInDistributionMode ? (
+                        <div className="space-y-2" data-testid="distribution-editor">
+                          {draftRows.map((entry, idx) => {
+                            const pct = draftTotal > 0 && entry.weight > 0
+                              ? Math.round((entry.weight / draftTotal) * 100)
+                              : 0;
+                            return (
+                              <div key={idx} className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <ModelPicker
+                                    label={`Entry ${idx + 1} model`}
+                                    value={entry.model}
+                                    workhorses={workhorses}
+                                    providerGroups={providerGroups}
+                                    providers={settings?.models?.providers}
+                                    claudeAuth={claudeAuthQuery.data}
+                                    disabled={saveMutation.isPending}
+                                    onChange={(m) => {
+                                      const next = [...draftRows];
+                                      next[idx] = { ...entry, model: m };
+                                      setDraftRows(next);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <input
+                                    aria-label={`Weight for entry ${idx + 1}`}
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={entry.weight}
+                                    disabled={saveMutation.isPending}
+                                    className="w-14 px-2 py-1.5 bg-popover border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                                    onChange={(e) => {
+                                      const next = [...draftRows];
+                                      next[idx] = { ...entry, weight: Math.max(1, parseInt(e.target.value, 10) || 1) };
+                                      setDraftRows(next);
+                                    }}
+                                  />
+                                  <span className="text-[11px] text-muted-foreground w-8 text-right">{pct}%</span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove entry ${idx + 1}`}
+                                    disabled={saveMutation.isPending || draftRows.length <= 1}
+                                    className="text-muted-foreground hover:text-destructive disabled:opacity-40 text-xs px-1"
+                                    onClick={() => setDraftRows(draftRows.filter((_, i) => i !== idx))}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={saveMutation.isPending}
+                              className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50"
+                              onClick={() => setDraftRows([...draftRows, { model: role.defaultModel, weight: 1 }])}
+                            >
+                              + Add model
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saveMutation.isPending || draftRows.filter((e) => e.weight > 0).length === 0}
+                              className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50 ml-auto"
+                              onClick={saveDistribution}
+                            >
+                              Save distribution
+                            </button>
+                          </div>
+                          <p className="text-[11px] leading-snug text-muted-foreground">
+                            Weights are relative — each spawn is routed statistically based on these proportions.
+                          </p>
+                        </div>
+                      ) : (
+                        <ModelPicker
+                          label={`${role.name} model`}
+                          value={scalarSavedModel ?? role.defaultModel}
+                          workhorses={workhorses}
+                          providerGroups={providerGroups}
+                          providers={settings?.models?.providers}
+                          claudeAuth={claudeAuthQuery.data}
+                          disabled={saveMutation.isPending}
+                          onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -565,7 +710,7 @@ export function RolesPanel() {
                     <div className="grid gap-3 md:grid-cols-2">
                       {role.subRoles?.map((subRole) => {
                         const subModel = getSubRoleModel(settings, role, subRole);
-                        const subTooltip = modelRefTooltip(subModel, workhorses, roleModel);
+                        const subTooltip = modelRefTooltip(subModel, workhorses, parentModelRefForSubRoles);
 
                         return (
                           <div key={subRole.id} className="rounded-md border border-border bg-card p-3">
@@ -586,7 +731,7 @@ export function RolesPanel() {
                               providerGroups={providerGroups}
                               providers={settings?.models?.providers}
                               claudeAuth={claudeAuthQuery.data}
-                              parentModelRef={roleModel}
+                              parentModelRef={parentModelRefForSubRoles}
                               disabled={saveMutation.isPending}
                               onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, patch: { model: modelRef } })}
                             />
