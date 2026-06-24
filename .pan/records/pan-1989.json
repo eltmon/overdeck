@@ -102,17 +102,17 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T04:44:34.642Z",
+  "updated": "2026-06-24T04:49:38.098Z",
   "pipeline": {
     "issueId": "PAN-1989",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T04:44:34.606Z",
+    "updatedAt": "2026-06-24T04:49:38.061Z",
     "reviewNotes": "ohmypi conversation launch still checks Pi OAuth",
-    "verificationNotes": "Verification FAILED at typecheck (28598ms):\n\noverdeck/core@0.30.2 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.30.2 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.30.2 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1989/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m162.34 kB\u001b[22m \u001b[2m│ gzip: 27.48 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 162.34 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4613ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m138.88 kB\u001b[22m \u001b[2m│ gzip: 25.63 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m261.56 kB\u001b[22m \u001b[2m│ gzip: 44.44 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 36.29 kB\u001b[22m \u001b[2m│ gzip:  4.16 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m639.75 kB\u001b[22m \u001b[2m│ gzip: 60.15 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.08 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5037ms\u001b[39m\n\n> @overdeck/core@0.30.2 typecheck\n> tsc --noEmit && npm run typecheck:hooks\n\n\n> @overdeck/core@0.30.2 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (74%)\n  - rolldown-plugin-dts:fake-js (18%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
+    "verificationNotes": "Verification FAILED at test (300004ms):\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
   },
@@ -151,10 +151,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1658,
-            "output": 491353,
-            "cacheRead": 203854119,
-            "cacheWrite": 2726282
+            "input": 1674,
+            "output": 495115,
+            "cacheRead": 205904107,
+            "cacheWrite": 2735439
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -172,10 +172,10 @@
           "cacheWrite": 1215918
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1712,
-          "output": 508313,
-          "cacheRead": 210077059,
-          "cacheWrite": 2843250
+          "input": 1728,
+          "output": 512075,
+          "cacheRead": 212127047,
+          "cacheWrite": 2852407
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 252053,
@@ -191,8 +191,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 98.358315,
-        "pricingAsOf": "2026-06-24T04:44:34.641Z"
+        "usd": 99.064129,
+        "pricingAsOf": "2026-06-24T04:49:38.098Z"
       }
     },
     "merges": [
