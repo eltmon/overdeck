@@ -667,12 +667,18 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // specialist fallback below; it checks both locations and skips the
   // cost-events.jsonl / activity.jsonl sidecars.
   if (conv.harness === 'pi') {
-    return resolvePiSessionPath(conv.tmuxSession);
+    const piPath = await resolvePiSessionPath(conv.tmuxSession);
+    // If the pi path resolves, use it. If not, fall through to the claude-code
+    // path — the harness field may be stale (agent was re-run under claude-code
+    // after the conversation record was created with harness='pi').
+    if (piPath) return piPath;
   }
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
   // The thread-id stored in codex-thread-id is the session identifier.
   if (conv.harness === 'codex') {
-    return resolveCodexRolloutPath(conv.tmuxSession);
+    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
+    if (codexPath) return codexPath;
+    // Fall through if codex path not found — same stale-harness recovery.
   }
   // claude-code: the launcher pins `--session-id <id>` (or `--resume <id>`) — the
   // EXACT session the live tmux pane runs. Resolving from that pinned id makes the
