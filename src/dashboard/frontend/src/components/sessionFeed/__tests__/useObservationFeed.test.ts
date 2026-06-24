@@ -40,6 +40,23 @@ describe('createObservationFeedSelector', () => {
     expect(entries.map((entry) => entry.id)).toEqual(['obs-1', 'obs-2']);
   });
 
+  it('uses the rich summary as the headline and carries actionStatus as the status chip label', () => {
+    const selector = createObservationFeedSelector();
+
+    const entries = selector({
+      observationsByIssueId: {
+        'PAN-1': [observation({
+          id: 'obs-1',
+          actionStatus: 'blocked',
+          summary: 'Harness rename is blocked by a legacy harness test that normalizes pi to ohmypi.',
+        })],
+      },
+    });
+
+    expect(entries[0]?.headline).toBe('Harness rename is blocked by a legacy harness test that normalizes pi to ohmypi.');
+    expect(entries[0]?.statusLabel).toBe('blocked');
+  });
+
   it('filters out observations with null actionStatus', () => {
     const selector = createObservationFeedSelector();
 

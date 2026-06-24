@@ -65,15 +65,17 @@ describe('ActivityFeedSidebar', () => {
     expect(screen.queryByTestId('activity-feed-bucket-older')).toBeNull();
   });
 
-  it('shows actionStatus, workspace and issue label, and relative time for each item', () => {
+  it('shows the summary headline, the actionStatus chip, workspace/issue label, and relative time for each item', () => {
     seedObservations({
-      'PAN-1052': [observation('recent', '2026-05-16T11:30:00.000Z', 'Wired sidebar bucket rendering')],
+      'PAN-1052': [observation('recent', '2026-05-16T11:30:00.000Z', 'in_progress')],
     });
 
     render(<ActivityFeedSidebar issueId="PAN-1052" now={new Date('2026-05-16T12:00:00.000Z')} />);
 
     const bucket = screen.getByTestId('activity-feed-bucket-justNow');
-    expect(within(bucket).getByText('Wired sidebar bucket rendering')).toBeInTheDocument();
+    // Headline is the rich summary, not the bare lifecycle token (PAN-2040).
+    expect(within(bucket).getByText('Summary')).toBeInTheDocument();
+    expect(within(bucket).getByTestId('action-status-chip')).toHaveTextContent('in_progress');
     expect(within(bucket).getByText('feature-pan-1052 · PAN-1052')).toBeInTheDocument();
     expect(within(bucket).getByText('30m ago')).toBeInTheDocument();
   });

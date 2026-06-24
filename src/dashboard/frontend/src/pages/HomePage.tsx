@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { NotificationClassBadge } from '../components/NotificationClassBadge';
+import { ActionStatusChip } from '../components/ActionStatusChip';
 import type { AgentSnapshot, FeatureRegistryEntry, MemoryHealthSnapshot, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
 import { fetchProjects, type ProjectData } from '../components/CommandDeck/projectsData';
@@ -380,12 +381,14 @@ function explainMemoryFailure(failure: MemoryHealthSnapshot): string {
 function HomeActivityFeedItem({ observation, now }: { observation: MemoryObservation & { actionStatus: string }; now: Date }) {
   return (
     <li className="rounded-lg border border-border bg-background p-3 text-xs">
-      <p className="font-semibold text-foreground">{observation.actionStatus}</p>
+      <div className="flex items-center gap-2">
+        <ActionStatusChip status={observation.actionStatus} />
+        <p className="font-semibold text-foreground">{observation.summary}</p>
+      </div>
       <p className="mt-1 text-[10px] text-muted-foreground">
         {observation.workspaceId} · {observation.issueId} · <time dateTime={observation.timestamp}>{formatRelativeTime(observation.timestamp, now)}</time>
       </p>
-      <p className="mt-2 text-sm text-foreground">{observation.summary}</p>
-      {observation.narrative ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{observation.narrative}</p> : null}
+      {observation.narrative ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{observation.narrative}</p> : null}
       {observation.files.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1" aria-label="Files">
           {observation.files.map((file) => (

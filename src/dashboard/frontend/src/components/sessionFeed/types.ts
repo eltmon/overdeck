@@ -35,6 +35,12 @@ export interface ActivitySessionFeedEntry extends SessionFeedEntryBase {
   activityClass?: 'operational' | 'memory';
   headline: string;
   summary: string;
+  /**
+   * Lifecycle status token for memory observations (e.g. `blocked`, `done`,
+   * `in_progress`). Rendered as a small chip beside the headline. Absent for
+   * operational entries.
+   */
+  statusLabel?: string;
   narrative?: string;
   files?: readonly string[];
   tags?: readonly string[];

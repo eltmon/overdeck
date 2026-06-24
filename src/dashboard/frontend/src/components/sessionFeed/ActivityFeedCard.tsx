@@ -1,5 +1,6 @@
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { NotificationClassBadge } from '../NotificationClassBadge';
+import { ActionStatusChip } from '../ActionStatusChip';
 import type { ActivitySessionFeedEntry } from './types';
 
 interface ActivityFeedCardProps {
@@ -24,6 +25,7 @@ export function ActivityFeedCard({ entry, onSelect, now = new Date() }: Activity
           <p className="break-words font-medium text-foreground">{entry.headline}</p>
           <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-[10px] text-muted-foreground">
             <div className="flex min-w-0 items-center gap-1">
+              {entry.statusLabel ? <ActionStatusChip status={entry.statusLabel} /> : null}
               <span className="truncate">{meta}</span>
               <span aria-hidden="true" className="shrink-0">·</span>
               <time dateTime={entry.timestamp} className="shrink-0">

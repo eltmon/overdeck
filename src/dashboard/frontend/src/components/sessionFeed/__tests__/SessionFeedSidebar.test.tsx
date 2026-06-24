@@ -22,7 +22,9 @@ vi.mock('../useGitFeed', () => ({
 
 const now = new Date('2026-05-23T01:05:00.000Z');
 
-function observation(id: string, timestamp: string, actionStatus: string | null, issueId = 'PAN-1389'): MemoryObservation {
+// The descriptive text is the observation `summary` (rendered as the headline);
+// `actionStatus` holds the terse lifecycle token rendered as a chip (PAN-2040).
+function observation(id: string, timestamp: string, summary: string, issueId = 'PAN-1389'): MemoryObservation {
   return {
     id,
     timestamp,
@@ -35,9 +37,9 @@ function observation(id: string, timestamp: string, actionStatus: string | null,
     agentHarness: 'claude-code',
     gitBranch: `feature/${issueId.toLowerCase()}`,
     sourceTranscriptOffset: 1,
-    actionStatus,
+    actionStatus: 'in_progress',
     narrative: 'Narrative',
-    summary: 'Summary',
+    summary,
     files: [],
     tags: [],
     tokens: { prompt: 1, completion: 1, total: 2 },
@@ -173,8 +175,8 @@ describe('SessionFeedSidebar', () => {
     expect(section).not.toBeNull();
     const entries = within(section as HTMLElement).getAllByRole('button');
     expect(entries.map((button) => button.textContent)).toEqual([
-      'Newer activityfeature-pan-1389 · PAN-1389·1m agoMemory',
-      'Older activityfeature-pan-1389 · PAN-1389·3m agoMemory',
+      'Newer activityin_progressfeature-pan-1389 · PAN-1389·1m agoMemory',
+      'Older activityin_progressfeature-pan-1389 · PAN-1389·3m agoMemory',
     ]);
     const badgeRow = within(entries[0]).getByTestId('notification-class-memory').parentElement;
     expect(badgeRow).toHaveTextContent('feature-pan-1389 · PAN-1389');
