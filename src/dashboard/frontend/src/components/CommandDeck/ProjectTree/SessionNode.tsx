@@ -413,17 +413,12 @@ function getSessionStatusTitle({
 }
 
 /**
- * PAN-2053: read-only "why this model" header for the Start/Restart submenu,
- * shown in place of the bare `Currently: …` label. Three cases:
- *  - SCALAR role        → resolved model + "no distribution" note.
- *  - WEIGHTED, matched  → the live hash derivation genuinely explains this agent
- *                         (its running model === the spawn key's current pick):
- *                         weight bars + FNV-1a derivation, running model highlighted.
- *  - WEIGHTED, drifted  → the agent runs a model the current weights wouldn't pick
- *                         (the distribution was edited after it spawned): show the
- *                         current weights for context, but do NOT pretend the hash
- *                         selected this model.
- * Read-only; monochrome per the dashboard style guide. No affordance mutates.
+ * PAN-2053: read-only model header for the Start/Restart submenu, in place of the
+ * bare `Currently: …` label. The headline is the model a `pan start` for this issue
+ * would DETERMINISTICALLY select right now — for a weighted role, the FNV-1a pick
+ * from the distribution (`origin.resolved`); for a scalar role, the fixed model.
+ * It is NOT the model the (possibly stale) running agent happens to be on.
+ * Monochrome per the dashboard style guide; read-only — nothing here mutates.
  */
 function ModelOriginPanel({
   origin,
@@ -436,17 +431,14 @@ function ModelOriginPanel({
   roleLabel: string;
   currentHarness?: string | null;
 }) {
-  // Headline is ALWAYS the agent's actual running model (ground truth).
-  const resolved = resolvedModel ?? origin?.resolved ?? 'unknown';
+  // The deterministic selection for this issue's spawn key (what a restart picks).
+  const resolved = origin?.resolved ?? resolvedModel ?? 'unknown';
   const positive = origin ? origin.distribution.filter((d) => d.weight > 0) : [];
-  // "matched" = the live distribution's pick for this key IS the running model, so
-  // the FNV-1a derivation truly explains it. Otherwise the agent predates the weights.
-  const matched = origin != null && resolvedModel != null && origin.resolved === resolvedModel;
-  const drifted = origin != null && !matched;
   const chosenBand = origin?.distribution.find((d) => d.chosen);
 
-  const bar = (d: ModelOrigin['distribution'][number], highlight: boolean) => {
+  const bar = (d: ModelOrigin['distribution'][number]) => {
     const pct = Math.round((d.hi - d.lo) * 100);
+    const highlight = d.model === resolved;
     return (
       <div key={d.model} className="flex items-center gap-2">
         <span className={`w-[108px] shrink-0 truncate font-mono text-[10px] ${highlight ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -462,10 +454,12 @@ function ModelOriginPanel({
 
   return (
     <div className="mx-1 mb-1 mt-0.5 rounded-md border border-border bg-foreground/[0.03] px-2.5 py-2">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Model</div>
+      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {origin ? 'Resolves to' : 'Model'}
+      </div>
       <div className="mt-1 flex items-baseline gap-1.5">
         <span className="truncate font-mono text-xs text-foreground">{resolved}</span>
-        {currentHarness ? (
+        {!origin && currentHarness ? (
           <span className="shrink-0 font-mono text-[10px] text-muted-foreground">· {currentHarness}</span>
         ) : null}
       </div>
@@ -478,21 +472,12 @@ function ModelOriginPanel({
       ) : (
         <>
           <div className="mt-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            {matched ? `${roleLabel} distribution` : `current ${roleLabel} weights`}
+            {roleLabel} distribution
           </div>
-          <div className="mt-1.5 space-y-1.5">
-            {positive.map((d) => bar(d, matched && d.model === resolved))}
-          </div>
-          {matched && chosenBand ? (
+          <div className="mt-1.5 space-y-1.5">{positive.map((d) => bar(d))}</div>
+          {chosenBand ? (
             <div className="mt-2 rounded-sm bg-foreground/[0.04] px-1.5 py-1 font-mono text-[10px] leading-snug text-muted-foreground">
               fnv1a32(&quot;{origin.spawnKey}&quot;) = {origin.hash01.toFixed(2)} → band [{chosenBand.lo.toFixed(2)}–{chosenBand.hi.toFixed(2)}] → <span className="text-foreground">{origin.resolved}</span>
-            </div>
-          ) : null}
-          {drifted ? (
-            <div className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              Running <span className="font-mono">{resolved}</span>, which the current {roleLabel} weights
-              don&apos;t include — this agent spawned before they were set. New {roleLabel} agents draw from
-              the weights above.
             </div>
           ) : null}
         </>
@@ -521,8 +506,12 @@ function RestartModelSubmenu({
   modelOrigin?: ModelOrigin;
   roleLabel?: string;
 }) {
-  const defaultLabel = defaultModel
-    ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
+  // "Default role config" restarts with NO model override, so the server re-runs
+  // the weighted pick for this issue's key — i.e. modelOrigin.resolved. Show that,
+  // not the representative model, so the label matches what the restart actually does.
+  const defaultPick = modelOrigin?.resolved ?? defaultModel;
+  const defaultLabel = defaultPick
+    ? defaultPick.replace(/^claude-/, '').replace(/-\d{8}$/, '')
     : 'default';
 
   return (
@@ -554,7 +543,7 @@ function RestartModelSubmenu({
                 onSelect={() => onRestart(m.id)}
               >
                 <span
-                  className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
+                  className={`flex-1 ${m.id === defaultPick ? 'text-foreground' : ''}`}
                 >
                   {m.label}
                 </span>
