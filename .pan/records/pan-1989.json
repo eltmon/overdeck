@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T08:05:04.674Z",
-  "updated": "2026-06-24T02:47:29.613Z",
+  "updated": "2026-06-24T02:51:22.155Z",
   "pipeline": {
     "issueId": "PAN-1989",
     "reviewStatus": "pending",
@@ -110,8 +110,8 @@
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T02:47:29.592Z",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/conversations.ts",
+    "updatedAt": "2026-06-24T02:51:22.137Z",
+    "verificationNotes": "Verification FAILED at test (68428ms):\n\n[22m\n\u001b[2m    {\u001b[22m\n\u001b[32m-     \"explicit\": \"pi\",\u001b[90m\n\u001b[31m+     \"explicit\": undefined,\u001b[90m\n\u001b[2m      \"model\": \"kimi-k2.6\",\u001b[22m\n\u001b[2m    },\u001b[22m\n\u001b[2m  ]\u001b[22m\n\u001b[31m\u001b[90m\n\nNumber of calls: \u001b[1m3\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/conversations-resolve-harness.test.ts:\u001b[2m35:32\u001b[22m\u001b[39m\n    \u001b[90m 33|\u001b[39m     \u001b[35mconst\u001b[39m explicitPi \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mresolveAllowedHarness\u001b[39m(\u001b[32m'pi'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'kimi-k2.6'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 34|\u001b[39m     \u001b[34mexpect\u001b[39m(explicitPi)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m'pi'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 35|\u001b[39m     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.…\n    \u001b[90m   |\u001b[39m                                \u001b[31m^\u001b[39m\n    \u001b[90m 36|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 37|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/conversations/__tests__/show.test.ts\u001b[2m > \u001b[22mshowAction\u001b[2m > \u001b[22mshows conversation fields with no discovered session when transcript was never scanned\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'ohmypi' to be 'pi' // Object.is equality\u001b[39m\n\nExpected: \u001b[32m\"pi\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7mohmy\u001b[27mpi\"\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/cli/commands/conversations/__tests__/show.test.ts:\u001b[2m179:41\u001b[22m\u001b[39m\n    \u001b[90m177|\u001b[39m     expect(parsed.conversation.title).toBe('A conversation with no sca…\n    \u001b[90m178|\u001b[39m     \u001b[34mexpect\u001b[39m(parsed\u001b[33m.\u001b[39mconversation\u001b[33m.\u001b[39mmodel)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m'glm-5.2'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m179|\u001b[39m     \u001b[34mexpect\u001b[39m(parsed\u001b[33m.\u001b[39mconversation\u001b[33m.\u001b[39mharness)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m'pi'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                         \u001b[31m^\u001b[39m\n    \u001b[90m180|\u001b[39m     \u001b[90m// No bridged session row exists.\u001b[39m\n    \u001b[90m181|\u001b[39m     \u001b[34mexpect\u001b[39m(parsed\u001b[33m.\u001b[39msession)\u001b[33m.\u001b[39m\u001b[34mtoBeNull\u001b[39m()\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯\u001b[22m\u001b[39m\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
     "reviewRequestedAt": "2026-06-23T22:40:09.931Z"
   },
@@ -134,8 +134,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 161325,
-            "output": 21381,
+            "input": 171761,
+            "output": 22921,
             "cacheRead": 7424,
             "cacheWrite": 0
           }
@@ -150,10 +150,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1321,
-            "output": 404815,
-            "cacheRead": 166782976,
-            "cacheWrite": 2161774
+            "input": 1339,
+            "output": 407967,
+            "cacheRead": 168595149,
+            "cacheWrite": 2169177
           },
           "custom/glm-5.2": {
             "input": 18404,
@@ -171,14 +171,14 @@
           "cacheWrite": 1215918
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1375,
-          "output": 421775,
-          "cacheRead": 173005916,
-          "cacheWrite": 2278742
+          "input": 1393,
+          "output": 424927,
+          "cacheRead": 174818089,
+          "cacheWrite": 2286145
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 161325,
-          "output": 21381,
+          "input": 171761,
+          "output": 22921,
           "cacheRead": 7424,
           "cacheWrite": 0
         },
@@ -190,8 +190,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 83.820987,
-        "pricingAsOf": "2026-06-24T02:47:29.613Z"
+        "usd": 84.439733,
+        "pricingAsOf": "2026-06-24T02:51:22.155Z"
       }
     },
     "merges": [
