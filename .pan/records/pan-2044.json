@@ -87,26 +87,17 @@
   ],
   "feedback": [],
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-06-25T10:23:49.066Z",
+  "updated": "2026-06-25T11:28:52.201Z",
   "pipeline": {
     "issueId": "PAN-2044",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T10:23:49.050Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-06-25T10:23:49.049Z"
-      }
-    ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
-    "reviewedAtCommit": "6dd5832fd2eacea8cfd165e078d0936f48259fe4",
-    "lastVerifiedCommit": "b1cecda87c1c112c995baa0a14ea12c6fd054caf"
+    "updatedAt": "2026-06-25T11:28:52.183Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2048"
   },
   "closeOut": {
     "usage": {
@@ -121,8 +112,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 9134,
-            "output": 542,
+            "input": 9699,
+            "output": 674,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -149,6 +140,12 @@
             "output": 97729,
             "cacheRead": 40372893,
             "cacheWrite": 773850
+          },
+          "custom/glm-5.2": {
+            "input": 29496,
+            "output": 595,
+            "cacheRead": 66368,
+            "cacheWrite": 0
           }
         }
       },
@@ -160,8 +157,8 @@
           "cacheWrite": 868021
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 9134,
-          "output": 542,
+          "input": 9699,
+          "output": 674,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -176,11 +173,17 @@
           "output": 5389,
           "cacheRead": 1420811,
           "cacheWrite": 133436
+        },
+        "custom/glm-5.2": {
+          "input": 29496,
+          "output": 595,
+          "cacheRead": 66368,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 25.924322,
-        "pricingAsOf": "2026-06-25T10:23:49.064Z"
+        "usd": 25.974872,
+        "pricingAsOf": "2026-06-25T11:28:52.200Z"
       }
     },
     "merges": [
@@ -188,8 +191,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "harness": "ohmypi",
+  "model": "glm-5.2",
   "statusOverrides": {
     "driver-readonly-option": "completed",
     "driver-readonly-option.ac1": "completed",
