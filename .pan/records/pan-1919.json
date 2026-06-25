@@ -78,30 +78,33 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-06-25T02:57:56.755Z",
+  "updated": "2026-06-25T03:03:44.261Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T02:57:56.718Z",
+    "updatedAt": "2026-06-25T03:03:44.244Z",
+    "reviewNotes": "review passed; record cutover verified",
+    "testNotes": "Verification gates passed: npm run typecheck (✓ no errors), npm run lint (✓ clean), npm test (✓ 7148 tests passed, 696 files passed, 0 failures). Build successful. All 6 beads implemented: types/sampler, resolve-sampling, config-load-validation, settings-api-validation, thread-spawn-key, frontend-types-and-display, distribution-editor. RolesPanel assertion stale fix (Sequencer role card count 7→8) committed and verified. Weighted distribution logic confirmed in config-yaml.ts, settings-api.ts, RolesPanel.tsx. API responds correctly. Dashboard builds and serves settings.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
       {
         "type": "merge_conflict",
         "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-06-25T02:57:56.716Z"
+        "detectedAt": "2026-06-25T03:02:54.652Z"
       },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
-        "detectedAt": "2026-06-25T02:57:56.716Z"
+        "detectedAt": "2026-06-25T03:02:54.652Z"
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/1950",
-    "reviewedAtCommit": "3dddbdd30964b3d5d34928fd3a138502f90eaf7a"
+    "reviewedAtCommit": "bcfd47ae2904d7007844a11a8f15ba841d80d1bc"
   },
   "closeOut": {
     "usage": {
@@ -124,8 +127,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 120374,
-            "output": 30287,
+            "input": 130321,
+            "output": 32546,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -148,10 +151,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 712,
-            "output": 246906,
-            "cacheRead": 84046212,
-            "cacheWrite": 1756504
+            "input": 733,
+            "output": 251346,
+            "cacheRead": 85806249,
+            "cacheWrite": 1856010
           }
         }
       },
@@ -163,14 +166,14 @@
           "cacheWrite": 452641
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 722,
-          "output": 253399,
-          "cacheRead": 84623390,
-          "cacheWrite": 1826697
+          "input": 743,
+          "output": 257839,
+          "cacheRead": 86383427,
+          "cacheWrite": 1926203
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 120374,
-          "output": 30287,
+          "input": 130321,
+          "output": 32546,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -182,8 +185,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 45.925705,
-        "pricingAsOf": "2026-06-25T02:57:56.755Z"
+        "usd": 46.893528,
+        "pricingAsOf": "2026-06-25T03:03:44.261Z"
       }
     },
     "merges": [
@@ -192,5 +195,5 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "model": "claude-haiku-4-5"
 }
