@@ -643,6 +643,9 @@ export const DiscoveredSessionSnapshot = Schema.Struct({
   tags: Schema.Array(Schema.String),
   summary: Schema.optional(Schema.String),
   summaryDetailed: Schema.optional(Schema.String),
+  // Human title of the tracked conversation this session belongs to, when the
+  // session id matches a conversation in the DB (joined via conversation_files).
+  conversationTitle: Schema.optional(Schema.String),
   enrichmentLevel: Schema.Number,
   enrichmentModel: Schema.optional(Schema.String),
   enrichedAt: Schema.optional(Schema.String),

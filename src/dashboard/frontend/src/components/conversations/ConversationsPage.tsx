@@ -40,6 +40,7 @@ interface DiscoveredSession {
   filesTouched: string[];
   tags: string[];
   summary: string | null;
+  conversationTitle?: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
   overdeckManaged: boolean;
@@ -265,6 +266,7 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
     filesTouched: [...session.filesTouched],
     tags: [...session.tags],
     summary: session.summary ?? null,
+    conversationTitle: session.conversationTitle ?? null,
     enrichmentLevel: session.enrichmentLevel as 0 | 1 | 2 | 3,
     enrichmentFailed: session.enrichmentFailed,
     overdeckManaged: session.overdeckManaged,

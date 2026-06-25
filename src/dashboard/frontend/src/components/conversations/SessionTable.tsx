@@ -15,6 +15,8 @@ interface Session {
   estimatedCost: number;
   tags: string[];
   summary: string | null;
+  conversationTitle?: string | null;
+  conversationName?: string | null;
   archivedAt?: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
@@ -75,9 +77,15 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
                 {/* Workspace + summary */}
                 <td className="px-3 py-1.5 max-w-xs">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="font-mono text-gray-200 truncate" title={workspace}>
-                      {shortWorkspace}
-                    </div>
+                    {(session.conversationTitle ?? session.conversationName) ? (
+                      <div className="text-gray-100 truncate" title={session.conversationTitle ?? session.conversationName ?? undefined}>
+                        {session.conversationTitle ?? session.conversationName}
+                      </div>
+                    ) : (
+                      <div className="font-mono text-gray-200 truncate" title={workspace}>
+                        {shortWorkspace}
+                      </div>
+                    )}
                     {session.source === 'managed-archived' ? (
                       <span className="shrink-0 rounded-full border border-amber-700 bg-amber-950 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
                         Archived{session.panIssueId ? ` · ${session.panIssueId}` : ''}
@@ -88,6 +96,11 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
                       </span>
                     )}
                   </div>
+                  {(session.conversationTitle ?? session.conversationName) && (
+                    <div className="font-mono text-gray-600 truncate text-[11px] mt-0.5" title={workspace}>
+                      {shortWorkspace}
+                    </div>
+                  )}
                   {session.summary && (
                     <div className="text-gray-500 truncate mt-0.5" title={session.summary}>
                       {session.summary}

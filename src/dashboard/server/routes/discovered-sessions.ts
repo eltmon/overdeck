@@ -132,6 +132,7 @@ const DiscoveredSessionResponseSchema = Schema.Struct({
   tags: Schema.Array(Schema.String),
   summary: Schema.NullOr(Schema.String),
   summaryDetailed: Schema.NullOr(Schema.String),
+  conversationTitle: Schema.NullOr(Schema.String),
   enrichmentLevel: Schema.Number,
   enrichmentModel: Schema.NullOr(Schema.String),
   enrichedAt: Schema.NullOr(Schema.String),
