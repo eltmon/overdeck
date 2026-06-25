@@ -13,6 +13,8 @@
  * Vocabulary (operator-confirmed 2026-06-21):
  *  - Ready      — operator marked it workable (Definition of Ready): `ready` label / Linear Todo. Entry gate.
  *  - Planned    — has a vBRIEF spec + beads. Derived. Distinct from Ready.
+ *  - released   — operator reviewed the plan and released it for pickup (`released` label, PAN-2059). Required for auto-pickup.
+ *  - objection  — AI raised a written "held for review" objection in place of planning (`objection` label, PAN-2059). Halts pickup until override/park.
  *  - parked     — deferred pending human design/discussion (`parked` label; legacy `needs-design`/`needs-discussion`).
  *  - vetoed     — absolute NO; overrides even a pipeline-unblock (`vetoed` label OR pickup-gate `vetoed`).
  *  - blocks-main — must land to green main (`blocks-main` label).
@@ -24,6 +26,10 @@ export const READY_LABEL = 'ready';
 export const PARKED_LABEL = 'parked';
 export const VETOED_LABEL = 'vetoed';
 export const BLOCKS_MAIN_LABEL = 'blocks-main';
+/** PAN-2059: operator's explicit "go" after reviewing the plan. Required for auto-pickup. */
+export const RELEASED_LABEL = 'released';
+/** PAN-2059: the planning AI's written "no, and here's why" — raised in place of a plan. */
+export const OBJECTION_LABEL = 'objection';
 /** Pre-PAN-2006 labels that still mean "parked" until migrated (FR-2). */
 export const LEGACY_PARKED_LABELS = ['needs-design', 'needs-discussion'] as const;
 
@@ -42,6 +48,10 @@ export interface PipelineState {
   blocksMain: boolean;
   /** Active work/review/test in flight. */
   inPipeline: boolean;
+  /** PAN-2059: operator reviewed the plan and released it for pickup. Required for auto-pickup. */
+  released: boolean;
+  /** PAN-2059: AI raised a written objection (held for review) in place of planning. */
+  objection: boolean;
   /** Operator pickup override. */
   gate: PickupGate;
 }
@@ -74,24 +84,31 @@ export function classifyIssue(node: SequenceNode, lk: ClassifyLookups): Pipeline
     vetoed: has(VETOED_LABEL) || gate === 'vetoed',
     blocksMain: has(BLOCKS_MAIN_LABEL),
     inPipeline: lk.isInPipeline(node.issue),
+    released: has(RELEASED_LABEL),
+    objection: has(OBJECTION_LABEL),
     gate,
   };
 }
 
 /**
- * Routine auto-pickup for WORK: Ready AND Planned AND not parked/vetoed/in-flight.
- * (The DoR `ready` requirement is the entry gate — FR-1.)
+ * Routine auto-pickup for WORK: Ready AND Planned AND Released AND not
+ * parked/vetoed/objected/in-flight. The DoR `ready` is the entry gate; `released`
+ * (PAN-2059) is the operator's explicit "go" after reviewing the plan — a Planned
+ * item is NOT pickable until released. An open `objection` halts pickup until the
+ * operator overrides or parks.
  */
 export function isAutoPickable(s: PipelineState): boolean {
-  return s.ready && s.planned && !s.parked && !s.vetoed && !s.inPipeline;
+  return s.ready && s.planned && s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline;
 }
 
 /**
  * Pipeline-unblock override (FR-6): a blocks-main issue may be picked / struck even
- * when not Ready and even with auto-pickup off — EXCEPT `vetoed`, the one hard stop.
+ * when not Ready/Released and even with auto-pickup off — EXCEPT `vetoed` (the one
+ * hard stop) and an open `objection` (PAN-2059), which halts even blocks-main pickup
+ * until the operator overrides or parks.
  */
 export function isUnblockEligible(s: PipelineState): boolean {
-  return s.blocksMain && !s.vetoed && !s.inPipeline;
+  return s.blocksMain && !s.vetoed && !s.objection && !s.inPipeline;
 }
 
 /** Effort → relative duration units for the lane forecast. */
@@ -197,8 +214,11 @@ export interface ForecastStats {
   inFlight: number;
   ready: number;
   planned: number;
+  released: number;
+  objection: number;
   pickable: number;
   needsPlanning: number;
+  needsRelease: number;
   parked: number;
   vetoed: number;
   blocksMain: number;
@@ -207,20 +227,24 @@ export interface ForecastStats {
 /** Aggregate counts for the forecast header / filter bar. */
 export function computeStats(nodes: readonly SequenceNode[], lk: ClassifyLookups): ForecastStats {
   const stats: ForecastStats = {
-    total: nodes.length, inFlight: 0, ready: 0, planned: 0, pickable: 0,
-    needsPlanning: 0, parked: 0, vetoed: 0, blocksMain: 0,
+    total: nodes.length, inFlight: 0, ready: 0, planned: 0, released: 0, objection: 0,
+    pickable: 0, needsPlanning: 0, needsRelease: 0, parked: 0, vetoed: 0, blocksMain: 0,
   };
   for (const node of nodes) {
     const s = classifyIssue(node, lk);
     if (s.inPipeline) stats.inFlight++;
     if (s.ready) stats.ready++;
     if (s.planned) stats.planned++;
+    if (s.released) stats.released++;
+    if (s.objection) stats.objection++;
     if (s.parked) stats.parked++;
     if (s.vetoed) stats.vetoed++;
     if (s.blocksMain) stats.blocksMain++;
     if (isAutoPickable(s)) stats.pickable++;
-    // "needs planning" = wants to run (ready, not parked/vetoed/in-flight) but no spec yet
-    if (s.ready && !s.planned && !s.parked && !s.vetoed && !s.inPipeline) stats.needsPlanning++;
+    // "needs planning" = wants to run (ready, not parked/vetoed/objected/in-flight) but no spec yet
+    if (s.ready && !s.planned && !s.parked && !s.vetoed && !s.objection && !s.inPipeline) stats.needsPlanning++;
+    // "needs release" = planned + ready but the operator hasn't released it yet (PAN-2059)
+    if (s.ready && s.planned && !s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline) stats.needsRelease++;
   }
   return stats;
 }

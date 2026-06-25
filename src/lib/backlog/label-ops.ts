@@ -1,11 +1,11 @@
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL } from './pickup.js';
+import { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL, RELEASED_LABEL, OBJECTION_LABEL } from './pickup.js';
 
 const execAsync = promisify(exec);
 
-export { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL };
+export { PARKED_LABEL, VETOED_LABEL, BLOCKS_MAIN_LABEL, READY_LABEL, RELEASED_LABEL, OBJECTION_LABEL };
 
 /**
  * Add or remove a GitHub label on an issue. Non-GitHub issues are silently
@@ -31,3 +31,9 @@ export const applyIssueBlocksMainLabel = (id: string): Promise<void> => addIssue
 export const removeIssueBlocksMainLabel = (id: string): Promise<void> => removeIssueLabel(id, BLOCKS_MAIN_LABEL);
 export const applyIssueReadyLabel = (id: string): Promise<void> => addIssueLabel(id, READY_LABEL);
 export const removeIssueReadyLabel = (id: string): Promise<void> => removeIssueLabel(id, READY_LABEL);
+
+// PAN-2059 pickup-gate labels.
+export const applyIssueReleasedLabel = (id: string): Promise<void> => addIssueLabel(id, RELEASED_LABEL);
+export const removeIssueReleasedLabel = (id: string): Promise<void> => removeIssueLabel(id, RELEASED_LABEL);
+export const applyIssueObjectionLabel = (id: string): Promise<void> => addIssueLabel(id, OBJECTION_LABEL);
+export const removeIssueObjectionLabel = (id: string): Promise<void> => removeIssueLabel(id, OBJECTION_LABEL);

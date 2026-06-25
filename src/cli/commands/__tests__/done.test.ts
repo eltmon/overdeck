@@ -2,9 +2,10 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { augmentCommentWithWaiver, recordTestWaiver, verifyStrikeBranchMergedIntoMain } from '../done.js';
+import { getProjectConfigFromWorkspacePath, readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
 
 const execFileAsync = promisify(execFile);
 const CLI = join(process.cwd(), 'dist', 'cli', 'index.js');
@@ -62,35 +63,39 @@ describe('augmentCommentWithWaiver', () => {
 });
 
 describe('recordTestWaiver', () => {
-  it('appends a D-test-waived decision to .pan/continue.json (AC1/AC4)', async () => {
-    const workspacePath = mkdtempSync(join(tmpdir(), 'pan-done-waiver-'));
-    const continuePath = join(workspacePath, '.pan', 'continue.json');
+  it('appends a D-test-waived decision to the per-issue record (AC1/AC4)', async () => {
+    // Workspace path must end in feature-pan-<N> for issueId detection
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-done-waiver-feature-pan-1501-'));
+    const workspacePath = join(workspace, 'feature-pan-1501');
     mkdirSync(join(workspacePath, '.pan'), { recursive: true });
-    writeFileSync(
-      continuePath,
-      JSON.stringify({
-        version: '1',
-        issueId: 'PAN-1501',
-        created: '2026-01-01T00:00:00.000Z',
-        updated: '2026-01-01T00:00:00.000Z',
-        decisions: [{ id: 'D1', summary: 'Existing decision', recordedAt: '2026-01-01T00:00:00.000Z' }],
-        hazards: [],
-        resumePoint: { description: 'test', beadId: '', filesToRead: [] },
-        beadsMapping: {},
-        agentModel: 'test',
-        sessionHistory: [],
-      }),
-    );
+    const project = getProjectConfigFromWorkspacePath(workspacePath);
+    const now = '2026-01-01T00:00:00.000Z';
+    writeIssueRecordSync(project, 'PAN-1501', {
+      issueId: 'PAN-1501',
+      schemaVersion: 2,
+      created: now,
+      updated: now,
+      decisions: [{ id: 'D1', summary: 'Existing decision', recordedAt: now }],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      statusOverrides: {},
+      sessionHistory: [],
+      feedback: [],
+      pipeline: null,
+      closeOut: null,
+    });
 
     await recordTestWaiver(workspacePath, 'covered by existing test at abc123');
 
-    const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
-    expect(updated.decisions).toHaveLength(2);
-    expect(updated.decisions[1].id).toBe('D-test-waived');
-    expect(updated.decisions[1].summary).toBe(
+    const updated = readIssueRecordSync(project, 'PAN-1501');
+    expect(updated?.decisions).toHaveLength(2);
+    expect(updated?.decisions[1].id).toBe('D-test-waived');
+    expect(updated?.decisions[1].summary).toBe(
       'Test gate waived: covered by existing test at abc123',
     );
-    expect(updated.decisions[1].recordedAt).toMatch(/^\d{4}-/);
+    expect(updated?.decisions[1].recordedAt).toMatch(/^\d{4}-/);
+    rmSync(workspace, { recursive: true, force: true });
   });
 });
 

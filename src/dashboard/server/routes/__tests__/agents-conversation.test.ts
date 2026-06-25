@@ -235,6 +235,25 @@ describe('buildConversationResponse', () => {
     expect(mockParseOhmypiConversationMessages).not.toHaveBeenCalled();
   });
 
+  it('routes recorded pi agents through parsePiConversationMessages', async () => {
+    const piPath = '/home/testuser/.overdeck/agents/agent-PAN-473/2026-06-23T10:00:00_abc.jsonl';
+    mockResolveAgentHarness.mockResolvedValue('pi');
+    mockResolvePiSessionPath.mockResolvedValue(piPath);
+    mockExistsSync.mockReturnValue(true);
+    mockParsePiConversationMessages.mockResolvedValue({
+      messages: [{ role: 'assistant', content: 'Starting — how can I help you?' } as never],
+      ...PARSE_RESULT_BASE,
+    });
+
+    const result = await buildConversationResponse('agent-PAN-473');
+
+    expect(mockParsePiConversationMessages).toHaveBeenCalledWith(piPath);
+    expect(mockParseOhmypiConversationMessages).not.toHaveBeenCalled();
+    expect(mockParseEntireConversation).not.toHaveBeenCalled();
+    expect(result.messages).toHaveLength(1);
+    expect(result.streaming).toBe(false);
+  });
+
   // ── codex harness ─────────────────────────────────────────────────────────
 
   it('routes codex agents through parseCodexConversationMessages', async () => {

@@ -106,7 +106,6 @@ import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js'
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../../../lib/model-validation.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
-import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
@@ -328,29 +327,6 @@ function updateRegistryForAgentStart(issueId: string, workspacePath: string, age
   });
 }
 
-async function readWorkspaceContinueState(workspacePath: string): Promise<ContinueState | null> {
-  const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-  if (!existsSync(continuePath)) return null;
-  const raw = await readFile(continuePath, 'utf-8');
-  return JSON.parse(raw) as ContinueState;
-}
-
-async function writeWorkspaceContinueState(workspacePath: string, state: ContinueState): Promise<ContinueState> {
-  const panDir = join(workspacePath, PAN_DIRNAME);
-  const continuePath = join(panDir, PAN_CONTINUE_FILENAME);
-  await mkdir(panDir, { recursive: true });
-  const now = new Date().toISOString();
-  const next: ContinueState = {
-    ...state,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  const tmpPath = `${continuePath}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
-  await rename(tmpPath, continuePath);
-  return next;
-}
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
 
@@ -1045,6 +1021,13 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
       const sessionFile = await resolvePiSessionPath(id);
       if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
       const result = await parseOhmypiConversationMessages(sessionFile);
+      return { ...result, streaming: false };
+    }
+
+    if (harness === 'pi') {
+      const sessionFile = await resolvePiSessionPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parsePiConversationMessages(sessionFile);
       return { ...result, streaming: false };
     }
 
@@ -3195,43 +3178,19 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    // Write initial continue state (PAN-946: workspace-44p)
+    // Write start session entry to per-issue record (PAN-1919)
     try {
-      const { stdout: branchOut } = yield* Effect.promise(() => execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' }));
-      const { stdout: shaOut } = yield* Effect.promise(() => execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' }));
-      const { stdout: dirtyOut } = yield* Effect.promise(() => execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' }));
-      const branch = branchOut.trim();
-      const sha = shaOut.trim();
-      const dirty = dirtyOut.trim().length > 0;
-
-      const existing = yield* Effect.promise(() => readWorkspaceContinueState(workspacePath));
-      const now = new Date().toISOString();
-      const next: ContinueState = existing
-        ? {
-            ...existing,
-            issueId,
-            gitState: { branch, sha, dirty },
-            agentModel: spawnModel,
-            sessionHistory: [...existing.sessionHistory, { timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
-          }
-        : {
-            version: '1',
-            issueId,
-            created: now,
-            updated: now,
-            gitState: { branch, sha, dirty },
-            decisions: [],
-            hazards: [],
-            resumePoint: null,
-            beadsMapping: {},
-            agentModel: spawnModel,
-            sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
-            feedback: [],
-          };
-      yield* Effect.promise(() => writeWorkspaceContinueState(workspacePath, next));
-      console.log(`[start-agent] Wrote workspace continue state for ${issueId}`);
+      const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
+        yield* Effect.promise(() => import('../../../lib/pan-dir/record.js'));
+      const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      yield* Effect.promise(() => appendSessionEntry(recordProject, issueId, {
+        timestamp: new Date().toISOString(),
+        reason: 'start',
+        agentModel: spawnModel,
+      }));
+      console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
     } catch (continueErr: any) {
-      console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+      console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
     if (isRemote && workspaceMetadata) {

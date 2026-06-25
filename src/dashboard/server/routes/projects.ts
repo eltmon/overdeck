@@ -30,6 +30,7 @@ import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType }
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -365,6 +366,10 @@ async function collectSessionTreeNodes(
       });
     }
   }
+
+  // PAN-2053: attach read-only model-origin so the right-click MODEL inspector works
+  // in the project tree, not just the activity cockpit. Shared helper with command-deck.
+  enrichSessionsWithModelOrigin(sections, issueId);
 
   return sections.filter((s) => !isStaleLegacySession(s));
 }

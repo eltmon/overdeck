@@ -23,6 +23,10 @@ export interface PipelineState {
   vetoed: boolean;
   blocksMain: boolean;
   inPipeline: boolean;
+  /** PAN-2059: operator released the reviewed plan for pickup. */
+  released: boolean;
+  /** PAN-2059: AI raised a written objection in place of planning. */
+  objection: boolean;
   gate: 'auto' | 'promote' | 'vetoed';
 }
 
@@ -358,6 +362,8 @@ export function RationaleSidePanel({
   const [ready, setReady] = useState(!!node.state?.ready);
   const [parked, setParked] = useState(!!node.state?.parked);
   const [blocksMain, setBlocksMain] = useState(!!node.state?.blocksMain);
+  const [released, setReleased] = useState(!!node.state?.released);
+  const [objection, setObjection] = useState(!!node.state?.objection);
   const planned = !!node.state?.planned;
 
   useEffect(() => {
@@ -366,6 +372,8 @@ export function RationaleSidePanel({
     setReady(!!node.state?.ready);
     setParked(!!node.state?.parked);
     setBlocksMain(!!node.state?.blocksMain);
+    setReleased(!!node.state?.released);
+    setObjection(!!node.state?.objection);
   }, [node.issueId, node.gate, node.planning, node.state]);
 
   async function handleGateChange(v: string) {
@@ -380,11 +388,14 @@ export function RationaleSidePanel({
     try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
   }
 
-  // PAN-2006 WI-10: toggle ready / parked / blocks-main labels via the editor write-door.
-  async function toggleLabel(field: 'ready' | 'parked' | 'blocksMain', value: boolean) {
+  // PAN-2006 WI-10 + PAN-2059: toggle ready / parked / blocks-main / released / objection
+  // labels via the editor write-door.
+  async function toggleLabel(field: 'ready' | 'parked' | 'blocksMain' | 'released' | 'objection', value: boolean) {
     if (field === 'ready') setReady(value);
     if (field === 'parked') setParked(value);
     if (field === 'blocksMain') setBlocksMain(value);
+    if (field === 'released') setReleased(value);
+    if (field === 'objection') setObjection(value);
     setBusy(true);
     try {
       await fetch('/api/backlog/sequence/labels', {
@@ -395,8 +406,39 @@ export function RationaleSidePanel({
     } finally { setBusy(false); }
   }
 
+  // PAN-2059: kick off planning NOW (imperative), stopping before pickup so the operator
+  // reviews the plan and Releases it. Auto = non-interactive; Interactive = Q&A session.
+  async function startPlanning(mode: 'auto' | 'interactive') {
+    setBusy(true);
+    try {
+      await fetch(`/api/issues/${node.issueId}/start-planning`, {
+        method: 'POST',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ auto: mode === 'auto', autoStart: false }),
+      }).catch(() => {});
+    } finally { setBusy(false); }
+  }
+
+  // PAN-2059: accept the AI objection — clear it and park the item.
+  async function acceptObjectionAndPark() {
+    await toggleLabel('objection', false);
+    await toggleLabel('parked', true);
+  }
+
   const flags = buildPanelFlags(node);
   const clampedScore = Math.max(0, Math.min(100, node.score));
+
+  // PAN-2059 Plan → Release action buttons.
+  const BTN_BASE: CSSProperties = { fontSize: 11, fontWeight: 500, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--accent)', color: 'var(--foreground)' };
+  const BTN_PRIMARY: CSSProperties = { ...BTN_BASE, border: 'none', background: 'var(--primary)', color: 'var(--primary-foreground)' };
+  const BTN_DANGER: CSSProperties = { ...BTN_BASE, border: '1px solid color-mix(in srgb, var(--destructive) 50%, transparent)', background: 'color-mix(in srgb, var(--destructive) 8%, transparent)', color: 'var(--destructive-foreground)' };
+  const BTN_LINK: CSSProperties = { fontSize: 11, background: 'none', border: 'none', color: 'var(--muted-foreground)', textDecoration: 'underline', cursor: 'pointer', padding: 2 };
+  const stateChip = (tone: 'planned' | 'released'): CSSProperties => ({
+    fontSize: 10, fontWeight: 500, padding: '1px 7px', borderRadius: 5, border: '1px solid', whiteSpace: 'nowrap',
+    ...(tone === 'released'
+      ? { color: 'var(--success-foreground)', borderColor: 'color-mix(in srgb, var(--success) 40%, transparent)', background: 'color-mix(in srgb, var(--success) 12%, transparent)' }
+      : { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }),
+  });
 
   return (
     <div style={{
@@ -466,6 +508,57 @@ export function RationaleSidePanel({
       {flags.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
           {flags.map((f, i) => <span key={i} style={panelChipStyle(f.kind)}>{f.label}</span>)}
+        </div>
+      )}
+
+      {/* Plan → Release pickup flow + AI objection (PAN-2059) */}
+      {node.state && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
+          <div style={SECTION_LABEL}>Plan → Release · operator (PAN-2059) {busy && '…'}</div>
+          {objection ? (
+            // State 5 — Held for review / AI objection
+            <div style={{ border: '1px solid color-mix(in srgb, var(--destructive) 34%, transparent)', background: 'color-mix(in srgb, var(--destructive) 6%, transparent)', borderRadius: 9, padding: '10px 11px' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--destructive-foreground)', marginBottom: 6 }}>🛑 Held for review — AI objection</div>
+              <div style={{ fontSize: 11, color: 'var(--muted-foreground)', lineHeight: 1.5, marginBottom: 9 }}>
+                The planning agent objects to this work (doesn&apos;t make sense / would worsen the product / superseded).{' '}
+                {onIssueAction && (
+                  <button style={{ ...BTN_LINK, padding: 0 }} onClick={() => onIssueAction(node.issueId, 'browser')}>View the write-up on the issue ↗</button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button style={BTN_DANGER} onClick={() => toggleLabel('objection', false)} disabled={busy}>Override → Plan anyway</button>
+                <button style={BTN_BASE} onClick={acceptObjectionAndPark} disabled={busy}>Accept &amp; park</button>
+              </div>
+            </div>
+          ) : !planned ? (
+            // States 1–2 — needs plan / planning
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button style={BTN_PRIMARY} onClick={() => startPlanning('auto')} disabled={busy}>Plan (Auto)</button>
+                <button style={BTN_BASE} onClick={() => startPlanning('interactive')} disabled={busy}>⚑ Plan (Interactive)</button>
+              </div>
+              <div style={SECTION_HINT}>Generates the vBRIEF + beads. Auto runs end-to-end and stops before pickup; Interactive opens a Q&amp;A session. The plan must be Released before an agent can pick it up.</div>
+            </>
+          ) : !released ? (
+            // State 3 — planned, awaiting release
+            <>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={stateChip('planned')}>✓ planned</span>
+                <button style={BTN_PRIMARY} onClick={() => toggleLabel('released', true)} disabled={busy}>Release ▶</button>
+                <button style={BTN_LINK} onClick={() => startPlanning('auto')} disabled={busy}>Re-plan</button>
+              </div>
+              <div style={SECTION_HINT}>Plan ready — review it, then <b>Release</b> for pickup. <b>Not pickable until released.</b></div>
+            </>
+          ) : (
+            // State 4 — released / pickable
+            <>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={stateChip('released')}>▶ released · pickable</span>
+                <button style={BTN_LINK} onClick={() => toggleLabel('released', false)} disabled={busy}>Recall</button>
+              </div>
+              <div style={SECTION_HINT}>Released — eligible for pickup. Recall pulls it back to planned (held).</div>
+            </>
+          )}
         </div>
       )}
 

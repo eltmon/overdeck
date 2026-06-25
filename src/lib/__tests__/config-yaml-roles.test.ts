@@ -4,8 +4,11 @@ import {
   DEFAULT_MODEL_REFS,
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
+  computeModelOrigin,
   derefWorkhorse,
+  derivePercentPick,
   mergeConfigs,
+  pickPercentModelRef,
   resolveModel,
   stripProjectTtsEndpoint,
   type NormalizedConfig,
@@ -242,6 +245,92 @@ describe('role model configuration', () => {
       mid: 'gpt-5.4-mini',
     });
     expect(resolveModel('work', undefined, config)).toBe('gpt-5.4-mini');
+  });
+});
+
+describe('percent model pick derivation (PAN-2053)', () => {
+  const weighted: Pick<NormalizedConfig, 'workhorses' | 'roles'> = {
+    workhorses: WORKHORSES,
+    roles: {
+      work: { model: [
+        { model: 'workhorse:mid', weight: 70 },
+        { model: 'gpt-5.5', weight: 30 },
+      ] },
+      review: { model: 'workhorse:expensive' }, // scalar — no distribution to explain
+    },
+  };
+
+  it('derivePercentPick.chosen always equals pickPercentModelRef', () => {
+    const entries = weighted.roles!.work!.model as Array<{ model: string; weight: number }>;
+    for (let i = 0; i < 200; i++) {
+      const key = `work:PAN-${i}`;
+      expect(derivePercentPick(entries, key).chosen).toBe(pickPercentModelRef(entries, key));
+    }
+  });
+
+  it('bands are contiguous integer ranges covering [0,total), exactly one chosen by the bucket', () => {
+    const entries = weighted.roles!.work!.model as Array<{ model: string; weight: number }>;
+    const pick = derivePercentPick(entries, 'work:PAN-1832');
+    expect(pick.total).toBe(100);
+    // contiguous integer bands: each starts where the previous ended; widths = weights
+    let cursor = 0;
+    for (let i = 0; i < pick.bands.length; i++) {
+      const b = pick.bands[i];
+      expect(b.lo).toBe(cursor);
+      expect(b.hi - b.lo).toBe(entries[i].weight);
+      cursor = b.hi;
+    }
+    expect(cursor).toBe(pick.total);
+    // bucket is an integer in [0, total) and the chosen band contains it
+    expect(Number.isInteger(pick.bucket)).toBe(true);
+    expect(pick.bucket).toBeGreaterThanOrEqual(0);
+    expect(pick.bucket).toBeLessThan(pick.total);
+    const chosen = pick.bands.filter((b) => b.chosen);
+    expect(chosen).toHaveLength(1);
+    expect(pick.bucket).toBeGreaterThanOrEqual(chosen[0].lo);
+    expect(pick.bucket).toBeLessThan(chosen[0].hi);
+  });
+
+  it('proportional percentages spread across sequential common-prefix keys (PAN-2055)', () => {
+    // Regression: the old fnv1a32/2^32 bucketing clustered `work:PAN-19xx` keys into
+    // one band (kimi 68% / glm 30% / gpt 2%). The fmix32 + modulo bucket spreads a
+    // 33/33/34 distribution roughly evenly — each band within ±15pts of its weight.
+    const entries = [
+      { model: 'kimi-k2.7-code', weight: 33 },
+      { model: 'glm-5.2', weight: 33 },
+      { model: 'gpt-5.5', weight: 34 },
+    ];
+    const counts: Record<string, number> = {};
+    let total = 0;
+    for (let n = 1900; n <= 2060; n++) {
+      const m = pickPercentModelRef(entries, `work:PAN-${n}`);
+      counts[m] = (counts[m] ?? 0) + 1;
+      total++;
+    }
+    for (const e of entries) {
+      const share = (counts[e.model] ?? 0) / total;
+      expect(Math.abs(share - e.weight / 100), `${e.model} share ${(share * 100).toFixed(0)}%`).toBeLessThan(0.15);
+    }
+  });
+
+  it('computeModelOrigin returns null for a scalar role', () => {
+    expect(computeModelOrigin('review', 'review:PAN-1832', weighted)).toBeNull();
+  });
+
+  it('computeModelOrigin derefs workhorse refs and matches resolveModel', () => {
+    const spawnKey = 'work:PAN-1832';
+    const origin = computeModelOrigin('work', spawnKey, weighted);
+    expect(origin).not.toBeNull();
+    expect(origin!.spawnKey).toBe(spawnKey);
+    // resolved equals what the agent would actually spawn with for this exact key
+    expect(origin!.resolved).toBe(resolveModel('work', undefined, weighted, spawnKey));
+    // workhorse:mid is dereffed to the real model id for display
+    expect(origin!.distribution[0].model).toBe(derefWorkhorse('workhorse:mid', weighted));
+    expect(origin!.distribution[1].model).toBe('gpt-5.5');
+    // exactly one entry chosen, and it names the resolved model
+    const chosen = origin!.distribution.filter((d) => d.chosen);
+    expect(chosen).toHaveLength(1);
+    expect(chosen[0].model).toBe(origin!.resolved);
   });
 });
 

@@ -2,11 +2,12 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { readContinueState, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
@@ -40,6 +41,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
   let featureContextStr = '';
   let polyrepoContextStr = '';
   let pendingFeedbackStr = '';
+  let recordContextStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = await readPlanningContext(ctx.workspacePath);
@@ -64,6 +66,16 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
     polyrepoContextStr = buildPolyrepoContext(issueId, ctx.workspacePath);
     pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
+
+    try {
+      const project = { name: 'inferred', path: ctx.projectRoot };
+      const record = readRecordContinueViewSync(project, issueIdLower);
+      if (record) {
+        recordContextStr = JSON.stringify(record, null, 2);
+      }
+    } catch {
+      // Record may not exist yet for a fresh issue — silently skip
+    }
   }
 
   return await Effect.runPromise(renderPrompt({
@@ -86,6 +98,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
       TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
+      RECORD_CONTEXT: recordContextStr,
     },
   }));
 }
@@ -99,13 +112,9 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       ?? doc.plan.items.find(item => item.status === 'running')
       ?? doc.plan.items.find(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'blocked');
     if (!nextItem) return '';
-    // PAN-977: continue-state readers internally call `getContinuesDir(projectRoot)`
-    // which appends `.pan/continues/`. Callers must pass the workspace root, NOT the
-    // `.pan` subdirectory, to avoid the double-`.pan` path bug.
     // PAN-1872: guard against an undefined issueId so a malformed context does not
     // mask a sync-main conflict with `Cannot read properties of undefined (reading 'toUpperCase')`.
     const normalizedIssueId = (issueId ?? '').toUpperCase();
-    const cont = await Effect.runPromise(readContinueState(workspacePath, normalizedIssueId));
     const currentItemIds = doc.plan.items
       .filter(item => item.status === 'running' || item.id === nextItem.id)
       .map(item => item.id);
@@ -139,9 +148,10 @@ async function readPendingFeedback(workspacePath: string): Promise<string> {
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
     try {
-      const cont = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-      if (cont?.feedback?.length) {
-        continueEntries.push(...cont.feedback)
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      const recordView = readRecordContinueViewSync(project, issueId);
+      if (recordView?.feedback?.length) {
+        continueEntries.push(...recordView.feedback);
       }
     } catch { /* ignore */ }
   }
@@ -359,9 +369,10 @@ export async function readPlanningContext(workspacePath: string): Promise<string
   if (!issueId) return null;
 
   try {
-    const workspaceContinue = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-    if (workspaceContinue) {
-      return JSON.stringify(workspaceContinue, null, 2)
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const recordView = readRecordContinueViewSync(project, issueId);
+    if (recordView) {
+      return JSON.stringify(recordView, null, 2);
     }
   } catch { /* ignore */ }
 

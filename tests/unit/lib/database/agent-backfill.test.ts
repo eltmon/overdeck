@@ -159,6 +159,74 @@ describe('backfillAgentsFromStateJsonSync', () => {
   });
 });
 
+describe('PAN-1919: rebuild-agents prefers record harness/model over state.json', () => {
+  it('uses record harness/model when a record exists for the agent issue', () => {
+    writeAgentState('agent-pan-1919', {
+      id: 'agent-pan-1919',
+      issueId: 'PAN-1919',
+      role: 'work',
+      harness: 'pi',
+      model: 'state-model',
+      status: 'stopped',
+      workspace: '/workspaces/feature-pan-1919',
+      startedAt: '2026-06-21T00:00:00.000Z',
+    });
+
+    backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(),
+      readHarnessModel: () => ({ harness: 'claude-code', model: 'record-model' }),
+    });
+
+    const row = getAgent('agent-pan-1919');
+    expect(row?.harness).toBe('claude-code');
+    expect(row?.model).toBe('record-model');
+  });
+
+  it('falls back to state.json harness/model when no record exists', () => {
+    writeAgentState('agent-pan-1919b', {
+      id: 'agent-pan-1919b',
+      issueId: 'PAN-1919',
+      role: 'work',
+      harness: 'pi',
+      model: 'state-model',
+      status: 'stopped',
+      workspace: '/workspaces/feature-pan-1919',
+      startedAt: '2026-06-21T00:00:00.000Z',
+    });
+
+    backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(),
+      readHarnessModel: () => null,
+    });
+
+    const row = getAgent('agent-pan-1919b');
+    expect(row?.harness).toBe('pi');
+    expect(row?.model).toBe('state-model');
+  });
+
+  it('uses record value when record harness/model differs from state.json', () => {
+    writeAgentState('agent-pan-1919c', {
+      id: 'agent-pan-1919c',
+      issueId: 'PAN-1919',
+      role: 'work',
+      harness: 'codex',
+      model: 'gpt-5.5',
+      status: 'stopped',
+      workspace: '/workspaces/feature-pan-1919',
+      startedAt: '2026-06-21T00:00:00.000Z',
+    });
+
+    backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(),
+      readHarnessModel: () => ({ harness: 'claude-code', model: 'claude-opus-4-8' }),
+    });
+
+    const row = getAgent('agent-pan-1919c');
+    expect(row?.harness).toBe('claude-code');
+    expect(row?.model).toBe('claude-opus-4-8');
+  });
+});
+
 describe('PAN-1908 backfill isolation (AC-2)', () => {
   it('only backfillAgentsFromStateJsonSync reaches into the agents directory', () => {
     const { readFileSync } = require('node:fs');

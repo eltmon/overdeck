@@ -1,0 +1,60 @@
+{
+  "issueId": "PAN-2022",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-06-25T02:49:14.044Z",
+  "updated": "2026-06-25T02:57:36.749Z",
+  "pipeline": {
+    "issueId": "PAN-2022",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-25T02:57:36.729Z",
+    "testNotes": "Skipped: issue is already merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 1175,
+            "output": 367,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 12941,
+            "output": 13728,
+            "cacheRead": 709806,
+            "cacheWrite": 102736
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 1175,
+          "output": 367,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 12941,
+          "output": 13728,
+          "cacheRead": 709806,
+          "cacheWrite": 102736
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 1.404908,
+        "pricingAsOf": "2026-06-25T02:57:36.749Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}

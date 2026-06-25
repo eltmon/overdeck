@@ -12,6 +12,8 @@ import {
   applyIssueReadyLabel, removeIssueReadyLabel,
   applyIssueParkedLabel, removeIssueParkedLabel,
   applyIssueBlocksMainLabel, removeIssueBlocksMainLabel,
+  applyIssueReleasedLabel, removeIssueReleasedLabel,
+  applyIssueObjectionLabel, removeIssueObjectionLabel,
 } from '../../../lib/backlog/label-ops.js';
 import {
   normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats,
@@ -365,6 +367,10 @@ const postBacklogLabelsRoute = HttpRouter.add(
       if (typeof body['ready'] === 'boolean') await (body['ready'] ? applyIssueReadyLabel : removeIssueReadyLabel)(issueId);
       if (typeof body['parked'] === 'boolean') await (body['parked'] ? applyIssueParkedLabel : removeIssueParkedLabel)(issueId);
       if (typeof body['blocksMain'] === 'boolean') await (body['blocksMain'] ? applyIssueBlocksMainLabel : removeIssueBlocksMainLabel)(issueId);
+      // PAN-2059 pickup-gate toggles. Release (operator's "go" after reviewing the plan)
+      // and Objection override/clear both flow through here.
+      if (typeof body['released'] === 'boolean') await (body['released'] ? applyIssueReleasedLabel : removeIssueReleasedLabel)(issueId);
+      if (typeof body['objection'] === 'boolean') await (body['objection'] ? applyIssueObjectionLabel : removeIssueObjectionLabel)(issueId);
       return jsonResponse({ status: 'ok', issueId });
     });
   })),

@@ -30,6 +30,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../transcript-landing.js');
     vi.doUnmock('../agent-runtime-mirror.js');
     vi.doUnmock('../runtimes/pi-fifo.js');
+    vi.doUnmock('../runtimes/ohmypi-fifo.js');
     vi.doUnmock('../harness-resolve.js');
     delete process.env.OVERDECK_HOME;
     rmSync(tempHome, { recursive: true, force: true });
@@ -473,6 +474,103 @@ describe('AgentState role persistence', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('retry with --host to override'));
     warnSpy.mockRestore();
     rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('PAN-2017: fails and stops a strike spawn when kickoff delivery fails', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-strike-kickoff-fail-'));
+    const agentId = 'strike-pan-2017';
+    const agentDir = join(tempHome, 'agents', agentId);
+    const readyPath = join(agentDir, 'ready.json');
+    const fifoPath = join(agentDir, 'rpc.in');
+    let sessionAlive = false;
+    const createSessionAsync = vi.fn(async () => {
+      sessionAlive = true;
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(readyPath, JSON.stringify({ agentId, sessionId: 'omp-session' }));
+    });
+    const killSessionAsync = vi.fn(async () => {
+      sessionAlive = false;
+    });
+    const writeOhmypiCommandSync = vi.fn(() => {
+      throw new Error('fifo write failed');
+    });
+    const emitActivityEntry = vi.fn();
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const originalHome = process.env.HOME;
+    process.env.HOME = tempHome;
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-25T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(sessionAlive)),
+      sessionExistsSync: vi.fn(() => sessionAlive),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+      emitActivityTts: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
+    }));
+    vi.doMock('../workspace-manager.js', () => ({
+      preTrustDirectory: vi.fn(),
+    }));
+    vi.doMock('../github-app.js', () => ({
+      isGitHubAppConfigured: vi.fn(() => false),
+    }));
+    vi.doMock('../memory/injection.js', () => ({
+      injectPromptTimeMemory: vi.fn(async () => ({ context: '' })),
+    }));
+    vi.doMock('../runtimes/ohmypi-fifo.js', () => ({
+      OhmypiNotReady: class OhmypiNotReady extends Error {},
+      ohmypiFifoPaths: vi.fn(() => ({ agentDir, readyPath, fifoPath })),
+      createOhmypiFifo: vi.fn(() => Effect.succeed(fifoPath)),
+      writeOhmypiCommandSync,
+    }));
+
+    try {
+      const { getAgentStateSync, spawnAgent } = await import('../agents.js');
+      const spawn = spawnAgent({
+        issueId: 'PAN-2017',
+        workspace,
+        role: 'strike',
+        harness: 'ohmypi',
+        model: 'claude-sonnet-4-6',
+        prompt: 'do the strike',
+      });
+
+      await expect(spawn).rejects.toThrow(/kickoff delivery failed/);
+
+      expect(createSessionAsync).toHaveBeenCalled();
+      expect(writeOhmypiCommandSync).toHaveBeenCalled();
+      expect(killSessionAsync).toHaveBeenCalled();
+      expect(sessionAlive).toBe(false);
+      expect(getAgentStateSync(agentId)).toMatchObject({
+        status: 'stopped',
+        kickoffDelivered: false,
+        lastFailureReason: 'kickoff delivery failed',
+      });
+      expect(emitActivityEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Work agent started for PAN-2017',
+      }));
+    } finally {
+      process.env.HOME = originalHome;
+      consoleErrorSpy.mockRestore();
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   it('does not block when workspace stack health is healthy', async () => {

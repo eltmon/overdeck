@@ -937,6 +937,13 @@ export interface AgentState {
   /** Unified role primitive (PAN-1048). */
   role: Role;
   model: string;
+  /**
+   * The exact spawn key fed to the weighted-distribution model picker at spawn
+   * (`${role}:${issueId}`), persisted so the dashboard MODEL inspector (PAN-2053)
+   * can show the faithful FNV-1a derivation without re-guessing the key's form.
+   * Undefined for scalar-role agents and for agents spawned before PAN-2053.
+   */
+  modelSpawnKey?: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
@@ -3388,7 +3395,8 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
-  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${issueId}` });
+  const modelSpawnKey = `${role}:${issueId}`;
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
 
   if (role === 'work') {
     return spawnAgent({
@@ -3442,6 +3450,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     harness: resolvedHarness,
     role,
     model: selectedModel,
+    modelSpawnKey,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
@@ -3717,7 +3726,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   // Determine model based on role configuration
-  const selectedModel = determineModel({ model: options.model, role, spawnKey: `${role}:${options.issueId}` });
+  const modelSpawnKey = `${role}:${options.issueId}`;
+  const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
@@ -3753,6 +3763,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     harness: resolvedHarness,
     role,
     model: selectedModel,
+    modelSpawnKey,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
@@ -3853,9 +3864,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Write prompt to file for complex prompts (avoids shell escaping issues)
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
+  const tracksKickoffDelivery = role === 'work' || role === 'strike';
   if (prompt) {
     await writeFileAsync(promptFile, prompt);
-    if (role === 'work') {
+    if (tracksKickoffDelivery) {
       state.kickoffDelivered = false;
       saveAgentStateSync(state);
     }
@@ -3979,14 +3991,18 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (prompt && resolvedHarness === 'ohmypi') {
     try {
       await writeOhmypiAgentPrompt(agentId, prompt);
-      if (role === 'work') {
+      if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);
       }
     } catch (err) {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
-      if (role === 'work') {
+      if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
+        if (role === 'strike') {
+          await Effect.runPromise(stopAgent(agentId));
+          throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
         return state;
       }
     }
@@ -3996,15 +4012,19 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
     const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
     if (delivery.ok) {
-      if (role === 'work') {
+      if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);
       }
-    } else if (role === 'work') {
+    } else if (tracksKickoffDelivery) {
       if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
         await recordStartupSessionExit(state, options.issueId, role);
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
+      if (role === 'strike') {
+        await Effect.runPromise(stopAgent(agentId));
+        throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
+      }
       return state;
     }
   }

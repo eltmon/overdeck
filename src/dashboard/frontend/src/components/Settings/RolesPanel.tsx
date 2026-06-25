@@ -615,7 +615,7 @@ export function RolesPanel() {
                               </div>
                             );
                           })}
-                          <div className="flex gap-2 pt-1">
+                          <div className="flex items-center gap-2 pt-1">
                             <button
                               type="button"
                               disabled={saveMutation.isPending}
@@ -624,9 +624,15 @@ export function RolesPanel() {
                             >
                               + Add model
                             </button>
+                            <span
+                              className={`text-[11px] tabular-nums ${draftTotal === 100 ? 'text-muted-foreground' : 'text-destructive'}`}
+                              data-testid="distribution-total"
+                            >
+                              Total: {draftTotal}% {draftTotal === 100 ? '' : '(must be 100)'}
+                            </span>
                             <button
                               type="button"
-                              disabled={saveMutation.isPending || draftRows.filter((e) => e.weight > 0).length === 0}
+                              disabled={saveMutation.isPending || draftTotal !== 100}
                               className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50 ml-auto"
                               onClick={saveDistribution}
                             >
@@ -634,7 +640,8 @@ export function RolesPanel() {
                             </button>
                           </div>
                           <p className="text-[11px] leading-snug text-muted-foreground">
-                            Weights are relative — each spawn is routed statistically based on these proportions.
+                            Percentages must total 100. Selection is deterministic — the same issue always
+                            routes to the same model; change a percentage and only future spawns shift.
                           </p>
                         </div>
                       ) : (

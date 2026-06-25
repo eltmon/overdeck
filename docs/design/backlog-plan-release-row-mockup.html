@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Backlog detail — Plan → Release gate (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<style>
+  /* --- real Overdeck dark tokens (copied from src/dashboard/frontend/src/index.css .dark) --- */
+  :root {
+    --background:#080b10; --foreground:#e5e7eb;
+    --card:#0c1018; --card-2:#11161f;
+    --primary:oklch(0.588 0.217 264); --primary-foreground:#ffffff;
+    --accent:color-mix(in srgb, white 8%, transparent);
+    --muted:color-mix(in srgb, white 4%, transparent);
+    --muted-foreground:#9ca3af;
+    --border:color-mix(in srgb, white 6%, transparent);
+    --destructive:#f87171; --destructive-foreground:#fca5a5;
+    --info:#3b82f6; --info-foreground:#60a5fa;
+    --success:#10b981; --success-foreground:#34d399;
+    --warning:#f59e0b; --warning-foreground:#fbbf24;
+    --signal-review:#a855f7; --signal-review-foreground:#c084fc;
+    --signal-cost:#06b6d4; --signal-cost-foreground:#22d3ee;
+    --color-neutral-400:#9ca3af;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:
+      radial-gradient(900px 500px at 18% -8%, color-mix(in srgb,var(--info) 8%,transparent), transparent 60%),
+      var(--background);
+    color:var(--foreground);
+    font-family:'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    font-weight:500; font-size:13px; line-height:1.45;
+    padding:34px 32px 80px;
+  }
+  .mono { font-family:ui-monospace,'SF Mono',Menlo,monospace; }
+  h1 { font-size:19px; font-weight:500; margin:0 0 4px; letter-spacing:-.01em; }
+  .sub { color:var(--muted-foreground); font-size:12.5px; margin:0 0 26px; max-width:880px; line-height:1.55; }
+  .sub b { color:var(--foreground); font-weight:500; }
+  .layout { display:flex; gap:26px; align-items:flex-start; flex-wrap:wrap; }
+
+  /* ---- inspector / detail panel ---- */
+  .panel { width:430px; flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.45); }
+  .phead { padding:15px 17px 13px; border-bottom:1px solid var(--border); background:linear-gradient(var(--card-2),var(--card)); }
+  .phead .r1 { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .iid { font-size:11px; color:var(--muted-foreground); }
+  .heat { width:6px; height:6px; border-radius:2px; background:var(--warning); }
+  .sz { margin-left:auto; font-size:9px; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:1px 6px; }
+  .ttl { font-size:14px; font-weight:500; line-height:1.3; }
+  .chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:10px; }
+  .chip { font-size:9px; font-weight:500; padding:1px 6px; border-radius:4px; border:1px solid; display:inline-flex; gap:3px; align-items:center; white-space:nowrap; }
+  .chip.ready    { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 32%,transparent); background:color-mix(in srgb,var(--success) 9%,transparent); }
+  .chip.released { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 40%,transparent); background:color-mix(in srgb,var(--success) 12%,transparent); }
+  .chip.pickable { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 32%,transparent); background:color-mix(in srgb,var(--success) 9%,transparent); }
+  .chip.planned  { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 30%,transparent); background:color-mix(in srgb,var(--info) 8%,transparent); }
+  .chip.planning { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 9%,transparent); }
+  .chip.parked   { color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 34%,transparent); background:color-mix(in srgb,var(--warning) 9%,transparent); }
+  .chip.needsplan{ color:var(--muted-foreground); border-color:var(--border); background:var(--accent); }
+  .dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+  .dot.spin { animation:pulse 1.1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.35;} 50%{opacity:1;} }
+
+  /* ---- detail rows ---- */
+  .rows { padding:6px 4px 10px; }
+  .row { display:flex; align-items:flex-start; gap:12px; padding:11px 13px; border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent); }
+  .row:last-child { border-bottom:0; }
+  .row .k { width:74px; flex:0 0 auto; color:var(--muted-foreground); font-size:11px; padding-top:3px; text-transform:uppercase; letter-spacing:.06em; }
+  .row .v { flex:1; min-width:0; }
+  .row.gate { background:color-mix(in srgb,var(--info) 4%,transparent); }
+  .row.gate.held { background:color-mix(in srgb,var(--warning) 5%,transparent); }
+  .ctrlline { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .cap { color:var(--muted-foreground); font-size:11px; margin-top:7px; line-height:1.5; }
+  .cap b { color:var(--foreground); font-weight:500; }
+
+  /* ---- buttons ---- */
+  button { font:inherit; font-weight:500; cursor:pointer; }
+  .btn { border-radius:8px; padding:5px 12px; font-size:12px; border:1px solid var(--border); background:var(--accent); color:var(--foreground); display:inline-flex; align-items:center; gap:6px; }
+  .btn:hover { background:color-mix(in srgb,white 12%,transparent); }
+  .btn.primary { background:var(--primary); border-color:transparent; color:var(--primary-foreground); }
+  .btn.primary:hover { filter:brightness(1.08); }
+  .btn.ghost { background:transparent; }
+  .btn.sm { padding:3px 8px; font-size:11px; border-radius:6px; }
+  .link { background:none; border:0; color:var(--muted-foreground); font-size:11px; text-decoration:underline; text-underline-offset:2px; padding:2px; }
+  .link:hover { color:var(--foreground); }
+  .caret { font-size:9px; opacity:.8; }
+
+  /* split button + menu */
+  .split { position:relative; display:inline-flex; }
+  .menu { position:absolute; top:calc(100% + 5px); left:0; z-index:9; background:var(--card-2); border:1px solid var(--border); border-radius:9px; padding:5px; min-width:212px; box-shadow:0 14px 34px rgba(0,0,0,.5); display:none; }
+  .menu.open { display:block; }
+  .mi { display:flex; flex-direction:column; gap:1px; padding:7px 9px; border-radius:6px; cursor:pointer; }
+  .mi:hover { background:var(--accent); }
+  .mi .t { font-size:12px; }
+  .mi .d { font-size:10.5px; color:var(--muted-foreground); }
+
+  /* toggle */
+  .toggle { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .toggle button { background:transparent; border:0; color:var(--muted-foreground); font-size:11.5px; padding:5px 12px; }
+  .toggle button.on { background:var(--accent); color:var(--foreground); }
+  .toggle button.on.warn { background:color-mix(in srgb,var(--warning) 16%,transparent); color:var(--warning-foreground); }
+
+  .banner { margin-top:9px; font-size:11px; border-radius:8px; padding:7px 10px; border:1px solid; line-height:1.5; }
+  .banner.amber { color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 32%,transparent); background:color-mix(in srgb,var(--warning) 8%,transparent); }
+  .banner.green { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 32%,transparent); background:color-mix(in srgb,var(--success) 8%,transparent); }
+
+  /* ---- legend / explainer ---- */
+  .aside { width:430px; flex:1 1 380px; max-width:560px; }
+  .card2 { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:18px; }
+  .card2 h3 { margin:0 0 12px; font-size:13px; font-weight:500; }
+  .gatelist { display:flex; flex-direction:column; gap:13px; }
+  .gateitem { display:flex; gap:11px; }
+  .gnum { flex:0 0 auto; width:23px; height:23px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:11px; border:1px solid var(--border); background:var(--accent); }
+  .gateitem .gt { font-size:12.5px; margin-bottom:2px; }
+  .gateitem .gd { font-size:11.5px; color:var(--muted-foreground); line-height:1.5; }
+  .gnum.b1 { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 40%,transparent); }
+  .gnum.b2 { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 40%,transparent); }
+  .gnum.b3 { color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 40%,transparent); }
+  .flow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--muted-foreground); margin-top:4px; }
+  .pill { border:1px solid var(--border); border-radius:6px; padding:2px 8px; color:var(--foreground); }
+  .arr { opacity:.55; }
+  table.diff { width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.diff td { padding:6px 8px; border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent); vertical-align:top; }
+  table.diff td.h { color:var(--muted-foreground); width:96px; }
+  .old { color:var(--muted-foreground); }
+  .new { color:var(--success-foreground); }
+
+  /* filmstrip */
+  .strip { margin-top:30px; }
+  .strip h2 { font-size:13px; font-weight:500; color:var(--muted-foreground); text-transform:uppercase; letter-spacing:.08em; margin:0 0 14px; }
+  .frames { display:flex; gap:14px; flex-wrap:wrap; }
+  .frame { width:268px; background:var(--card); border:1px solid var(--border); border-radius:11px; padding:13px 14px; }
+  .frame .fh { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-foreground); margin-bottom:10px; display:flex; gap:7px; align-items:center; }
+  .frame .fn { font-family:ui-monospace,monospace; color:var(--foreground); }
+  .miniline { display:flex; align-items:center; gap:7px; margin:9px 0 6px; flex-wrap:wrap; }
+  .mbtn { font-size:11px; border-radius:7px; padding:4px 10px; border:1px solid var(--border); background:var(--accent); }
+  .mbtn.primary { background:var(--primary); color:#fff; border-color:transparent; }
+  .frame .fc { font-size:10.5px; color:var(--muted-foreground); line-height:1.5; margin-top:7px; }
+</style>
+</head>
+<body>
+  <h1>Backlog item detail — the <span class="mono">Plan&nbsp;→&nbsp;Release</span> pickup gate</h1>
+  <p class="sub">
+    A new row in the backlog item's detail panel with <b>two sequential operator gates on one line</b>:
+    <b>Plan</b> (Auto or Interactive) produces the spec + beads, then a <b>Release</b> control appears on the
+    same row to let the item be picked up. This is a <b>separate gate from Hold</b> (park) and separate from
+    any automatic planning — the operator drives plan, reviews it, then deliberately releases.
+    The panel on the left is <b>live — click through it.</b>
+  </p>
+
+  <div class="layout">
+    <!-- ====================== LIVE INTERACTIVE PANEL ====================== -->
+    <div class="panel">
+      <div class="phead">
+        <div class="r1">
+          <span class="heat"></span>
+          <span class="iid mono">PAN-1982</span>
+          <span class="sz">M · high</span>
+        </div>
+        <div class="ttl">Revive convoy review as a configurable opt-in (quick stays default)</div>
+        <div class="chips" id="topchips"></div>
+      </div>
+
+      <div class="rows">
+        <div class="row">
+          <div class="k">Labels</div>
+          <div class="v"><span style="color:var(--muted-foreground);font-size:11.5px">enhancement · review · substrate</span></div>
+        </div>
+
+        <!-- NEW: Plan -> Release gate -->
+        <div class="row gate" id="pickupRow">
+          <div class="k">Pickup</div>
+          <div class="v">
+            <div class="ctrlline" id="pickupCtrl"><!-- injected by JS --></div>
+            <div class="cap" id="pickupCap"><!-- injected by JS --></div>
+          </div>
+        </div>
+
+        <!-- SEPARATE: Hold gate -->
+        <div class="row gate" id="holdRow">
+          <div class="k">Hold</div>
+          <div class="v">
+            <div class="ctrlline">
+              <div class="toggle">
+                <button id="holdActive" class="on" onclick="setHold(false)">Active</button>
+                <button id="holdOn" onclick="setHold(true)">On hold</button>
+              </div>
+              <span class="chip parked" id="holdChip" style="display:none">⏸ parked</span>
+            </div>
+            <div class="cap" id="holdCap">Independent kill-switch. Holding an item parks it even if it is planned and released — nothing gets picked up while On hold.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================== EXPLAINER ====================== -->
+    <div class="aside">
+      <div class="card2">
+        <h3>Three independent gates</h3>
+        <div class="gatelist">
+          <div class="gateitem">
+            <div class="gnum b1">1</div>
+            <div>
+              <div class="gt"><b>Plan</b> — Auto or Interactive</div>
+              <div class="gd">Operator clicks Plan and picks the mode. <b>Auto</b> runs <span class="mono">pan plan&nbsp;--auto&nbsp;--auto-start-off</span> end-to-end; <b>Interactive</b> opens a planning session with Q&amp;A. Produces the vBRIEF spec + beads → state becomes <b>Planned</b>.</div>
+            </div>
+          </div>
+          <div class="gateitem">
+            <div class="gnum b2">2</div>
+            <div>
+              <div class="gt"><b>Release</b> — appears once Planned</div>
+              <div class="gd">On the <b>same row</b>, a Release control appears. Until the operator clicks it, a planned item is <b>not</b> pickable — this is the review checkpoint. Release → eligible for pickup by the flywheel / a work agent.</div>
+            </div>
+          </div>
+          <div class="gateitem">
+            <div class="gnum b3">3</div>
+            <div>
+              <div class="gt"><b>Hold</b> — separate gate</div>
+              <div class="gd">An orthogonal park/pause. Independent of Plan and Release: you can hold an item at any stage and it will not be picked up, without losing its plan or release state.</div>
+            </div>
+          </div>
+        </div>
+        <div class="flow">
+          <span class="pill">Needs plan</span><span class="arr">→</span>
+          <span class="pill">⟳ Planning</span><span class="arr">→</span>
+          <span class="pill">Planned (held)</span><span class="arr">→</span>
+          <span class="pill">Released</span><span class="arr">→</span>
+          <span class="pill">Picked up</span>
+        </div>
+      </div>
+
+      <div class="card2">
+        <h3>How this differs from today</h3>
+        <table class="diff">
+          <tr><td class="h">Today</td><td class="old">An item is auto-pickable the moment it is <span class="mono">ready</span> <b>AND</b> <span class="mono">planned</span> — <span class="mono">isAutoPickable = ready &amp;&amp; planned &amp;&amp; !parked &amp;&amp; !vetoed &amp;&amp; !inPipeline</span>. Having a plan = it can be grabbed. No review beat between "a plan exists" and "go work it."</td></tr>
+          <tr><td class="h">Proposed</td><td class="new">Insert an explicit <b>Release</b> gate between Planned and pickable. Planned alone no longer makes it pickable; the operator reviews the plan, then Releases. Plan is now an explicit one-click action (Auto/Interactive) right on the detail row, not buried in a menu and not only an automatic flywheel step.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== STATIC FILMSTRIP OF THE 4 STATES ====================== -->
+  <div class="strip">
+    <h2>The Pickup row across its four states</h2>
+    <div class="frames">
+      <div class="frame">
+        <div class="fh"><span class="fn">PICKUP</span> · needs plan</div>
+        <div class="miniline">
+          <span class="mbtn primary">Plan ▾</span>
+        </div>
+        <div class="miniline"><span class="chip needsplan">needs plan</span></div>
+        <div class="fc">Click Plan → choose <b>Auto</b> or <b>Interactive</b>.</div>
+      </div>
+      <div class="frame">
+        <div class="fh"><span class="fn">PICKUP</span> · planning</div>
+        <div class="miniline">
+          <span class="chip planning"><span class="dot spin"></span> planning (auto)…</span>
+          <span class="link">Cancel</span>
+        </div>
+        <div class="fc">Planning agent is producing the spec + beads (machine working = blue).</div>
+      </div>
+      <div class="frame">
+        <div class="fh"><span class="fn">PICKUP</span> · planned, held</div>
+        <div class="miniline">
+          <span class="chip planned">✓ planned</span>
+          <span class="mbtn primary">Release ▶</span>
+        </div>
+        <div class="fc"><b>Review the plan</b>, then Release. Not pickable yet — this is the checkpoint.</div>
+      </div>
+      <div class="frame">
+        <div class="fh"><span class="fn">PICKUP</span> · released</div>
+        <div class="miniline">
+          <span class="chip released">▶ released</span>
+          <span class="chip pickable">pickable · wave 2</span>
+          <span class="link">Recall</span>
+        </div>
+        <div class="fc">Eligible for pickup. <b>Recall</b> pulls it back to Planned (held).</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---- live panel state machine ----
+  const S = { stage: 'needsplan', planMode: null, held: false };
+
+  function topChips() {
+    const c = [];
+    if (S.held) c.push('<span class="chip parked">⏸ parked</span>');
+    if (S.stage === 'needsplan') c.push('<span class="chip needsplan">needs plan</span>');
+    if (S.stage === 'planning')  c.push('<span class="chip planning"><span class="dot spin"></span> planning</span>');
+    if (S.stage === 'planned')   c.push('<span class="chip planned">✓ planned</span>');
+    if (S.stage === 'released') { c.push('<span class="chip planned">✓ planned</span>');
+      c.push('<span class="chip released">▶ released</span>');
+      if (!S.held) c.push('<span class="chip pickable">pickable</span>'); }
+    document.getElementById('topchips').innerHTML = c.join('');
+  }
+
+  function render() {
+    const ctrl = document.getElementById('pickupCtrl');
+    const cap  = document.getElementById('pickupCap');
+
+    if (S.stage === 'needsplan') {
+      ctrl.innerHTML = `
+        <div class="split">
+          <button class="btn primary" onclick="togglePlanMenu(event)">Plan <span class="caret">▾</span></button>
+          <div class="menu" id="planMenu">
+            <div class="mi" onclick="startPlan('auto')"><span class="t">Auto</span><span class="d">Non-interactive — plan end-to-end, stop before pickup</span></div>
+            <div class="mi" onclick="startPlan('interactive')"><span class="t">Interactive</span><span class="d">Open a planning session with Q&amp;A</span></div>
+          </div>
+        </div>`;
+      cap.innerHTML = 'No spec yet. <b>Plan</b> this item to generate its vBRIEF + beads.';
+    } else if (S.stage === 'planning') {
+      ctrl.innerHTML = `<span class="chip planning"><span class="dot spin"></span> planning (${S.planMode})…</span>
+        <button class="link" onclick="cancelPlan()">Cancel</button>`;
+      cap.innerHTML = 'Planning agent is running. The row will switch to <b>Release</b> when the plan is ready.';
+    } else if (S.stage === 'planned') {
+      ctrl.innerHTML = `<span class="chip planned">✓ planned</span>
+        <button class="btn primary" onclick="release()">Release <span class="caret">▶</span></button>
+        <button class="link" onclick="replan()">Re-plan</button>`;
+      cap.innerHTML = '<b>Plan ready.</b> Review the spec + beads, then <b>Release</b> to let an agent pick it up. Until released it is <b>not</b> pickable.';
+    } else if (S.stage === 'released') {
+      ctrl.innerHTML = `<span class="chip released">▶ released</span>
+        ${S.held ? '' : '<span class="chip pickable">pickable · wave 2</span>'}
+        <button class="link" onclick="recall()">Recall</button>`;
+      cap.innerHTML = S.held
+        ? 'Released, but <b>On hold</b> — will not be picked up until the hold is cleared.'
+        : 'Released — eligible for pickup. The flywheel will grab it when a slot frees (modeled in wave 2).';
+    }
+    // banner about hold interaction
+    topChips();
+  }
+
+  function togglePlanMenu(e){ e.stopPropagation(); document.getElementById('planMenu').classList.toggle('open'); }
+  function startPlan(mode){ S.planMode = mode; S.stage='planning'; render();
+    setTimeout(()=>{ if(S.stage==='planning'){ S.stage='planned'; render(); } }, 1600); }
+  function cancelPlan(){ S.stage='needsplan'; S.planMode=null; render(); }
+  function replan(){ S.stage='needsplan'; S.planMode=null; render(); }
+  function release(){ S.stage='released'; render(); }
+  function recall(){ S.stage='planned'; render(); }
+
+  function setHold(on){
+    S.held = on;
+    document.getElementById('holdActive').classList.toggle('on', !on);
+    document.getElementById('holdOn').classList.toggle('on', on);
+    document.getElementById('holdOn').classList.toggle('warn', on);
+    document.getElementById('holdChip').style.display = on ? 'inline-flex' : 'none';
+    document.getElementById('holdRow').classList.toggle('held', on);
+    const cap = document.getElementById('holdCap');
+    cap.innerHTML = on
+      ? '<b>On hold.</b> Parked regardless of plan/release state — the flywheel will not pick it up. Clearing the hold restores the prior pickup state.'
+      : 'Independent kill-switch. Holding an item parks it even if it is planned and released — nothing gets picked up while On hold.';
+    render();
+  }
+
+  document.addEventListener('click', () => {
+    const m = document.getElementById('planMenu'); if (m) m.classList.remove('open');
+  });
+
+  render();
+</script>
+</body>
+</html>

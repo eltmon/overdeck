@@ -65,7 +65,7 @@ import {
   getGitHubConfig as getGitHubConfigShared,
   getRallyConfig as getRallyConfigShared,
 } from '../services/tracker-config.js';
-import { loadConfigSync as loadYamlConfig, isTldrEnabledSync } from '../../../lib/config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isTldrEnabledSync, resolveModel } from '../../../lib/config-yaml.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealth, determineHealthStatus } from '../../lib/health-filtering.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
@@ -1222,8 +1222,7 @@ Continue the PLANNING session. Do NOT implement anything.
         const { getAgentCommandSync } = await import('../../../lib/settings.js');
         let msgPlanningModel = 'claude-sonnet-4-6';
         try {
-          const { loadConfigSync, resolveModel } = await import('../../../lib/config-yaml.js');
-          msgPlanningModel = resolveModel('plan', undefined, loadConfigSync().config);
+          msgPlanningModel = resolveModel('plan', undefined, loadYamlConfig().config);
         } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommandSync(msgPlanningModel);
         const msgPermissionFlags = getClaudePermissionFlagsStringSync();

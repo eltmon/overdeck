@@ -17,10 +17,17 @@ import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
-import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
+import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
+import {
+  appendSessionEntrySync,
+  getProjectConfigFromWorkspacePath,
+  readRecordContinueViewSync,
+  resolveProjectForIssue,
+  writeRecordDecisionsSync,
+} from '../../lib/pan-dir/record.js';
 import type { MergeSet } from '../../lib/merge-set.js';
 
 interface DoneOptions {
@@ -158,25 +165,17 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
 export async function recordTestWaiver(workspacePath: string, reason: string): Promise<void> {
   try {
-    const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
-    if (!continueState) return;
-
+    const issueId = workspacePath.match(/feature-([a-z]+-\d+)$/i)?.[1]?.toUpperCase();
+    if (!issueId) return;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const existing = readRecordContinueViewSync(project, issueId);
     const now = new Date().toISOString();
-    await Effect.runPromise(
-      writeWorkspaceContinue(workspacePath, {
-        ...continueState,
-        decisions: [
-          ...continueState.decisions,
-          {
-            id: 'D-test-waived',
-            summary: `Test gate waived: ${reason}`,
-            recordedAt: now,
-          },
-        ],
-      }),
-    );
+    writeRecordDecisionsSync(project, issueId, [
+      ...(existing?.decisions ?? []),
+      { id: 'D-test-waived', summary: `Test gate waived: ${reason}`, recordedAt: now },
+    ]);
   } catch (err: any) {
-    console.warn(`[pan done] Failed to record test waiver in continue state (non-fatal): ${err?.message ?? err}`);
+    console.warn(`[pan done] Failed to record test waiver in record (non-fatal): ${err?.message ?? err}`);
   }
 }
 
@@ -568,25 +567,16 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       comment: options.comment,
     }));
 
-    // Append 'end' session entry to workspace continue state.
+    // Append 'end' session entry to per-issue record.
     try {
-      const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
-      if (continueState) {
-        const now = new Date().toISOString();
-        await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
-          ...continueState,
-          sessionHistory: [
-            ...continueState.sessionHistory,
-            {
-              timestamp: now,
-              reason: 'end',
-              note: options.comment || 'Agent signaled work complete',
-            },
-          ],
-        }));
-      }
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      appendSessionEntrySync(project, issueId, {
+        timestamp: new Date().toISOString(),
+        reason: 'end',
+        note: options.comment || 'Agent signaled work complete',
+      });
     } catch (continueErr: any) {
-      console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+      console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
     // Step 4b: Guard against actually-merged issues (e.g. merge completed in

@@ -5,6 +5,7 @@ import {
   toEpoch,
   type TimelineConversation,
 } from './timeline-utils'
+import { ProviderIcon } from '../../shared/branding'
 import styles from '../stage.module.css'
 
 export interface TimelineProps {
@@ -43,9 +44,15 @@ export function Timeline({ conversations, onOpen, now = Date.now() }: TimelinePr
               onClick={() => onOpen(c.id)}
             >
               <div className={styles.timelineCardHead}>
-                <span className={styles.timelineAgent}>{c.agentLabel ?? 'Agent'}</span>
+                <span className={styles.timelineAgentWrap}>
+                  <span className={styles.timelineModelIcon}>
+                    <ProviderIcon provider={providerForConversation(c)} label={c.model ?? c.harness ?? 'model'} />
+                  </span>
+                  <span className={styles.timelineAgent}>{c.agentLabel ?? 'Agent'}</span>
+                </span>
                 <span className={styles.timelineTime}>{relativeTime(toEpoch(c.timestamp), now)}</span>
               </div>
+              {c.model && <div className={styles.timelineModel}>{friendlyModelName(c.model)}</div>}
               {c.preview && <div className={styles.timelinePreview}>{c.preview}</div>}
             </button>
           ))}
@@ -53,4 +60,27 @@ export function Timeline({ conversations, onOpen, now = Date.now() }: TimelinePr
       ))}
     </div>
   )
+}
+
+function providerForConversation(conversation: TimelineConversation): string {
+  const model = conversation.model?.toLowerCase() ?? '';
+  const harness = conversation.harness?.toLowerCase() ?? '';
+  if (model.startsWith('claude') || harness === 'claude-code') return 'anthropic';
+  if (model.startsWith('gpt') || model.startsWith('o') || harness === 'codex') return 'openai';
+  if (model.includes('gemini')) return 'google';
+  if (model.includes('kimi')) return 'kimi';
+  if (model.includes('minimax')) return 'minimax';
+  if (model.includes('zai') || model.includes('glm')) return 'zai';
+  if (model.includes('mimo')) return 'mimo';
+  if (model.includes('nous')) return 'nous';
+  if (model.includes('dashscope') || model.includes('qwen')) return 'dashscope';
+  if (model.includes('/')) return 'openrouter';
+  return harness === 'ohmypi' || harness === 'pi' ? 'openrouter' : 'openai';
+}
+
+function friendlyModelName(model: string): string {
+  return model
+    .replace(/-20\d{6}$/, '')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
 }

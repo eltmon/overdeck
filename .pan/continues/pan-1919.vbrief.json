@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-21T06:44:36.785Z",
+  "updated": "2026-06-25T03:36:32.776Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -196,7 +196,100 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-21T06:44:36.785Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T02:00:43.986Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T02:28:26.932Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:00:42.699Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:01Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:01:06.326Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T03:01:31.545Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:04:11.880Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:04:38.536Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:06Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:06:22.647Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:08:24.787Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:08:27.550Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:11Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:11:40.209Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:14:00.826Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:14Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:14:53.014Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T03:15:18.374Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:19:29.794Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:22Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:22:35.918Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T03:36:32.776Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-06-25T03:22:35Z",
+      "markdownBody": "# Test failure\n\nTest suite FAILED: 10 failing tests across 2 files.\n\n1. done.test.ts (2 failures):\n   - Tests fail with 'ReferenceError: writeFileSync is not defined' at lines 27 and 115\n   - Root cause: writeFileSync is used but not imported from 'fs' module (line 5 imports mkdtempSync/mkdirSync/rmSync but omits writeFileSync)\n   - Affected tests: 'accepts a strike branch contained in origin/main', 'rejects a strike branch that has not landed on origin/main'\n\n2. weighted-model-ref.test.ts (8 failures):\n   - All 8 tests fail with 'TypeError: pickWeightedModelRef is not a function'\n   - Root cause: Function pickWeightedModelRef is used but not exported from the implementation module\n   - Affected tests: deterministic pick, range validation, 70/30 ratio, proportional weights, error handling (2 tests), non-positive weights, single entry\n\n3. Boundary gate and linting:\n   - ✓ Boundary gate PASSES: 'zero consumers on the old database'\n   - ✓ No other linting errors detected\n\nTest execution: npm test (build + typecheck + lint + vitest)\nGates run: typecheck, lint, tests\nTotal test results: 7371 passed | 10 failed | 52 skipped | 725 total files\nDuration: 75.16 seconds\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-1919`."
+    }
+  ]
 }

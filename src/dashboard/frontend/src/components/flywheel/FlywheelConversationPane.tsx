@@ -431,6 +431,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               embedded
               onEmbeddedResume={!conversation.sessionAlive ? () => startMutation.mutate() : undefined}
               embeddedResumeLabel={startMutation.isPending ? 'Starting…' : 'Start New Run'}
+              onSendFailed={() => void queryClient.invalidateQueries({ queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME] })}
             />
           )
         ) : (
