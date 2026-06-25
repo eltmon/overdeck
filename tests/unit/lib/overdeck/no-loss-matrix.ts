@@ -396,6 +396,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/settings/openrouter/test-key',               kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
   { surface: 'GET /api/settings/harness-policy',                     kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth/harness-policy' },
   { surface: 'GET /api/settings/provider-env-conflicts',             kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
+  { surface: 'GET /api/settings/legacy-import/conversations',        kind: 'http', disposition: 'READ',        door: 'previewLegacyConversations (src/lib/overdeck/legacy-import.ts)' },
+  { surface: 'POST /api/settings/legacy-import/conversations',       kind: 'http', disposition: 'WRITE',       door: 'importLegacyConversations → importLegacyConversation write door' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },

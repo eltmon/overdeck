@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { openDatabase } from '../driver.js';
 
@@ -143,6 +146,27 @@ describe('SQLite driver adapter', () => {
       expect([...roundTripped]).toEqual([...values]);
     } finally {
       db.close();
+    }
+  });
+
+  it('opens a file database read-only: SELECT succeeds and writes throw', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pan-driver-test-'));
+    const dbPath = join(dir, 'fixture.db');
+    try {
+      const setup = openDatabase(dbPath);
+      setup.exec('CREATE TABLE items (name TEXT NOT NULL)');
+      setup.prepare('INSERT INTO items (name) VALUES (?)').run('seed');
+      setup.close();
+
+      const db = openDatabase(dbPath, { readOnly: true });
+      try {
+        expect(db.prepare('SELECT name FROM items').get()).toEqual({ name: 'seed' });
+        expect(() => db.exec('INSERT INTO items (name) VALUES (\'fail\')')).toThrow();
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true });
     }
   });
 

@@ -28,6 +28,7 @@ export interface SqliteDatabase {
 
 export interface OpenDatabaseOptions {
   allowExtension?: boolean;
+  readOnly?: boolean;
 }
 
 declare const Bun: unknown;

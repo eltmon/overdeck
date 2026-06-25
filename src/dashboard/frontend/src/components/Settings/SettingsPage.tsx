@@ -48,6 +48,7 @@ import { VoicePresetsTab } from './VoicePresetsTab';
 import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 import { ReindexConfirmDialog } from './ReindexConfirmDialog';
+import { LegacyImportDialog } from './LegacyImportDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
@@ -725,6 +726,7 @@ export function SettingsPage() {
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
   const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
+  const [legacyImportOpen, setLegacyImportOpen] = useState(false);
   const [reindexConfirm, setReindexConfirm] = useState<{
     kind: 'manual' | 'model';
     newModel?: string;
@@ -4150,8 +4152,28 @@ export function SettingsPage() {
               }`} />
             </button>
           </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Import conversations from old Panopticon</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Migrate conversations from your pre-rebrand <span className="font-mono">~/.panopticon/panopticon.db</span> into
+                Overdeck. Titles, cost history, favorites, and JSONL transcript links are preserved.
+                Existing conversations are never overwritten.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLegacyImportOpen(true)}
+              data-testid="legacy-import-open-button"
+              className="shrink-0 px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-muted/30 transition-colors"
+            >
+              Import…
+            </button>
+          </div>
         </div>
       </section>
+
+      <LegacyImportDialog open={legacyImportOpen} onClose={() => setLegacyImportOpen(false)} />
 
       <ReindexConfirmDialog
         open={reindexConfirm !== null}

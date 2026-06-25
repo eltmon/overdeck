@@ -1,3 +1,10 @@
 
-# Use bd merge for beads JSONL files
-.beads/issues.jsonl merge=beads
+# .beads/issues.jsonl is JSON-Lines (one independent object per line). The built-in `union`
+# driver needs NO git config and concatenates both sides' lines; `bd` reconciles duplicate IDs
+# on load. (The previous attribute named a custom driver that was never configured and was
+# therefore inert — git silently fell back to 3-way merge. See PAN-1901.)
+.beads/issues.jsonl merge=union
+
+# WARNING: The single-JSON state files under .pan/specs/, .pan/continues/, and .pan/records/
+# must NOT receive a content-merge driver like `union`. union concatenates hunks into
+# invalid JSON. These files need a take-one-whole-side strategy, not line-level merging.
