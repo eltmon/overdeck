@@ -332,4 +332,61 @@ describe('importLegacyConversations (orchestration)', () => {
     const favs = listFavoritedIds('conversation');
     expect(favs).toContain('fav-conv');
   });
+
+  it('imports from an older legacy DB missing newer columns (regression: no such column: fork_request)', async () => {
+    const { importLegacyConversations } = await import('../legacy-import.js');
+    const { getOverdeckDatabaseSync } = await import('../infra.js');
+
+    // Reproduce a pre-rename panopticon.db whose schema predates fork_request /
+    // fork_retry_count and other later-added columns. The full SELECT used to
+    // throw "no such column: fork_request" the instant it was prepared.
+    const OLD_DB_PATH = join(TEST_HOME, 'old-legacy.db');
+    const oldDb = openDatabase(OLD_DB_PATH);
+    oldDb.exec(`
+      CREATE TABLE conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        tmux_session TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        cwd TEXT NOT NULL DEFAULT '/',
+        created_at TEXT NOT NULL,
+        ended_at TEXT,
+        last_attached_at TEXT,
+        session_file TEXT,
+        claude_session_id TEXT,
+        title TEXT,
+        title_source TEXT,
+        title_seed TEXT,
+        total_cost REAL DEFAULT 0,
+        total_tokens INTEGER DEFAULT 0,
+        archived_at TEXT,
+        model TEXT,
+        effort TEXT
+      );
+      CREATE TABLE favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(type, item_id)
+      );
+    `);
+    oldDb.prepare(
+      `INSERT INTO conversations (name, created_at, title, model) VALUES (?, ?, ?, ?)`,
+    ).run('old-conv', '2024-01-01T00:00:00.000Z', 'Old One', 'claude-opus-4-8');
+    oldDb.close();
+
+    const result = importLegacyConversations(OLD_DB_PATH, ['old-conv']);
+    expect(result.failed).toHaveLength(0);
+    expect(result.imported).toContain('old-conv');
+
+    const db = getOverdeckDatabaseSync();
+    const row = db.prepare(
+      `SELECT title, model, fork_request, fork_retry_count FROM conversations WHERE name = 'old-conv'`,
+    ).get() as Record<string, unknown>;
+    expect(row.title).toBe('Old One');
+    expect(row.model).toBe('claude-opus-4-8');
+    expect(row.fork_request).toBeNull();
+    expect(row.fork_retry_count).toBe(0);
+  });
 });

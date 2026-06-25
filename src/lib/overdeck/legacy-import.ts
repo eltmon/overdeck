@@ -122,6 +122,55 @@ type LegacyRow = {
   fork_retry_count: number | null;
 };
 
+// Every column importLegacyConversations would like to read from the legacy
+// source DB. The legacy panopticon.db is a frozen, read-only artifact whose
+// schema vintage varies — older files predate later columns (e.g. fork_request,
+// fork_retry_count). We select only the columns that actually exist and treat
+// absent ones as null, so the import never throws "no such column".
+const LEGACY_CONVERSATION_COLUMNS = [
+  'id', 'name', 'tmux_session', 'status', 'cwd', 'created_at', 'ended_at', 'last_attached_at',
+  'session_file', 'claude_session_id', 'title', 'title_source', 'title_seed',
+  'total_cost', 'total_tokens', 'archived_at', 'model', 'effort', 'fork_status', 'fork_error',
+  'harness', 'delivery_method', 'spawn_error', 'handoff_doc_path', 'handoff_target_conv_id',
+  'fork_fallback_reason', 'cleared_to_conv_id', 'fork_request', 'fork_retry_count',
+] as const;
+
+// Coalesce a raw row (only the columns that existed in the legacy DB) into a
+// complete LegacyRow, defaulting any column absent from this DB's schema to null.
+function normalizeLegacyRow(row: Partial<LegacyRow>): LegacyRow {
+  return {
+    id: row.id as number,
+    name: row.name as string,
+    tmux_session: row.tmux_session ?? null,
+    status: row.status ?? null,
+    cwd: row.cwd ?? '',
+    created_at: row.created_at ?? null,
+    ended_at: row.ended_at ?? null,
+    last_attached_at: row.last_attached_at ?? null,
+    session_file: row.session_file ?? null,
+    claude_session_id: row.claude_session_id ?? null,
+    title: row.title ?? null,
+    title_source: row.title_source ?? null,
+    title_seed: row.title_seed ?? null,
+    total_cost: row.total_cost ?? null,
+    total_tokens: row.total_tokens ?? null,
+    archived_at: row.archived_at ?? null,
+    model: row.model ?? null,
+    effort: row.effort ?? null,
+    fork_status: row.fork_status ?? null,
+    fork_error: row.fork_error ?? null,
+    harness: row.harness ?? null,
+    delivery_method: row.delivery_method ?? null,
+    spawn_error: row.spawn_error ?? null,
+    handoff_doc_path: row.handoff_doc_path ?? null,
+    handoff_target_conv_id: row.handoff_target_conv_id ?? null,
+    fork_fallback_reason: row.fork_fallback_reason ?? null,
+    cleared_to_conv_id: row.cleared_to_conv_id ?? null,
+    fork_request: row.fork_request ?? null,
+    fork_retry_count: row.fork_retry_count ?? null,
+  };
+}
+
 function parseIsoToMs(iso: string | null): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime();
@@ -143,17 +192,20 @@ export function importLegacyConversations(path: string, names: string[]): Import
   let legacyRows: LegacyRow[];
   let favSet: Set<string>;
   try {
+    const existingCols = new Set(
+      (db.prepare(`PRAGMA table_info(conversations)`).all() as { name: string }[]).map(
+        (c) => c.name,
+      ),
+    );
+    const selectCols = LEGACY_CONVERSATION_COLUMNS.filter((c) => existingCols.has(c));
     const placeholders = names.map(() => '?').join(', ');
-    legacyRows = db
+    const rawRows = db
       .prepare(
-        `SELECT id, name, tmux_session, status, cwd, created_at, ended_at, last_attached_at,
-                session_file, claude_session_id, title, title_source, title_seed,
-                total_cost, total_tokens, archived_at, model, effort, fork_status, fork_error,
-                harness, delivery_method, spawn_error, handoff_doc_path, handoff_target_conv_id,
-                fork_fallback_reason, cleared_to_conv_id, fork_request, fork_retry_count
+        `SELECT ${selectCols.join(', ')}
          FROM conversations WHERE name IN (${placeholders})`,
       )
-      .all(...names) as LegacyRow[];
+      .all(...names) as Partial<LegacyRow>[];
+    legacyRows = rawRows.map(normalizeLegacyRow);
 
     favSet = new Set<string>(
       (
