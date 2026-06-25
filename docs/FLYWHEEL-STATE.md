@@ -1732,3 +1732,46 @@ The chain (all autonomous, zero operator action):
 - Main `1009d2f3a` (GREEN pending CI). 3 substrate fixes landed (PAN-2050/2022/2058) + red-main (PAN-2057).
   Run ACTIVE — next: close the merged/verifying issues, reopen the merge gate (PAN-1919/1901/2044 need rebase —
   deacon still no-resume).
+## RUN-13 tick 6 (2026-06-25 ~04:00Z) — main GREEN, closed PAN-2039+PAN-2055; +3 strikes (one mid-tick merge)
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Live orchestrator: ohmypi/glm-5.2.
+
+- **Main GREEN** — red-main chain from ticks 1-5 fully resolved. CI `success` on `68e9c86d8` (PAN-2039 fix);
+  main then at `ce43370d8` (records commit, CI in-progress, not code). RAM 18.5/64 GB, **swap 0** (very healthy,
+  huge maxAgents headroom).
+- **Started this tick at 0 progressing agents** — PAN-1919's 3 "running" agents (work/review/test, 4-day-old,
+  5600+ min) were all **idle at prompt**: work agent said "complete — ready for merge", review/test sat at the
+  codex idle screen. Ground-truth = no active work. Launched 3 fresh strikes to meet minAgents and drive the
+  substrate dev-loop (strikes are the proven working launch path; deacon still no-resume so plan/start auto-revive
+  is unreliable):
+  - **PAN-2055** (weighted-picker hash clustering) → **LANDED** `a7fa155fd` (fmix32/MurmurHash3 finalizer
+    avalanches FNV output; deterministic bucket). → CLOSED (verify-merged ✓).
+  - **PAN-2039** (pan sync strands 62 shipped skills) → **LANDED** `68e9c86d8` (adopt legacy shipped skills).
+    CI success. → CLOSED (verify-merged ✓).
+  - **PAN-2014** (deacon patrol stops but cloister status still reports 'Running') → in flight (different code
+    area: `src/lib/cloister/` + `pan admin cloister status`; derive status from live patrol heartbeat, not
+    process-existence). Distinct from the closed PAN-2047 (auto-restart watchdog).
+  - **PAN-2056** (config-yaml duplicated across ~8 bundle chunks → clearConfigCache not process-wide) → launched
+    after PAN-2055 freed config-yaml.ts (no concurrent-same-area interference, per the RUN-4 PAN-2011 lesson).
+- **2 substrate bugs CLOSED this tick** (PAN-2039, PAN-2055); **7 total this run** (PAN-2050/2022/2058/2057 +
+  2039/2055 + the red-main clear). All via `pan close --force`; verify-merged gate passed on every one.
+- **Merge gate (operator-owned, unchanged):** MIN-831 (MR 68) + MIN-846 both review+test PASSED → readyForMerge,
+  `require_uat_before_merge=true` → operator UAT + merge. **PAN-1919** PR #1950 is **CLOSED+CONFLICTING**
+  (unmerged) — work done+verified but stranded; needs operator re-land (reopen + rebase). **PAN-2044** PR #2048
+  OPEN + real conflict (rebase). **PAN-1901** PR #2042 OPEN, test=fail on a STALE run (28071100557); main now
+  GREEN so a CI re-run may clear an inherited stale-red — investigate if still red.
+- **Deacon still OVERDECK_NO_RESUME=1** (operator freeze) on all active dashboard PIDs → no PR auto-rebase, no
+  agent auto-revive. PAN-1879's `--deacon`/`--resume` flag landed (RUN-4) but the operator must restart with
+  resume to actually re-engage the reconciler. This is THE blocker for the merge-gate cohort.
+- **DURABLE LESSON — trust the verify-merged gate + ancestor check over a strike's self-report prose.**
+  strike-pan-2055 said its `git push origin main` was "blocked by the safety layer" and that "the PAN-2055 code
+  was already present" — confusing/misleading. But `git merge-base --is-ancestor a7fa155fd origin/main` = YES,
+  and the fmix32 code is in `config-yaml.ts` on main, and `pan close`'s verify-merged gate passed. The strike HAD
+  landed its fix (via the clean temp-worktree push pattern) but narrated it poorly. **Verification = ancestor-of-
+  main + green CI + the close-out verify-merged gate; never the strike's own "I pushed / it was blocked" text.**
+- **PAN-1832 cohort member = CLOSED** (`merged`+`closed-out`+`ready` on GitHub). Drained. No open
+  verifying-on-main backlog remains (close-out backlog fully drained earlier this run).
+- **NEXT TICK:** monitor strike-pan-2014 + strike-pan-2056 → merge → close. Operator: clear no-resume / rebase
+  1919+2044 / UAT+merge MIN-831+MIN-846. Candidate next strikes (different areas): PAN-2017 (strike spawn-delivery,
+  highest pipeline leverage, already planned → `start`), PAN-2054 (close-out not terminal, multi-part → plan).
