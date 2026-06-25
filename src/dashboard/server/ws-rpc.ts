@@ -863,6 +863,13 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   null,
                 );
               }
+              if (harness === 'pi') {
+                return streamResolvedFullParseSnapshots(
+                  () => resolvePiSessionPath(input.conversationName),
+                  parsePiConversationMessages,
+                  null,
+                );
+              }
               if (harness === 'codex') {
                 return streamResolvedFullParseSnapshots(
                   () => resolveCodexRolloutPath(input.conversationName),
@@ -881,6 +888,15 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return streamResolvedFullParseSnapshots(
                 () => resolvePiSessionPath(conv.tmuxSession),
                 parseOhmypiConversationMessages,
+                conv.model ?? null,
+                true,
+              );
+            }
+
+            if (conv.harness === 'pi') {
+              return streamResolvedFullParseSnapshots(
+                () => resolvePiSessionPath(conv.tmuxSession),
+                parsePiConversationMessages,
                 conv.model ?? null,
                 true,
               );

@@ -1024,6 +1024,13 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
       return { ...result, streaming: false };
     }
 
+    if (harness === 'pi') {
+      const sessionFile = await resolvePiSessionPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parsePiConversationMessages(sessionFile);
+      return { ...result, streaming: false };
+    }
+
     if (harness === 'codex') {
       const sessionFile = await resolveCodexRolloutPath(id);
       if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
