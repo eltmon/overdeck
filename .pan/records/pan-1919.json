@@ -78,16 +78,16 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-06-25T03:07:03.240Z",
+  "updated": "2026-06-25T03:07:48.536Z",
   "pipeline": {
     "issueId": "PAN-1919",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T03:07:03.226Z",
+    "updatedAt": "2026-06-25T03:07:48.511Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -123,8 +123,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 130321,
-            "output": 32546,
+            "input": 132655,
+            "output": 33248,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -147,10 +147,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 758,
-            "output": 260536,
-            "cacheRead": 88633496,
-            "cacheWrite": 1874681
+            "input": 797,
+            "output": 261462,
+            "cacheRead": 89036705,
+            "cacheWrite": 1875834
           }
         }
       },
@@ -162,14 +162,14 @@
           "cacheWrite": 452641
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 768,
-          "output": 267029,
-          "cacheRead": 89210674,
-          "cacheWrite": 1944874
+          "input": 807,
+          "output": 267955,
+          "cacheRead": 89613883,
+          "cacheWrite": 1946027
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 130321,
-          "output": 32546,
+          "input": 132655,
+          "output": 33248,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -181,8 +181,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 48.327451,
-        "pricingAsOf": "2026-06-25T03:07:03.240Z"
+        "usd": 48.466744,
+        "pricingAsOf": "2026-06-25T03:07:48.536Z"
       }
     },
     "merges": [
