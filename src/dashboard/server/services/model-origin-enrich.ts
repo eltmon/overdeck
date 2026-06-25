@@ -8,7 +8,7 @@
  * the enrichment can never drift between them.
  */
 import { getAgentStateSync, type Role } from '../../../lib/agents.js';
-import { computeModelOrigin, loadConfigSync, type ModelOriginData } from '../../../lib/config-yaml.js';
+import { clearConfigCache, computeModelOrigin, loadConfigSync, type ModelOriginData } from '../../../lib/config-yaml.js';
 
 /**
  * Map a session-node type to the pipeline Role whose model distribution it draws
@@ -41,6 +41,12 @@ export function enrichSessionsWithModelOrigin(
   fallbackIssueId: string,
 ): void {
   try {
+    // Force a fresh config read: config-yaml is duplicated across several dashboard
+    // bundle chunks (each with its own cache), so a settings-save's clearConfigCache()
+    // may not have cleared THIS chunk's copy — leaving the inspector showing a stale
+    // distribution after an operator edits weights (PAN-2055). Clearing here guarantees
+    // the inspector always reflects the live config. Cheap on a read-path poll.
+    clearConfigCache();
     const { config } = loadConfigSync();
     for (const section of sections) {
       const role = sessionTypeToModelRole(section.type);
