@@ -83,21 +83,27 @@
       "reason": "planning",
       "note": "Planning role authored the vBRIEF directly after verifying every issue reference against the tree at SHA a1d01b2b9 and resolving the two under-specified design gaps (lossy/destructive write doors; missing read-only driver option) plus Q4.",
       "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-25T12:05:16.633Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-06-25T11:28:52.201Z",
+  "updated": "2026-06-25T12:05:16.634Z",
   "pipeline": {
     "issueId": "PAN-2044",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T11:28:52.183Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2048"
+    "updatedAt": "2026-06-25T11:37:42.865Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
+    "lastVerifiedCommit": "8438f38c9c4f1b9717243bce0faafe7038191603"
   },
   "closeOut": {
     "usage": {
@@ -142,9 +148,9 @@
             "cacheWrite": 773850
           },
           "custom/glm-5.2": {
-            "input": 29496,
-            "output": 595,
-            "cacheRead": 66368,
+            "input": 45305,
+            "output": 8924,
+            "cacheRead": 644480,
             "cacheWrite": 0
           }
         }
@@ -175,15 +181,15 @@
           "cacheWrite": 133436
         },
         "custom/glm-5.2": {
-          "input": 29496,
-          "output": 595,
-          "cacheRead": 66368,
+          "input": 45305,
+          "output": 8924,
+          "cacheRead": 644480,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 25.974872,
-        "pricingAsOf": "2026-06-25T11:28:52.200Z"
+        "usd": 26.091463,
+        "pricingAsOf": "2026-06-25T11:37:42.880Z"
       }
     },
     "merges": [
