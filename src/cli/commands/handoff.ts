@@ -24,6 +24,10 @@ function resolveConversation(convRef: string) {
 
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
 
+function looksLikeBareFocusText(convRef: string, focusArgs: string[]): boolean {
+  return focusArgs.length > 0 || /\s/.test(convRef) || /[.!?]/.test(convRef) || /^[A-Z]/.test(convRef);
+}
+
 function validateHarness(harness: string | undefined): RuntimeName | undefined {
   if (harness === undefined || harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex') {
     return harness;
@@ -49,6 +53,11 @@ export async function handoffCommand(
       console.log(chalk.gray('  Pass an explicit conversation id or name, e.g. `pan handoff 371`.'));
     } else {
       console.log(chalk.yellow(`Conversation not found: ${convRef}`));
+      if (looksLikeBareFocusText(convRef, focusArgs)) {
+        const focusPreview = [convRef, ...focusArgs].join(' ').trim();
+        console.log(chalk.gray('  If that was focus text for the current conversation, pass `self` before it:'));
+        console.log(chalk.gray(`  pan handoff self "${focusPreview}"`));
+      }
     }
     process.exit(1);
   }
