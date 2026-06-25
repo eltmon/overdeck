@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-25T03:06:22.647Z",
+  "updated": "2026-06-25T03:06:57.960Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -238,13 +238,5 @@
       "timestamp": "2026-06-25T03:06:22.647Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-06-25T03:06:22Z",
-      "markdownBody": "# Test failure\n\nDispatch failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-1919-test -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-1919 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL= -e ANTHROPIC_AUTH_TOKEN= -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-1919-test -e OVERDECK_ISSUE_ID=PAN-1919 -e OVERDECK_SESSION_TYPE=test -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-13 -e OVERDECK_FLYWHEEL_AGENT_ROLE=test bash /home/eltmon/.overdeck/agents/agent-pan-1919-test/launcher.sh\nduplicate session: agent-pan-1919-test\n\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-1919`."
-    }
-  ]
+  "feedback": []
 }
