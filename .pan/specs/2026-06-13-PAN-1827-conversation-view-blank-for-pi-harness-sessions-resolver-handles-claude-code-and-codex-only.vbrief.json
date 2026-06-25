@@ -4,17 +4,17 @@
     "created": "2026-06-13T15:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1827: Conversation view blank for pi-harness sessions — add pi branch to the shared transcript resolver",
-    "updated": "2026-06-13T15:43:08.246Z"
+    "updated": "2026-06-25T17:23:21.456Z"
   },
   "plan": {
     "id": "pan-1827",
     "title": "Conversation view blank for pi-harness sessions — resolver handles claude-code and codex only",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7f3c1e9a-2b6d-4c8e-9a1f-5e0d2c4b6a81",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T15:45:00.000Z",
-    "updated": "2026-06-13T15:43:08.246Z",
+    "updated": "2026-06-25T17:23:21.456Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1827",
@@ -251,5 +251,5 @@
       "canonicalFilename": "2026-06-13-PAN-1827-conversation-view-blank-for-pi-harness-sessions-resolver-handles-claude-code-and-codex-only.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
