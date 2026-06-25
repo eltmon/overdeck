@@ -1617,3 +1617,72 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
 
 - Main GREEN `db2f6cb08`. RAM 35/64 GB, swap 0.7. Run ACTIVE — 2 strikes in flight, merge gate
   operator-owned.
+## RUN-13 tick 1 (2026-06-25 ~02:09Z) — RED MAIN (stale-test class); struck PAN-2057 + PAN-2050; closed PAN-2047/2049; dueling dashboards
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Harness ohmypi/glm-5.2 (run-config said
+claude-code but live orchestrator session is ohmypi/glm-5.2 — mismatch noted).
+
+- **MAIN CI RED** on `c9613746` (failure): `TypeError: pickWeightedModelRef is not a function` ×8 in
+  `tests/lib/weighted-model-ref.test.ts`. PAN-1857 stale-test class — commit (PAN-2055 work) renamed the
+  impl to `pickPercentModelRef` (`src/lib/config-yaml.ts:499`) but the test still imports `pickWeightedModelRef`.
+  Prod is correct; the test import is stale. Local main was 1-ahead (regenerable `chore(records)` bot-state) +
+  dirty (`D .pan/backlog/sequence.md`). Already tracked as PAN-2057 (bug+blocks-main, RUN-12 filed).
+- **Re-struck PAN-2057** (the prior strike-pan-2057 was a GHOST: stopped, no tmux session, no branch — the
+  PAN-2022 ghost-strike class). Fresh `pan strike PAN-2057` worked cleanly (worktree dir didn't exist).
+  strike-pan-2057 (codex/gpt-5.5) committed `d8b0702cb Fix percent model picker test rename`, merged main into
+  the strike branch, and pushed `strike/pan-2057:main` to origin/main as a fast-forward — correctly bypassing
+  the dirty primary worktree by pushing the strike branch directly. Red-main fix landing at tick end.
+- **Struck PAN-2050** (critical: `pan plan/start --auto` worktree-creation race blocks ALL new launches — the
+  hazard that forced RUN-11 into strikes-only mode). strike-pan-2050 found the root cause: preliminary record
+  save creates the workspace dir BEFORE `git worktree add`, AND a second bug where `createWorkspace` itself
+  mkdirs the target path. Fix in progress on `src/lib/workspace-manager.ts` + regression test (move
+  `.pan`/`.beads` placeholder aside before worktree add, restore after). ** Strikes are the working launch
+  path; `pan plan --auto` status unconfirmed until this lands.**
+- **Closed 2 verifying-on-main** (`pan close --force`, verify-merged gate passed on both): PAN-2047 (deacon
+  lastPatrol watchdog clear) + PAN-2049 (dashboard status='error' schema fix). Both confirmed merged on
+  origin/main + CLOSED on GitHub. NOTE: close-out label step warns `'in-planning' not found` (non-fatal) — a
+  minor substrate bug where the label-removal list includes a label that doesn't exist.
+- **Merge gate (operator-owned, require_uat=true):** MIN-831 (GitLab MR 68) + MIN-846 both review+test
+  PASSED → readyForMerge. The primary intentional human-in-the-loop bottleneck.
+- **PAN merge-blocked (red-main-inherited + conflicts):** PAN-1919 (#1950 conflict+failing), PAN-1901
+  (#2042 failing/stale-red), PAN-2044 (#2048 conflict). All review/test-passed; will ease once main greens
+  (failing checks clear). Conflicts (1919/2044) need a rebase — orchestrator cannot `pan sync-main`.
+- **Dueling dashboards** (substrate hazard, surfaced not fixed): two `dist/dashboard/server.js` PIDs — 8401
+  on `pts/0` @25% CPU (looks wedged/foreground) + 79568 Ssl background. emit-status + strikes both succeeded,
+  so not acutely blocking, but the pts/0 @25%-CPU one is suspicious. `pan restart` is outside the flywheel
+  allowed-action list → surfaced as openQuestion for the operator.
+- **Launch posture:** met minAgents via the 2 strikes (red-main + critical unblocker) + live agent-pan-1919.
+  Held further launches: PAN-2022/2017 (strike-bug pair, planned) are plan-worthy not quick-strike, and need
+  `pan plan --auto` (blocked by PAN-2050) to start normally. Reassess next tick once main greens + 2050 lands.
+- RAM 11.8/64 GB, swap 0. minAgents met (3 productive). Run ACTIVE.
+
+## RUN-13 tick 1b (2026-06-25 ~02:13Z) — red-main strike DEADLOCKED by PAN-2022 (directly hit); PAN-2050 LANDED
+
+- **strike-pan-2050 LANDED** `2ec6164c4` (workspace-manager tolerates metadata-only placeholders; 10/10 tests).
+  PAN-2050 now `verifying_on_main`. **`pan plan --auto` is unblocked IN SOURCE** — but the fix is NOT rebuilt
+  into the running `dist/cli`, so the plan/start worktree race may still fire until a rebuild+reload. The strike
+  correctly flagged the red-main test failure as orthogonal.
+- **RED MAIN STILL P0.** strike-pan-2057 produced the verified fix (`d8b0702cb`, 28 tests pass) but is DEADLOCKED:
+  it merged LOCAL main (then 4-ahead) into its strike branch, entangling it so `strike/pan-2057` is NOT a
+  fast-forward from origin/main (cannot FF-push; force-push forbidden). The strike session exited at-prompt
+  ("Blocked before landing", posted blocker comment PAN-2057#issuecomment-4795219541) but its agent STATE still
+  says "running". **Re-strike refused: `Agent strike-pan-2057 already running. Use 'pan tell'`** — and
+  `pan tell`/`pan kill`/`pan wipe` are all flywheel-forbidden. This is **PAN-2022 exactly** ("stuck strike blocks
+  re-strike, no flywheel-safe clear verb"). I directly hit the bug I'd otherwise only track.
+- **The singular operator unblock (fastest green-main path):** `pan kill strike-pan-2057 && pan strike PAN-2057`.
+  A fresh strike on the current origin/main (`2ec6164c4`) that does NOT merge local main will land the test-rename
+  directly to main (proven: strike-pan-2050 landed cleanly the same way). Cannot be done by the flywheel —
+  clearing a stuck strike is `pan kill`, explicitly operator-only.
+- **Local primary main has DIVERGED** from origin (5 ahead / 1 behind; origin advanced under me to `2ec6164c4`).
+  DO NOT `git push origin main` — it is no longer a fast-forward and would lose/force. The 5-ahead commits are
+  bot-state + the small `55b604ef8` AgentPane fix (bot-authored, tested); they will re-converge as origin advances
+  (the transient self-healing pattern, RUN-5).
+- **Deacon genuinely no-resume** (not stale gates): PID 8401 env `OVERDECK_NO_RESUME=1`; PID 79568 env
+  `OVERDECK_DISABLE_DEACON=1` (that one runs NO deacon — dev/UI peer only). So: no agent auto-revive, no PR
+  auto-rebase. The merge-blocked PRs (PAN-1919/1901/2044) will NOT auto-clear even when main greens — operator
+  rebase or `pan restart --resume` needed.
+- **Launch tools currently constrained:** strike (PAN-2022 deadlock on PAN-2057 specifically; fresh strikes on
+  OTHER issues work); plan/start (PAN-2050 fix not in dist yet). Did NOT launch a redundant plan --auto on
+  PAN-2057 — it would risk the undeployed worktree race AND end at the operator merge gate (doesn't auto-green).
+  Holding further launches until the red-main deadlock clears.
