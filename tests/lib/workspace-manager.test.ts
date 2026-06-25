@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -213,6 +213,54 @@ describe('copyOverdeckSettingsToWorkspace', () => {
 
     const workspaceSettings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf8'));
     expect(workspaceSettings.hooks).toBeUndefined();
+  });
+});
+
+describe('createWorkspace', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-wm-create-test-'));
+    mockExecAsync.mockReset();
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('stages metadata-only workspace directories before git worktree add and restores records', async () => {
+    const workspacePath = join(tempDir, 'workspaces', 'feature-pan-2050');
+    const recordPath = join(workspacePath, '.pan', 'records', 'pan-2050.json');
+    mkdirSync(join(workspacePath, '.pan', 'records'), { recursive: true });
+    writeFileSync(recordPath, '{"issueId":"PAN-2050"}\n', 'utf8');
+
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('git worktree add')) {
+        expect(existsSync(workspacePath)).toBe(false);
+        mkdirSync(workspacePath, { recursive: true });
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
+    const result = await Effect.runPromise(createWorkspace({
+      projectConfig: {
+        name: 'Test',
+        path: tempDir,
+        package_manager: 'npm',
+      },
+      featureName: 'pan-2050',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(result.steps).toContain('Staged pre-worktree .pan/.beads metadata');
+    expect(mockExecAsync).toHaveBeenCalledWith(
+      expect.stringContaining(`git worktree add "${workspacePath}" -b "feature/pan-2050"`),
+      expect.objectContaining({ cwd: tempDir }),
+    );
+    expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');
   });
 });
 
