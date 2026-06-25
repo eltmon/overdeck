@@ -9,6 +9,8 @@ import {
   getDocsIndexPath,
   getDocsPaths,
   getDocsTelemetryPath,
+  packageRoot,
+  piExtensionCandidates,
   resolvePackageRootForDir,
 } from '../paths.js';
 
@@ -66,6 +68,26 @@ describe('resolvePackageRootForDir', () => {
   it.effect('resolves unbundled dist lib paths to the repository root', () =>
     Effect.sync(() => {
       expect(resolvePackageRootForDir(join('/repo', 'dist', 'lib'))).toBe('/repo');
+    })
+  );
+});
+
+describe('piExtensionCandidates', () => {
+  it.effect('resolves from packageRoot regardless of process cwd', () =>
+    Effect.sync(() => {
+      const originalCwd = process.cwd();
+      const expected = [
+        join(packageRoot, 'dist', 'extensions', 'pi.js'),
+        join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js'),
+      ];
+
+      try {
+        expect(piExtensionCandidates()).toEqual(expected);
+        process.chdir('/tmp');
+        expect(piExtensionCandidates()).toEqual(expected);
+      } finally {
+        process.chdir(originalCwd);
+      }
     })
   );
 });
