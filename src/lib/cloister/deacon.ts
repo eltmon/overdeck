@@ -4216,6 +4216,26 @@ function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>)
   return getReviewStatusSync(state.issueId)?.mergeStatus === 'merged';
 }
 
+function reviewArtifactExistsForRun(path: string | undefined, startedAt: string | undefined): boolean {
+  if (!path || !existsSync(path)) return false;
+  const startedMs = Date.parse(startedAt ?? '');
+  if (!Number.isFinite(startedMs)) return true;
+  try {
+    return statSync(path).mtimeMs >= startedMs;
+  } catch {
+    return false;
+  }
+}
+
+function hasCompletedReviewArtifact(state: AgentState): boolean {
+  if (state.role !== 'review') return false;
+  if (state.reviewSubRole) {
+    return reviewArtifactExistsForRun(state.reviewOutputPath, state.startedAt);
+  }
+  if (!state.workspace || !state.reviewRunId) return false;
+  return reviewArtifactExistsForRun(join(state.workspace, '.pan', 'review', state.reviewRunId, 'synthesis.md'), state.startedAt);
+}
+
 // Cache for auto-close-out canonical state queries to avoid N+1 shell execs on patrol
 const autoCloseOutCache = new Map<string, { state: string | null; timestamp: number }>();
 const AUTO_CLOSE_OUT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -5802,7 +5822,8 @@ export async function handleAgentHeartbeatDeadEvent(agentId: string, context?: s
   // PAN-1530: only record failure markers for agents the auto-resume gate
   // will actually retry. Planning agents are one-shot by design.
   const isResumableRole = !agentId.startsWith('planning-');
-  if (state.stoppedByUser !== true && isResumableRole) {
+  const completedReviewArtifact = hasCompletedReviewArtifact(state);
+  if (state.stoppedByUser !== true && isResumableRole && !completedReviewArtifact) {
     const rapidPostResumeDeath = isRapidPostResumeDeath(state);
     if (!rapidPostResumeDeath) {
       resetAgentFailureCount(agentId);
@@ -5815,6 +5836,8 @@ export async function handleAgentHeartbeatDeadEvent(agentId: string, context?: s
       notifyAgentStatusChanged(failedState, oldStatus, false);
       orphanFailureRecordedForAutoResume.add(agentId);
     }
+  } else if (completedReviewArtifact) {
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after completed review artifact; not recording orphan failure`);
   }
   const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);

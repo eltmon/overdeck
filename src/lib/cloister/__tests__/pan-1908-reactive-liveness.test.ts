@@ -5,6 +5,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const mockGetAgentStateSync = vi.fn();
 const mockSaveAgentState = vi.fn();
@@ -133,8 +136,11 @@ function makeState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('PAN-1908 reactive liveness handlers', () => {
+  let tempDir: string;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-1908-liveness-'));
     mockGetAgentStateSync.mockReturnValue(null);
     mockSaveAgentState.mockReturnValue(Effect.void);
     mockResumeAgent.mockResolvedValue({ success: true });
@@ -155,6 +161,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   describe('handleAgentStoppedEvent', () => {
@@ -218,6 +225,55 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const saved = mockSaveAgentState.mock.calls[0][0];
       expect(saved.status).toBe('stopped');
       expect(mockRecordAgentFailure).toHaveBeenCalled();
+    });
+
+    it('marks a review sub-role with a completed report stopped without recording orphan failure', async () => {
+      const outputPath = join(tempDir, 'security.md');
+      writeFileSync(outputPath, '## Findings\n\nNone.\n');
+      mockGetAgentStateSync.mockReturnValue(makeState({
+        id: 'agent-pan-1908-review-security',
+        role: 'review',
+        status: 'running',
+        startedAt: '2026-06-15T00:00:00.000Z',
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-1908-review-abcd1234',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-1908-review',
+      }));
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908-review-security');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
+      expect(mockResetAgentFailureCount).not.toHaveBeenCalled();
+    });
+
+    it('marks a review synthesis agent with synthesis.md stopped without recording orphan failure', async () => {
+      const workspace = join(tempDir, 'workspace');
+      const reviewRunId = 'agent-pan-1908-review-abcd1234';
+      const reviewDir = join(workspace, '.pan', 'review', reviewRunId);
+      mkdirSync(reviewDir, { recursive: true });
+      writeFileSync(join(reviewDir, 'synthesis.md'), '## Verdict: APPROVED\n\nReady.\n');
+      mockGetAgentStateSync.mockReturnValue(makeState({
+        id: 'agent-pan-1908-review',
+        role: 'review',
+        status: 'running',
+        workspace,
+        startedAt: '2026-06-15T00:00:00.000Z',
+        reviewRunId,
+      }));
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908-review');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
+      expect(mockResetAgentFailureCount).not.toHaveBeenCalled();
     });
 
     it('skips agents that are already stopped', async () => {
