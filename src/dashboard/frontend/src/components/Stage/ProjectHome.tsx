@@ -66,6 +66,8 @@ export function ProjectHome({
       conversations.map((c) => ({
         id: c.name,
         agentLabel: c.title ?? c.model ?? 'Agent',
+        model: c.model,
+        harness: c.harness,
         timestamp: c.lastAttachedAt ?? c.createdAt,
         preview: c.title ?? undefined,
       })),
@@ -131,6 +133,7 @@ export function ProjectHome({
         workspaceId={api.deckKey}
         openPane={api.openPane}
         wide
+        detailFirst
         header={
           <>
             <WorkspaceHeader variant="project" name={projectName} branch={branch} />

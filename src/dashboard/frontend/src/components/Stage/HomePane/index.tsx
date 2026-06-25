@@ -16,10 +16,12 @@ export interface HomePaneProps {
   timeline?: ReactNode
   detail?: ReactNode
   wide?: boolean
+  detailFirst?: boolean
 }
 
 /** Section render order — project detail/cockpit content sits above conversations. */
 const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'timeline'] as const
+const DETAIL_FIRST_SECTIONS = ['header', 'detail', 'launcher', 'agentDock', 'actionDock', 'timeline'] as const
 
 /**
  * HomePane — the permanent paneType='home' body (PAN-1549). This bead lays out
@@ -28,9 +30,10 @@ const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'ti
  * are populated by later beads; each renders into its named slot here.
  */
 export function HomePane(props: HomePaneProps) {
+  const sections = props.detailFirst ? DETAIL_FIRST_SECTIONS : SECTIONS
   return (
     <div className={props.wide ? `${styles.home} ${styles.homeWide}` : styles.home}>
-      {SECTIONS.map((name) => (
+      {sections.map((name) => (
         <section key={name} data-section={name} className={styles.homeSection}>
           {props[name]}
         </section>

@@ -353,8 +353,8 @@ export function ProjectOverview({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
-        padding: 16,
+        gap: 10,
+        padding: 12,
         overflow: 'auto',
       }}
     >
@@ -377,13 +377,25 @@ export function ProjectOverview({
           const entries = bucketedByPhase.get(phase) ?? [];
           if (entries.length === 0) return null;
           const blockedCount = entries.filter((entry) => isBlockedFeature(entry.feature, entry.reviewStatus)).length;
+          if (!collapsePipelineSections) {
+            return (
+              <PipelineSection
+                key={phase}
+                phase={phase}
+                entries={entries}
+                issueCosts={issueCosts}
+                issueCostDetails={issueCostDetails}
+                onSelectFeature={onSelectFeature}
+                flat
+              />
+            );
+          }
           return (
             <ProjectDisclosure
               key={phase}
               title={phaseLabel(phase)}
               summary={phaseSummary(phase, entries.length, blockedCount)}
               badges={phaseBadges(phase, entries.length, blockedCount)}
-              defaultOpen={!collapsePipelineSections}
             >
               <PipelineSection
                 phase={phase}
@@ -475,7 +487,7 @@ function ProjectCiHealthSection({ health }: { health: ProjectCiHealth }) {
           {statusLabel}
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: 8, borderTop: '1px solid var(--border)', padding: 10, background: 'var(--background)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 8, borderTop: '1px solid var(--border)', padding: 10, background: 'var(--background)' }}>
         <HealthTile label="Required checks" value={`${health.failingChecks} failing`} tone={health.failingChecks > 0 ? 'bad' : 'good'} />
         <HealthTile label="Mergeability" value={`${health.mergeBlocked} blocked`} tone={health.mergeBlocked > 0 ? 'warn' : 'good'} />
         <HealthTile label="Ship-ready" value={`${health.shipReadyClear} clear`} tone="good" />
@@ -590,19 +602,19 @@ function HeroBillboard({ projectName, metrics }: { projectName: string; metrics:
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
         <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>pipeline overview</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
         {metrics.map((m) => (
           <div
             key={m.label}
             style={{
               border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '8px 11px',
+              borderRadius: 10,
+              padding: '7px 9px',
               background: 'color-mix(in srgb, white 1.5%, transparent)',
             }}
           >
             <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>{m.label}</div>
-            <div style={{ marginTop: 2, fontSize: 18, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
+            <div style={{ marginTop: 2, fontSize: 17, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
             {m.sub && <div style={{ marginTop: 1, fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.sub}</div>}
           </div>
         ))}
@@ -617,12 +629,14 @@ function PipelineSection({
   issueCosts,
   issueCostDetails,
   onSelectFeature,
+  flat = false,
 }: {
   phase: PipelineIssuePhase;
   entries: BucketedFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
   onSelectFeature: (feature: ProjectFeature) => void;
+  flat?: boolean;
 }) {
   return (
     <section
@@ -630,15 +644,31 @@ function PipelineSection({
       data-component="command-deck-pipeline-phase"
       data-phase={phase}
       style={{
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: 14,
-        background: 'var(--card)',
+        border: flat ? 'none' : '1px solid var(--border)',
+        borderRadius: flat ? 0 : 14,
+        padding: flat ? 0 : 14,
+        background: flat ? 'transparent' : 'var(--card)',
       }}
     >
-      <PhaseHeader phase={phase} count={entries.length} variant="command-deck" className="static" />
+      <PhaseHeader
+        phase={phase}
+        count={entries.length}
+        variant="command-deck"
+        className="static"
+      />
 
-      <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: flat ? 6 : 0,
+          border: flat ? 'none' : '1px solid var(--border)',
+          borderTop: flat ? 'none' : '1px solid var(--border)',
+          borderRadius: flat ? 0 : 12,
+          overflow: flat ? 'visible' : 'hidden',
+          background: flat ? 'transparent' : 'var(--card)',
+        }}
+      >
         {entries.map(entry => (
           <ProjectIssueRow
             key={entry.feature.issueId}

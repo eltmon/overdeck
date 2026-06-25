@@ -352,10 +352,11 @@ describe('bucketFeaturePhase', () => {
     );
 
     const settings = collapsedDetailsForLabel('Project settings');
-    const review = collapsedDetailsForLabel('Review');
+    const review = screen.getByRole('region', { name: 'review pipeline phase' });
 
     expect(settings).not.toHaveAttribute('open');
-    expect(review).toHaveAttribute('open');
+    expect(review).toHaveTextContent('PAN-1');
+    expect(review.closest('details')).toBeNull();
   });
 
   it('labels structural merge blockers as merge blocked', () => {
