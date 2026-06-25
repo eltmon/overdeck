@@ -1775,3 +1775,25 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
 - **NEXT TICK:** monitor strike-pan-2014 + strike-pan-2056 → merge → close. Operator: clear no-resume / rebase
   1919+2044 / UAT+merge MIN-831+MIN-846. Candidate next strikes (different areas): PAN-2017 (strike spawn-delivery,
   highest pipeline leverage, already planned → `start`), PAN-2054 (close-out not terminal, multi-part → plan).
+---
+
+## 2026-06-25 — Ready-item relevance vet + PAN-2059 Plan→Release / AI-Objection gate (conversation-driven)
+
+Operator marked a batch of backlog issues `ready` and asked for a relevance vet (make-sense / good-to-have /
+still-relevant), the new behavior wired into `roles/flywheel.md` step 1 (vet EVERY item before launch; raise an AI
+objection + park instead of launching blindly). First pass, vetted against current `main`:
+
+- **PAN-1864 → OBJECTED + PARKED** (ready removed). Fixes *convoy* synthesis, but convoy is disabled
+  (`isExtendedReviewEnabled()` returns `false`) and PAN-1982 WI-6 owns its revival. Net-negative to fix a dead path now.
+- **PAN-806 → OBJECTED (held for review)** (ready removed). Still relevant in spirit, but an Epic, partly built
+  (work.md history-rewrite ban + `GIT_SEQUENCE_EDITOR:'false'` already landed), stale refs (`work.md:241`→`254`),
+  and Epic D (#804) dependency still OPEN. Needs re-scope before planning.
+- **KEEP:** PAN-1901 (verified-broken `.beads merge=beads` driver still unconfigured), PAN-1982 (well-specified
+  convoy revival), PAN-2044 (review+test green, PR #2048 ready-to-merge), PAN-1919 (in-flight: live work+review+test
+  sessions — not a backlog item).
+
+Shipped the gate itself (epic PAN-2059): `released` + `objection` states in the shared pickup model
+(`src/lib/backlog/pickup.ts`), label write-door, `/api/backlog/sequence/labels`, the BacklogDAG drawer Plan→Release
+section, and forecast chips/stats. Flywheel now plans routine work with `pan plan --auto` (no `--auto-start`) and
+leaves it awaiting operator Release; `--auto-start` reserved for released items + in-pipeline recovery; `blocks-main`
+strikes stay autonomous but an open objection halts even those.
