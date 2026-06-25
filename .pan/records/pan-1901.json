@@ -73,31 +73,41 @@
   ],
   "feedback": [],
   "created": "2026-06-24T01:04:59.067Z",
-  "updated": "2026-06-24T02:31:49.363Z",
+  "updated": "2026-06-25T09:38:46.172Z",
   "pipeline": {
     "issueId": "PAN-1901",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T01:21:06.293Z"
+    "updatedAt": "2026-06-25T09:38:45.308Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-06-25T03:31:56.321Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2042",
+    "reviewedAtCommit": "6214d54df025268e7de2f0f910ed0dcfb9c539bc",
+    "lastVerifiedCommit": "6214d54df025268e7de2f0f910ed0dcfb9c539bc"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-opus-4-8": {
-            "input": 12916,
-            "output": 137,
-            "cacheRead": 16236,
-            "cacheWrite": 48462
+            "input": 12942,
+            "output": 1744,
+            "cacheRead": 185342,
+            "cacheWrite": 54982
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 8243,
-            "output": 380,
+            "input": 16368,
+            "output": 786,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -109,28 +119,44 @@
             "cacheRead": 2368215,
             "cacheWrite": 153271
           }
+        },
+        "work": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 65,
+            "output": 16581,
+            "cacheRead": 5740093,
+            "cacheWrite": 188947
+          }
         }
       },
       "totals": {
         "anthropic/claude-opus-4-8": {
-          "input": 27300,
-          "output": 54159,
-          "cacheRead": 2384451,
-          "cacheWrite": 201733
+          "input": 27326,
+          "output": 55766,
+          "cacheRead": 2553557,
+          "cacheWrite": 208253
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 8243,
-          "output": 380,
+          "input": 16368,
+          "output": 786,
           "cacheRead": 0,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 65,
+          "output": 16581,
+          "cacheRead": 5740093,
+          "cacheWrite": 188947
         }
       },
       "costAtCloseOut": {
-        "usd": 3.943536,
-        "pricingAsOf": "2026-06-24T01:21:06.321Z"
+        "usd": 6.788637,
+        "pricingAsOf": "2026-06-25T09:38:45.979Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2042"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
