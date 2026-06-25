@@ -79,20 +79,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-25T11:26:00.483Z"
+    },
+    {
+      "timestamp": "2026-06-25T13:17:42.076Z",
+      "reason": "end",
+      "note": "Resolved main integration by merging origin/main after rebase was blocked by workspace policy. Preserved PAN-1901 gitattributes union behavior and PAN-2044 legacy import changes. Verified with focused legacy-import/gitattributes tests, npm run build, and npm test."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T13:17:42.265Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-24T01:04:59.067Z",
-  "updated": "2026-06-25T13:11:57.008Z",
+  "updated": "2026-06-25T13:17:51.232Z",
   "pipeline": {
     "issueId": "PAN-1901",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
-    "mergeStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "running",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T13:11:56.986Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2042"
+    "updatedAt": "2026-06-25T13:17:51.192Z",
+    "reviewNotes": "No blocking findings; union gitattributes change and guard tests reviewed and focused test passed",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2042",
+    "reviewedAtCommit": "835b324d2be3af02bef61b04f0811e45edf74116",
+    "reviewRequestedAt": "2026-06-25T13:17:42.078Z"
   },
   "closeOut": {
     "usage": {
@@ -107,8 +121,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 16368,
-            "output": 786,
+            "input": 16897,
+            "output": 1010,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -138,8 +152,8 @@
           "cacheWrite": 208253
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 16368,
-          "output": 786,
+          "input": 16897,
+          "output": 1010,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -152,7 +166,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.788637,
-        "pricingAsOf": "2026-06-25T13:11:57.007Z"
+        "pricingAsOf": "2026-06-25T13:17:51.230Z"
       }
     },
     "merges": [
