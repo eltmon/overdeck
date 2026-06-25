@@ -1994,3 +1994,48 @@ substrate-bug fixing. Operator did not object to the PAN-1956 strike → read as
   terminal; remaining 3 operator-gated (PAN-1919 re-land, PAN-1982 Release, PAN-806 objection) + merge gate (MIN-831/846
   UAT). minAgents met via the 3 strikes (now idle post-landing). Cleanest backlog substrate bugs harvested; remaining
   open bugs are moderately-scoped (PAN-1789 codex liveness, PAN-1790 handoff parsing, PAN-1900 multi-part UAT codename).
+
+
+## RUN-16 ticks 6-7 (2026-06-25 ~16:05–16:35Z) — PAN-2061 ROOT-CAUSED + workaround restored strikes; +2 more landed (PAN-1789/1790)
+
+Operator nudged a 4th time. PAN-1790 strike also failed worktree creation (3 of last 3) → dug into the substrate code.
+
+- **PAN-2061 ROOT CAUSE FOUND + WORKAROUND VERIFIED.** `src/cli/commands/strike.ts:58` `ensureStrikeWorktree` does
+  `if (existsSync(plan.workspace)) return;` — it skips `git worktree add` whenever the workspace DIR exists, WITHOUT
+  verifying it's a registered worktree. A stale non-worktree scaffold dir (`.agents/.claude/.codex/.git/.pan` present but
+  `.git` is a plain dir, not a worktree pointer — left by a prior failed strike) fools the check → worktree add never runs
+  → no branch, agent lands on primary main → self-aborts. Correlation is EXACT: PAN-1956/1833/1725 (no dir) succeeded;
+  PAN-1722/1789/1790 (stale dir) failed. Manual `git worktree add` is healthy (exit 0, no locks). Posted precise root cause
+  + 1-line fix (check registered worktree, else rm + worktree add) + regression test to PAN-2061.
+
+- **WORKAROUND (restores striking immediately):** before striking an issue with a stale non-worktree dir, `mv` the dir
+  aside so `existsSync` returns false. Verified: after `mv feature-pan-1790-strike .stalebak` + re-strike, the worktree
+  WAS created (`git worktree list` showed it). Applied to PAN-1789 + PAN-1790 → both created worktrees + landed. **This
+  makes the strike path reliable again** — for any strike that fails worktree setup, mv the stale dir + re-strike.
+
+- **+2 substrate bugs STRUCK → LANDED → CLOSED (verify-merged ✓) via the workaround:**
+  - **PAN-1790** — `36a8872c3 fix handoff bare focus guidance` (handoff.ts + test: focus-text-without-conv-id parsing,
+    codex in help string, 500-char limit doc).
+  - **PAN-1789** — `99faeb9c6 Fix live Codex conversation status repair` (conversations route repairs stale `ended` row
+    when tmux shows session alive + isHarnessProcessAlive confirms). Targeted regression passed; full npm test had only
+    environmental failures (EPERM/socket/missing-vite from nobody-owned node_modules) — NOT the fix.
+
+- **PAN-1722 still blocked** — workaround (mv stale dir) didn't fully clear it (accumulated cruft from 4+ prior failed
+  strikes: non-worktree dir + idle session). Needs a full `pan workspace discard`. Left blocked; surfaced.
+
+- **SESSION TOTAL: 6 substrate bugs fixed+closed** (PAN-2060, 1956, 1833, 1725, 1789, 1790) **+ PAN-2061 filed +
+  root-caused** (with verified workaround + precise fix). Strike path restored to reliability. Main green + in sync.
+
+- **DURABLE LESSONS:**
+  - **Strike worktree-skip (PAN-2061) symptom + workaround:** if `pan strike` spawns but `git worktree list` shows no
+    worktree for the issue (agent will self-abort on main), `mv workspaces/feature-pan-<id>-strike{,.stalebak}` then
+    re-strike. Root cause is strike.ts:58 `existsSync` (not a worktree check). Fix pending.
+  - **Strikes that fail to land often leave a stale non-worktree workspace dir** that blocks ALL future strikes on that
+    issue until cleared. Clean failed-strike scaffold (the `.stalebak`/non-worktree dirs) — they hold no source (no
+    registered worktree, `.git` is a dir not a pointer) so rm is safe.
+  - **`nobody`-owned shared `workspaces/node_modules` keeps breaking strike verification** (Vite can't write temp bundle).
+    Each strike solved it differently (symlink primary frontend node_modules / `bun install` / `mkdir node_modules` /
+    `--configLoader runner`). Candidate substrate note if it keeps costing cycles.
+  - **The recurring local-main divergence blocks strike landings.** Strikes using the main-push pattern refuse to push
+    when local main is ahead of origin with unrelated record/state commits. Reconcile (commit doc → `git pull --rebase`
+    → push) at the first sign of strike-landing friction. (Reaffirmed; main self-reconciled via close-outs this time.)
