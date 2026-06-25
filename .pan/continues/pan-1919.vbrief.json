@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-25T03:06:57.960Z",
+  "updated": "2026-06-25T03:15:18.374Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -236,7 +236,45 @@
       "reason": "feedback",
       "note": "[2026-06-25T03:06Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-06-25T03:06:22.647Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:08:24.787Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:08:27.550Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:11Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:11:40.209Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-25T03:14:00.826Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-25T03:14Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-06-25T03:14:53.014Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T03:15:18.374Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-06-25T03:14:53Z",
+      "markdownBody": "# Test failure\n\nTest suite FAILED: 10 failing tests.\n\n1. done.test.ts (2 failures): writeFileSync not imported from fs module (used at lines 27, 115). Tests: accept strike branch, reject unmerged strike branch.\n\n2. weighted-model-ref.test.ts (8 failures): pickWeightedModelRef function exported but not available at import (deterministic, range, ratio, weights, error cases × 2, single entry).\n\nLinting: ✓ Boundary gate passes. Duration: 75s. 7371 passed | 10 failed | 52 skipped\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-1919`."
+    }
+  ]
 }

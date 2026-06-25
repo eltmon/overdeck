@@ -98,6 +98,23 @@ describe('strikeCommand', () => {
     expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-2022');
   });
 
+  it('clears a prior strike session with no runtime state so the issue can be struck again', async () => {
+    const fakePlan = {
+      issueId: 'PAN-2058',
+      workspace: '/tmp/feature-pan-2058-strike',
+      branch: 'strike/pan-2058',
+      sessionName: 'strike-pan-2058',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed(null));
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).resolves.toBe(true);
+
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-2058');
+  });
+
   it('does not clear an active prior strike session', async () => {
     const fakePlan = {
       issueId: 'PAN-2022',
