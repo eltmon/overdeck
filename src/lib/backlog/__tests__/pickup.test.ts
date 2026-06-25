@@ -68,14 +68,27 @@ describe('classifyIssue', () => {
     expect(s.ready).toBe(true);
     expect(s.blocksMain).toBe(true);
   });
+
+  it('reads released + objection labels (PAN-2059)', () => {
+    const lk = lookups({ 'PAN-9': { labels: ['ready', 'released', 'objection'], planned: true } });
+    const s = classifyIssue(node({ issue: 'PAN-9', rank: 1 }), lk);
+    expect(s.released).toBe(true);
+    expect(s.objection).toBe(true);
+    const lk2 = lookups({ 'PAN-10': { labels: ['ready'], planned: true } });
+    const s2 = classifyIssue(node({ issue: 'PAN-10', rank: 1 }), lk2);
+    expect(s2.released).toBe(false);
+    expect(s2.objection).toBe(false);
+  });
 });
 
 describe('isAutoPickable', () => {
-  const base = { ready: true, planned: true, parked: false, vetoed: false, blocksMain: false, inPipeline: false, gate: 'auto' as const };
-  it('requires ready AND planned, excludes parked/vetoed/in-flight', () => {
+  const base = { ready: true, planned: true, released: true, objection: false, parked: false, vetoed: false, blocksMain: false, inPipeline: false, gate: 'auto' as const };
+  it('requires ready AND planned AND released, excludes parked/vetoed/objected/in-flight', () => {
     expect(isAutoPickable(base)).toBe(true);
-    expect(isAutoPickable({ ...base, ready: false })).toBe(false);   // DoR gate
-    expect(isAutoPickable({ ...base, planned: false })).toBe(false); // needs spec
+    expect(isAutoPickable({ ...base, ready: false })).toBe(false);    // DoR gate
+    expect(isAutoPickable({ ...base, planned: false })).toBe(false);  // needs spec
+    expect(isAutoPickable({ ...base, released: false })).toBe(false); // PAN-2059: planned but not released
+    expect(isAutoPickable({ ...base, objection: true })).toBe(false); // PAN-2059: open objection halts pickup
     expect(isAutoPickable({ ...base, parked: true })).toBe(false);
     expect(isAutoPickable({ ...base, vetoed: true })).toBe(false);
     expect(isAutoPickable({ ...base, inPipeline: true })).toBe(false);
@@ -83,10 +96,12 @@ describe('isAutoPickable', () => {
 });
 
 describe('isUnblockEligible (override)', () => {
-  it('blocks-main bypasses ready/planned, but vetoed is an absolute stop', () => {
-    expect(isUnblockEligible({ ready: false, planned: false, parked: false, vetoed: false, blocksMain: true, inPipeline: false, gate: 'auto' })).toBe(true);
-    expect(isUnblockEligible({ ready: false, planned: false, parked: false, vetoed: true, blocksMain: true, inPipeline: false, gate: 'vetoed' })).toBe(false);
-    expect(isUnblockEligible({ ready: true, planned: true, parked: false, vetoed: false, blocksMain: false, inPipeline: false, gate: 'auto' })).toBe(false);
+  const u = { ready: false, planned: false, released: false, objection: false, parked: false, vetoed: false, blocksMain: true, inPipeline: false, gate: 'auto' as const };
+  it('blocks-main bypasses ready/planned/released, but vetoed and objection are stops', () => {
+    expect(isUnblockEligible(u)).toBe(true);
+    expect(isUnblockEligible({ ...u, vetoed: true, gate: 'vetoed' })).toBe(false);
+    expect(isUnblockEligible({ ...u, objection: true })).toBe(false); // PAN-2059: open objection halts even blocks-main
+    expect(isUnblockEligible({ ...u, blocksMain: false, ready: true, planned: true, released: true })).toBe(false);
   });
 });
 
@@ -97,7 +112,7 @@ describe('pickableQueue ordering', () => {
       node({ issue: 'B', rank: 2, gate: 'ready' }), // promote
       node({ issue: 'C', rank: 3 }),
     ];
-    const lk = lookups({ A: { labels: ['ready'], planned: true }, B: { labels: ['ready'], planned: true }, C: { labels: ['ready'], planned: true } });
+    const lk = lookups({ A: { labels: ['ready', 'released'], planned: true }, B: { labels: ['ready', 'released'], planned: true }, C: { labels: ['ready', 'released'], planned: true } });
     expect(pickableQueue(nodes, lk).map((n) => n.issue)).toEqual(['B', 'A', 'C']);
   });
 });
@@ -109,9 +124,9 @@ describe('computeWaves', () => {
       node({ issue: 'D', rank: 4 }), node({ issue: 'E', rank: 5 }),
     ];
     const lk = lookups({
-      A: { labels: ['ready'], planned: true }, B: { labels: ['ready'], planned: true },
-      C: { labels: ['ready'], planned: true }, D: { labels: ['ready'], planned: false }, // not planned
-      E: { labels: ['ready'], planned: true, inPipeline: true }, // in flight
+      A: { labels: ['ready', 'released'], planned: true }, B: { labels: ['ready', 'released'], planned: true },
+      C: { labels: ['ready', 'released'], planned: true }, D: { labels: ['ready', 'released'], planned: false }, // not planned
+      E: { labels: ['ready', 'released'], planned: true, inPipeline: true }, // in flight
     });
     const waves = computeWaves(nodes, lk, 2);
     expect(waves.map((w) => w.map((n) => n.issue))).toEqual([['A', 'B'], ['C']]);
@@ -126,7 +141,7 @@ describe('computeLanes', () => {
       node({ issue: 'C', rank: 3, size: 'M' }), // 3
       node({ issue: 'D', rank: 4, size: 'M' }), // 3
     ];
-    const lk = lookups(Object.fromEntries(['A', 'B', 'C', 'D'].map((i) => [i, { labels: ['ready'], planned: true }])));
+    const lk = lookups(Object.fromEntries(['A', 'B', 'C', 'D'].map((i) => [i, { labels: ['ready', 'released'], planned: true }])));
     const { blocks, makespan } = computeLanes(nodes, lk, 3);
     // lanes: A→L0[0-3], B→L1[0-5], C→L2[0-3], D→earliest free (L0 or L2 @3)→[3-6]
     expect(blocks.length).toBe(4);
@@ -144,8 +159,8 @@ describe('computeCohort', () => {
     ];
     const lk = lookups({
       IF1: { inPipeline: true },
-      P1: { labels: ['ready'], planned: true }, P2: { labels: ['ready'], planned: true },
-      P3: { labels: ['ready'], planned: true }, P4: { labels: ['ready'], planned: true },
+      P1: { labels: ['ready', 'released'], planned: true }, P2: { labels: ['ready', 'released'], planned: true },
+      P3: { labels: ['ready', 'released'], planned: true }, P4: { labels: ['ready', 'released'], planned: true },
     });
     const cohort = computeCohort(nodes, lk, 1); // 2n = 2 pickable + in-flight
     expect(cohort).toContain('IF1');
@@ -183,26 +198,33 @@ describe('selectUnblockTargets', () => {
 });
 
 describe('computeStats', () => {
-  it('counts each state', () => {
+  it('counts each state, incl. released / objection / needsRelease (PAN-2059)', () => {
     const nodes = [
       node({ issue: 'IF', rank: 1 }),
-      node({ issue: 'RP', rank: 2 }),  // ready+planned (pickable)
+      node({ issue: 'RP', rank: 2 }),  // ready+planned+released (pickable)
       node({ issue: 'RN', rank: 3 }),  // ready, not planned (needs planning)
-      node({ issue: 'V', rank: 4 }),   // vetoed
-      node({ issue: 'BM', rank: 5 }),  // blocks-main
+      node({ issue: 'NR', rank: 4 }),  // ready+planned, NOT released (needs release)
+      node({ issue: 'OBJ', rank: 5 }), // ready+planned+released but objected (not pickable)
+      node({ issue: 'V', rank: 6 }),   // vetoed
+      node({ issue: 'BM', rank: 7 }),  // blocks-main (pickable)
     ];
     const lk = lookups({
       IF: { inPipeline: true },
-      RP: { labels: ['ready'], planned: true },
+      RP: { labels: ['ready', 'released'], planned: true },
       RN: { labels: ['ready'], planned: false },
+      NR: { labels: ['ready'], planned: true },
+      OBJ: { labels: ['ready', 'released', 'objection'], planned: true },
       V: { labels: ['vetoed'] },
-      BM: { labels: ['blocks-main', 'ready'], planned: true },
+      BM: { labels: ['blocks-main', 'ready', 'released'], planned: true },
     });
     const s = computeStats(nodes, lk);
-    expect(s.total).toBe(5);
+    expect(s.total).toBe(7);
     expect(s.inFlight).toBe(1);
-    expect(s.pickable).toBe(2); // RP + BM
+    expect(s.pickable).toBe(2); // RP + BM (OBJ excluded by objection, NR excluded by no-release)
     expect(s.needsPlanning).toBe(1); // RN
+    expect(s.needsRelease).toBe(1); // NR
+    expect(s.released).toBe(3); // RP, OBJ, BM
+    expect(s.objection).toBe(1); // OBJ
     expect(s.vetoed).toBe(1);
     expect(s.blocksMain).toBe(1);
   });

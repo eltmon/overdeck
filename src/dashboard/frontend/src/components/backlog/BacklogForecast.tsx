@@ -7,7 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 
 interface PipelineState {
   ready: boolean; planned: boolean; parked: boolean; vetoed: boolean;
-  blocksMain: boolean; inPipeline: boolean; gate: 'auto' | 'promote' | 'vetoed';
+  blocksMain: boolean; inPipeline: boolean; released: boolean; objection: boolean;
+  gate: 'auto' | 'promote' | 'vetoed';
 }
 interface ForecastNode {
   issue: string; rank: number; size: string; state: PipelineState;
@@ -15,8 +16,9 @@ interface ForecastNode {
 }
 interface LaneBlock extends ForecastNode { lane: number; start: number; end: number; }
 interface ForecastStats {
-  total: number; inFlight: number; ready: number; planned: number; pickable: number;
-  needsPlanning: number; parked: number; vetoed: number; blocksMain: number;
+  total: number; inFlight: number; ready: number; planned: number; released: number;
+  objection: number; pickable: number; needsPlanning: number; needsRelease: number;
+  parked: number; vetoed: number; blocksMain: number;
 }
 interface ForecastResponse {
   n: number; stats: ForecastStats | null; inFlight: ForecastNode[];
@@ -31,10 +33,13 @@ function Chips({ s }: { s: PipelineState }) {
       {s.inPipeline && <span className="bkf-chip run"><span className="bkf-dot" />in flight</span>}
       {s.blocksMain && <span className="bkf-chip blocksmain">🔴 blocks main</span>}
       {s.vetoed && <span className="bkf-chip vetoed">⛔ vetoed</span>}
+      {s.objection && <span className="bkf-chip objection">🛑 objection</span>}
       {s.parked && <span className="bkf-chip parked">⏸ parked</span>}
       {s.ready && <span className="bkf-chip ready">✓ ready</span>}
       {s.planned && <span className="bkf-chip planned">planned</span>}
-      {!s.planned && !s.parked && !s.vetoed && <span className="bkf-chip needsplan">needs plan</span>}
+      {s.planned && s.released && <span className="bkf-chip released">▶ released</span>}
+      {s.planned && !s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline && <span className="bkf-chip needsrelease">needs release</span>}
+      {!s.planned && !s.parked && !s.vetoed && !s.objection && <span className="bkf-chip needsplan">needs plan</span>}
     </div>
   );
 }
@@ -43,6 +48,7 @@ function Card({ n, onSelect }: { n: ForecastNode; onSelect?: (id: string) => voi
   const cls = ['bkf-card', IMP_CLASS[n.importance] ?? 'medium'];
   if (n.state.inPipeline) cls.push('pipe');
   if (n.state.blocksMain) cls.push('blocksmain');
+  if (n.state.objection) cls.push('objection');
   if (n.state.parked) cls.push('parked');
   if (n.state.vetoed) cls.push('vetoed');
   return (
@@ -89,6 +95,9 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
           <Stat k="Planned" v={stats.planned} c="info" />
           <Stat k="Pickable" v={stats.pickable} c="go" />
           <Stat k="Needs planning" v={stats.needsPlanning} c="warn" />
+          <Stat k="Needs release" v={stats.needsRelease} c="warn" />
+          <Stat k="Released" v={stats.released} c="go" />
+          <Stat k="Objection" v={stats.objection} c="danger" />
           <Stat k="Parked" v={stats.parked} c="" />
           <Stat k="Vetoed" v={stats.vetoed} c="" />
           <Stat k="Blocks main" v={stats.blocksMain} c="danger" />
@@ -179,6 +188,7 @@ const BKF_CSS = `
   .bkf-card.crit{--heat:var(--destructive);} .bkf-card.high{--heat:var(--warning);} .bkf-card.medium{--heat:color-mix(in srgb,var(--color-neutral-400) 80%,transparent);} .bkf-card.low{--heat:color-mix(in srgb,var(--muted-foreground) 55%,transparent);}
   .bkf-card.pipe { box-shadow:0 0 0 1.5px var(--info),0 0 12px color-mix(in srgb,var(--info) 40%,transparent); }
   .bkf-card.blocksmain { box-shadow:0 0 0 1.5px var(--destructive),0 0 12px color-mix(in srgb,var(--destructive) 35%,transparent); }
+  .bkf-card.objection { box-shadow:0 0 0 1.5px color-mix(in srgb,var(--destructive) 70%,transparent),0 0 12px color-mix(in srgb,var(--destructive) 30%,transparent); }
   .bkf-card.parked { opacity:.6; border-style:dashed; }
   .bkf-card.vetoed { opacity:.5; filter:grayscale(.5); border-style:dashed; }
   .bkf-r1 { display:flex; align-items:center; gap:6px; }
@@ -194,6 +204,9 @@ const BKF_CSS = `
   .bkf-chip.parked { color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 34%,transparent); background:color-mix(in srgb,var(--warning) 9%,transparent); }
   .bkf-chip.vetoed { color:var(--muted-foreground); border-color:var(--border); background:var(--accent); }
   .bkf-chip.blocksmain { color:var(--destructive-foreground); border-color:color-mix(in srgb,var(--destructive) 38%,transparent); background:color-mix(in srgb,var(--destructive) 9%,transparent); }
+  .bkf-chip.objection { color:var(--destructive-foreground); border-color:color-mix(in srgb,var(--destructive) 40%,transparent); background:color-mix(in srgb,var(--destructive) 11%,transparent); }
+  .bkf-chip.released { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 40%,transparent); background:color-mix(in srgb,var(--success) 12%,transparent); }
+  .bkf-chip.needsrelease { color:var(--muted-foreground); border-color:color-mix(in srgb,var(--warning) 30%,transparent); background:color-mix(in srgb,var(--warning) 7%,transparent); }
   .bkf-chip.needsplan { color:var(--muted-foreground); border-color:var(--border); background:var(--accent); }
   .bkf-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
   .bkf-gantt { border:1px solid var(--border); border-radius:12px; background:color-mix(in srgb,var(--background) 92%,var(--color-white)); padding:14px 16px; }
