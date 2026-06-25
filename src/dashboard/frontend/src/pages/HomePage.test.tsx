@@ -139,7 +139,9 @@ describe('HomePage', () => {
         running: makeAgent({ id: 'running', status: 'running' }),
         liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLiveTmuxSession: true }),
         paused: makeAgent({ id: 'paused', status: 'stopped', paused: true }),
-        troubled: makeAgent({ id: 'troubled', status: 'stopped', consecutiveFailures: 2 }),
+        troubled: makeAgent({ id: 'troubled', status: 'stopped', troubled: true, consecutiveFailures: 2 }),
+        failedAgent: makeAgent({ id: 'failedAgent', status: 'failed', consecutiveFailures: 1 }),
+        staleStoppedFailure: makeAgent({ id: 'staleStoppedFailure', status: 'stopped', consecutiveFailures: 1 }),
       },
       reviewStatusByIssueId: {
         recentMerge: { issueId: 'PAN-1', mergeStatus: 'merged', updatedAt: '2026-05-25T00:00:00.000Z' },
@@ -155,7 +157,7 @@ describe('HomePage', () => {
     renderHomePage({ now: new Date('2026-05-25T12:00:00.000Z') });
 
     expect(summaryCard('Running agents')).toHaveTextContent('2');
-    expect(summaryCard('Paused / troubled')).toHaveTextContent('2');
+    expect(summaryCard('Paused / troubled')).toHaveTextContent('3');
     expect(summaryCard('Merged today')).toHaveTextContent('1');
     expect(summaryCard('Needs verification')).toHaveTextContent('2');
     expect(await screen.findByText('$12.35')).toBeInTheDocument();

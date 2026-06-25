@@ -476,7 +476,9 @@ function isRunningAgent(agent: AgentSnapshot): boolean {
 }
 
 function isGatedAgent(agent: AgentSnapshot): boolean {
-  return agent.paused === true || agent.troubled === true || (agent.consecutiveFailures ?? 0) > 0;
+  return agent.paused === true ||
+    agent.troubled === true ||
+    (agent.status !== 'stopped' && (agent.consecutiveFailures ?? 0) > 0);
 }
 
 function isRecentMerge(status: ReviewStatusSnapshot, now: Date): boolean {
