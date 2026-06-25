@@ -10,23 +10,16 @@ import {
   findVBriefByIssueSync,
   moveVBrief,
   moveVBriefFilesOnly,
-  promoteContinueToProject,
   promoteVBriefToProposed,
   transitionVBriefOnMain,
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
-  continueFilePath,
-  writeContinueStateSync,
-  type ContinueState,
-} from '../continue-state.js';
-import { getContinueFilePath } from '../../pan-dir/continues.js';
-import {
   ensureVBriefDirsSync,
   generateVBriefFilename,
   resolveVBriefDir,
 } from '../lifecycle.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -186,26 +179,10 @@ describe('moveVBriefFilesOnly', () => {
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    const continueState: ContinueState = {
-      version: '1',
-      issueId: 'PAN-1',
-      created: '2026-05-03T00:00:00Z',
-      updated: '2026-05-03T00:00:00Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-    };
-    writeContinueStateSync(TEST_DIR, 'PAN-1', continueState);
-
     const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
     expect(existsSync(oldPath)).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
     expect(result.toPath).toBe(join(TEST_DIR, '.pan', 'specs', filename));
-    // Continue file lives at canonical path; lifecycle dir move has no effect on it
-    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-1'))).toBe(true);
 
     const movedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument & { status: string };
     expect(movedDoc.status).toBe('active');
@@ -271,7 +248,7 @@ describe('moveVBrief (with git staging)', () => {
 });
 
 describe('deleteVBrief', () => {
-  it('deletes scope vBRIEF and continue file', () => {
+  it('deletes the scope vBRIEF file', () => {
     ensureVBriefDirsSync(TEST_DIR);
     const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
@@ -279,21 +256,8 @@ describe('deleteVBrief', () => {
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    writeContinueStateSync(TEST_DIR, 'PAN-1', {
-      version: '1',
-      issueId: 'PAN-1',
-      created: '2026-05-03T00:00:00Z',
-      updated: '2026-05-03T00:00:00Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-    });
     expect(deleteVBrief(TEST_DIR, 'PAN-1')).toBe(true);
     expect(existsSync(path)).toBe(false);
-    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-1'))).toBe(false);
   });
 
   it('returns false when issue has no vBRIEF', () => {
@@ -367,50 +331,16 @@ describe('promoteVBriefToProposed', () => {
     expect(result.canonicalFilename).toMatch(/PAN-3/);
   });
 
-  it('copies continue file when present', () => {
+  it('always returns destContinue null (continue promotion retired in PAN-1919)', () => {
     const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-4');
     const plan = makePlan('PAN-4', 'with-continue');
     plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-4-with-continue.vbrief.json' };
     createWorkspace(workspacePath, plan);
 
-    // Write a continue file in the workspace .pan/
-    const continueFileName = 'continue-PAN-4.vbrief.json';
-    const continueContent: ContinueState = {
-      version: '1',
-      issueId: 'PAN-4',
-      created: '2026-05-03T00:00:00Z',
-      updated: '2026-05-03T00:00:00Z',
-      gitState: { branch: 'feature/pan-4', sha: 'abc123', dirty: false },
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-    };
-    writeFileSync(
-      join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME),
-      JSON.stringify(continueContent, null, 2),
-      'utf-8',
-    );
-
     const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
 
-    expect(result.destContinue).toBe(getContinueFilePath(TEST_DIR, 'pan-4'));
-    expect(existsSync(result.destContinue!)).toBe(true);
-    const copied = JSON.parse(readFileSync(result.destContinue!, 'utf-8'));
-    expect(copied.issueId).toBe('PAN-4');
-  });
-
-  it('returns destContinue null when continue file is absent', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-5');
-    const plan = makePlan('PAN-5', 'no-continue');
-    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-5-no-continue.vbrief.json' };
-    createWorkspace(workspacePath, plan);
-
-    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-5');
-
     expect(result.destContinue).toBeNull();
-    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-5'))).toBe(false);
+    expect(existsSync(result.destVBrief)).toBe(true);
   });
 
   it('creates canonical .pan/specs storage if it does not exist yet', () => {
@@ -449,57 +379,6 @@ describe('promoteVBriefToProposed', () => {
 
     const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
     expect(copied.plan.title).toBe('Updated title');
-  });
-});
-
-describe('promoteContinueToProject', () => {
-  function writeWorkspaceContinue(workspacePath: string, state: ContinueState): void {
-    const panDir = join(workspacePath, PAN_DIRNAME);
-    mkdirSync(panDir, { recursive: true });
-    writeFileSync(
-      join(panDir, PAN_CONTINUE_FILENAME),
-      JSON.stringify(state, null, 2),
-      'utf-8',
-    );
-  }
-
-  it('returns null when the workspace has no continue file', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-100');
-    mkdirSync(workspacePath, { recursive: true });
-    expect(promoteContinueToProject(workspacePath, TEST_DIR, 'PAN-100')).toBeNull();
-    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-100'))).toBe(false);
-  });
-
-  it('carries the planning agent decisions/hazards into the project continue (PAN-1395 regression)', () => {
-    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-101');
-    const continueContent: ContinueState = {
-      version: '1',
-      issueId: 'PAN-101',
-      created: '2026-05-31T21:30:18.000Z',
-      updated: '2026-05-31T22:26:09.000Z',
-      gitState: { branch: 'feature/pan-101', sha: 'deadbee', dirty: false },
-      decisions: [
-        { id: 'D1', summary: 'Embedding provider: cloud-default + pluggable.', recordedAt: '2026-05-31T21:30:18.000Z' },
-        { id: 'D2', summary: 'Indexing: hybrid startup scan + watcher.', recordedAt: '2026-05-31T21:30:18.000Z' },
-      ],
-      hazards: [
-        { id: 'H1', summary: 'sqlite-vec is a native loadable extension.', mitigation: 'Fail closed if load fails.' },
-      ],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-    };
-    writeWorkspaceContinue(workspacePath, continueContent);
-
-    const dest = promoteContinueToProject(workspacePath, TEST_DIR, 'PAN-101');
-
-    expect(dest).toBe(getContinueFilePath(TEST_DIR, 'pan-101'));
-    expect(existsSync(dest!)).toBe(true);
-    const promoted = JSON.parse(readFileSync(dest!, 'utf-8')) as ContinueState;
-    expect(promoted.decisions).toHaveLength(2);
-    expect(promoted.decisions.map((d) => d.id)).toEqual(['D1', 'D2']);
-    expect(promoted.hazards).toHaveLength(1);
-    expect(promoted.hazards[0]!.id).toBe('H1');
   });
 });
 
@@ -610,21 +489,8 @@ describe('transitionVBriefOnMain', () => {
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    const continueState: ContinueState = {
-      version: '1',
-      issueId: 'PAN-1',
-      created: '2026-05-03T00:00:00Z',
-      updated: '2026-05-03T00:00:00Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-    };
-    writeContinueStateSync(TEST_DIR, 'PAN-1', continueState);
     execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "seed with continue"', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "seed"', { cwd: TEST_DIR });
 
     const result = await Effect.runPromise(transitionVBriefOnMain(
       TEST_DIR,
@@ -634,8 +500,6 @@ describe('transitionVBriefOnMain', () => {
       'scope: approve PAN-1 vBRIEF',
     ));
 
-    // Continue file stays at canonical path; lifecycle dir transition has no effect on it
-    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-1'))).toBe(true);
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
     expect(result.committed).toBe(true);

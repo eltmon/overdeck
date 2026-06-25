@@ -15,6 +15,7 @@ const mockGetCostBreakdownByStageAndModel = vi.hoisted(() => vi.fn());
 const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
+const mockListOverdeckAgentStatesSync = vi.hoisted(() => vi.fn());
 
 // records.ts now imports from overdeck/cost-sync (not database/cost-events-db)
 vi.mock('../../overdeck/cost-sync.js', () => ({
@@ -30,6 +31,22 @@ vi.mock('../auto-commit.js', () => ({
   queueAutoCommit: mockQueueAutoCommit,
 }));
 
+vi.mock('../../overdeck/agent-state-sync.js', () => ({
+  listOverdeckAgentStatesSync: mockListOverdeckAgentStatesSync,
+  getOverdeckAgentStateSync: vi.fn(),
+  saveOverdeckAgentStateSync: vi.fn(),
+}));
+
+const mockResolveProjectFromIssueSync = vi.hoisted(() => vi.fn().mockReturnValue(null));
+
+vi.mock('../../projects.js', async () => {
+  const actual = await vi.importActual<typeof import('../../projects.js')>('../../projects.js');
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: mockResolveProjectFromIssueSync,
+  };
+});
+
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import {
@@ -42,6 +59,20 @@ import {
   clearIssueOwner,
 } from '../records.js';
 
+import {
+  readIssueRecordSync,
+  readRecordContinueViewSync,
+  RECORD_SCHEMA_VERSION,
+  writeRecordDecisionsSync,
+  writeRecordDecisions,
+  writeRecordHazardsSync,
+  writeRecordHazards,
+  writeRecordResumePointSync,
+  writeRecordResumePoint,
+  writeRecordBeadsMappingSync,
+  writeRecordBeadsMapping,
+} from '../record.js';
+
 describe('buildIssueRecord', () => {
   let projectRoot: string;
 
@@ -50,6 +81,7 @@ describe('buildIssueRecord', () => {
     mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
     mockGetCostForIssueFromDb.mockReturnValue(null);
     mockGetMergeSetSync.mockReturnValue(null);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
     mockQueueAutoCommit.mockClear();
   });
 
@@ -326,5 +358,365 @@ describe('getIssueRecordPath', () => {
   it('defaults to .pan/records/<issue>.json', () => {
     const project: ProjectConfig = { name: 'Test', path: tmp };
     expect(getIssueRecordPath(project, 'PAN-1908')).toBe(join(tmp, '.pan', 'records', 'pan-1908.json'));
+  });
+});
+
+// ─── PAN-1919: readRecordContinueViewSync ─────────────────────────────────────
+
+describe('readRecordContinueViewSync (PAN-1919)', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-cv-'));
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('returns null when no record file exists', () => {
+    const project = makeProject();
+    const view = readRecordContinueViewSync(project, 'PAN-1919');
+    expect(view).toBeNull();
+  });
+
+  it('returns a ContinueState-shaped projection from the record', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      decisions: [{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }],
+      hazards: [{ id: 'H1', summary: 'big change', mitigation: 'audit' }],
+      resumePoint: { description: 'resume here', beadId: 'bead-abc' },
+      beadsMapping: { 'item-1': ['bead-a'] },
+      sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
+      feedback: [{ seq: 1, specialist: 'review-agent', outcome: 'approved', timestamp: '2026-01-01T00:00:00.000Z', markdownBody: 'lgtm' }],
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    const view = readRecordContinueViewSync(project, 'PAN-1919');
+    expect(view).not.toBeNull();
+    expect(view?.decisions).toEqual([{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }]);
+    expect(view?.hazards).toEqual([{ id: 'H1', summary: 'big change', mitigation: 'audit' }]);
+    expect(view?.resumePoint).toEqual({ description: 'resume here', beadId: 'bead-abc' });
+    expect(view?.beadsMapping).toEqual({ 'item-1': ['bead-a'] });
+    expect(view?.sessionHistory).toHaveLength(1);
+    expect(view?.feedback).toHaveLength(1);
+  });
+
+  it('returns empty arrays for missing optional fields', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    const view = readRecordContinueViewSync(project, 'PAN-1919');
+    expect(view?.decisions).toEqual([]);
+    expect(view?.hazards).toEqual([]);
+    expect(view?.resumePoint).toBeNull();
+    expect(view?.beadsMapping).toEqual({});
+    expect(view?.sessionHistory).toEqual([]);
+    expect(view?.feedback).toEqual([]);
+  });
+});
+
+// ─── PAN-1919: continue field setters ─────────────────────────────────────────
+
+describe('writeRecordDecisions / writeRecordDecisionsSync (PAN-1919)', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-decisions-'));
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('sync: persists decisions and leaves other fields intact', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      hazards: [{ id: 'H1', summary: 'risk', mitigation: 'audit' }],
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    const decisions = [{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }];
+    writeRecordDecisionsSync(project, 'PAN-1919', decisions);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.decisions).toEqual(decisions);
+    expect(record?.hazards).toEqual([{ id: 'H1', summary: 'risk', mitigation: 'audit' }]);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+
+  it('async: persists decisions and queues commit', async () => {
+    const project = makeProject();
+    const decisions = [{ id: 'D2', summary: 'async', recordedAt: '2026-01-02' }];
+    await writeRecordDecisions(project, 'PAN-1919', decisions);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.decisions).toEqual(decisions);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+});
+
+describe('writeRecordHazards / writeRecordHazardsSync (PAN-1919)', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-hazards-'));
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('sync: persists hazards and leaves other fields intact', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      decisions: [{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }],
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    const hazards = [{ id: 'H1', summary: 'new hazard', mitigation: 'audit' }];
+    writeRecordHazardsSync(project, 'PAN-1919', hazards);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.hazards).toEqual(hazards);
+    expect(record?.decisions).toEqual([{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }]);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+
+  it('async: persists hazards and queues commit', async () => {
+    const project = makeProject();
+    const hazards = [{ id: 'H2', summary: 'async hazard', mitigation: 'watch' }];
+    await writeRecordHazards(project, 'PAN-1919', hazards);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.hazards).toEqual(hazards);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+});
+
+describe('writeRecordResumePoint / writeRecordResumePointSync (PAN-1919)', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-resume-'));
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('sync: persists resumePoint and leaves other fields intact', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      decisions: [{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }],
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    const resumePoint = { description: 'continue from bead-x', beadId: 'bead-x' };
+    writeRecordResumePointSync(project, 'PAN-1919', resumePoint);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.resumePoint).toEqual(resumePoint);
+    expect(record?.decisions).toEqual([{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }]);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+
+  it('sync: can clear resumePoint to null', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      resumePoint: { description: 'old', beadId: 'bead-old' },
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    writeRecordResumePointSync(project, 'PAN-1919', null);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.resumePoint).toBeNull();
+  });
+
+  it('async: persists resumePoint and queues commit', async () => {
+    const project = makeProject();
+    const resumePoint = { description: 'async resume', beadId: 'bead-async' };
+    await writeRecordResumePoint(project, 'PAN-1919', resumePoint);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.resumePoint).toEqual(resumePoint);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+});
+
+describe('writeRecordBeadsMapping / writeRecordBeadsMappingSync (PAN-1919)', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-beads-'));
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('sync: persists beadsMapping and leaves other fields intact', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      decisions: [{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }],
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    const beadsMapping = { 'item-1': ['bead-a', 'bead-b'], 'item-2': ['bead-c'] };
+    writeRecordBeadsMappingSync(project, 'PAN-1919', beadsMapping);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.beadsMapping).toEqual(beadsMapping);
+    expect(record?.decisions).toEqual([{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }]);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+
+  it('async: persists beadsMapping and queues commit', async () => {
+    const project = makeProject();
+    const beadsMapping = { 'async-item': ['bead-x'] };
+    await writeRecordBeadsMapping(project, 'PAN-1919', beadsMapping);
+
+    const record = readIssueRecordSync(project, 'PAN-1919');
+    expect(record?.beadsMapping).toEqual(beadsMapping);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+});
+
+describe('PAN-1919: buildIssueRecord backfill migration', () => {
+  function makeProject(): ProjectConfig {
+    const path = mkdtempSync(join(tmpdir(), 'pan-records-build-'));
+    return { name: 'Test', path };
+  }
+
+  beforeEach(() => {
+    mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
+    mockGetCostForIssueFromDb.mockReturnValue(null);
+    mockGetMergeSetSync.mockReturnValue(null);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
+    mockResolveProjectFromIssueSync.mockReturnValue(null);
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    mockResolveProjectFromIssueSync.mockReturnValue(null);
+  });
+
+  it('produces a record with schemaVersion equal to RECORD_SCHEMA_VERSION (2)', async () => {
+    const project = makeProject();
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.schemaVersion).toBe(RECORD_SCHEMA_VERSION);
+    expect(record.schemaVersion).toBe(2);
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('folds workspace continue statusOverrides into the record', async () => {
+    const project = makeProject();
+    const workspaceDir = join(project.path, 'workspaces', 'feature-pan-1919');
+    mkdirSync(join(workspaceDir, '.pan'), { recursive: true });
+    writeFileSync(
+      join(workspaceDir, '.pan', 'continue.json'),
+      JSON.stringify({ statusOverrides: { 'item-1': 'completed', 'item-2': 'skipped' } }),
+    );
+    mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'pan', projectPath: project.path });
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.statusOverrides).toEqual({ 'item-1': 'completed', 'item-2': 'skipped' });
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('returns undefined statusOverrides when no workspace continue exists', async () => {
+    const project = makeProject();
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.statusOverrides).toBeUndefined();
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('folds harness and model from agents table into the record', async () => {
+    const project = makeProject();
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      {
+        id: 'agent-pan-1919',
+        issueId: 'PAN-1919',
+        role: 'work',
+        harness: 'claude-code',
+        model: 'claude-opus-4-8',
+        status: 'stopped',
+        startedAt: '2026-06-21T00:00:00.000Z',
+      },
+    ]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('claude-code');
+    expect(record.model).toBe('claude-opus-4-8');
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('prefers existing record harness/model over agents table', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      harness: 'pi',
+      model: 'kimi-k2.5',
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      { id: 'agent-pan-1919', issueId: 'PAN-1919', role: 'work', harness: 'claude-code', model: 'claude-opus-4-8', status: 'stopped', startedAt: '2026-06-21T00:00:00.000Z' },
+    ]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('pi');
+    expect(record.model).toBe('kimi-k2.5');
+    rmSync(project.path, { recursive: true, force: true });
   });
 });

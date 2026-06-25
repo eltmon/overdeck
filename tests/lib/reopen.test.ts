@@ -242,39 +242,40 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  // PAN-946 regression: when a continue file already exists at the canonical path,
-  // reopen MUST append the resume breadcrumb to that file rather than creating
-  // a new one alongside a lifecycle directory.
-  describe('lifecycle-aware continue file appends', () => {
-    function seedContinueFile(projectRoot: string, issueId: string): string {
-      const continueDir = join(projectRoot, '.pan', 'continues');
-      mkdirSync(continueDir, { recursive: true });
-      const continuePath = join(continueDir, `${issueId.toLowerCase()}.vbrief.json`);
+  // PAN-946 regression: reopen MUST append a resume breadcrumb to the per-issue
+  // record. PAN-1919: the old .pan/continues/ files are retired; all session
+  // history now goes through the per-issue record at .pan/records/<issue>.json.
+  describe('record-aware session history appends', () => {
+    function seedRecord(projectRoot: string, issueId: string): void {
+      const recordDir = join(projectRoot, '.pan', 'records');
+      mkdirSync(recordDir, { recursive: true });
+      const now = '2026-05-04T00:00:00Z';
       writeFileSync(
-        continuePath,
+        join(recordDir, `${issueId.toLowerCase()}.json`),
         JSON.stringify({
-          version: '1',
           issueId,
-          created: '2026-05-04T00:00:00Z',
-          updated: '2026-05-04T00:00:00Z',
-          gitState: {},
+          schemaVersion: 2,
+          created: now,
+          updated: now,
           decisions: [],
           hazards: [],
           resumePoint: null,
           beadsMapping: {},
+          statusOverrides: {},
           sessionHistory: [
-            { timestamp: '2026-05-04T00:00:00Z', reason: 'planning', note: 'initial seed' },
+            { timestamp: now, reason: 'planning', note: 'initial seed' },
           ],
+          feedback: [],
+          pipeline: null,
+          closeOut: null,
         }),
         'utf-8',
       );
-      return continuePath;
     }
 
-    it('appends to a continue file in .pan/continues/ rather than creating a new one', async () => {
+    it('appends a resume breadcrumb to the per-issue record (PAN-1919)', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
-      const continuePath = seedContinueFile(projectRoot, 'PAN-901');
-      const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-901.vbrief.json');
+      seedRecord(projectRoot, 'PAN-901');
       projectStub = { projectPath: projectRoot };
 
       seedStatus({
@@ -285,11 +286,8 @@ describe('reopenWorkspaceState', () => {
       const result = await Effect.runPromise(reopenWorkspaceState('PAN-901', wsDir, { reason: 'redo merge' }));
       expect(result.continueFileUpdated).toBe(true);
 
-      // Active dir must NOT have been auto-created with a fresh continue file.
-      expect(existsSync(activeContinuePath)).toBe(false);
-
-      // Existing continue file in .pan/continues/ should have grown by exactly one entry.
-      const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
+      const recordPath = join(projectRoot, '.pan', 'records', 'pan-901.json');
+      const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
       expect(updated.sessionHistory.length).toBe(2);
       const last = updated.sessionHistory[1];
       expect(last.reason).toBe('resume');
@@ -303,10 +301,9 @@ describe('reopenWorkspaceState', () => {
       rmSync(projectRoot, { recursive: true, force: true });
     });
 
-    it('appends to existing continue file without creating one in vbrief/active/', async () => {
+    it('appends session breadcrumb to record on review-failed reopen', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
-      const continuePath = seedContinueFile(projectRoot, 'PAN-902');
-      const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-902.vbrief.json');
+      seedRecord(projectRoot, 'PAN-902');
       projectStub = { projectPath: projectRoot };
 
       seedStatus({
@@ -316,9 +313,8 @@ describe('reopenWorkspaceState', () => {
 
       await Effect.runPromise(reopenWorkspaceState('PAN-902', wsDir));
 
-      expect(existsSync(activeContinuePath)).toBe(false);
-
-      const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
+      const recordPath = join(projectRoot, '.pan', 'records', 'pan-902.json');
+      const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
       expect(updated.sessionHistory.length).toBe(2);
       expect(updated.sessionHistory[1].reason).toBe('resume');
 

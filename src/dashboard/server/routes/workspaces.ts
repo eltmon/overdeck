@@ -207,18 +207,20 @@ async function readWorkspacePlanningMarkdown(
 }
 
 /**
- * Read the workspace `.pan/continue.json` file asynchronously and return it as
- * normalized JSON text, or null when it does not exist.
+ * Read per-issue record continue view and return it as normalized JSON text,
+ * or null when the record does not exist.
  */
 async function readWorkspaceContinueFile(
   _projectPath: string,
   workspacePath: string,
-  _issueId: string,
+  issueId: string,
 ): Promise<string | null> {
   try {
-    const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-    const raw = await readFile(continuePath, 'utf-8');
-    return JSON.stringify(JSON.parse(raw), null, 2);
+    const { readRecordContinueViewSync, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
+      await import('../../../lib/pan-dir/record.js');
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const recordView = readRecordContinueViewSync(project, issueId);
+    return recordView ? JSON.stringify(recordView, null, 2) : null;
   } catch {
     return null;
   }
