@@ -87,21 +87,26 @@
   ],
   "feedback": [],
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-06-24T18:14:23.871Z",
+  "updated": "2026-06-24T23:24:00.126Z",
   "pipeline": {
     "issueId": "PAN-2044",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-24T18:14:23.842Z",
-    "reviewNotes": "LegacyImportDialog treats failed import responses as successful summaries and can crash",
-    "verificationNotes": "Verification FAILED at test (78414ms):\n\nonSession src/dashboard/server/routes/conversations.ts:1528:13\n    1526|     supervisorScriptPath = resolvePtySupervisorScriptPath();\n    1527|     if (!existsSync(supervisorScriptPath)) {\n    1528|       throw new Error('pty-supervisor build artifact missing — run `np…\n       |             ^\n    1529|     }\n    1530|     await writePtyToken(tmuxSession);\n ❯ src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts:174:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts > spawnConversationSession PTY supervisor wiring > keeps plain forks off Channels MCP while routing them through the supervisor\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ spawnConversationSession src/dashboard/server/routes/conversations.ts:1528:13\n    1526|     supervisorScriptPath = resolvePtySupervisorScriptPath();\n    1527|     if (!existsSync(supervisorScriptPath)) {\n    1528|       throw new Error('pty-supervisor build artifact missing — run `np…\n       |             ^\n    1529|     }\n    1530|     await writePtyToken(tmuxSession);\n ❯ src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts:195:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts > spawnConversationSession PTY supervisor wiring > dismisses the dev-channels dialog only when Channels MCP is wired\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ spawnConversationSession src/dashboard/server/routes/conversations.ts:1528:13\n    1526|     supervisorScriptPath = resolvePtySupervisorScriptPath();\n    1527|     if (!existsSync(supervisorScriptPath)) {\n    1528|       throw new Error('pty-supervisor build artifact missing — run `np…\n       |             ^\n    1529|     }\n    1530|     await writePtyToken(tmuxSession);\n ❯ src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts:219:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯\n\n",
-    "inspectNotes": "Spec fidelity: importLegacyConversation and setImportedConversationLinks correctly added to conversations.ts (non-destructive INSERT OR IGNORE, randomUUID, full column mapping, conversation_files locator on claudeSessionId). importLegacyConversations in legacy-import.ts implements two-pass orchestration: pass 1 skips-by-name and skips-by-claude_session_id then inserts; pass 2 remaps FK rowids to UUIDs with NULL+warning for unresolved targets. Favorites carry-over via setFavorite. failed[] for unparseable created_at. No DELETE in import path. All 6 ACs covered by fixture tests.",
+    "updatedAt": "2026-06-24T23:24:00.107Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-24T23:24:00.107Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
-    "reviewRequestedAt": "2026-06-24T17:50:03.264Z"
+    "reviewedAtCommit": "b1cecda87c1c112c995baa0a14ea12c6fd054caf",
+    "lastVerifiedCommit": "b1cecda87c1c112c995baa0a14ea12c6fd054caf"
   },
   "closeOut": {
     "usage": {
@@ -132,19 +137,19 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 271,
-            "output": 83498,
-            "cacheRead": 31069895,
-            "cacheWrite": 527650
+            "input": 305,
+            "output": 91821,
+            "cacheRead": 35814953,
+            "cacheWrite": 546342
           }
         }
       },
       "totals": {
         "anthropic/claude-sonnet-4-6": {
-          "input": 326,
-          "output": 98710,
-          "cacheRead": 36066260,
-          "cacheWrite": 621821
+          "input": 360,
+          "output": 107033,
+          "cacheRead": 40811318,
+          "cacheWrite": 640513
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 8132,
@@ -160,8 +165,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 21.660628,
-        "pricingAsOf": "2026-06-24T18:14:23.871Z"
+        "usd": 23.279187,
+        "pricingAsOf": "2026-06-24T23:24:00.126Z"
       }
     },
     "merges": [
@@ -169,8 +174,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "driver-readonly-option": "completed",
     "driver-readonly-option.ac1": "completed",
