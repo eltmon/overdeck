@@ -1,19 +1,79 @@
 {
   "issueId": "PAN-1827",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-06-25T17:16:11.854Z",
-  "updated": "2026-06-25T17:16:11.854Z",
+  "updated": "2026-06-25T17:22:44.426Z",
   "pipeline": {
     "issueId": "PAN-1827",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T17:16:11.854Z"
+    "updatedAt": "2026-06-25T17:22:44.394Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 50,
+            "output": 2561,
+            "cacheRead": 54807,
+            "cacheWrite": 226068
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 11608,
+            "output": 172,
+            "cacheRead": 16990,
+            "cacheWrite": 43476
+          },
+          "custom/kimi-k2.7-code": {
+            "input": 34060,
+            "output": 170,
+            "cacheRead": 25600,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 96,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 50,
+          "output": 2561,
+          "cacheRead": 54807,
+          "cacheWrite": 226068
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 11608,
+          "output": 172,
+          "cacheRead": 16990,
+          "cacheWrite": 43476
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 34060,
+          "output": 170,
+          "cacheRead": 25600,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 96,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.6813819999999999,
+        "pricingAsOf": "2026-06-25T17:22:44.426Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
