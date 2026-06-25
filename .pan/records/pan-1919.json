@@ -78,28 +78,29 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-06-25T03:06:22.665Z",
+  "updated": "2026-06-25T03:07:03.240Z",
   "pipeline": {
     "issueId": "PAN-1919",
-    "reviewStatus": "passed",
-    "testStatus": "dispatch_failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T03:06:22.637Z",
-    "reviewNotes": "review passed; record cutover verified",
-    "testNotes": "Dispatch failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-1919-test -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-1919 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL= -e ANTHROPIC_AUTH_TOKEN= -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-1919-test -e OVERDECK_ISSUE_ID=PAN-1919 -e OVERDECK_SESSION_TYPE=test -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-13 -e OVERDECK_FLYWHEEL_AGENT_ROLE=test bash /home/eltmon/.overdeck/agents/agent-pan-1919-test/launcher.sh\nduplicate session: agent-pan-1919-test\n",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-06-25T03:07:03.226Z",
     "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-25T03:07:03.226Z"
+      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
-        "detectedAt": "2026-06-25T03:02:54.652Z"
+        "detectedAt": "2026-06-25T03:07:03.226Z"
       }
     ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/1950",
-    "reviewedAtCommit": "8ac389117566e4095659c94f7188e608f1d92006"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/1950"
   },
   "closeOut": {
     "usage": {
@@ -138,18 +139,18 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 217,
-            "output": 5676,
-            "cacheRead": 2451750,
-            "cacheWrite": 381392
+            "input": 226,
+            "output": 5970,
+            "cacheRead": 2614198,
+            "cacheWrite": 381848
           }
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 752,
-            "output": 256074,
-            "cacheRead": 87849315,
-            "cacheWrite": 1867776
+            "input": 758,
+            "output": 260536,
+            "cacheRead": 88633496,
+            "cacheWrite": 1874681
           }
         }
       },
@@ -161,10 +162,10 @@
           "cacheWrite": 452641
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 762,
-          "output": 262567,
-          "cacheRead": 88426493,
-          "cacheWrite": 1937969
+          "input": 768,
+          "output": 267029,
+          "cacheRead": 89210674,
+          "cacheWrite": 1944874
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 130321,
@@ -173,15 +174,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 217,
-          "output": 5676,
-          "cacheRead": 2451750,
-          "cacheWrite": 381392
+          "input": 226,
+          "output": 5970,
+          "cacheRead": 2614198,
+          "cacheWrite": 381848
         }
       },
       "costAtCloseOut": {
-        "usd": 47.981062,
-        "pricingAsOf": "2026-06-25T03:06:22.665Z"
+        "usd": 48.327451,
+        "pricingAsOf": "2026-06-25T03:07:03.240Z"
       }
     },
     "merges": [
