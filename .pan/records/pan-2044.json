@@ -1,0 +1,229 @@
+{
+  "issueId": "PAN-2044",
+  "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Q4 resolved: dialog checkboxes default to ALL conversations selected, with Select-all / Select-none controls. Matches the issue author's stated default and 'carry all over' intent; trivially reversible UI default, not escalated.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Add a purpose-built NON-destructive write-door function importLegacyConversation (+ setImportedConversationLinks) to src/lib/overdeck/conversations.ts. Do NOT route imports through createConversation (conversations.ts:1153) — it DELETEs same-name rows and hardcodes status='active'/archived_at=NULL, dropping created_at/cost/tokens/ended/FK columns (violates AC5 + the mapping). Do NOT use ConversationWriter.create (415) — it cannot pass claudeSessionId (AC6). Extending the writer keeps the single-source-of-truth tenet; routes never write the tables directly.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Add readOnly?: boolean to OpenDatabaseOptions in src/lib/database/driver.ts. openDatabase already forwards the whole options object to new DatabaseSync(path, options) and node:sqlite honors readOnly, so the type addition is sufficient for the Node-only dashboard server. The bun branch (driver.ts:288) is not exercised here.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D4",
+      "summary": "All import-specific logic lives in ONE deletable module src/lib/overdeck/legacy-import.ts (preview + two-pass import + favorites). The whole legacy-import path (incl. getLegacyHome()) is slated for removal at cutover per src/lib/paths.ts:14-18 — keep it isolated so the future delete is clean.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Two-pass insert: pass 1 inserts all selected conversations with FK columns NULL (minting UUIDs, building a {legacyRowid → newUuid} map); pass 2 sets handoff_target_conv_id/cleared_to_conv_id from the map (NULL + per-row warning when the target was not imported). Avoids FK-constraint violations regardless of PRAGMA foreign_keys.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Idempotency: skip-and-report (never DELETE, never overwrite) when a conversation with the same name exists, or when the legacy row's claude_session_id matches an existing conversation_files.locator via getConversationByClaudeSessionId (conversations.ts:961). Report in skipped[].",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D7",
+      "summary": "A legacy row with empty/unparseable created_at fails that single row (reason in failed[]); never insert a zero timestamp. created_at is NOT NULL in both legacy and new schemas. Other rows proceed.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    },
+    {
+      "id": "D8",
+      "summary": "status is copied through (null → derive 'ended' if archived_at else 'active'). Imported conversations have no live tmux session, so the liveness oracle reconciles any 'active' import to 'ended' on its next poll — no special-casing.",
+      "recordedAt": "2026-06-24T16:25:24.065Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Sacred-JSONL invariant: the importer must never move, copy, delete, or mutate any ~/.claude/projects/**/*.jsonl backing transcript file (AC6).",
+      "mitigation": "Copy DB metadata only; carry claude_session_id into conversation_files so the existing transcript reader resolves the file in place. No filesystem writes to transcript paths."
+    },
+    {
+      "id": "H2",
+      "summary": "Re-pointing the singleton overdeck DB handle at the legacy DB would corrupt the live connection.",
+      "mitigation": "legacy-import.ts opens its OWN read-only handle via openDatabase(path,{readOnly:true}) and closes it; it never calls getDatabase()/getOverdeckDatabaseSync() for the source. (NFR-1 / AC8.)"
+    },
+    {
+      "id": "H3",
+      "summary": "The pre-rebrand ~/.panopticon/panopticon.db will NOT exist on the dev machine at implementation time, so tests cannot read a live source DB.",
+      "mitigation": "Tests build a fixture legacy DB from the legacy conversations DDL (src/lib/database/schema.ts:471) + a legacy favorites row, and the ?path= param points preview/import at the fixture."
+    },
+    {
+      "id": "H4",
+      "summary": "createConversation's destructive DELETE-then-insert (conversations.ts:1173-1174) would silently destroy a same-named overdeck conversation if reused for import.",
+      "mitigation": "Use the dedicated non-destructive importLegacyConversation (D2); a test asserts no DELETE is issued against the overdeck conversations table (AC5 / legacy-import-write.ac3)."
+    },
+    {
+      "id": "H5",
+      "summary": "If PRAGMA foreign_keys is ON, a one-pass insert with a forward FK reference (handoff_target_conv_id/cleared_to_conv_id) throws.",
+      "mitigation": "Two-pass insert (D5): all rows inserted with NULL FKs first, then a second pass sets the remapped UUIDs."
+    },
+    {
+      "id": "H6",
+      "summary": "The POST import endpoint mutates overdeck.db and must be CSRF-guarded.",
+      "mitigation": "Call rejectUnsafeDashboardMutationRequest(request) before importing (NFR-2); the frontend sends dashboardMutationJsonHeaders()."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-24T16:25:24.065Z",
+      "reason": "planning",
+      "note": "Planning role authored the vBRIEF directly after verifying every issue reference against the tree at SHA a1d01b2b9 and resolving the two under-specified design gaps (lossy/destructive write doors; missing read-only driver option) plus Q4.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "glm-5.2",
+      "timestamp": "2026-06-25T12:05:16.633Z"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-06-24T16:16:16.756Z",
+  "updated": "2026-06-25T12:05:16.634Z",
+  "pipeline": {
+    "issueId": "PAN-2044",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-25T11:37:42.865Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
+    "lastVerifiedCommit": "8438f38c9c4f1b9717243bce0faafe7038191603"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect-deep": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 55,
+            "output": 15212,
+            "cacheRead": 4996365,
+            "cacheWrite": 94171
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 9699,
+            "output": 674,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 33503,
+            "output": 74973,
+            "cacheRead": 6173473,
+            "cacheWrite": 303793
+          }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 48,
+            "output": 5389,
+            "cacheRead": 1420811,
+            "cacheWrite": 133436
+          }
+        },
+        "work": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 341,
+            "output": 97729,
+            "cacheRead": 40372893,
+            "cacheWrite": 773850
+          },
+          "custom/glm-5.2": {
+            "input": 45305,
+            "output": 8924,
+            "cacheRead": 644480,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-sonnet-4-6": {
+          "input": 396,
+          "output": 112941,
+          "cacheRead": 45369258,
+          "cacheWrite": 868021
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 9699,
+          "output": 674,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 33503,
+          "output": 74973,
+          "cacheRead": 6173473,
+          "cacheWrite": 303793
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 48,
+          "output": 5389,
+          "cacheRead": 1420811,
+          "cacheWrite": 133436
+        },
+        "custom/glm-5.2": {
+          "input": 45305,
+          "output": 8924,
+          "cacheRead": 644480,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 26.091463,
+        "pricingAsOf": "2026-06-25T11:37:42.880Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2048"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "ohmypi",
+  "model": "glm-5.2",
+  "statusOverrides": {
+    "driver-readonly-option": "completed",
+    "driver-readonly-option.ac1": "completed",
+    "driver-readonly-option.ac2": "completed",
+    "legacy-import-read": "completed",
+    "legacy-import-read.ac1": "completed",
+    "legacy-import-read.ac2": "completed",
+    "legacy-import-read.ac3": "completed",
+    "legacy-import-read.ac4": "completed",
+    "legacy-import-write": "completed",
+    "legacy-import-write.ac1": "completed",
+    "legacy-import-write.ac2": "completed",
+    "legacy-import-write.ac3": "completed",
+    "legacy-import-write.ac4": "completed",
+    "legacy-import-write.ac5": "completed",
+    "legacy-import-write.ac6": "completed",
+    "legacy-import-endpoints": "completed",
+    "legacy-import-endpoints.ac1": "completed",
+    "legacy-import-endpoints.ac2": "completed",
+    "legacy-import-endpoints.ac3": "completed",
+    "legacy-import-endpoints.ac4": "completed",
+    "legacy-import-dialog": "completed",
+    "legacy-import-dialog.ac1": "completed",
+    "legacy-import-dialog.ac2": "completed",
+    "legacy-import-dialog.ac3": "completed",
+    "legacy-import-dialog.ac4": "completed"
+  }
+}

@@ -202,44 +202,48 @@ export function createSubstrateBugPoller(options: SubstrateBugPollerOptions = {}
   async function scanIssueCandidates(config: GitHubConfig, store: EventStore): Promise<void> {
     const since = isoLookback(now(), lookbackMs);
     for (const repo of config.repos) {
-      const repoQualifier = `repo:${repo.owner}/${repo.repo}`;
-      const authorResults = await fetchSearch(config.token, searchQuery([
-        repoQualifier,
-        'is:issue',
-        '-is:pr',
-        `author:${BOT_LOGIN}`,
-        `updated:>=${since}`,
-      ]));
-      if (authorResults === null) return;
+      try {
+        const repoQualifier = `repo:${repo.owner}/${repo.repo}`;
+        const authorResults = await fetchSearch(config.token, searchQuery([
+          repoQualifier,
+          'is:issue',
+          '-is:pr',
+          `author:${BOT_LOGIN}`,
+          `updated:>=${since}`,
+        ]));
+        if (authorResults === null) return;
 
-      const substrateResults = await fetchSearch(config.token, searchQuery([
-        repoQualifier,
-        'is:issue',
-        '-is:pr',
-        'label:substrate',
-        `updated:>=${since}`,
-      ]));
-      if (substrateResults === null) return;
+        const substrateResults = await fetchSearch(config.token, searchQuery([
+          repoQualifier,
+          'is:issue',
+          '-is:pr',
+          'label:substrate',
+          `updated:>=${since}`,
+        ]));
+        if (substrateResults === null) return;
 
-      const byNumber = new Map<number, GitHubSearchIssue>();
-      for (const issue of [...authorResults, ...substrateResults]) byNumber.set(issue.number, issue);
+        const byNumber = new Map<number, GitHubSearchIssue>();
+        for (const issue of [...authorResults, ...substrateResults]) byNumber.set(issue.number, issue);
 
-      for (const issue of byNumber.values()) {
-        const issueId = issueIdFor(repo.prefix, issue.number);
-        if (!issueId) continue;
-        const trailer = parseSubstrateBugTrailer(issue.body);
-        const filedBy = trailer.filedBy ?? (issue.user?.login === BOT_LOGIN ? 'agent' : 'operator');
-        const existing = repository.getByIssueId(issueId);
-        const bug = repository.upsert({
-          issueId,
-          filedAt: issue.created_at ?? issue.updated_at ?? now().toISOString(),
-          runId: trailer.runId ?? null,
-          filedBy,
-          discoveredInIssueId: trailer.discoveredIn ?? null,
-          severity: severityFromLabels(issue.labels),
-          updatedAt: issue.updated_at ?? now().toISOString(),
-        });
-        if (!existing) await appendSubstrateBugFiledEvent(store, bug);
+        for (const issue of byNumber.values()) {
+          const issueId = issueIdFor(repo.prefix, issue.number);
+          if (!issueId) continue;
+          const trailer = parseSubstrateBugTrailer(issue.body);
+          const filedBy = trailer.filedBy ?? (issue.user?.login === BOT_LOGIN ? 'agent' : 'operator');
+          const existing = repository.getByIssueId(issueId);
+          const bug = repository.upsert({
+            issueId,
+            filedAt: issue.created_at ?? issue.updated_at ?? now().toISOString(),
+            runId: trailer.runId ?? null,
+            filedBy,
+            discoveredInIssueId: trailer.discoveredIn ?? null,
+            severity: severityFromLabels(issue.labels),
+            updatedAt: issue.updated_at ?? now().toISOString(),
+          });
+          if (!existing) await appendSubstrateBugFiledEvent(store, bug);
+        }
+      } catch (err) {
+        log.warn(`[substrate-bug-poller] skipping ${repo.owner}/${repo.repo}:`, err instanceof Error ? err.message : err);
       }
     }
   }
@@ -247,36 +251,40 @@ export function createSubstrateBugPoller(options: SubstrateBugPollerOptions = {}
   async function scanMergedPullRequests(config: GitHubConfig): Promise<void> {
     const since = isoLookback(now(), lookbackMs);
     for (const repo of config.repos) {
-      const repoQualifier = `repo:${repo.owner}/${repo.repo}`;
-      const pullResults = await fetchSearch(config.token, searchQuery([
-        repoQualifier,
-        'is:pr',
-        'is:merged',
-        `updated:>=${since}`,
-      ]));
-      if (pullResults === null) return;
+      try {
+        const repoQualifier = `repo:${repo.owner}/${repo.repo}`;
+        const pullResults = await fetchSearch(config.token, searchQuery([
+          repoQualifier,
+          'is:pr',
+          'is:merged',
+          `updated:>=${since}`,
+        ]));
+        if (pullResults === null) return;
 
-      for (const pull of pullResults) {
-        const details = await githubGet<GitHubPullRequest>(config.token, `/repos/${repo.owner}/${repo.repo}/pulls/${pull.number}`);
-        if (!details?.merged_at) continue;
-        const commits = await githubGet<GitHubCommit[]>(config.token, `/repos/${repo.owner}/${repo.repo}/pulls/${pull.number}/commits`);
-        if (commits === null) return;
+        for (const pull of pullResults) {
+          const details = await githubGet<GitHubPullRequest>(config.token, `/repos/${repo.owner}/${repo.repo}/pulls/${pull.number}`);
+          if (!details?.merged_at) continue;
+          const commits = await githubGet<GitHubCommit[]>(config.token, `/repos/${repo.owner}/${repo.repo}/pulls/${pull.number}/commits`);
+          if (commits === null) return;
 
-        const text = [
-          details.title ?? pull.title ?? '',
-          details.body ?? pull.body ?? '',
-          ...commits.map((commit) => commit.commit?.message ?? ''),
-        ].join('\n');
-        const closingNumbers = extractClosingIssueNumbers(text);
-        const fixedAt = details.merged_at;
-        const commitSha = details.merge_commit_sha ?? commits.at(-1)?.sha;
-        if (!commitSha) continue;
+          const text = [
+            details.title ?? pull.title ?? '',
+            details.body ?? pull.body ?? '',
+            ...commits.map((commit) => commit.commit?.message ?? ''),
+          ].join('\n');
+          const closingNumbers = extractClosingIssueNumbers(text);
+          const fixedAt = details.merged_at;
+          const commitSha = details.merge_commit_sha ?? commits.at(-1)?.sha;
+          if (!commitSha) continue;
 
-        for (const number of closingNumbers) {
-          const issueId = issueIdFor(repo.prefix, number);
-          if (!issueId || !repository.getByIssueId(issueId)) continue;
-          repository.markFixed(issueId, commitSha, fixedAt);
+          for (const number of closingNumbers) {
+            const issueId = issueIdFor(repo.prefix, number);
+            if (!issueId || !repository.getByIssueId(issueId)) continue;
+            repository.markFixed(issueId, commitSha, fixedAt);
+          }
         }
+      } catch (err) {
+        log.warn(`[substrate-bug-poller] skipping ${repo.owner}/${repo.repo}:`, err instanceof Error ? err.message : err);
       }
     }
   }

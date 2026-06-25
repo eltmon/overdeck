@@ -1797,3 +1797,50 @@ Shipped the gate itself (epic PAN-2059): `released` + `objection` states in the 
 section, and forecast chips/stats. Flywheel now plans routine work with `pan plan --auto` (no `--auto-start`) and
 leaves it awaiting operator Release; `--auto-start` reserved for released items + in-pipeline recovery; `blocks-main`
 strikes stay autonomous but an open objection halts even those.
+
+
+---
+
+## RUN-16 tick 1 (2026-06-25 ~09:55Z) — red-main discovered mid-tick; PAN-2017 closed; PAN-2060 struck
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Live orchestrator: ohmypi/glm-5.2.
+
+- **Cohort (18) largely carried from prior runs.** 10 already terminal at start (PAN-2049/2047/2012/2057/2050/
+  2014/2039/2055/2056/2022 — CLOSED + closed-out + merged + verifying-on-main). PAN-806 (`objection`) and
+  PAN-1864 (`parked`+`objection`) held (skip). PAN-1982 `planned` (not `ready`, awaits Release), PAN-1956 `planning`.
+- **PAN-2017 CLOSED OUT this tick.** Fix `20473399d` (`fix: fail strike spawn on kickoff delivery failure`) on main,
+  issue at verifying-on-main → `pan close PAN-2017 --force`; verify-merged gate passed. 11/18 drained.
+- **RED MAIN discovered mid-tick (P0).** Main CI `e765e4e1` `test` job FAILED. Root cause = **PAN-2059 regression**:
+  `isAutoPickable` (`src/lib/backlog/pickup.ts:100`) now requires `s.released` (by design), but `pickFromSequence`
+  (`src/lib/flywheel-merge-order.ts:304`) backward-compat branch fakes `ready:true` not `released:true` → 13 stale
+  tests in `src/lib/__tests__/flywheel-sequence-auth.test.ts` fail (`expected undefined to be 'PAN-1'`).
+  + 1 Playwright `tests/playwright/conversation-supervisor-uat.test.ts:325` (verify real-vs-flaky).
+  **Filed PAN-2060 (`blocks-main`) and struck it (strike-pan-2060, codex/gpt-5.5).**
+- **KEY DIAGNOSIS for the strike:** `pickFromSequence` has exactly ONE production caller —
+  `src/lib/cloister/flywheel.ts:137`, which passes `requireReady: true` (uses `state` directly, correctly requires
+  released). The `requireReady:false` legacy branch at line 304 is exercised ONLY by tests. So the fix is test-only:
+  update the stale describe blocks (author/assignee, vetoed/parked, Definition-of-Ready) to mark picked issues
+  `released` (+ ready/spec), matching the sole caller and PAN-2059's mandatory-released contract. DO NOT weaken
+  `isAutoPickable` or fake released in the production path.
+- **Merge-gate cohort unchanged (operator-blocked):** PAN-1919 (#1950 conflict+failing), PAN-2044 (#2048 conflict),
+  PAN-1901 (#2042 failing, likely stale-red candidate once main greens). Deacon FROZEN (`OVERDECK_NO_RESUME=1` on all
+  dashboard PIDs) → no auto-rebase. `require_uat_before_merge=true` → every merge operator-owned. Plus MIN-831/MIN-846
+  readyForMerge (review+test passed) await operator UAT+merge. These are THE cohort-drain blockers and require operator
+  action (clear no-resume to re-engage reconciler, or manual rebase+UAT+merge).
+- **No eligible unstarted work to launch** under configured scope: cohort's open non-terminal items are all
+  operator-blocked (merge gate) or held/not-ready. Active surface = strike-pan-2060 (red-main) + strike-pan-2045
+  (non-cohort perf, idle at prompt) + PAN-1919 work/review/test trio (idle-at-prompt, work done/stranded).
+
+**DURABLE LESSONS:**
+- **Main CI runs on the `CI` workflow show as failing back to 2026-06-01** — verify whether CI was disabled/re-enabled
+  or runs were purged; "main GREEN" claims in prior run notes may have rested on a stale/different check. Always
+  re-verify the live `gh run list` conclusion this tick, not a prior note's claim.
+- **The gh-issue-trailer-hook did NOT append the Flywheel provenance trailer** to PAN-2060 (`gh issue create`).
+  Telemetry-only gap; the hook may be disabled or scoped to a different create path. Worth a look (not blocking).
+- **`pan close <id>` needs a fully-qualified ID** (`PAN-2017`, not `2017`) or it errors "Could not resolve issue ID".
+  Prior runs used `pan close --force`; confirmed working with qualified ID + verify-merged gate.
+
+- Next tick: confirm strike-pan-2060 landed + main CI green; if green, re-check PAN-1901 stale-red (may clear) and
+  re-emit merge-gate suggestions. If strike self-aborts or main stays red, follow through (re-strike tighter or
+  escalate) per the follow-through rule.

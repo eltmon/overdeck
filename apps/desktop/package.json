@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/desktop",
-  "version": "0.31.0",
+  "version": "0.40.0",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "publishConfig": {
     "access": "public"
