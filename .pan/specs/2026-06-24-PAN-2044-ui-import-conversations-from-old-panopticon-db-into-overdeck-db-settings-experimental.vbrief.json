@@ -4,17 +4,17 @@
     "created": "2026-06-24T16:25:24.065Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2044: interactive Settings → Experimental importer to copy selected conversations from the legacy panopticon.db into overdeck.db",
-    "updated": "2026-06-24T17:21:39.543Z"
+    "updated": "2026-06-25T14:33:59.546Z"
   },
   "plan": {
     "id": "pan-2044",
     "title": "UI: import conversations from old panopticon.db into overdeck.db (Settings → Experimental)",
-    "status": "running",
+    "status": "completed",
     "uid": "fedee69f-a0f9-4784-a5e8-762a410fa04f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-06-24T16:25:24.065Z",
-    "updated": "2026-06-24T17:21:39.543Z",
+    "updated": "2026-06-25T14:33:59.546Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2044",
@@ -384,5 +384,5 @@
       "canonicalFilename": "2026-06-24-PAN-2044-ui-import-conversations-from-old-panopticon-db-into-overdeck-db-settings-experimental.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
