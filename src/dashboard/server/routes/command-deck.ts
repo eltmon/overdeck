@@ -53,6 +53,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import {
   getCachedResourceAllocatedIssues,
@@ -1056,7 +1057,6 @@ Be specific: reference actual file names, function names, requirement text, disc
 
   // Build provider env vars for non-Anthropic models
   const { getProviderForModelSync, getProviderEnvSync } = await import('../../../lib/providers.js');
-  const { loadConfigSync: loadYamlConfig } = await import('../../../lib/config-yaml.js');
   let providerEnvStr = '';
   let providerEnv: Record<string, string> = {};
   const statusProvider = getProviderForModelSync(statusModelId);

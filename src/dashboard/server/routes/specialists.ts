@@ -76,6 +76,7 @@ import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
+import { loadConfigSync, resolveModel } from '../../../lib/config-yaml.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { killSession } from '../../../lib/tmux.js';
@@ -1672,9 +1673,6 @@ const getModelsResolveRoute = HttpRouter.add(
   'GET',
   '/api/models/resolve',
   httpHandler(Effect.gen(function* () {
-    const { loadConfigSync, resolveModel } = yield* Effect.promise(
-      () => import('../../../lib/config-yaml.js'),
-    );
     const config = loadConfigSync().config;
 
     const routes = [

@@ -21,6 +21,7 @@ import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
 import { mergeSkillsIntoWorkspaceSync, mergePanSkillsIntoWorkspaceSync } from './skills-merge.js';
+import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 import {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
@@ -1146,7 +1147,6 @@ function copyProjectTemplateDirs(
 
   // Inject caveman hooks into workspace .claude/settings.json (if enabled in config)
   try {
-    const { loadConfigSync: loadYamlConfig } = await import('./config-yaml.js');
     const { determineCavemanVariant, injectCavemanSettings } = await import('./caveman/workspace.js');
     const yamlConfig = loadYamlConfig();
     const cavemanConfig = yamlConfig.config.caveman;
