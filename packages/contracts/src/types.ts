@@ -546,8 +546,8 @@ export const ReviewerRoundMetadata = Schema.Struct({
 })
 export type ReviewerRoundMetadata = typeof ReviewerRoundMetadata.Type
 
-// One row of a weighted-distribution model origin (PAN-2053). `lo`/`hi` are the
-// half-open hash band [lo, hi) the entry owns; `chosen` marks the selected one.
+// One row of a percentage-distribution model origin (PAN-2053). `lo`/`hi` are the
+// half-open bucket band [lo, hi) the entry owns; `chosen` marks the selected one.
 export const ModelOriginEntry = Schema.Struct({
   model: Schema.String,
   weight: Schema.Number,
@@ -557,16 +557,18 @@ export const ModelOriginEntry = Schema.Struct({
 })
 export type ModelOriginEntry = typeof ModelOriginEntry.Type
 
-// Read-only "why this model" derivation shown in the agent right-click MODEL
-// inspector (PAN-2053). Present only when the agent's role uses a weighted
+// Read-only "which model & why" derivation shown in the agent right-click MODEL
+// inspector (PAN-2053). Present only when the agent's role uses a percentage
 // distribution; absent for scalar/single-model roles.
 export const ModelOrigin = Schema.Struct({
-  // The exact spawn key whose hash selected the model (`${role}:${issueId}`).
+  // The exact spawn key whose bucket selected the model (`${role}:${issueId}`).
   spawnKey: Schema.String,
-  // The chosen model id — equals what the agent actually spawned with.
+  // The chosen model id.
   resolved: Schema.String,
-  // fnv1a32(spawnKey) / 2^32, normalized to [0, 1).
-  hash01: Schema.Number,
+  // Deterministic bucket for this key, in [0, total).
+  bucket: Schema.Number,
+  // Number of buckets = sum of weights (100 when the distribution is percentages).
+  total: Schema.Number,
   distribution: Schema.Array(ModelOriginEntry),
 })
 export type ModelOrigin = typeof ModelOrigin.Type

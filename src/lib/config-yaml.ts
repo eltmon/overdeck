@@ -403,16 +403,10 @@ export function fnv1a32(s: string): number {
 }
 
 /**
- * MurmurHash3 32-bit finalizer — an avalanche/bit-mixing step.
- *
- * WHY this exists (PAN-2055): raw `fnv1a32(key) / 2^32` distributes terribly for
- * structured, common-prefix keys like `work:PAN-1901`, `work:PAN-1919`, … — FNV's
- * HIGH-order bits (which dominate the /2^32 normalization) barely avalanche between
- * near-identical inputs, so sequential issue keys cluster into the same weight band.
- * Measured over 161 sequential `work:PAN-19xx` keys against a 1/1/1 distribution the
- * raw hash gave kimi 68% / glm 30% / gpt 2% — i.e. the load-spreading was broken.
- * Running the FNV output through this finalizer first restores ~uniform spread
- * (≈33/33/33). Deterministic; pure bit ops.
+ * MurmurHash3 32-bit finalizer — an avalanche/bit-mixing step applied to the FNV
+ * output before bucketing, so near-identical spawn keys land in different buckets.
+ * Belt-and-suspenders for the modulo bucketing in `derivePercentPick` (PAN-2055).
+ * Deterministic; pure bit ops.
  */
 export function fmix32(h: number): number {
   h ^= h >>> 16;
@@ -423,94 +417,87 @@ export function fmix32(h: number): number {
   return h >>> 0;
 }
 
-/**
- * Deterministically map a spawn key to a well-distributed value in [0, 1). FNV-1a
- * for the per-character mixing, then a MurmurHash3 finalizer (`fmix32`) so the high
- * bits avalanche — see `fmix32` for why the finalizer is required.
- */
-export function hashKeyToUnitInterval(key: string): number {
-  return fmix32(fnv1a32(key)) / 0x100000000;
-}
-
-/** One entry of a weighted pick, with the half-open hash band [lo, hi) it owns. */
-export interface WeightedBand {
+/** One entry of a percent pick, with the half-open bucket band [lo, hi) it owns. */
+export interface PercentBand {
   /** The entry's model ref (NOT dereffed — may be a `workhorse:*` ref). */
   model: ModelRef;
+  /** This entry's weight. A percentage when the weights total 100. */
   weight: number;
-  /** Band start in [0, 1). */
+  /** Bucket-band start (integer, inclusive). */
   lo: number;
-  /** Band end in (0, 1]. A spawn key whose hash01 falls in [lo, hi) selects this entry. */
+  /** Bucket-band end (integer, exclusive). A key whose bucket is in [lo, hi) picks this. */
   hi: number;
   /** True for the single entry the spawn key selected. */
   chosen: boolean;
 }
 
-/** The full, inspectable result of a weighted pick — what selected the model and why. */
-export interface WeightedPick {
-  /** The selected model ref (same value `pickWeightedModelRef` returns). */
+/** The full, inspectable result of a percent pick — what selected the model and why. */
+export interface PercentPick {
+  /** The selected model ref (same value `pickPercentModelRef` returns). */
   chosen: ModelRef;
-  /** `fnv1a32(spawnKey) / 2^32`, normalized to [0, 1). */
-  hash01: number;
-  /** Every entry, in declaration order, with its band and the chosen flag. */
-  bands: WeightedBand[];
+  /** Deterministic bucket for this key: `fmix32(fnv1a32(key)) % total`, in [0, total). */
+  bucket: number;
+  /** Sum of positive weights = number of buckets (100 when weights are percentages). */
+  total: number;
+  /** Every entry, in declaration order, with its bucket band and the chosen flag. */
+  bands: PercentBand[];
 }
 
 /**
- * Deterministically pick a model from a weighted distribution AND return the full
- * derivation (hash, per-entry bands, winner) so it can be shown read-only in the UI.
+ * Deterministically pick a model from a percentage distribution, returning the full
+ * derivation (bucket, per-entry bands, winner) so it can be shown read-only in the UI.
  *
- * This is the single source of truth for the weighted-pick math: `pickWeightedModelRef`
- * delegates to it, so the band a key falls into here is exactly the model that gets
- * spawned. Weights are relative (need not sum to 100). Throws if no entry has weight > 0.
+ * Mental model: hash the spawn key to a stable bucket `0 .. total-1`, then walk the
+ * cumulative weights and take the entry whose band contains the bucket. The same key
+ * and weights always give the same model; change a weight and future picks change.
+ * `pickPercentModelRef` delegates here so selection and explanation can't drift.
+ * Throws if no entry has weight > 0.
  */
-export function deriveWeightedPick(entries: WeightedModelRef[], spawnKey: string): WeightedPick {
-  let totalWeight = 0;
+export function derivePercentPick(entries: WeightedModelRef[], spawnKey: string): PercentPick {
+  let total = 0;
   for (const e of entries) {
-    if (e.weight > 0) totalWeight += e.weight;
+    if (e.weight > 0) total += e.weight;
   }
-  if (totalWeight <= 0) {
-    throw new Error('deriveWeightedPick: all entries have weight <= 0');
+  if (total <= 0) {
+    throw new Error('derivePercentPick: all entries have weight <= 0');
   }
-  // Map the key to a well-distributed [0, 1) value (FNV-1a + fmix32 avalanche).
-  // The finalizer is essential: raw fnv1a32/2^32 clusters common-prefix issue keys
-  // into one band and breaks load-spreading (PAN-2055). Proportional weight sets
-  // still give identical picks (7/10 and 70/100 are the same double → same bands).
-  const hash01 = hashKeyToUnitInterval(spawnKey);
-  const bands: WeightedBand[] = [];
-  let cumFraction = 0;
+  // Deterministic bucket 0..total-1. fmix32 avalanches FNV's output so common-prefix
+  // issue keys (work:PAN-1901, work:PAN-1919, …) don't all land in one band (PAN-2055).
+  const bucket = fmix32(fnv1a32(spawnKey)) % total;
+  const bands: PercentBand[] = [];
+  let cursor = 0;
   let chosenIdx = -1;
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
     if (e.weight <= 0) {
       // Zero-weight entries occupy an empty band; they can never be selected.
-      bands.push({ model: e.model, weight: e.weight, lo: cumFraction, hi: cumFraction, chosen: false });
+      bands.push({ model: e.model, weight: e.weight, lo: cursor, hi: cursor, chosen: false });
       continue;
     }
-    const lo = cumFraction;
-    cumFraction += e.weight / totalWeight;
-    const hi = cumFraction;
-    const isChosen = chosenIdx === -1 && hash01 < hi;
+    const lo = cursor;
+    cursor += e.weight;
+    const hi = cursor;
+    const isChosen = chosenIdx === -1 && bucket < hi;
     if (isChosen) chosenIdx = i;
     bands.push({ model: e.model, weight: e.weight, lo, hi, chosen: isChosen });
   }
   if (chosenIdx === -1) {
-    // Floating-point accumulation may leave the final band slightly below 1.0; fall
-    // through to the last entry — matches the original pickWeightedModelRef semantics.
+    // bucket < total always holds, so a positive-weight entry is always chosen — this
+    // is a defensive fallback only.
     chosenIdx = entries.length - 1;
     bands[chosenIdx].chosen = true;
   }
-  return { chosen: entries[chosenIdx].model, hash01, bands };
+  return { chosen: entries[chosenIdx].model, bucket, total, bands };
 }
 
 /**
- * Pick a model from a weighted distribution using a deterministic spawn key.
- * Weights are relative (need not sum to 100). {a:7, b:3} and {a:70, b:30} produce
- * identical per-key picks. Throws if no entry has weight > 0.
+ * Pick a model from a percentage distribution using a deterministic spawn key.
+ * Same key + same weights → same model. Throws if no entry has weight > 0.
  *
- * Thin wrapper over `deriveWeightedPick` so selection and its explanation can never drift.
+ * Thin wrapper over `derivePercentPick` so selection and its explanation can't drift.
  */
-export function pickWeightedModelRef(entries: WeightedModelRef[], spawnKey: string): ModelRef {
-  return deriveWeightedPick(entries, spawnKey).chosen;
+export function pickPercentModelRef(entries: WeightedModelRef[], spawnKey: string): ModelRef {
+  return derivePercentPick(entries, spawnKey).chosen;
 }
 
 /** Return the model with the highest weight; first entry wins on a tie. */
@@ -1810,7 +1797,7 @@ export function resolveModel(
 
   if (Array.isArray(roleModel)) {
     const picked = spawnKey
-      ? pickWeightedModelRef(roleModel, spawnKey)
+      ? pickPercentModelRef(roleModel, spawnKey)
       : representativeModelRef(roleModel);
     return derefWorkhorse(picked, config, `roles.${role}.model`);
   }
@@ -1820,41 +1807,47 @@ export function resolveModel(
   return derefWorkhorse(scalarRef, config, fieldPath);
 }
 
-/** One row of a model-origin distribution: a dereffed model with its band and chosen flag. */
+/** One row of a model-origin distribution: a dereffed model with its bucket band and chosen flag. */
 export interface ModelOriginEntry {
   /** The actual model id (workhorse refs already dereffed for display). */
   model: ModelId;
+  /** This entry's weight (a percentage when the distribution totals 100). */
   weight: number;
+  /** Bucket-band start (integer, inclusive). */
   lo: number;
+  /** Bucket-band end (integer, exclusive). */
   hi: number;
+  /** True for the entry the spawn key's bucket selected. */
   chosen: boolean;
 }
 
 /**
- * Read-only explanation of why a weighted-role agent resolved to its model:
- * the spawn key, the FNV-1a hash, and the weight bands. Surfaced in the dashboard
- * right-click MODEL inspector (PAN-2053). `null` for scalar/single-model roles.
+ * Read-only explanation of which model a percentage-role agent resolves to and why:
+ * the spawn key, the deterministic bucket, and the percent bands. Surfaced in the
+ * dashboard right-click MODEL inspector (PAN-2053). `null` for scalar/single-model roles.
  */
 export interface ModelOriginData {
-  /** The exact spawn key whose hash selected the model (`${role}:${issueId}`). */
+  /** The exact spawn key whose bucket selected the model (`${role}:${issueId}`). */
   spawnKey: string;
   /** The chosen model id (dereffed) — equals what determineModel produced for this key. */
   resolved: ModelId;
-  /** `fnv1a32(spawnKey) / 2^32` in [0, 1). */
-  hash01: number;
-  /** Every distribution entry, dereffed, with its band and the chosen flag. */
+  /** Deterministic bucket for this key, in [0, total). */
+  bucket: number;
+  /** Number of buckets = sum of weights (100 when the distribution is percentages). */
+  total: number;
+  /** Every distribution entry, dereffed, with its bucket band and the chosen flag. */
   distribution: ModelOriginEntry[];
 }
 
 /**
- * Explain which model a `role` agent drew from its role's WEIGHTED distribution,
+ * Explain which model a `role` agent drew from its role's percentage distribution,
  * and why, given the EXACT `spawnKey` the agent spawned with. Returns `null` when
  * the role uses a scalar model (nothing to explain) — the caller should then just
- * show the resolved model with no bars/hash.
+ * show the resolved model with no bars/bucket.
  *
  * Faithfulness: `spawnKey` must be the real key persisted on the agent's state at
- * spawn (`AgentState.modelSpawnKey`), not a guess — the FNV-1a hash is sensitive to
- * its exact form (e.g. issue-id casing). Read-only: never mutates anything.
+ * spawn (`AgentState.modelSpawnKey`), not a guess — the bucket is sensitive to its
+ * exact form (e.g. issue-id casing). Read-only: never mutates anything.
  *
  * The distribution is read from the LIVE config (an operator edit since spawn is
  * reflected); the resolved model still derives from the same key, so the highlighted
@@ -1868,7 +1861,7 @@ export function computeModelOrigin(
   const roleModel = config.roles?.[role]?.model;
   if (!Array.isArray(roleModel)) return null;
 
-  const pick = deriveWeightedPick(roleModel, spawnKey);
+  const pick = derivePercentPick(roleModel, spawnKey);
   const fieldPath = `roles.${role}.model`;
   const distribution: ModelOriginEntry[] = pick.bands.map((b) => ({
     model: derefWorkhorse(b.model, config, fieldPath),
@@ -1880,7 +1873,8 @@ export function computeModelOrigin(
   return {
     spawnKey,
     resolved: derefWorkhorse(pick.chosen, config, fieldPath),
-    hash01: pick.hash01,
+    bucket: pick.bucket,
+    total: pick.total,
     distribution,
   };
 }

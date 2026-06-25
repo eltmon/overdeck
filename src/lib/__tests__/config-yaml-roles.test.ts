@@ -6,9 +6,9 @@ import {
   DEFAULT_WORKHORSES,
   computeModelOrigin,
   derefWorkhorse,
-  deriveWeightedPick,
+  derivePercentPick,
   mergeConfigs,
-  pickWeightedModelRef,
+  pickPercentModelRef,
   resolveModel,
   stripProjectTtsEndpoint,
   type NormalizedConfig,
@@ -248,7 +248,7 @@ describe('role model configuration', () => {
   });
 });
 
-describe('weighted model pick derivation (PAN-2053)', () => {
+describe('percent model pick derivation (PAN-2053)', () => {
   const weighted: Pick<NormalizedConfig, 'workhorses' | 'roles'> = {
     workhorses: WORKHORSES,
     roles: {
@@ -260,51 +260,56 @@ describe('weighted model pick derivation (PAN-2053)', () => {
     },
   };
 
-  it('deriveWeightedPick.chosen always equals pickWeightedModelRef', () => {
+  it('derivePercentPick.chosen always equals pickPercentModelRef', () => {
     const entries = weighted.roles!.work!.model as Array<{ model: string; weight: number }>;
     for (let i = 0; i < 200; i++) {
       const key = `work:PAN-${i}`;
-      expect(deriveWeightedPick(entries, key).chosen).toBe(pickWeightedModelRef(entries, key));
+      expect(derivePercentPick(entries, key).chosen).toBe(pickPercentModelRef(entries, key));
     }
   });
 
-  it('bands are contiguous, cover [0,1), and exactly one is chosen', () => {
+  it('bands are contiguous integer ranges covering [0,total), exactly one chosen by the bucket', () => {
     const entries = weighted.roles!.work!.model as Array<{ model: string; weight: number }>;
-    const pick = deriveWeightedPick(entries, 'work:PAN-1832');
-    // contiguous: each band starts where the previous ended
+    const pick = derivePercentPick(entries, 'work:PAN-1832');
+    expect(pick.total).toBe(100);
+    // contiguous integer bands: each starts where the previous ended; widths = weights
     let cursor = 0;
-    for (const b of pick.bands) {
-      expect(b.lo).toBeCloseTo(cursor, 10);
+    for (let i = 0; i < pick.bands.length; i++) {
+      const b = pick.bands[i];
+      expect(b.lo).toBe(cursor);
+      expect(b.hi - b.lo).toBe(entries[i].weight);
       cursor = b.hi;
     }
-    expect(cursor).toBeCloseTo(1, 10);
-    // exactly one chosen, and it owns the band hash01 falls into
+    expect(cursor).toBe(pick.total);
+    // bucket is an integer in [0, total) and the chosen band contains it
+    expect(Number.isInteger(pick.bucket)).toBe(true);
+    expect(pick.bucket).toBeGreaterThanOrEqual(0);
+    expect(pick.bucket).toBeLessThan(pick.total);
     const chosen = pick.bands.filter((b) => b.chosen);
     expect(chosen).toHaveLength(1);
-    expect(pick.hash01).toBeGreaterThanOrEqual(chosen[0].lo);
-    expect(pick.hash01).toBeLessThan(chosen[0].hi);
+    expect(pick.bucket).toBeGreaterThanOrEqual(chosen[0].lo);
+    expect(pick.bucket).toBeLessThan(chosen[0].hi);
   });
 
-  it('spreads near-uniformly across sequential common-prefix keys (PAN-2055)', () => {
-    // Regression: raw fnv1a32/2^32 clustered `work:PAN-19xx` keys into one band
-    // (kimi 68% / glm 30% / gpt 2% over this range). With the fmix32 finalizer the
-    // 1/1/1 distribution must spread roughly evenly — no band may exceed 50%.
+  it('proportional percentages spread across sequential common-prefix keys (PAN-2055)', () => {
+    // Regression: the old fnv1a32/2^32 bucketing clustered `work:PAN-19xx` keys into
+    // one band (kimi 68% / glm 30% / gpt 2%). The fmix32 + modulo bucket spreads a
+    // 33/33/34 distribution roughly evenly — each band within ±15pts of its weight.
     const entries = [
-      { model: 'kimi-k2.7-code', weight: 1 },
-      { model: 'glm-5.2', weight: 1 },
-      { model: 'gpt-5.5', weight: 1 },
+      { model: 'kimi-k2.7-code', weight: 33 },
+      { model: 'glm-5.2', weight: 33 },
+      { model: 'gpt-5.5', weight: 34 },
     ];
     const counts: Record<string, number> = {};
     let total = 0;
     for (let n = 1900; n <= 2060; n++) {
-      const m = pickWeightedModelRef(entries, `work:PAN-${n}`);
+      const m = pickPercentModelRef(entries, `work:PAN-${n}`);
       counts[m] = (counts[m] ?? 0) + 1;
       total++;
     }
-    for (const model of entries.map((e) => e.model)) {
-      const share = (counts[model] ?? 0) / total;
-      expect(share, `${model} share ${(share * 100).toFixed(0)}%`).toBeGreaterThan(0.2);
-      expect(share, `${model} share ${(share * 100).toFixed(0)}%`).toBeLessThan(0.5);
+    for (const e of entries) {
+      const share = (counts[e.model] ?? 0) / total;
+      expect(Math.abs(share - e.weight / 100), `${e.model} share ${(share * 100).toFixed(0)}%`).toBeLessThan(0.15);
     }
   });
 
