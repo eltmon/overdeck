@@ -2895,7 +2895,7 @@ const getConversationMessagesRoute = HttpRouter.add(
           const cached = getSpecialistSessionCache(name);
           if (cached) {
             sessionFile = cached;
-          } else if (/^(specialist-|agent-|planning-)/.test(name)) {
+          } else if (/^(specialist-|agent-|planning-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(name)) {
             // Non-claude harnesses (no Claude session exists): the transcript
             // is the harness's own JSONL under the per-agent dir. Codex
             // (PAN-1805) writes a rollout under CODEX_HOME; pi/kimi (PAN-1908)
@@ -2909,7 +2909,7 @@ const getConversationMessagesRoute = HttpRouter.add(
                   sessionFile = rollout;
                   setSpecialistSessionCache(name, rollout);
                 }
-              } else if (agentHarness === 'ohmypi') {
+              } else if (agentHarness === 'ohmypi' || agentHarness === 'pi') {
                 const piSession = await resolvePiSessionPath(name);
                 if (piSession) {
                   sessionFile = piSession;

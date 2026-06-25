@@ -484,13 +484,15 @@ describe('readLauncherPinnedSessionId — Conversation tab matches Terminal tab'
 
 describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () => {
   const PI_AGENT_ID = 'agent-pan-1908';
+  const PI_STRIKE_ID = 'strike-pan-1827';
+  const PI_FLYWHEEL_ID = 'flywheel-orchestrator';
   const TRANSCRIPT_OLD = '2026-06-15T06-43-53-944Z_019eca05-bbd8-7330-82e8-f54e6020a7e2.jsonl';
   const TRANSCRIPT_NEW = '2026-06-15T07-10-00-000Z_019eca05-cccc-7330-82e8-ffffffffffff.jsonl';
 
-  async function setupPiAgent(): Promise<string> {
-    const agentDir = join(agentsDir, PI_AGENT_ID);
+  async function setupPiAgent(agentId = PI_AGENT_ID, harness: 'pi' | 'ohmypi' = 'pi'): Promise<string> {
+    const agentDir = join(agentsDir, agentId);
     await mkdir(agentDir, { recursive: true });
-    await writeFile(join(agentDir, 'state.json'), JSON.stringify({ id: PI_AGENT_ID, harness: 'pi' }));
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({ id: agentId, harness }));
     return agentDir;
   }
 
@@ -552,5 +554,40 @@ describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () 
     const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
 
     expect(path).toBeNull();
+  });
+
+  it('pi harness wins over a stale claude session.id', async () => {
+    const agentDir = await setupPiAgent();
+    await writeFile(join(agentDir, TRANSCRIPT_OLD), '{"type":"session"}\n');
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{"stale":"claude"}\n');
+    await writeFile(join(agentDir, 'session.id'), CLAUDE_SESSION_ID);
+
+    const path = await resolveJsonlPath(PI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(join(agentDir, TRANSCRIPT_OLD));
+  });
+
+  it('strike agents resolve pi transcripts from the strike session dir', async () => {
+    const agentDir = await setupPiAgent(PI_STRIKE_ID);
+    await writeFile(join(agentDir, TRANSCRIPT_OLD), '{"type":"session"}\n');
+
+    const path = await resolveJsonlPath(PI_STRIKE_ID, WORKSPACE_PATH, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(join(agentDir, TRANSCRIPT_OLD));
+  });
+
+  it('flywheel orchestrator resolves pi transcripts from its agent dir', async () => {
+    const agentDir = await setupPiAgent(PI_FLYWHEEL_ID, 'ohmypi');
+    await writeFile(join(agentDir, TRANSCRIPT_OLD), '{"type":"session"}\n');
+
+    const path = await resolveJsonlPath(PI_FLYWHEEL_ID, WORKSPACE_PATH, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(join(agentDir, TRANSCRIPT_OLD));
   });
 });

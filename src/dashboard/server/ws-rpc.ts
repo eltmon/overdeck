@@ -854,7 +854,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // tailing their transcript and pushing full snapshots. Claude agent
             // sessions keep the HTTP-poll path — the front-end gate only enables
             // streaming for pi/codex here.
-            if (!conv && /^(agent-|planning-|specialist-)/.test(input.conversationName)) {
+            if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
               if (harness === 'ohmypi') {
                 return streamResolvedFullParseSnapshots(
