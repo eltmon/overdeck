@@ -75,6 +75,22 @@ export function insertCostEventSync(event: CostEvent): boolean {
 
 // ── Records-layer helpers ─────────────────────────────────────────────────────
 
+export function getCostSinceSync(startTs: Date): number {
+  const db = getOverdeckDatabaseSync();
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(cost), 0) AS total_cost FROM cost_events
+       WHERE ts >= ?`,
+    )
+    .get(startTs.getTime()) as { total_cost: number } | undefined;
+  return row?.total_cost ?? 0;
+}
+
+export function getTodayCostSync(now = new Date()): number {
+  const utcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return getCostSinceSync(utcMidnight);
+}
+
 /**
  * Returns the total cost in USD for an issue (for records.ts projectUsage).
  * Returns null if no cost events exist.

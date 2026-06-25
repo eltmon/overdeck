@@ -18,6 +18,7 @@ import { EventStoreService } from '../services/domain-services.js';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { getTodayCostSync } from '../../../lib/overdeck/cost-sync.js';
 
 // ─── Cached review statuses ───────────────────────────────────────────────────
 // loadReviewStatuses() hits SQLite with SELECT * FROM review_status on every
@@ -87,9 +88,8 @@ const getMetricsSummaryRoute = HttpRouter.add(
     const service = getCloisterService();
     const status = service.getStatus();
 
-    // Use in-memory cost summary instead of readEvents() — the events file is
-    // 100K+ lines and readFileSync on every metrics request blocks the loop.
     const costSummary = service.getCostSummary();
+    const todayCost = getTodayCostSync();
     const topAgents = costSummary.topAgents.slice(0, 5);
     const topIssues = costSummary.topIssues.slice(0, 5);
 
@@ -103,7 +103,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
 
     return jsonResponse({
       today: {
-        totalCost: Math.round(costSummary.dailyTotal * 100) / 100,
+        totalCost: Math.round(todayCost * 100) / 100,
         agentCount: status.summary.total,
         activeCount: status.summary.active,
         stuckCount,
