@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-25T03:22:35.918Z",
+  "updated": "2026-06-25T03:36:32.776Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -276,6 +276,11 @@
       "reason": "feedback",
       "note": "[2026-06-25T03:22Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-06-25T03:22:35.918Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T03:36:32.776Z"
     }
   ],
   "feedback": [
