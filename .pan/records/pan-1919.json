@@ -78,25 +78,20 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-06-25T03:03:44.261Z",
+  "updated": "2026-06-25T03:06:22.665Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "dispatch_failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-25T03:03:44.244Z",
+    "updatedAt": "2026-06-25T03:06:22.637Z",
     "reviewNotes": "review passed; record cutover verified",
-    "testNotes": "Verification gates passed: npm run typecheck (✓ no errors), npm run lint (✓ clean), npm test (✓ 7148 tests passed, 696 files passed, 0 failures). Build successful. All 6 beads implemented: types/sampler, resolve-sampling, config-load-validation, settings-api-validation, thread-spawn-key, frontend-types-and-display, distribution-editor. RolesPanel assertion stale fix (Sequencer role card count 7→8) committed and verified. Weighted distribution logic confirmed in config-yaml.ts, settings-api.ts, RolesPanel.tsx. API responds correctly. Dashboard builds and serves settings.",
+    "testNotes": "Dispatch failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-1919-test -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-1919 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL= -e ANTHROPIC_AUTH_TOKEN= -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-1919-test -e OVERDECK_ISSUE_ID=PAN-1919 -e OVERDECK_SESSION_TYPE=test -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-13 -e OVERDECK_FLYWHEEL_AGENT_ROLE=test bash /home/eltmon/.overdeck/agents/agent-pan-1919-test/launcher.sh\nduplicate session: agent-pan-1919-test\n",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-06-25T03:02:54.652Z"
-      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
@@ -104,7 +99,7 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/1950",
-    "reviewedAtCommit": "bcfd47ae2904d7007844a11a8f15ba841d80d1bc"
+    "reviewedAtCommit": "8ac389117566e4095659c94f7188e608f1d92006"
   },
   "closeOut": {
     "usage": {
@@ -143,18 +138,18 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 27,
-            "output": 3458,
-            "cacheRead": 1930814,
-            "cacheWrite": 144479
+            "input": 217,
+            "output": 5676,
+            "cacheRead": 2451750,
+            "cacheWrite": 381392
           }
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 733,
-            "output": 251346,
-            "cacheRead": 85806249,
-            "cacheWrite": 1856010
+            "input": 752,
+            "output": 256074,
+            "cacheRead": 87849315,
+            "cacheWrite": 1867776
           }
         }
       },
@@ -166,10 +161,10 @@
           "cacheWrite": 452641
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 743,
-          "output": 257839,
-          "cacheRead": 86383427,
-          "cacheWrite": 1926203
+          "input": 762,
+          "output": 262567,
+          "cacheRead": 88426493,
+          "cacheWrite": 1937969
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 130321,
@@ -178,15 +173,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 27,
-          "output": 3458,
-          "cacheRead": 1930814,
-          "cacheWrite": 144479
+          "input": 217,
+          "output": 5676,
+          "cacheRead": 2451750,
+          "cacheWrite": 381392
         }
       },
       "costAtCloseOut": {
-        "usd": 46.893528,
-        "pricingAsOf": "2026-06-25T03:03:44.261Z"
+        "usd": 47.981062,
+        "pricingAsOf": "2026-06-25T03:06:22.665Z"
       }
     },
     "merges": [
