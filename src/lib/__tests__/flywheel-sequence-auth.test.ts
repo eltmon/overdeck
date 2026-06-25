@@ -32,6 +32,7 @@ describe('pickFromSequence – ready-or-PRD eligibility gate (FR-14)', () => {
       makeNode('PAN-HAS-PRD', 2),
     ];
     const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-HAS-PRD' ? ['released'] : []),
       isAuthorizedIssue: () => true,
       isReadyOrHasPrd: (id) => id === 'PAN-HAS-PRD',
     });
@@ -50,6 +51,7 @@ describe('pickFromSequence – ready-or-PRD eligibility gate (FR-14)', () => {
   it('selects rank-1 when it has a spec (ready=true)', () => {
     const nodes = [makeNode('PAN-READY', 1), makeNode('PAN-2', 2)];
     const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-READY' ? ['released'] : []),
       isReadyOrHasPrd: (id) => id === 'PAN-READY',
     });
     expect(result?.issueId).toBe('PAN-READY');
@@ -57,7 +59,7 @@ describe('pickFromSequence – ready-or-PRD eligibility gate (FR-14)', () => {
 
   it('backwards-compatible: no isReadyOrHasPrd passes all issues regardless of PRD/spec', () => {
     const nodes = [makeNode('PAN-NO-ANYTHING', 1)];
-    const result = pickFromSequence(nodes);
+    const result = pickFromSequence(nodes, { issueLabels: () => ['released'] });
     expect(result?.issueId).toBe('PAN-NO-ANYTHING');
   });
 });
@@ -71,6 +73,7 @@ describe('pickFromSequence – isInPipeline live-workspace gate', () => {
       makeNode('PAN-IDLE', 2),
     ];
     const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-IDLE' ? ['released'] : []),
       isInPipeline: (id) => id === 'PAN-LIVE',
     });
     expect(result?.issueId).toBe('PAN-IDLE');
@@ -86,7 +89,7 @@ describe('pickFromSequence – isInPipeline live-workspace gate', () => {
 
   it('backwards-compatible: no isInPipeline option selects rank-1', () => {
     const nodes = [makeNode('PAN-1', 1), makeNode('PAN-2', 2)];
-    const result = pickFromSequence(nodes);
+    const result = pickFromSequence(nodes, { issueLabels: () => ['released'] });
     expect(result?.issueId).toBe('PAN-1');
   });
 });
@@ -100,6 +103,7 @@ describe('pickFromSequence – author/assignee safety gate', () => {
       makeNode('PAN-100', 2),
     ];
     const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-100' ? ['released'] : []),
       isAuthorizedIssue: (id) => id !== 'PAN-THIRD-PARTY',
     });
     expect(result?.issueId).toBe('PAN-100');
@@ -116,6 +120,7 @@ describe('pickFromSequence – author/assignee safety gate', () => {
   it('selects rank-1 when isAuthorizedIssue returns true for it', () => {
     const nodes = [makeNode('PAN-1', 1), makeNode('PAN-2', 2)];
     const result = pickFromSequence(nodes, {
+      issueLabels: () => ['released'],
       isAuthorizedIssue: () => true,
     });
     expect(result?.issueId).toBe('PAN-1');
@@ -123,7 +128,7 @@ describe('pickFromSequence – author/assignee safety gate', () => {
 
   it('backwards-compatible: no isAuthorizedIssue option selects rank-1 regardless of ownership', () => {
     const nodes = [makeNode('PAN-ANY', 1)];
-    const result = pickFromSequence(nodes);
+    const result = pickFromSequence(nodes, { issueLabels: () => ['released'] });
     expect(result?.issueId).toBe('PAN-ANY');
   });
 });
@@ -134,7 +139,7 @@ describe('pickFromSequence – vetoed / parked label gates (PAN-2006)', () => {
   it('skips a `vetoed`-labelled rank-1 issue and picks rank-2', () => {
     const nodes = [makeNode('PAN-VETO', 1), makeNode('PAN-OK', 2)];
     const result = pickFromSequence(nodes, {
-      issueLabels: (id) => (id === 'PAN-VETO' ? ['vetoed'] : []),
+      issueLabels: (id) => (id === 'PAN-VETO' ? ['vetoed'] : ['released']),
     });
     expect(result?.issueId).toBe('PAN-OK');
   });
@@ -142,7 +147,7 @@ describe('pickFromSequence – vetoed / parked label gates (PAN-2006)', () => {
   it('vetoed is case-insensitive', () => {
     const nodes = [makeNode('PAN-VETO', 1), makeNode('PAN-OK', 2)];
     const result = pickFromSequence(nodes, {
-      issueLabels: (id) => (id === 'PAN-VETO' ? ['Vetoed'] : []),
+      issueLabels: (id) => (id === 'PAN-VETO' ? ['Vetoed'] : ['released']),
     });
     expect(result?.issueId).toBe('PAN-OK');
   });
@@ -155,7 +160,7 @@ describe('pickFromSequence – vetoed / parked label gates (PAN-2006)', () => {
     ];
     const result = pickFromSequence(nodes, {
       issueLabels: (id) =>
-        id === 'PAN-PARKED' ? ['parked'] : id === 'PAN-LEGACY' ? ['needs-design'] : [],
+        id === 'PAN-PARKED' ? ['parked'] : id === 'PAN-LEGACY' ? ['needs-design'] : ['released'],
     });
     expect(result?.issueId).toBe('PAN-OK');
   });
@@ -174,7 +179,7 @@ describe('pickFromSequence – Definition of Ready gate (PAN-2006, requireReady)
     const nodes = [makeNode('PAN-NOTREADY', 1), makeNode('PAN-READY', 2)];
     const result = pickFromSequence(nodes, {
       requireReady: true,
-      issueLabels: (id) => (id === 'PAN-READY' ? ['ready'] : []),
+      issueLabels: (id) => (id === 'PAN-READY' ? ['ready', 'released'] : []),
     });
     expect(result?.issueId).toBe('PAN-READY');
   });
@@ -187,7 +192,7 @@ describe('pickFromSequence – Definition of Ready gate (PAN-2006, requireReady)
 
   it('without requireReady (legacy), an unlabelled rank-1 is still picked', () => {
     const nodes = [makeNode('PAN-1', 1)];
-    const result = pickFromSequence(nodes, { issueLabels: () => [] });
+    const result = pickFromSequence(nodes, { issueLabels: () => ['released'] });
     expect(result?.issueId).toBe('PAN-1');
   });
 });
