@@ -2,23 +2,75 @@
   "version": "1",
   "issueId": "PAN-1901",
   "created": "2026-06-24T01:09:26.877Z",
-  "updated": "2026-06-24T02:30:00.000Z",
-  "gitState": { "branch": "feature/pan-1901", "sha": "865a5a2d3", "dirty": false },
+  "updated": "2026-06-24T02:32:04.541Z",
+  "gitState": {
+    "branch": "feature/pan-1901",
+    "sha": "865a5a2d3",
+    "dirty": false
+  },
   "decisions": [
-    { "id": "D1", "summary": "Fix per file-class, not one-liner: `.beads/issues.jsonl` → built-in `merge=union` (zero config); `.pan/specs|continues|records` single-JSON state → `merge=ours` + wired `merge.ours.driver true`. Confirmed by the operator's issue comment that union corrupts single-JSON objects.", "recordedAt": "2026-06-24T01:09:26.877Z" },
-    { "id": "D2", "summary": "Use `union` for beads, NOT a real `merge.beads.driver`: `bd` has no merge-driver subcommand (`bd merge` is unknown; only `merge-slot`/`duplicates` exist), so the named `beads` driver can never be configured. union is the only viable conflict-free strategy and is built-in/config-free.", "recordedAt": "2026-06-24T01:09:26.877Z" },
-    { "id": "D3", "summary": "Use `merge=ours` with `git config merge.ours.driver true` (the documented git recipe — `true` exits 0, keeping the current branch's whole file) rather than a bespoke timestamp-aware script driver. Safe because the on-main pan-dir auto-commit owns these files and re-stamps them from sources of truth; a transiently stale-but-valid side self-heals.", "recordedAt": "2026-06-24T01:09:26.877Z" },
-    { "id": "D4", "summary": "Add a `pan doctor` guard + unit test that fails on any inert merge attribute (a `.gitattributes` `merge=<driver>` whose `merge.<driver>.driver` is unset and which is not a git built-in union/text/binary). This is the root-cause fix for PAN-1841's silent inertness — it makes the bug class loud and detectable.", "recordedAt": "2026-06-24T01:09:26.877Z" },
-    { "id": "D5", "summary": "Backfill must be UNCONDITIONAL: `sync.ts:329` sets git config only inside the beads-DB-missing `catch`, so it never re-runs on already-initialized repos. The new `ensurePanMergeDrivers(config.path)` call runs for every project in the `pan sync` loop so one `pan sync` heals all existing primary repos.", "recordedAt": "2026-06-24T01:09:26.877Z" },
-    { "id": "D6", "summary": "Extend `merge=ours` coverage to `.pan/records/*.json` (42 tracked) in addition to the `.pan/specs` (233) and `.pan/continues` (147) named in the issue — records are the same single-JSON, per-issue, auto-committed class and conflict identically.", "recordedAt": "2026-06-24T01:09:26.877Z" },
-    { "id": "D7", "summary": "Implemented only the two beads scoped to this issue: (1) switch .beads/issues.jsonl to merge=union in .gitattributes with updated comments; (2) 4 Vitest tests proving union works cleanly and guarding the invariant. Remaining beads from the full PRD (merge=ours for .pan/ state, ensurePanMergeDrivers, pan doctor guard) are separate future work.", "recordedAt": "2026-06-24T02:30:00.000Z" }
+    {
+      "id": "D1",
+      "summary": "Fix per file-class, not one-liner: `.beads/issues.jsonl` → built-in `merge=union` (zero config); `.pan/specs|continues|records` single-JSON state → `merge=ours` + wired `merge.ours.driver true`. Confirmed by the operator's issue comment that union corrupts single-JSON objects.",
+      "recordedAt": "2026-06-24T01:09:26.877Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Use `union` for beads, NOT a real `merge.beads.driver`: `bd` has no merge-driver subcommand (`bd merge` is unknown; only `merge-slot`/`duplicates` exist), so the named `beads` driver can never be configured. union is the only viable conflict-free strategy and is built-in/config-free.",
+      "recordedAt": "2026-06-24T01:09:26.877Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Use `merge=ours` with `git config merge.ours.driver true` (the documented git recipe — `true` exits 0, keeping the current branch's whole file) rather than a bespoke timestamp-aware script driver. Safe because the on-main pan-dir auto-commit owns these files and re-stamps them from sources of truth; a transiently stale-but-valid side self-heals.",
+      "recordedAt": "2026-06-24T01:09:26.877Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Add a `pan doctor` guard + unit test that fails on any inert merge attribute (a `.gitattributes` `merge=<driver>` whose `merge.<driver>.driver` is unset and which is not a git built-in union/text/binary). This is the root-cause fix for PAN-1841's silent inertness — it makes the bug class loud and detectable.",
+      "recordedAt": "2026-06-24T01:09:26.877Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Backfill must be UNCONDITIONAL: `sync.ts:329` sets git config only inside the beads-DB-missing `catch`, so it never re-runs on already-initialized repos. The new `ensurePanMergeDrivers(config.path)` call runs for every project in the `pan sync` loop so one `pan sync` heals all existing primary repos.",
+      "recordedAt": "2026-06-24T01:09:26.877Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Extend `merge=ours` coverage to `.pan/records/*.json` (42 tracked) in addition to the `.pan/specs` (233) and `.pan/continues` (147) named in the issue — records are the same single-JSON, per-issue, auto-committed class and conflict identically.",
+      "recordedAt": "2026-06-24T01:09:26.877Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Implemented only the two beads scoped to this issue: (1) switch .beads/issues.jsonl to merge=union in .gitattributes with updated comments; (2) 4 Vitest tests proving union works cleanly and guarding the invariant. Remaining beads from the full PRD (merge=ours for .pan/ state, ensurePanMergeDrivers, pan doctor guard) are separate future work.",
+      "recordedAt": "2026-06-24T02:30:00.000Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "Re-creating the PAN-1841 inert-attribute bug: declaring `merge=ours` in `.gitattributes` without wiring `merge.ours.driver` makes git silently fall back to default merge (no error).", "mitigation": "The `merge=ours` attribute bead (vbrief-ours-attr) is `blocks`-gated behind the driver-config helper bead, and the doctor guard bead fails CI/doctor if any non-built-in `merge=` attribute lacks its driver. Land config before/with the attribute." },
-    { "id": "H2", "summary": "`merge=ours` on `git merge origin/main` keeps the LOCAL (main) version and discards origin/main's copy of that per-issue file, which could drop a genuinely newer status from another machine.", "mitigation": "Acceptable: the pan-dir auto-commit re-derives and re-commits state from sources of truth (GitHub, records, transcripts) on the next flush, so a stale side self-heals. Never corrupts JSON (unlike union). Documented in NFR-2." },
-    { "id": "H3", "summary": "Scope creep: a blanket `*.json merge=union` would corrupt every single-JSON `.pan` state file.", "mitigation": "union is scoped ONLY to `.beads/issues.jsonl`. The `.pan` single-JSON families use `merge=ours`. Enforced by the exact `.gitattributes` patterns in the plan." },
-    { "id": "H4", "summary": "Config writes can fail (read-only repo, missing git). The four existing `git config beads.role contributor` sites swallow errors (`.catch(() => {})`).", "mitigation": "`ensurePanMergeDrivers` must be idempotent and best-effort (non-fatal on failure), matching the existing sites (NFR-3). The doctor guard surfaces any repo where the driver did not land." },
-    { "id": "H5", "summary": "The conflict storm occurs on the PRIMARY main worktree (flywheel `git merge origin/main`), not in agent workspaces. Wiring config only at worktree creation would NOT heal the primary repo.", "mitigation": "Backfill bead wires `ensurePanMergeDrivers` into the per-project `pan sync` loop (cwd = primary repo path), which is the heal point for primary repos. `.gitattributes` itself travels via git to all clones." }
+    {
+      "id": "H1",
+      "summary": "Re-creating the PAN-1841 inert-attribute bug: declaring `merge=ours` in `.gitattributes` without wiring `merge.ours.driver` makes git silently fall back to default merge (no error).",
+      "mitigation": "The `merge=ours` attribute bead (vbrief-ours-attr) is `blocks`-gated behind the driver-config helper bead, and the doctor guard bead fails CI/doctor if any non-built-in `merge=` attribute lacks its driver. Land config before/with the attribute."
+    },
+    {
+      "id": "H2",
+      "summary": "`merge=ours` on `git merge origin/main` keeps the LOCAL (main) version and discards origin/main's copy of that per-issue file, which could drop a genuinely newer status from another machine.",
+      "mitigation": "Acceptable: the pan-dir auto-commit re-derives and re-commits state from sources of truth (GitHub, records, transcripts) on the next flush, so a stale side self-heals. Never corrupts JSON (unlike union). Documented in NFR-2."
+    },
+    {
+      "id": "H3",
+      "summary": "Scope creep: a blanket `*.json merge=union` would corrupt every single-JSON `.pan` state file.",
+      "mitigation": "union is scoped ONLY to `.beads/issues.jsonl`. The `.pan` single-JSON families use `merge=ours`. Enforced by the exact `.gitattributes` patterns in the plan."
+    },
+    {
+      "id": "H4",
+      "summary": "Config writes can fail (read-only repo, missing git). The four existing `git config beads.role contributor` sites swallow errors (`.catch(() => {})`).",
+      "mitigation": "`ensurePanMergeDrivers` must be idempotent and best-effort (non-fatal on failure), matching the existing sites (NFR-3). The doctor guard surfaces any repo where the driver did not land."
+    },
+    {
+      "id": "H5",
+      "summary": "The conflict storm occurs on the PRIMARY main worktree (flywheel `git merge origin/main`), not in agent workspaces. Wiring config only at worktree creation would NOT heal the primary repo.",
+      "mitigation": "Backfill bead wires `ensurePanMergeDrivers` into the per-project `pan sync` loop (cwd = primary repo path), which is the heal point for primary repos. `.gitattributes` itself travels via git to all clones."
+    }
   ],
   "resumePoint": {
     "description": "Implementation complete. Both beads closed. Run pan done PAN-1901.",
@@ -38,6 +90,11 @@
       "note": "Completed both beads: (1) switched .beads/issues.jsonl to merge=union in .gitattributes with updated comments explaining the built-in driver and warning about single-JSON .pan/ files; (2) added 4 Vitest tests in gitattributes-merge.test.ts proving union merges cleanly, control confirms default 3-way conflicts, and two invariant guards block future regressions.",
       "timestamp": "2026-06-24T02:30:00.000Z",
       "agentModel": "agent:claude-sonnet-4-6"
+    },
+    {
+      "timestamp": "2026-06-24T02:32:04.531Z",
+      "reason": "end",
+      "note": "No deviations. Implemented both scoped beads: (1) switched .beads/issues.jsonl from inert merge=beads to built-in merge=union in .gitattributes, with comments explaining union requires no git config and warning single-JSON .pan/ state files must not use content-merge drivers; (2) added 4 Vitest tests in gitattributes-merge.test.ts proving union cleanly resolves divergent JSONL appends (control without union confirms default 3-way produces conflict markers), plus two invariant guards blocking re-introduction of inert custom drivers or content-merge on .pan/ JSON state files."
     }
   ],
   "feedback": []
