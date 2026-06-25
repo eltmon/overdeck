@@ -1400,3 +1400,89 @@ export function setFavorite(type: LegacyFavoriteType, itemId: string): void {
 export function removeFavorite(type: LegacyFavoriteType, itemId: string): void {
   overdeckDb().prepare(`DELETE FROM favorites WHERE type = ? AND item_id = ?`).run(type, itemId);
 }
+
+export interface ImportLegacyConversationMapped {
+  name: string;
+  tmuxSession: string | null;
+  status: 'active' | 'ended';
+  cwd: string;
+  createdAt: number;
+  endedAt: number | null;
+  lastAttachedAt: number | null;
+  sessionFile: string | null;
+  claudeSessionId: string | null;
+  title: string | null;
+  titleSource: string | null;
+  titleSeed: string | null;
+  totalCost: number;
+  totalTokens: number;
+  archivedAt: number | null;
+  model: string | null;
+  effort: string | null;
+  forkStatus: string | null;
+  forkError: string | null;
+  harness: string | null;
+  deliveryMethod: string | null;
+  spawnError: string | null;
+  handoffDocPath: string | null;
+  forkFallbackReason: string | null;
+  forkRequest: string | null;
+  forkRetryCount: number;
+}
+
+export function importLegacyConversation(mapped: ImportLegacyConversationMapped): { uuid: string } {
+  const db = overdeckDb();
+  const uuid = randomUUID();
+  db.transaction(() => {
+    db.prepare(`
+      INSERT OR IGNORE INTO conversations
+        (id, name, cwd, harness, model, effort, title, title_source, created_at, archived_at,
+         tmux_session, status, ended_at, last_attached_at, session_file, total_cost, total_tokens,
+         fork_status, fork_error, fork_retry_count, fork_request, fork_fallback_reason,
+         delivery_method, spawn_error, handoff_doc_path, handoff_target_conv_id, cleared_to_conv_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+    `).run(
+      uuid,
+      mapped.name,
+      mapped.cwd,
+      mapped.harness,
+      mapped.model,
+      mapped.effort,
+      mapped.title,
+      mapped.titleSource,
+      mapped.createdAt,
+      mapped.archivedAt,
+      mapped.tmuxSession ?? `conv-${mapped.name}`,
+      mapped.status,
+      mapped.endedAt,
+      mapped.lastAttachedAt,
+      mapped.sessionFile,
+      mapped.totalCost,
+      mapped.totalTokens,
+      mapped.forkStatus,
+      mapped.forkError,
+      mapped.forkRetryCount,
+      mapped.forkRequest,
+      mapped.forkFallbackReason,
+      mapped.deliveryMethod,
+      mapped.spawnError,
+      mapped.handoffDocPath,
+    );
+    if (mapped.claudeSessionId) {
+      db.prepare(`
+        INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(uuid, mapped.harness ?? 'claude-code', mapped.claudeSessionId, mapped.createdAt);
+    }
+  })();
+  return { uuid };
+}
+
+export function setImportedConversationLinks(
+  uuid: string,
+  links: { handoffTargetUuid: string | null; clearedToUuid: string | null },
+): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET handoff_target_conv_id = ?, cleared_to_conv_id = ? WHERE id = ?`)
+    .run(links.handoffTargetUuid, links.clearedToUuid, uuid);
+}
