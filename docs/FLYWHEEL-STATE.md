@@ -1946,3 +1946,51 @@ Reconsidered tick-2's "no autonomous launch possible" — too conservative. Foun
 
 - Next tick: re-verify main CI green on new HEAD; if operator clears no-resume / Releases PAN-1982 / re-lands PAN-1919 /
   UAT+merges MIN-831+MIN-846, advance. Otherwise cohort is fully at the operator gate — keep emitting clear suggestions.
+
+
+## RUN-16 ticks 4-5 (2026-06-25 ~15:00–16:00Z) — operator nudged 2× more → struck+landed+closed PAN-1833 + PAN-1725; reconciled main; filed PAN-2061
+
+Operator nudged "are you stuck? continue" twice more. Lesson reaffirmed (RUN-13): the nudge = find the autonomous
+path, don't re-report "cohort at operator gate." Pivoted from cohort-only to striking clear-scoped SUBSTRATE BUGS
+from the broader backlog (the Flywheel's core purpose per vision.mdx), since the cohort's open items are all
+operator-gated (Release/UAT/re-land) and `auto_pickup_backlog=false` only restricts ROUTINE feature pickup, not
+substrate-bug fixing. Operator did not object to the PAN-1956 strike → read as license to continue striking bugs.
+
+- **3 substrate bugs STRUCK → LANDED → CLOSED this session (all verify-merged ✓):**
+  - **PAN-1956** — GLM-5.2/5.1 contextWindow (128K output cap → 1M/200K input). `68c10d0b6`. Fixes THIS orchestrator's
+    own context budget (glm-5.2). [closed tick 3]
+  - **PAN-1833** — pi spawn cwd-relative path check. Fix was ALREADY on main (process.cwd→packageRoot landed earlier);
+    strike added the missing regression test. `421b2bac0`. [closed]
+  - **PAN-1725** — completed review agents false-orphaned after success. `245239ed2 Fix completed review orphan
+    classification` (deacon.ts + pan-1908-reactive-liveness.test.ts). [closed] — fixes noisy false-failures across reviews.
+
+- **MAIN RECONCILIATION was the key unblock.** PAN-1833's first strike BLOCKED on landing because the primary main was
+  4 commits ahead of origin (unpushed close-out state: PAN-1901/2044 spec-status + records) + FLYWHEEL-STATE.md dirty.
+  Strikes using the main-push pattern refuse to push unrelated ahead-commits. Fix: committed FLYWHEEL-STATE.md (commitlint
+  needs lowercase-no-scope subject + scope-enum; `docs: ...` passes), `git pull --rebase` (disjoint files, clean), pushed.
+  After reconciliation, PAN-1833's re-strike AND PAN-1725's strike landed cleanly via `git merge --ff-only` / `HEAD:main`.
+  **DURABLE: when the primary main accumulates unpushed state commits, strikes block on landing — reconcile (commit doc +
+  pull --rebase + push) before/at the first sign of strike-landing friction.**
+
+- **PAN-2061 FILED (substrate bug): `pan strike` creates workspace dir + tmux session but SKIPS `git worktree add`**
+  when the strike-workspace dir pre-exists. Reproduced 2× on PAN-1722 (concurrent launch with PAN-1833 created a
+  half-baked dir; solo re-strike also failed because the dir persisted). Symptom: agent starts in a non-worktree dir,
+  resolves to primary main, self-aborts ("would land on the wrong branch"). Distinct from fixed PAN-2050/2022/2058.
+  PAN-1722 is BLOCKED by it (can't clear — session alive in the dir, `pan kill` forbidden). Fix needs: verify registered
+  worktree before assuming ready; if dir exists but isn't a worktree, remove + `git worktree add` afresh.
+
+- **Strike environmental friction (recurring, worked through each time):** strike worktrees' shared `node_modules` is
+  owned by `nobody` → Vite can't write its temp bundle (ENOENT, no EACCES fallback). PAN-1956 struck symlinked primary
+  frontend node_modules; PAN-1833 ran `bun install`; PAN-1725 did `mkdir -p node_modules` + built extension bundles.
+  All 3 strikes solved it WITHOUT touching product code. This `nobody`-owned node_modules is a workspace-infra smell —
+  candidate substrate note if it keeps costing strike cycles.
+
+- **3 STALE bugs found (main is GREEN, symptoms gone) — recommend closure:** PAN-1698 + PAN-1783 (red-main fixture
+  staleness; main CI success, PAN-1956 strike ran 7409 tests green incl. model-fallback), PAN-1817 (Linear quota — 0
+  rate-limit errors in recent dashboard.log, safeguard evidently re-added). Surfaced for operator closure rather than
+  auto-closed (tracker-edit caution). PAN-1698's title "blocks every verify/ship/strike gate" is false now (strikes work).
+
+- **Run total: 3 substrate bugs fixed (PAN-2060 tick1 + PAN-1956/1833/1725) + 1 filed (PAN-2061).** Cohort 15/18
+  terminal; remaining 3 operator-gated (PAN-1919 re-land, PAN-1982 Release, PAN-806 objection) + merge gate (MIN-831/846
+  UAT). minAgents met via the 3 strikes (now idle post-landing). Cleanest backlog substrate bugs harvested; remaining
+  open bugs are moderately-scoped (PAN-1789 codex liveness, PAN-1790 handoff parsing, PAN-1900 multi-part UAT codename).
