@@ -36,6 +36,17 @@ interface ProjectCiHealth {
   mergeBlocked: number;
   shipReadyClear: number;
   workRunning: number;
+  errors: ProjectCiError[];
+  hiddenErrorCount: number;
+}
+
+interface ProjectCiError {
+  issueId: string;
+  title: string;
+  label: string;
+  summary: string;
+  details?: string;
+  tone: 'bad' | 'warn';
 }
 
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'todo'];
@@ -137,6 +148,7 @@ function hasBlockerType(reviewStatus: ReviewStatusSnapshot | undefined, types: S
 
 const CI_BLOCKER_TYPES = new Set(['failing_checks']);
 const MERGEABILITY_BLOCKER_TYPES = new Set(['merge_conflict', 'not_mergeable', 'draft_pr']);
+const PROJECT_CI_ERROR_LIMIT = 4;
 
 function isCiBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
   return Boolean(
@@ -151,6 +163,66 @@ function isMergeabilityBlocked(reviewStatus: ReviewStatusSnapshot | undefined): 
     hasBlockerType(reviewStatus, MERGEABILITY_BLOCKER_TYPES) ||
       MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? ''),
   );
+}
+
+function ciErrorLabel(type: string): string {
+  switch (type) {
+    case 'failing_checks': return 'Checks';
+    case 'merge_conflict': return 'Merge conflict';
+    case 'not_mergeable': return 'Not mergeable';
+    case 'draft_pr': return 'Draft PR';
+    case 'test_status': return 'Test gate';
+    case 'verification_status': return 'Verification';
+    case 'merge_status': return 'Merge';
+    default: return 'Blocker';
+  }
+}
+
+function ciErrorsForEntry({ feature, reviewStatus }: BucketedFeature): ProjectCiError[] {
+  const errors: ProjectCiError[] = [];
+  for (const reason of reviewStatus?.blockerReasons ?? []) {
+    if (!CI_BLOCKER_TYPES.has(reason.type) && !MERGEABILITY_BLOCKER_TYPES.has(reason.type)) continue;
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel(reason.type),
+      summary: reason.summary,
+      details: reason.details,
+      tone: CI_BLOCKER_TYPES.has(reason.type) ? 'bad' : 'warn',
+    });
+  }
+  if (errors.length > 0) return errors;
+
+  if (TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '')) {
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel('test_status'),
+      summary: reviewStatus?.testStatus === 'dispatch_failed' ? 'Test dispatch failed' : 'Test failed',
+      tone: 'bad',
+    });
+  }
+  if (VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? '')) {
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel('verification_status'),
+      summary: 'Verification failed',
+      details: reviewStatus?.verificationNotes,
+      tone: 'bad',
+    });
+  }
+  if (MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '')) {
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel('merge_status'),
+      summary: 'Merge failed',
+      details: reviewStatus?.mergeNotes,
+      tone: 'warn',
+    });
+  }
+  return errors;
 }
 
 function blockedVariant(
@@ -329,7 +401,15 @@ export function ProjectOverview({
       phase === 'ship' && (feature.readyForMerge || reviewStatus?.readyForMerge) && !isBlockedFeature(feature, reviewStatus),
     ).length;
     const workRunning = bucketedFeatures.filter(({ feature }) => hasActiveAgentSignal(feature)).length;
-    return { failingChecks, mergeBlocked, shipReadyClear, workRunning };
+    const allErrors = bucketedFeatures.flatMap(ciErrorsForEntry);
+    return {
+      failingChecks,
+      mergeBlocked,
+      shipReadyClear,
+      workRunning,
+      errors: allErrors.slice(0, PROJECT_CI_ERROR_LIMIT),
+      hiddenErrorCount: Math.max(0, allErrors.length - PROJECT_CI_ERROR_LIMIT),
+    };
   }, [bucketedFeatures]);
 
   const metrics = useMemo<HeroMetric[]>(() => {
@@ -493,6 +573,55 @@ function ProjectCiHealthSection({ health }: { health: ProjectCiHealth }) {
         <HealthTile label="Ship-ready" value={`${health.shipReadyClear} clear`} tone="good" />
         <HealthTile label="Work agents" value={`${health.workRunning} running`} tone={health.workRunning > 0 ? 'good' : 'neutral'} />
       </div>
+      {health.errors.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '9px 12px 11px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--foreground)' }}>Blocking details</div>
+          {health.errors.map((error) => (
+            <div
+              key={`${error.issueId}-${error.label}-${error.summary}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '8px minmax(0, 1fr)',
+                gap: 8,
+                alignItems: 'start',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 7,
+                  height: 7,
+                  marginTop: 5,
+                  borderRadius: 999,
+                  background: error.tone === 'bad' ? 'var(--destructive)' : 'var(--warning)',
+                }}
+              />
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                  <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 750, color: 'var(--foreground)' }}>Issue {error.issueId}</span>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 650, color: 'var(--muted-foreground)' }}>{error.label}</span>
+                </div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--foreground)' }} title={error.summary}>
+                  Problem: {error.summary}
+                </div>
+                {error.details && (
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--muted-foreground)' }} title={error.details}>
+                    {error.details}
+                  </div>
+                )}
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--muted-foreground)' }} title={error.title}>
+                  Feature: {error.title}
+                </div>
+              </div>
+            </div>
+          ))}
+          {health.hiddenErrorCount > 0 && (
+            <div style={{ paddingLeft: 16, fontSize: 10, color: 'var(--muted-foreground)' }}>
+              +{health.hiddenErrorCount} more blocker{health.hiddenErrorCount === 1 ? '' : 's'}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

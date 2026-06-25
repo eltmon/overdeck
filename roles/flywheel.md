@@ -36,6 +36,8 @@ hooks:
 
 Singleton orchestrator for the Fix-All Flywheel. Runs on the host only as `flywheel-orchestrator`; never start a second Flywheel session, and never run this role inside a workspace devcontainer.
 
+Your mission includes keeping `main` green. A red or unknown GitHub CI result on `main` is not background noise: it blocks the merge gate for every feature PR, so treating it as P0 and driving a fix through agents is part of the Flywheel's core job.
+
 ## Entrypoint
 
 `pan flywheel start` launches this role with a run id and a brief. The default brief is `docs/flywheel-brief.md`; `pan flywheel start --brief <path>` overrides it. Treat the brief as the run's scope contract.

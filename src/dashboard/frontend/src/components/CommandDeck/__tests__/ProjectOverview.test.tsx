@@ -269,8 +269,8 @@ describe('bucketFeaturePhase', () => {
   it('summarizes current CI health from project review state', () => {
     useDashboardStore.setState({
       reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' }] }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', details: 'test job failed on main', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', details: 'src/app.ts conflicts', detectedAt: '2026-06-14T00:00:00Z' }] }),
         'PAN-3': reviewStatus({ issueId: 'PAN-3', readyForMerge: true }),
       },
     });
@@ -295,6 +295,13 @@ describe('bucketFeaturePhase', () => {
     expect(within(ciHealth).getByText('Mergeability').parentElement).toHaveTextContent('1 blocked');
     expect(within(ciHealth).getByText('Ship-ready').parentElement).toHaveTextContent('1 clear');
     expect(within(ciHealth).getByText('Work agents').parentElement).toHaveTextContent('1 running');
+    expect(ciHealth).toHaveTextContent('Blocking details');
+    expect(ciHealth).toHaveTextContent('PAN-1');
+    expect(ciHealth).toHaveTextContent('Checks failing');
+    expect(ciHealth).toHaveTextContent('test job failed on main');
+    expect(ciHealth).toHaveTextContent('PAN-2');
+    expect(ciHealth).toHaveTextContent('Merge conflict');
+    expect(ciHealth).toHaveTextContent('src/app.ts conflicts');
   });
 
   it('renders project settings and pipeline sections as collapsed detail rows', () => {
