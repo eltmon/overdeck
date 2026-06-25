@@ -20,6 +20,7 @@ import {
   type ModelRef,
   type RoleConfig,
   type RolesConfig,
+  type WeightedModelRef,
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
@@ -414,7 +415,31 @@ function validateModelRef(
   warnings: string[],
   allowWorkhorseRef: boolean,
   allowParentRef = false,
+  allowDistribution = false,
 ): void {
+  if (Array.isArray(ref)) {
+    if (!allowDistribution) {
+      errors.push(`${fieldPath} distribution not allowed here; must be a scalar model reference`);
+      return;
+    }
+    if (ref.length === 0) {
+      errors.push(`${fieldPath} distribution must be a non-empty array`);
+      return;
+    }
+    for (let i = 0; i < ref.length; i++) {
+      const entry = ref[i] as Record<string, unknown>;
+      if (!isRecord(entry)) {
+        errors.push(`${fieldPath}[${i}] must be an object with model and weight`);
+        continue;
+      }
+      if (!Number.isInteger(entry.weight) || (entry.weight as number) <= 0) {
+        errors.push(`${fieldPath}[${i}].weight must be a positive integer`);
+      }
+      validateModelRef(`${fieldPath}[${i}].model`, entry.model, effectiveWorkhorses, errors, warnings, allowWorkhorseRef);
+    }
+    return;
+  }
+
   if (typeof ref !== 'string' || ref.trim() === '') {
     errors.push(`${fieldPath} must be a non-empty model reference`);
     return;
@@ -456,8 +481,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    errors.push(`${fieldPath}.harness must be claude-code, pi, codex, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -520,20 +545,35 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
           continue;
         }
 
-        validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true);
+        validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true, false, true);
         validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
 
         // Model-aware effort: reject levels the role's resolved model doesn't accept.
+        // For a distribution, every entry must support the effort.
         const effort = rawRoleConfig.effort;
         if (typeof effort === 'string' && ROLE_EFFORTS.includes(effort as RoleEffort)) {
           const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
-          const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
-          if (resolvedModel) {
-            const supported = getModelEffortLevelsSync(resolvedModel);
-            if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
-              errors.push(
-                `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-              );
+          if (Array.isArray(modelRef)) {
+            for (const entry of modelRef as WeightedModelRef[]) {
+              const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
+              if (resolvedModel) {
+                const supported = getModelEffortLevelsSync(resolvedModel);
+                if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                  errors.push(
+                    `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+                  );
+                }
+              }
+            }
+          } else {
+            const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
+            if (resolvedModel) {
+              const supported = getModelEffortLevelsSync(resolvedModel);
+              if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                errors.push(
+                  `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+                );
+              }
             }
           }
         }
@@ -1061,8 +1101,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, codex, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, or empty string`);
         }
       }
     }

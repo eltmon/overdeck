@@ -106,7 +106,6 @@ import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js'
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../../../lib/model-validation.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
-import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
@@ -134,6 +133,7 @@ import {
 } from '../../../lib/agent-enrichment.js';
 import { parseEntireConversation } from '../services/conversation-service.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import { readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath, resolveAgentHarness } from './jsonl-resolver.js';
 import type { ConversationResponse } from '@overdeck/contracts';
@@ -327,29 +327,6 @@ function updateRegistryForAgentStart(issueId: string, workspacePath: string, age
   });
 }
 
-async function readWorkspaceContinueState(workspacePath: string): Promise<ContinueState | null> {
-  const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-  if (!existsSync(continuePath)) return null;
-  const raw = await readFile(continuePath, 'utf-8');
-  return JSON.parse(raw) as ContinueState;
-}
-
-async function writeWorkspaceContinueState(workspacePath: string, state: ContinueState): Promise<ContinueState> {
-  const panDir = join(workspacePath, PAN_DIRNAME);
-  const continuePath = join(panDir, PAN_CONTINUE_FILENAME);
-  await mkdir(panDir, { recursive: true });
-  const now = new Date().toISOString();
-  const next: ContinueState = {
-    ...state,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  const tmpPath = `${continuePath}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
-  await rename(tmpPath, continuePath);
-  return next;
-}
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
 
@@ -1039,6 +1016,13 @@ const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], st
 export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
   try {
     const harness = await resolveAgentHarness(id);
+
+    if (harness === 'ohmypi') {
+      const sessionFile = await resolvePiSessionPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parseOhmypiConversationMessages(sessionFile);
+      return { ...result, streaming: false };
+    }
 
     if (harness === 'pi') {
       const sessionFile = await resolvePiSessionPath(id);
@@ -2203,7 +2187,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message } = body as {
       model?: string;
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
       graceful?: boolean;
       message?: string;
     };
@@ -2374,7 +2358,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'pi' | 'codex';
+      harness?: 'claude-code' | 'ohmypi' | 'codex';
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
 
@@ -2436,7 +2420,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     // We don't go through HTTP — we call the spawn primitives directly so
     // the caller gets a single 200 with both wipe and spawn confirmed.
     const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-4-6';
-    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (harness) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
@@ -3024,6 +3008,7 @@ const postAgentsRoute = HttpRouter.add(
       spawnModel = determineModel({
         model: (body as any).model,
         role,
+        spawnKey: `${role}:${issueId}`,
       });
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
@@ -3193,43 +3178,19 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    // Write initial continue state (PAN-946: workspace-44p)
+    // Write start session entry to per-issue record (PAN-1919)
     try {
-      const { stdout: branchOut } = yield* Effect.promise(() => execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' }));
-      const { stdout: shaOut } = yield* Effect.promise(() => execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' }));
-      const { stdout: dirtyOut } = yield* Effect.promise(() => execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' }));
-      const branch = branchOut.trim();
-      const sha = shaOut.trim();
-      const dirty = dirtyOut.trim().length > 0;
-
-      const existing = yield* Effect.promise(() => readWorkspaceContinueState(workspacePath));
-      const now = new Date().toISOString();
-      const next: ContinueState = existing
-        ? {
-            ...existing,
-            issueId,
-            gitState: { branch, sha, dirty },
-            agentModel: spawnModel,
-            sessionHistory: [...existing.sessionHistory, { timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
-          }
-        : {
-            version: '1',
-            issueId,
-            created: now,
-            updated: now,
-            gitState: { branch, sha, dirty },
-            decisions: [],
-            hazards: [],
-            resumePoint: null,
-            beadsMapping: {},
-            agentModel: spawnModel,
-            sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
-            feedback: [],
-          };
-      yield* Effect.promise(() => writeWorkspaceContinueState(workspacePath, next));
-      console.log(`[start-agent] Wrote workspace continue state for ${issueId}`);
+      const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
+        yield* Effect.promise(() => import('../../../lib/pan-dir/record.js'));
+      const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      yield* Effect.promise(() => appendSessionEntry(recordProject, issueId, {
+        timestamp: new Date().toISOString(),
+        reason: 'start',
+        agentModel: spawnModel,
+      }));
+      console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
     } catch (continueErr: any) {
-      console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+      console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
     if (isRemote && workspaceMetadata) {
@@ -3426,9 +3387,9 @@ const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'pi' | 'codex' | null =
-      bodyHarness === 'pi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | null =
+      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))

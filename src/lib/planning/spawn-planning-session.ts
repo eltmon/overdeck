@@ -34,7 +34,13 @@ import { resolveHarness } from '../harness-resolve.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
+import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
+import {
+  appendSessionEntrySync,
+  getIssueRecordPath,
+  getProjectConfigFromWorkspacePath,
+  resolveProjectForIssue,
+} from '../pan-dir/record.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 
@@ -393,7 +399,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi' | 'codex'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -404,8 +410,8 @@ async function claudePlanningSystemPromptFiles(workspacePath: string, harness: '
   }
   files.push(await ensureSessionContextBriefingFile());
 
-  // PAN-1566: Pi also receives the rendered global context layer.
-  if (harness === 'pi') {
+  // PAN-1566: Pi/ohmypi also receives the rendered global context layer.
+  if (harness === 'ohmypi') {
     const { piGlobalContextFile } = await import('../context-layers/index.js');
     const globalFile = piGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -587,7 +593,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       settingsModel = modelOverride;
       modelSource = 'modelOverride';
     } else {
-      settingsModel = resolveModel('plan', undefined, loadConfigSync().config);
+      settingsModel = resolveModel('plan', undefined, loadConfigSync().config, `plan:${issue.identifier}`);
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
@@ -628,27 +634,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext);
     }
 
-    // Capture planning prompt in workspace .pan/continue.json.
-    await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
-      version: '1',
-      issueId: issue.identifier,
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [
-        {
-          reason: 'planning',
-          content: planningPrompt,
-          note: `Planning session started for ${issue.identifier}: ${issue.title}`,
-          timestamp: new Date().toISOString(),
-        },
-      ],
-      feedback: [],
-    }));
+    // Capture planning prompt in per-issue record (PAN-1919: replaces workspace continue.json).
+    const recordProject = resolveProjectForIssue(issue.identifier) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    appendSessionEntrySync(recordProject, issue.identifier, {
+      reason: 'planning',
+      content: planningPrompt,
+      note: `Planning session started for ${issue.identifier}: ${issue.title}`,
+      timestamp: new Date().toISOString(),
+    });
 
     await writeFeatureContext(workspacePath, issue);
 
@@ -661,8 +654,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const providerExports = await getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────
-    const continueFilePath = getWorkspacePanPaths(workspacePath).continuePath;
-    const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${continueFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+    const recordFilePath = getIssueRecordPath(recordProject, issue.identifier);
+    const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${recordFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);

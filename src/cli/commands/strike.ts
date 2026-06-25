@@ -5,15 +5,18 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
-import { spawnAgent } from '../../lib/agents.js';
+import { Effect } from 'effect';
+
+import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
 const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   dryRun?: boolean;
 }
@@ -112,6 +115,20 @@ function buildStrikePrompt(plan: StrikePlan): string {
   ].join('\n');
 }
 
+async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
+  const hasExistingSession = await Effect.runPromise(sessionExists(plan.sessionName));
+  if (!hasExistingSession) return false;
+
+  const runtimeState = await Effect.runPromise(getAgentRuntimeState(plan.sessionName));
+  const replaceableStates = new Set(['idle', 'suspended', 'stopped']);
+  if (runtimeState && !replaceableStates.has(runtimeState.state)) {
+    throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
+  }
+
+  await Effect.runPromise(stopAgent(plan.sessionName));
+  return true;
+}
+
 async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
   const spinner = ora(`Striking ${issueId}...`).start();
   try {
@@ -131,8 +148,11 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
 
     spinner.text = `Preparing strike workspace for ${plan.issueId}...`;
     await ensureStrikeWorktree(plan);
+    const replacedPriorSession = await clearIdlePriorStrike(plan);
 
-    spinner.text = `Spawning strike agent for ${plan.issueId}...`;
+    spinner.text = replacedPriorSession
+      ? `Replacing idle prior strike session for ${plan.issueId}...`
+      : `Spawning strike agent for ${plan.issueId}...`;
     const prompt = buildStrikePrompt(plan);
     const agent = await spawnAgent({
       issueId: plan.issueId,
@@ -191,4 +211,5 @@ export async function strikeCommand(ids: string[], options: StrikeOptions = {}):
 export const __testInternals = {
   planStrike,
   buildStrikePrompt,
+  clearIdlePriorStrike,
 };

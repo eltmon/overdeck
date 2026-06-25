@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { loadConfigNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/overdeck/control-settings.js';
-import { sessionExists } from '../../../lib/tmux.js';
+import { isPaneDead, killSession, sessionExists } from '../../../lib/tmux.js';
 import {
   abortFlywheelRun,
   getFlywheelRunDetail,
@@ -141,7 +141,7 @@ async function createInitialFlywheelStatus(
   startedAt: string,
   cwd: string,
   agentModel: string | undefined,
-  agentHarness: 'claude-code' | 'pi' | 'codex' | undefined,
+  agentHarness: 'claude-code' | 'ohmypi' | 'codex' | undefined,
   roleConfig: ResolvedFlywheelRoleConfig,
 ): Promise<FlywheelStatus> {
   const ramTotalMb = mb(totalmem());
@@ -198,7 +198,22 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
   // so the two start paths agree about what counts as "active".
   const activeRunId = await resolveLiveFlywheelRunId();
   if (activeRunId) {
-    throw new Error(`Flywheel run ${activeRunId} is already active; pause, resume, or report it before starting another run`);
+    // Auto-abort when the orchestrator process has exited (Pi/ohmypi exited
+    // without writing report.md or aborted.json — a "keep-alive corpse").
+    // sessionExists only checks if the tmux session exists, not if the pane
+    // process is alive. Use isPaneDead which checks #{pane_dead}.
+    const sessionMissing = !(await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID)));
+    const paneDead = sessionMissing || await Effect.runPromise(isPaneDead(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+    if (paneDead) {
+      console.log(`[flywheel] ${activeRunId} gate stuck — orchestrator pane is dead; auto-aborting`);
+      // Kill the stale tmux session directly — stopAgent may fail if the agent
+      // is not yet in the DB (e.g. after a rebuild). killSession is sufficient
+      // to clear the "already running" guard in spawnFlywheelAgent.
+      await Effect.runPromise(killSession(FLYWHEEL_ORCHESTRATOR_AGENT_ID)).catch(() => {});
+      await abortFlywheelRun(activeRunId);
+    } else {
+      throw new Error(`Flywheel run ${activeRunId} is already active; pause, resume, or report it before starting another run`);
+    }
   }
 
   const brief = await requireFlywheelBrief(cwd, options.brief ?? DEFAULT_BRIEF_PATH);

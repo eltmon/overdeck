@@ -41,7 +41,7 @@ import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync }
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlanSync, readPlan } from '../../../lib/vbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../../../lib/vbrief/quality-lint.js';
-import { appendContinueSessionEntryForIssue, promoteContinueToProject } from '../../../lib/vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
@@ -210,21 +210,6 @@ export async function completePlanningArtifacts(options: {
     beadCount: created.length,
     planItemCount,
   });
-
-  // Promote the workspace continue (decisions, hazards, resumePoint) into the
-  // canonical project-side `.pan/continues/`. Without this the work-agent handoff
-  // reads an empty `decisions` array even though planning recorded them (PAN-1395).
-  try {
-    const destContinue = promoteContinueToProject(workspacePath, projectPath, upperIssueId);
-    if (destContinue) {
-      console.log(`[complete-planning] Promoted continue context to ${destContinue}`);
-    }
-  } catch (error) {
-    // Non-fatal: the spec + beads are the gating artifacts; a continue-copy failure
-    // must not block the handoff. Surface it so the drop-out is visible.
-    const reason = error instanceof Error ? error.message : String(error);
-    console.warn(`[complete-planning] Failed to promote continue context for ${upperIssueId} (non-fatal): ${reason}`);
-  }
 
   return { proposed, beadCount: created.length, beadsWarning: null };
 }
@@ -891,7 +876,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       probe = false,
       harness = 'claude-code',
     } = body as any;
-    const requestedHarness = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
@@ -1035,12 +1020,13 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       return Promise.resolve();
     });
 
-    if (issue.source === 'linear') {
-      // Transition to "In Planning" state — emits issue.transitioned which
-      // reactive Cloister consumes. State.json was written above so the
-      // observer can see role: 'plan' before mapping in_planning → plan role.
-      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
-    }
+    // Transition to "In Planning" state — emits issue.transitioned which
+    // reactive Cloister consumes. State.json was written above so the
+    // observer can see role: 'plan' before mapping in_planning → plan role.
+    // PAN-1994: call for ALL tracker types (not just linear). For GitHub
+    // issues this cleans up stale labels (merged, verifying-on-main, etc.)
+    // left by a prior pipeline cycle when re-planning starts.
+    yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
 
     yield* eventStore.append({
       type: 'workspace.created',

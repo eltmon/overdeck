@@ -21,6 +21,7 @@ interface ProjectOverviewProps {
   features: ProjectFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails?: Record<string, IssueCostBreakdown>;
+  collapsePipelineSections?: boolean;
   onSelectFeature: (feature: ProjectFeature) => void;
 }
 
@@ -28,6 +29,24 @@ interface BucketedFeature {
   feature: ProjectFeature;
   reviewStatus: ReviewStatusSnapshot | undefined;
   phase: PipelineIssuePhase;
+}
+
+interface ProjectCiHealth {
+  failingChecks: number;
+  mergeBlocked: number;
+  shipReadyClear: number;
+  workRunning: number;
+  errors: ProjectCiError[];
+  hiddenErrorCount: number;
+}
+
+interface ProjectCiError {
+  issueId: string;
+  title: string;
+  label: string;
+  summary: string;
+  details?: string;
+  tone: 'bad' | 'warn';
 }
 
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'todo'];
@@ -121,6 +140,89 @@ function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSna
       MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '') ||
       VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
   );
+}
+
+function hasBlockerType(reviewStatus: ReviewStatusSnapshot | undefined, types: Set<string>): boolean {
+  return (reviewStatus?.blockerReasons ?? []).some((reason) => types.has(reason.type));
+}
+
+const CI_BLOCKER_TYPES = new Set(['failing_checks']);
+const MERGEABILITY_BLOCKER_TYPES = new Set(['merge_conflict', 'not_mergeable', 'draft_pr']);
+const PROJECT_CI_ERROR_LIMIT = 4;
+
+function isCiBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  return Boolean(
+    hasBlockerType(reviewStatus, CI_BLOCKER_TYPES) ||
+      TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '') ||
+      VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
+  );
+}
+
+function isMergeabilityBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  return Boolean(
+    hasBlockerType(reviewStatus, MERGEABILITY_BLOCKER_TYPES) ||
+      MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? ''),
+  );
+}
+
+function ciErrorLabel(type: string): string {
+  switch (type) {
+    case 'failing_checks': return 'Checks';
+    case 'merge_conflict': return 'Merge conflict';
+    case 'not_mergeable': return 'Not mergeable';
+    case 'draft_pr': return 'Draft PR';
+    case 'test_status': return 'Test gate';
+    case 'verification_status': return 'Verification';
+    case 'merge_status': return 'Merge';
+    default: return 'Blocker';
+  }
+}
+
+function ciErrorsForEntry({ feature, reviewStatus }: BucketedFeature): ProjectCiError[] {
+  const errors: ProjectCiError[] = [];
+  for (const reason of reviewStatus?.blockerReasons ?? []) {
+    if (!CI_BLOCKER_TYPES.has(reason.type) && !MERGEABILITY_BLOCKER_TYPES.has(reason.type)) continue;
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel(reason.type),
+      summary: reason.summary,
+      details: reason.details,
+      tone: CI_BLOCKER_TYPES.has(reason.type) ? 'bad' : 'warn',
+    });
+  }
+  if (errors.length > 0) return errors;
+
+  if (TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '')) {
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel('test_status'),
+      summary: reviewStatus?.testStatus === 'dispatch_failed' ? 'Test dispatch failed' : 'Test failed',
+      tone: 'bad',
+    });
+  }
+  if (VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? '')) {
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel('verification_status'),
+      summary: 'Verification failed',
+      details: reviewStatus?.verificationNotes,
+      tone: 'bad',
+    });
+  }
+  if (MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '')) {
+    errors.push({
+      issueId: feature.issueId,
+      title: feature.title,
+      label: ciErrorLabel('merge_status'),
+      summary: 'Merge failed',
+      details: reviewStatus?.mergeNotes,
+      tone: 'warn',
+    });
+  }
+  return errors;
 }
 
 function blockedVariant(
@@ -236,6 +338,7 @@ export function ProjectOverview({
   features,
   issueCosts,
   issueCostDetails,
+  collapsePipelineSections = true,
   onSelectFeature,
 }: ProjectOverviewProps) {
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
@@ -291,6 +394,24 @@ export function ProjectOverview({
     return byPhase;
   }, [bucketedFeatures]);
 
+  const ciHealth = useMemo<ProjectCiHealth>(() => {
+    const failingChecks = bucketedFeatures.filter(({ reviewStatus }) => isCiBlocked(reviewStatus)).length;
+    const mergeBlocked = bucketedFeatures.filter(({ reviewStatus }) => isMergeabilityBlocked(reviewStatus)).length;
+    const shipReadyClear = bucketedFeatures.filter(({ feature, phase, reviewStatus }) =>
+      phase === 'ship' && (feature.readyForMerge || reviewStatus?.readyForMerge) && !isBlockedFeature(feature, reviewStatus),
+    ).length;
+    const workRunning = bucketedFeatures.filter(({ feature }) => hasActiveAgentSignal(feature)).length;
+    const allErrors = bucketedFeatures.flatMap(ciErrorsForEntry);
+    return {
+      failingChecks,
+      mergeBlocked,
+      shipReadyClear,
+      workRunning,
+      errors: allErrors.slice(0, PROJECT_CI_ERROR_LIMIT),
+      hiddenErrorCount: Math.max(0, allErrors.length - PROJECT_CI_ERROR_LIMIT),
+    };
+  }, [bucketedFeatures]);
+
   const metrics = useMemo<HeroMetric[]>(() => {
     const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
     const stuck = bucketedFeatures.filter((e) => isBlockedFeature(e.feature, e.reviewStatus)).length;
@@ -312,32 +433,279 @@ export function ProjectOverview({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
-        padding: 16,
+        gap: 10,
+        padding: 12,
         overflow: 'auto',
       }}
     >
       <HeroBillboard projectName={projectName} metrics={metrics} />
 
-      {projectKey && <ProjectSettingsSection projectKey={projectKey} />}
+      <ProjectCiHealthSection health={ciHealth} />
+
+      {projectKey && (
+        <ProjectDisclosure
+          title="Project settings"
+          summary="Auto-merge default and project-level merge policy"
+          badges={['collapsed']}
+        >
+          <ProjectSettingsSection projectKey={projectKey} />
+        </ProjectDisclosure>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PIPELINE_PHASES.map(phase => {
           const entries = bucketedByPhase.get(phase) ?? [];
           if (entries.length === 0) return null;
+          const blockedCount = entries.filter((entry) => isBlockedFeature(entry.feature, entry.reviewStatus)).length;
+          if (!collapsePipelineSections) {
+            return (
+              <PipelineSection
+                key={phase}
+                phase={phase}
+                entries={entries}
+                issueCosts={issueCosts}
+                issueCostDetails={issueCostDetails}
+                onSelectFeature={onSelectFeature}
+                flat
+              />
+            );
+          }
           return (
-            <PipelineSection
+            <ProjectDisclosure
               key={phase}
-              phase={phase}
-              entries={entries}
-              issueCosts={issueCosts}
-              issueCostDetails={issueCostDetails}
-              onSelectFeature={onSelectFeature}
-            />
+              title={phaseLabel(phase)}
+              summary={phaseSummary(phase, entries.length, blockedCount)}
+              badges={phaseBadges(phase, entries.length, blockedCount)}
+            >
+              <PipelineSection
+                phase={phase}
+                entries={entries}
+                issueCosts={issueCosts}
+                issueCostDetails={issueCostDetails}
+                onSelectFeature={onSelectFeature}
+              />
+            </ProjectDisclosure>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function phaseLabel(phase: PipelineIssuePhase): string {
+  switch (phase) {
+    case 'ship': return 'Ship';
+    case 'review': return 'Review';
+    case 'work': return 'Work';
+    case 'plan': return 'Plan';
+    case 'todo': return 'Todo';
+    case 'verifying': return 'Verifying';
+    default: return phase;
+  }
+}
+
+function phaseSummary(phase: PipelineIssuePhase, count: number, blockedCount: number): string {
+  if (blockedCount > 0) return `${blockedCount} blocked`;
+  if (phase === 'work') return `${count} active implementation lane${count === 1 ? '' : 's'}`;
+  if (phase === 'review') return `${count} review lane${count === 1 ? '' : 's'}`;
+  return `${count} issue${count === 1 ? '' : 's'}`;
+}
+
+function phaseBadges(phase: PipelineIssuePhase, count: number, blockedCount: number): string[] {
+  const badges = [`${count}`];
+  if (blockedCount > 0) badges.push(`${blockedCount} blocked`);
+  if (phase === 'work') badges.push('work');
+  return badges;
+}
+
+function ProjectCiHealthSection({ health }: { health: ProjectCiHealth }) {
+  const needsAttention = health.failingChecks > 0 || health.mergeBlocked > 0;
+  const statusLabel = needsAttention ? 'Needs attention' : 'Clear';
+  return (
+    <section
+      aria-label="Current CI health"
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        background: 'var(--card)',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>
+            <span
+              aria-hidden="true"
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '999px',
+                background: needsAttention ? 'var(--warning)' : 'var(--success)',
+                flex: '0 0 auto',
+              }}
+            />
+            Current CI health
+          </div>
+          <div style={{ marginTop: 3, fontSize: 12, color: 'var(--muted-foreground)' }}>
+            {health.failingChecks} failing checks · {health.mergeBlocked} merge blocked · {health.shipReadyClear} ship-ready clear
+          </div>
+        </div>
+        <span
+          style={{
+            flex: '0 0 auto',
+            border: '1px solid var(--border)',
+            borderRadius: 999,
+            padding: '4px 9px',
+            fontSize: 12,
+            fontWeight: 700,
+            color: needsAttention ? 'var(--warning)' : 'var(--success)',
+            background: needsAttention
+              ? 'color-mix(in srgb, var(--warning) 12%, transparent)'
+              : 'color-mix(in srgb, var(--success) 12%, transparent)',
+          }}
+        >
+          {statusLabel}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 8, borderTop: '1px solid var(--border)', padding: 10, background: 'var(--background)' }}>
+        <HealthTile label="Required checks" value={`${health.failingChecks} failing`} tone={health.failingChecks > 0 ? 'bad' : 'good'} />
+        <HealthTile label="Mergeability" value={`${health.mergeBlocked} blocked`} tone={health.mergeBlocked > 0 ? 'warn' : 'good'} />
+        <HealthTile label="Ship-ready" value={`${health.shipReadyClear} clear`} tone="good" />
+        <HealthTile label="Work agents" value={`${health.workRunning} running`} tone={health.workRunning > 0 ? 'good' : 'neutral'} />
+      </div>
+      {health.errors.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '9px 12px 11px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--foreground)' }}>Blocking details</div>
+          {health.errors.map((error) => (
+            <div
+              key={`${error.issueId}-${error.label}-${error.summary}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '8px minmax(0, 1fr)',
+                gap: 8,
+                alignItems: 'start',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 7,
+                  height: 7,
+                  marginTop: 5,
+                  borderRadius: 999,
+                  background: error.tone === 'bad' ? 'var(--destructive)' : 'var(--warning)',
+                }}
+              />
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                  <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 750, color: 'var(--foreground)' }}>Issue {error.issueId}</span>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 650, color: 'var(--muted-foreground)' }}>{error.label}</span>
+                </div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--foreground)' }} title={error.summary}>
+                  Problem: {error.summary}
+                </div>
+                {error.details && (
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--muted-foreground)' }} title={error.details}>
+                    {error.details}
+                  </div>
+                )}
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--muted-foreground)' }} title={error.title}>
+                  Feature: {error.title}
+                </div>
+              </div>
+            </div>
+          ))}
+          {health.hiddenErrorCount > 0 && (
+            <div style={{ paddingLeft: 16, fontSize: 10, color: 'var(--muted-foreground)' }}>
+              +{health.hiddenErrorCount} more blocker{health.hiddenErrorCount === 1 ? '' : 's'}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HealthTile({ label, value, tone }: { label: string; value: string; tone: 'bad' | 'warn' | 'good' | 'neutral' }) {
+  const color = tone === 'bad'
+    ? 'var(--destructive)'
+    : tone === 'warn'
+      ? 'var(--warning)'
+      : tone === 'good'
+        ? 'var(--success)'
+        : 'var(--foreground)';
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 8px', background: 'var(--card)' }}>
+      <div style={{ fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ marginTop: 3, fontSize: 12, fontWeight: 700, color }}>{value}</div>
+    </div>
+  );
+}
+
+function ProjectDisclosure({
+  title,
+  summary,
+  badges,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  summary: string;
+  badges?: string[];
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        background: 'var(--card)',
+        overflow: 'hidden',
+      }}
+    >
+      <summary
+        style={{
+          cursor: 'pointer',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          alignItems: 'center',
+          gap: 10,
+          padding: '11px 12px',
+          listStyle: 'none',
+        }}
+      >
+        <span style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>{title}</span>
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted-foreground)' }}>{summary}</span>
+        </span>
+        {badges && badges.length > 0 && (
+          <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {badges.map((badge) => (
+              <span
+                key={badge}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 999,
+                  padding: '2px 7px',
+                  background: 'var(--secondary)',
+                  color: 'var(--foreground)',
+                  fontSize: 11,
+                  fontWeight: 650,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {badge}
+              </span>
+            ))}
+          </span>
+        )}
+      </summary>
+      <div style={{ borderTop: '1px solid var(--border)', padding: 12, background: 'var(--background)' }}>
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -363,19 +731,19 @@ function HeroBillboard({ projectName, metrics }: { projectName: string; metrics:
         <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
         <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>pipeline overview</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
         {metrics.map((m) => (
           <div
             key={m.label}
             style={{
               border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '8px 11px',
+              borderRadius: 10,
+              padding: '7px 9px',
               background: 'color-mix(in srgb, white 1.5%, transparent)',
             }}
           >
             <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>{m.label}</div>
-            <div style={{ marginTop: 2, fontSize: 18, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
+            <div style={{ marginTop: 2, fontSize: 17, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
             {m.sub && <div style={{ marginTop: 1, fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.sub}</div>}
           </div>
         ))}
@@ -390,12 +758,14 @@ function PipelineSection({
   issueCosts,
   issueCostDetails,
   onSelectFeature,
+  flat = false,
 }: {
   phase: PipelineIssuePhase;
   entries: BucketedFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
   onSelectFeature: (feature: ProjectFeature) => void;
+  flat?: boolean;
 }) {
   return (
     <section
@@ -403,15 +773,31 @@ function PipelineSection({
       data-component="command-deck-pipeline-phase"
       data-phase={phase}
       style={{
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: 14,
-        background: 'var(--card)',
+        border: flat ? 'none' : '1px solid var(--border)',
+        borderRadius: flat ? 0 : 14,
+        padding: flat ? 0 : 14,
+        background: flat ? 'transparent' : 'var(--card)',
       }}
     >
-      <PhaseHeader phase={phase} count={entries.length} variant="command-deck" className="static" />
+      <PhaseHeader
+        phase={phase}
+        count={entries.length}
+        variant="command-deck"
+        className="static"
+      />
 
-      <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: flat ? 6 : 0,
+          border: flat ? 'none' : '1px solid var(--border)',
+          borderTop: flat ? 'none' : '1px solid var(--border)',
+          borderRadius: flat ? 0 : 12,
+          overflow: flat ? 'visible' : 'hidden',
+          background: flat ? 'transparent' : 'var(--card)',
+        }}
+      >
         {entries.map(entry => (
           <ProjectIssueRow
             key={entry.feature.issueId}

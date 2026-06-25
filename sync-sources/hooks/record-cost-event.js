@@ -28740,6 +28740,7 @@ function cloneRoles(roles) {
 	const cloned = {};
 	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
 		...roleConfig,
+		model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
 		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
 	};
 	return cloned;
@@ -28934,7 +28935,7 @@ function normalizeProviderConfig(providerConfig, fallbackKey) {
 	};
 }
 function validateProviderHarness(provider, harness) {
-	if (harness !== void 0 && harness !== "claude-code" && harness !== "pi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
 }
 function applyProviderHarness(result, provider, harness) {
 	validateProviderHarness(provider, harness);
@@ -29167,7 +29168,15 @@ function mergeRoleConfig(result, config) {
 	}
 }
 function validateRoleFields(role, roleConfig) {
-	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "pi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
+	if (Array.isArray(roleConfig.model)) {
+		if (roleConfig.model.length === 0) throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
+		for (let i = 0; i < roleConfig.model.length; i++) {
+			const entry = roleConfig.model[i];
+			if (!entry.model || typeof entry.model !== "string") throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
+			if (!Number.isInteger(entry.weight) || entry.weight <= 0) throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
+		}
+	}
+	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
 	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
 	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
 	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
@@ -29182,7 +29191,8 @@ function validateRoleModelRefs(config) {
 	}
 	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
 		validateRoleFields(role, roleConfig);
-		if (roleConfig.model) {
+		if (Array.isArray(roleConfig.model)) for (let i = 0; i < roleConfig.model.length; i++) derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
+		else if (roleConfig.model) {
 			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
 			if (roleConfig.effort !== void 0) {
 				const supported = getModelEffortLevelsSync(resolvedModel);

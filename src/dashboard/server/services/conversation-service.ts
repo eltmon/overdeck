@@ -17,6 +17,7 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
 import { isPiSessionFile, parsePiConversationMessages } from './pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './ohmypi-conversation-parser.js';
 
 type ModelCapability = (typeof MODEL_CAPABILITIES)[keyof typeof MODEL_CAPABILITIES];
 
@@ -984,7 +985,9 @@ export async function summarizeConversationActivity(
 
   const parsed = options.harness === 'codex'
     ? await parseCodexConversationMessages(sessionFile)
-    : options.harness === 'pi' || isPiSessionFile(sessionFile)
+    : options.harness === 'ohmypi' || isOhmypiSessionFile(sessionFile)
+      ? await parseOhmypiConversationMessages(sessionFile)
+      : options.harness === 'pi' || isPiSessionFile(sessionFile)
       ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
       // re-reading potentially megabytes of history on every list enrichment tick.

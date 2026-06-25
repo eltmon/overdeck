@@ -11,18 +11,9 @@
 #   - src/lib/pan-dir/auto-commit.ts   — commit fan-in helper
 #   - src/lib/pan-dir/drafts.ts        — PRD drafts (human/agent narrative)
 #   - src/lib/pan-dir/context.ts       — context-layer config
+#   - src/lib/pan-dir/feedback.ts      — workspace feedback delivery surface (D6)
+#   - src/lib/pan-dir/sessions.ts      — workspace session log surface (D6)
 #   - src/lib/agents.ts writeAgentStateJsonSync — state.json writer
-#
-# Legacy exceptions (known scattered state writes not yet routed to the record
-# writer; tracked for follow-up):
-#   - src/lib/pan-dir/continue.ts, continues.ts
-#   - src/lib/pan-dir/feedback.ts, sessions.ts
-#   - src/lib/vbrief/io.ts, continue-state.ts, lifecycle-io.ts
-#   - src/lib/vbrief/dag.ts
-#   - src/lib/planning/spawn-planning-session.ts
-#   - src/lib/cloister/feedback-writer.ts
-#   - src/cli/commands/done.ts
-#   - src/dashboard/server/routes/agents.ts
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -46,13 +37,10 @@ PAN_DIR_APPROVED=(
   ':!src/lib/pan-dir/auto-commit.ts'
   ':!src/lib/pan-dir/drafts.ts'
   ':!src/lib/pan-dir/context.ts'
-)
-PAN_DIR_LEGACY=(
-  ':!src/lib/pan-dir/continue.ts'
-  ':!src/lib/pan-dir/continues.ts'
   ':!src/lib/pan-dir/feedback.ts'
   ':!src/lib/pan-dir/sessions.ts'
 )
+PAN_DIR_LEGACY=()
 
 candidates=$(
   { git grep -nE -e 'writeFileString' -e 'writeFileSync' -e 'writeFile\(' -e '\.rename\(' -e 'renameSync' \
@@ -115,19 +103,9 @@ if [[ -n "$func_start" ]]; then
 fi
 
 # ── Rule 3: continue-file literal guard (scans ALL of src/) ──
-# Known off-pan-dir continue writers are allowlisted as legacy exceptions; any
-# new file that writes to the continue file fails.
+# All legacy continue writers have been retired (PAN-1919). Any new write to
+# .pan/continue.json or .pan/continues/ is a hard failure.
 CONTINUE_EXCLUDES=(
-  ':!src/lib/pan-dir/continue.ts'
-  ':!src/lib/pan-dir/continues.ts'
-  ':!src/lib/vbrief/io.ts'
-  ':!src/lib/vbrief/continue-state.ts'
-  ':!src/lib/vbrief/lifecycle-io.ts'
-  ':!src/lib/vbrief/dag.ts'
-  ':!src/lib/planning/spawn-planning-session.ts'
-  ':!src/lib/cloister/feedback-writer.ts'
-  ':!src/cli/commands/done.ts'
-  ':!src/dashboard/server/routes/agents.ts'
   ':!src/**/__tests__/*'
   ':!*.md'
 )

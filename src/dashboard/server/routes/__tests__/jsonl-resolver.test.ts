@@ -5,6 +5,7 @@ import { join } from 'path';
 
 import {
   readLauncherPinnedSessionId,
+  resolveAgentHarness,
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
   resolveJsonlPath,
@@ -316,6 +317,80 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     });
 
     expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+});
+
+describe('resolveAgentHarness — stale claude-code self-corrects to the live runtime', () => {
+  // Reproduces PAN-1832: a wipe-and-respawn changed the provider-default harness
+  // to codex, but state.json kept the pre-respawn 'claude-code'. The resolver took
+  // the claude-code branch, found no claudeSessionId, and the dashboard showed
+  // "No conversation data available" for a live codex agent. resolveAgentHarness
+  // now self-corrects from on-disk artifacts when the recording is the generic
+  // 'claude-code' default.
+  const STALE_AGENT = 'agent-pan-1832';
+
+  async function writeState(agentId: string, harness: string | null): Promise<void> {
+    const dir = join(agentsDir, agentId);
+    await mkdir(dir, { recursive: true });
+    const state: Record<string, unknown> = { id: agentId, workspace: WORKSPACE_PATH };
+    if (harness) state.harness = harness;
+    await writeFile(join(dir, 'state.json'), JSON.stringify(state));
+  }
+
+  async function writeCodexRollout(agentId: string): Promise<void> {
+    const day = join(agentsDir, agentId, 'codex-home', 'sessions', '2026', '06', '24');
+    await mkdir(day, { recursive: true });
+    await writeFile(
+      join(day, 'rollout-2026-06-24T11-00-00-019efa97-b5d4-7a12-aee6-0f518469972c.jsonl'),
+      '{"type":"session_meta"}\n',
+    );
+  }
+
+  it('corrects stale claude-code to codex when a codex rollout exists and no claude transcript does', async () => {
+    await writeState(STALE_AGENT, 'claude-code');
+    await writeCodexRollout(STALE_AGENT);
+
+    const harness = await resolveAgentHarness(STALE_AGENT, { agentsDirOverride: agentsDir });
+
+    expect(harness).toBe('codex');
+  });
+
+  it('keeps claude-code when a claude transcript IS present (past codex run does not shadow it)', async () => {
+    await writeState(STALE_AGENT, 'claude-code');
+    await writeCodexRollout(STALE_AGENT);
+    // A live claude-code transcript exists for this agent.
+    await writeFile(join(agentsDir, STALE_AGENT, 'session.id'), `${CLAUDE_SESSION_ID}\n`);
+    const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(WORKSPACE_PATH));
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}');
+
+    const harness = await resolveAgentHarness(STALE_AGENT, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(harness).toBe('claude-code');
+  });
+
+  it('trusts an explicit non-default harness (codex) without probing', async () => {
+    await writeState(STALE_AGENT, 'codex');
+    // No codex rollout on disk at all.
+    const harness = await resolveAgentHarness(STALE_AGENT, { agentsDirOverride: agentsDir });
+
+    expect(harness).toBe('codex');
+  });
+
+  it('resolveJsonlPath returns the codex rollout for the stale-claude-code agent', async () => {
+    await writeState(STALE_AGENT, 'claude-code');
+    await writeCodexRollout(STALE_AGENT);
+
+    const path = await resolveJsonlPath(STALE_AGENT, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).not.toBeNull();
+    expect(path).toContain('rollout-');
   });
 });
 

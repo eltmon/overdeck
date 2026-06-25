@@ -458,6 +458,197 @@ export function writeAgentHarnessModelSync(
   }
 }
 
+// ─── Continue read-view ───────────────────────────────────────────────────────
+
+/**
+ * ContinueState-shaped projection of the per-issue record. Returned by
+ * readRecordContinueViewSync so old continue callers can switch with minimal
+ * churn. Returns null when no record file exists.
+ */
+export interface RecordContinueView {
+  decisions: ContinueDecision[];
+  hazards: ContinueHazard[];
+  resumePoint: ContinueResumePoint | null;
+  beadsMapping: ContinueBeadsMapping;
+  sessionHistory: ContinueSessionEntry[];
+  feedback: ContinueFeedbackEntry[];
+}
+
+export function readRecordContinueViewSync(
+  project: ProjectConfig,
+  issueId: string,
+): RecordContinueView | null {
+  const record = readIssueRecordSync(project, issueId);
+  if (!record) return null;
+  return {
+    decisions: record.decisions ?? [],
+    hazards: record.hazards ?? [],
+    resumePoint: record.resumePoint ?? null,
+    beadsMapping: record.beadsMapping ?? {},
+    sessionHistory: record.sessionHistory ?? [],
+    feedback: record.feedback ?? [],
+  };
+}
+
+// ─── Continue mutation helpers (sync) ────────────────────────────────────────
+
+/** Append a session-history entry to the per-issue record (sync). */
+export function appendSessionEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueSessionEntry,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.sessionHistory = [...(record.sessionHistory ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Append a feedback entry to the per-issue record (sync). */
+export function appendFeedbackEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [...(record.feedback ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Clear all feedback entries in the per-issue record (sync). */
+export function clearRecordFeedbackSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+// ─── Continue field setters ───────────────────────────────────────────────────
+
+/** Write decisions into the per-issue record (sync). */
+export function writeRecordDecisionsSync(
+  project: ProjectConfig,
+  issueId: string,
+  decisions: ContinueDecision[],
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.decisions = decisions;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write decisions into the per-issue record (async). */
+export async function writeRecordDecisions(
+  project: ProjectConfig,
+  issueId: string,
+  decisions: ContinueDecision[],
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.decisions = decisions;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write hazards into the per-issue record (sync). */
+export function writeRecordHazardsSync(
+  project: ProjectConfig,
+  issueId: string,
+  hazards: ContinueHazard[],
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.hazards = hazards;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write hazards into the per-issue record (async). */
+export async function writeRecordHazards(
+  project: ProjectConfig,
+  issueId: string,
+  hazards: ContinueHazard[],
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.hazards = hazards;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write resumePoint into the per-issue record (sync). */
+export function writeRecordResumePointSync(
+  project: ProjectConfig,
+  issueId: string,
+  resumePoint: ContinueResumePoint | null,
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.resumePoint = resumePoint;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write resumePoint into the per-issue record (async). */
+export async function writeRecordResumePoint(
+  project: ProjectConfig,
+  issueId: string,
+  resumePoint: ContinueResumePoint | null,
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.resumePoint = resumePoint;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write beadsMapping into the per-issue record (sync). */
+export function writeRecordBeadsMappingSync(
+  project: ProjectConfig,
+  issueId: string,
+  beadsMapping: ContinueBeadsMapping,
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.beadsMapping = beadsMapping;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write beadsMapping into the per-issue record (async). */
+export async function writeRecordBeadsMapping(
+  project: ProjectConfig,
+  issueId: string,
+  beadsMapping: ContinueBeadsMapping,
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.beadsMapping = beadsMapping;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
 // ─── Resolve project helper ───────────────────────────────────────────────────
 
 /** Infer a minimal ProjectConfig from a workspace path (tests / fallback).

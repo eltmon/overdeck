@@ -445,17 +445,22 @@ export function CommandDeck({
     const excludeSet = new Set<number>();
     if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
-    const pathToKey = new Map<string, string>();
+    const pathToKeys = new Map<string, string[]>();
     for (const rp of registeredProjects) {
-      if (rp.path) pathToKey.set(rp.path, rp.key);
+      if (!rp.path) continue;
+      const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
+      pathToKeys.set(rp.path.replace(/\/+$/, ''), keys);
     }
 
     for (const conv of conversations) {
       if (!conv.cwd) continue;
-      for (const [projectPath, projectKey] of pathToKey) {
-        if (conv.cwd === projectPath || conv.cwd.startsWith(projectPath + '/')) {
-          if (!map[projectKey]) map[projectKey] = [];
-          map[projectKey].push(conv);
+      const cwd = conv.cwd.replace(/\/+$/, '');
+      for (const [projectPath, projectKeys] of pathToKeys) {
+        if (cwd === projectPath || cwd.startsWith(projectPath + '/')) {
+          for (const projectKey of projectKeys) {
+            if (!map[projectKey]) map[projectKey] = [];
+            map[projectKey].push(conv);
+          }
           excludeSet.add(conv.id);
           break;
         }
@@ -1100,7 +1105,7 @@ export function CommandDeck({
   // can open/focus an agent tab on it.
   const createDeckConversation = useCallback(
     (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
-      const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
+      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
       return createConversationForProject(projectKey, harness, message, viewMode);

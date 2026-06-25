@@ -384,6 +384,131 @@ export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 export type ModelRef = string;
 export const PARENT_MODEL_REF = 'parent';
 
+export interface WeightedModelRef {
+  model: ModelRef;
+  weight: number;
+}
+
+/** Top-level role model: either a scalar model string or a weighted distribution list. */
+export type RoleModelRef = ModelRef | WeightedModelRef[];
+
+/** 32-bit FNV-1a hash — deterministic, no Math.random / Date.now. */
+export function fnv1a32(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * MurmurHash3 32-bit finalizer — an avalanche/bit-mixing step applied to the FNV
+ * output before bucketing, so near-identical spawn keys land in different buckets.
+ * Belt-and-suspenders for the modulo bucketing in `derivePercentPick` (PAN-2055).
+ * Deterministic; pure bit ops.
+ */
+export function fmix32(h: number): number {
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/** One entry of a percent pick, with the half-open bucket band [lo, hi) it owns. */
+export interface PercentBand {
+  /** The entry's model ref (NOT dereffed — may be a `workhorse:*` ref). */
+  model: ModelRef;
+  /** This entry's weight. A percentage when the weights total 100. */
+  weight: number;
+  /** Bucket-band start (integer, inclusive). */
+  lo: number;
+  /** Bucket-band end (integer, exclusive). A key whose bucket is in [lo, hi) picks this. */
+  hi: number;
+  /** True for the single entry the spawn key selected. */
+  chosen: boolean;
+}
+
+/** The full, inspectable result of a percent pick — what selected the model and why. */
+export interface PercentPick {
+  /** The selected model ref (same value `pickPercentModelRef` returns). */
+  chosen: ModelRef;
+  /** Deterministic bucket for this key: `fmix32(fnv1a32(key)) % total`, in [0, total). */
+  bucket: number;
+  /** Sum of positive weights = number of buckets (100 when weights are percentages). */
+  total: number;
+  /** Every entry, in declaration order, with its bucket band and the chosen flag. */
+  bands: PercentBand[];
+}
+
+/**
+ * Deterministically pick a model from a percentage distribution, returning the full
+ * derivation (bucket, per-entry bands, winner) so it can be shown read-only in the UI.
+ *
+ * Mental model: hash the spawn key to a stable bucket `0 .. total-1`, then walk the
+ * cumulative weights and take the entry whose band contains the bucket. The same key
+ * and weights always give the same model; change a weight and future picks change.
+ * `pickPercentModelRef` delegates here so selection and explanation can't drift.
+ * Throws if no entry has weight > 0.
+ */
+export function derivePercentPick(entries: WeightedModelRef[], spawnKey: string): PercentPick {
+  let total = 0;
+  for (const e of entries) {
+    if (e.weight > 0) total += e.weight;
+  }
+  if (total <= 0) {
+    throw new Error('derivePercentPick: all entries have weight <= 0');
+  }
+  // Deterministic bucket 0..total-1. fmix32 avalanches FNV's output so common-prefix
+  // issue keys (work:PAN-1901, work:PAN-1919, …) don't all land in one band (PAN-2055).
+  const bucket = fmix32(fnv1a32(spawnKey)) % total;
+  const bands: PercentBand[] = [];
+  let cursor = 0;
+  let chosenIdx = -1;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e.weight <= 0) {
+      // Zero-weight entries occupy an empty band; they can never be selected.
+      bands.push({ model: e.model, weight: e.weight, lo: cursor, hi: cursor, chosen: false });
+      continue;
+    }
+    const lo = cursor;
+    cursor += e.weight;
+    const hi = cursor;
+    const isChosen = chosenIdx === -1 && bucket < hi;
+    if (isChosen) chosenIdx = i;
+    bands.push({ model: e.model, weight: e.weight, lo, hi, chosen: isChosen });
+  }
+  if (chosenIdx === -1) {
+    // bucket < total always holds, so a positive-weight entry is always chosen — this
+    // is a defensive fallback only.
+    chosenIdx = entries.length - 1;
+    bands[chosenIdx].chosen = true;
+  }
+  return { chosen: entries[chosenIdx].model, bucket, total, bands };
+}
+
+/**
+ * Pick a model from a percentage distribution using a deterministic spawn key.
+ * Same key + same weights → same model. Throws if no entry has weight > 0.
+ *
+ * Thin wrapper over `derivePercentPick` so selection and its explanation can't drift.
+ */
+export function pickPercentModelRef(entries: WeightedModelRef[], spawnKey: string): ModelRef {
+  return derivePercentPick(entries, spawnKey).chosen;
+}
+
+/** Return the model with the highest weight; first entry wins on a tie. */
+export function representativeModelRef(entries: WeightedModelRef[]): ModelRef {
+  let best = entries[0];
+  for (let i = 1; i < entries.length; i++) {
+    if (entries[i].weight > best.weight) best = entries[i];
+  }
+  return best.model;
+}
+
 /**
  * Canonical workhorse slot list. Anything outside this set is rejected by
  * config-load validation (PAN-1048 review feedback 003 / REQ-18).
@@ -401,8 +526,8 @@ export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xh
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
-  model: ModelRef;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  model: RoleModelRef;
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   /**
    * Target minimum concurrent agents the role should keep launched. The
@@ -480,6 +605,8 @@ function cloneRoles(roles: RolesConfig): RolesConfig {
   for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfig]>) {
     cloned[role] = {
       ...roleConfig,
+      // Shallow-clone the distribution array so later mutations can't alias the cloned config.
+      model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
       sub: roleConfig.sub ? { ...roleConfig.sub } : undefined,
     };
   }
@@ -1239,8 +1366,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
   }
 }
 
@@ -1655,18 +1782,101 @@ export function resolveModel(
   role: Role,
   subRole?: string,
   config: Pick<NormalizedConfig, 'roles' | 'workhorses'> = {},
+  spawnKey?: string,
 ): ModelId {
   const roleConfig = config.roles?.[role];
   const rawSubModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
   const subModel = rawSubModel === PARENT_MODEL_REF ? undefined : rawSubModel;
   const roleModel = roleConfig?.model;
-  const ref = subModel ?? roleModel ?? DEFAULT_MODEL_REFS[role];
-  const fieldPath = subModel
-    ? `roles.${role}.sub.${subRole}.model`
-    : roleModel
-      ? `roles.${role}.model`
-      : `defaults.${role}.model`;
-  return derefWorkhorse(ref, config, fieldPath);
+
+  // Sub-role model takes precedence; never sample the parent distribution for a sub-role.
+  if (subModel) {
+    const fieldPath = `roles.${role}.sub.${subRole}.model`;
+    return derefWorkhorse(subModel, config, fieldPath);
+  }
+
+  if (Array.isArray(roleModel)) {
+    const picked = spawnKey
+      ? pickPercentModelRef(roleModel, spawnKey)
+      : representativeModelRef(roleModel);
+    return derefWorkhorse(picked, config, `roles.${role}.model`);
+  }
+
+  const scalarRef = roleModel ?? DEFAULT_MODEL_REFS[role];
+  const fieldPath = roleModel ? `roles.${role}.model` : `defaults.${role}.model`;
+  return derefWorkhorse(scalarRef, config, fieldPath);
+}
+
+/** One row of a model-origin distribution: a dereffed model with its bucket band and chosen flag. */
+export interface ModelOriginEntry {
+  /** The actual model id (workhorse refs already dereffed for display). */
+  model: ModelId;
+  /** This entry's weight (a percentage when the distribution totals 100). */
+  weight: number;
+  /** Bucket-band start (integer, inclusive). */
+  lo: number;
+  /** Bucket-band end (integer, exclusive). */
+  hi: number;
+  /** True for the entry the spawn key's bucket selected. */
+  chosen: boolean;
+}
+
+/**
+ * Read-only explanation of which model a percentage-role agent resolves to and why:
+ * the spawn key, the deterministic bucket, and the percent bands. Surfaced in the
+ * dashboard right-click MODEL inspector (PAN-2053). `null` for scalar/single-model roles.
+ */
+export interface ModelOriginData {
+  /** The exact spawn key whose bucket selected the model (`${role}:${issueId}`). */
+  spawnKey: string;
+  /** The chosen model id (dereffed) — equals what determineModel produced for this key. */
+  resolved: ModelId;
+  /** Deterministic bucket for this key, in [0, total). */
+  bucket: number;
+  /** Number of buckets = sum of weights (100 when the distribution is percentages). */
+  total: number;
+  /** Every distribution entry, dereffed, with its bucket band and the chosen flag. */
+  distribution: ModelOriginEntry[];
+}
+
+/**
+ * Explain which model a `role` agent drew from its role's percentage distribution,
+ * and why, given the EXACT `spawnKey` the agent spawned with. Returns `null` when
+ * the role uses a scalar model (nothing to explain) — the caller should then just
+ * show the resolved model with no bars/bucket.
+ *
+ * Faithfulness: `spawnKey` must be the real key persisted on the agent's state at
+ * spawn (`AgentState.modelSpawnKey`), not a guess — the bucket is sensitive to its
+ * exact form (e.g. issue-id casing). Read-only: never mutates anything.
+ *
+ * The distribution is read from the LIVE config (an operator edit since spawn is
+ * reflected); the resolved model still derives from the same key, so the highlighted
+ * band stays internally consistent with `resolved`.
+ */
+export function computeModelOrigin(
+  role: Role,
+  spawnKey: string,
+  config: Pick<NormalizedConfig, 'roles' | 'workhorses'>,
+): ModelOriginData | null {
+  const roleModel = config.roles?.[role]?.model;
+  if (!Array.isArray(roleModel)) return null;
+
+  const pick = derivePercentPick(roleModel, spawnKey);
+  const fieldPath = `roles.${role}.model`;
+  const distribution: ModelOriginEntry[] = pick.bands.map((b) => ({
+    model: derefWorkhorse(b.model, config, fieldPath),
+    weight: b.weight,
+    lo: b.lo,
+    hi: b.hi,
+    chosen: b.chosen,
+  }));
+  return {
+    spawnKey,
+    resolved: derefWorkhorse(pick.chosen, config, fieldPath),
+    bucket: pick.bucket,
+    total: pick.total,
+    distribution,
+  };
 }
 
 function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
@@ -1723,8 +1933,22 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
 }
 
 function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
-  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi' && roleConfig.harness !== 'codex') {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
+  if (Array.isArray(roleConfig.model)) {
+    if (roleConfig.model.length === 0) {
+      throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
+    }
+    for (let i = 0; i < roleConfig.model.length; i++) {
+      const entry = roleConfig.model[i];
+      if (!entry.model || typeof entry.model !== 'string') {
+        throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
+      }
+      if (!Number.isInteger(entry.weight) || entry.weight <= 0) {
+        throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
+      }
+    }
+  }
+  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex') {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
   }
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
@@ -1760,7 +1984,12 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
     validateRoleFields(role, roleConfig);
-    if (roleConfig.model) {
+    if (Array.isArray(roleConfig.model)) {
+      // Validate each distribution entry's model ref is resolvable.
+      for (let i = 0; i < roleConfig.model.length; i++) {
+        derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
+      }
+    } else if (roleConfig.model) {
       const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
       if (roleConfig.effort !== undefined) {
         const supported = getModelEffortLevelsSync(resolvedModel);

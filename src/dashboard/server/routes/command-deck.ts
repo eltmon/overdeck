@@ -34,6 +34,8 @@ import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
 import { getAgentRuntimeState, getAgentStateSync, listRunningAgents } from '../../../lib/agents.js';
+import type { ModelOriginData } from '../../../lib/config-yaml.js';
+import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
@@ -51,6 +53,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import {
   getCachedResourceAllocatedIssues,
@@ -263,6 +266,7 @@ export async function fetchActivityDataWithContext(
     awaitingInputReason?: string;
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
+    modelOrigin?: ModelOriginData;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
@@ -612,6 +616,11 @@ export async function fetchActivityDataWithContext(
     if (!b.startedAt) return -1;
     return a.startedAt.localeCompare(b.startedAt);
   });
+
+  // PAN-2053: attach the read-only model-origin (weighted-distribution + FNV-1a
+  // derivation) for the right-click MODEL inspector. Shared with the project tree
+  // (projects.ts) so both surfaces stay in lock-step.
+  enrichSessionsWithModelOrigin(sections, issueId);
 
   // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};
@@ -1048,7 +1057,6 @@ Be specific: reference actual file names, function names, requirement text, disc
 
   // Build provider env vars for non-Anthropic models
   const { getProviderForModelSync, getProviderEnvSync } = await import('../../../lib/providers.js');
-  const { loadConfigSync: loadYamlConfig } = await import('../../../lib/config-yaml.js');
   let providerEnvStr = '';
   let providerEnv: Record<string, string> = {};
   const statusProvider = getProviderForModelSync(statusModelId);

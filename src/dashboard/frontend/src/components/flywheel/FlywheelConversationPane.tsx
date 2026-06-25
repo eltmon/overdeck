@@ -426,7 +426,13 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
           viewMode === 'terminal' ? (
             <XTerminal sessionName={FLYWHEEL_CONVERSATION_NAME} />
           ) : (
-            <ConversationPanel conversation={conversation} embedded />
+            <ConversationPanel
+              conversation={conversation}
+              embedded
+              onEmbeddedResume={!conversation.sessionAlive ? () => startMutation.mutate() : undefined}
+              embeddedResumeLabel={startMutation.isPending ? 'Starting…' : 'Start New Run'}
+              onSendFailed={() => void queryClient.invalidateQueries({ queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME] })}
+            />
           )
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">
@@ -451,7 +457,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             <div>
               <dt className="text-muted-foreground">Harness</dt>
-              <dd className="font-medium text-foreground">{config.harness}</dd>
+              <dd className="font-medium text-foreground">{status?.orchestrator.harness ?? config.harness}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Model</dt>

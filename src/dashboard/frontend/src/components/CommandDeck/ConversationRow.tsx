@@ -28,7 +28,8 @@ function shortModel(model: string): string {
 
 function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   if (harness === 'claude-code') return 'Claude Code';
-  if (harness === 'pi') return 'Pi';
+  if (harness === 'ohmypi') return 'oh-my-pi';
+  if (harness === 'pi') return 'oh-my-pi';
   return 'Codex';
 }
 

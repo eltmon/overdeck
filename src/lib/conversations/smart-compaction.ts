@@ -644,7 +644,7 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   const effectiveTimeout = timeoutMs ?? SUMMARY_TIMEOUT_MS;
   const spawnEnv = await buildSpawnEnvForModel(model);
 
-  const child = spawn('pi', [
+  const child = spawn('omp', [
     '--mode', 'rpc',
     '--model', model,
     '--session-dir', sessionDir,
@@ -696,10 +696,10 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
-  if (harness === 'pi') {
-    // Pi runs in rpc mode and auto-executes tools, so it needs no allowlist.
+  if (harness === 'ohmypi') {
+    // Pi/omp runs in rpc mode and auto-executes tools, so it needs no allowlist.
     const summary = await runPiModelSummary(prompt, useModel, timeoutMs);
-    console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=pi | outputChars=${summary.length}`);
+    console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=${harness} | outputChars=${summary.length}`);
     return summary;
   }
 
@@ -1161,7 +1161,7 @@ export function runModelSummary(
     try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness, allowedTools),
     catch: (cause) =>
       new ProcessSpawnError({
-        command: harness === 'pi' ? 'pi' : 'claude',
+        command: harness === 'ohmypi' ? 'omp' : 'claude',
         args: ['-p', model ?? 'default'],
         message: cause instanceof Error ? cause.message : String(cause),
         cause,

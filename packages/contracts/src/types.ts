@@ -39,23 +39,28 @@ export type MergeStatusValue = typeof MergeStatusValue.Type
 export const VerificationStatusValue = Schema.Literals(["pending", "running", "passed", "failed", "skipped"])
 export type VerificationStatusValue = typeof VerificationStatusValue.Type
 
-// ─── Harness (PAN-636) ────────────────────────────────────────────────────────
+// ─── Harness (PAN-636, PAN-1989) ─────────────────────────────────────────────
 // Identifies which coding-agent harness an agent is running under.
 // AgentSnapshot.runtime is left as Schema.optional(Schema.String) for forward
 // compatibility (events from older readers may carry unknown values), but every
 // consumer that branches on harness MUST go through getHarness() so unknown or
 // legacy values normalize to 'claude-code'.
+//
+// PAN-1989: narrowed to 3-value set — 'pi' retired; legacy DB rows read as
+// 'ohmypi' via getHarness(). All new write sites use 'ohmypi'.
 
-export type Harness = 'claude-code' | 'pi' | 'codex'
+export type Harness = 'claude-code' | 'ohmypi' | 'codex'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'codex'])
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.
  * Unknown or missing values fall back to 'claude-code' (the default harness).
+ * Legacy 'pi' values are normalized to 'ohmypi' on read (PAN-1989).
  */
 export function getHarness(snapshot: { runtime?: string | undefined } | null | undefined): Harness {
   const raw = snapshot?.runtime
+  if (raw === 'pi') return 'ohmypi'
   if (raw && KNOWN_HARNESSES.has(raw)) {
     return raw as Harness
   }
@@ -541,6 +546,33 @@ export const ReviewerRoundMetadata = Schema.Struct({
 })
 export type ReviewerRoundMetadata = typeof ReviewerRoundMetadata.Type
 
+// One row of a percentage-distribution model origin (PAN-2053). `lo`/`hi` are the
+// half-open bucket band [lo, hi) the entry owns; `chosen` marks the selected one.
+export const ModelOriginEntry = Schema.Struct({
+  model: Schema.String,
+  weight: Schema.Number,
+  lo: Schema.Number,
+  hi: Schema.Number,
+  chosen: Schema.Boolean,
+})
+export type ModelOriginEntry = typeof ModelOriginEntry.Type
+
+// Read-only "which model & why" derivation shown in the agent right-click MODEL
+// inspector (PAN-2053). Present only when the agent's role uses a percentage
+// distribution; absent for scalar/single-model roles.
+export const ModelOrigin = Schema.Struct({
+  // The exact spawn key whose bucket selected the model (`${role}:${issueId}`).
+  spawnKey: Schema.String,
+  // The chosen model id.
+  resolved: Schema.String,
+  // Deterministic bucket for this key, in [0, total).
+  bucket: Schema.Number,
+  // Number of buckets = sum of weights (100 when the distribution is percentages).
+  total: Schema.Number,
+  distribution: Schema.Array(ModelOriginEntry),
+})
+export type ModelOrigin = typeof ModelOrigin.Type
+
 export const SessionNode = Schema.Struct({
   type: SessionNodeType,
   role: Schema.optional(Schema.String),
@@ -570,6 +602,9 @@ export const SessionNode = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
+  // PAN-2053: read-only model-origin for the right-click MODEL inspector. Set
+  // only when the agent's role uses a weighted model distribution.
+  modelOrigin: Schema.optional(ModelOrigin),
 })
 export type SessionNode = typeof SessionNode.Type
 

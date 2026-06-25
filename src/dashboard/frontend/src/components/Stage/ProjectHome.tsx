@@ -14,6 +14,7 @@ import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
 import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
+import styles from './stage.module.css'
 
 export interface ProjectHomeProps {
   /** Project key/name shown as `# <projectName>`. */
@@ -65,6 +66,8 @@ export function ProjectHome({
       conversations.map((c) => ({
         id: c.name,
         agentLabel: c.title ?? c.model ?? 'Agent',
+        model: c.model,
+        harness: c.harness,
         timestamp: c.lastAttachedAt ?? c.createdAt,
         preview: c.title ?? undefined,
       })),
@@ -115,10 +118,22 @@ export function ProjectHome({
   // Clicking an issue card opens its cockpit tab. Falls back to the sparse
   // launch composition during load.
   if (features && features.length > 0 && onSelectFeature) {
+    const timeline = (
+      <Timeline
+        conversations={timelineConversations}
+        onOpen={(id) => {
+          const conv = conversations.find((c) => c.name === id)
+          api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
+        }}
+      />
+    )
+
     return (
       <HomePane
         workspaceId={api.deckKey}
         openPane={api.openPane}
+        wide
+        detailFirst
         header={
           <>
             <WorkspaceHeader variant="project" name={projectName} branch={branch} />
@@ -143,24 +158,23 @@ export function ProjectHome({
             }
           />
         }
-        timeline={
-          <Timeline
-            conversations={timelineConversations}
-            onOpen={(id) => {
-              const conv = conversations.find((c) => c.name === id)
-              api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
-            }}
-          />
-        }
         detail={
-          <ProjectOverview
-            projectName={projectName}
-            projectKey={projectKey}
-            features={features}
-            issueCosts={issueCosts ?? {}}
-            issueCostDetails={issueCostDetails}
-            onSelectFeature={onSelectFeature}
-          />
+          <div className={styles.projectHomeColumns}>
+            <div className={styles.projectHomeStages}>
+              <ProjectOverview
+                projectName={projectName}
+                projectKey={projectKey}
+                features={features}
+                issueCosts={issueCosts ?? {}}
+                issueCostDetails={issueCostDetails}
+                collapsePipelineSections={false}
+                onSelectFeature={onSelectFeature}
+              />
+            </div>
+            <aside className={styles.projectHomeConversations} aria-label="Project conversations">
+              {timeline}
+            </aside>
+          </div>
         }
       />
     )

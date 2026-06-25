@@ -112,7 +112,19 @@ describe('AgentPane', () => {
     expect(updated.targetMessageNonce).toBeUndefined()
   })
 
-  it('shows an unavailable state when no backing data resolves', () => {
+  it('shows a starting state while identified backing data is still resolving', () => {
+    const id = usePanesStore.getState().addPane(WS, {
+      paneType: 'agent',
+      label: 'Agent',
+      conversationId: 'conv-1',
+    })
+    const pane = selectPanesForWorkspace(WS)(usePanesStore.getState()).find((p) => p.paneId === id)!
+    render(<AgentPane pane={pane} ctx={ctxWith(undefined)} />)
+    expect(screen.getByText('Starting...')).toBeTruthy()
+    expect(screen.getByText(/waiting for the agent conversation/i)).toBeTruthy()
+  })
+
+  it('shows an unavailable state when no backing data or identifier resolves', () => {
     const id = usePanesStore.getState().addPane(WS, { paneType: 'agent', label: 'Agent' })
     const pane = selectPanesForWorkspace(WS)(usePanesStore.getState()).find((p) => p.paneId === id)!
     render(<AgentPane pane={pane} ctx={ctxWith(undefined)} />)

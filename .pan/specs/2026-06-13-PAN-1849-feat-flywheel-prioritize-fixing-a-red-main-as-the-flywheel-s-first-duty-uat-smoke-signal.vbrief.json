@@ -4,17 +4,17 @@
     "created": "2026-06-13T14:10:40.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1849: prioritize fixing a red main as the flywheel's first duty (+ UAT/smoke signal)",
-    "updated": "2026-06-13T14:16:54.107Z"
+    "updated": "2026-06-24T18:08:50.855Z"
   },
   "plan": {
     "id": "pan-1849",
     "title": "feat(flywheel): prioritize fixing a red main as the flywheel's first duty (+ UAT/smoke signal)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b3f1c2a4-7d9e-4a6b-9c1f-2e5d8a0b4c63",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T14:10:40.000Z",
-    "updated": "2026-06-13T14:16:54.107Z",
+    "updated": "2026-06-24T18:08:50.855Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1849",
@@ -675,5 +675,5 @@
       "canonicalFilename": "2026-06-13-PAN-1849-feat-flywheel-prioritize-fixing-a-red-main-as-the-flywheel-s-first-duty-uat-smoke-signal.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

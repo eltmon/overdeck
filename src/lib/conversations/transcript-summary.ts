@@ -100,6 +100,46 @@ export function sanitizeTitle(raw: string | null | undefined): string {
 }
 
 /**
+ * Generate a deterministic title from a serialized transcript when the model
+ * path is unavailable. Prefer the latest user request because explicit retitle
+ * should describe where the conversation currently landed.
+ */
+export function fallbackTranscriptTitle(transcript: string): string {
+  const lines = transcript
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('[…'));
+
+  const userLines = lines
+    .filter((line) => line.startsWith('User:'))
+    .map((line) => line.slice('User:'.length).trim())
+    .filter(Boolean);
+
+  const source = userLines.at(-1)
+    ?? lines[0]?.replace(/^(User|Assistant):\s*/i, '').trim()
+    ?? '';
+
+  const compact = source
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\b(?:please|can you|could you|would you)\b/gi, ' ')
+    .replace(/\b(?:i need you to|i want you to|help me|let's|lets)\b/gi, ' ')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/[^\p{L}\p{N}#/_+.-]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!compact) return '';
+
+  const words = compact.split(/\s+/).slice(0, 8);
+  const title = words
+    .join(' ')
+    .replace(/\s+(?:and|or|to|for|with)$/i, '')
+    .replace(/[.,:;!?]+$/g, '');
+  return sanitizeTitle(title);
+}
+
+/**
  * Invoke `claude -p` with a JSON schema and return the structured output.
  * Throws on non-zero exit, timeout, spawn error, or unparseable output.
  */

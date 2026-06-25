@@ -153,7 +153,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   // so plain forks force launchHarness back to claude-code. Summary and handoff
   // forks inject portable text after spawn, so Pi launch is fine there subject
   // to the canonical harness policy (ToS gate).
-  const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
+  const [launchHarness, setLaunchHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
   useEffect(() => {

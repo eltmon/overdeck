@@ -33,7 +33,7 @@ import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { resetPatrolHeartbeatForStartup, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -50,6 +50,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
+import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -431,6 +432,9 @@ void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message
 startTranscriptPoller();
 console.log('[overdeck] Memory transcript poller started');
 
+startCostReconcileService();
+console.log('[overdeck] Cost reconciler started');
+
 const conversationSearchWatcher = startConversationSearchWatcher();
 console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
@@ -501,6 +505,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsPlayback();
   stopAutoMergeExecutor();
   stopTranscriptPoller();
+  stopCostReconcileService();
   stopRestartAnnouncer();
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
@@ -588,6 +593,7 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
+  resetPatrolHeartbeatForStartup();
   getCloisterService().start().catch((err) => {
     console.error('[overdeck] Cloister auto-start failed:', err);
     emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });

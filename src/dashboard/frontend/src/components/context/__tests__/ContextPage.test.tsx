@@ -124,7 +124,7 @@ function installFetchHandler() {
         operation: 'preview',
         previews: {
           'claude-code': content.includes('claude-only') ? 'shared claude-only' : `Claude preview: ${content}`,
-          pi: content.includes('pi-only') ? 'shared pi-only' : `Pi preview: ${content}`,
+          ohmypi: content.includes('pi-only') ? 'shared pi-only' : `oh-my-pi preview: ${content}`,
           fullPrompt: `Full injected prompt\n\n${content}\n\nMemory/status/briefing placeholders`,
         },
         diagnostics: content.includes('broken-harness')
@@ -215,7 +215,7 @@ describe('ContextPage', () => {
     vi.useRealTimers();
 
     await waitFor(() => expect(screen.getByText(/shared claude-only/)).toBeTruthy());
-    fireEvent.click(screen.getByText('Pi output'));
+    fireEvent.click(screen.getByText('oh-my-pi output'));
     expect(screen.getByText(/shared pi-only/)).toBeTruthy();
     fireEvent.click(screen.getByText('Full injected prompt'));
     expect(screen.getByText(/Memory\/status\/briefing placeholders/)).toBeTruthy();

@@ -2,9 +2,11 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DialogProvider } from './components/DialogProvider';
 import App, {
   SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY,
   buildConversationUrl,
+  getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
@@ -124,14 +126,18 @@ vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
 }));
 vi.mock('./components/CommandDeck', () => ({
-  CommandDeck: ({ conversationViewMode, onConversationViewModeChange }: {
+  CommandDeck: ({ conversationViewMode, onConversationViewModeChange, selectedProject, onSelectProject }: {
     conversationViewMode?: 'conversation' | 'terminal';
     onConversationViewModeChange?: (mode: 'conversation' | 'terminal') => void;
+    selectedProject?: string | null;
+    onSelectProject?: (project: string | null) => void;
   }) => (
     <div>
       <div data-testid="view-mode">{conversationViewMode}</div>
+      <div data-testid="selected-project">{selectedProject ?? ''}</div>
       <button onClick={() => onConversationViewModeChange?.('terminal')}>Terminal</button>
       <button onClick={() => onConversationViewModeChange?.('conversation')}>Conversation</button>
+      <button onClick={() => onSelectProject?.('panopticon-cli')}>Select panopticon</button>
     </div>
   ),
 }));
@@ -160,7 +166,9 @@ function renderApp() {
 
   render(
     <QueryClientProvider client={client}>
-      <App />
+      <DialogProvider>
+        <App />
+      </DialogProvider>
     </QueryClientProvider>,
   );
 }
@@ -196,6 +204,13 @@ describe('conversation route helpers', () => {
     expect(getConvIdFromPath('/conv/123')).toBe('123');
     expect(getConvIdFromPath('/conv/20260523-1234')).toBe('20260523-1234');
     expect(getConvIdFromPath('/command-deck')).toBeNull();
+  });
+
+  it('extracts command deck project routes without swallowing issue cockpit routes', () => {
+    expect(getCommandDeckProjectRouteFromPath('/command-deck/panopticon-cli')).toBe('panopticon-cli');
+    expect(getCommandDeckProjectRouteFromPath('/command-deck/panopticon%20cli')).toBe('panopticon cli');
+    expect(getCommandDeckProjectRouteFromPath('/command-deck/panopticon-cli/PAN-1')).toBeNull();
+    expect(getCommandDeckProjectRouteFromPath('/command-deck')).toBeNull();
   });
 
   it('serializes and parses per-conversation terminal view memory', () => {
@@ -349,6 +364,22 @@ describe('App primary routing', () => {
     window.history.replaceState(null, '', '/pipeline');
     renderApp();
     expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('restores the selected project from a command deck project URL', () => {
+    window.history.replaceState(null, '', '/command-deck/panopticon-cli');
+    renderApp();
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
+  it('updates the URL when a command deck project is selected', () => {
+    window.history.replaceState(null, '', '/command-deck');
+    renderApp();
+
+    fireEvent.click(screen.getByText('Select panopticon'));
+
+    expect(window.location.pathname).toBe('/command-deck/panopticon-cli');
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 
   it('marks the parent surface when the drawer is open', () => {

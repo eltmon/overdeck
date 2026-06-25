@@ -33,7 +33,7 @@ describe('ProjectHome', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
 
     await waitFor(() => {
-      expect(onCreateConversation).toHaveBeenCalledWith('claude-code', 'This is a test')
+      expect(onCreateConversation).toHaveBeenCalledWith('claude-code', 'This is a test', 'terminal')
     })
     expect(openOrFocusAgentPane).toHaveBeenCalledWith('conv-123', 'Agent')
   })

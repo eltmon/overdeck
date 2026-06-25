@@ -1,0 +1,300 @@
+{
+  "issueId": "PAN-1989",
+  "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Clean rename pi→ohmypi across union types, runtime registry, DB enum, routing, ToS gate, files, and frontend — NOT an in-place swap. Keep read-only back-compat: EXTEND the EXISTING normalizeHarness() at src/lib/overdeck/conversations.ts:851 (do not fork it) to map legacy 'pi'→'ohmypi' on read, and the on-disk session-path detector stays harness-agnostic so existing Pi transcripts still parse.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Execute the type rename as widen→migrate→narrow so every intermediate commit is green: (a) widen union to transient 4-value 'claude-code'|'pi'|'ohmypi'|'codex' and extend the existing normalizeHarness(), routing the inline duplicate harness validation at src/lib/database/conversations-db.ts:142 through it (single source of truth); (b) migrate each subsystem to 'ohmypi'; (c) narrow union back to 3 values, keeping 'pi' only in normalizeHarness() for legacy reads. The narrow bead's compiler errors are the residual-site finder. NOTE: conversations-db.ts DOES exist (the orchestrator's 'phantom file' note was wrong) — line 142 is a real inline validation that must be collapsed into normalizeHarness().",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "omp is a superset FORK of the same pi-mono: --mode rpc, the extension model, and JSONL session shape are preserved; but binary (pi→omp, no pi alias), npm package (@mariozechner/pi-coding-agent→@oh-my-pi/pi-coding-agent), config/auth dir (~/.pi→~/.omp/agent), and the extension import package all change. Exact flags/hook-names/paths are NOT in upstream prose — the gated foundation bead discovers them from `omp --help` + the installed package and records them in docs/ohmypi-contract.md. Downstream beads consume the contract; they never guess.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Verify parser parity against REAL omp output: bead 1 installs omp, runs a real --mode rpc session, and commits the captured transcript as the cost/conversation parser fixture. No assumed-v3 parity.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Parity + two BOUNDED low-risk wins land in this issue: (a) surface omp's additional routable providers; (b) capture extra omp usage/cost fields + tool-call detail in the parsers (PAN-1912 data half). All higher-risk omp features (LSP/DAP, hashline edits, subagents, browser/search, ACP, model-control UIs) are deferred to filed follow-up issues.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "No-loss audit is a hard requirement, enumerate-before + verify-after: bead 2 writes docs/ohmypi-no-loss-audit.md enumerating all 20 Pi surface rows + 4 defects; bead 16 is a closing gate that verifies every row has a home (preserved/replaced/retired) and every defect is dispositioned.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Four in-flight Pi defects are explicitly dispositioned, not dropped: PAN-1859 (RED main resume→FIFO test) resolved in bead 4; PAN-1833 (extension cwd detection) resolved in bead 5; PAN-1827 (blank pi conversation view) resolved in bead 8; PAN-1912 split — tool-call data in bead 14, frontend Tools-toggle UI carried forward as a filed follow-up.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Auto-file follow-up GH issues (bead 19) from the capabilities doc's Proposed-Follow-ups table; the operator authorizes agents to file issues freely. Rename `pan pi-auth`→`pan ohmypi-auth`, keeping `pan pi-auth` as a hidden deprecated alias for one release.",
+      "recordedAt": "2026-06-23T08:16:42.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "main is RED (PAN-1859: agent-spawning.test.ts resume→Pi FIFO test fails). The work agent builds on a red base, and a red main silently empties the merge gate.",
+      "mitigation": "Bead 4 must land a GREEN ohmypi resume→FIFO delivery test (it is the rename of the very surface that is failing). Verify CI conclusion (not just HEAD sha) before relying on readyForMerge."
+    },
+    {
+      "id": "H2",
+      "summary": "omp session transcript format may differ from Pi v3 — cost parser and conversation parser break silently if assumed.",
+      "mitigation": "Bead 1 captures a REAL omp --mode rpc transcript as a committed fixture; beads 7/8 are written and unit-tested against it. The contract doc records any v3 divergence."
+    },
+    {
+      "id": "H3",
+      "summary": "omp's exact CLI flags, extension import package, hook names, and OAuth/config path are not enumerated in upstream prose.",
+      "mitigation": "Bead 1 discovers them from `omp --help`/subcommand help + the installed package's TS types and records each in docs/ohmypi-contract.md with a stated fallback for any missing pi-equivalent flag. Downstream beads cite the contract, never guess."
+    },
+    {
+      "id": "H4",
+      "summary": "ToS policy gate (canUseHarnessSync, harness-policy.ts:69) blocks harness+Anthropic+subscription. Renaming the key is easy to get subtly wrong (drop the block, or reorder around it).",
+      "mitigation": "Re-key the SAME blocked cell to 'ohmypi' with posture unchanged; keep harness-policy.test.ts asserting the block. Never weaken or reorder (concerns.md)."
+    },
+    {
+      "id": "H5",
+      "summary": "Transient widened 4-value union could leak past the narrow bead, leaving a dishonest 'pi' as a writable value.",
+      "mitigation": "Bead 15 narrows the writable union to 3 values; 'pi' survives only inside normalizeHarness(); the no-loss-audit gate (bead 16) checks no writable 'pi' producer remains."
+    },
+    {
+      "id": "H6",
+      "summary": "Resume across a model/harness change corrupts context (concerns.md): old Pi sessions resumed under omp.",
+      "mitigation": "Treat a pi→omp identity change like any harness change — fresh session + continue.json re-onboarding, never --resume across the boundary. Legacy Pi transcripts are read-only history, not resume targets."
+    },
+    {
+      "id": "H7",
+      "summary": "Skills/CLI lint (scripts/lint-skills.sh) cross-checks wrapper skills against `pan <verb> --help`; renaming pi-auth or adding ohmypi-auth can fail CI if a wrapper skill drifts.",
+      "mitigation": "Bead 9 updates any skill referencing pi-auth in the same commit and keeps the deprecated alias documented; run `npm run lint` before done."
+    },
+    {
+      "id": "H8",
+      "summary": "Dashboard server code must not use execSync (freezes the event loop); doctor's checkCommand is execSync-based and CLI-only.",
+      "mitigation": "Keep checkOhmypi CLI-only; any server-reachable ohmypi status check uses async exec/spawn (concerns.md)."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1989: Replace Pi harness with ohmypi and evaluate advanced features",
+      "timestamp": "2026-06-23T08:05:04.484Z"
+    },
+    {
+      "timestamp": "2026-06-23T08:16:42.000Z",
+      "reason": "planning",
+      "note": "Discovery complete. Confirmed omp = @oh-my-pi/pi-coding-agent (binary omp), a superset fork of pi-mono. Operator decisions: clean rename, install+capture real omp, doc+auto-file follow-ups, parity+bounded low-risk wins. Folded in orchestrator context: hard no-loss audit FR + disposition of PAN-1859/1833/1827/1912. 19-bead widen→migrate→narrow plan authored.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-06-23T08:05:04.674Z",
+  "updated": "2026-06-24T13:49:36.203Z",
+  "pipeline": {
+    "issueId": "PAN-1989",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-24T13:49:36.157Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2036",
+    "reviewRequestedAt": "2026-06-24T03:28:05.857Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 30050,
+            "output": 100835,
+            "cacheRead": 13812904,
+            "cacheWrite": 157106
+          },
+          "anthropic/claude-sonnet-4-6": {
+            "input": 54,
+            "output": 16960,
+            "cacheRead": 6222940,
+            "cacheWrite": 116968
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 261888,
+            "output": 49202,
+            "cacheRead": 7424,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 20519,
+            "output": 142509,
+            "cacheRead": 9989954,
+            "cacheWrite": 1201626
+          }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 117,
+            "output": 4131,
+            "cacheRead": 932470,
+            "cacheWrite": 392259
+          },
+          "anthropic/claude-sonnet-4-6": {
+            "input": 1715,
+            "output": 498923,
+            "cacheRead": 209805502,
+            "cacheWrite": 2745363
+          },
+          "custom/glm-5.2": {
+            "input": 18404,
+            "output": 234,
+            "cacheRead": 9472,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 50569,
+          "output": 243344,
+          "cacheRead": 23802858,
+          "cacheWrite": 1358732
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 1769,
+          "output": 515883,
+          "cacheRead": 216028442,
+          "cacheWrite": 2862331
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 261888,
+          "output": 49202,
+          "cacheRead": 7424,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 117,
+          "output": 4131,
+          "cacheRead": 932470,
+          "cacheWrite": 392259
+        },
+        "custom/glm-5.2": {
+          "input": 18404,
+          "output": 234,
+          "cacheRead": 9472,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 110.647866,
+        "pricingAsOf": "2026-06-24T13:49:36.203Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2036"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "pi",
+  "model": "glm-5.2",
+  "statusOverrides": {
+    "widen-union": "completed",
+    "widen-union.ac1": "completed",
+    "widen-union.ac2": "completed",
+    "widen-union.ac3": "completed",
+    "widen-union.ac4": "completed",
+    "audit-enumeration": "completed",
+    "audit-enumeration.ac1": "completed",
+    "audit-enumeration.ac2": "completed",
+    "audit-enumeration.ac3": "completed",
+    "omp-contract": "completed",
+    "omp-contract.ac1": "completed",
+    "omp-contract.ac2": "completed",
+    "omp-contract.ac3": "completed",
+    "omp-contract.ac4": "completed",
+    "omp-contract.ac5": "completed",
+    "audit-gate": "completed",
+    "audit-gate.ac1": "completed",
+    "audit-gate.ac2": "completed",
+    "audit-gate.ac3": "completed",
+    "narrow-union": "completed",
+    "narrow-union.ac1": "completed",
+    "narrow-union.ac2": "completed",
+    "narrow-union.ac3": "completed",
+    "docs": "completed",
+    "docs.ac1": "completed",
+    "docs.ac2": "completed",
+    "provider-expansion": "completed",
+    "provider-expansion.ac1": "completed",
+    "provider-expansion.ac2": "completed",
+    "provider-expansion.ac3": "completed",
+    "doctor": "completed",
+    "doctor.ac1": "completed",
+    "doctor.ac2": "completed",
+    "doctor.ac3": "completed",
+    "observability-toolcalls": "completed",
+    "observability-toolcalls.ac1": "completed",
+    "observability-toolcalls.ac2": "completed",
+    "observability-toolcalls.ac3": "completed",
+    "launcher-omp": "completed",
+    "launcher-omp.ac1": "completed",
+    "launcher-omp.ac2": "completed",
+    "launcher-omp.ac3": "completed",
+    "launcher-omp.ac4": "completed",
+    "file-followups": "completed",
+    "file-followups.ac1": "completed",
+    "file-followups.ac2": "completed",
+    "file-followups.ac3": "completed",
+    "frontend-labels": "completed",
+    "frontend-labels.ac1": "completed",
+    "frontend-labels.ac2": "completed",
+    "frontend-labels.ac3": "completed",
+    "policy-routing": "completed",
+    "policy-routing.ac1": "completed",
+    "policy-routing.ac2": "completed",
+    "policy-routing.ac3": "completed",
+    "auth-paths": "completed",
+    "auth-paths.ac1": "completed",
+    "auth-paths.ac2": "completed",
+    "auth-paths.ac3": "completed",
+    "auth-paths.ac4": "completed",
+    "conv-parser": "completed",
+    "conv-parser.ac1": "completed",
+    "conv-parser.ac2": "completed",
+    "conv-parser.ac3": "completed",
+    "conv-parser.ac4": "completed",
+    "cost-parser": "completed",
+    "cost-parser.ac1": "completed",
+    "cost-parser.ac2": "completed",
+    "cost-parser.ac3": "completed",
+    "extension-pkg": "completed",
+    "extension-pkg.ac1": "completed",
+    "extension-pkg.ac2": "completed",
+    "extension-pkg.ac3": "completed",
+    "extension-pkg.ac4": "completed",
+    "runtime-fifo": "completed",
+    "runtime-fifo.ac1": "completed",
+    "runtime-fifo.ac2": "completed",
+    "runtime-fifo.ac3": "completed",
+    "runtime-fifo.ac4": "completed",
+    "research-doc": "completed",
+    "research-doc.ac1": "completed",
+    "research-doc.ac2": "completed",
+    "research-doc.ac3": "completed"
+  }
+}

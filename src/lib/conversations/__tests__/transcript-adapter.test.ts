@@ -74,7 +74,7 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
       },
     ]);
 
-    const adapter = getTranscriptAdapter('pi');
+    const adapter = getTranscriptAdapter('ohmypi');
     const { summary } = await adapter.compactSummary(file, { model: 'claude-haiku-4-5', includeThinking: false });
 
     expect(summary.trim().length).toBeGreaterThan(0);
@@ -99,7 +99,7 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
       { type: 'model_change', model: 'x' },
     ]);
 
-    const adapter = getTranscriptAdapter('pi');
+    const adapter = getTranscriptAdapter('ohmypi');
     const { summary, summaryModel } = await adapter.compactSummary(file, { model: 'claude-haiku-4-5' });
 
     expect(summary).toBe('');
@@ -136,7 +136,7 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
   });
 
   it('selects the source adapter independently of the summarizer harness', () => {
-    expect(getTranscriptAdapter('pi').name).toBe('pi');
+    expect(getTranscriptAdapter('ohmypi').name).toBe('ohmypi');
     expect(getTranscriptAdapter('claude-code').name).toBe('claude-code');
     expect(getTranscriptAdapter(undefined).name).toBe('claude-code');
   });

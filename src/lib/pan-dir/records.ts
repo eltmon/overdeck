@@ -9,7 +9,7 @@
 
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { promises as fsp } from 'node:fs';
+import { existsSync, promises as fsp } from 'node:fs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 import {
@@ -23,6 +23,7 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import type { ReviewStatus } from '../review-status.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import type {
   ContinueBeadsMapping,
   ContinueDecision,
@@ -31,9 +32,12 @@ import type {
   ContinueResumePoint,
   ContinueSessionEntry,
 } from '../vbrief/continue-state.js';
+import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
   getIssueRecordPath,
+  getIssueWorkspacePath,
   queueIssueRecordCommit,
+  RECORD_SCHEMA_VERSION,
   readIssueRecord,
   writeIssueRecordSync,
   type PanIssueRecord,
@@ -149,6 +153,40 @@ async function readLegacyContinueText(projectRoot: string, issueId: string): Pro
   }
 }
 
+/** Read workspace continue.json and return its statusOverrides (if any). */
+async function readWorkspaceContinueStatusOverrides(issueId: string): Promise<Record<string, string> | undefined> {
+  const workspacePath = getIssueWorkspacePath(issueId);
+  if (!workspacePath || !existsSync(workspacePath)) return undefined;
+  const continuePath = join(workspacePath, '.pan', 'continue.json');
+  try {
+    const text = await fsp.readFile(continuePath, 'utf-8');
+    const parsed = JSON.parse(text) as { statusOverrides?: Record<string, string> };
+    return parsed.statusOverrides ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read harness/model for an issue from the overdeck agents table (most recent work agent). */
+function projectAgentHarnessModel(issueId: string): { harness?: RuntimeName; model?: string } {
+  try {
+    const agents = listOverdeckAgentStatesSync().filter(
+      (a) => a.issueId?.toUpperCase() === issueId.toUpperCase(),
+    );
+    const workAgent =
+      agents
+        .filter((a) => a.role === 'work')
+        .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))[0]
+      ?? agents[agents.length - 1];
+    return {
+      harness: workAgent?.harness,
+      model: workAgent?.model ?? undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export interface BuildIssueRecordOptions {
   closedAt?: string;
   owner?: string;
@@ -167,11 +205,25 @@ export async function buildIssueRecord(
   const usageRecord = projectUsage(issueId);
   const merges = projectMerges(issueId);
 
+  // PAN-1919: fold workspace continue statusOverrides; fall back to existing.
+  const workspaceStatusOverrides = await readWorkspaceContinueStatusOverrides(issueId);
+  const mergedStatusOverrides = workspaceStatusOverrides
+    ? { ...(existing?.statusOverrides ?? {}), ...workspaceStatusOverrides }
+    : existing?.statusOverrides;
+
+  // PAN-1919: harness/model from existing record, then agents table as fallback.
+  const agentHM = existing?.harness || existing?.model
+    ? { harness: existing.harness, model: existing.model }
+    : projectAgentHarnessModel(issueId);
+
   return {
     issueId: issueId.toUpperCase(),
-    schemaVersion: 1,
+    schemaVersion: RECORD_SCHEMA_VERSION,
     ...continueSubset,
     ...existing,
+    harness: agentHM.harness,
+    model: agentHM.model,
+    statusOverrides: mergedStatusOverrides,
     pipeline: pipelineRecord,
     closeOut: {
       usage: usageRecord,

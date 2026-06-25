@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@overdeck/contracts';
+import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot, ModelOrigin } from '@overdeck/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
@@ -412,6 +412,81 @@ function getSessionStatusTitle({
   return details.join(' ');
 }
 
+/**
+ * PAN-2053: read-only model header for the Start/Restart submenu, in place of the
+ * bare `Currently: …` label. The headline is the model a `pan start` for this issue
+ * would DETERMINISTICALLY select right now — for a weighted role, the FNV-1a pick
+ * from the distribution (`origin.resolved`); for a scalar role, the fixed model.
+ * It is NOT the model the (possibly stale) running agent happens to be on.
+ * Monochrome per the dashboard style guide; read-only — nothing here mutates.
+ */
+function ModelOriginPanel({
+  origin,
+  resolvedModel,
+  roleLabel,
+  currentHarness,
+}: {
+  origin?: ModelOrigin;
+  resolvedModel?: string | null;
+  roleLabel: string;
+  currentHarness?: string | null;
+}) {
+  // The deterministic selection for this issue's spawn key (what a restart picks).
+  const resolved = origin?.resolved ?? resolvedModel ?? 'unknown';
+  const positive = origin ? origin.distribution.filter((d) => d.weight > 0) : [];
+  const chosenBand = origin?.distribution.find((d) => d.chosen);
+
+  const total = origin?.total ?? 0;
+  const bar = (d: ModelOrigin['distribution'][number]) => {
+    const pct = total > 0 ? Math.round((d.weight / total) * 100) : 0;
+    const highlight = d.model === resolved;
+    return (
+      <div key={d.model} className="flex items-center gap-2">
+        <span className={`w-[108px] shrink-0 truncate font-mono text-[10px] ${highlight ? 'text-foreground' : 'text-muted-foreground'}`}>
+          {d.model}
+        </span>
+        <span className="h-1 flex-1 overflow-hidden rounded-sm bg-foreground/10">
+          <span className={`block h-full rounded-sm ${highlight ? 'bg-foreground/45' : 'bg-foreground/20'}`} style={{ width: `${pct}%` }} />
+        </span>
+        <span className="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mx-1 mb-1 mt-0.5 rounded-md border border-border bg-foreground/[0.03] px-2.5 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {origin ? 'Resolves to' : 'Model'}
+      </div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="truncate font-mono text-xs text-foreground">{resolved}</span>
+        {!origin && currentHarness ? (
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">· {currentHarness}</span>
+        ) : null}
+      </div>
+
+      {!origin ? (
+        <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          Fixed <span className="font-mono">{roleLabel}</span> role model — no distribution. Add
+          model percentages in Settings → Roles to spread across providers.
+        </div>
+      ) : (
+        <>
+          <div className="mt-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {roleLabel} distribution
+          </div>
+          <div className="mt-1.5 space-y-1.5">{positive.map((d) => bar(d))}</div>
+          {chosenBand ? (
+            <div className="mt-2 rounded-sm bg-foreground/[0.04] px-1.5 py-1 font-mono text-[10px] leading-snug text-muted-foreground">
+              hash(&quot;{origin.spawnKey}&quot;) → bucket {origin.bucket} of {origin.total} → <span className="text-foreground">{origin.resolved}</span>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RestartModelSubmenu({
   defaultModel,
   currentHarness,
@@ -419,6 +494,8 @@ function RestartModelSubmenu({
   groups,
   label,
   onRestart,
+  modelOrigin,
+  roleLabel,
 }: {
   defaultModel: string | null;
   currentHarness?: string | null;
@@ -427,25 +504,30 @@ function RestartModelSubmenu({
   harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
   onRestart: (model?: string, harness?: Harness) => void;
+  modelOrigin?: ModelOrigin;
+  roleLabel?: string;
 }) {
-  const defaultLabel = defaultModel
-    ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
+  // "Default role config" restarts with NO model override, so the server re-runs
+  // the weighted pick for this issue's key — i.e. modelOrigin.resolved. Show that,
+  // not the representative model, so the label matches what the restart actually does.
+  const defaultPick = modelOrigin?.resolved ?? defaultModel;
+  const defaultLabel = defaultPick
+    ? defaultPick.replace(/^claude-/, '').replace(/-\d{8}$/, '')
     : 'default';
-  // PAN-1985: render the trigger as just the action ("Restart All") and put
-  // the current harness+model as a non-clickable status row at the top of
-  // the submenu. The previous "(gpt-5.5)" suffix on the trigger read as
-  // "restart with gpt-5.5" — ambiguous and easy to misread.
-  const currentSummary = currentHarness && currentModel
-    ? `${currentHarness} + ${currentModel}`
-    : currentHarness ?? currentModel ?? null;
 
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger>{label ?? 'Restart'}</ContextMenuSubTrigger>
       <ContextMenuSubContent>
-        {currentSummary ? (
-          <ContextMenuLabel>Currently: {currentSummary}</ContextMenuLabel>
-        ) : null}
+        {/* PAN-2053: read-only MODEL header — weight bars + FNV-1a derivation for
+            weighted roles, resolved model + "no distribution" note for scalar roles.
+            Replaces the old bare "Currently: …" label (PAN-1985). */}
+        <ModelOriginPanel
+          origin={modelOrigin}
+          resolvedModel={currentModel}
+          roleLabel={roleLabel ?? 'role'}
+          currentHarness={currentHarness}
+        />
         <ContextMenuItem onSelect={() => onRestart()}>
           <span className="flex-1">Default role config</span>
           <span className="ml-2 shrink-0 text-[10px] opacity-50">uses {defaultLabel}</span>
@@ -462,7 +544,7 @@ function RestartModelSubmenu({
                 onSelect={() => onRestart(m.id)}
               >
                 <span
-                  className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
+                  className={`flex-1 ${m.id === defaultPick ? 'text-foreground' : ''}`}
                 >
                   {m.label}
                 </span>
@@ -692,6 +774,8 @@ export function SessionNode({
             groups={groups}
             harnessPolicy={harnessPolicy}
             label={restartLabel}
+            modelOrigin={session.modelOrigin}
+            roleLabel={session.role ?? session.type}
             onRestart={(model, harness) => onRestartSession!(session.sessionId, issueId!, session.type, session.role, model, harness)}
           />
         )}

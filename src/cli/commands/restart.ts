@@ -125,11 +125,20 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     });
   }
   const env = applyBootGateEnv({ ...process.env }, opts);
+  const traefikEnv = config.traefikEnabled
+    ? {
+        DASHBOARD_URL: `https://${config.traefikDomain}`,
+        OVERDECK_TRAEFIK_ENABLED: '1',
+        OVERDECK_TRAEFIK_DOMAIN: config.traefikDomain,
+        OVERDECK_TRUSTED_ORIGINS: [process.env.OVERDECK_TRUSTED_ORIGINS, `https://${config.traefikDomain}`].filter(Boolean).join(','),
+      }
+    : {};
   const child = spawn(resolveNode22(), [serverPath], {
     detached: true,
     stdio: openDashboardLogStdio(),
     env: {
       ...env,
+      ...traefikEnv,
       DASHBOARD_PORT: String(config.dashboardPort),
       API_PORT: String(config.dashboardApiPort),
       PORT: String(config.dashboardApiPort),

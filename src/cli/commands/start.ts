@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
@@ -173,8 +173,8 @@ async function resolveExplicitHarnessFlag(
     return undefined;
   }
 
-  if (harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
+  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', or 'codex'.\n`);
     process.exit(1);
   }
 
@@ -807,6 +807,37 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
   process.exit(1);
 }
 
+async function repairMainBranchWorkspace(workspace: string, normalizedId: string): Promise<string | null> {
+  const featureBranch = `feature/${normalizedId}`;
+
+  try {
+    const [{ stdout: topLevel }, { stdout: status }] = await Promise.all([
+      execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd: workspace, encoding: 'utf-8' }),
+      execFileAsync('git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf-8' }),
+    ]);
+
+    if (resolve(topLevel.trim()) !== resolve(workspace)) return null;
+    if (status.trim().length > 0) return null;
+
+    const { stdout: matchingBranches } = await execFileAsync('git', ['branch', '--list', featureBranch], {
+      cwd: workspace,
+      encoding: 'utf-8',
+    });
+    const branchExists = matchingBranches
+      .split('\n')
+      .map((line) => line.replace(/^[*+\s]+/, '').trim())
+      .includes(featureBranch);
+
+    await execFileAsync('git', branchExists ? ['switch', featureBranch] : ['switch', '-c', featureBranch], {
+      cwd: workspace,
+      encoding: 'utf-8',
+    });
+    return featureBranch;
+  } catch {
+    return null;
+  }
+}
+
 function transientBeadsFailureMessage(issueId: string, cause?: unknown): string {
   if (cause instanceof BdTransientFailure) {
     return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times`;
@@ -987,6 +1018,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     let workspace = workspacePath;
     const workspaceExisted = !!workspace;
     let workspaceCreatedThisRun = false;
+    let skipSyncMainForUnsafeWorkspace = false;
 
     if (!workspace) {
       spinner.text = `Creating workspace for ${id}...`;
@@ -1005,9 +1037,30 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
+    if (workspaceExisted) {
+      try {
+        const { execSync } = await import('child_process');
+        const branch = execSync('git branch --show-current', {
+          cwd: workspace,
+          encoding: 'utf8'
+        }).trim();
+        if (branch === 'main' || branch === 'master') {
+          const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
+          if (repairedBranch) {
+            spinner.text = `Moved clean workspace to branch: ${repairedBranch}`;
+          } else {
+            skipSyncMainForUnsafeWorkspace = true;
+            spinner.text = `Workspace is on ${branch} branch; skipping sync-main until validation runs`;
+          }
+        }
+      } catch {
+        // Let the post-sync verification below surface the canonical warning.
+      }
+    }
+
     // If workspace was created during planning, main may have moved forward.
     // Fetch and merge latest main before the agent starts working.
-    if (workspaceExisted) {
+    if (workspaceExisted && !skipSyncMainForUnsafeWorkspace) {
       spinner.text = 'Syncing latest main into workspace...';
       let syncConflictFiles: string[] | undefined;
       try {
@@ -1068,22 +1121,27 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         } catch { /* ignore sub-repo check errors */ }
 
         if (!hasFeatureBranch) {
-          await failPostCreateValidation({
-            spinner,
-            issueId: id,
-            projectRoot,
-            workspaceCreatedThisRun,
-            message: `Workspace is on ${branch} branch`,
-            printDetails: () => {
-              console.log('');
-              console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
-              console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
-              console.log('');
-              console.log(chalk.bold('To fix:'));
-              console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
-              console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
-            },
-          });
+          const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
+          if (repairedBranch) {
+            spinner.text = `Moved clean workspace to branch: ${repairedBranch}`;
+          } else {
+            await failPostCreateValidation({
+              spinner,
+              issueId: id,
+              projectRoot,
+              workspaceCreatedThisRun,
+              message: `Workspace is on ${branch} branch`,
+              printDetails: () => {
+                console.log('');
+                console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
+                console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+                console.log('');
+                console.log(chalk.bold('To fix:'));
+                console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+                console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+              },
+            });
+          }
         }
       } else {
         spinner.text = `Found workspace on branch: ${branch}`;
@@ -1384,5 +1442,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 export const __testInternals = {
   failPostCreateValidation,
   failTransientBeadsValidation,
+  repairMainBranchWorkspace,
   resolveExplicitHarnessFlag,
 };

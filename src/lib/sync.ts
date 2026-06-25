@@ -32,7 +32,7 @@ export interface SyncItem {
   name: string;
   sourcePath: string;
   targetPath: string;
-  status: 'new' | 'exists' | 'conflict' | 'symlink';
+  status: 'new' | 'exists' | 'conflict' | 'symlink' | 'adopted';
 }
 
 export interface SyncPlan {
@@ -365,7 +365,7 @@ export function planSyncSync(): SyncPlan {
       } else if (status.action === 'user-owned') {
         // Identical content sitting at the target from a previous Overdeck
         // era is not a conflict — it would simply be adopted on the real run.
-        syncStatus = hashFileSync(targetFile) === hashFileSync(file.absolutePath) ? 'exists' : 'conflict';
+        syncStatus = hashFileSync(targetFile) === hashFileSync(file.absolutePath) ? 'exists' : 'adopted';
       }
 
       bucket.push({
@@ -392,6 +392,7 @@ export interface SyncOptions {
 export interface SyncResult {
   created: string[];
   updated: string[];
+  adopted: string[];
   skipped: string[];
   conflicts: string[];
   diffs: Array<{ path: string; sourceContent: string; targetContent: string }>;
@@ -410,12 +411,15 @@ export interface SyncResult {
  * absent from the manifest (a prior Overdeck era, or a fresh ~/.claude)
  * is *adopted* when its content is byte-identical to our source — recorded
  * into the manifest so future syncs can update it. A target file that
- * differs is genuinely user-owned and is left untouched.
+ * differs at an Overdeck-shipped source path is a legacy pre-manifest
+ * install; it is overwritten, recorded in the manifest, and reported as
+ * adopted.
  */
 export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   const result: SyncResult = {
     created: [],
     updated: [],
+    adopted: [],
     skipped: [],
     conflicts: [],
     diffs: [],
@@ -481,12 +485,19 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
       case 'user-owned': {
         // Target file exists but is absent from the manifest. If its content
         // is byte-identical to our source, it is ours (a prior era) — adopt
-        // it so future syncs can manage it. Otherwise it is genuinely
-        // user-authored: never touch it.
+        // it so future syncs can manage it. If it differs at a bundled source
+        // path, it is a legacy pre-manifest Overdeck install: overwrite and
+        // record it explicitly so the operator sees the adoption.
         if (hashFileSync(targetFile) === hashFileSync(file.absolutePath)) {
           setManifestEntry(manifest, file.relativePath, hashFileSync(targetFile), 'overdeck');
+          result.skipped.push(file.relativePath);
+        } else {
+          mkdirSync(dirname(targetFile), { recursive: true });
+          copyFileSync(file.absolutePath, targetFile);
+          const hash = hashFileSync(targetFile);
+          setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
+          result.adopted.push(file.relativePath);
         }
-        result.skipped.push(file.relativePath);
         break;
       }
     }
@@ -583,9 +594,9 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`global: ${err?.message ?? err}`);
   }
 
-  // PAN-1566: Global layer → ~/.overdeck/context/pi-global.md
+  // PAN-1566/PAN-1989: Global layer → ~/.overdeck/context/pi-global.md (ohmypi harness)
   try {
-    const piManaged = renderGlobalLayer('pi', isDevMode());
+    const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
     const existingPi = existsSync(piGlobalFile) ? readFileSync(piGlobalFile, 'utf-8') : '';
     if (piManaged.trim() !== existingPi.trim()) {
@@ -619,7 +630,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     if (!existsSync(config.path)) continue;
     try {
       const claudeManaged = renderProjectLayer(config.path, 'claude-code');
-      const piManaged = renderProjectLayer(config.path, 'pi');
+      const piManaged = renderProjectLayer(config.path, 'ohmypi');
       if (!claudeManaged && !piManaged) continue;
       let wrote = false;
       if (claudeManaged) {

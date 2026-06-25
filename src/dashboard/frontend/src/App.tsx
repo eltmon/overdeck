@@ -142,6 +142,20 @@ export function getCockpitRouteFromPath(path = window.location.pathname): { proj
   return { project: dec(m[1] ?? ''), issue: dec(m[2] ?? '') };
 }
 
+/**
+ * Parse a project-home deep-link `/command-deck/<project>`. The issue cockpit
+ * route is handled separately by getCockpitRouteFromPath.
+ */
+export function getCommandDeckProjectRouteFromPath(path = window.location.pathname): string | null {
+  const m = path.match(/^\/command-deck\/([^/]+)$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1] ?? '');
+  } catch {
+    return m[1] ?? null;
+  }
+}
+
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
   const view = new URLSearchParams(search).get('view');
   return view === 'terminal' ? 'terminal' : 'conversation';
@@ -528,10 +542,14 @@ export default function App() {
 
   // Conversation deep-link state (/conv/:id?view=terminal&views=161:terminal)
   const initialConversationRoute = getConversationRouteState();
+  const initialCockpitRoute = getCockpitRouteFromPath();
+  const initialProjectRoute = getCommandDeckProjectRouteFromPath();
   const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
   // PAN-1561: the project whose deck is shown in the Command Deck, driven by the
   // sidebar's Projects rail.
-  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null);
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(
+    () => initialCockpitRoute?.project ?? initialProjectRoute,
+  );
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
     () => initialConversationRoute.viewMode,
   );
@@ -541,7 +559,7 @@ export default function App() {
   // Cockpit deep-link (PAN-2005): the issue cockpit tab restored from
   // /command-deck/<project>/<issue>. Mirrors the conversation deep-link pattern.
   const [cockpitRoute, setCockpitRouteState] = useState<{ project: string; issue: string } | null>(
-    () => getCockpitRouteFromPath(),
+    () => initialCockpitRoute,
   );
   const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
     setSelectedConvIdState(id);
@@ -577,6 +595,10 @@ export default function App() {
     void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
     setSelectedProjectKey(project.key);
     setActiveTabState('command-deck');
+    const path = `/command-deck/${encodeURIComponent(project.key)}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState({ tab: 'command-deck', project: project.key }, '', path);
+    }
     usePanesStore.getState().ensureHome(project.key);
   }, [queryClient]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
@@ -771,11 +793,14 @@ export default function App() {
 
   // Sync the URL to the active issue cockpit (PAN-2005). replaceState (like the
   // conversation route) keeps history clean; reload/bookmark restores the tab.
-  // issueId=null reverts to the bare /command-deck (cockpit closed / home).
+  // issueId=null reverts to the project home when a project is active.
   const onCockpitChange = useCallback((projectKey: string | null, issueId: string | null) => {
     if (projectKey && issueId) {
       const path = `/command-deck/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}`;
       if (window.location.pathname !== path) window.history.replaceState({ tab: 'command-deck' }, '', path);
+    } else if (projectKey) {
+      const path = `/command-deck/${encodeURIComponent(projectKey)}`;
+      if (window.location.pathname !== path) window.history.replaceState({ tab: 'command-deck', project: projectKey }, '', path);
     } else if (window.location.pathname.startsWith('/command-deck/')) {
       window.history.replaceState({ tab: 'command-deck' }, '', '/command-deck');
     }
@@ -833,8 +858,12 @@ export default function App() {
   // after onSelectProject), so deep-links still land on their conversation.
   const handleSelectProject = useCallback((projectName: string | null) => {
     setSelectedProjectKey(projectName);
+    setActiveTabState('command-deck');
+    const path = projectName ? `/command-deck/${encodeURIComponent(projectName)}` : '/command-deck';
+    if (window.location.pathname !== path) {
+      window.history.pushState({ tab: 'command-deck', project: projectName }, '', path);
+    }
     if (projectName) {
-      setActiveTab('command-deck');
       // ensureHome hydrates/creates the workspace and replaces the store object,
       // so re-read getState() afterward — the pre-ensureHome snapshot can be
       // empty on a project's first access (its panes aren't hydrated yet).
@@ -843,7 +872,7 @@ export default function App() {
       const home = (fresh.panesByWorkspace[projectName] ?? []).find((p) => p.paneType === 'home');
       if (home) fresh.setActivePane(projectName, home.paneId);
     }
-  }, [setActiveTab]);
+  }, []);
 
   // Handle browser back/forward
   useEffect(() => {
@@ -854,7 +883,14 @@ export default function App() {
       setSelectedConvIdState(routeState.convId);
       setConversationViewModeState(routeState.viewMode);
       setConversationViewModes(routeState.viewModes);
-      setCockpitRouteState(getCockpitRouteFromPath());
+      const cockpitRoute = getCockpitRouteFromPath();
+      setCockpitRouteState(cockpitRoute);
+      const routeProject = cockpitRoute?.project ?? getCommandDeckProjectRouteFromPath();
+      if (routeProject) {
+        setSelectedProjectKey(routeProject);
+      } else if (window.location.pathname === '/command-deck') {
+        setSelectedProjectKey(null);
+      }
       syncDrawerFromUrl();
     };
     window.addEventListener('popstate', onPopState);
@@ -1681,7 +1717,7 @@ export default function App() {
                 pendingConversationTarget={pendingConversationTarget}
                 onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
                 selectedProject={selectedProjectKey}
-                onSelectProject={setSelectedProjectKey}
+                onSelectProject={handleSelectProject}
                 onProjectPrefixChange={setSearchProjectPrefix}
                 cockpitIssue={cockpitRoute}
                 onCockpitChange={onCockpitChange}

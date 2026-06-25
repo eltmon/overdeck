@@ -470,7 +470,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, pi, codex, or empty string');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, or empty string');
     });
   });
 
@@ -780,6 +780,113 @@ describe('OpenRouter favorites', () => {
       const [, writtenContent] = vi.mocked(writeFile).mock.calls.at(-1)!;
       // YAML dump of empty array produces "favorites: []\n" or similar
       expect(String(writtenContent)).toContain('favorites:');
+    });
+  });
+
+  describe('validateSettingsApi distribution model (PAN-1832)', () => {
+    const baseProviders: ApiSettingsConfig = {
+      models: {
+        providers: {
+          anthropic: true,
+          openai: false,
+          google: false,
+          minimax: false,
+          zai: false,
+          kimi: false,
+          mimo: false,
+          openrouter: false,
+          nous: false,
+          dashscope: false,
+        },
+        overrides: {},
+        gemini_thinking_level: 3,
+      },
+    };
+
+    it('accepts a valid distribution for a role model', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [
+              { model: 'claude-opus-4-8', weight: 70 },
+              { model: 'claude-sonnet-4-6', weight: 30 },
+            ],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('rejects a distribution entry with weight 0', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [{ model: 'claude-opus-4-8', weight: 0 }],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /weight must be a positive integer/.test(e))).toBe(true);
+    });
+
+    it('rejects a distribution entry with negative weight', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [{ model: 'claude-opus-4-8', weight: -1 }],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /weight must be a positive integer/.test(e))).toBe(true);
+    });
+
+    it('rejects an empty distribution array', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /distribution must be a non-empty array/.test(e))).toBe(true);
+    });
+
+    it('rejects a distribution on a sub-role model', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: 'claude-sonnet-4-6',
+            sub: {
+              inspect: {
+                model: [{ model: 'claude-haiku-4-5', weight: 1 }],
+              },
+            },
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /distribution not allowed here/.test(e))).toBe(true);
+    });
+
+    it('rejects a distribution on a workhorse slot', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        workhorses: {
+          mid: [{ model: 'claude-sonnet-4-6', weight: 1 }] as unknown as string,
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /distribution not allowed here/.test(e))).toBe(true);
+    });
+
+    it('scalar role model still validates correctly (back-compat)', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: { work: { model: 'claude-sonnet-4-6' } },
+      } as ApiSettingsConfig);
+      expect(result.errors).toHaveLength(0);
     });
   });
 });

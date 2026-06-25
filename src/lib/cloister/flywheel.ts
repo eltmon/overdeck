@@ -31,7 +31,7 @@ export interface FlywheelLifecycleOptions {
   briefPath?: string;
   prompt?: string;
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   minAgents?: number;
   maxAgents?: number;
