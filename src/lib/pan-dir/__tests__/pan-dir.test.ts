@@ -26,13 +26,10 @@ import {
   readSessions,
   readSpec,
   readWorkspaceContext,
-  readWorkspaceContinue,
   updateSpecStatus,
   writeFeedback,
   writeSpec,
   writeWorkspaceContext,
-  writeWorkspaceContinue,
-  type WorkspaceContinueState,
 } from '../index.js'
 import type { VBriefDocument } from '../../vbrief/types.js'
 
@@ -64,22 +61,6 @@ function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocume
       created: '2026-05-04T00:00:00Z',
       updated: '2026-05-04T00:00:00Z',
     },
-  }
-}
-
-function makeContinue(issueId: string): WorkspaceContinueState {
-  return {
-    version: '1',
-    issueId,
-    created: '2026-05-04T00:00:00.000Z',
-    updated: '2026-05-04T00:00:00.000Z',
-    gitState: { branch: `feature/${issueId.toLowerCase()}` },
-    decisions: [],
-    hazards: [],
-    resumePoint: null,
-    beadsMapping: {},
-    sessionHistory: [],
-    feedback: [],
   }
 }
 
@@ -164,31 +145,6 @@ describe('spec helpers', () => {
       expect(updated?.status).toBe('active')
       const reread = yield* readSpec(path)
       expect(reread.status).toBe('active')
-    }),
-  )
-})
-
-describe('continue helpers', () => {
-  it.effect('round-trips workspace continue state and preserves created timestamp', () =>
-    Effect.gen(function* () {
-      const first = yield* writeWorkspaceContinue(TEST_DIR, makeContinue('PAN-967'))
-      yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 5)))
-      const second = yield* writeWorkspaceContinue(TEST_DIR, {
-        ...first,
-        decisions: [{ id: 'D1', summary: 'Use .pan', recordedAt: '2026-05-04T01:00:00Z' }],
-      })
-
-      const read = yield* readWorkspaceContinue(TEST_DIR)
-      expect(read?.issueId).toBe('PAN-967')
-      expect(read?.created).toBe(first.created)
-      expect(new Date(second.updated).getTime()).toBeGreaterThan(new Date(first.updated).getTime())
-    }),
-  )
-
-  it.effect('returns null when workspace continue file is missing', () =>
-    Effect.gen(function* () {
-      const result = yield* readWorkspaceContinue(TEST_DIR)
-      expect(result).toBeNull()
     }),
   )
 })
