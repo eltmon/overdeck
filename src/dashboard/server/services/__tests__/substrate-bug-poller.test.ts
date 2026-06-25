@@ -303,6 +303,57 @@ describe('createSubstrateBugPoller', () => {
     expect(eventStore.appendAsync).not.toHaveBeenCalled();
   });
 
+  it('skips a repo whose search 422s instead of aborting discovery for all repos', async () => {
+    const repository = makeRepository();
+    const eventStore = makeEventStore();
+    const multiConfig = {
+      token: 'ghp_test',
+      repos: [
+        { owner: 'stale', repo: 'renamed-away', prefix: 'BAD' },
+        { owner: 'acme', repo: 'overdeck', prefix: 'PAN' },
+      ],
+    };
+    const fetchImpl = makeFetch((url) => {
+      const query = url.searchParams.get('q') ?? '';
+      // A stale (renamed/deleted) repo makes GitHub's search API 422.
+      if (url.pathname === '/search/issues' && query.includes('repo:stale/renamed-away')) {
+        return response({ message: 'Validation Failed' }, 422);
+      }
+      if (url.pathname === '/search/issues' && query.includes('is:issue')) {
+        return response({
+          items: query.includes('author:panopticon-agent[bot]') ? [{
+            number: 1487,
+            body: 'Flywheel-Filed-By: agent',
+            created_at: '2026-05-25T12:00:00.000Z',
+            updated_at: '2026-05-25T12:01:00.000Z',
+            labels: [{ name: 'P1' }],
+            user: { login: 'panopticon-agent[bot]' },
+          }] : [],
+        });
+      }
+      return response({ items: [] });
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const poller = createSubstrateBugPoller({
+      fetchImpl,
+      repository,
+      eventStore,
+      getConfig: () => multiConfig,
+      now: () => new Date('2026-05-25T12:15:00.000Z'),
+    });
+
+    await poller.pollOnce();
+
+    // The stale repo was skipped (warned), but the good repo's bug was still discovered.
+    expect(repository.upsert).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-1487' }));
+    expect(repository.upsert).not.toHaveBeenCalledWith(expect.objectContaining({ issueId: expect.stringMatching(/^BAD-/) }));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[substrate-bug-poller] skipping stale/renamed-away'),
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+  });
+
   it('polls immediately and then every configured interval', async () => {
     const repository = makeRepository();
     const eventStore = makeEventStore();
