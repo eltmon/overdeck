@@ -31,6 +31,7 @@ import {
 import { FsError, ProcessSpawnError } from './errors.js';
 
 const execAsync = promisify(exec);
+const PRE_WORKTREE_METADATA_DIRS = new Set(['.pan', '.beads']);
 
 export interface PanMigrationResult {
   /** Subdirectories migrated from .overdeck/ to .pan/ */
@@ -546,6 +547,44 @@ const TEXT_EXTENSIONS = new Set([
   '.md', '.sh', '.yml', '.yaml', '.json', '.ts', '.js', '.env', '.txt', '.toml', '.template',
 ]);
 
+function isPreWorktreeMetadataOnlyDir(path: string): boolean {
+  const entries = readdirSync(path, { withFileTypes: true });
+  return entries.every((entry) =>
+    PRE_WORKTREE_METADATA_DIRS.has(entry.name) && entry.isDirectory()
+  );
+}
+
+function stagePreWorktreeMetadataSync(workspacePath: string): string | null {
+  if (!existsSync(workspacePath)) return null;
+  if (!isPreWorktreeMetadataOnlyDir(workspacePath)) return null;
+
+  const stagedPath = `${workspacePath}.pre-worktree-${process.pid}-${Date.now()}`;
+  renameSync(workspacePath, stagedPath);
+  return stagedPath;
+}
+
+function mergeDirectoryWithoutOverwriteSync(source: string, target: string): void {
+  if (!existsSync(source)) return;
+  mkdirSync(target, { recursive: true });
+
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = join(source, entry.name);
+    const targetPath = join(target, entry.name);
+
+    if (entry.isDirectory()) {
+      mergeDirectoryWithoutOverwriteSync(sourcePath, targetPath);
+    } else if (entry.isFile() && !existsSync(targetPath)) {
+      copyFileSync(sourcePath, targetPath);
+    }
+  }
+}
+
+function restorePreWorktreeMetadataSync(stagedPath: string | null, workspacePath: string): void {
+  if (!stagedPath || !existsSync(stagedPath)) return;
+  mergeDirectoryWithoutOverwriteSync(stagedPath, workspacePath);
+  rmSync(stagedPath, { recursive: true, force: true });
+}
+
 function copyProjectTemplateDirs(
   sourceDir: string,
   targetDir: string,
@@ -621,28 +660,38 @@ function copyProjectTemplateDirs(
   const workspacePath = join(workspacesDir, featureFolder);
   result.workspacePath = workspacePath;
 
-  // Check if workspace already exists
-  if (existsSync(workspacePath)) {
-    result.success = false;
-    result.errors.push(`Workspace already exists at ${workspacePath}`);
-    return result;
-  }
-
   if (dryRun) {
     result.steps.push('[DRY RUN] Would create workspace at: ' + workspacePath);
     return result;
   }
 
+  // A failed auto-plan/start can leave only orchestration metadata at the
+  // future workspace path. Stage it so `git worktree add` sees a clean target,
+  // then merge it back into the real worktree after creation.
+  let stagedMetadataPath: string | null = null;
+  if (existsSync(workspacePath)) {
+    stagedMetadataPath = stagePreWorktreeMetadataSync(workspacePath);
+    if (stagedMetadataPath) {
+      result.steps.push('Staged pre-worktree .pan/.beads metadata');
+    } else {
+      result.success = false;
+      result.errors.push(`Workspace already exists at ${workspacePath}`);
+      return result;
+    }
+  }
+
   // Create placeholders
   const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
 
-  // Create workspace directory
   progress('Creating git worktree', `feature/${featureName}`);
-  mkdirSync(workspacePath, { recursive: true });
-  result.steps.push('Created workspace directory');
 
   // Handle polyrepo vs monorepo
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
+    // Polyrepo workspaces need a root container for child repo worktrees and
+    // symlinks. Monorepo worktrees must let git create the target directory.
+    mkdirSync(workspacePath, { recursive: true });
+    result.steps.push('Created workspace directory');
+
     // Determine which repos to create: in progressive mode, only always_include repos
     const reposToCreate = workspaceConfig.progressive && workspaceConfig.always_include
       ? workspaceConfig.repos.filter(r => workspaceConfig.always_include!.includes(r.name))
@@ -691,6 +740,14 @@ function copyProjectTemplateDirs(
       result.success = false; // Fail the entire workspace creation if worktree fails
     }
   }
+
+  if (!result.success) {
+    restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
+    progress('Creating git worktree', 'Worktree creation failed', 'error');
+    return result;
+  }
+
+  restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
 
   // For polyrepo workspaces, create a beads redirect at the workspace root
   // pointing to the first repo that has a .beads/ directory. Without this,
