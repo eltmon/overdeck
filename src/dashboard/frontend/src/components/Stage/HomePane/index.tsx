@@ -17,13 +17,13 @@ export interface HomePaneProps {
   detail?: ReactNode
 }
 
-/** Section render order — matches the pan-1549 mockup top-to-bottom. */
-const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'timeline', 'detail'] as const
+/** Section render order — project detail/cockpit content sits above conversations. */
+const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'timeline'] as const
 
 /**
  * HomePane — the permanent paneType='home' body (PAN-1549). This bead lays out
  * the section scaffold (WorkspaceHeader, Launcher, AgentDock, ActionDock,
- * Timeline, detail) in a constrained content column. The sections themselves
+ * detail, Timeline) in a constrained content column. The sections themselves
  * are populated by later beads; each renders into its named slot here.
  */
 export function HomePane(props: HomePaneProps) {

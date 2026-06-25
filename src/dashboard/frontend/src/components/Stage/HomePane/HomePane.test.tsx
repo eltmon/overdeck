@@ -8,7 +8,7 @@ describe('HomePane', () => {
     const order = Array.from(container.querySelectorAll('[data-section]')).map((el) =>
       el.getAttribute('data-section'),
     )
-    expect(order).toEqual(['header', 'launcher', 'agentDock', 'actionDock', 'timeline', 'detail'])
+    expect(order).toEqual(['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'timeline'])
   })
 
   it('renders provided section content into the matching slot', () => {

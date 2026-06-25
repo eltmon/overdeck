@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
@@ -58,6 +58,15 @@ function expectPhase(
 function expectBadgeVariant(issueId: string, variant: string) {
   const row = screen.getByText(issueId).closest('[data-component="issue-row"]') as HTMLElement;
   expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', variant);
+}
+
+function collapsedDetailsForLabel(label: string): HTMLElement {
+  const details = screen
+    .getAllByText(label)
+    .map((element) => element.closest('details'))
+    .find((element): element is HTMLElement => Boolean(element));
+  expect(details).toBeTruthy();
+  return details;
 }
 
 describe('bucketFeaturePhase', () => {
@@ -217,7 +226,7 @@ describe('bucketFeaturePhase', () => {
 
     // Five project-scoped glance tiles in the hero billboard.
     for (const label of ['Active issues', 'Stuck', 'Agents', 'Ship-ready', 'Spend']) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(screen.getByText('Active issues').parentElement).toHaveTextContent('2');
     expect(screen.getByText('Agents').parentElement).toHaveTextContent('1');
@@ -255,6 +264,73 @@ describe('bucketFeaturePhase', () => {
     const row = screen.getByText('PAN-1').closest('[data-component="issue-row"]') as HTMLElement;
     expect(row).toHaveAttribute('data-variant', 'command-deck');
     expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'WORK RUNNING');
+  });
+
+  it('summarizes current CI health from project review state', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-3': reviewStatus({ issueId: 'PAN-3', readyForMerge: true }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'CI red' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Conflict' }),
+          makeFeature({ issueId: 'PAN-3', title: 'Ready', readyForMerge: true }),
+          makeFeature({ issueId: 'PAN-4', title: 'Work', agentStatus: 'running' }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const ciHealth = screen.getByRole('region', { name: 'Current CI health' });
+    expect(ciHealth).toHaveTextContent('1 failing checks');
+    expect(within(ciHealth).getByText('Required checks').parentElement).toHaveTextContent('1 failing');
+    expect(within(ciHealth).getByText('Mergeability').parentElement).toHaveTextContent('1 blocked');
+    expect(within(ciHealth).getByText('Ship-ready').parentElement).toHaveTextContent('1 clear');
+    expect(within(ciHealth).getByText('Work agents').parentElement).toHaveTextContent('1 running');
+  });
+
+  it('renders project settings and pipeline sections as collapsed detail rows', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'reviewing' }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' }] }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        projectKey="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'Reviewing' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Blocked' }),
+          makeFeature({ issueId: 'PAN-3', title: 'Work', agentStatus: 'running' }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const settings = collapsedDetailsForLabel('Project settings');
+    const review = collapsedDetailsForLabel('Review');
+    const work = collapsedDetailsForLabel('Work');
+
+    expect(settings).toBeTruthy();
+    expect(review).toBeTruthy();
+    expect(work).toBeTruthy();
+    expect(settings).not.toHaveAttribute('open');
+    expect(review).not.toHaveAttribute('open');
+    expect(work).not.toHaveAttribute('open');
+    expect(review).toHaveTextContent('1 review lane');
+    expect(work).toHaveTextContent('work');
   });
 
   it('labels structural merge blockers as merge blocked', () => {

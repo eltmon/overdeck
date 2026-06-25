@@ -30,6 +30,13 @@ interface BucketedFeature {
   phase: PipelineIssuePhase;
 }
 
+interface ProjectCiHealth {
+  failingChecks: number;
+  mergeBlocked: number;
+  shipReadyClear: number;
+  workRunning: number;
+}
+
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'todo'];
 const ACTIVE_AGENT_STATUSES = new Set(['active', 'running', 'starting']);
 const REVIEW_BLOCKED_STATUSES = new Set(['failed', 'blocked']);
@@ -120,6 +127,28 @@ function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSna
       TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '') ||
       MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '') ||
       VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
+  );
+}
+
+function hasBlockerType(reviewStatus: ReviewStatusSnapshot | undefined, types: Set<string>): boolean {
+  return (reviewStatus?.blockerReasons ?? []).some((reason) => types.has(reason.type));
+}
+
+const CI_BLOCKER_TYPES = new Set(['failing_checks']);
+const MERGEABILITY_BLOCKER_TYPES = new Set(['merge_conflict', 'not_mergeable', 'draft_pr']);
+
+function isCiBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  return Boolean(
+    hasBlockerType(reviewStatus, CI_BLOCKER_TYPES) ||
+      TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '') ||
+      VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
+  );
+}
+
+function isMergeabilityBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  return Boolean(
+    hasBlockerType(reviewStatus, MERGEABILITY_BLOCKER_TYPES) ||
+      MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? ''),
   );
 }
 
@@ -291,6 +320,16 @@ export function ProjectOverview({
     return byPhase;
   }, [bucketedFeatures]);
 
+  const ciHealth = useMemo<ProjectCiHealth>(() => {
+    const failingChecks = bucketedFeatures.filter(({ reviewStatus }) => isCiBlocked(reviewStatus)).length;
+    const mergeBlocked = bucketedFeatures.filter(({ reviewStatus }) => isMergeabilityBlocked(reviewStatus)).length;
+    const shipReadyClear = bucketedFeatures.filter(({ feature, phase, reviewStatus }) =>
+      phase === 'ship' && (feature.readyForMerge || reviewStatus?.readyForMerge) && !isBlockedFeature(feature, reviewStatus),
+    ).length;
+    const workRunning = bucketedFeatures.filter(({ feature }) => hasActiveAgentSignal(feature)).length;
+    return { failingChecks, mergeBlocked, shipReadyClear, workRunning };
+  }, [bucketedFeatures]);
+
   const metrics = useMemo<HeroMetric[]>(() => {
     const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
     const stuck = bucketedFeatures.filter((e) => isBlockedFeature(e.feature, e.reviewStatus)).length;
@@ -319,25 +358,207 @@ export function ProjectOverview({
     >
       <HeroBillboard projectName={projectName} metrics={metrics} />
 
-      {projectKey && <ProjectSettingsSection projectKey={projectKey} />}
+      <ProjectCiHealthSection health={ciHealth} />
+
+      {projectKey && (
+        <ProjectDisclosure
+          title="Project settings"
+          summary="Auto-merge default and project-level merge policy"
+          badges={['collapsed']}
+        >
+          <ProjectSettingsSection projectKey={projectKey} />
+        </ProjectDisclosure>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PIPELINE_PHASES.map(phase => {
           const entries = bucketedByPhase.get(phase) ?? [];
           if (entries.length === 0) return null;
+          const blockedCount = entries.filter((entry) => isBlockedFeature(entry.feature, entry.reviewStatus)).length;
           return (
-            <PipelineSection
+            <ProjectDisclosure
               key={phase}
-              phase={phase}
-              entries={entries}
-              issueCosts={issueCosts}
-              issueCostDetails={issueCostDetails}
-              onSelectFeature={onSelectFeature}
-            />
+              title={phaseLabel(phase)}
+              summary={phaseSummary(phase, entries.length, blockedCount)}
+              badges={phaseBadges(phase, entries.length, blockedCount)}
+            >
+              <PipelineSection
+                phase={phase}
+                entries={entries}
+                issueCosts={issueCosts}
+                issueCostDetails={issueCostDetails}
+                onSelectFeature={onSelectFeature}
+              />
+            </ProjectDisclosure>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function phaseLabel(phase: PipelineIssuePhase): string {
+  switch (phase) {
+    case 'ship': return 'Ship';
+    case 'review': return 'Review';
+    case 'work': return 'Work';
+    case 'plan': return 'Plan';
+    case 'todo': return 'Todo';
+    case 'verifying': return 'Verifying';
+    default: return phase;
+  }
+}
+
+function phaseSummary(phase: PipelineIssuePhase, count: number, blockedCount: number): string {
+  if (blockedCount > 0) return `${blockedCount} blocked`;
+  if (phase === 'work') return `${count} active implementation lane${count === 1 ? '' : 's'}`;
+  if (phase === 'review') return `${count} review lane${count === 1 ? '' : 's'}`;
+  return `${count} issue${count === 1 ? '' : 's'}`;
+}
+
+function phaseBadges(phase: PipelineIssuePhase, count: number, blockedCount: number): string[] {
+  const badges = [`${count}`];
+  if (blockedCount > 0) badges.push(`${blockedCount} blocked`);
+  if (phase === 'work') badges.push('work');
+  return badges;
+}
+
+function ProjectCiHealthSection({ health }: { health: ProjectCiHealth }) {
+  const needsAttention = health.failingChecks > 0 || health.mergeBlocked > 0;
+  const statusLabel = needsAttention ? 'Needs attention' : 'Clear';
+  return (
+    <section
+      aria-label="Current CI health"
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        background: 'var(--card)',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>
+            <span
+              aria-hidden="true"
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '999px',
+                background: needsAttention ? 'var(--warning)' : 'var(--success)',
+                flex: '0 0 auto',
+              }}
+            />
+            Current CI health
+          </div>
+          <div style={{ marginTop: 3, fontSize: 12, color: 'var(--muted-foreground)' }}>
+            {health.failingChecks} failing checks · {health.mergeBlocked} merge blocked · {health.shipReadyClear} ship-ready clear
+          </div>
+        </div>
+        <span
+          style={{
+            flex: '0 0 auto',
+            border: '1px solid var(--border)',
+            borderRadius: 999,
+            padding: '4px 9px',
+            fontSize: 12,
+            fontWeight: 700,
+            color: needsAttention ? 'var(--warning)' : 'var(--success)',
+            background: needsAttention
+              ? 'color-mix(in srgb, var(--warning) 12%, transparent)'
+              : 'color-mix(in srgb, var(--success) 12%, transparent)',
+          }}
+        >
+          {statusLabel}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: 8, borderTop: '1px solid var(--border)', padding: 10, background: 'var(--background)' }}>
+        <HealthTile label="Required checks" value={`${health.failingChecks} failing`} tone={health.failingChecks > 0 ? 'bad' : 'good'} />
+        <HealthTile label="Mergeability" value={`${health.mergeBlocked} blocked`} tone={health.mergeBlocked > 0 ? 'warn' : 'good'} />
+        <HealthTile label="Ship-ready" value={`${health.shipReadyClear} clear`} tone="good" />
+        <HealthTile label="Work agents" value={`${health.workRunning} running`} tone={health.workRunning > 0 ? 'good' : 'neutral'} />
+      </div>
+    </section>
+  );
+}
+
+function HealthTile({ label, value, tone }: { label: string; value: string; tone: 'bad' | 'warn' | 'good' | 'neutral' }) {
+  const color = tone === 'bad'
+    ? 'var(--destructive)'
+    : tone === 'warn'
+      ? 'var(--warning)'
+      : tone === 'good'
+        ? 'var(--success)'
+        : 'var(--foreground)';
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 8px', background: 'var(--card)' }}>
+      <div style={{ fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ marginTop: 3, fontSize: 12, fontWeight: 700, color }}>{value}</div>
+    </div>
+  );
+}
+
+function ProjectDisclosure({
+  title,
+  summary,
+  badges,
+  children,
+}: {
+  title: string;
+  summary: string;
+  badges?: string[];
+  children: ReactNode;
+}) {
+  return (
+    <details
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        background: 'var(--card)',
+        overflow: 'hidden',
+      }}
+    >
+      <summary
+        style={{
+          cursor: 'pointer',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          alignItems: 'center',
+          gap: 10,
+          padding: '11px 12px',
+          listStyle: 'none',
+        }}
+      >
+        <span style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>{title}</span>
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted-foreground)' }}>{summary}</span>
+        </span>
+        {badges && badges.length > 0 && (
+          <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {badges.map((badge) => (
+              <span
+                key={badge}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 999,
+                  padding: '2px 7px',
+                  background: 'var(--secondary)',
+                  color: 'var(--foreground)',
+                  fontSize: 11,
+                  fontWeight: 650,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {badge}
+              </span>
+            ))}
+          </span>
+        )}
+      </summary>
+      <div style={{ borderTop: '1px solid var(--border)', padding: 12, background: 'var(--background)' }}>
+        {children}
+      </div>
+    </details>
   );
 }
 
