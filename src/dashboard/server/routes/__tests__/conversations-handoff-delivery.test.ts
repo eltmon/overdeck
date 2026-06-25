@@ -13,11 +13,13 @@ import { promisify } from 'node:util';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Effect } from 'effect';
 
 const execFileAsync = promisify(execFile);
 
 // Control the hook-driven runtime mirror that confirmForkPromptAccepted reads.
 const runtimeState = vi.hoisted(() => ({ value: null as null | { state: string } }));
+const paneSnapshots = vi.hoisted(() => ({ values: [] as string[] }));
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
   return {
@@ -26,8 +28,15 @@ vi.mock('../../../../lib/agents.js', async () => {
     getAgentRuntimeStateSync: vi.fn(() => runtimeState.value),
   };
 });
+vi.mock('../../../../lib/tmux.js', async () => {
+  const actual = await vi.importActual('../../../../lib/tmux.js');
+  return {
+    ...(actual as object),
+    capturePane: vi.fn(() => Effect.succeed(paneSnapshots.values.shift() ?? '')),
+  };
+});
 
-import { confirmForkPromptAccepted, isInsideGitWorkTree } from '../conversations.js';
+import { confirmForkPromptAccepted, isInsideGitWorkTree, waitForPiTuiReady } from '../conversations.js';
 
 describe('confirmForkPromptAccepted (PAN-1624)', () => {
   beforeEach(() => {
@@ -65,6 +74,38 @@ describe('confirmForkPromptAccepted (PAN-1624)', () => {
       await vi.advanceTimersByTimeAsync(9000);
       await expect(p).resolves.toBe('unknown');
     });
+  });
+});
+
+describe('waitForPiTuiReady (PAN-1793)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    paneSnapshots.values = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('waits for the Pi input prompt instead of treating splash text as ready', async () => {
+    paneSnapshots.values = [
+      'oh-my-pi starting...\nloading extensions\n',
+      'Model kimi-k2.6\n0.0% context used\n❯ ',
+    ];
+
+    const ready = waitForPiTuiReady('conv-pi', 1000);
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(ready).resolves.toBe(true);
+  });
+
+  it('times out when Pi renders text but never reaches the input prompt', async () => {
+    paneSnapshots.values = Array.from({ length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
+
+    const ready = waitForPiTuiReady('conv-pi', 1000);
+    await vi.advanceTimersByTimeAsync(1250);
+
+    await expect(ready).resolves.toBe(false);
   });
 });
 

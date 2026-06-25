@@ -635,25 +635,30 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
+function isPiTuiInputReady(snapshot: string): boolean {
+  return /^\s*[❯›>]\s/m.test(snapshot)
+    || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot);
+}
+
 /**
- * Wait until Pi's TUI has rendered into the tmux pane.
+ * Wait until Pi's TUI is accepting input in the tmux pane.
  *
  * Pi TUI mode does not write a ready.json marker (that was an RPC-mode
- * artifact). We instead poll capture-pane for non-empty content, which
- * indicates Pi has drawn at least its title/prompt line. This is the same
- * shape of readiness check we use for Claude Code's interactive prompt.
+ * artifact). Splash/header output can appear before the prompt is wired; wait
+ * for the actual prompt/context footer so first-turn handoff delivery is not
+ * pasted into a not-yet-ready TUI.
  */
 // piProviderForModel moved to src/lib/providers.ts so the work-agent launcher
 // (launcher-generator.ts buildPiCommand) and conversations share one source of
 // truth for the Pi provider taxonomy (PAN-1799 follow-up).
 
-async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
+export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const snapshot = await Effect.runPromise(
-      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
+      capturePane(tmuxSession, 40).pipe(Effect.catch(() => Effect.succeed(''))),
     );
-    if (snapshot.trim().length > 0) {
+    if (isPiTuiInputReady(snapshot)) {
       console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
       return true;
     }
