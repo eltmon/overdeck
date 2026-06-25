@@ -663,6 +663,47 @@ async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promi
   return false;
 }
 
+/**
+ * Find a Claude Code session JSONL by its (globally-unique) session id, searching
+ * every project dir under ~/.claude/projects/. Claude keys session files by the
+ * cwd AT RUNTIME, so when a repo directory is renamed (e.g. Projects/panopticon-cli
+ * → Projects/overdeck) a conversation's recorded cwd goes stale and the
+ * deterministic sessionFilePath(cwd, id) points at a dir that no longer exists,
+ * while the JSONL itself lives under the new encoded dir. A by-id search recovers
+ * it. Mirrors the cross-dir lookup the non-DB specialist/agent fallback already
+ * uses below.
+ */
+async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
+  if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) return null;
+  try {
+    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const dirs = await readdir(claudeProjects);
+    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+    const candidates = dirs
+      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+    const STAT_BATCH_SIZE = 50;
+    for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
+      const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+      const checks = await Promise.all(
+        batch.map(async (candidate) => {
+          try {
+            await stat(candidate);
+            return candidate;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const found = checks.find((c): c is string => c !== null);
+      if (found) return found;
+    }
+  } catch {
+    /* ~/.claude/projects unreadable */
+  }
+  return null;
+}
+
 async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // Pi writes its own JSONL transcript under the per-agent dir using a per-run
   // timestamped filename (not into ~/.claude/projects/<dir>/<id>.jsonl). Pi
@@ -699,7 +740,15 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
   const sessionId = pinned ?? conv.claudeSessionId;
   if (sessionId) {
-    return sessionFilePath(conv.cwd, sessionId);
+    const deterministic = sessionFilePath(conv.cwd, sessionId);
+    if (existsSync(deterministic)) return deterministic;
+    // conv.cwd may be stale (e.g. the repo dir was renamed after this conversation
+    // ran), so the deterministic path points at a dir that no longer exists. Recover
+    // the JSONL by its globally-unique session id across all project dirs. If still
+    // not found (e.g. a live conversation before its first turn writes the file),
+    // return the deterministic path so the live-session banner logic is preserved.
+    const found = await findClaudeSessionFileById(sessionId);
+    return found ?? deterministic;
   }
   // Neither the launcher nor the conversation record yields a session id. For a
   // live conversation this must never happen — scream so it gets attention
