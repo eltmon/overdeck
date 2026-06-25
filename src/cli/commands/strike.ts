@@ -121,7 +121,7 @@ async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
 
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(plan.sessionName));
   const replaceableStates = new Set(['idle', 'suspended', 'stopped']);
-  if (!runtimeState || !replaceableStates.has(runtimeState.state)) {
+  if (runtimeState && !replaceableStates.has(runtimeState.state)) {
     throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
   }
 
