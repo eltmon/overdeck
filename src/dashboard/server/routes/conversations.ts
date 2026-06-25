@@ -46,6 +46,7 @@ import * as Multipart from 'effect/unstable/http/Multipart';
 
 import {
   listConversations,
+  getConversationLedgerCosts,
   listArchivedConversationsWithEnrichment,
   getStuckForks,
   incrementForkRetryCount,
@@ -2130,6 +2131,10 @@ function getEnrichedConversationList(limit: number, offset: number): Promise<unk
 async function enrichConversationList(limit: number, offset: number): Promise<unknown[]> {
   const conversations = listConversations({ limit, offset });
   const favoritedNames = getCachedFavoritedIds();
+  // Cost/tokens come from the canonical cost_events ledger (per session id), not the
+  // stale conversations.total_cost cache — see getConversationLedgerCosts. Computed
+  // once per list build; conversations with no ledger rows fall back to the cache.
+  const ledgerCosts = getConversationLedgerCosts();
 
   // Enrich with live tmux status
   // Grace period removed (PAN-826): POST /api/conversations now waits for
@@ -2250,8 +2255,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
               }
             }
 
+            const ledger = ledgerCosts.get(String(row.id));
             return {
               ...row,
+              totalCost: ledger ? ledger.cost : row.totalCost,
+              totalTokens: ledger ? ledger.tokens : row.totalTokens,
               sessionAlive,
               isWorking,
               currentTool,
