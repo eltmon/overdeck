@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-21T00:04:47.437Z",
-  "updated": "2026-06-21T06:44:36.785Z",
+  "updated": "2026-06-25T02:00:43.986Z",
   "gitState": {
     "branch": "feature/pan-1919",
     "sha": "36c83de66a",
@@ -196,6 +196,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-21T06:44:36.785Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-25T02:00:43.986Z"
     }
   ],
   "feedback": []
