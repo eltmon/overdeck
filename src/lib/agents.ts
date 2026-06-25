@@ -3864,9 +3864,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Write prompt to file for complex prompts (avoids shell escaping issues)
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
+  const tracksKickoffDelivery = role === 'work' || role === 'strike';
   if (prompt) {
     await writeFileAsync(promptFile, prompt);
-    if (role === 'work') {
+    if (tracksKickoffDelivery) {
       state.kickoffDelivered = false;
       saveAgentStateSync(state);
     }
@@ -3990,14 +3991,18 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (prompt && resolvedHarness === 'ohmypi') {
     try {
       await writeOhmypiAgentPrompt(agentId, prompt);
-      if (role === 'work') {
+      if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);
       }
     } catch (err) {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
-      if (role === 'work') {
+      if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
+        if (role === 'strike') {
+          await Effect.runPromise(stopAgent(agentId));
+          throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
         return state;
       }
     }
@@ -4007,15 +4012,19 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
     const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
     if (delivery.ok) {
-      if (role === 'work') {
+      if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);
       }
-    } else if (role === 'work') {
+    } else if (tracksKickoffDelivery) {
       if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
         await recordStartupSessionExit(state, options.issueId, role);
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
+      if (role === 'strike') {
+        await Effect.runPromise(stopAgent(agentId));
+        throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
+      }
       return state;
     }
   }
