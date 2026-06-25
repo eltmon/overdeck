@@ -54,6 +54,7 @@ import {
   getConversationById,
   createConversation,
   markConversationEnded,
+  markConversationRunning,
   markConversationActive,
   updateLastAttached,
   updateConversationTitle,
@@ -2036,6 +2037,14 @@ export function conversationSessionAliveFromState(
   return conv.status === 'active' && !conv.forkStatus && tmuxSessionAlive;
 }
 
+export function conversationNeedsRunningRepair(
+  conv: Pick<Conversation, 'status' | 'forkStatus'>,
+  tmuxSessionAlive: boolean,
+  harnessProcessAlive: boolean,
+): boolean {
+  return conv.status === 'ended' && !conv.forkStatus && tmuxSessionAlive && harnessProcessAlive;
+}
+
 function getEnrichedConversationList(limit: number, offset: number): Promise<unknown[]> {
   const key = `${limit}:${offset}`;
   const now = Date.now();
@@ -2075,10 +2084,20 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
   const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
   return Effect.runPromise(withConcurrencyLimit(
           conversations.map((conv) => Effect.promise(async () => {
-            const sessionAlive = conversationSessionAliveFromState(conv, liveSessionNames.has(conv.tmuxSession));
+            let row = conv;
+            const tmuxSessionAlive = liveSessionNames.has(conv.tmuxSession);
+            let sessionAlive = conversationSessionAliveFromState(row, tmuxSessionAlive);
+            if (!sessionAlive && row.status === 'ended' && !row.forkStatus && tmuxSessionAlive) {
+              const harnessAlive = await isHarnessProcessAlive(row.tmuxSession);
+              if (conversationNeedsRunningRepair(row, tmuxSessionAlive, harnessAlive)) {
+                markConversationRunning(row.name);
+                row = { ...row, status: 'active', endedAt: null };
+                sessionAlive = true;
+              }
+            }
             let isWorking = false;
             let currentTool: string | null = null;
-            const convSf = await resolveSessionFile(conv);
+            const convSf = await resolveSessionFile(row);
 
             // Context usage is intentionally NOT computed here — it requires a
             // full JSONL scan per row (cold cache) and made the list endpoint
@@ -2092,10 +2111,10 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
               // (busy); 'idle'/'waiting' are not busy. Falls back to the JSONL
               // transcript scan for sessions whose hooks predate the auth fix
               // and so have no mirror state yet.
-              const rt = getAgentRuntimeStateSync(conv.tmuxSession);
-              if (conv.harness === 'codex' && convSf && existsSync(convSf)) {
+              const rt = getAgentRuntimeStateSync(row.tmuxSession);
+              if (row.harness === 'codex' && convSf && existsSync(convSf)) {
                 try {
-                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
+                  const summary = await summarizeConversationActivity(convSf, { harness: row.harness });
                   isWorking = summary.isWorking;
                   currentTool = summary.currentTool;
                 } catch {
@@ -2109,7 +2128,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
                 currentTool = rt.currentTool ?? null;
               } else if (convSf && existsSync(convSf)) {
                 try {
-                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
+                  const summary = await summarizeConversationActivity(convSf, { harness: row.harness });
                   isWorking = summary.isWorking;
                   currentTool = summary.currentTool;
                 } catch {
@@ -2143,7 +2162,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
               }
             }
             const compacting = convSf ? isCompacting(convSf) : false;
-            const gitInfo = await resolveConversationGitInfo(conv.cwd);
+            const gitInfo = await resolveConversationGitInfo(row.cwd);
 
             // PAN-1556: surface the transcript's last-write time as the
             // conversation's last-activity signal. The JSONL is appended on
@@ -2166,7 +2185,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
             // askedAt so the 4s poll doesn't churn the timestamp.
             if (pendingInputCount === 0) {
               const codex = await codexConversationPendingInput(
-                conv,
+                row,
                 sessionAlive,
                 lastActivityAt ?? new Date().toISOString(),
               );
@@ -2178,11 +2197,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
             }
 
             return {
-              ...conv,
+              ...row,
               sessionAlive,
               isWorking,
               currentTool,
-              isFavorited: favoritedNames.has(conv.name),
+              isFavorited: favoritedNames.has(row.name),
               compacting,
               contextUsage: null,
               lastActivityAt,

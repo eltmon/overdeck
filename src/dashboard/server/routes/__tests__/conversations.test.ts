@@ -12,6 +12,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
+  conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
   getInFlightForkPipelineCount,
   parseSummaryForkFocus,
@@ -84,6 +85,37 @@ describe('conversationSessionAliveFromState', () => {
 
   it('keeps provisioning forks out of the live-session path', () => {
     expect(conversationSessionAliveFromState({ status: 'active', forkStatus: 'spawning' }, true)).toBe(false);
+  });
+});
+
+describe('conversationNeedsRunningRepair', () => {
+  it('repairs stale-ended non-fork conversations only when tmux and harness are alive', () => {
+    expect(conversationNeedsRunningRepair(
+      { status: 'ended', forkStatus: null },
+      true,
+      true,
+    )).toBe(true);
+  });
+
+  it('does not repair keep-alive corpses or active rows', () => {
+    expect(conversationNeedsRunningRepair(
+      { status: 'ended', forkStatus: null },
+      true,
+      false,
+    )).toBe(false);
+    expect(conversationNeedsRunningRepair(
+      { status: 'active', forkStatus: null },
+      true,
+      true,
+    )).toBe(false);
+  });
+
+  it('does not repair in-flight fork rows', () => {
+    expect(conversationNeedsRunningRepair(
+      { status: 'ended', forkStatus: 'spawning' },
+      true,
+      true,
+    )).toBe(false);
   });
 });
 
