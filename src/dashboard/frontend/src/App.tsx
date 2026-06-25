@@ -856,12 +856,18 @@ export default function App() {
   // stale conversation and the click would appear to "do nothing". A conversation
   // deep-link overrides this immediately afterward (openConversationTabIn runs
   // after onSelectProject), so deep-links still land on their conversation.
-  const handleSelectProject = useCallback((projectName: string | null) => {
+  const handleSelectProject = useCallback((projectName: string | null, opts?: { updateUrl?: boolean }) => {
     setSelectedProjectKey(projectName);
     setActiveTabState('command-deck');
-    const path = projectName ? `/command-deck/${encodeURIComponent(projectName)}` : '/command-deck';
-    if (window.location.pathname !== path) {
-      window.history.pushState({ tab: 'command-deck', project: projectName }, '', path);
+    // When a conversation is being opened, the conversation route (/conv/<id>) owns
+    // the URL — switching the deck's project must NOT clobber it with /command-deck/<project>.
+    // Callers opening a conversation pass { updateUrl: false }; plain project-rail
+    // selection leaves it default (true).
+    if (opts?.updateUrl !== false) {
+      const path = projectName ? `/command-deck/${encodeURIComponent(projectName)}` : '/command-deck';
+      if (window.location.pathname !== path) {
+        window.history.pushState({ tab: 'command-deck', project: projectName }, '', path);
+      }
     }
     if (projectName) {
       // ensureHome hydrates/creates the workspace and replaces the store object,

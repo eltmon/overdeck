@@ -152,7 +152,7 @@ interface CommandDeckProps {
   selectedProject?: string | null;
   /** PAN-1561: switch the active project (e.g. when a conversation resolves to
    * a different project than the one currently shown). */
-  onSelectProject?: (projectName: string | null) => void;
+  onSelectProject?: (projectName: string | null, opts?: { updateUrl?: boolean }) => void;
   /** PAN-1593: report the selected project's issue prefix (e.g. "PAN") so the
    * app-bar search can scope to it. Null when no single prefix is resolvable. */
   onProjectPrefixChange?: (prefix: string | null) => void;
@@ -559,7 +559,9 @@ export function CommandDeck({
             nonce: pendingConversationTarget.nonce,
           }
         : undefined;
-      onSelectProject?.(projectName);
+      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+      // deck's project without writing /command-deck/<project> over it.
+      onSelectProject?.(projectName, { updateUrl: false });
       openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
       if (target) onPendingConversationTargetConsumed?.();
       appliedConvId.current = convId;
@@ -1022,7 +1024,9 @@ export function CommandDeck({
       const conv = conversations.find((c) => c.name === name);
       // Unscoped conversations live in the No-project bucket.
       const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
-      if (projectName !== selectedProject) onSelectProject?.(projectName);
+      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+      // deck's project without writing /command-deck/<project> over it.
+      if (projectName !== selectedProject) onSelectProject?.(projectName, { updateUrl: false });
       openConversationTabIn(projectName, name, conv?.title ?? 'Agent');
     }
   }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn]);
