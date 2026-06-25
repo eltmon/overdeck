@@ -313,6 +313,10 @@ export async function parseConversationMessages(
     };
   }
 
+  if (fromByteOffset === 0 && !priorState && fileSize > MAX_READ_BYTES) {
+    return parseEntireConversation(sessionFile);
+  }
+
   const toRead = Math.max(0, Math.min(fileSize - fromByteOffset, MAX_READ_BYTES));
   const isIncremental = fromByteOffset > 0;
 
@@ -899,23 +903,25 @@ export async function parseConversationMessages(
 /**
  * Parse an ENTIRE JSONL transcript, regardless of size.
  *
- * `parseConversationMessages(file)` reads at most MAX_READ_BYTES (10 MB) in a
- * single call, so a one-shot full parse of a larger file silently returns only
- * its first 10 MB — i.e. the OLDEST messages, dropping the most recent turns
- * (PAN-1989: a 14.5 MB work-agent transcript rendered only up to its ~10 MB
- * mark, hiding the final ~3 hours of work). The live WebSocket panel never hit
- * this because it advances `byteOffset` tick-by-tick; the one-shot
- * `GET /api/agents/:id/conversation` endpoint does not.
+ * `parseConversationMessages(file, offset, state)` reads at most MAX_READ_BYTES
+ * (10 MB) in a single incremental call. This helper loops the same parser in
+ * bounded chunks for callers that need a complete transcript snapshot.
  *
- * This loops the same parser in 10 MB chunks until it stops advancing,
- * threading ParseState across boundaries (identical to watchConversation's
- * carry-over) and accumulating messages, workLog, compact boundaries, and
- * cost/token totals. Per-chunk totals are safe to sum because `countedUsageIds`
- * is threaded, so a response split across a read boundary is counted once.
+ * ParseState is threaded from the first chunk so tool_use/tool_result pairs can
+ * span chunk boundaries. Per-chunk totals are safe to sum because
+ * `countedUsageIds` is threaded, so a response split across a read boundary is
+ * counted once.
  */
-export async function parseEntireConversation(sessionFile: string): Promise<ParseResult> {
+export async function parseEntireConversation(
+  sessionFile: string,
+  options: { flushPendingToolUse?: boolean } = {},
+): Promise<ParseResult> {
   let offset = 0;
-  let priorState: ParseState | undefined;
+  let priorState: ParseState = {
+    pendingToolUse: new Map(),
+    unresolvedResults: new Map(),
+    lastSequence: 0,
+  };
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
@@ -953,6 +959,15 @@ export async function parseEntireConversation(sessionFile: string): Promise<Pars
   }
 
   if (!last) return parseConversationMessages(sessionFile, 0);
+
+  if (options.flushPendingToolUse ?? true) {
+    for (const [id, entry] of last.pendingToolUse) {
+      if (!last.planToolUseIds?.has(id)) {
+        workLog.push(entry);
+      }
+    }
+    last.pendingToolUse.clear();
+  }
 
   // Take terminal state (byteOffset, boundary offsets, pending maps, mtime, …)
   // from the final chunk; replace the accumulating fields with the full totals.

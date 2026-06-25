@@ -701,6 +701,36 @@ describe('parseConversationMessages', () => {
     expect(result.messages[0]).toMatchObject({ id: 'u-2', text: 'Second message' });
   });
 
+  it('parses the complete initial transcript when the file exceeds the read cap', async () => {
+    const firstLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-1',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      message: { content: [{ type: 'text', text: 'First message' }] },
+    });
+    const lateLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-late',
+      timestamp: '2024-01-01T00:00:01.000Z',
+      message: { content: [{ type: 'text', text: 'Message past 10MB' }] },
+    });
+    const fillerLine = makeJsonlLine({
+      type: 'system',
+      timestamp: '2024-01-01T00:00:00.500Z',
+      payload: 'x'.repeat(1024 * 1024),
+    });
+    const content = `${firstLine}\n${Array.from({ length: 11 }, () => fillerLine).join('\n')}\n${lateLine}\n`;
+    const buffer = Buffer.from(content);
+    mockReadFile.mockResolvedValue(buffer);
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    expect(buffer.length).toBeGreaterThan(10 * 1024 * 1024);
+    expect(result.byteOffset).toBe(buffer.length);
+    expect(result.messages.map((message) => message.id)).toEqual(['u-1', 'u-late']);
+  });
+
   it('pairs parallel tool calls when tool_results arrive in reverse order', async () => {
     const lines = [
       {

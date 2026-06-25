@@ -15,7 +15,7 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
@@ -959,15 +959,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     }
                   };
 
-                  // Pass an explicit empty ParseState so pending tool_use entries
-                  // remain in parser state for the watcher instead of being flushed
-                  // and cleared by the non-incremental display path.
-                  const initialState: ParseState = {
-                    pendingToolUse: new Map(),
-                    unresolvedResults: new Map(),
-                    lastSequence: 0,
-                  };
-                  const initial = await parseConversationMessages(sessionFile, 0, initialState);
+                  // Parse the complete existing transcript before subscribing to
+                  // appends. Keep pending tool_use entries in parser state for the
+                  // watcher instead of flushing them into the display-only work log.
+                  const initial = await parseEntireConversation(sessionFile, { flushPendingToolUse: false });
                   let currentByteOffset = initial.byteOffset;
                   let currentContextUsage = contextUsageFromParseResult(initial, model);
                   // Per-subscription high-water mark of the largest full transcript
