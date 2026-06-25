@@ -15,6 +15,7 @@ export interface HomePaneProps {
   actionDock?: ReactNode
   timeline?: ReactNode
   detail?: ReactNode
+  wide?: boolean
 }
 
 /** Section render order — project detail/cockpit content sits above conversations. */
@@ -28,7 +29,7 @@ const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'ti
  */
 export function HomePane(props: HomePaneProps) {
   return (
-    <div className={styles.home}>
+    <div className={props.wide ? `${styles.home} ${styles.homeWide}` : styles.home}>
       {SECTIONS.map((name) => (
         <section key={name} data-section={name} className={styles.homeSection}>
           {props[name]}

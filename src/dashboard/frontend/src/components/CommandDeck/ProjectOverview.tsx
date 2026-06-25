@@ -21,6 +21,7 @@ interface ProjectOverviewProps {
   features: ProjectFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails?: Record<string, IssueCostBreakdown>;
+  collapsePipelineSections?: boolean;
   onSelectFeature: (feature: ProjectFeature) => void;
 }
 
@@ -265,6 +266,7 @@ export function ProjectOverview({
   features,
   issueCosts,
   issueCostDetails,
+  collapsePipelineSections = true,
   onSelectFeature,
 }: ProjectOverviewProps) {
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
@@ -381,6 +383,7 @@ export function ProjectOverview({
               title={phaseLabel(phase)}
               summary={phaseSummary(phase, entries.length, blockedCount)}
               badges={phaseBadges(phase, entries.length, blockedCount)}
+              defaultOpen={!collapsePipelineSections}
             >
               <PipelineSection
                 phase={phase}
@@ -502,15 +505,18 @@ function ProjectDisclosure({
   title,
   summary,
   badges,
+  defaultOpen = false,
   children,
 }: {
   title: string;
   summary: string;
   badges?: string[];
+  defaultOpen?: boolean;
   children: ReactNode;
 }) {
   return (
     <details
+      open={defaultOpen}
       style={{
         border: '1px solid var(--border)',
         borderRadius: 10,

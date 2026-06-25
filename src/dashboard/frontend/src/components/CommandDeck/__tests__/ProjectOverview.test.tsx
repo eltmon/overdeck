@@ -333,6 +333,31 @@ describe('bucketFeaturePhase', () => {
     expect(work).toHaveTextContent('work');
   });
 
+  it('can render pipeline sections expanded while keeping settings collapsed', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'reviewing' }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        projectKey="overdeck"
+        features={[makeFeature({ issueId: 'PAN-1', title: 'Reviewing' })]}
+        issueCosts={{}}
+        collapsePipelineSections={false}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const settings = collapsedDetailsForLabel('Project settings');
+    const review = collapsedDetailsForLabel('Review');
+
+    expect(settings).not.toHaveAttribute('open');
+    expect(review).toHaveAttribute('open');
+  });
+
   it('labels structural merge blockers as merge blocked', () => {
     useDashboardStore.setState({
       reviewStatusByIssueId: {

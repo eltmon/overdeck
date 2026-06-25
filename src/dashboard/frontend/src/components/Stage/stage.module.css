@@ -113,6 +113,37 @@
   padding: 26px 30px;
 }
 
+.homeWide {
+  max-width: 1180px;
+}
+
+.projectHomeColumns {
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) minmax(280px, 360px);
+  gap: 18px;
+  align-items: start;
+}
+
+.projectHomeStages,
+.projectHomeConversations {
+  min-width: 0;
+}
+
+.projectHomeConversations {
+  position: sticky;
+  top: 16px;
+}
+
+@media (max-width: 980px) {
+  .projectHomeColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .projectHomeConversations {
+    position: static;
+  }
+}
+
 /* WorkspaceHeader */
 .wsHead {
   position: relative;
