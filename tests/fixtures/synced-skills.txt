@@ -59,6 +59,7 @@ pan-pause
 pan-plan
 pan-projects
 pan-quickstart
+pan-recap
 pan-release
 pan-reload
 pan-reopen
