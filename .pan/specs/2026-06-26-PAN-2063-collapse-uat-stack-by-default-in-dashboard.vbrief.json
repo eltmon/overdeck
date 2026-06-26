@@ -1,0 +1,115 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-26T03:26:23.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2063: Collapse UAT stack by default in dashboard",
+    "updated": "2026-06-26T03:28:51.596Z"
+  },
+  "plan": {
+    "id": "pan-2063",
+    "title": "Collapse UAT stack by default in dashboard",
+    "status": "proposed",
+    "uid": "f07dc6f4-5c2d-4a48-901b-342c7746eef2",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-26T03:26:23.000Z",
+    "updated": "2026-06-26T03:28:51.596Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2063",
+        "label": "PAN-2063",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "command-deck",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "The 'UAT environment' panel inside an expanded feature row (FeatureItem.tsx:1282-1298) always renders its full per-service list. The header draws a ChevronDown that is purely decorative — no toggle is wired. Worse, UatStackStatus.tsx:122 forces showDetails=true whenever the stack is unhealthy, so the noisiest case (e.g. 0/7 healthy) is always fully expanded, cluttering a surface that is rarely the active focus.",
+      "Proposal": "Make the wrapper (FeatureItem) own a session-local uatExpanded state defaulting to collapsed, and keep UatStackStatus a pure presenter (unchanged). Convert the uatStackTreeHeader <div> to a <button> that toggles uatExpanded, exposes aria-expanded, and renders ChevronRight when collapsed / ChevronDown when expanded — mirroring the existing row-caret pattern at FeatureItem.tsx:1080-1086. Render <UatStackStatus> only when uatExpanded; keep the 'UAT environment' label and the N/M-healthy summary span in the header so health stays glanceable while collapsed. Add a button-reset to .uatStackTreeHeader so it looks the same but behaves as a toggle. Update the existing FeatureItem UAT test (which currently asserts the expanded body by default) to assert collapsed-by-default plus click-to-expand, in the same change.",
+      "NonGoals": "- No localStorage persistence of the UAT collapse state (session-local useState only; a fresh render starts collapsed).\n- No change to UatStackStatus.tsx (showDetails, summary, density behavior all stay).\n- No change to the one-line 'feature-uat-stack' badge (FeatureItem.tsx:1203) or the outer feature-row caret.\n- No change to the workspace-health query gating (FeatureItem.tsx:1028-1030); it must keep running while the panel body is collapsed so the header summary count stays populated.\n- No change to which issues show the UAT panel (still readyForMerge + hasWorkspace + row expanded)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Wrapper owns collapse; UatStackStatus stays a pure presenter (do not edit UatStackStatus.tsx showDetails).",
+        "rationale": "Matches the issue's recommended fix; the existing feature-uat-stack badge + header summary keep health glanceable while collapsed, so the inner showDetails logic only needs to govern the already-mounted expanded view."
+      },
+      {
+        "summary": "Session-local useState only — no localStorage persistence of the UAT collapse state.",
+        "rationale": "The issue marks persistence explicitly optional. The literal requirement is 'collapsed by default'; for a clutter-reduction feature, starting every fresh render collapsed is the cleaner default. Reusing readExpanded/writeExpanded would collide with the row-expand key (mc-feature-expanded:), so persistence would need a new key/helpers — added surface for an optional behavior, deferred to NonGoals."
+      },
+      {
+        "summary": "Single bead covering FeatureItem.tsx + command-deck.module.css + FeatureItem.test.tsx.",
+        "rationale": "The existing UAT test (FeatureItem.test.tsx:626) asserts the expanded body by default and breaks under collapse-by-default. Impl and test must land together to keep the vitest suite green and the bead independently mergeable; splitting them would ship a red suite."
+      }
+    ],
+    "items": [
+      {
+        "id": "collapse-uat-panel",
+        "title": "Default the UAT environment panel to collapsed with a working header toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-26T03:26:23.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2063",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx: add `const [uatExpanded, setUatExpanded] = useState(false);`. At the UAT panel render site (around lines 1282-1298), convert the `uatStackTreeHeader` <div> into a <button> that calls `setUatExpanded(v => !v)`, sets `aria-expanded={uatExpanded}` and an aria-label/title like 'Toggle UAT environment details', and renders `{uatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}` (both already imported at line 5). Keep the 'UAT environment' label span and the `uatStackTreeSummary` span (`uatStackSummary.label.replace(/^UAT stack\\s*/i, '')`) inside the header so the N/M-healthy count stays visible when collapsed. Render `<UatStackStatus ... density=\"compact\" />` only when `uatExpanded` is true. Do NOT modify UatStackStatus.tsx, the feature-uat-stack badge (line 1203), or the workspace-health query gating (lines 1028-1030 — it must keep running while collapsed). In src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css, give `.uatStackTreeHeader` a button reset (appearance:none; background:none; border:none; width:100%; cursor:pointer; font:inherit; text-align:left; plus existing padding) while preserving its muted, uppercase, letter-spaced flex styling per pan-style-guide, and add a subtle hover color. Finally, update the existing test at src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx:626 ('shows expanded UAT environment state for ready-for-merge issues') to reflect collapsed-by-default: assert the 'UAT environment' header and feature-uat-stack badge render on mount while service rows ('postgres','api') and 'UAT stack 1/2 healthy' are absent, then fire a click on the UAT header and assert the service rows now render.",
+          "Why": "Reduces visual clutter on a surface that is rarely the active focus, and stops the unhealthy case from being forced fully expanded, while keeping the health count glanceable when collapsed."
+        },
+        "items": [
+          {
+            "id": "collapse-uat-panel.ac1",
+            "title": "Given a ready-for-merge feature row with an unhealthy UAT stack and the row expanded, when it first renders, then the UAT panel renders collapsed — the 'UAT environment' label and the 'N/M healthy' header summary are present while the per-service rows (e.g. 'postgres', 'api') and the UatStackStatus body are not rendered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-uat-panel.ac2",
+            "title": "When the user clicks the UAT panel header, then the UatStackStatus per-service detail list renders; clicking the header again removes it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-uat-panel.ac3",
+            "title": "The UAT panel header renders as a button that exposes aria-expanded and a chevron reflecting state — ChevronRight when collapsed, ChevronDown when expanded — and preserves the existing muted, uppercase header styling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-uat-panel.ac4",
+            "title": "FeatureItem.test.tsx renders the UAT panel collapsed on mount (no 'postgres'/'api' service rows) and renders those service rows after a click on the UAT header; npm run typecheck and npm run lint produce no new errors and the frontend vitest suite is green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-06-26-PAN-2063-collapse-uat-stack-by-default-in-dashboard.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
