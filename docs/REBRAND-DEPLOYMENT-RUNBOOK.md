@@ -28,25 +28,41 @@
 
 ## Phase 2a — Landing site: stand up `overdeck.ai` on Vercel
 
-The [`vercel.json`](../vercel.json) at the repo root already configures everything:
-`framework: null`, `outputDirectory: "site"`, build copies the `curl | sh` installer to
-`site/install`, and serves `/docs` → `docs.overdeck.ai` as a permanent redirect.
+> **Status (2026-06-26): DEPLOYED.** The site is live at
+> `https://overdeck.vercel.app` (HTTP 200, verified). The Vercel project
+> `eltmons-projects/overdeck` is created, GitHub-connected, and the custom domains
+> `overdeck.ai` + `www.overdeck.ai` are attached. **Only the Cloudflare DNS records
+> remain** to activate the custom domain.
 
-1. **Create the Vercel project.** Import `eltmon/overdeck` into Vercel. Vercel reads
-   `vercel.json` automatically — no build settings to configure. Output is the static
-   `site/` directory.
+**Deploy note:** the repo root is a monorepo with 20MB+ of tracked media, which exceeds
+Vercel's 10MB CLI upload limit. Deploy from a clean dir containing only `site/` +
+`scripts/install.sh` + `vercel.json` + `.vercel/` (the link). See the deploy snippet at
+the bottom of this section. Images were compressed PNG/JPEG → WebP (25MB → 1.3MB).
 
-2. **Add the custom domain.** In the Vercel project → Settings → Domains → add `overdeck.ai`
-   (and `www.overdeck.ai` if desired). Vercel provides an A record / CNAME.
+### DNS records to add on Cloudflare (the only remaining step)
 
-3. **Configure DNS in Cloudflare.** Add the records Vercel specifies for `overdeck.ai`:
-   - Typically `A overdeck.ai → 76.76.21.21` (Vercel's anycast) and
-     `CNAME www.overdeck.ai → cname.vercel-dns.com`.
-   - **Cloudflare proxy (orange cloud):** leave DNS-only (grey cloud) for the initial
-     verification, then enable proxying once Vercel confirms the domain is active. If the
-     proxy is on during verification, Cloudflare may intercept Vercel's validation.
+The `overdeck.ai` zone is on Cloudflare nameservers (`lucy/rick.ns.cloudflare.com`).
+Add these records (Vercel-verified):
 
-4. **Verify.** `curl -sI https://overdeck.ai` should return 200 and serve the landing page.
+| Type | Name | Value | Proxy |
+|---|---|---|---|
+| `A` | `overdeck.ai` (=`@`) | `76.76.21.21` | DNS-only (grey cloud) |
+| `A` | `www` | `76.76.21.21` | DNS-only (grey cloud) |
+
+> Leave the Cloudflare proxy **off** (grey cloud) initially so Vercel can verify the
+> domain. Once Vercel confirms "Valid Configuration", you may re-enable the orange-cloud
+> proxy if desired.
+
+After DNS propagates, verify: `curl -sI https://overdeck.ai` → 200, serving the landing
+page. Vercel auto-runs verification and emails on completion.
+
+### Redeploy snippet (from a clean dir)
+```bash
+D=/tmp/overdeck-site-deploy && rm -rf "$D" && mkdir -p "$D/scripts"
+cp -r site/ scripts/install.sh vercel.json .vercel/ "$D/"
+cp scripts/install.sh "$D/site/install"   # pre-build the /install one-liner
+cd "$D" && vercel deploy --prod --yes
+```
 
 ---
 
