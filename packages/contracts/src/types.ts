@@ -471,6 +471,7 @@ export const DashboardSnapshot = Schema.Struct({
   specialists: Schema.Array(Schema.Unknown),
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
+  recentActivity: Schema.optional(Schema.Array(Schema.Unknown)),
   resources: Schema.optional(Schema.Unknown),
   memory: Schema.optional(Schema.Unknown),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
