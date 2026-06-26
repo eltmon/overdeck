@@ -1,12 +1,22 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStats } from '@overdeck/contracts';
 import { runGhIssueTrailerHook } from '../../sync-sources/hooks/gh-issue-trailer-hook.ts';
 
 const projectRoot = resolve(__dirname, '../..');
+const require = createRequire(import.meta.url);
+const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
+const packageResolutionRoots = [
+  frontendRoot,
+  projectRoot,
+  join(projectRoot, 'node_modules/.bun/node_modules'),
+  resolve(projectRoot, '../..'),
+  resolve(projectRoot, '../../node_modules/.bun/node_modules'),
+];
 
 let tempDirs: string[] = [];
 let previousOverdeckHome: string | undefined;
@@ -14,6 +24,14 @@ let browser: Browser | undefined;
 let context: BrowserContext | undefined;
 let page: Page | undefined;
 let viteServer: { close: () => Promise<void>; httpServer?: { address: () => unknown } } | undefined;
+
+function resolvePackage(specifier: string): string {
+  return require.resolve(specifier, { paths: packageResolutionRoots });
+}
+
+function resolvePackageDir(specifier: string): string {
+  return dirname(resolvePackage(`${specifier}/package.json`));
+}
 
 function payload(command: string): string {
   return JSON.stringify({ tool_name: 'Bash', tool_input: { command } });
@@ -42,17 +60,17 @@ async function makeOverdeckHome(): Promise<string> {
 }
 
 async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
-  const { createServer } = await import('../../src/dashboard/frontend/node_modules/vite/dist/node/index.js');
+  const { createServer } = await import(resolvePackage('vite'));
   const root = await mkdtemp(join(tmpdir(), 'pan-flywheel-stats-page-'));
   tempDirs.push(root);
   await mkdir(join(root, 'src'), { recursive: true });
   await mkdir(join(root, 'node_modules'), { recursive: true });
   await symlink(resolve(projectRoot, 'src/dashboard/frontend/src'), join(root, 'src', 'dashboard-frontend'), 'dir');
-  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/react'), join(root, 'node_modules', 'react'), 'dir');
-  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/react-dom'), join(root, 'node_modules', 'react-dom'), 'dir');
-  await symlink(resolve(projectRoot, 'node_modules/.bun/scheduler@0.23.2/node_modules/scheduler'), join(root, 'node_modules', 'scheduler'), 'dir');
-  await symlink(resolve(projectRoot, 'node_modules/.bun/loose-envify@1.4.0/node_modules/loose-envify'), join(root, 'node_modules', 'loose-envify'), 'dir');
-  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/lucide-react'), join(root, 'node_modules', 'lucide-react'), 'dir');
+  await symlink(resolvePackageDir('react'), join(root, 'node_modules', 'react'), 'dir');
+  await symlink(resolvePackageDir('react-dom'), join(root, 'node_modules', 'react-dom'), 'dir');
+  await symlink(resolvePackageDir('scheduler'), join(root, 'node_modules', 'scheduler'), 'dir');
+  await symlink(resolvePackageDir('loose-envify'), join(root, 'node_modules', 'loose-envify'), 'dir');
+  await symlink(resolvePackageDir('lucide-react'), join(root, 'node_modules', 'lucide-react'), 'dir');
   await writeFile(join(root, 'index.html'), '<!doctype html><html><body><div id="root"></div><script type="module" src="/src/main.ts"></script></body></html>');
   await writeFile(join(root, 'src', 'wsTransport.ts'), 'export function subscribeFlywheelStatus() { return () => undefined; }\n');
   await writeFile(join(root, 'src', 'reactQuery.ts'), `
