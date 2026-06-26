@@ -1,21 +1,89 @@
 {
   "issueId": "PAN-2063",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-06-26T03:22:41.601Z",
-  "updated": "2026-06-26T03:22:41.601Z",
+  "updated": "2026-06-29T12:55:50.683Z",
   "pipeline": {
     "issueId": "PAN-2063",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-26T03:22:41.601Z"
+    "updatedAt": "2026-06-29T12:55:50.591Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2110"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 40329,
+            "output": 5150,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 29577,
+            "output": 57490,
+            "cacheRead": 5048063,
+            "cacheWrite": 281556
+          }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 79,
+            "output": 7431,
+            "cacheRead": 4152720,
+            "cacheWrite": 285462
+          }
+        },
+        "work": {
+          "custom/glm-5.2": {
+            "input": 237548,
+            "output": 113650,
+            "cacheRead": 21441856,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 40329,
+          "output": 5150,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 29577,
+          "output": 57490,
+          "cacheRead": 5048063,
+          "cacheWrite": 281556
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 79,
+          "output": 7431,
+          "cacheRead": 4152720,
+          "cacheWrite": 285462
+        },
+        "custom/glm-5.2": {
+          "input": 237548,
+          "output": 113650,
+          "cacheRead": 21441856,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.655044,
+        "pricingAsOf": "2026-06-29T12:55:50.674Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2110"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
