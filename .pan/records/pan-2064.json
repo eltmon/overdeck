@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-2064",
+  "schemaVersion": 2,
+  "created": "2026-06-26T03:38:00.194Z",
+  "updated": "2026-06-26T03:38:00.194Z",
+  "pipeline": {
+    "issueId": "PAN-2064",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-26T03:38:00.194Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}
