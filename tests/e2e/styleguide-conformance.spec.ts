@@ -1,7 +1,9 @@
+import { existsSync } from 'node:fs';
+import { lstat, mkdir, readFile, symlink, unlink } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 
 type ViteDevServer = {
@@ -14,6 +16,92 @@ const require = createRequire(import.meta.url);
 let vite: ViteDevServer;
 let browser: Browser;
 let baseUrl: string;
+let linkedFrontendNodeModules = false;
+const linkedFrontendPackages: string[] = [];
+const projectRoot = process.cwd();
+const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
+const packageResolutionRoots = [
+  frontendRoot,
+  projectRoot,
+  join(projectRoot, 'node_modules/.bun/node_modules'),
+  resolve(projectRoot, '../..'),
+  resolve(projectRoot, '../../node_modules/.bun/node_modules'),
+];
+
+function resolvePackage(specifier: string): string {
+  return require.resolve(specifier, { paths: packageResolutionRoots });
+}
+
+function resolvePackageDir(specifier: string): string {
+  if (specifier === '@overdeck/contracts') {
+    return join(projectRoot, 'packages/contracts');
+  }
+  try {
+    const packageJsonPath = resolvePackage(`${specifier}/package.json`);
+    return packageJsonPath.slice(0, -'/package.json'.length);
+  } catch {
+    try {
+      const entryPath = resolvePackage(specifier);
+      const nodeModulesPart = `/node_modules/${specifier}/`;
+      const index = entryPath.lastIndexOf(nodeModulesPart);
+      if (index !== -1) return entryPath.slice(0, index + nodeModulesPart.length - 1);
+    } catch {
+      // Fall through to filesystem probing below.
+    }
+    for (const root of packageResolutionRoots) {
+      const packagePath = join(root, ...specifier.split('/'));
+      if (existsSync(packagePath)) return packagePath;
+    }
+    throw new Error(`Unable to resolve package root for ${specifier}`);
+  }
+}
+
+function resolvePackageStoreRoot(): string {
+  for (const root of packageResolutionRoots) {
+    try {
+      require.resolve('react/package.json', { paths: [root] });
+      return root;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  throw new Error('Unable to resolve frontend package store root');
+}
+
+async function ensureFrontendNodeModules(): Promise<void> {
+  const nodeModulesPath = join(frontendRoot, 'node_modules');
+  try {
+    await lstat(nodeModulesPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    await symlink(resolvePackageStoreRoot(), nodeModulesPath, 'dir');
+    linkedFrontendNodeModules = true;
+    return;
+  }
+
+  const packageJson = JSON.parse(await readFile(join(frontendRoot, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const dependencies = Object.keys({
+    ...packageJson.dependencies,
+    ...packageJson.devDependencies,
+  });
+  for (const dependency of dependencies) {
+    const packagePath = join(nodeModulesPath, ...dependency.split('/'));
+    try {
+      await lstat(packagePath);
+      continue;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    if (dependency.startsWith('@')) {
+      await mkdir(join(nodeModulesPath, dependency.split('/')[0]), { recursive: true });
+    }
+    await symlink(resolvePackageDir(dependency), packagePath, 'dir');
+    linkedFrontendPackages.push(packagePath);
+  }
+}
 
 const renderPoll = { timeout: 10_000, interval: 100 };
 const now = '2026-05-18T00:00:00.000Z';
@@ -178,6 +266,23 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
+      if (path === '/api/backlog/issue-state') return json({
+        issueId: new URL(url, window.location.origin).searchParams.get('issueId') ?? 'PAN-1148',
+        state: {
+          ready: true,
+          planned: true,
+          parked: false,
+          vetoed: false,
+          blocksMain: false,
+          inPipeline: true,
+          released: true,
+          objection: false,
+          gate: 'auto',
+        },
+        gate: 'auto',
+        planning: 'auto',
+        inSequence: false,
+      });
       if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Overdeck', path: '/tmp/overdeck' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
       if (path === '/api/conversations/pending-input') return json([]);
@@ -200,9 +305,9 @@ async function openRoute(path: string): Promise<{ context: BrowserContext; page:
 }
 
 beforeAll(async () => {
-  const frontendRoot = join(process.cwd(), 'src/dashboard/frontend');
-  const vitePath = require.resolve('vite', { paths: [frontendRoot] });
-  const reactPath = require.resolve('@vitejs/plugin-react', { paths: [frontendRoot] });
+  await ensureFrontendNodeModules();
+  const vitePath = resolvePackage('vite');
+  const reactPath = resolvePackage('@vitejs/plugin-react');
   const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
   const { default: react } = await import(reactPath) as { default: () => unknown };
   vite = await createServer({
@@ -270,6 +375,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   await vite?.close();
+  await Promise.all(linkedFrontendPackages.map((packagePath) => unlink(packagePath)));
+  if (linkedFrontendNodeModules) {
+    await unlink(join(frontendRoot, 'node_modules'));
+  }
 });
 
 describe('styleguide rendered surface conformance', () => {

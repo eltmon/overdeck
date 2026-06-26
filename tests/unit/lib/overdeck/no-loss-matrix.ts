@@ -636,6 +636,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // PAN-1866: backlog sequence routes
   { surface: 'GET /api/backlog/sequence',                  kind: 'http', disposition: 'READ',       door: 'backlog route reads backlog_sequence cache + parseSequenceMd fallback; server-side inPipeline join via getReviewStatusSync (PAN-1866)' },
+  { surface: 'GET /api/backlog/issue-state',               kind: 'http', disposition: 'READ',       door: 'backlog route reads single-issue pickup state from backlog classifier (same source as /sequence) + getReviewStatusSync join (PAN-2059)' },
   { surface: 'POST /api/backlog/sequence/regenerate',      kind: 'http', disposition: 'WRITE',      door: 'backlog route spawns sequencer agent via spawnSequencerAgent (PAN-1866)' },
   { surface: 'POST /api/backlog/sequence/gate',            kind: 'http', disposition: 'WRITE',      door: 'backlog route writes operator gate field to sequence.md via writeSequenceMd; applies parked label when gate=blocked (PAN-1866)' },
   { surface: 'POST /api/backlog/sequence/planning',        kind: 'http', disposition: 'WRITE',      door: 'backlog route writes operator planning field to sequence.md via writeSequenceMd (PAN-1866)' },

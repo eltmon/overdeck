@@ -19,6 +19,25 @@ interface IssueStateResponse {
   issueId: string; state: PipelineState; gate: string; planning: string | null; inSequence: boolean;
 }
 
+function isIssueStateResponse(value: unknown): value is IssueStateResponse {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<IssueStateResponse>;
+  return (
+    typeof candidate.issueId === 'string' &&
+    !!candidate.state &&
+    typeof candidate.state === 'object' &&
+    typeof (candidate.state as Partial<PipelineState>).ready === 'boolean' &&
+    typeof (candidate.state as Partial<PipelineState>).planned === 'boolean' &&
+    typeof (candidate.state as Partial<PipelineState>).parked === 'boolean' &&
+    typeof (candidate.state as Partial<PipelineState>).blocksMain === 'boolean' &&
+    typeof (candidate.state as Partial<PipelineState>).released === 'boolean' &&
+    typeof (candidate.state as Partial<PipelineState>).objection === 'boolean' &&
+    typeof candidate.gate === 'string' &&
+    (typeof candidate.planning === 'string' || candidate.planning === null) &&
+    typeof candidate.inSequence === 'boolean'
+  );
+}
+
 const SECTION_LABEL: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 7 };
 const SECTION_HINT: CSSProperties = { fontSize: 12, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
 
@@ -81,7 +100,9 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
     queryFn: async () => {
       const r = await fetch(`/api/backlog/issue-state?issueId=${encodeURIComponent(issueId)}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json() as Promise<IssueStateResponse>;
+      const body: unknown = await r.json();
+      if (!isIssueStateResponse(body)) throw new Error('Invalid pickup state response');
+      return body;
     },
     staleTime: 10_000,
   });

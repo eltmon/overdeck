@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:ui": "vitest --ui",
-    "test:watch": "vitest",
+    "test": "vitest run --configLoader runner",
+    "test:ui": "vitest --configLoader runner --ui",
+    "test:watch": "vitest --configLoader runner",
     "test:playwright": "playwright test tests/command-deck-resource-strip.spec.ts"
   },
   "dependencies": {

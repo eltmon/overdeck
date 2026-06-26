@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "tsdown --watch",
     "build": "tsdown",
-    "test": "vitest run --config vitest.config.ts",
+    "test": "vitest run --configLoader runner --config vitest.config.ts",
     "run": "bun run",
     "typecheck": "tsc --noEmit"
   },

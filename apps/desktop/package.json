@@ -32,7 +32,7 @@
     "prepublishOnly": "node scripts/build-for-publish.mjs",
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --configLoader runner --passWithNoTests",
     "dist:linux": "electron-builder --linux AppImage --publish never",
     "dist:mac": "electron-builder --mac dmg --universal --publish never",
     "dist:win": "electron-builder --win nsis --publish never",
