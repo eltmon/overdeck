@@ -313,7 +313,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
-    recentActivity: snapshot.recentActivity ?? state.recentActivity,
+    recentActivity: snapshot.recentActivity ? [...snapshot.recentActivity] : state.recentActivity,
     observationsByIssueId: memory?.observationsByIssueId ?? state.observationsByIssueId,
     statusByIssueId: memory?.statusByIssueId ?? state.statusByIssueId,
     rollupsByIssueId: memory?.rollupsByIssueId ?? state.rollupsByIssueId,
