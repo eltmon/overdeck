@@ -73,10 +73,14 @@ Vercel). Move them to `docs.overdeck.ai`.
 
 ---
 
-## Phase 2c — Redirect `panopticon-cli.com` → `overdeck.ai`
+## Phase 2c — Redirect `panopticon-cli.com` (DEFERRED — operator handles last)
 
-External/cached links to `panopticon-cli.com/<doc-path>` must not 404. Since the old
-domain served **docs**, redirect doc paths to `docs.overdeck.ai`:
+> **Status: deferred.** The operator will handle `panopticon-cli.com` last, after
+> `overdeck.ai` and `docs.overdeck.ai` are both live and stable. Do not touch this domain
+> until then — it keeps serving the Mintlify docs as the active fallback.
+
+When the time comes, external/cached links to `panopticon-cli.com/<doc-path>` must not
+404. Since the old domain served **docs**, redirect doc paths to `docs.overdeck.ai`:
 
 1. **Remove `panopticon-cli.com` from the Mintlify project** (after `docs.overdeck.ai` is
    verified and serving). This frees the domain.
@@ -88,10 +92,9 @@ domain served **docs**, redirect doc paths to `docs.overdeck.ai`:
      `docs.overdeck.ai/quickstart`.
    - The bare domain (`panopticon-cli.com`) → `https://docs.overdeck.ai`.
 
-   > Alternative: if you'd rather send everything to the marketing site, redirect to
-   > `overdeck.ai` instead — the landing page has prominent "Docs" links so users still
-   > reach the docs in one click. Path-preserving → `docs.overdeck.ai` is friendlier for
-   > deep-linked doc URLs, though.
+   > Alternative: redirect to `overdeck.ai` (marketing site) instead — it has prominent
+   > "Docs" links so users reach docs in one click. Path-preserving → `docs.overdeck.ai`
+   > is friendlier for deep-linked doc URLs.
 
 ---
 
@@ -181,7 +184,7 @@ concern from the import functionality and is tracked under the data-remodel epic
 - [ ] **2a** `https://overdeck.ai` returns 200 (landing page live)
 - [ ] **2b** `docs.overdeck.ai` added as Mintlify custom domain
 - [ ] **2b** DNS configured; `https://docs.overdeck.ai` serves docs
-- [ ] **2c** `panopticon-cli.com` removed from Mintlify; 301 redirect → `docs.overdeck.ai`
+- [ ] **2c** (DEFERRED — last) `panopticon-cli.com` removed from Mintlify; 301 redirect → `docs.overdeck.ai`
 - [ ] **5** Trusted Publisher configured for `overdeck` on npmjs.com
 - [ ] **5** `overdeck` published at the real version (dual-publish)
 - [ ] **5** `@panctl/cli` deprecated on npm
