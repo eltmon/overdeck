@@ -31,6 +31,7 @@ import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
 import { BeadsRail } from './BeadsRail'
+import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
@@ -975,6 +976,7 @@ function OverviewTab({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: 
     <div className="space-y-3.5">
       <IssueBlockerSpotlight issueId={issueId} />
       <NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
+      <PickupGateCard issueId={issueId} />
     </div>
   )
 }

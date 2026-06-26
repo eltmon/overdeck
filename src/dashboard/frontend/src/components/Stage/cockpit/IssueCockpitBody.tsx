@@ -6,7 +6,6 @@ import { PlanCard } from './PlanCard'
 import { CostCard } from './CostCard'
 import { WorkspaceCard } from './WorkspaceCard'
 import { AgentCard, ActivityCard } from './AgentActivityCards'
-import { PickupGateCard } from './PickupGateCard'
 import { IssueDigTabs, type DigTab } from './IssueDigTabs'
 
 /**
@@ -30,7 +29,6 @@ export function IssueCockpitBody({ issueId }: { issueId: string }) {
           <ReviewVerificationCard issueId={issueId} />
           <CodeCard issueId={issueId} />
           <PlanCard issueId={issueId} />
-          <PickupGateCard issueId={issueId} />
         </div>
         {/* RIGHT — the context */}
         <div className="flex flex-col gap-3.5">
