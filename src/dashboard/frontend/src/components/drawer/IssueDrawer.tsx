@@ -16,6 +16,7 @@ import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
 import PhaseTimeline from './PhaseTimeline';
+import { PickupGateControls } from '../backlog/PickupGateControls';
 import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
 import { VBriefViewer } from '../vbrief/VBriefViewer';
 import type { VBriefDocument } from '../vbrief/types';
@@ -86,6 +87,23 @@ function DrawerPlanPanel({ issueId }: { issueId: string }) {
         <VBriefViewer doc={data ?? null} />
       )}
     </div>
+  );
+}
+
+// PAN-2059: the backlog pickup controls (Plan → Release, AI objection, Ready /
+// Park / Blocks-main, planning, pickup gate) on the issue overlay — the same
+// shared component the cockpit and backlog drawer use.
+function DrawerPickupSection({ issueId }: { issueId: string }) {
+  return (
+    <section data-testid="drawer-pickup-section" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
+      <PickupGateControls
+        issueId={issueId}
+        onOpenIssueBrowser={(id) => {
+          const href = trackerIssueUrl(id);
+          if (href) window.open(href, '_blank', 'noopener,noreferrer');
+        }}
+      />
+    </section>
   );
 }
 
@@ -267,6 +285,7 @@ export function IssueDrawer() {
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
                 <PhaseTimeline />
+                <DrawerPickupSection issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />
                 <DrawerVerificationGates />

@@ -376,6 +376,48 @@ const postBacklogLabelsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/backlog/issue-state — single-issue pickup state (PAN-2059) ─
+// Focused per-issue read for the issue cockpit / overlay pickup controls so they
+// don't pull the whole 549-node sequence. Same classifier as /sequence (single
+// source of truth). Works even when the issue isn't in sequence.md: state is
+// label-derived; gate/planning then return defaults with inSequence=false (the UI
+// hides the sequence-only gate/planning controls in that case).
+
+const getBacklogIssueStateRoute = HttpRouter.add(
+  'GET',
+  '/api/backlog/issue-state',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const issueId = (url.searchParams.get('issueId') ?? '').trim();
+    if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
+    return yield* Effect.try({
+      try: () => {
+        const projectRoot = process.cwd();
+        const lookups = buildClassifyLookups(projectRoot);
+
+        // Pull the operator gate + planning mode from sequence.md when the issue is
+        // ranked there; otherwise leave them at defaults and flag inSequence=false.
+        let gate = 'auto';
+        let planning: string | null = null;
+        let inSequence = false;
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        if (existsSync(seqPath)) {
+          const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+          if (parsed.ok) {
+            const node = parsed.doc.nodes.find((n) => n.issue.toUpperCase() === issueId.toUpperCase());
+            if (node) { gate = node.gate; planning = node.planning; inSequence = true; }
+          }
+        }
+
+        const state = classifyIssue({ issue: issueId, gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
+        return jsonResponse({ issueId, state, gate, planning, inSequence });
+      },
+      catch: (err) => new Error(String(err)),
+    });
+  })),
+);
+
 // ─── Route: POST /api/backlog/sequence/clear — delete the sequencing ──────────
 // Removes the ranked sequence (sequence.md + the disposable DB cache). Recoverable:
 // a re-sequence pass regenerates it. The operator gate fields live in sequence.md, so
@@ -466,6 +508,7 @@ export const backlogRouteLayer = Layer.mergeAll(
   postBacklogPlanningRoute,
   getBacklogForecastRoute,
   postBacklogLabelsRoute,
+  getBacklogIssueStateRoute,
   postBacklogClearRoute,
   getSequencerStatusRoute,
 );
