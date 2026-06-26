@@ -1,0 +1,189 @@
+# Rebrand Deployment Runbook — External Ops
+
+> The in-repo rebrand is **done** (PAN-1938/1960/1964/1952 all closed; cutover `cfcd3fca64`
+> landed on `main` 2026-06-19). What remains is **external infrastructure** — DNS, hosting,
+> and npm — that requires operator access to the Cloudflare, Vercel, Mintlify, and npm
+> consoles. This runbook is the source of truth for those ops.
+>
+> **Target architecture:**
+> - `overdeck.ai` → marketing landing site (static `site/`, served by Vercel)
+> - `docs.overdeck.ai` → Mintlify docs (moved from `panopticon-cli.com`)
+> - `panopticon-cli.com` → 301 redirect to `overdeck.ai`
+> - npm: both `overdeck` (unscoped) and `@overdeck/core` resolve to the real release
+
+## Prerequisites / current state (verified 2026-06-26)
+
+| Resource | State |
+|---|---|
+| GitHub repo | Renamed → `eltmon/overdeck` (301 redirects old URLs) ✅ |
+| `overdeck.ai` DNS | **Parked on Cloudflare, not resolving** ❌ |
+| `docs.overdeck.ai` DNS | **Not configured** ❌ |
+| `panopticon-cli.com` | **Live** — Mintlify docs on Vercel |
+| `site/index.html` | Overdeck-branded, ready; `vercel.json` deploys `site/` ✅ |
+| `@overdeck/core` on npm | v0.41.1 (the real package) ✅ |
+| `overdeck` (unscoped) on npm | v0.0.1 — **deprecated placeholder** ❌ |
+| `@panctl/cli` on npm | v0.21.0 — deprecated legacy |
+
+---
+
+## Phase 2a — Landing site: stand up `overdeck.ai` on Vercel
+
+The [`vercel.json`](../vercel.json) at the repo root already configures everything:
+`framework: null`, `outputDirectory: "site"`, build copies the `curl | sh` installer to
+`site/install`, and serves `/docs` → `docs.overdeck.ai` as a permanent redirect.
+
+1. **Create the Vercel project.** Import `eltmon/overdeck` into Vercel. Vercel reads
+   `vercel.json` automatically — no build settings to configure. Output is the static
+   `site/` directory.
+
+2. **Add the custom domain.** In the Vercel project → Settings → Domains → add `overdeck.ai`
+   (and `www.overdeck.ai` if desired). Vercel provides an A record / CNAME.
+
+3. **Configure DNS in Cloudflare.** Add the records Vercel specifies for `overdeck.ai`:
+   - Typically `A overdeck.ai → 76.76.21.21` (Vercel's anycast) and
+     `CNAME www.overdeck.ai → cname.vercel-dns.com`.
+   - **Cloudflare proxy (orange cloud):** leave DNS-only (grey cloud) for the initial
+     verification, then enable proxying once Vercel confirms the domain is active. If the
+     proxy is on during verification, Cloudflare may intercept Vercel's validation.
+
+4. **Verify.** `curl -sI https://overdeck.ai` should return 200 and serve the landing page.
+
+---
+
+## Phase 2b — Docs: move Mintlify to `docs.overdeck.ai`
+
+The Mintlify docs are currently published at `panopticon-cli.com` (Mintlify-hosted on
+Vercel). Move them to `docs.overdeck.ai`.
+
+1. **Add the custom domain in Mintlify.** In the Mintlify dashboard (dashboard.mintlify.com)
+   → your project → Settings → Domains → add `docs.overdeck.ai`. Mintlify provides a
+   CNAME target (e.g. `host.mintlify.com` or a Vercel-managed endpoint).
+
+2. **Configure DNS in Cloudflare.** Add the CNAME Mintlify specifies:
+   - `CNAME docs.overdeck.ai → <mintlify-provided-target>`.
+   - Cloudflare proxy: Mintlify generally requires DNS-only (grey cloud) so their edge
+     serves the SSL cert; enable proxying only if Mintlify documents it's supported.
+
+3. **Verify.** `curl -sI https://docs.overdeck.ai` should return 308 → `/introduction`
+   (Mintlify's entry redirect), matching the current `panopticon-cli.com` behavior.
+
+4. **Update the docs homepage CTA** (already done in `docs.json`): the "Install" button
+   points to `npmjs.com/package/overdeck`, GitHub links to `eltmon/overdeck`. No further
+   `docs.json` changes needed.
+
+---
+
+## Phase 2c — Redirect `panopticon-cli.com` → `overdeck.ai`
+
+External/cached links to `panopticon-cli.com/<doc-path>` must not 404. Since the old
+domain served **docs**, redirect doc paths to `docs.overdeck.ai`:
+
+1. **Remove `panopticon-cli.com` from the Mintlify project** (after `docs.overdeck.ai` is
+   verified and serving). This frees the domain.
+
+2. **Set up a Cloudflare redirect rule.** Cloudflare → Rules → Redirect Rules on the
+   `panopticon-cli.com` zone:
+   - `*` → `https://docs.overdeck.ai${http.request.uri.path}` with a 301.
+   - This preserves the path: `panopticon-cli.com/quickstart` →
+     `docs.overdeck.ai/quickstart`.
+   - The bare domain (`panopticon-cli.com`) → `https://docs.overdeck.ai`.
+
+   > Alternative: if you'd rather send everything to the marketing site, redirect to
+   > `overdeck.ai` instead — the landing page has prominent "Docs" links so users still
+   > reach the docs in one click. Path-preserving → `docs.overdeck.ai` is friendlier for
+   > deep-linked doc URLs, though.
+
+---
+
+## Phase 5 — npm: publish the unscoped `overdeck` package
+
+The goal: `npx overdeck` works, in addition to `npx @overdeck/core`. The `overdeck`
+(unscoped) package currently sits at v0.0.1 and is deprecated. It must resolve to the
+same release as `@overdeck/core`.
+
+**Two viable mechanisms** (pick one):
+
+### Option A — dual-publish in the release workflow (recommended)
+
+Add a publish step to [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+that swaps the package name and republishes the same tarball under `overdeck`:
+
+```yaml
+- name: Publish unscoped `overdeck` alias
+  env:
+    PKG_VERSION: ${{ needs.<version-source>.outputs.version }}
+  run: |
+    # The trusted-publisher config on npmjs.com for `overdeck` must pin this
+    # repo + workflow (same as @overdeck/core) for OIDC to authorize the publish.
+    if npm view "overdeck@${PKG_VERSION}" version >/dev/null 2>&1; then
+      echo "overdeck@${PKG_VERSION} already published — skipping"
+      exit 0
+    fi
+    # Temporarily publish the built dist under the unscoped name
+    npm version "${PKG_VERSION}" --no-git-tag-version --allow-same-version
+    node -e "const p=require('./package.json'); p.name='overdeck'; require('fs').writeFileSync('./package.json', JSON.stringify(p,null,2)+'\n')"
+    npm publish --provenance --access public --tag latest
+```
+
+> ⚠️ The **Trusted Publisher** config for the `overdeck` package on npmjs.com must be set
+> to allow this repo + workflow file, exactly like `@overdeck/core`. Without it, OIDC
+> publish is rejected. Configure this once in the npm web UI.
+
+### Option B — thin wrapper package
+
+Publish a tiny `overdeck` package whose only job is `@overdeck/core`:
+
+```json
+{
+  "name": "overdeck",
+  "version": "<same-as-core>",
+  "bin": { "overdeck": "./node_modules/@overdeck/core/dist/cli/index.js" },
+  "dependencies": { "@overdeck/core": "<same-version>" }
+}
+```
+
+This is simpler to reason about but adds an install hop. Option A produces a single
+self-contained tarball under each name.
+
+### After publish
+
+- **Deprecate `@panctl/cli`** (idempotent metadata write; the release workflow already
+  notes this is done for `overdeck` and `@eltmon/panctl`).
+- Once `overdeck` is live at the real version, update the landing site (`site/index.html`)
+  and README to lead with `npx overdeck` (currently `npx @overdeck/core`, which also works).
+
+---
+
+## Phase 6 — Legacy cleanup (DECISION: keep import functionality)
+
+**Decision (operator, 2026-06-26):** We **keep** the `panopticon.db` import functionality
+and the `~/.panopticon` legacy-home resolver in the codebase. We do **not** delete users'
+old `panopticon.db`, and the `--seed-from-legacy` import path stays available.
+
+This means the following carve-outs from PAN-1964 **remain indefinitely** (do not remove):
+
+- [`src/lib/paths.ts`](../src/lib/paths.ts) `getLegacyHome()` → `~/.panopticon` (import-only).
+- `src/lib/overdeck/legacy-import.ts` — the opt-in importer that reads the old DB.
+- The `LegacyImportDialog` in the dashboard settings (the "Import conversations from old
+  Panopticon" UI).
+- `pan up --seed-from-legacy` CLI path.
+
+The live primary DB is `~/.overdeck/panopticon.db` (filename retained during the in-flight
+dual-DB migration to `overdeck.db`; PAN-1908/1938/1979/1983). That filename is a separate
+concern from the import functionality and is tracked under the data-remodel epic.
+
+---
+
+## Checklist
+
+- [ ] **2a** Vercel project created for `eltmon/overdeck` (outputs `site/`)
+- [ ] **2a** `overdeck.ai` domain added + DNS configured on Cloudflare
+- [ ] **2a** `https://overdeck.ai` returns 200 (landing page live)
+- [ ] **2b** `docs.overdeck.ai` added as Mintlify custom domain
+- [ ] **2b** DNS configured; `https://docs.overdeck.ai` serves docs
+- [ ] **2c** `panopticon-cli.com` removed from Mintlify; 301 redirect → `docs.overdeck.ai`
+- [ ] **5** Trusted Publisher configured for `overdeck` on npmjs.com
+- [ ] **5** `overdeck` published at the real version (dual-publish)
+- [ ] **5** `@panctl/cli` deprecated on npm
+- [ ] **(post-5)** Landing site + README lead with `npx overdeck`
+- [ ] **6** Confirmed: legacy import + `~/.panopticon` resolver retained (no deletion)

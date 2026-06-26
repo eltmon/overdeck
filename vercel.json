@@ -4,6 +4,18 @@
   "installCommand": "true",
   "buildCommand": "cp scripts/install.sh site/install",
   "outputDirectory": "site",
+  "redirects": [
+    {
+      "source": "/docs",
+      "destination": "https://docs.overdeck.ai",
+      "permanent": true
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "https://docs.overdeck.ai/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/install",

@@ -6,7 +6,8 @@
 >
 > **What this is not:** the public docs site. The Mintlify site lives at the repo root
 > (`introduction.mdx`, `quickstart.mdx`, …) and is published at
-> [overdeck.ai](https://overdeck.ai). This file is internal collateral —
+> [docs.overdeck.ai](https://docs.overdeck.ai) (the marketing landing page is a separate
+> static site at [overdeck.ai](https://overdeck.ai)). This file is internal collateral —
 > the raw material we draw from when we write external-facing pages, posts, and scripts.
 >
 > Everything here is grounded in shipped functionality. When a claim changes, update it
