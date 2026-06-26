@@ -140,6 +140,66 @@ function getCommitSubjects(repoRoot: string, range: string): string[] {
   }
 }
 
+/** Commit subjects that are pure pipeline bookkeeping — never user-facing. */
+const RELEASE_NOTE_NOISE: RegExp[] = [
+  /^chore\((records|state|beads)\)/,
+  /^chore: (reconcile|integrate)/,
+  /^chore\(state\): update spec/,
+  /^docs: run-\d+/,
+  /^Merge /,
+  /per-issue record$/,
+];
+
+function isReleaseNoteNoise(subject: string): boolean {
+  return RELEASE_NOTE_NOISE.some((re) => re.test(subject));
+}
+
+/** Strip a conventional-commit `type(scope):` prefix and capitalize for readability. */
+function humanizeSubject(subject: string): string {
+  const match = subject.match(/^\w+(\([^)]*\))?!?:\s*(.*)$/);
+  const body = match ? match[2] : subject;
+  return body.length > 0 ? body[0].toUpperCase() + body.slice(1) : body;
+}
+
+/**
+ * Turn a flat list of commit subjects into grouped, de-noised release
+ * highlights: Features / Fixes / Performance, with everything else collapsed
+ * into a single "internal changes" count. Drops bookkeeping commits entirely so
+ * the changelog reads for a human, not a git log.
+ */
+export function groupCommitSubjects(entries: string[]): string {
+  const features: string[] = [];
+  const fixes: string[] = [];
+  const perf: string[] = [];
+  let internal = 0;
+  const seen = new Set<string>();
+
+  for (const subject of entries) {
+    if (isReleaseNoteNoise(subject)) continue;
+    const key = subject.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    if (/^(feat|Add )/.test(subject)) features.push(humanizeSubject(subject));
+    else if (/^(fix|Fix )/.test(subject)) fixes.push(humanizeSubject(subject));
+    else if (/^perf/.test(subject)) perf.push(humanizeSubject(subject));
+    else internal += 1;
+  }
+
+  const sections: string[] = [];
+  const addSection = (title: string, items: string[]) => {
+    if (items.length > 0) sections.push(`### ${title}\n${items.map((i) => `- ${i}`).join('\n')}`);
+  };
+  addSection('Features', features);
+  addSection('Fixes', fixes);
+  addSection('Performance', perf);
+  if (internal > 0) {
+    sections.push(`_Plus ${internal} internal change${internal === 1 ? '' : 's'} (refactors, tests, tooling)._`);
+  }
+
+  return sections.length > 0 ? sections.join('\n\n') : '- No user-facing changes in the selected range.';
+}
+
 function buildReleaseNotesMarkdown(params: {
   channel: ReleaseChannel;
   version: string;
@@ -153,9 +213,7 @@ function buildReleaseNotesMarkdown(params: {
     ? 'npm install -g @overdeck/core'
     : `npm install -g @overdeck/core@${channel}`;
 
-  const bullets = entries.length > 0
-    ? entries.map((entry) => `- ${entry}`).join('\n')
-    : '- No commit subjects found in the selected range.';
+  const highlights = groupCommitSubjects(entries);
 
   return `## Summary
 - Release ${version} (${channel})
@@ -163,7 +221,7 @@ function buildReleaseNotesMarkdown(params: {
 - Published intentionally from main via tag promotion
 
 ## Highlights
-${bullets}
+${highlights}
 
 ## Breaking changes
 - None explicitly called out in commit subjects. Review the full changelog before upgrading across versions.
