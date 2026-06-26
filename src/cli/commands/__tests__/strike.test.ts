@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
 import { Effect } from 'effect';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { spawnSync } from 'child_process';
 
 const agentMocks = vi.hoisted(() => ({
   getAgentRuntimeState: vi.fn(),
@@ -23,6 +27,14 @@ vi.mock('../../../lib/tmux.js', () => ({
 }));
 
 import { strikeCommand, __testInternals } from '../strike.js';
+
+function git(cwd: string, args: string[]): string {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+  }
+  return result.stdout;
+}
 
 describe('strikeCommand', () => {
   beforeEach(() => {
@@ -132,5 +144,34 @@ describe('strikeCommand', () => {
     await expect(__testInternals.clearIdlePriorStrike(fakePlan)).rejects.toThrow(/already running/);
 
     expect(agentMocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('replaces a stale strike directory with a registered worktree on the strike branch', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'pan-strike-repo-'));
+    const origin = mkdtempSync(join(tmpdir(), 'pan-strike-origin-'));
+    git(repo, ['init', '-b', 'main']);
+    writeFileSync(join(repo, 'README.md'), 'base\n', 'utf8');
+    git(repo, ['add', 'README.md']);
+    git(repo, ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'initial']);
+    git(origin, ['init', '--bare']);
+    git(repo, ['remote', 'add', 'origin', origin]);
+    git(repo, ['push', '-u', 'origin', 'main']);
+
+    const workspace = join(repo, 'workspaces', 'feature-pan-2061-strike');
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(join(workspace, 'stale.txt'), 'not a worktree\n', 'utf8');
+
+    await __testInternals.ensureStrikeWorktree({
+      issueId: 'PAN-2061',
+      workspace,
+      branch: 'strike/pan-2061',
+      sessionName: 'strike-pan-2061',
+      projectRoot: repo,
+    });
+
+    expect(existsSync(join(workspace, 'stale.txt'))).toBe(false);
+    expect(readFileSync(join(workspace, '.git'), 'utf8')).toContain('gitdir:');
+    expect(git(workspace, ['branch', '--show-current']).trim()).toBe('strike/pan-2061');
+    expect(git(repo, ['worktree', 'list', '--porcelain'])).toContain(`worktree ${workspace}\n`);
   });
 });

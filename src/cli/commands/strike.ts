@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, mkdirSync } from 'fs';
+import { rm } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -29,6 +30,25 @@ interface StrikePlan {
   projectRoot: string;
 }
 
+async function registeredWorktreeBranch(projectRoot: string, workspace: string): Promise<string | null | undefined> {
+  const { stdout } = await execAsync('git worktree list --porcelain', { cwd: projectRoot });
+  let currentPath: string | null = null;
+  let foundWorkspace = false;
+
+  for (const line of stdout.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      currentPath = line.slice('worktree '.length);
+      if (currentPath === workspace) foundWorkspace = true;
+      continue;
+    }
+    if (currentPath === workspace && line.startsWith('branch ')) {
+      return line.slice('branch '.length).replace(/^refs\/heads\//, '');
+    }
+  }
+
+  return foundWorkspace ? null : undefined;
+}
+
 /**
  * Resolve the strike workspace path for an issue. Strike workspaces live next
  * to normal feature workspaces but use the suffix `-strike` so they cannot
@@ -55,8 +75,18 @@ function planStrike(issueId: string): StrikePlan {
  * If the worktree already exists, reuse it (no-op).
  */
 async function ensureStrikeWorktree(plan: StrikePlan): Promise<void> {
-  if (existsSync(plan.workspace)) {
+  const registeredBranch = await registeredWorktreeBranch(plan.projectRoot, plan.workspace);
+  if (registeredBranch === plan.branch) {
     return;
+  }
+  if (registeredBranch !== undefined) {
+    const actual = registeredBranch ?? 'a detached HEAD';
+    throw new Error(
+      `Strike workspace ${plan.workspace} is registered on ${actual}, expected ${plan.branch}. Refusing to reuse the wrong worktree.`,
+    );
+  }
+  if (existsSync(plan.workspace)) {
+    await rm(plan.workspace, { recursive: true, force: true });
   }
   mkdirSync(join(plan.workspace, '..'), { recursive: true });
 
@@ -212,4 +242,6 @@ export const __testInternals = {
   planStrike,
   buildStrikePrompt,
   clearIdlePriorStrike,
+  ensureStrikeWorktree,
+  registeredWorktreeBranch,
 };
