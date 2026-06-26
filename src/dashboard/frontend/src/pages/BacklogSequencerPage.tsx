@@ -281,23 +281,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
     }
   }
 
-  async function handleGateChange(issueId: string, gate: string) {
-    await fetch('/api/backlog/sequence/gate', {
-      method: 'POST',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ issueId, gate }),
-    });
-    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
-  }
-
-  async function handlePlanningChange(issueId: string, planning: string) {
-    await fetch('/api/backlog/sequence/planning', {
-      method: 'POST',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ issueId, planning }),
-    });
-    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
-  }
 
   const conditionBadge = (condition: string) =>
     CONDITION_BADGE_CLASS[condition] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]';
@@ -759,8 +742,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                   className="w-full h-full"
                   selectedNodeId={selectedNode?.issueId}
                   onSelectNode={(n) => setSelectedNode(n)}
-                  onGateChange={handleGateChange}
-                  onPlanningChange={handlePlanningChange}
                   onIssueAction={onIssueAction}
                 />
               </div>
@@ -782,8 +763,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
           <RationaleSidePanel
             node={selectedNode}
             onClose={() => setSelectedNode(null)}
-            onGateChange={handleGateChange}
-            onPlanningChange={handlePlanningChange}
             onIssueAction={onIssueAction}
           />
         )}

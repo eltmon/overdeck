@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PickupGateControls } from './PickupGateControls';
+import { useQuery } from '@tanstack/react-query';
 import ReactFlow, {
   type Node,
   type Edge,
@@ -209,20 +209,6 @@ const IMP_SWATCH: Record<string, string> = {
   low: 'color-mix(in srgb, var(--muted-foreground) 55%, transparent)',
 };
 
-// Planning-policy hint shown under the segmented control (verbatim from the mockup).
-const PLAN_HINT: Record<string, string> = {
-  interactive: 'Interactive: a human drives planning — a HARD gate. The Flywheel surfaces it as needs-you and never auto-runs it.',
-  skip: 'Skip: no planning — pan start --auto straight to work (trivial/tiny/urgent).',
-  auto: 'Auto: the AI plans it end-to-end (pan plan --auto).',
-};
-
-// Pickup-gate hint shown under the segmented control (verbatim from the mockup).
-const GATE_HINT: Record<string, string> = {
-  ready: 'Promote: jump the queue ahead of rank (and auto-plan it if it has no spec yet).',
-  blocked: 'Vetoed: an absolute NO — never auto-picked, planned, or struck, even to unblock the pipeline.',
-  auto: 'Auto: normal eligibility (Ready · Planned · not parked · not vetoed).',
-};
-
 type FlagKind = 'pipeline' | 'refine' | 'stale' | 'ready' | 'prd' | 'none';
 
 function buildPanelFlags(node: SequenceNode): Array<{ label: string; kind: FlagKind }> {
@@ -256,75 +242,10 @@ function panelChipStyle(kind: FlagKind): CSSProperties {
 const META_GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '7px 14px', fontSize: 12 };
 const META_KEY: CSSProperties = { color: 'var(--muted-foreground)' };
 const META_VAL: CSSProperties = { color: 'var(--foreground)', textAlign: 'right' };
-const SECTION_LABEL: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 7 };
-const SECTION_HINT: CSSProperties = { fontSize: 12, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
-
-function SegControl({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: Array<{ value: string; label: string; activeColor?: string }>;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-      {options.map((opt) => {
-        const isActive = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            style={{
-              flex: 1,
-              padding: '3px 6px',
-              fontSize: 10,
-              fontWeight: isActive ? 700 : 400,
-              border: 'none',
-              cursor: 'pointer',
-              background: isActive ? (opt.activeColor ?? '#3b82f6') : 'var(--color-surface)',
-              color: isActive ? '#fff' : 'var(--color-fg-muted)',
-              transition: 'all 0.15s',
-            }}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// PAN-2006: a labelled on/off switch for the editor drawer's pipeline-state controls.
-function ToggleRow({ label, hint, on, color, onChange }: {
-  label: string; hint: string; on: boolean; color: string; onChange: (v: boolean) => void;
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, margin: '9px 0' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 10, color: 'var(--muted-foreground)', lineHeight: 1.4, marginTop: 2 }}>{hint}</div>
-      </div>
-      <button
-        onClick={() => onChange(!on)}
-        aria-pressed={on}
-        style={{
-          flexShrink: 0, width: 38, height: 22, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative',
-          background: on ? `color-mix(in srgb, ${color} 60%, transparent)` : 'var(--input)', transition: 'background 0.15s',
-        }}
-      >
-        <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }} />
-      </button>
-    </div>
-  );
-}
 
 export interface RationaleSidePanelProps {
   node: SequenceNode;
   onClose: () => void;
-  onGateChange: (issueId: string, gate: string) => Promise<void>;
-  onPlanningChange: (issueId: string, planning: string) => Promise<void>;
   /** PAN-2005: open the issue in the browser / overlay / cockpit panel. */
   onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
@@ -352,93 +273,10 @@ const NAV_BTN: CSSProperties = {
 export function RationaleSidePanel({
   node,
   onClose,
-  onGateChange,
-  onPlanningChange,
   onIssueAction,
 }: RationaleSidePanelProps) {
-  const [gate, setGate] = useState(node.gate);
-  const [planning, setPlanning] = useState(node.planning);
-  const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(!!node.state?.ready);
-  const [parked, setParked] = useState(!!node.state?.parked);
-  const [blocksMain, setBlocksMain] = useState(!!node.state?.blocksMain);
-  const [released, setReleased] = useState(!!node.state?.released);
-  const [objection, setObjection] = useState(!!node.state?.objection);
-  const planned = !!node.state?.planned;
-
-  useEffect(() => {
-    setGate(node.gate);
-    setPlanning(node.planning);
-    setReady(!!node.state?.ready);
-    setParked(!!node.state?.parked);
-    setBlocksMain(!!node.state?.blocksMain);
-    setReleased(!!node.state?.released);
-    setObjection(!!node.state?.objection);
-  }, [node.issueId, node.gate, node.planning, node.state]);
-
-  async function handleGateChange(v: string) {
-    setGate(v);
-    setBusy(true);
-    try { await onGateChange(node.issueId, v); } finally { setBusy(false); }
-  }
-
-  async function handlePlanningChange(v: string) {
-    setPlanning(v);
-    setBusy(true);
-    try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
-  }
-
-  // PAN-2006 WI-10 + PAN-2059: toggle ready / parked / blocks-main / released / objection
-  // labels via the editor write-door.
-  async function toggleLabel(field: 'ready' | 'parked' | 'blocksMain' | 'released' | 'objection', value: boolean) {
-    if (field === 'ready') setReady(value);
-    if (field === 'parked') setParked(value);
-    if (field === 'blocksMain') setBlocksMain(value);
-    if (field === 'released') setReleased(value);
-    if (field === 'objection') setObjection(value);
-    setBusy(true);
-    try {
-      await fetch('/api/backlog/sequence/labels', {
-        method: 'POST',
-        headers: await dashboardMutationJsonHeaders(),
-        body: JSON.stringify({ issueId: node.issueId, [field]: value }),
-      });
-    } finally { setBusy(false); }
-  }
-
-  // PAN-2059: kick off planning NOW (imperative), stopping before pickup so the operator
-  // reviews the plan and Releases it. Auto = non-interactive; Interactive = Q&A session.
-  async function startPlanning(mode: 'auto' | 'interactive') {
-    setBusy(true);
-    try {
-      await fetch(`/api/issues/${node.issueId}/start-planning`, {
-        method: 'POST',
-        headers: await dashboardMutationJsonHeaders(),
-        body: JSON.stringify({ auto: mode === 'auto', autoStart: false }),
-      }).catch(() => {});
-    } finally { setBusy(false); }
-  }
-
-  // PAN-2059: accept the AI objection — clear it and park the item.
-  async function acceptObjectionAndPark() {
-    await toggleLabel('objection', false);
-    await toggleLabel('parked', true);
-  }
-
   const flags = buildPanelFlags(node);
   const clampedScore = Math.max(0, Math.min(100, node.score));
-
-  // PAN-2059 Plan → Release action buttons.
-  const BTN_BASE: CSSProperties = { fontSize: 11, fontWeight: 500, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--accent)', color: 'var(--foreground)' };
-  const BTN_PRIMARY: CSSProperties = { ...BTN_BASE, border: 'none', background: 'var(--primary)', color: 'var(--primary-foreground)' };
-  const BTN_DANGER: CSSProperties = { ...BTN_BASE, border: '1px solid color-mix(in srgb, var(--destructive) 50%, transparent)', background: 'color-mix(in srgb, var(--destructive) 8%, transparent)', color: 'var(--destructive-foreground)' };
-  const BTN_LINK: CSSProperties = { fontSize: 11, background: 'none', border: 'none', color: 'var(--muted-foreground)', textDecoration: 'underline', cursor: 'pointer', padding: 2 };
-  const stateChip = (tone: 'planned' | 'released'): CSSProperties => ({
-    fontSize: 10, fontWeight: 500, padding: '1px 7px', borderRadius: 5, border: '1px solid', whiteSpace: 'nowrap',
-    ...(tone === 'released'
-      ? { color: 'var(--success-foreground)', borderColor: 'color-mix(in srgb, var(--success) 40%, transparent)', background: 'color-mix(in srgb, var(--success) 12%, transparent)' }
-      : { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }),
-  });
 
   return (
     <div style={{
@@ -511,117 +349,14 @@ export function RationaleSidePanel({
         </div>
       )}
 
-      {/* Plan → Release pickup flow + AI objection (PAN-2059) */}
-      {node.state && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
-          <div style={SECTION_LABEL}>Plan → Release · operator (PAN-2059) {busy && '…'}</div>
-          {objection ? (
-            // State 5 — Held for review / AI objection
-            <div style={{ border: '1px solid color-mix(in srgb, var(--destructive) 34%, transparent)', background: 'color-mix(in srgb, var(--destructive) 6%, transparent)', borderRadius: 9, padding: '10px 11px' }}>
-              <div style={{ fontSize: 11.5, color: 'var(--destructive-foreground)', marginBottom: 6 }}>🛑 Held for review — AI objection</div>
-              <div style={{ fontSize: 11, color: 'var(--muted-foreground)', lineHeight: 1.5, marginBottom: 9 }}>
-                The planning agent objects to this work (doesn&apos;t make sense / would worsen the product / superseded).{' '}
-                {onIssueAction && (
-                  <button style={{ ...BTN_LINK, padding: 0 }} onClick={() => onIssueAction(node.issueId, 'browser')}>View the write-up on the issue ↗</button>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button style={BTN_DANGER} onClick={() => toggleLabel('objection', false)} disabled={busy}>Override → Plan anyway</button>
-                <button style={BTN_BASE} onClick={acceptObjectionAndPark} disabled={busy}>Accept &amp; park</button>
-              </div>
-            </div>
-          ) : !planned ? (
-            // States 1–2 — needs plan / planning
-            <>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button style={BTN_PRIMARY} onClick={() => startPlanning('auto')} disabled={busy}>Plan (Auto)</button>
-                <button style={BTN_BASE} onClick={() => startPlanning('interactive')} disabled={busy}>⚑ Plan (Interactive)</button>
-              </div>
-              <div style={SECTION_HINT}>Generates the vBRIEF + beads. Auto runs end-to-end and stops before pickup; Interactive opens a Q&amp;A session. The plan must be Released before an agent can pick it up.</div>
-            </>
-          ) : !released ? (
-            // State 3 — planned, awaiting release
-            <>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={stateChip('planned')}>✓ planned</span>
-                <button style={BTN_PRIMARY} onClick={() => toggleLabel('released', true)} disabled={busy}>Release ▶</button>
-                <button style={BTN_LINK} onClick={() => startPlanning('auto')} disabled={busy}>Re-plan</button>
-              </div>
-              <div style={SECTION_HINT}>Plan ready — review it, then <b>Release</b> for pickup. <b>Not pickable until released.</b></div>
-            </>
-          ) : (
-            // State 4 — released / pickable
-            <>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={stateChip('released')}>▶ released · pickable</span>
-                <button style={BTN_LINK} onClick={() => toggleLabel('released', false)} disabled={busy}>Recall</button>
-              </div>
-              <div style={SECTION_HINT}>Released — eligible for pickup. Recall pulls it back to planned (held).</div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Pipeline state — operator controls (PAN-2006) */}
-      {node.state && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
-          <div style={SECTION_LABEL}>Pipeline state · operator controls {busy && '…'}</div>
-          <ToggleRow
-            label="Ready" color="var(--success)" on={ready}
-            hint="Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate)."
-            onChange={(v) => toggleLabel('ready', v)}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '9px 0' }}>
-            <span style={{ fontSize: 12, fontWeight: 500 }}>Planned</span>
-            <span style={{
-              fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 5, border: '1px solid',
-              ...(planned
-                ? { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }
-                : { color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 34%, transparent)', background: 'color-mix(in srgb, var(--warning) 9%, transparent)' }),
-            }}>{planned ? '✓ has spec + beads' : '✗ no spec'}</span>
-            <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>derived</span>
-          </div>
-          <ToggleRow
-            label="Blocks main 🔴" color="var(--destructive)" on={blocksMain}
-            hint="Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed)."
-            onChange={(v) => toggleLabel('blocksMain', v)}
-          />
-          <ToggleRow
-            label="Park" color="var(--warning)" on={parked}
-            hint="Defer — needs human design/discussion; excluded from auto-pickup, reversible."
-            onChange={(v) => toggleLabel('parked', v)}
-          />
-        </div>
-      )}
-
-      {/* Planning policy */}
+      {/* Backlog pickup controls — Plan → Release, AI objection, pipeline state,
+          planning, pickup gate. Shared component (PAN-2059), identical to the one
+          on the issue cockpit + overlay. */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
-        <div style={SECTION_LABEL}>Planning · AI-suggested, operator-overridable</div>
-        <SegControl
-          value={planning}
-          options={[
-            { value: 'skip', label: 'Skip' },
-            { value: 'auto', label: 'Auto' },
-            { value: 'interactive', label: '⚑ Interactive', activeColor: '#b45309' },
-          ]}
-          onChange={handlePlanningChange}
+        <PickupGateControls
+          issueId={node.issueId}
+          onOpenIssueBrowser={onIssueAction ? (id) => onIssueAction(id, 'browser') : undefined}
         />
-        <div style={SECTION_HINT}>{PLAN_HINT[planning] ?? ''}</div>
-      </div>
-
-      {/* Pickup gate */}
-      <div style={{ marginBottom: 13 }}>
-        <div style={SECTION_LABEL}>Pickup gate · operator {busy && '…'}</div>
-        <SegControl
-          value={gate}
-          options={[
-            { value: 'auto', label: 'Auto' },
-            { value: 'ready', label: '📌 Promote', activeColor: '#15803d' },
-            { value: 'blocked', label: '⛔ Vetoed', activeColor: '#b91c1c' },
-          ]}
-          onChange={handleGateChange}
-        />
-        <div style={SECTION_HINT}>{GATE_HINT[gate] ?? ''}</div>
       </div>
 
       {/* AI rationale */}
@@ -643,8 +378,6 @@ interface BacklogDAGProps {
   className?: string;
   selectedNodeId?: string | null;
   onSelectNode?: (n: SequenceNode | null) => void;
-  onGateChange?: (issueId: string, gate: string) => Promise<void>;
-  onPlanningChange?: (issueId: string, planning: string) => Promise<void>;
   /** PAN-2005: open the selected issue in the browser / overlay / cockpit panel. */
   onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
@@ -654,11 +387,8 @@ export function BacklogDAG({
   className,
   selectedNodeId,
   onSelectNode,
-  onGateChange,
-  onPlanningChange,
   onIssueAction,
 }: BacklogDAGProps) {
-  const queryClient = useQueryClient();
   const [internalSelectedNode, setInternalSelectedNode] = useState<SequenceNode | null>(null);
 
   // If external control is provided, use it; otherwise use internal state
@@ -701,27 +431,6 @@ export function BacklogDAG({
       if (found) setInternalSelectedNode(found);
     }
   }, [data.nodes, data.edges, handleSelect, setNodes, setEdges, internalSelectedNode, isControlled]);
-
-  const defaultGateChange = async (issueId: string, gate: string) => {
-    await fetch('/api/backlog/sequence/gate', {
-      method: 'POST',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ issueId, gate }),
-    });
-    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
-  };
-
-  const defaultPlanningChange = async (issueId: string, planning: string) => {
-    await fetch('/api/backlog/sequence/planning', {
-      method: 'POST',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ issueId, planning }),
-    });
-    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
-  };
-
-  const handleGateChange = onGateChange ?? defaultGateChange;
-  const handlePlanningChange = onPlanningChange ?? defaultPlanningChange;
 
   return (
     <div
@@ -806,8 +515,6 @@ export function BacklogDAG({
         <RationaleSidePanel
           node={selectedNode}
           onClose={handleClose}
-          onGateChange={handleGateChange}
-          onPlanningChange={handlePlanningChange}
           onIssueAction={onIssueAction}
         />
       )}
