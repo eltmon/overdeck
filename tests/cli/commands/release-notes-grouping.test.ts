@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupCommitSubjects } from '../../../src/cli/commands/release.js';
+import { groupCommitSubjects, buildReleaseNotesMarkdown } from '../../../src/cli/commands/release.js';
 
 describe('groupCommitSubjects', () => {
   it('drops pipeline bookkeeping commits entirely', () => {
@@ -51,5 +51,22 @@ describe('groupCommitSubjects', () => {
       'fix(dashboard): route pi transcripts for strike sessions',
     ]);
     expect(out.match(/Route pi transcripts/g)).toHaveLength(1);
+  });
+});
+
+describe('buildReleaseNotesMarkdown install command', () => {
+  it('pins the package.json name and the exact version (not "latest", not hardcoded)', () => {
+    const md = buildReleaseNotesMarkdown({
+      channel: 'stable',
+      version: '1.2.3',
+      from: 'v1.2.2',
+      to: 'v1.2.3',
+      entries: ['fix: a thing'],
+      packageName: '@panctl/cli',
+    });
+    // The package name is taken verbatim from the caller (sourced from package.json) and the
+    // version is pinned, so a release's notes install THAT release under THAT package — even
+    // across the project's historical renames (panopticon-cli -> @panctl/cli -> @overdeck/core).
+    expect(md).toContain('npm install -g @panctl/cli@1.2.3');
   });
 });

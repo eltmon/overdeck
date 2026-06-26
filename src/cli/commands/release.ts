@@ -9,6 +9,7 @@ type ReleaseChannel = 'stable' | 'canary';
 
 type PackageJson = {
   version: string;
+  name?: string;
   [key: string]: unknown;
 };
 
@@ -200,18 +201,20 @@ export function groupCommitSubjects(entries: string[]): string {
   return sections.length > 0 ? sections.join('\n\n') : '- No user-facing changes in the selected range.';
 }
 
-function buildReleaseNotesMarkdown(params: {
+export function buildReleaseNotesMarkdown(params: {
   channel: ReleaseChannel;
   version: string;
   from: string | null;
   to: string;
   entries: string[];
+  packageName: string;
 }): string {
-  const { channel, version, from, to, entries } = params;
+  const { channel, version, from, to, entries, packageName } = params;
   const range = from ? `${from}...${to}` : to;
-  const installCommand = channel === 'stable'
-    ? 'npm install -g @overdeck/core'
-    : `npm install -g @overdeck/core@${channel}`;
+  // Pin the package name (passed in from package.json) and the exact version, so a release's
+  // notes install THAT release. The package was renamed across history
+  // (panopticon-cli -> @panctl/cli -> @overdeck/core); never hardcode it here.
+  const installCommand = `npm install -g ${packageName}@${version}`;
 
   const highlights = groupCommitSubjects(entries);
 
@@ -483,6 +486,7 @@ async function releaseCreateCommand(
     from: previousTag,
     to: tagName,
     entries,
+    packageName: pkg.name ?? '@overdeck/core',
   });
 
   writeTextFile(releaseNotesPath, releaseNotes);
@@ -544,6 +548,7 @@ async function releaseNotesCommand(
     from: resolvedFrom,
     to: resolvedTo,
     entries,
+    packageName: readPackageJson().name ?? '@overdeck/core',
   });
 
   if (options.write) {
