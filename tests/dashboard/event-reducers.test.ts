@@ -62,8 +62,8 @@ describe('INITIAL_READ_MODEL_STATE', () => {
 // ─── syncSnapshot ────────────────────────────────────────────────────────────
 
 describe('syncSnapshot', () => {
-  // DashboardSnapshot only contains: sequence, agents, specialists, reviewStatuses, resources, timestamp
-  // agentOutput, recentActivity, shadowInference are NOT part of the snapshot — they arrive via events
+  // DashboardSnapshot carries bootstrap state; high-volume output and shadow
+  // inference still arrive via events.
   const snapshot: DashboardSnapshot = {
     sequence: 10,
     agents: [baseAgent],
@@ -94,6 +94,16 @@ describe('syncSnapshot', () => {
     const snapshotWithIssues = { ...snapshot, issues: [{ id: 'PAN-1' }, { id: 'PAN-2' }] } as any
     const state = syncSnapshot(makeState(), snapshotWithIssues)
     expect(state.issuesRaw).toHaveLength(2)
+  })
+
+  it('seeds recentActivity from the snapshot', () => {
+    const state = syncSnapshot(makeState(), {
+      ...snapshot,
+      recentActivity: [{ id: 'activity-1', timestamp: '2026-06-11T23:24:05.000Z', message: 'Restarted' }],
+    })
+    expect(state.recentActivity).toEqual([
+      { id: 'activity-1', timestamp: '2026-06-11T23:24:05.000Z', message: 'Restarted' },
+    ])
   })
 
   it('hydrates conversation progress fields from snapshot', () => {

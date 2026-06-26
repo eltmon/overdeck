@@ -32,6 +32,22 @@ import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
+const MAX_SNAPSHOT_ACTIVITY_ENTRIES = 50;
+
+type DashboardSnapshotWithActivity = DashboardSnapshot & {
+  recentActivity?: unknown[];
+};
+
+export function activityEntriesFromStoredEvents(
+  events: ReadonlyArray<{ timestamp: string; payload: unknown }>,
+): unknown[] {
+  return events.slice(0, MAX_SNAPSHOT_ACTIVITY_ENTRIES).map((event) => {
+    const entry = event.payload && typeof event.payload === 'object'
+      ? event.payload as Record<string, unknown>
+      : {};
+    return { id: entry.id, timestamp: event.timestamp, ...entry };
+  });
+}
 
 
 // PAN-1510: bootstrap previously only seeded `issuesRaw` from the projection
@@ -340,7 +356,7 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
 
 export interface ReadModelServiceShape {
   /** Return the current read model state as a DashboardSnapshot. */
-  readonly getSnapshot: Effect.Effect<DashboardSnapshot>;
+  readonly getSnapshot: Effect.Effect<DashboardSnapshotWithActivity>;
   /** Return a single pending channel permission request without rebuilding a full snapshot. */
   readonly getChannelPermissionRequest: (
     requestId: string,
@@ -418,7 +434,7 @@ export const ReadModelServiceLive = Layer.effect(
       }));
     }
 
-    function buildSnapshot(): DashboardSnapshot {
+    function buildSnapshot(): DashboardSnapshotWithActivity {
       // turnDiffSummariesByAgentId is intentionally excluded from the snapshot.
       //
       // Per-agent checkpoint history can grow to thousands of turns × hundreds
@@ -440,6 +456,7 @@ export const ReadModelServiceLive = Layer.effect(
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
+        recentActivity: state.recentActivity,
         resources: state.resources ?? undefined,
         memory: {
           observationsByIssueId: state.observationsByIssueId,
@@ -460,7 +477,7 @@ export const ReadModelServiceLive = Layer.effect(
       state = applyEventReducer(state, event);
     };
 
-    const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
+    const getSnapshot: Effect.Effect<DashboardSnapshotWithActivity> = Effect.gen(function* () {
       // Refresh issues from the shared issue service before building snapshot.
       // IssueDataService polls trackers in the background; its cached issues are
       // the freshest available without blocking on API calls.
@@ -536,11 +553,16 @@ export const ReadModelServiceLive = Layer.effect(
 
       // ── Sequence from event store (labels the snapshot, not a replay source) ─
       let sequence = 0;
+      let recentActivity: unknown[] = [];
       try {
         const { getEventStore } = yield* Effect.promise(
           () => import('./event-store.js'),
         );
-        sequence = getEventStore().getLatestSequence();
+        const eventStore = getEventStore();
+        sequence = eventStore.getLatestSequence();
+        recentActivity = activityEntriesFromStoredEvents(
+          eventStore.queryByType('activity.entry', MAX_SNAPSHOT_ACTIVITY_ENTRIES),
+        );
       } catch {
         // Event store may not be initialized yet
       }
@@ -551,6 +573,7 @@ export const ReadModelServiceLive = Layer.effect(
         agentsById,
         reviewStatusByIssueId: result.reviewStatusByIssueId,
         issuesRaw: [],
+        recentActivity,
       };
 
       console.log(

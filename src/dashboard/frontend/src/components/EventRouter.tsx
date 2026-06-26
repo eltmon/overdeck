@@ -127,9 +127,8 @@ export function EventRouter() {
           (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
         ) as DashboardSnapshot
         syncSnapshot(snapshot)
-        // The WS snapshot carries no activity history — backfill from the
-        // persisted event store so entries emitted while this page was
-        // disconnected (e.g. restart announcements at boot) still show.
+        // Snapshot carries recent activity now; keep the HTTP backfill as a
+        // non-fatal compatibility path for older cached/server payloads.
         void seedRecentActivityFromApi()
         bootstrapComplete = true
         stopFallbackPoller()

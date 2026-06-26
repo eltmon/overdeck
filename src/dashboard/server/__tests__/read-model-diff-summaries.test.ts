@@ -3,7 +3,7 @@ import { Effect, Layer } from 'effect'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { shouldSkipCheckpointReconciliation } from '../read-model.js'
+import { activityEntriesFromStoredEvents, shouldSkipCheckpointReconciliation } from '../read-model.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -50,6 +50,33 @@ async function withIsolatedReadModel<T>(
 }
 
 describe('ReadModel diff summaries', () => {
+  it('converts stored activity.entry rows into snapshot recentActivity entries', () => {
+    const entries = activityEntriesFromStoredEvents([
+      {
+        timestamp: '2026-06-11T23:24:05.000Z',
+        payload: { id: 'restart-1', source: 'dashboard', message: 'Dashboard restarted via pan reload' },
+      },
+      {
+        timestamp: '2026-06-11T23:20:00.000Z',
+        payload: { id: 'older-1', timestamp: '2026-06-11T23:20:01.000Z', message: 'Payload timestamp wins' },
+      },
+    ]) as Array<Record<string, unknown>>
+
+    expect(entries).toEqual([
+      {
+        id: 'restart-1',
+        timestamp: '2026-06-11T23:24:05.000Z',
+        source: 'dashboard',
+        message: 'Dashboard restarted via pan reload',
+      },
+      {
+        id: 'older-1',
+        timestamp: '2026-06-11T23:20:01.000Z',
+        message: 'Payload timestamp wins',
+      },
+    ])
+  })
+
   it('keeps turn diff summaries off the dashboard snapshot while serving them separately', async () => {
     const timestamp = '2026-05-08T05:00:00.000Z'
 
