@@ -56,6 +56,23 @@ function mockFetch() {
     const currentIssue = useDashboardStore.getState().issuesRaw.find((candidate) => candidate.identifier === 'PAN-1');
     if (url.endsWith('/artifacts')) return Response.json({ artifacts: [] });
     if (url.endsWith('/plan')) return Response.json(null);
+    if (url.includes('/api/backlog/issue-state')) return Response.json({
+      issueId: 'PAN-1',
+      state: {
+        ready: false,
+        planned: currentIssue?.hasPlan ?? false,
+        parked: false,
+        vetoed: false,
+        blocksMain: false,
+        inPipeline: false,
+        released: false,
+        objection: false,
+        gate: 'auto',
+      },
+      gate: 'auto',
+      planning: 'auto',
+      inSequence: false,
+    });
     if (url.includes('/planning-state')) return Response.json({
       hasPlan: currentIssue?.hasPlan ?? false,
       hasBeads: currentIssue?.hasBeads ?? false,
@@ -321,11 +338,31 @@ describe('IssueDrawer', () => {
   });
 
   it('renders the open-in picker for an existing drawer workspace', async () => {
-    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      exists: true,
-      issueId: 'PAN-1',
-      path: '/tmp/pan-workspace',
-    }), { status: 200 }));
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/backlog/issue-state')) return Response.json({
+        issueId: 'PAN-1',
+        state: {
+          ready: false,
+          planned: false,
+          parked: false,
+          vetoed: false,
+          blocksMain: false,
+          inPipeline: false,
+          released: false,
+          objection: false,
+          gate: 'auto',
+        },
+        gate: 'auto',
+        planning: 'auto',
+        inSequence: false,
+      });
+      return Response.json({
+        exists: true,
+        issueId: 'PAN-1',
+        path: '/tmp/pan-workspace',
+      });
+    });
     wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
     useDashboardStore.getState().openIssue('PAN-1');
 

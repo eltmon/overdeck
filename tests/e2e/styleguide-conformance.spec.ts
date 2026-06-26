@@ -178,6 +178,23 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
+      if (path === '/api/backlog/issue-state') return json({
+        issueId: new URL(url, window.location.origin).searchParams.get('issueId') ?? 'PAN-1148',
+        state: {
+          ready: true,
+          planned: true,
+          parked: false,
+          vetoed: false,
+          blocksMain: false,
+          inPipeline: true,
+          released: true,
+          objection: false,
+          gate: 'auto',
+        },
+        gate: 'auto',
+        planning: 'auto',
+        inSequence: false,
+      });
       if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Overdeck', path: '/tmp/overdeck' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
       if (path === '/api/conversations/pending-input') return json([]);
