@@ -3,7 +3,8 @@ name: pan-recap
 description: >
   Executive recap of the most recent day's work (default last 24h) across the
   Overdeck pipeline — what shipped, what's still in flight, what needs the
-  operator's attention, and the numbers. EVERY issue is described in plain
+  operator's attention, and the numbers — PLUS a separate, shareable user-facing
+  PR-FAQ of what was released. EVERY issue is described in plain
   language (what it is / what it does), never a bare ID. Use when the user asks
   "what happened overnight / today / while I was away", "catch me up", "daily
   recap", "standup", "what did the flywheel do", or wants an up-leveled summary
@@ -34,8 +35,11 @@ Overdeck pipeline over a recent window (default: last 24 hours). It is the
 answer to "what happened while I was asleep?" — written for an operator who
 wants the story and the decisions, not a log.
 
-The output groups work by **outcome** (shipped / in flight / needs attention),
-explains **every issue in plain language**, and ends with a one-line scoreboard.
+The output has two parts: (1) an **operator recap** that groups work by
+**outcome** (shipped / in flight / needs attention), explains **every issue in
+plain language**, and ends with a one-line scoreboard; and (2) a separate,
+copy-pasteable **user-facing PR-FAQ** that announces only the user-visible
+releases in benefit language — the thing you'd actually send to users.
 
 ## Output style — EXECUTIVE (read this first; it is the whole point)
 
@@ -70,6 +74,27 @@ number memorized. Up-level it.
 > PAN-2063, PAN-1884, PAN-1084 planning. PAN-1722, PAN-1793, PAN-2045 strikes.
 
 That is a list of IDs with no meaning. Rewrite it as the template below.
+
+### Two audiences — operator recap AND a user-facing PR-FAQ
+
+The executive recap is for the **operator** — it includes internal plumbing,
+incidents, and decisions. But every recap ALSO produces a **user-facing
+PR-FAQ**: a short, plain-language announcement of what *shipped to users*,
+written the way you'd tell a customer — benefit first, no jargon, no internal
+issue IDs in the prose.
+
+- **PR-FAQ = "press release + FAQ."** A few sentences announcing the
+  user-visible change(s), then 2–4 anticipated questions with answers.
+- **Only user-facing work belongs in the PR-FAQ:** new features, UX or behavior
+  changes, and bug fixes a user would actually notice. **Internal substrate** —
+  pipeline reliability, CI fixes, deacon/orchestrator plumbing, refactors, test
+  infra — stays in the operator recap and is **NOT** in the PR-FAQ.
+- **If nothing user-facing shipped, say so honestly:** "No user-facing releases
+  this window — all internal reliability work." Never dress up plumbing as a
+  feature.
+- **Voice:** second person, benefit-first ("You can now …"). Lead with what the
+  user can do that they couldn't before, then why it matters. Keep issue links
+  in a trailing reference line, never in the headline.
 
 ## Steps
 
@@ -192,6 +217,16 @@ Translate each title into operator English. Examples of the transform:
 Write it in the template below. Keep it skimmable — a busy operator should get
 the whole picture in ~20 seconds. Omit any section that's empty.
 
+### 6. Write the user-facing PR-FAQ
+
+From the "what shipped" set, keep **only** the user-facing items (apply the
+classification rule under *Two audiences* above — drop everything that's
+internal substrate). For each survivor, write one benefit-first line in plain
+user English. Then add a short **FAQ** of 2–4 questions a user would actually
+ask ("Do I need to do anything?", "Where do I find it?", "Did the way X works
+change?"). If the window shipped nothing user-facing, write the single honest
+line and skip the FAQ — do not invent user value out of plumbing.
+
 ## Output template
 
 ```
@@ -213,6 +248,51 @@ the whole picture in ~20 seconds. Omit any section that's empty.
 
 **By the numbers:** <N bugs fixed> · <N merged> · <N in flight> · <cost/uptime/incident facts>. Main is <green/red>.
 ```
+
+Then, as a separate, copy-pasteable block (an operator can share this verbatim
+with users/stakeholders without editing):
+
+```
+---
+
+## What's new — shareable (PR-FAQ)
+
+*(when nothing user-facing shipped):*
+No user-facing releases this window — the work was all behind-the-scenes reliability.
+
+*(when there are user-facing releases):*
+**<Headline: the user-visible capability, stated as a benefit>**
+
+<1–3 sentences: what you can now do that you couldn't before, and why it helps.
+Plain language, second person, no issue IDs in the prose.>
+
+- **<Capability / visible fix>** — <benefit-first description>.
+- **<Capability / visible fix>** — <benefit-first description>.
+
+**FAQ**
+- **<Anticipated question?>** <Answer.>
+- **<Anticipated question?>** <Answer.>
+
+*Shipped: [PAN-XXXX](url), [PAN-XXXX](url)*
+```
+
+### Example PR-FAQ (illustrative)
+
+> **You can now pull backlog items into the pipeline yourself.**
+>
+> A new pickup control on each issue lets you move a backlog item straight into
+> planning from the dashboard — no CLI, no waiting on the flywheel to choose it.
+>
+> - **Pi / GLM agent conversations are now viewable** — the conversation panel
+>   used to render blank for non-Claude agents; it now shows their transcripts.
+> - **Long transcripts no longer get cut off** — conversations over 10 MB used
+>   to truncate in the live view; you now see the whole thing.
+>
+> **FAQ**
+> - **Do I need to do anything?** No — it's live on next dashboard load.
+> - **Where's the pickup control?** On each issue card and in the issue cockpit.
+>
+> *Shipped: [PAN-2059](url), [PAN-1827](url), [PAN-1850](url)*
 
 ## When to surface this
 
