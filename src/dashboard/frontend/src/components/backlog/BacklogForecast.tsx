@@ -5,24 +5,47 @@ import { useQuery } from '@tanstack/react-query';
 // pick up work (waves + lanes) from GET /api/backlog/forecast, which is computed by
 // the shared pickup module (single source of truth — never diverges from the Flywheel).
 
-interface PipelineState {
+export interface PipelineState {
   ready: boolean; planned: boolean; parked: boolean; vetoed: boolean;
   blocksMain: boolean; inPipeline: boolean; released: boolean; objection: boolean;
   gate: 'auto' | 'promote' | 'vetoed';
 }
-interface ForecastNode {
+export interface ForecastNode {
   issue: string; rank: number; size: string; state: PipelineState;
   title: string; importance: string; score: number; why: string;
 }
-interface LaneBlock extends ForecastNode { lane: number; start: number; end: number; }
-interface ForecastStats {
+export interface LaneBlock extends ForecastNode { lane: number; start: number; end: number; }
+export interface ForecastStats {
   total: number; inFlight: number; ready: number; planned: number; released: number;
   objection: number; pickable: number; needsPlanning: number; needsRelease: number;
   parked: number; vetoed: number; blocksMain: number;
 }
-interface ForecastResponse {
+export interface ForecastResponse {
   n: number; stats: ForecastStats | null; inFlight: ForecastNode[];
   waves: ForecastNode[][]; lanes: { blocks: LaneBlock[]; makespan: number }; cohort: string[];
+  epics?: Array<{ issue: string; title: string }>;
+  contains?: Array<{ epic: string; child: string }>;
+}
+
+export interface WaveEpicGroup {
+  epic: string | null;
+  cards: ForecastNode[];
+}
+
+export function groupWaveByEpic(cards: readonly ForecastNode[], childToEpic: ReadonlyMap<string, string>): WaveEpicGroup[] {
+  const usedEpics = new Set<string>();
+  const groups: WaveEpicGroup[] = [];
+  for (const card of cards) {
+    const epic = childToEpic.get(card.issue);
+    if (!epic) {
+      groups.push({ epic: null, cards: [card] });
+      continue;
+    }
+    if (usedEpics.has(epic)) continue;
+    usedEpics.add(epic);
+    groups.push({ epic, cards: cards.filter((candidate) => childToEpic.get(candidate.issue) === epic) });
+  }
+  return groups;
 }
 
 const IMP_CLASS: Record<string, string> = { critical: 'crit', high: 'high', medium: 'medium', low: 'low' };
@@ -44,7 +67,12 @@ function Chips({ s }: { s: PipelineState }) {
   );
 }
 
-function Card({ n, onSelect }: { n: ForecastNode; onSelect?: (id: string) => void }) {
+function EpicTag({ epicId, epicTitle }: { epicId?: string; epicTitle?: string }) {
+  if (!epicId) return null;
+  return <span className="bkf-epictag" title={epicTitle || epicId}>▣ {epicId}</span>;
+}
+
+function Card({ n, onSelect, epicId, epicTitle }: { n: ForecastNode; onSelect?: (id: string) => void; epicId?: string; epicTitle?: string }) {
   const cls = ['bkf-card', IMP_CLASS[n.importance] ?? 'medium'];
   if (n.state.inPipeline) cls.push('pipe');
   if (n.state.blocksMain) cls.push('blocksmain');
@@ -59,6 +87,7 @@ function Card({ n, onSelect }: { n: ForecastNode; onSelect?: (id: string) => voi
         <span className="bkf-sz">{n.size}</span>
       </div>
       <div className="bkf-ttl">{n.title || n.why || n.issue}</div>
+      <EpicTag epicId={epicId} epicTitle={epicTitle} />
       <Chips s={n.state} />
     </div>
   );
@@ -82,6 +111,10 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
 
   const stats = data.stats;
   const unit = Math.max(36, Math.floor(900 / Math.max(data.lanes.makespan, 1)));
+  const epics = data.epics ?? [];
+  const contains = data.contains ?? [];
+  const childToEpic = new Map(contains.map((entry) => [entry.child, entry.epic]));
+  const epicTitle = new Map(epics.map((entry) => [entry.issue, entry.title]));
 
   return (
     <div className={className} style={{ height: '100%', overflow: 'auto', padding: '16px 20px' }}>
@@ -115,14 +148,33 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
           <div className="bkf-wcol now">
             <div className="bkf-wh">▶ Running now <span className="c">{data.inFlight.length}</span></div>
             <div className="bkf-wstack">
-              {data.inFlight.map((nn) => <Card key={nn.issue} n={nn} onSelect={onSelectIssue} />)}
+              {data.inFlight.map((nn) => {
+                const epic = childToEpic.get(nn.issue);
+                return <Card key={nn.issue} n={nn} onSelect={onSelectIssue} epicId={epic} epicTitle={epic ? epicTitle.get(epic) : undefined} />;
+              })}
               {data.inFlight.length === 0 && <div className="bkf-empty">nothing in flight</div>}
             </div>
           </div>
           {data.waves.map((w, i) => (
             <div key={i} className="bkf-wcol">
               <div className="bkf-wh">Wave <span className="c">{i + 1}</span></div>
-              <div className="bkf-wstack">{w.map((nn) => <Card key={nn.issue} n={nn} onSelect={onSelectIssue} />)}</div>
+              <div className="bkf-wstack">
+                {groupWaveByEpic(w, childToEpic).map((group, groupIndex) => (
+                  <div key={group.epic ?? `orphan-${group.cards[0]?.issue ?? groupIndex}`} className={group.epic ? 'bkf-epicrun' : undefined}>
+                    {group.epic && (
+                      <div className="bkf-epichead" title={epicTitle.get(group.epic) || group.epic}>
+                        ▣ {group.epic}{epicTitle.get(group.epic) ? ` · ${epicTitle.get(group.epic)}` : ''}
+                      </div>
+                    )}
+                    <div className="bkf-wstack">
+                      {group.cards.map((nn) => {
+                        const epic = childToEpic.get(nn.issue);
+                        return <Card key={nn.issue} n={nn} onSelect={onSelectIssue} epicId={epic} epicTitle={epic ? epicTitle.get(epic) : undefined} />;
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
           {data.waves.length === 0 && (
@@ -146,6 +198,7 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
                   <div key={b.issue} className={`bkf-blk ${IMP_CLASS[b.importance] ?? 'medium'}`}
                     style={{ left: b.start * unit, width: (b.end - b.start) * unit - 4 }} title={b.title} onClick={() => onSelectIssue?.(b.issue)}>
                     <div className="bkf-bi">#{b.rank} {b.issue}</div>
+                    <EpicTag epicId={childToEpic.get(b.issue)} epicTitle={childToEpic.get(b.issue) ? epicTitle.get(childToEpic.get(b.issue)!) : undefined} />
                     <div className="bkf-bt">{b.title || b.issue}</div>
                   </div>
                 ))}
@@ -182,6 +235,8 @@ const BKF_CSS = `
   .bkf-wh .c { font-family:ui-monospace,monospace; color:var(--foreground); font-weight: 500; }
   .bkf-wcol.now .bkf-wh { color:var(--info-foreground); }
   .bkf-wstack { display:flex; flex-direction:column; gap:8px; }
+  .bkf-epicrun { display:flex; flex-direction:column; gap:7px; }
+  .bkf-epichead { font-size:9.5px; font-weight:500; letter-spacing:.04em; color:var(--muted-foreground); border-left:3px solid color-mix(in srgb,var(--primary) 55%,transparent); padding-left:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bkf-empty { font-size:11px; color:var(--muted-foreground); font-style:italic; }
   .bkf-emptywaves { flex:1; font-size:12.5px; color:var(--muted-foreground); line-height:1.6; border:1px dashed var(--border); border-radius:10px; padding:18px; max-width:560px; }
   .bkf-card { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.3); }
@@ -197,6 +252,7 @@ const BKF_CSS = `
   .bkf-iid { font-family:ui-monospace,monospace; font-size:10px; color:var(--muted-foreground); }
   .bkf-sz { margin-left:auto; font-size:8.5px; font-weight: 500; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
   .bkf-ttl { font-size:11px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; color:var(--foreground); }
+  .bkf-epictag { align-self:flex-start; font-size:8.5px; font-weight:500; letter-spacing:.04em; padding:1px 5px; border-radius:4px; border:1px solid color-mix(in srgb,var(--primary) 38%,transparent); color:var(--foreground); background:color-mix(in srgb,var(--primary) 10%,transparent); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .bkf-chips { display:flex; gap:4px; flex-wrap:wrap; }
   .bkf-chip { font-size:8.5px; font-weight: 500; padding:1px 5px; border-radius:4px; border:1px solid; }
   .bkf-chip.run { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 9%,transparent); display:inline-flex; gap:3px; align-items:center; }
@@ -214,7 +270,7 @@ const BKF_CSS = `
   .bkf-lane { display:flex; align-items:center; height:48px; }
   .bkf-ll { width:82px; flex:0 0 auto; font-family:ui-monospace,monospace; font-size:11px; color:var(--muted-foreground); }
   .bkf-track { position:relative; flex:1; height:100%; border-left:1px dashed var(--border); }
-  .bkf-blk { position:absolute; top:6px; height:36px; border-radius:8px; border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); background:var(--card); padding:4px 8px; box-sizing:border-box; overflow:hidden; cursor:pointer; }
+  .bkf-blk { position:absolute; top:6px; min-height:36px; border-radius:8px; border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); background:var(--card); padding:4px 8px; box-sizing:border-box; overflow:hidden; cursor:pointer; }
   .bkf-blk.crit{--heat:var(--destructive);} .bkf-blk.high{--heat:var(--warning);} .bkf-blk.medium{--heat:color-mix(in srgb,var(--color-neutral-400) 80%,transparent);}
   .bkf-bi { font-family:ui-monospace,monospace; font-size:9.5px; color:var(--muted-foreground); }
   .bkf-bt { font-size:10px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

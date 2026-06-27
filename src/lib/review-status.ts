@@ -712,6 +712,16 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   // workspace/record hasn't been created yet.)
   if (!journal) return dbStatus ?? null;
 
+  if ((journal.durable as { closedOut?: boolean }).closedOut === true) {
+    // PAN-2054: closed-out journal records are terminal; stale active DB rows are cache residue.
+    try {
+      dbDelete(issueId);
+    } catch {
+      // Read-only DB (a sandboxed reader) — the host clears residue when it reads. Non-fatal.
+    }
+    return null;
+  }
+
   // PAN-1988 — journal is the source of truth; DB is a rebuildable cache. If the journal is
   // NEWER than the DB row, an agent recorded its verdict to the journal but the DB write
   // lagged or was blocked (a sandboxed agent that can't write ~/.overdeck). Reconcile the

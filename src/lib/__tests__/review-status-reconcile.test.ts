@@ -9,6 +9,7 @@ vi.mock('../cloister/review-verdict-feedback.js', () => ({ deliverReviewVerdictF
 // setReviewStatusSync deterministically without touching SQLite or the filesystem.
 const db = vi.hoisted(() => ({
   upsert: vi.fn(),
+  delete: vi.fn(),
   getFromDb: vi.fn(),
 }));
 const journal = vi.hoisted(() => ({
@@ -20,7 +21,7 @@ const journal = vi.hoisted(() => ({
 vi.mock('../overdeck/review-status-sync.js', () => ({
   upsertReviewStatusSync: db.upsert,
   getReviewStatusFromDbSync: db.getFromDb,
-  deleteReviewStatus: vi.fn(),
+  deleteReviewStatus: db.delete,
   getAllReviewStatusesFromDb: vi.fn(() => ({})),
   getReviewStatusesFromDb: vi.fn(() => ({})),
   markWorkspaceStuck: vi.fn(),
@@ -70,6 +71,33 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
     expect(result?.updatedAt).toBe('2026-06-20T07:22:21.788Z');
     // The cache was reconciled (host write) so bulk/merge-gate readers catch up.
     expect(db.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for a closed-out journal with stale active durable status', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'running',
+      mergeStatus: 'pending',
+      updatedAt: '2026-06-20T07:00:00.000Z',
+    }));
+    journal.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-06-20T07:22:21.788Z',
+      durable: {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'running',
+        mergeStatus: 'pending',
+        closedOut: true,
+        closedOutAt: '2026-06-20T07:22:21.788Z',
+      },
+    });
+
+    const result = getReviewStatusSync('PAN-1866');
+
+    expect(result).toBeNull();
+    expect(db.delete).toHaveBeenCalledWith('PAN-1866');
+    expect(db.upsert).not.toHaveBeenCalled();
   });
 
   it('does not reconcile when the DB is current — overlays feedback from the journal', () => {

@@ -116,8 +116,13 @@ function readStoredSessionId(agentId: string): string | null {
 /**
  * Resolve the real omp session id from the freshest session JSONL (PAN-1988 parity).
  * Returns null when no prior session exists on disk.
+ *
+ * Exported (PAN-2098) so the generic recovery path in agents.ts
+ * (`getLatestSessionIdSync`) can resume a crashed ohmypi agent — omp never
+ * writes a `session.id` file, so without this fallback the deacon reports
+ * "no saved session id" and can only respawn fresh, losing context.
  */
-function resolveLatestOhmypiSessionId(agentId: string): string | null {
+export function resolveLatestOhmypiSessionId(agentId: string): string | null {
   const root = ohmypiSessionDirFor(agentId)
   if (!existsSync(root)) return null
   const files: { path: string; mtime: number }[] = []

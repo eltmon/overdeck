@@ -2222,3 +2222,286 @@ pane diff / commits advancing), not just that the tmux session exists** — the 
 
 - Next tick: verify the 2 codex strikes landed green on main (CI), then close them out; if claude-code restored,
   re-plan PAN-2054 + PAN-1781. Watch for ff-push races if both strikes finish near-simultaneously.
+
+## RUN-18 tick 3 (2026-06-27 ~03:22Z) — 2 codex strikes FIXED+CLOSED; +2 launched; codex bypass fully validated
+
+- **CODEX STRIKE BYPASS IS PROVEN END-TO-END.** Both first-wave strikes landed clean on main and closed out:
+  - **PAN-1559** FIXED+CLOSED — `2e6712433 fix(deacon): reap orphaned inspect sessions` (new `inspect-session-reaper.ts`
+    + test + deacon wiring). CI green on `629b6cee3`. Closed (#1559).
+  - **PAN-1900** FIXED+CLOSED — `5bb276fcc fix: reuse daily UAT candidate branch` (deterministic daily UAT branch).
+    Strike's own verify: typecheck + 732 root tests passed / 32 frontend. CI green. Closed (#1900).
+  Both via `pan strike <id> --harness codex` → ff-push `strike/<id>:main` → `pan done --strike` → verifying-on-main.
+  **This is the reliable autonomous path while PAN-2087 is open.**
+
+- **DURABLE LESSON — the codex strike ff-push DID race, but self-resolved.** PAN-1559 landed first (`2e6712433`),
+  then PAN-1900's branch was briefly behind the moved main; the strike agent rebased + ff-pushed cleanly (RUN-17
+  behavior held). No manual intervention needed. Sequential launch (PAN-1900 then PAN-1559) did NOT prevent the race —
+  landing order is nondeterministic — but codex handles the rebase. **Multiple concurrent codex strikes are safe.**
+
+- **DURABLE LESSON — strike ff-push sweeps local-ahead commits onto origin.** strike-pan-1900 noted a pre-existing
+  local commit `04f3e9558 docs(flywheel): run 1` (not mine; sequencer/operator) was in its ff ancestry and got pushed
+  to origin/main. Benign here (docs), but reaffirms RUN-16: the primary main diverges (now ahead 3 / behind 4 per the
+  strike's `git status`) as origin advances under strikes. Reconcile at end-of-run (commit FLYWHEEL-STATE.md, pull
+  --rebase) — but the operator's uncommitted files (.gitignore/docs.json/record-cost-event.js.map/.vercelignore/
+  features/tldr.mdx) are NOT mine to commit, so a rebase may need care or deferral to `pan flywheel report`.
+
+- **+2 codex strikes launched (next wave):** `pan strike PAN-1638 --harness codex` (conversation active-status
+  liveness probe) + `pan strike PAN-1652 --harness codex` (title-regen 500 timeout). Both clean/deterministic,
+  different files (conversation-lifecycle.ts vs title route) → low landing-conflict risk. minAgents=2 sustained.
+
+- **`pan close` cosmetic failures confirmed recurring + harmless** — `gh issue edit --remove-label "in-planning"`
+  fails ('in-planning' not found) every close-out; `teardown:strike-worktree: not merged to main` is a FALSE NEGATIVE
+  (ff-push pattern; verify-merged gate is authoritative). Both non-fatal. (Reaffirms RUN-17.)
+
+- Next tick: when 1638/1652 land green, close them out; launch next codex wave. If operator restores claude-code,
+  re-plan PAN-2054 (close-out terminality) + PAN-1781 (context-overflow). Watch main CI for the new-wave landings.
+
+## RUN-18 tick 4 (2026-06-27 ~03:52Z) — RED MAIN resolved (PAN-2089 filed+struck+closed); claude-code RESTORED; 6 bugs closed; PAN-2054/1781 re-planned on Opus
+
+**RUN TOTAL: 6 substrate bugs FIXED+CLOSED** (PAN-1559, 1900, 1652, 1638, 1637, 2089) + PAN-2087 fixed by operator.
+Main GREEN at `4f1e208bf`. claude-code launches WORKING again. Pipeline fully restored.
+
+- **RED MAIN (P0) hit mid-run from the operator's own PAN-2087 fix.** `d224b4363` (inject role as system prompt)
+  correctly switched the launcher `--agent roles/<role>.md` → `--append-system-prompt-file <tmp>/role-prompts/<role>.md`,
+  but `tests/lib/agents-auth-routing.test.ts:207-209` still asserted the OLD `--agent` form → 1 test failure → red main.
+  **Filed PAN-2089 + `pan strike PAN-2089 --harness codex`** → `4f1e208bf test: update auth routing role prompt
+  assertion` (path-agnostic assertion). CI green. Closed. **~20 min P0 turnaround** (file→strike→land→CI green→close).
+  This is the textbook red-main protocol (RUN-17 PAN-2064 pattern): file + strike in the SAME tick.
+
+- **DURABLE LESSON — a legitimate launcher change leaves a stale-assertion test tripwire.** PAN-2087 (PAN-982/1048
+  `--agent <file>` design) had a test asserting the exact old command string; the fix changed the string shape (temp
+  path is nondeterministic) so the test needed a path-agnostic rewrite, not a literal swap. **When changing a launcher
+  command shape, grep tests for the old flag form AND update them in the same change** (the PAN-2087 fix missed its
+  own test). Sibling of the no-loss-matrix / E2E-route-mock CI tripwires.
+
+- **claude-code RESTORED + VERIFIED LIVE.** Operator fixed PAN-2087 (`d224b4363`) + closed it + RESTARTED the
+  dashboard (old PID 7428 gone — `pan reload`/restart deployed the rebuilt dist). Verified by re-planning PAN-2054:
+  `planning-pan-2054` now runs Claude Code v2.1.195 / Opus 4.8, reading files, ctx advancing — NO `--agent ... not
+  found` error. **The 3-check verify-live rule held: merged → deployed (restart) → observed firing.** No `pan reload`
+  from this role (outside allowed surface) — the operator deployed it.
+
+- **Re-engaged the 2 highest-leverage deferred substrate bugs on the restored harness:** `pan plan PAN-2054 --auto`
+  + `pan plan PAN-1781 --auto` (claude-code/Opus, the configured harness — no more codex deviation needed). Both
+  alive + progressing. Next: when they reach proposed, `pan start` to spin up work agents.
+
+- **PAN-1637 ALSO closed** — fixed by the same operator commit `ab4ba668c` that fixed PAN-1638 (probe harness
+  liveness for conversation resume + status); was still OPEN/todo, close-out's verify-merged gate confirmed the
+  squash-merge and closed it. (Strike-pan-1638 had correctly detected its fix was already on main.)
+
+- **Codex-strike deviation served its purpose:** while claude-code was down (PAN-2087), `pan strike --harness codex`
+  kept the pipeline productive (4 bugs landed). Now that claude-code is restored, the normal plan→work pipeline
+  resumes; codex strikes remain a viable fallback for future harness outages.
+
+- Next tick: monitor PAN-2054/1781 plans → proposed → `pan start`. MIN-831/846 still at the operator UAT/merge gate
+  (require_uat_before_merge=true). Vet next substrate candidates (PAN-1769 message-delivery, PAN-1824 flaky-CI
+  real-timer — note: orphan-proposed-reconciler.test.ts timed out under load during PAN-2089 verify but passed in
+  isolation = the PAN-1824 family; CI didn't flake on the final run but it's live).
+
+## RUN-18 tick 5 (2026-06-27 ~04:18Z) — PAN-2054 WORKING (8 beads); PAN-1781 CLOSED as already-fixed (contradiction-halt)
+
+- **PAN-2054 plan finalized → proposed (8 beads) → `pan start PAN-2054 --auto` spawned `agent-pan-2054`.** Reaffirms
+  the RUN-17/state lesson: **`pan plan --auto` stops at `proposed`; follow with `pan start`** to spawn the work agent
+  (finalize's auto-promote CHAINS to complete-planning + kills the planning tmux session — that's why the planning
+  session disappears after a successful finalize; state.json shows "stopped" cosmetically, NOT a crash). The work
+  agent is implementing close-out terminality: a `markPipelineJournalTerminal` helper + threading preservation
+  through `buildIssueRecord` (the durable-record reset that stops `getReviewStatusSync` re-deriving active).
+
+- **PAN-2054 work agent routed to codex/gpt-5.5, NOT the configured claude-code** — Cloister's provider default
+  picked codex (`harness codex chosen by provider default — override in Settings → Providers`). With claude-code
+  restored, this is surprising, but codex is proven-working this run and gpt-5.5 is strong for the substrate scope.
+  Did NOT override (respect Cloister routing). Watch-item: a `pan start` sync-main hit a non-blocking conflict in
+  `.pan/records/pan-2054.json` (records metadata, not source); spawn proceeded, but reconcile before merge.
+
+- **PAN-1781 CLOSED as already-fixed** — the planning agent (Opus) ran a forensic audit and found the central premise
+  is no longer true on main: native compaction recovery (`cee6da534`/`d00e0cd68`, PAN-1675 keystone) spawns a fresh
+  session id with a bounded seed instead of resuming the wedged session. Fix landed under sibling/checkpoint commits
+  (`2848e011b` + PAN-1792/1980 tests), never a PAN-1781 PR — which is why it stayed open. Agent correctly
+  **contradiction-halted** (no duplicate beads; audit + hazards to `.pan/drafts/PAN-1781.md`). **DURABLE: this is the
+  prescribed triage outcome for "issue's premise is already false on main" — investigate, document, close with
+  evidence rather than manufacture a re-implementation** (sibling of RUN-32 PAN-1507 "closed as non-bug"). Closed
+  directly via `gh issue close` + comment (no PR → `pan close` verify-merged gate wouldn't apply; direct tracker
+  close with on-main evidence is legitimate triage cleanup).
+
+- **RUN TOTAL: 7 substrate issues resolved** (6 fixed+closed: 2087-operator, 2089, 1559, 1900, 1652, 1638; +1
+  triaged+closed: 1781). Main GREEN. claude-code RESTORED. Pipeline healthy. PAN-2054 (highest leverage) in flight.
+
+## RUN-19 tick 1 (2026-06-27 ~04:58Z) — fresh orchestrator (glm-5.2/ohmypi); recovered PAN-1718; baseline established
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`, `merge_train_enabled=true`.
+RUN-18 was aborted to spawn RUN-19 (same model, fresh session). RUN-18 closed 7 substrate issues
+(2087/2089/1559/1900/1652/1638/1781) and restored claude-code; PAN-2054 + PAN-1718 were in-flight.
+
+- **Main GREEN** at `b8af1231` (CI `success`, sha MATCHES origin/main HEAD — verified, not just a green HEAD line).
+  RAM 15.5/64 GB, **swap clear**. ~12 productive agents running; well under the 20 cap.
+- **DURABLE LESSON — the orchestrator's `roleRunHead` is NOT main HEAD.** The startup snapshot's
+  `system.mainHead: "279417e"` was the orchestrator's OWN launch commit (its roleRunHead), not main.
+  Always reconcile main HEAD against `gh run list --branch main --workflow CI` (sha match), never trust
+  the snapshot's mainHead field blindly. (Sibling of the "green HEAD line ≠ green CI" lesson.)
+- **Recovered PAN-1718 (in-progress, dead work agent).** The kimi/ohmypi work agent died after the RUN-18→19
+  transition: `pan start PAN-1718` was blocked by a `Troubled (3 failures)` gate, all the SAME benign cause
+  ("No saved session ID found — not resumable" = auto-resume after a run transition, NOT a code crash).
+  **Recovery sequence that worked: `pan untroubled PAN-1718` (clears the gate, non-spawning) → `pan start
+  PAN-1718 --auto` (fresh session).** Spawned cleanly with **4 beads loaded** (the plan.items path holds the
+  beads; a top-level `beads:[]` read in spec.vbrief.json is a SCHEMA-PATH MISS, not "no beads" — `pan start`
+  resolves beads from plan.items). **DURABLE: `pan untroubled` is the permitted recovery primitive for a
+  troubled gate blocking an in-progress issue — it is the agent-state analogue of the explicitly-allowed
+  `pan review reset/abort` (clears gate, doesn't spawn/destroy), NOT a forbidden lifecycle op (resume/wake/kill).**
+- **WATCH — ohmypi/kimi kickoff delivery 30s timeout.** The fresh PAN-1718 start logged `ohmypi prompt
+  delivery failed: agent did not become ready within 30s` then `✔ Agent spawned`. The agent may be spawned
+  but sitting idle-at-prompt if the kickoff wasn't delivered. Verify next tick it is advancing its beads;
+  the deacon's re-deliver or a `pan tell` would unstick (but `pan tell` is orchestrator-forbidden — surface
+  if stuck, don't workaround).
+- **PAN-2054 (highest leverage) about to submit.** codex/gpt-5.5 work agent resolved the `.pan/records/
+  pan-2054.json` sync-main conflict, merged origin/main (`6aa4467e3`), typecheck passed, running lint→tests
+  before `pan done`. Jidoka inspect already PASSED. Next tick: watch it enter review.
+- **Three live planning chains** (PAN-2081/2086/2088, claude-code/Opus) — confirmed ALIVE + progressing
+  via two-signal diff (ctx advancing 0→21%, cost accumulating, +diff lines). NOT zombies. Operator-launched
+  or RUN-18 carry-over; exempt from governor reaping.
+- **auto_pickup_backlog=false respected.** 3 ready+planned eltmon issues exist (PAN-1084, 1884, 2063) but
+  none are immediate pipeline-unblockers, so they became operator `start` suggestions (not auto-launches).
+  PAN-2063 carries a `released` label (likely stale-open). Deck already full; no backlog fill warranted.
+- **MIN-831/MIN-846** still at the operator UAT/merge gate (require_uat_before_merge=true) — the only
+  flywheel-forbidden forward motion (can't auto-merge). Highest-leverage OPERATOR actions.
+- Next tick: verify PAN-2054 entered review + PAN-1718 kickoff delivered; watch planning chains for finalize.
+
+## RUN-19 ticks 2-3 (2026-06-27 ~05:02-05:09Z) — PAN-2054 CHANGES REQUESTED (real finding); PAN-2093 filed+planned (ohmypi spawn orphan)
+
+- **PAN-2054 review = CHANGES REQUESTED — a HIGH-QUALITY, legitimate catch.** The work agent implemented the
+  terminal close-out marker + read-door on the **OBSOLETE path** (`src/lib/close-out.ts:440-528`) instead of
+  the real production close-out workflow (`closeOut()` in `src/lib/lifecycle/workflows.ts:203-217`, called by
+  CLI `src/cli/commands/close.ts:190`, dashboard `src/dashboard/server/routes/issues.ts:2620`, deacon
+  `src/lib/cloister/deacon.ts:4358`). Plus `closeIssue()` label handling filters only `WORKFLOW_LABELS`
+  (`src/lib/lifecycle/close-issue.ts:433-533`) and never removes `POST_MERGE_RESIDUE_LABELS` → `merged`/`ready`
+  survive close-out. **DURABLE LESSON — close-out/terminality fixes MUST touch `closeOut()` in workflows.ts,
+  not `src/lib/close-out.ts`; and label stripping must use POST_MERGE_RESIDUE_LABELS, not just WORKFLOW_LABELS.**
+  The review agent correctly stopped after delivering (review done = synth agent stops; NOT a stall). Work agent
+  re-engaged self-driving on the fix. Healthy review→work→re-review loop.
+- **PAN-1718 BLOCKED on new PAN-2093 (ohmypi work-spawn orphan).** The recovered work agent had NO live tmux
+  session — orphaned on the ohmypi 30s ready.json readiness window (`supervisor:ineligible:harness-ohmypi` →
+  direct delivery → "did not become ready within 30s" → state row created, no session). The deacon does NOT
+  retry orphaned work agents (observed static, failures stuck at 1, for 3+ min). **Filed PAN-2093** as the
+  **ohmypi variant of PAN-2009** (closed; that fix targeted the `pi` harness's same 30s ready.json window —
+  the ohmypi path appears uncovered). **DURABLE: ohmypi/kimi work spawns via `pan start` are currently BROKEN
+  (orphan) — do not expect a freshly-spawned ohmypi work agent to run; surface as blocked-on-PAN-2093 rather
+  than re-spawn (same wall).** Did NOT override Cloister's ohmypi routing (trust-provider-default rule); the
+  provider default is itself the broken thing, tracked in PAN-2093.
+- **PAN-2093 filed + `pan plan PAN-2093 --auto` launched in the SAME tick.** It is a pipeline-unblocker of the
+  "agent spawning" class (brief override: launch even with auto_pickup=false). Too high blast-radius to strike
+  blind (touches spawn/delivery/deacon readiness code) → planned instead. planning-pan-2093 running.
+- **PAN-2054 NOT stalled — distinguish "review agent stopped" from "stuck convoy".** A CHANGES REQUESTED
+  verdict means the synth reviewer delivered + exited (correct). A stuck convoy is a STOPPED convoy on an
+  OPEN in-review issue with no verdict delivered (the PAN-1614/PAN-1765 class → `pan review restart`).
+  Verified by reading `.pan/review/<run>/review.md` for the verdict before any restart action.
+- **Three planning chains (2081/2086/2088) + PAN-2093 now planning** = 4 concurrent plan sessions. RAM fine
+  (16.5/64 GB, swap 0). 0 bd-lock errors. Deck full and self-driving.
+- Next tick: watch PAN-2054 re-submit + re-review; watch PAN-2093/2081/2086/2088 plans finalize → `pan start`
+  the resulting work (NOT ohmypi-routed ones until PAN-2093 lands). MIN-831/846 still operator-gated.
+
+## RUN-20 tick 1 (2026-06-27 ~06:45Z) — fresh orchestrator (glm-5.2/ohmypi); 5 proposed plans stalled; struck PAN-2093 + PAN-1817 on codex
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. RUN-19 ticks 2-3 (~05:09Z) left
+PAN-2054 in review and 5 planning chains (2081/2086/2088/2093/1718) alive. ~1h gap before RUN-20.
+
+- **Main GREEN** at `b8af12317` (CI `success`, sha MATCHES origin/main). RAM 16.7/64 GB, **swap clear**.
+  Primary main ahead 37 of origin (known strike-push divergence) + uncommitted operator files
+  (.gitignore/docs.json/record-cost-event.js.map/.vercelignore/features/tldr.mdx) — NOT flywheel's to commit.
+
+- **DURABLE LESSON — the 5 planning chains had ALL reached `plan.status: proposed` but were idle-at-prompt,
+  never followed through to `pan start`.** Confirmed by reading each workspace's `spec.vbrief.json`
+  (`plan.status: proposed`) AND capturing the plan panes (status bar only, ctx 0-24%, `⏵⏵ auto mode on`, no
+  active work). This is the RUN-17/state lesson live again: **`pan plan --auto` stops at `proposed`; it does NOT
+  auto-spawn the work agent.** With no orchestrator follow-through during the 1h gap, 5 producers sat idle. **The
+  fix is always: when a plan shows `proposed`, follow with `pan start <id>`.** Check `spec.vbrief.json:plan.status`
+  every tick for stalled-proposed plans.
+
+- **PAN-2054 is fully MERGE-READY (the highest-leverage operator action).** PR #2092: `mergeStateStatus: CLEAN`,
+  `mergeable: MERGEABLE`, ALL checks SUCCESS (build/lint/test/smoke/mintlify/vercel). review=passed, test=passed.
+  Work agent idle (done): `9ce404869 fix(cloister): wire terminal close-out lifecycle` + `c15f18fea` re-review
+  record. With `require_uat_before_merge=true` this is an operator merge. Merging it lands the close-out-terminality
+  fix that should unblock the verifying-on-main close-out backlog (4 open).
+
+- **THE CATCH-22 — PAN-2093's work agent orphaned on the very ohmypi path it fixes.** `pan start PAN-2093 --auto`
+  → Cloister routed work to `ohmypi/kimi-k2.7-code` → `ohmypi prompt delivery failed: did not become ready within
+  30s` → orphaned. Reaffirms RUN-19: **ohmypi/kimi work spawns via `pan start` are BROKEN until PAN-2093 lands.**
+  **DURABLE: while PAN-2093 is open, `pan start` is structurally blocked for ALL work agents (Cloister's provider
+  default keeps picking ohmypi/kimi for work → guaranteed orphan). The ONLY working work-execution path is
+  `pan strike --harness codex` (proven RUN-18) or pi. Do NOT `pan start` work agents until PAN-2093 lands.**
+
+- **DURABLE LESSON — the broken-stack docker-health gate now SELF-HEALS (PAN-1618 fix is LIVE).** `pan start`/
+  `pan strike` on an unhealthy workspace stack logged: "Workspace stack for <id> unhealthy — rebuilding before
+  spawn (attempt 1/3)" → "rebuilt — proceeding with spawn". PAN-2093's stack (init exited non-zero) rebuilt
+  cleanly. **The PAN-1618 "no recovery path" gap from RUN-3 is closed — spawn no longer hard-blocks on a down
+  stack.** (PAN-1817's strike fell back to `--host` after "Workspace not found: feature-pan-1817" — a missing
+  dir, not a stack issue; strike ran on host fine.)
+
+- **Struck 2 scoped substrate bugs on codex (the only working path while PAN-2093 open):**
+  - `pan strike PAN-2093 --harness codex` → `strike-pan-2093` (the ohmypi spawn-orphan fix itself; pipeline
+    unblocker of the agent-spawning class; 3 beads). strike-pan-1817 too. Both confirmed progressing (vitest ran,
+    git fetch ok, ctx advancing) — NOT wedged.
+  - `pan strike PAN-1817 --harness codex` → `strike-pan-1817` (Linear API quota throttle; tracker-substrate;
+    relevant to the Linear/MIN items at the merge gate).
+  Both via the proven RUN-18 codex-strike bypass. If either push-backs ("too big" / "not a bug"), convert to plan.
+
+- **Stalled producers parked for next tick (blocked on PAN-2093 landing):** PAN-2081 (4 beads), PAN-2086 (9),
+  PAN-2088 (8), PAN-1718 (4) — all `proposed`. Do NOT `pan start` them until PAN-2093 lands (ohmypi orphan);
+  re-engage via `pan start` the tick after the strike lands green.
+
+- **planning-pan-1781 is a ZOMBIE on a CLOSED issue** (PAN-1781 closed as already-fixed RUN-19). Still has a live
+  tmux session, holds a slot. Orchestrator cannot `pan kill`. Harmless but wasteful; surface for operator reap.
+
+- Next tick: verify the 2 strikes landed green on main + close them out; then `pan start` the 4 proposed plans
+  (2081/2086/2088/1718) once work-spawns are confirmed unblocked. Surface PAN-2054/MIN-831/MIN-846 merge as the
+  urgent operator action. MIN-831/846 still operator UAT/merge-gated.
+
+## RUN-20 ticks 2-3 (2026-06-27 ~07:00-07:32Z) — PAN-2093 strike was INCOMPLETE (corrective PAN-2094 landed); PAN-2095 deploy-stale-source bug; ohmypi still orphaned live
+
+**RUN tally so far:** 1 triaged-closed (PAN-1817 already-fixed), 2 source-fixes landed on origin/main
+(PAN-2093 `73ad6fd99`, PAN-2094 `0973c8c8d`), 1 deploy-substrate bug filed (PAN-2095). 2 codex work agents
+productive (PAN-2081, PAN-2088). ohmypi work spawns still orphan LIVE (deploy blocked).
+
+- **DURABLE LESSON — a strike can land "green" yet NOT fix the bug (changed the wrong default).** PAN-2093's
+  strike (`73ad6fd99`) correctly added `OHMYPI_AGENT_READY_TIMEOUT_SECONDS = 120` and used it as the DEFAULT of
+  `waitForOhmypiAgentReady` — but the actual orphan path `writeOhmypiAgentPrompt` has its OWN `timeoutSec = 30`
+  default and passes it explicitly, bypassing the 120. The strike's test (`expect(CONSTANT).toBe(120)`) passed
+  (the constant IS 120) but the constant is inert at the orphan call site. **Live proof: after the merge, ohmypi
+  spawns STILL orphaned with "within 30s".** LESSON: when a fix touches a default, verify the CALL SITE actually
+  inherits it (explicit args override defaults). The follow-through was a corrective strike (PAN-2094,
+  `0973c8c8d`: make writeOhmypiAgentPrompt default to the constant too) — filed + launched in the SAME tick the
+  incompleteness was discovered (the brief's "every action ends with code merged OR a follow-up dispatched").
+
+- **DURABLE LESSON — `pan reload` builds the STALE primary worktree source, NOT origin/main (PAN-2095).** The
+  primary main HEAD diverges from origin/main: 61 local `chore(beads/state/records)` pan-dir auto-commits AHEAD,
+  1-2 strike fixes BEHIND. `pan reload` compiles the primary's `src/` (which lacks the landed fixes) → deploys
+  stale dist → the fix never goes live. Verified end-to-end: ran `pan reload` (✓ built ✓ reloaded) after
+  `0973c8c8d` landed, then `pan start PAN-2086` orphaned at "within 30s" — the deployed spawn path still had the
+  old 30. **This is the PAN-1723 family recurring** (RUN-18 "post-merge-deploy builds primary without syncing
+  origin"; supposedly closed — it has NOT). `git merge-base --is-ancestor <strike-sha> HEAD` → NO confirms the
+  primary lacks the fix. **Until PAN-2095 is fixed, EVERY strike/PR landing on origin/main is invisible to the
+  running dashboard until the operator manually reconciles the primary main.** Operator workaround (clean, no
+  src/ overlap): `git fetch origin && git merge origin/main --no-edit && pan reload`. The orchestrator did NOT do
+  this itself (uncommitted operator files + blind primary-main git manipulation outside the flywheel surface).
+
+- **DURABLE LESSON — the 3-step verify-live chain now has a 4th failure mode.** Merged ✓ → DEPLOYED (pan reload)
+  ✓ → **but deployed STALE code because the build source ≠ origin/main** → observed firing ✗. "Reloaded + healthy"
+  is NOT proof the fix is live; confirm the build source actually contains the fix (`git merge-base --is-ancestor
+  <sha> HEAD` against the primary, not origin) before trusting the deploy. (Reinforces the existing "landed ≠ live"
+  rule with the build-source-divergence twist.)
+
+- **DURABLE LESSON — work-agent harness routing is NONDETERMINISTIC across spawns (ohmypi vs codex).** This run:
+  PAN-2093→ohmypi (orphan), PAN-2081→codex (worked), PAN-2086→ohmypi (orphan), PAN-2088→codex (worked),
+  PAN-1718→ohmypi (orphan). Same Cloister provider-default, different picks per spawn. So `pan start` is a coin
+  flip while ohmypi is broken: ~half orphans. Strikes reliably route to codex (`pan strike <id> --harness codex`).
+  **While ohmypi work spawns are broken, codex-routed spawns and codex strikes are the only reliable execution.**
+
+- **PAN-1817 closed as already-fixed** — codex strike forensics found `92a82ed9a fix(dashboard): peer dashboards
+  serve cache-only, never poll trackers (PAN-1817)` already on main; strike branch exactly = origin/main, no diff
+  to land. (Reaffirms the PAN-1781/PAN-1507 "closed as already-fixed / contradiction-halt" triage outcome.)
+
+- **PAN-2054 still the highest-leverage OPERATOR action** — PR #2092 CLEAN/MERGEABLE, all checks SUCCESS, the
+  close-out-terminality fix. require_uat_before_merge=true → operator merge. Merging it unblocks the verifying-on-
+  main close-out backlog.
+
+- Next tick: watch PAN-2081/PAN-2088 (codex) → review; once operator deploys (PAN-2095 workaround), re-spawn the
+  ohmypi-orphaned 2086/1718 and close PAN-2093/2094. MIN-831/846 still operator UAT/merge-gated.
