@@ -64,6 +64,28 @@ pan up --no-deacon
 pan up --no-resume
 ```
 
+## Desktop App
+
+`pan up` opens the Overdeck Electron desktop app if it is installed in one of
+the supported locations. Otherwise it falls back to the default browser.
+
+### Install the desktop app
+
+- **Linux**
+  - Download the AppImage and place it at `~/Applications/Overdeck*.AppImage`.
+  - Or create a symlink at one of:
+    - `~/.local/bin/overdeck`
+    - `~/.local/share/applications/overdeck`
+    - `/usr/local/bin/overdeck`
+    - `/opt/overdeck/overdeck`
+- **macOS**
+  - Copy `Overdeck.app` to `/Applications` or `~/Applications`.
+- **Windows**
+  - Install to `%LOCALAPPDATA%\Programs\overdeck\Overdeck.exe`.
+
+When a supported install is found, `pan up` launches the app window. Without an
+install, `pan up` opens the dashboard in your default browser.
+
 ## Step-by-Step Workflow
 
 ### Step 1: Check current status
