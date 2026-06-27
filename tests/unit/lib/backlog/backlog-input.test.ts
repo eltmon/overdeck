@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeBacklogIssues } from '../../../../src/lib/backlog/backlog-input.js';
+import {
+  normalizeBacklogIssues,
+  detectIsEpic,
+  detectPartOf,
+} from '../../../../src/lib/backlog/backlog-input.js';
 
 /**
  * Regression for PAN-1866: the sequencer was fed dashboard read-model issue
@@ -81,5 +85,35 @@ describe('normalizeBacklogIssues', () => {
       { identifier: 'PAN-11', canonicalStatus: 'todo' },
     ]);
     expect(out.map((i) => i.ref)).toEqual(['PAN-11']);
+  });
+});
+
+/**
+ * PAN-2081 Phase 1: epic membership is derived at input assembly so the sequencer
+ * gets structured `isEpic` / `partOf` hints rather than re-inferring from titles.
+ */
+describe('detectIsEpic / detectPartOf (PAN-2081)', () => {
+  it('detects epics by [EPIC] title prefix (case-insensitive, leading space ok)', () => {
+    expect(detectIsEpic('[EPIC] Boot Reconciliation', [])).toBe(true);
+    expect(detectIsEpic('  [epic] lowercase', [])).toBe(true);
+  });
+
+  it('detects epics by the `epic` label (case-insensitive)', () => {
+    expect(detectIsEpic('Regular title', ['bug', 'Epic'])).toBe(true);
+  });
+
+  it('is false for ordinary issues', () => {
+    expect(detectIsEpic('Fix the thing', ['bug'])).toBe(false);
+    expect(detectIsEpic('Mentions [EPIC] mid-title', [])).toBe(false);
+  });
+
+  it('parses "Part of #N" into the child\'s own prefix', () => {
+    expect(detectPartOf('PAN-2076', 'Part of #2075. Some body.')).toBe('PAN-2075');
+    expect(detectPartOf('MIN-50', 'part of #12')).toBe('MIN-12');
+  });
+
+  it('returns undefined when no membership is declared or it is self-referential', () => {
+    expect(detectPartOf('PAN-2076', 'No parent here')).toBeUndefined();
+    expect(detectPartOf('PAN-2075', 'Part of #2075')).toBeUndefined();
   });
 });

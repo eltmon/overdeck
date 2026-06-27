@@ -15,6 +15,10 @@ export type BacklogManifestEntry = {
   hasPrd: boolean;
   ready: boolean;
   updatedAt: string;
+  /** Epic container (`[EPIC]` title prefix or `epic` label) — not directly workable. */
+  isEpic: boolean;
+  /** Epic this issue declares membership in via "Part of #N" in its body, if any. */
+  partOf?: string;
 };
 
 export type BatchedBodyAccessor = {
@@ -83,6 +87,27 @@ export function normalizeBacklogIssues(
   return out;
 }
 
+const EPIC_TITLE_RE = /^\s*\[EPIC\]/i;
+
+/** An issue is an epic if its title is prefixed `[EPIC]` or it carries the `epic` label. */
+export function detectIsEpic(title: string, labels: readonly string[]): boolean {
+  return EPIC_TITLE_RE.test(title) || labels.some((l) => l.toLowerCase() === 'epic');
+}
+
+/**
+ * Parse an explicit epic-membership declaration ("Part of #N") from an issue body.
+ * Returns the epic's ref using the child's own prefix (PAN-2076 body "Part of #2075"
+ * → "PAN-2075"), or undefined if none is declared or it points at the issue itself.
+ */
+export function detectPartOf(childRef: string, body: string): string | undefined {
+  const m = /\bpart of\s+#(\d+)\b/i.exec(body);
+  if (!m) return undefined;
+  const prefix = childRef.split('-')[0];
+  if (!prefix) return undefined;
+  const epicRef = `${prefix}-${m[1]}`;
+  return epicRef === childRef.toUpperCase() ? undefined : epicRef;
+}
+
 export async function collectOpenBacklog(
   projectRoot: string,
   issues: Issue[],
@@ -146,6 +171,8 @@ export async function collectOpenBacklog(
       hasPrd,
       ready,
       updatedAt: issue.updatedAt,
+      isEpic: detectIsEpic(issue.title, issue.labels),
+      partOf: detectPartOf(issue.ref, issue.description),
     };
   });
 

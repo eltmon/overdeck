@@ -24,6 +24,8 @@ import type { SequenceNode } from './types.js';
 
 export const READY_LABEL = 'ready';
 export const PARKED_LABEL = 'parked';
+/** An epic is a container of child issues — never directly workable/pickable. */
+export const EPIC_LABEL = 'epic';
 export const VETOED_LABEL = 'vetoed';
 export const BLOCKS_MAIN_LABEL = 'blocks-main';
 /** PAN-2059: operator's explicit "go" after reviewing the plan. Required for auto-pickup. */
@@ -52,6 +54,8 @@ export interface PipelineState {
   released: boolean;
   /** PAN-2059: AI raised a written objection (held for review) in place of planning. */
   objection: boolean;
+  /** Epic container (not directly workable) — its children carry the work. */
+  epic: boolean;
   /** Operator pickup override. */
   gate: PickupGate;
 }
@@ -86,6 +90,7 @@ export function classifyIssue(node: SequenceNode, lk: ClassifyLookups): Pipeline
     inPipeline: lk.isInPipeline(node.issue),
     released: has(RELEASED_LABEL),
     objection: has(OBJECTION_LABEL),
+    epic: node.isEpic === true || has(EPIC_LABEL),
     gate,
   };
 }
@@ -95,20 +100,22 @@ export function classifyIssue(node: SequenceNode, lk: ClassifyLookups): Pipeline
  * parked/vetoed/objected/in-flight. The DoR `ready` is the entry gate; `released`
  * (PAN-2059) is the operator's explicit "go" after reviewing the plan — a Planned
  * item is NOT pickable until released. An open `objection` halts pickup until the
- * operator overrides or parks.
+ * operator overrides or parks. An `epic` is a container, never directly workable —
+ * its children carry the work, so it is excluded regardless of the other gates.
  */
 export function isAutoPickable(s: PipelineState): boolean {
-  return s.ready && s.planned && s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline;
+  return s.ready && s.planned && s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline && !s.epic;
 }
 
 /**
  * Pipeline-unblock override (FR-6): a blocks-main issue may be picked / struck even
  * when not Ready/Released and even with auto-pickup off — EXCEPT `vetoed` (the one
- * hard stop) and an open `objection` (PAN-2059), which halts even blocks-main pickup
- * until the operator overrides or parks.
+ * hard stop), an open `objection` (PAN-2059), and `epic` containers, which halt even
+ * blocks-main pickup until the operator overrides or parks. An epic is never directly
+ * worked, so it is not a valid unblock target either — strike a child instead.
  */
 export function isUnblockEligible(s: PipelineState): boolean {
-  return s.blocksMain && !s.vetoed && !s.objection && !s.inPipeline;
+  return s.blocksMain && !s.vetoed && !s.objection && !s.inPipeline && !s.epic;
 }
 
 /** Effort → relative duration units for the lane forecast. */

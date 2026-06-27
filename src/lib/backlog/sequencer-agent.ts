@@ -187,6 +187,12 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 - Keep operator-sourced edges verbatim. Re-derive github-ref edges. Recompute ai-inferred edges as advisory with a confidence value 0.0–1.0.
 - Stamp pass="${pass}" and generatedAt=<current ISO timestamp> in the output JSON.
 
+## Epics & parent-child
+
+- An EPIC is a container of child issues, not directly workable. The manifest flags epics with \`isEpic: true\` (derived from an \`[EPIC]\` title prefix or an \`epic\` label). On an epic's node set \`isEpic: true\`, and rank/score it by the aggregate impact of its CHILDREN — never as standalone work. Never mark an epic ready/promoted; it must not be picked up.
+- Express membership with a \`contains\` edge from the epic to each child: \`{ from: <epic>, to: <child>, type: "contains", source: "github-ref", confidence: 1 }\`. Membership sources: a child's manifest \`partOf\` field ("Part of #N" in its body) AND the epic body's task-list of child issue numbers (read the epic body to confirm). Emit one \`contains\` edge per child.
+- \`contains\` edges are membership, NOT ordering. Keep the children's intended BUILD ORDER in their \`dependsOn\` (and \`unblocks\` edges) as usual — an epic body often states the order explicitly.
+
 ## Reading issue bodies
 
 Fetch issue bodies in batches of ${batchSize} using the GitHub CLI:
@@ -209,7 +215,11 @@ The SequenceDoc JSON must conform to the schema:
 
 where each node has: issue, rank, size (XS/S/M/L/XL), importance (critical/high/medium/low),
 score (0-100), condition (ok/needs-refinement/stale), dependsOn (string[]), why (≤140 chars),
-rationale (optional), gate (auto/ready/blocked), planning (skip/auto/interactive).
+rationale (optional), gate (auto/ready/blocked), planning (skip/auto/interactive),
+isEpic (optional boolean — true for epic containers).
+
+Each edge has: from, to, type (unblocks/informs/contains), source (github-ref/operator/ai-inferred),
+confidence (0.0–1.0). Use type="contains" only for epic→child membership.
 
 Do not ask for operator input. If an issue is ambiguous, assign condition=needs-refinement and move on.
 `;
@@ -227,6 +237,6 @@ ${passInstructions[pass]}
 ${priorContext}
 ## Backlog manifest (${manifest.length} open issues, ${bodies.count} bodies available in ${Math.ceil(bodies.count / batchSize)} batches of ${batchSize})
 
-The manifest is written to \`.pan/backlog/manifest.json\` (relative to the project root) — it is NOT inlined here. Read it FIRST (the Read tool, or \`cat .pan/backlog/manifest.json\`) to load every open issue's { id, title, labels, priority, ageMs, inPipeline, hasPrd, ready, updatedAt }. Do NOT ask for it to be pasted into the prompt.
+The manifest is written to \`.pan/backlog/manifest.json\` (relative to the project root) — it is NOT inlined here. Read it FIRST (the Read tool, or \`cat .pan/backlog/manifest.json\`) to load every open issue's { id, title, labels, priority, ageMs, inPipeline, hasPrd, ready, updatedAt, isEpic, partOf }. Do NOT ask for it to be pasted into the prompt.
 ${commonRules}`;
 }
