@@ -23,23 +23,33 @@
   ],
   "feedback": [],
   "created": "2026-06-27T02:46:24.299Z",
-  "updated": "2026-06-27T07:07:48.277Z",
+  "updated": "2026-06-27T07:16:38.373Z",
   "pipeline": {
     "issueId": "PAN-2081",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T07:06:29.267Z"
+    "updatedAt": "2026-06-27T07:16:36.082Z",
+    "inspectNotes": "Bead workspace-46l48 (Thread epic data through both backlog read endpoints) INSPECTION PASSED. computeEpicGroups + EpicGroups added at src/lib/backlog/pickup.ts:259; getBacklogSequenceForRoot surfaces isEpic via Map with isEpic:false fallback in md-absent path; routes/backlog.ts forecast returns epics (titleByIssue uppercase lookup) + contains. No SCHEMA_VERSION bump, no new DB column, no direct store access. Tests cover both AC (#2075 epic fixture, getBacklogSequenceForRoot epic-enrichment with temp sequence.md)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect": {
+          "custom/MiniMax-M3": {
+            "input": 150290,
+            "output": 5723,
+            "cacheRead": 1920896,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 55256,
-            "output": 7593,
+            "input": 87284,
+            "output": 7721,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -54,9 +64,15 @@
         }
       },
       "totals": {
+        "custom/MiniMax-M3": {
+          "input": 150290,
+          "output": 5723,
+          "cacheRead": 1920896,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 55256,
-          "output": 7593,
+          "input": 87284,
+          "output": 7721,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -68,13 +84,19 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 13.27164,
-        "pricingAsOf": "2026-06-27T07:06:29.284Z"
+        "usd": 13.323593,
+        "pricingAsOf": "2026-06-27T07:16:36.117Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "MiniMax-M3",
+  "statusOverrides": {
+    "epic-data-thread": "completed",
+    "epic-data-thread.ac1": "completed",
+    "epic-data-thread.ac2": "completed",
+    "epic-data-thread.ac3": "completed"
+  }
 }
