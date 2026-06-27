@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-1718",
   "schemaVersion": 2,
-  "created": "2026-06-27T04:24:19.383Z",
-  "updated": "2026-06-27T04:24:26.104Z",
-  "pipeline": {
-    "issueId": "PAN-1718",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T04:24:19.383Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-1718: Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes",
       "timestamp": "2026-06-27T04:24:26.104Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-27T04:24:19.383Z",
+  "updated": "2026-06-27T04:35:55.177Z",
+  "pipeline": {
+    "issueId": "PAN-1718",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T04:34:54.841Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7521,
+            "output": 272,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 32680,
+            "output": 76238,
+            "cacheRead": 7039173,
+            "cacheWrite": 333046
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7521,
+          "output": 272,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 32680,
+          "output": 76238,
+          "cacheRead": 7039173,
+          "cacheWrite": 333046
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.670478,
+        "pricingAsOf": "2026-06-27T04:34:54.859Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-4-8"
 }
