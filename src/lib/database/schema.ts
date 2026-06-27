@@ -345,9 +345,8 @@ export function initSchema(db: SqliteDatabase): void {
     );
 
     -- ===== UAT Generations (PAN-1737: UAT batch trains) =====
-    -- One row per assembled uat/<codename>-<mmdd> batch branch. Append-only
-    -- chain: lifecycle transitions are status flips, rows are never deleted
-    -- (auditable history of what was bundled, resolved, and promoted).
+    -- One row per deterministic uat/<codename>-<mmdd> batch branch. Rebuilds
+    -- reset the same row so the active UAT candidate stays authoritative.
     CREATE TABLE IF NOT EXISTS uat_generations (
       name             TEXT PRIMARY KEY,
       worktree_path    TEXT NOT NULL,

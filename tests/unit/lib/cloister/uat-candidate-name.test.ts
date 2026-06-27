@@ -12,26 +12,32 @@ describe('makeUatCandidateName (PAN-1691 codename + short date)', () => {
     expect(name).toBe('uat/pan-otter-0609');
   });
 
-  it('skips a taken codename and uses the next', () => {
-    const name = makeUatCandidateName({
+  it('uses the same codename for the same label and day', () => {
+    const first = makeUatCandidateName({
       label: 'pan',
       dateIso: '2026-06-09T00:00:00Z',
       codenames: ['otter', 'falcon'],
-      pick: () => 0,
-      isTaken: (b) => b === 'uat/pan-otter-0609',
     });
-    expect(name).toBe('uat/pan-falcon-0609');
+    const second = makeUatCandidateName({
+      label: 'pan',
+      dateIso: '2026-06-09T23:59:59Z',
+      codenames: ['otter', 'falcon'],
+    });
+    expect(second).toBe(first);
   });
 
-  it('appends a numeric suffix when every codename for the day is taken', () => {
-    const name = makeUatCandidateName({
+  it('can produce different codenames for different labels on the same day', () => {
+    const pan = makeUatCandidateName({
       label: 'pan',
       dateIso: '2026-06-09T00:00:00Z',
-      codenames: ['otter'],
-      pick: () => 0,
-      isTaken: (b) => b === 'uat/pan-otter-0609',
+      codenames: ['otter', 'falcon'],
     });
-    expect(name).toBe('uat/pan-otter-0609-2');
+    const min = makeUatCandidateName({
+      label: 'min',
+      dateIso: '2026-06-09T00:00:00Z',
+      codenames: ['otter', 'falcon'],
+    });
+    expect(pan).not.toBe(min);
   });
 
   it('zero-pads the month/day', () => {
