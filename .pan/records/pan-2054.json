@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2054",
   "schemaVersion": 2,
-  "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-06-27T03:53:27.316Z",
-  "pipeline": {
-    "issueId": "PAN-2054",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T02:50:24.426Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -39,5 +20,77 @@
       "note": "Planning session started for PAN-2054: Close-out is not terminal: closed/closed-out issues linger in the pipeline (paused agent + workspace + stale pipeline record)",
       "timestamp": "2026-06-27T03:53:27.315Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-27T02:50:24.426Z",
+  "updated": "2026-06-27T04:37:26.288Z",
+  "pipeline": {
+    "issueId": "PAN-2054",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T04:37:26.255Z",
+    "inspectNotes": "workspace-m9lki passed: reapIssueResidue matches the vBRIEF helper requirements, uses the merge guard before disk/branch cleanup, uses execAsync plus Effect killSession, and introduces no prohibited execSync/sendKeys pattern."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 879359,
+            "output": 26476,
+            "cacheRead": 3777536,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 45383,
+            "output": 978,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 23200,
+            "output": 42932,
+            "cacheRead": 5096283,
+            "cacheWrite": 191936
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 879359,
+          "output": 26476,
+          "cacheRead": 3777536,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 45383,
+          "output": 978,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 23200,
+          "output": 42932,
+          "cacheRead": 5096283,
+          "cacheWrite": 191936
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 12.016888,
+        "pricingAsOf": "2026-06-27T04:37:26.287Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.5"
 }
