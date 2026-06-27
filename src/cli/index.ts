@@ -694,28 +694,12 @@ program
     }
     console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
-    // Auto-sync on every startup: skills, agents, hooks, MCP config,
-    // and rendered context layers (~/.claude/CLAUDE.md + per-project
-    // CLAUDE.md files). Ensures bundled engineering rules and any
-    // edits to global.md / project.md reach every Claude Code session
-    // without the user remembering to run `pan sync` first.
-    {
-      const origWrite = process.stdout.write;
-      const origErrWrite = process.stderr.write;
-      try {
-        const { syncCommand } = await import('./commands/sync.js');
-        process.stdout.write = () => true;  // suppress all output during sync
-        process.stderr.write = () => true;
-        await syncCommand({});
-        process.stdout.write = origWrite;
-        process.stderr.write = origErrWrite;
-        console.log(chalk.dim('  Auto-synced skills, agents, rules, hooks, MCP config, and CLAUDE.md context layers'));
-      } catch {
-        process.stdout.write = origWrite;
-        process.stderr.write = origErrWrite;
-        console.log(chalk.yellow('⚠ Auto-sync failed (non-fatal, continuing startup)'));
-      }
-    }
+    // Startup context sync (skills, agents, hooks, MCP config, rendered
+    // ~/.claude/CLAUDE.md + per-project CLAUDE.md) is DEFERRED to run in the
+    // background AFTER the dashboard is listening — see startPostLaunchSidecars
+    // below. Running it here cost ~22s on every `overdeck up`, blocking the
+    // server from even spawning, and the dashboard does not depend on synced
+    // content to boot. Deferring it shaves that ~22s off time-to-available.
 
     // Ensure tmux is installed — required for all agent/conversation sessions
     {
@@ -976,6 +960,25 @@ program
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
         console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
+      }
+
+      // Deferred context sync — moved off the critical path of `overdeck up`.
+      // Spawned detached AFTER the dashboard is up so it neither blocks the
+      // ~22s before the server spawns nor contends with the server's own boot.
+      // A separate process so it completes regardless of how `pan up` exits
+      // (foreground supervision, --detach, or the Electron fast-path). Its
+      // output is discarded; the next Claude Code session picks up the result.
+      try {
+        const selfCli = fileURLToPath(import.meta.url);
+        const syncChild = spawn(process.execPath, [selfCli, 'sync'], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        syncChild.on('error', () => { /* non-fatal: sync is best-effort */ });
+        syncChild.unref();
+        console.log(chalk.dim('Context sync (skills, rules, hooks, MCP, CLAUDE.md) running in background'));
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Could not start deferred context sync (non-fatal):'), error?.message || String(error));
       }
     }
 
