@@ -20,7 +20,9 @@ This skill guides you through syncing Overdeck skills to AI coding assistants. T
 
 ## Auto-Sync
 
-`pan up` runs a full sync automatically on every startup. You rarely need to run `pan sync` manually. Manual sync is useful when:
+`pan up` runs `pan sync --if-changed` automatically after the dashboard starts.
+The startup sync skips work when sync inputs are unchanged. You rarely need to
+run `pan sync` manually. Manual sync is useful when:
 
 - You added new skills and want to sync without restarting the dashboard
 - You want to preview changes with `--dry-run`
@@ -84,6 +86,24 @@ Output:
 ```
 ✓ Synced 24 items to claude, codex, cursor, gemini
 ```
+
+Manual `pan sync` always runs a full sync, even when startup sync would skip.
+
+### Startup Sync (Skip When Unchanged)
+
+```bash
+pan sync --if-changed
+```
+
+Used by `pan up` for the deferred background sync. If the sync-source inputs
+are unchanged, it exits quickly:
+
+```
+[sync] skipped — inputs unchanged
+```
+
+Do not use `--if-changed` when you need to force a full refresh; run `pan sync`
+or `pan sync --force` instead.
 
 ### Force Sync (Overwrite Conflicts)
 

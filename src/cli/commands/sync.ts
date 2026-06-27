@@ -51,6 +51,7 @@ interface SyncOptions {
   force?: boolean;
   diff?: boolean;
   backupOnly?: boolean;
+  ifChanged?: boolean;
 }
 
 export async function syncCommand(options: SyncOptions): Promise<void> {
@@ -82,6 +83,15 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (devrootWarning) {
     console.log(chalk.yellow(devrootWarning));
     console.log('');
+  }
+
+  // Startup-only shortcut: skip the expensive full sync when inputs are unchanged.
+  if (options.ifChanged && !options.force) {
+    const gate = isStartupSyncNeededSync();
+    if (!gate.needed) {
+      console.log(chalk.dim('[sync] skipped — inputs unchanged'));
+      return;
+    }
   }
 
   // Dry run mode

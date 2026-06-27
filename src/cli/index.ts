@@ -210,6 +210,7 @@ program
   .option('--force', 'Overwrite files modified since Overdeck installed them')
   .option('--diff', 'Show diff for modified files')
   .option('--backup-only', 'Only create backup')
+  .option('--if-changed', 'Skip the sync when inputs are unchanged (used by startup)')
   .action(syncCommand);
 
 // pan context — layered context distribution (PAN-1201)
@@ -1019,7 +1020,7 @@ program
       // output is discarded; the next Claude Code session picks up the result.
       try {
         const selfCli = fileURLToPath(import.meta.url);
-        const syncChild = spawn(process.execPath, [selfCli, 'sync'], {
+        const syncChild = spawn(process.execPath, [selfCli, 'sync', '--if-changed'], {
           detached: true,
           stdio: 'ignore',
         });

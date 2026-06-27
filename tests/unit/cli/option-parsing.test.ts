@@ -126,3 +126,19 @@ describe('pan up — option parsing', () => {
     expect(all).not.toMatch(/error: option '--no-open'/i);
   });
 });
+
+describe('pan sync — option parsing', () => {
+  it('registers --if-changed on the command', () => {
+    const { stdout, status } = runCli(['sync', '--help']);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/--if-changed/);
+    expect(stdout).toMatch(/Skip the sync when inputs are unchanged/);
+  });
+
+  it('does NOT reject --if-changed as an unknown option', () => {
+    const { stdout, stderr } = runCli(['sync', '--if-changed', '--help']);
+    const all = stdout + stderr;
+    expect(all).not.toMatch(/unknown option/i);
+    expect(all).not.toMatch(/error: option '--if-changed'/i);
+  });
+});
