@@ -25,7 +25,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import { readLauncherPinnedSessionId, resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
-import { validateOrigin } from './origin-validation.js';
+import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
@@ -918,6 +918,16 @@ export function handleConversationControlAck(
   const error = typeof body['error'] === 'string' ? body['error'] : undefined;
   const outcome = resolveConversationControlAck({ id, ok, ...(error !== undefined ? { error } : {}) });
   return { status: 200, body: { ok: true, outcome } };
+}
+
+export function validateConversationControlAckOrigin(
+  headers: HeaderMap,
+  method = 'POST',
+): { ok: true } | { ok: false; error: string } {
+  const origin = getHeaderFromMap(headers, 'origin');
+  const referer = getHeaderFromMap(headers, 'referer');
+  if (!origin && !referer) return { ok: true };
+  return validateOriginHeaders(headers, method);
 }
 
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
@@ -3736,7 +3746,7 @@ const postConversationControlAckRoute = HttpRouter.add(
   '/api/conversations/:name/control-ack',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
+    const originCheck = validateConversationControlAckOrigin(request.headers as HeaderMap, request.method);
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }

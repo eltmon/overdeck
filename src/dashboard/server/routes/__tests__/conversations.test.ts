@@ -29,6 +29,7 @@ import {
   recoverStuckForks,
   registerConversationControlAck,
   registerInFlightForkPipeline,
+  validateConversationControlAckOrigin,
   resolveConversationDeliveryMethod,
   resolveConversationControlAck,
   piConversationSystemPromptFiles,
@@ -37,6 +38,7 @@ import {
 } from '../conversations.js';
 import { deliverAgentMessage } from '../../../../lib/agents.js';
 import { sendKeysAsync } from '../../../../lib/tmux.js';
+import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -287,6 +289,7 @@ describe('conversation control ack registry', () => {
   afterEach(() => {
     clearPendingConversationControlAcksForTests();
     vi.useRealTimers();
+    _resetTrustedOriginsForTests();
   });
 
   it('resolves a pending command when a successful ack arrives', async () => {
@@ -343,6 +346,17 @@ describe('conversation control ack registry', () => {
 
     await expect(pending).rejects.toThrow('unsupported');
     expect(getPendingConversationControlAckCount()).toBe(0);
+  });
+
+  it('accepts no-origin extension ack posts from the local Pi runtime', () => {
+    expect(validateConversationControlAckOrigin({}, 'POST')).toEqual({ ok: true });
+  });
+
+  it('still rejects browser ack posts from untrusted origins', () => {
+    expect(validateConversationControlAckOrigin({ origin: 'https://evil.example' }, 'POST')).toEqual({
+      ok: false,
+      error: 'Invalid origin',
+    });
   });
 });
 
