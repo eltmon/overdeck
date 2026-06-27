@@ -7,7 +7,7 @@ import { Effect } from 'effect';
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -17,8 +17,10 @@ import {
   conversationSessionAliveFromState,
   getPendingConversationControlAckCount,
   getInFlightForkPipelineCount,
+  deliverConversationViaControlChannel,
   handleConversationControlAck,
   parseSummaryForkFocus,
+  pickDeliverAs,
   readExistingHandoffDoc,
   recoverStuckForks,
   registerConversationControlAck,
@@ -27,6 +29,7 @@ import {
   shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
+import { deliverAgentMessage } from '../../../../lib/agents.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -322,6 +325,48 @@ describe('conversation control ack registry', () => {
   });
 });
 
+describe('conversation control channel delivery', () => {
+  afterEach(() => {
+    clearPendingConversationControlAcksForTests();
+  });
+
+  it('writes a prompt command and resolves when the ack arrives', async () => {
+    const delivery = deliverConversationViaControlChannel(
+      { tmuxSession: 'conv-pi' },
+      'hello pi',
+      { source: 'operator', deliverAs: 'prompt' },
+    );
+    const controlDir = join(process.env.OVERDECK_HOME!, 'agents', 'conv-pi', 'control');
+    await vi.waitFor(() => {
+      expect(readdirSync(controlDir).filter((name) => name.endsWith('.json'))).toHaveLength(1);
+    });
+    const file = join(controlDir, readdirSync(controlDir).find((name) => name.endsWith('.json'))!);
+    const command = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+
+    expect(command).toMatchObject({
+      type: 'prompt',
+      message: 'hello pi',
+      source: 'operator',
+    });
+
+    handleConversationControlAck({ id: command.id, ok: true });
+    await expect(delivery).resolves.toBeUndefined();
+  });
+
+  it('defaults busy pi conversations to steer and honors follow_up override', () => {
+    const heartbeatDir = join(process.env.OVERDECK_HOME!, 'heartbeats');
+    mkdirSync(heartbeatDir, { recursive: true });
+    writeFileSync(join(heartbeatDir, 'conv-busy.json'), JSON.stringify({
+      timestamp: new Date().toISOString(),
+      last_action: 'tool_end',
+    }));
+
+    expect(pickDeliverAs({ tmuxSession: 'conv-idle' }, undefined)).toBe('prompt');
+    expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, undefined)).toBe('steer');
+    expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, 'follow_up')).toBe('follow_up');
+  });
+});
+
 describe('readExistingHandoffDoc', () => {
   it('reuses a persisted handoff document when it still exists', async () => {
     const docPath = join(TEST_HOME, 'handoff.md');
@@ -383,6 +428,32 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
+  it('keeps claude-code composer delivery on deliverAgentMessage', async () => {
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { handleConversationMessage } = await import('../conversations.js');
+    vi.mocked(deliverAgentMessage).mockClear();
+
+    createConversation({
+      name: 'claude-conv',
+      tmuxSession: 'conv-claude',
+      cwd: '/tmp',
+      harness: 'claude-code',
+      status: 'active',
+    });
+
+    const response = await handleConversationMessage('claude-conv', { message: 'hello claude' });
+    const body = decodeJsonResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(deliverAgentMessage).toHaveBeenCalledWith(
+      'conv-claude',
+      'hello claude',
+      'conversation-message',
+      'auto',
+    );
+  });
+
   it('returns a persisted handoff document as markdown', async () => {
     const { createConversation, getConversationByName, recordConversationHandoff } = await import('../../../../lib/overdeck/conversations.js');
     const { handleConversationHandoffDoc } = await import('../conversations.js');

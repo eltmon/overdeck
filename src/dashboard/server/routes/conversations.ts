@@ -106,6 +106,10 @@ import {
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
+import {
+  writeConversationControlCommand,
+  type ControlCommand,
+} from '../../../lib/runtimes/conversation-control.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
  * module default when config is unavailable. */
@@ -1146,50 +1150,57 @@ export async function handleConversationMessage(
     );
   }
 
-  // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
-  // eaten-by-compaction watcher below can tell whether this message ever
-  // landed. Claude-only — the probe parses Claude-format JSONL.
-  let watchFromByteOffset: number | null = null;
-  if (behavior.transcriptKind === 'claude-jsonl' && conv.claudeSessionId) {
-    const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
-    watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
-  }
-
-  try {
-    await deliverAgentMessage(
-      conv.tmuxSession,
-      deliveredMessage,
-      'conversation-message',
-      resolveConversationDeliveryMethod(conv),
-    );
-  } catch (deliveryErr: unknown) {
-    const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
-    if (errMsg.includes('MessageDeliveryFailed')) {
-      return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
-    }
-    throw deliveryErr;
-  }
-
-  // Watch in the background for Claude Code's submit-time compaction eating
-  // the just-delivered prompt (compact boundary lands, message doesn't) and
-  // redeliver once. The POST already returned ok by the time this matters.
-  if (watchFromByteOffset !== null && conv.claudeSessionId) {
-    void watchForEatenConversationMessage({
-      conversationName: conv.name,
-      tmuxSession: conv.tmuxSession,
-      cwd: conv.cwd,
-      sessionId: conv.claudeSessionId,
-      message: deliveredMessage,
-      deliveryMethod: resolveConversationDeliveryMethod(conv),
-      fromByteOffset: watchFromByteOffset,
-    }).then((outcome) => {
-      if (outcome === 'redelivered') {
-        console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
-      }
-    }).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+  if (isPiControlChannelHarness(harness)) {
+    await deliverConversationViaControlChannel(conv, deliveredMessage, {
+      source: 'operator',
+      deliverAs: pickDeliverAs(conv, body['deliverAs']),
     });
+  } else {
+    // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
+    // eaten-by-compaction watcher below can tell whether this message ever
+    // landed. Claude-only — the probe parses Claude-format JSONL.
+    let watchFromByteOffset: number | null = null;
+    if (behavior.transcriptKind === 'claude-jsonl' && conv.claudeSessionId) {
+      const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
+      watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
+    }
+
+    try {
+      await deliverAgentMessage(
+        conv.tmuxSession,
+        deliveredMessage,
+        'conversation-message',
+        resolveConversationDeliveryMethod(conv),
+      );
+    } catch (deliveryErr: unknown) {
+      const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
+      if (errMsg.includes('MessageDeliveryFailed')) {
+        return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
+      }
+      throw deliveryErr;
+    }
+
+    // Watch in the background for Claude Code's submit-time compaction eating
+    // the just-delivered prompt (compact boundary lands, message doesn't) and
+    // redeliver once. The POST already returned ok by the time this matters.
+    if (watchFromByteOffset !== null && conv.claudeSessionId) {
+      void watchForEatenConversationMessage({
+        conversationName: conv.name,
+        tmuxSession: conv.tmuxSession,
+        cwd: conv.cwd,
+        sessionId: conv.claudeSessionId,
+        message: deliveredMessage,
+        deliveryMethod: resolveConversationDeliveryMethod(conv),
+        fromByteOffset: watchFromByteOffset,
+      }).then((outcome) => {
+        if (outcome === 'redelivered') {
+          console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
+        }
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+      });
+    }
   }
 
   // Generate AI title for conversations created via instant-start (no message at creation)
@@ -1244,6 +1255,67 @@ async function waitForConversationRuntimeReady(tmuxSession: string, harness: Run
     await waitForClaudeReady(tmuxSession);
     console.log(`[conversations] Claude ready in ${tmuxSession}`);
   } else if (transcriptKind !== 'codex-rollout-jsonl') await waitForReadySignal(tmuxSession, 30);
+}
+
+type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | 'steer' | 'follow_up'>;
+
+function isPiControlChannelHarness(harness: RuntimeName): boolean {
+  return harness === 'ohmypi' || harness === 'pi';
+}
+
+function isConversationMidTurn(conv: Pick<Conversation, 'tmuxSession'>): boolean {
+  const heartbeatPath = join(getOverdeckHome(), 'heartbeats', `${conv.tmuxSession}.json`);
+  if (!existsSync(heartbeatPath)) return false;
+  try {
+    const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8')) as {
+      timestamp?: string
+      last_action?: string
+    };
+    if (!heartbeat.timestamp) return false;
+    const ageMs = Date.now() - new Date(heartbeat.timestamp).getTime();
+    if (!Number.isFinite(ageMs) || ageMs > 60_000) return false;
+    return heartbeat.last_action !== 'turn_end';
+  } catch {
+    return false;
+  }
+}
+
+export function pickDeliverAs(
+  conv: Pick<Conversation, 'tmuxSession'>,
+  bodyDeliverAs: unknown,
+): ConversationControlDeliverAs {
+  if (bodyDeliverAs === 'follow_up') return 'follow_up';
+  if (bodyDeliverAs === 'steer') return 'steer';
+  return isConversationMidTurn(conv) ? 'steer' : 'prompt';
+}
+
+export async function deliverConversationViaControlChannel(
+  conv: Pick<Conversation, 'tmuxSession'>,
+  message: string,
+  options: {
+    source: 'operator' | 'orchestrator'
+    deliverAs: ConversationControlDeliverAs
+  },
+): Promise<void> {
+  const id = randomUUID();
+  const ackPromise = registerConversationControlAck(id);
+  const command: ControlCommand = {
+    id,
+    type: options.deliverAs,
+    message,
+    source: options.source,
+  };
+
+  try {
+    await writeConversationControlCommand(conv.tmuxSession, command);
+  } catch (err) {
+    resolveConversationControlAck({
+      id,
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  await ackPromise;
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
