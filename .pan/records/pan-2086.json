@@ -23,7 +23,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-06-27T15:41:24.170Z",
+  "updated": "2026-06-27T16:15:50.580Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "pending",
@@ -32,24 +32,24 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T15:41:21.886Z",
-    "inspectNotes": "Bead workspace-bfd0v implements Task 5 / FR-5 (Traefik readiness gate) per vBRIEF narrative: waitForTraefikHealthPromise polls https://<domain>/api/health in src/lib/platform-lifecycle.ts:226, resolveDashboardReadyUrl gates announce/open on Traefik URL with localhost fallback in src/cli/index.ts:638, both detach (~1107+) and foreground (~1116+) branches wired, !traefikEnabled skips the Traefik poll, no execSync (NFR-2), no new CLI flags. Task 6 (auto-open + --no-open) correctly scoped to a separate bead."
+    "updatedAt": "2026-06-27T16:15:50.425Z",
+    "inspectNotes": "Bead workspace-h51bn PASS. Implements Task 1 Step 1 (profile via time/timeAsync helpers + [sync-timing] summary) and Step 2 (content-hash gate: isStartupSyncNeededSync + writeSyncManifestSync at ~/.overdeck/.sync-manifest.json). Hash covers SYNC_SOURCES tree + global.md + per-project project.md + devMode + cwd; missing input falls back to needed=true (conservative). 6 unit tests cover all gate branches. Manual pan sync / pan sync --force behavior unchanged. Follow-up bead expected to wire the gate into the deferred startup spawn in src/cli/index.ts and add the --if-changed flag per the Task 1 guardrail."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "inspect": {
           "custom/MiniMax-M3": {
-            "input": 319929,
-            "output": 19956,
-            "cacheRead": 2338560,
+            "input": 498944,
+            "output": 45358,
+            "cacheRead": 4711424,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 215287,
-            "output": 6646,
+            "input": 217748,
+            "output": 7012,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -64,23 +64,23 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 669719,
-            "output": 94991,
-            "cacheRead": 33299456,
+            "input": 900808,
+            "output": 162617,
+            "cacheRead": 87639296,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "custom/MiniMax-M3": {
-          "input": 319929,
-          "output": 19956,
-          "cacheRead": 2338560,
+          "input": 498944,
+          "output": 45358,
+          "cacheRead": 4711424,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 215287,
-          "output": 6646,
+          "input": 217748,
+          "output": 7012,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -91,15 +91,15 @@
           "cacheWrite": 478941
         },
         "custom/kimi-k2.7-code": {
-          "input": 669719,
-          "output": 94991,
-          "cacheRead": 33299456,
+          "input": 900808,
+          "output": 162617,
+          "cacheRead": 87639296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.420452,
-        "pricingAsOf": "2026-06-27T15:41:21.918Z"
+        "usd": 28.319243,
+        "pricingAsOf": "2026-06-27T16:15:50.566Z"
       }
     },
     "merges": [],
