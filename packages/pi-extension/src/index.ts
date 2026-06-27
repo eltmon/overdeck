@@ -5,7 +5,8 @@
  * to emit Overdeck lifecycle signals via filesystem markers and HTTP POSTs.
  */
 
-import { appendFile, mkdir, open, readFile, stat, unlink, writeFile } from 'node:fs/promises'
+import { watch, type FSWatcher } from 'node:fs'
+import { appendFile, mkdir, open, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
@@ -46,6 +47,34 @@ export interface PiExtensionCapabilities {
   setModel: boolean
   exec: boolean
   compact: boolean
+}
+
+export type ControlCommand =
+  | {
+      id: string
+      type: 'prompt' | 'steer' | 'follow_up'
+      message: string
+      source: 'operator' | 'orchestrator'
+    }
+  | {
+      id: string
+      type: 'set_thinking_level'
+      level: ThinkingLevel
+    }
+  | {
+      id: string
+      type: 'set_model'
+      model: string
+    }
+  | {
+      id: string
+      type: 'compact'
+    }
+
+export interface ControlAck {
+  id: string
+  ok: boolean
+  error?: string
 }
 
 function hasFunction(value: unknown, name: string): boolean {
@@ -122,6 +151,7 @@ export interface OverdeckPaths {
   pendingEventsPath: string
   costEventsPath: string
   progressStatePath: string
+  controlDir: string
 }
 
 export function overdeckPathsFor(agentId: string, home: string = homedir()): OverdeckPaths {
@@ -137,6 +167,7 @@ export function overdeckPathsFor(agentId: string, home: string = homedir()): Ove
     pendingEventsPath: join(agentDir, 'pending-events.jsonl'),
     costEventsPath: join(agentDir, 'cost-events.jsonl'),
     progressStatePath: join(agentDir, 'pi-progress.json'),
+    controlDir: join(agentDir, 'control'),
   }
 }
 
@@ -151,6 +182,7 @@ const MAX_PENDING_DRAIN_EVENTS = 25
 const MAX_TURN_OUTPUT_BYTES = 64_000
 const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token'
 const HEARTBEAT_PATH = (agentId: string) => `/api/agents/${agentId}/heartbeat`
+const CONVERSATION_CONTROL_ACK_PATH = (agentId: string) => `/api/conversations/${encodeURIComponent(agentId)}/control-ack`
 
 function getDashboardUrl(): string {
   return process.env['OVERDECK_DASHBOARD_URL'] ?? 'http://localhost:3011'
@@ -677,6 +709,141 @@ export async function handleGlobalContext(ctx: unknown): Promise<void> {
   await appendSystemPromptFile(ctx, join(home, 'context', 'pi-global.md'))
 }
 
+async function postControlAck(env: HookEnv, ack: ControlAck): Promise<void> {
+  await postDashboard(env, CONVERSATION_CONTROL_ACK_PATH(env.agentId), { ...ack })
+}
+
+function isControlCommand(value: unknown): value is ControlCommand {
+  const record = value as Record<string, unknown> | null
+  if (!record || typeof record !== 'object') return false
+  if (typeof record['id'] !== 'string' || typeof record['type'] !== 'string') return false
+  switch (record['type']) {
+    case 'prompt':
+    case 'steer':
+    case 'follow_up':
+      return typeof record['message'] === 'string' &&
+        (record['source'] === 'operator' || record['source'] === 'orchestrator')
+    case 'set_thinking_level':
+      return record['level'] === 'off' ||
+        record['level'] === 'minimal' ||
+        record['level'] === 'low' ||
+        record['level'] === 'medium' ||
+        record['level'] === 'high' ||
+        record['level'] === 'xhigh'
+    case 'set_model':
+      return typeof record['model'] === 'string'
+    case 'compact':
+      return true
+    default:
+      return false
+  }
+}
+
+export async function dispatchControlCommand(
+  env: HookEnv,
+  pi: PiExtensionAPI,
+  ctx: unknown,
+  command: ControlCommand,
+): Promise<ControlAck> {
+  try {
+    switch (command.type) {
+      case 'prompt':
+        if (typeof pi.sendUserMessage !== 'function') return { id: command.id, ok: false, error: 'sendUserMessage unsupported' }
+        await pi.sendUserMessage(command.message)
+        return { id: command.id, ok: true }
+      case 'steer':
+        if (typeof pi.sendUserMessage !== 'function') return { id: command.id, ok: false, error: 'sendUserMessage unsupported' }
+        await pi.sendUserMessage(command.message, { deliverAs: 'steer' })
+        return { id: command.id, ok: true }
+      case 'follow_up':
+        if (typeof pi.sendUserMessage !== 'function') return { id: command.id, ok: false, error: 'sendUserMessage unsupported' }
+        await pi.sendUserMessage(command.message, { deliverAs: 'followUp' })
+        return { id: command.id, ok: true }
+      case 'set_thinking_level': {
+        const ok = await setThinkingLevelIfSupported(pi, command.level)
+        return ok ? { id: command.id, ok: true } : { id: command.id, ok: false, error: 'setThinkingLevel unsupported' }
+      }
+      case 'set_model':
+        if (typeof pi.setModel !== 'function') return { id: command.id, ok: false, error: 'setModel unsupported' }
+        await pi.setModel(command.model)
+        return { id: command.id, ok: true }
+      case 'compact': {
+        const compact = (ctx as ExtensionContext | null | undefined)?.compact
+        if (typeof compact !== 'function') return { id: command.id, ok: false, error: 'compact unsupported' }
+        await compact.call(ctx)
+        return { id: command.id, ok: true }
+      }
+    }
+  } catch (err) {
+    return { id: command.id, ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function processControlCommandFile(
+  env: HookEnv,
+  pi: PiExtensionAPI,
+  ctx: unknown,
+  file: string,
+): Promise<void> {
+  let idForAck: string | null = null
+  try {
+    const raw = await readFile(file, 'utf8')
+    const parsed = JSON.parse(raw) as unknown
+    if (!isControlCommand(parsed)) {
+      console.warn(`[overdeck-pi-extension] malformed control command ignored: ${file}`)
+      return
+    }
+    idForAck = parsed.id
+    const ack = await dispatchControlCommand(env, pi, ctx, parsed)
+    await postControlAck(env, ack)
+  } catch (err) {
+    console.warn(`[overdeck-pi-extension] failed to process control command ${file}:`, err)
+    if (idForAck) {
+      await postControlAck(env, { id: idForAck, ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  } finally {
+    await unlink(file).catch(() => {})
+  }
+}
+
+export async function drainConversationControlCommands(
+  env: HookEnv,
+  pi: PiExtensionAPI,
+  ctx: unknown,
+): Promise<void> {
+  const paths = overdeckPathsFor(env.agentId, env.home)
+  await mkdir(paths.controlDir, { recursive: true, mode: 0o700 })
+  const entries = await readdir(paths.controlDir).catch(() => [])
+  for (const entry of entries.filter((name) => name.endsWith('.json')).sort()) {
+    await processControlCommandFile(env, pi, ctx, join(paths.controlDir, entry))
+  }
+}
+
+export async function handleInputEvent(env: HookEnv, event: InputEvent): Promise<void> {
+  await postEvent(env, {
+    kind: 'conversation_input',
+    source: event.source ?? 'unknown',
+    timestamp: env.now ? env.now() : new Date().toISOString(),
+  })
+}
+
+export async function handleConversationControlSessionStart(
+  env: HookEnv,
+  pi: PiExtensionAPI,
+  ctx: unknown,
+): Promise<FSWatcher> {
+  const paths = overdeckPathsFor(env.agentId, env.home)
+  await mkdir(paths.controlDir, { recursive: true, mode: 0o700 })
+  await drainConversationControlCommands(env, pi, ctx)
+  const watcher = watch(paths.controlDir, (_event, filename) => {
+    if (!filename || !filename.endsWith('.json')) return
+    void processControlCommandFile(env, pi, ctx, join(paths.controlDir, filename)).catch((err) => {
+      console.warn(`[overdeck-pi-extension] control watcher failed for ${filename}:`, err)
+    })
+  })
+  return watcher
+}
+
 async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void> {
   const content = await readFile(file, 'utf8').catch(() => '')
   if (!content.trim()) return
@@ -702,6 +869,13 @@ export default function overdeckPiExtension(pi: PiExtensionAPI): void {
       // PAN-1201: fold the assembled workspace context layer into the prompt.
       await handleWorkspaceContext(ctx)
       await handleSessionBriefingContext(ctx)
+      await handleConversationControlSessionStart(env, pi, ctx)
+    } catch {}
+  })
+
+  pi.on('input', async event => {
+    try {
+      await handleInputEvent(env, event)
     } catch {}
   })
 
