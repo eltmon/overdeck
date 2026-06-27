@@ -22,6 +22,11 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-06-27T17:09:25.470Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T17:19:05.393Z"
     }
   ],
   "feedback": [
@@ -40,26 +45,26 @@
     "auto-start.ac3": "completed"
   },
   "created": "2026-06-26T03:33:27.321Z",
-  "updated": "2026-06-27T17:09:25.473Z",
+  "updated": "2026-06-27T17:19:09.991Z",
   "pipeline": {
     "issueId": "PAN-1084",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T17:09:23.838Z",
-    "reviewNotes": "Global tmux-send-keys guard is not scoped to work agents and can block non-work or human sessions",
+    "updatedAt": "2026-06-27T17:19:09.930Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: scoped tmux-send-keys-guard to work agents only so planning/test/inspect/conversation/human sessions keep normal tmux behavior; added tests for non-work pass-through.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2107",
-    "lastVerifiedCommit": "e091a8eefba29d642ade7a1afef092f732d18f73"
+    "lastVerifiedCommit": "0eee912cc6f0fa7ebe9cfbd3f7391ad7b2108d9c"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 39880,
-            "output": 4787,
+            "input": 47517,
+            "output": 8933,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -74,17 +79,17 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 361551,
-            "output": 58845,
-            "cacheRead": 21211648,
+            "input": 922206,
+            "output": 79544,
+            "cacheRead": 32899328,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 39880,
-          "output": 4787,
+          "input": 47517,
+          "output": 8933,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -95,15 +100,15 @@
           "cacheWrite": 217485
         },
         "custom/kimi-k2.7-code": {
-          "input": 361551,
-          "output": 58845,
-          "cacheRead": 21211648,
+          "input": 922206,
+          "output": 79544,
+          "cacheRead": 32899328,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.782651,
-        "pricingAsOf": "2026-06-27T17:09:23.876Z"
+        "usd": 10.618725,
+        "pricingAsOf": "2026-06-27T17:19:09.960Z"
       }
     },
     "merges": [
@@ -111,6 +116,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
