@@ -154,6 +154,35 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
   });
 
+  it('logs one summary line per poll tick with sub-counts for sessions gone and keep-alive corpses', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockListActiveConversations.mockReturnValue([
+      { name: 'gone-1', tmuxSession: 'conv-gone-1', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'gone-2', tmuxSession: 'conv-gone-2', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'alive', tmuxSession: 'conv-alive', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-corpse', 'conv-alive']));
+    mockIsHarnessProcessAlive.mockImplementation(async (session: string) => session === 'conv-alive');
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledTimes(3);
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-1');
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-2');
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
+
+    const summaryCalls = consoleSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.startsWith('[conversation-lifecycle] marked'),
+    );
+    expect(summaryCalls).toHaveLength(1);
+    expect(summaryCalls[0][0]).toMatch(/marked 3 conversation\(s\) ended \(2 session\(s\) gone, 1 keep-alive corpses\)/);
+
+    consoleSpy.mockRestore();
+  });
+
   it('does NOT mark a corpse ended while a respawn is in flight for its session', async () => {
     mockListActiveConversations.mockReturnValue([
       { name: 'reviving', tmuxSession: 'conv-reviving', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
