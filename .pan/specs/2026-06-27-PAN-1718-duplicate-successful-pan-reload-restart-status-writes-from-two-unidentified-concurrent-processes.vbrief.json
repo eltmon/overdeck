@@ -4,17 +4,17 @@
     "created": "2026-06-27T04:29:47.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1718: Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes",
-    "updated": "2026-06-27T04:32:14.634Z"
+    "updated": "2026-06-27T04:35:31.510Z"
   },
   "plan": {
     "id": "pan-1718",
     "title": "Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes",
-    "status": "proposed",
+    "status": "running",
     "uid": "66d33eca-9c69-41d7-9a71-a88e52bbbb35",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-27T04:29:47.000Z",
-    "updated": "2026-06-27T04:32:14.634Z",
+    "updated": "2026-06-27T04:35:31.510Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1718",
@@ -258,5 +258,5 @@
       "canonicalFilename": "2026-06-27-PAN-1718-duplicate-successful-pan-reload-restart-status-writes-from-two-unidentified-concurrent-processes.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
