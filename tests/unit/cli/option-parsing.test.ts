@@ -110,3 +110,19 @@ describe('pan project(s) add — option parsing', () => {
     expect(stdout).toMatch(/Register a project with Overdeck/);
   });
 });
+
+describe('pan up — option parsing', () => {
+  it('registers --no-open on the command', () => {
+    const { stdout, status } = runCli(['up', '--help']);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/--no-open/);
+    expect(stdout).toMatch(/Do not open the dashboard app\/browser after startup/);
+  });
+
+  it('does NOT reject --no-open as an unknown option', () => {
+    const { stdout, stderr } = runCli(['up', '--no-open', '--help']);
+    const all = stdout + stderr;
+    expect(all).not.toMatch(/unknown option/i);
+    expect(all).not.toMatch(/error: option '--no-open'/i);
+  });
+});

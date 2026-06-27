@@ -676,6 +676,7 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
+  .option('--no-open', 'Do not open the dashboard app/browser after startup')
   .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.')
   .action(async (options) => {
     const noResume = isNoResumeCliOptionEnabled(options);
@@ -1030,7 +1031,24 @@ program
       }
     }
 
-    if (electronAppPath) {
+    async function openDashboardInBrowser(url: string): Promise<void> {
+      if (options.open === false) return;
+
+      try {
+        const [{ openBrowser }, { layer: nodeServicesLayer }] = await Promise.all([
+          import('../lib/browser.js'),
+          import('@effect/platform-node/NodeServices'),
+        ]);
+        await Effect.runPromise(
+          openBrowser(url).pipe(Effect.provide(nodeServicesLayer)),
+        );
+        console.log(chalk.green('✓ Dashboard opened in browser'));
+      } catch {
+        console.log(chalk.dim(`  Open your browser to: ${url}`));
+      }
+    }
+
+    if (electronAppPath && options.open !== false) {
       console.log(chalk.dim(`\nLaunching Overdeck desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
@@ -1148,6 +1166,7 @@ program
       // recoverable state (dashboard-side failure, sidecars still usable).
       let readyUrl: string;
       let apiUrl: string;
+      let shouldOpenDashboard = true;
       try {
         const resolved = await resolveDashboardReadyUrl({
           traefikEnabled,
@@ -1172,15 +1191,37 @@ program
         apiUrl = traefikEnabled
           ? `https://${traefikDomain}/api`
           : `http://localhost:${dashboardApiPort}`;
+        shouldOpenDashboard = false;
         console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
         console.log(chalk.dim('  CLIProxy and Traefik have been left running — recover with `pan restart --dashboard` once the issue is fixed.'));
       }
       console.log(`  Frontend: ${chalk.cyan(readyUrl)}`);
       console.log(`  API:      ${chalk.cyan(apiUrl)}`);
+      if (shouldOpenDashboard) {
+        await openDashboardInBrowser(readyUrl);
+      }
     } else {
       // Run in foreground
+      const child = spawn(node22, [bundledServer], {
+            stdio: 'inherit',
+            env: {
+              ...dashboardBootEnv,
+              ...dashboardOriginEnv,
+              DASHBOARD_PORT: String(dashboardPort),
+              API_PORT: String(dashboardApiPort),
+              PORT: String(dashboardApiPort),
+              OVERDECK_MODE: isProduction ? 'production' : 'development',
+            },
+          });
+
+      child.on('error', (err) => {
+        console.error(chalk.red('Failed to start dashboard:'), err.message);
+        process.exit(1);
+      });
+
       let readyUrl: string;
       let apiUrl: string;
+      let shouldOpenDashboard = true;
       try {
         const resolved = await resolveDashboardReadyUrl({
           traefikEnabled,
@@ -1204,28 +1245,15 @@ program
         apiUrl = traefikEnabled
           ? `https://${traefikDomain}/api`
           : `http://localhost:${dashboardApiPort}`;
+        shouldOpenDashboard = false;
         console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
       }
       console.log(`  Frontend: ${chalk.cyan(readyUrl)}`);
       console.log(`  API:      ${chalk.cyan(apiUrl)}`);
       console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
-
-      const child = spawn(node22, [bundledServer], {
-            stdio: 'inherit',
-            env: {
-              ...dashboardBootEnv,
-              ...dashboardOriginEnv,
-              DASHBOARD_PORT: String(dashboardPort),
-              API_PORT: String(dashboardApiPort),
-              PORT: String(dashboardApiPort),
-              OVERDECK_MODE: isProduction ? 'production' : 'development',
-            },
-          });
-
-      child.on('error', (err) => {
-        console.error(chalk.red('Failed to start dashboard:'), err.message);
-        process.exit(1);
-      });
+      if (shouldOpenDashboard) {
+        await openDashboardInBrowser(readyUrl);
+      }
     }
 
     await startPostLaunchSidecars();

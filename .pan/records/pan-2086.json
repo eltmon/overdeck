@@ -112,6 +112,10 @@
     "traefik-readiness-gate.ac1": "completed",
     "traefik-readiness-gate.ac2": "completed",
     "traefik-readiness-gate.ac3": "completed",
-    "traefik-readiness-gate.ac4": "completed"
+    "traefik-readiness-gate.ac4": "completed",
+    "dashboard-auto-open": "completed",
+    "dashboard-auto-open.ac1": "completed",
+    "dashboard-auto-open.ac2": "completed",
+    "dashboard-auto-open.ac3": "completed"
   }
 }

@@ -62,6 +62,9 @@ pan up --no-deacon
 
 # Disable agent auto-resume for this boot
 pan up --no-resume
+
+# Start services without opening the app/browser
+pan up --no-open
 ```
 
 ## Desktop App
@@ -84,7 +87,9 @@ the supported locations. Otherwise it falls back to the default browser.
   - Install to `%LOCALAPPDATA%\Programs\overdeck\Overdeck.exe`.
 
 When a supported install is found, `pan up` launches the app window. Without an
-install, `pan up` opens the dashboard in your default browser.
+install, `pan up` opens the dashboard in your default browser. Use
+`pan up --no-open` for scripted or headless starts that should not open a
+window.
 
 ## Step-by-Step Workflow
 
