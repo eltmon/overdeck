@@ -24,22 +24,54 @@
       "timestamp": "2026-06-27T05:05:39.097Z",
       "reason": "end",
       "note": "All eight PAN-2054 beads are closed in the exported bead state. Deep inspection passed for workspace-lqlti and workspace-m9lki. Quality gates passed on the origin/main-merged branch: npm run typecheck, npm run lint, npm test. Resolved the prior rebase gate by merging origin/main and keeping the completed PAN-2054 record. Branch pushed at 612191c77."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-27T05:08Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-27T05:08:10.978Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T05:08:19.217Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-27T05:09Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-27T05:09:18.105Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-27T05:08:10Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2054\n\nterminal close-out changes landed on obsolete executeCloseOut path, not lifecycle closeOut\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2054 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-27T05:09:18Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2054\n\nterminal close-out changes are not wired into lifecycle closeOut production path\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2054 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-06-27T05:05:44.481Z",
+  "updated": "2026-06-27T05:09:18.105Z",
   "pipeline": {
     "issueId": "PAN-2054",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T05:05:44.439Z",
+    "updatedAt": "2026-06-27T05:09:17.411Z",
+    "reviewNotes": "terminal close-out changes are not wired into lifecycle closeOut production path",
     "inspectNotes": "workspace-m9lki passed: reapIssueResidue matches the vBRIEF helper requirements, uses the merge guard before disk/branch cleanup, uses execAsync plus Effect killSession, and introduces no prohibited execSync/sendKeys pattern.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2092",
+    "lastVerifiedCommit": "d07fa71d8bd054a6ed9ca067d9fcc79f1b61839a",
     "reviewRequestedAt": "2026-06-27T05:05:39.099Z"
   },
   "closeOut": {
@@ -92,7 +124,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.125394,
-        "pricingAsOf": "2026-06-27T05:05:44.480Z"
+        "pricingAsOf": "2026-06-27T05:09:17.451Z"
       }
     },
     "merges": [
