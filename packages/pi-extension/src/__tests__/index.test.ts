@@ -10,8 +10,11 @@ import overdeckPiExtension, {
   handleSessionBriefingContext,
   handleWorkspaceContext,
   overdeckPathsFor,
+  probePiExtensionCapabilities,
+  setThinkingLevelIfSupported,
   type PiExtensionAPI,
   type PiCommand,
+  type ThinkingLevel,
 } from '../index.js'
 
 function makeFakeHome(): { home: string; cleanup: () => void } {
@@ -225,6 +228,53 @@ describe('Pi system prompt context', () => {
 
     expect(appended).toEqual(['workspace context', 'live briefing context'])
     expect(ctx.appendSystemPrompt).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('extension control capabilities', () => {
+  it('reports supported runtime control methods', () => {
+    const runtime = {
+      on: () => {},
+      registerCommand: () => {},
+      sendUserMessage: () => {},
+      setThinkingLevel: () => {},
+      getThinkingLevel: () => 'high' as ThinkingLevel,
+      setModel: () => {},
+      exec: () => {},
+    } satisfies PiExtensionAPI
+    const ctx = { compact: () => {} }
+
+    expect(probePiExtensionCapabilities(runtime, ctx)).toEqual({
+      sendUserMessage: true,
+      setThinkingLevel: true,
+      getThinkingLevel: true,
+      setModel: true,
+      exec: true,
+      compact: true,
+    })
+  })
+
+  it('no-ops instead of throwing when setThinkingLevel is unsupported', async () => {
+    const runtime = {
+      on: () => {},
+      registerCommand: () => {},
+      sendUserMessage: () => {},
+      setModel: () => {},
+    } satisfies PiExtensionAPI
+
+    await expect(setThinkingLevelIfSupported(runtime, 'high')).resolves.toBe(false)
+  })
+
+  it('dispatches setThinkingLevel when the runtime supports it', async () => {
+    const setThinkingLevel = vi.fn()
+    const runtime = {
+      on: () => {},
+      registerCommand: () => {},
+      setThinkingLevel,
+    } satisfies PiExtensionAPI
+
+    await expect(setThinkingLevelIfSupported(runtime, 'low')).resolves.toBe(true)
+    expect(setThinkingLevel).toHaveBeenCalledWith('low')
   })
 })
 

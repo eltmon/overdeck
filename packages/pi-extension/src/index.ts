@@ -14,8 +14,60 @@ export interface PiExtensionAPI {
   on(event: 'session_start', handler: (event: SessionStartEvent, ctx: unknown) => void | Promise<void>): void
   on(event: 'tool_execution_end', handler: (event: ToolExecutionEndEvent, ctx: unknown) => void | Promise<void>): void
   on(event: 'turn_end', handler: (event: TurnEndEvent, ctx: unknown) => void | Promise<void>): void
+  on(event: 'input', handler: (event: InputEvent, ctx: unknown) => void | Promise<void>): void
   on(event: string, handler: (event: unknown, ctx: unknown) => void | Promise<void>): void
   registerCommand(name: string, command: PiCommand): void
+  sendUserMessage?(content: string, options?: SendUserMessageOptions): void | Promise<void>
+  setThinkingLevel?(level: ThinkingLevel): void | Promise<void>
+  getThinkingLevel?(): ThinkingLevel | Promise<ThinkingLevel>
+  setModel?(model: string): void | Promise<void>
+  exec?(command: string, args?: string[], options?: Record<string, unknown>): unknown | Promise<unknown>
+}
+
+export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+
+export interface SendUserMessageOptions {
+  deliverAs?: 'steer' | 'followUp'
+}
+
+export interface InputEvent {
+  source?: 'interactive' | 'rpc' | 'extension'
+  text?: string
+}
+
+export interface ExtensionContext {
+  compact?(options?: Record<string, unknown>): void | Promise<void>
+}
+
+export interface PiExtensionCapabilities {
+  sendUserMessage: boolean
+  setThinkingLevel: boolean
+  getThinkingLevel: boolean
+  setModel: boolean
+  exec: boolean
+  compact: boolean
+}
+
+function hasFunction(value: unknown, name: string): boolean {
+  return typeof (value as Record<string, unknown> | null | undefined)?.[name] === 'function'
+}
+
+export function probePiExtensionCapabilities(runtime: unknown, ctx?: unknown): PiExtensionCapabilities {
+  return {
+    sendUserMessage: hasFunction(runtime, 'sendUserMessage'),
+    setThinkingLevel: hasFunction(runtime, 'setThinkingLevel'),
+    getThinkingLevel: hasFunction(runtime, 'getThinkingLevel'),
+    setModel: hasFunction(runtime, 'setModel'),
+    exec: hasFunction(runtime, 'exec'),
+    compact: hasFunction(ctx, 'compact'),
+  }
+}
+
+export async function setThinkingLevelIfSupported(runtime: unknown, level: ThinkingLevel): Promise<boolean> {
+  const setThinkingLevel = (runtime as PiExtensionAPI | null | undefined)?.setThinkingLevel
+  if (typeof setThinkingLevel !== 'function') return false
+  await setThinkingLevel.call(runtime, level)
+  return true
 }
 
 export interface SessionStartEvent {
