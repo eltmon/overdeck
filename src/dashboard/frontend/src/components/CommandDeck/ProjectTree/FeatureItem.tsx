@@ -933,6 +933,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   });
 
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
+  // UAT environment panel collapses by default to reduce clutter; the health
+  // summary stays visible in the header while collapsed (PAN-2063).
+  const [uatExpanded, setUatExpanded] = useState(false);
 
   useEffect(() => {
     if (!expanded) return;
@@ -1281,19 +1284,28 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
       {shouldShowUatStack && uatStackSummary && (
         <div className={styles.uatStackTreeGroup}>
-          <div className={styles.uatStackTreeHeader}>
-            <ChevronDown size={12} />
+          <button
+            type="button"
+            className={styles.uatStackTreeHeader}
+            onClick={() => setUatExpanded(v => !v)}
+            aria-expanded={uatExpanded}
+            aria-label="Toggle UAT environment details"
+            title="Toggle UAT environment details"
+          >
+            {uatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             <span>UAT environment</span>
             <span className={styles.uatStackTreeSummary}>{uatStackSummary.label.replace(/^UAT stack\s*/i, '')}</span>
-          </div>
-          <UatStackStatus
-            containers={workspace?.containers}
-            stackHealth={workspace?.stackHealth}
-            frontendUrl={workspace?.frontendUrl}
-            apiUrl={workspace?.apiUrl}
-            pending={stackPending}
-            density="compact"
-          />
+          </button>
+          {uatExpanded && (
+            <UatStackStatus
+              containers={workspace?.containers}
+              stackHealth={workspace?.stackHealth}
+              frontendUrl={workspace?.frontendUrl}
+              apiUrl={workspace?.apiUrl}
+              pending={stackPending}
+              density="compact"
+            />
+          )}
         </div>
       )}
 
