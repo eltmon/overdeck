@@ -8,8 +8,10 @@ import overdeckOhmypiExtension, {
   handleTurnEnd,
   handlePanDone,
   handleSessionBriefingContext,
+  handleConversationControlSessionStart,
   handleWorkspaceContext,
   overdeckPathsFor,
+  processControlCommandFile,
   probeOhmypiExtensionCapabilities,
   setThinkingLevelIfSupported,
   type OhmypiExtensionAPI,
@@ -281,6 +283,87 @@ describe('extension control capabilities', () => {
     await expect(setThinkingLevelIfSupported(runtime, 'low')).resolves.toBe(true)
     expect(setThinkingLevel).toHaveBeenCalledWith('low')
   })
+
+  it('skips malformed control files without crashing later command processing', async () => {
+    const h = makeFakeHome()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const paths = overdeckPathsFor('conv-one', h.home)
+      mkdirSync(paths.controlDir, { recursive: true })
+      const badFile = join(paths.controlDir, 'bad.json')
+      const goodFile = join(paths.controlDir, 'good.json')
+      writeFileSync(badFile, 'not json')
+      writeFileSync(goodFile, JSON.stringify({ id: 'cmd-good', type: 'steer', message: 'pivot', source: 'operator' }))
+      const sendUserMessage = vi.fn()
+      const runtime: OhmypiExtensionAPI = {
+        on: () => {},
+        registerCommand: () => {},
+        sendUserMessage,
+      }
+
+      await expect(processControlCommandFile({ agentId: 'conv-one', home: h.home, now }, runtime, {}, badFile)).resolves.toBeUndefined()
+      await processControlCommandFile({ agentId: 'conv-one', home: h.home, now }, runtime, {}, goodFile)
+
+      expect(warn).toHaveBeenCalled()
+      expect(existsSync(badFile)).toBe(false)
+      expect(sendUserMessage).toHaveBeenCalledWith('pivot', { deliverAs: 'steer' })
+    } finally {
+      warn.mockRestore()
+      h.cleanup()
+    }
+  })
+
+  it('dispatches steer command files, unlinks them, and posts an ack', async () => {
+    const h = makeFakeHome()
+    try {
+      const paths = overdeckPathsFor('conv-steer', h.home)
+      mkdirSync(paths.controlDir, { recursive: true })
+      const file = join(paths.controlDir, 'cmd.json')
+      writeFileSync(file, JSON.stringify({ id: 'cmd-steer', type: 'steer', message: 'adjust', source: 'operator' }))
+      const sendUserMessage = vi.fn()
+      const runtime: OhmypiExtensionAPI = {
+        on: () => {},
+        registerCommand: () => {},
+        sendUserMessage,
+      }
+
+      await processControlCommandFile({ agentId: 'conv-steer', home: h.home, now }, runtime, {}, file)
+
+      expect(sendUserMessage).toHaveBeenCalledWith('adjust', { deliverAs: 'steer' })
+      expect(existsSync(file)).toBe(false)
+      expect(fetchCalls.at(-1)).toMatchObject({
+        url: 'http://localhost:3011/api/conversations/conv-steer/control-ack',
+        body: { id: 'cmd-steer', ok: true },
+      })
+    } finally {
+      h.cleanup()
+    }
+  })
+
+  it('drains pre-existing command files before starting the session watcher', async () => {
+    const h = makeFakeHome()
+    try {
+      const paths = overdeckPathsFor('conv-backlog', h.home)
+      mkdirSync(paths.controlDir, { recursive: true })
+      const file = join(paths.controlDir, 'cmd.json')
+      writeFileSync(file, JSON.stringify({ id: 'cmd-backlog', type: 'prompt', message: 'queued', source: 'operator' }))
+      const sendUserMessage = vi.fn()
+      const runtime: OhmypiExtensionAPI = {
+        on: () => {},
+        registerCommand: () => {},
+        sendUserMessage,
+      }
+
+      const watcher = await handleConversationControlSessionStart({ agentId: 'conv-backlog', home: h.home, now }, runtime, {})
+      watcher.close()
+
+      expect(sendUserMessage).toHaveBeenCalledWith('queued')
+      expect(existsSync(file)).toBe(false)
+      expect(fetchCalls.at(-1)?.body).toEqual({ id: 'cmd-backlog', ok: true })
+    } finally {
+      h.cleanup()
+    }
+  })
 })
 
 describe('handleToolExecutionEnd', () => {
@@ -549,7 +632,7 @@ describe('default export — Pi extension wiring', () => {
     expect(Object.keys(commands)).toHaveLength(0)
   })
 
-  it('registers all four hooks when OVERDECK_AGENT_ID is set', () => {
+  it('registers lifecycle hooks and input source tracking when OVERDECK_AGENT_ID is set', () => {
     process.env['OVERDECK_AGENT_ID'] = 'agent-pan-636'
     const handlers: Record<string, unknown> = {}
     const commands: Record<string, PiCommand> = {}
@@ -558,7 +641,7 @@ describe('default export — Pi extension wiring', () => {
       registerCommand: (name, command) => { commands[name] = command },
     }
     overdeckPiExtension(pi)
-    expect(Object.keys(handlers).sort()).toEqual(['session_start', 'tool_execution_end', 'turn_end'])
+    expect(Object.keys(handlers).sort()).toEqual(['input', 'session_start', 'tool_execution_end', 'turn_end'])
     expect(Object.keys(commands)).toEqual(['pan-done'])
   })
 })
