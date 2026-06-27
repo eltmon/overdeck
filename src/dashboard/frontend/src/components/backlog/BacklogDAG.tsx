@@ -7,9 +7,11 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
   Controls,
+  Handle,
   useNodesState,
   useEdgesState,
   MarkerType,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from '@dagrejs/dagre';
@@ -33,6 +35,7 @@ export interface PipelineState {
 export interface SequenceNode {
   issueId: string;
   title?: string;
+  isEpic?: boolean;
   /** PAN-2006 pipeline state from the shared classifier (editor controls). */
   state?: PipelineState;
   rank: number;
@@ -132,6 +135,7 @@ function IssueNode({ data }: { data: IssueNodeData }) {
   if (node.condition === 'needs-refinement') cls.push('cond-refine');
   if (node.condition === 'stale') cls.push('cond-stale');
   if (node.gate === 'blocked') cls.push('gate-blocked');
+  if (node.isEpic) cls.push('epic');
   // gate=ready on an in-flight issue is the sequencer auto-PINNING active work, not an
   // operator promotion — only badge a real (idle) operator promote.
   const isPromoted = node.gate === 'ready' && !node.inPipeline;
@@ -139,6 +143,7 @@ function IssueNode({ data }: { data: IssueNodeData }) {
 
   return (
     <div className={cls.join(' ')} onClick={() => onSelect(node)}>
+      <Handle type="target" position={Position.Top} className="edge-handle" />
       <div className="row1">
         <span className="rank">#{node.rank}</span>
         <span className="iid">{node.issueId}</span>
@@ -151,10 +156,12 @@ function IssueNode({ data }: { data: IssueNodeData }) {
         {node.inPipeline && <span className="chip verb work"><span className="pulsedot" />in pipeline</span>}
         {node.condition === 'needs-refinement' && <span className="chip refine">⚠ REFINE</span>}
         {node.condition === 'stale' && <span className="chip stale">⊘ STALE</span>}
+        {node.isEpic && <span className="chip epic">EPIC</span>}
         {node.ready && <span className="chip ready">✓ READY</span>}
         {node.hasPrd && <span className="chip prd">PRD</span>}
         <span className="score">{node.score}</span>
       </div>
+      <Handle type="source" position={Position.Bottom} className="edge-handle" />
     </div>
   );
 }
@@ -176,9 +183,13 @@ function sequenceToFlow(
   }));
 
   const rawEdges: Edge[] = edges.map((e, i) => {
-    // 'unblocks' = hard dependency (solid); 'informs' = advisory (dashed, tinted).
-    const isDashed = e.type === 'informs';
-    const color = isDashed
+    // 'unblocks' = hard dependency (solid); 'informs' = advisory (dashed, tinted);
+    // 'contains' = epic membership (separate presentation, not a blocking edge).
+    const isInforms = e.type === 'informs';
+    const isContains = e.type === 'contains';
+    const color = isContains
+      ? 'color-mix(in srgb, var(--primary) 58%, transparent)'
+      : isInforms
       ? 'color-mix(in srgb, var(--info) 60%, transparent)'
       : 'color-mix(in srgb, var(--muted-foreground) 55%, transparent)';
     return {
@@ -189,8 +200,8 @@ function sequenceToFlow(
       markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color },
       style: {
         stroke: color,
-        strokeWidth: 1.5,
-        strokeDasharray: isDashed ? '5 4' : undefined,
+        strokeWidth: isContains ? 1.2 : 1.5,
+        strokeDasharray: isInforms ? '5 4' : isContains ? '2 5' : undefined,
       },
     };
   });
@@ -441,6 +452,7 @@ export function BacklogDAG({
         /* ── Backlog DAG nodes — ported from docs/design/mockups/backlog-sequencer-scaled-opus.html, scoped to .bk-dag-root ── */
         .bk-dag-root .react-flow { background: transparent; }
         .bk-dag-root .react-flow__node { cursor: pointer; }
+        .bk-dag-root .edge-handle { opacity: 0; pointer-events: none; }
         .bk-dag-root .node {
           background: var(--card); border: 1px solid var(--border);
           border-left: 4px solid var(--heat, var(--muted-foreground));
@@ -472,6 +484,14 @@ export function BacklogDAG({
         .bk-dag-root .node.pipe.cond-stale { opacity: 1; filter: none; }
         .bk-dag-root .node.gate-blocked { opacity: .82; }
         .bk-dag-root .node.gate-promoted { border-top: 2px solid color-mix(in srgb, var(--primary) 60%, transparent); }
+        .bk-dag-root .node.epic {
+          border-style: dashed;
+          border-width: 1.5px;
+          border-left-width: 5px;
+          border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+          border-left-color: color-mix(in srgb, var(--primary) 72%, var(--foreground));
+          background: color-mix(in srgb, var(--primary) 6%, var(--card));
+        }
         .bk-dag-root .node .row1 { display: flex; align-items: center; gap: 7px; }
         .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 500; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
         .bk-dag-root .node .iid { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
@@ -483,6 +503,7 @@ export function BacklogDAG({
         .bk-dag-root .chip.ready { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
         .bk-dag-root .chip.refine { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
         .bk-dag-root .chip.stale { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+        .bk-dag-root .chip.epic { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 44%, transparent); background: color-mix(in srgb, var(--primary) 12%, transparent); }
         .bk-dag-root .chip.promoted { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 50%, transparent); background: color-mix(in srgb, var(--primary) 14%, transparent); }
         .bk-dag-root .chip.held { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 40%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); }
         .bk-dag-root .chip.verb { display: inline-flex; align-items: center; gap: 3px; }
