@@ -110,7 +110,7 @@ function mockFetch() {
       return Response.json({
         roles: {
           flywheel: {
-            harness: 'pi',
+            harness: 'ohmypi',
             model: 'claude-sonnet-4-6',
             effort: 'medium',
             maxAgents: 4,
@@ -190,7 +190,7 @@ describe('FlywheelConversationPane', () => {
     renderPane(onOpenSettings);
 
     expect(await screen.findByText('RUN-2')).toBeInTheDocument();
-    expect(screen.getByText('pi')).toBeInTheDocument();
+    expect(screen.getByText('ohmypi')).toBeInTheDocument();
     expect(screen.getByText('claude-sonnet-4-6')).toBeInTheDocument();
     expect(screen.getByText('All tracked projects')).toBeInTheDocument();
 

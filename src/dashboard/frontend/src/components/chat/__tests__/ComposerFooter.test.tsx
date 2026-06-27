@@ -508,6 +508,28 @@ describe('ComposerFooter image attachments', () => {
     );
   });
 
+  it('omits pi delivery mode for idle sends so the server uses prompt delivery', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+    const piConversation = { ...conversation, harness: 'pi' as const };
+
+    render(<ComposerFooter conversation={piConversation} onSendAcknowledged={onSendAcknowledged} />);
+
+    expect(screen.getByLabelText('Pi delivery mode')).toHaveValue('auto');
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'hello pi' }),
+      }),
+    );
+  });
+
   it('posts live thinking-level changes for pi conversations', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
