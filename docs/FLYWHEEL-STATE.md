@@ -2663,3 +2663,136 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
   tail (re-trigger vs operator force-close); (4) once gate unjams, `pan start` the stack-broken ready+
   planned cohort members (1084/1884/2063) — kimi spawns are now safe. MIN-831/846 still operator
   UAT/merge-gated.
+
+## RUN-30 tick 2 (2026-06-27 ~16:48Z) — PAN-1084 recovering via idle-nudge (PAN-2102 LIVE); strike-2104 FIX CORRECT but bundled scope-creep 36523347b RE-REDDENED main → struck revert (PAN-2105)
+
+- **DURABLE LESSON — verify a strike's commit list contains ONLY the requested change; a strike can
+  bundle unrelated scope-creep that lands "green in its own gate" yet re-reddens main via a test the
+  strike never ran.** strike-pan-2104 correctly fixed the 4 kimi→ohmypi assertions (`794e04361`,
+  confirmed: on that commit only 1 unrelated test fails) BUT also landed `36523347b fix(terminal):
+  create empty session and configure survival before sending command` — unrelated to the red-main
+  brief. That terminal fix destabilized `tests/playwright/conversation-supervisor-uat.test.ts`
+  (BOTH sub-tests PASSED on green e93897caf pre-fix; one FAILS on each terminal-fix-bearing commit
+  — "resumes Codex conversations" on 36523347b, "delivers through real conversation routes" on
+  794e04361). Main stayed red, just via a different test. LESSON: after a strike "lands green," (a)
+  list `git log --oneline strike/<id>` and confirm every commit traces to the brief; (b) check main
+  CI on the NEW head, not the strike's self-reported gate; (c) if an extra commit appears, treat it
+  as suspect for any residual red.
+
+- **DURABLE LESSON — PAN-2102 idle-nudge->on-disk-brief recovery is LIVE and WORKS.** `pan start
+  PAN-1084` kickoff delivery FAILED twice ("input echo confirmation failed after 2 attempts x2500ms"
+  — the large-brief PTY echo-confirm gap PAN-2102 names), but the deacon's idle-nudge fired and
+  pointed the agent at its open bead + workflow; agent-pan-1084 proceeded to read roles/work.md and
+  start implementing. **A failed kickoff delivery is NOT a dead agent** — the deacon recovers it
+  within a patrol cycle. Do not treat "Kickoff delivery attempt N/N failed" + "Agent spawned" as a
+  spawn failure; verify via the pane (agent thinking/reading files) before concluding it stalled.
+  (Reinforces PAN-2102's whole premise; first clean prod observation this run.)
+
+- **Follow-through on the scope-creep re-red: filed PAN-2105 + struck the revert in the SAME tick.**
+  `pan strike PAN-2105 --harness codex` -> `strike-pan-2105` (`git revert 36523347b`). Revert keeps
+  the correct kimi test fix (794e04361) and removes the Playwright regression; zero runtime effect
+  (terminal fix landed 16:35Z, server started 15:14Z, so it was never in the deployed binary). If
+  the terminal improvement is real, re-land it correctly via the normal pipeline as a separate issue.
+
+- **PAN-2104 at `verifying-on-main` (labels merged/verifying-on-main/blocks-main).** Its test fix is
+  correct; close it once strike-pan-2105's revert lands green. Do NOT close before main is green.
+
+- **Net RUN-30 cohort-drain position: still 8/17 terminal-or-parked.** Active 9 unchanged. Productive
+  agents now: agent-pan-1084 (NEW, recovering), agent-pan-1718, agent-pan-2086 (both kimi->claude-code
+  flowing), strike-pan-2105 (revert in flight). The merge gate remains jammed until strike-2105 lands
+  green; operator UAT/merge (MIN-831/846) + close-out tail (2054/2081/2088) + broken stacks
+  (1884/2063/1982/806) are the other holds.
+
+- Next tick: (1) verify strike-pan-2105 revert lands -> main CI GREEN -> close PAN-2104 AND PAN-2105;
+  (2) with green main, re-check PAN-1718/1919 gate (1919 merge_conflict still needs operator rebase);
+  (3) confirm agent-pan-1084 is making real progress (commits); (4) consider `pan start` on the next
+  ready+planned stack-broken cohort member (1884 or 2063) now that kimi->claude-code + stack self-heal
+  are both proven live this run.
+
+## RUN-30 tick 3 (2026-06-27 ~17:03Z) — MAIN GREEN; PAN-2104/2105 CLOSED; PAN-1084 implemented+PR#2107 (full idle-nudge->work->review arc validated)
+
+- **RED MAIN RESOLVED.** strike-pan-2105's revert `a28cdd974` landed on origin/main → CI `completed
+  success`. strike verified: kimi tests pass (test fix 794e04361 intact), typecheck pass, npm test
+  736 files / 7496 tests pass — the conversation-supervisor Playwright UAT is GREEN again (terminal
+  regression gone). Closed PAN-2104 + PAN-2105 via `pan close --force` (both merged + verifying-on-main;
+  verify-merged gate passed; the non-fatal label step is the known missing-`in-planning` quirk). Net:
+  the original kimi red-main (filed+struck tick 1) + the scope-creep re-red (filed+struck tick 2) are
+  both drained. PAN-2106 (pan strike workspace-setup substrate bug) filed and pending normal pipeline.
+
+- **DURABLE LESSON — PAN-1084 proved the FULL recovered-spawn arc end-to-end this run.** `pan start
+  PAN-1084` kickoff delivery FAILED (echo-confirm) -> deacon idle-nudge recovered it -> agent
+  IMPLEMENTED the security fix (`51d19ae39 fix(specialists): block work agents from self-approving
+  subagent prompts via tmux`, + a tmux-send-keys-guard PreToolUse hook + tests) -> pushed -> PR #2107
+  -> review & test auto-running. A kimi-k2.7-code work agent that lost its kickoff prompt still
+  delivered a real security fix and entered review, all via the PAN-2102 on-disk-brief recovery path.
+  This is the strongest evidence yet that kimi->claude-code + idle-nudge recovery = reliable work
+  execution. (NOTE the agent hit ctx 91% / 701k by bead-close; PAN-1675 compact brake is the net for
+  multi-bead kimi work.)
+
+- **Merge gate after green main:** PAN-1718 (PR #2103) STILL `failing_checks` despite green main —
+  likely a STALE PR check evaluated against the old red base; GitHub did not auto-rerun on base update.
+  Next tick try `pan review request PAN-1718` to refresh the check, or the operator can retrigger.
+  PAN-1919 (PR #1950) merge_conflict+checks (conflict is independent — needs operator rebase).
+  PAN-2088 (PR #2097) merge_conflict. MIN-831/846 still operator UAT/merge-gated.
+
+- **Strike workspace-setup substrate bug confirmed transient + filed (PAN-2106).** The first
+  strike-pan-2105 spawn left a broken partial workspace (no worktree/branch/source, false "spawned"
+  success); a clean re-strike ~5 min later (after strike-2104's push finished) set up correctly.
+  Root cause = git-lock race (concurrent worktree-add vs push on the shared primary). PAN-2106 tracks
+  the verify-after-add + serialize-against-push fix.
+
+- **Cohort-drain position: 8/17 terminal-or-parked + PAN-1084 now advancing (review).** Productive:
+  agent-pan-1718, agent-pan-2086 (kimi->claude-code flowing), agent-pan-1084 (PR #2107 in review).
+  Holds: operator UAT/merge (MIN-831/846), close-out tail (2054/2081/2088), stale/conflict gate
+  (1718/1919/2088), broken stacks (1884/2063/1982/806). Did NOT start 1884/2063 yet — gate already
+  holds 4-5 items + 1084 incoming; capacity is not the bottleneck, the gate is.
+
+- Next tick: (1) refresh PAN-1718 stale check (pan review request or operator); (2) watch PAN-1084
+  PR #2107 review/test; (3) reassess close-out tail (2054/2081/2088) now that main is green + close-out
+  fix deployed; (4) once the gate drains, `pan start` 1884/2063 (kimi+stack-self-heal both proven).
+
+## RUN-30 ticks 4-6 (2026-06-27 ~17:16-17:27Z) — PAN-1084 PR#2107 MERGE-READY; 3 of 4 producers WEDGED (unrecoverable by flywheel); filed PAN-2106 + PAN-2108
+
+- **PAN-1084 is fully merge-ready (operator gate).** PR #2107 CLEAN/MERGEABLE, ALL checks pass incl.
+  test. The security fix (block work agents self-approving subagent prompts) is verified. With
+  require_uat_before_merge=true this is an operator merge — the single highest-leverage action.
+
+- **DURABLE LESSON — the flywheel has NO recovery path for context-exhausted/user-stopped/troubled
+  work agents, and 3 of 4 producers wedged into exactly that unrecoverable state.** Mechanism (from
+  deacon.log + pty-supervisor logs):
+  - **agent-pan-2086** (17 commits, no PR): kimi, hit `API 400 token limit 262144`; was
+    `deliberately stopped by user` (~15:02Z) then fed ~138KB `pan-tell` pastes that fail PTY
+    echo-confirm and inflate ctx to 209k. User-stopped → exempt from deacon auto-recovery.
+  - **agent-pan-1718** (19 commits, PR #2103 conflicts main, review=CHANGES REQUESTED): deacon
+    `bd ready -l pan-1718` FAILS (the `.pan/records` sync conflict breaks bd) → idle-nudge can't
+    fire → `stuck-remediation stage=3 → marked-troubled` (17:25Z). Troubled → exempt from auto-resume.
+  - **agent-pan-2063** (glm-5.2/ohmypi): stalled at startup, only the sync auto-commit, NO
+    idle-nudge recovery (the glm-5.2/ohmypi path did NOT get the kimi idle-nudge recovery).
+  - The ONE recovery command (`pan resume --compact`, PAN-1675) is **flywheel-forbidden**; and
+    user-stopped/troubled gates exempt the agent from the deacon compact brake. So once an agent
+    lands user-stopped-OR-troubled AND context-exhausted (the common end-state), it wedges
+    permanently until a human intervenes. Committed work is SAFE on the branches (re-PR-able).
+  Filed as **PAN-2108** (flywheel-safe recovery surface / compact-brake-for-context-overflow).
+
+- **DURABLE LESSON — glm-5.2/ohmypi work spawns do NOT self-recover from a failed kickoff, but
+  kimi/claude-code ones DO.** PAN-1084 + PAN-1884 (kimi) both recovered via the deacon idle-nudge
+  after their ~50KB kickoff echo-confirm failed. PAN-2063 (glm-5.2/ohmypi) stalled with no recovery.
+  Prefer kimi-routed (claude-code) work spawns; ohmypi/glm work spawns are not yet reliable. (Filed
+  context in PAN-2108.)
+
+- **DURABLE LESSON — `.pan/records/<issue>.json` sync-main conflicts abort the spawn's main sync AND
+  break `bd ready -l <issue>` (which breaks the idle-nudge).** Seen on PAN-1884, PAN-2063 (spawn),
+  PAN-1718 (bd ready failed). The record file is auto-generated state; sync should take origin's side
+  or re-merge rather than abort. (In PAN-2108.)
+
+- **Filed PAN-2106** (pan strike workspace-setup git-lock race: broken partial workspace + false
+  "spawned" success — confirmed transient; clean re-strike worked).
+
+- **Cohort-drain position: 8/17 terminal/parked; 1 merge-ready (PAN-1084); 1 healthy producer
+  (PAN-1884); 3 wedged (2086/1718/2063); gate-bound (1919/2088 conflicts, 2054/2081/2088 close-out
+  tail).** The remaining drain is operator-gated: merges (PAN-1084, MIN-846), rebases (1718/1919/2088),
+  force-close close-out tail (2054/2081/2088), and recovery of the 2 wedged kimi agents (2086/1718).
+
+- Next tick: (1) watch PAN-1884 (only healthy producer) → review; (2) if operator merges PAN-1084 /
+  recovers 2086/1718, reassess; (3) keep snapshots current. **The flywheel's autonomous levers are
+  exhausted for this cohort state — further drain needs operator gate/recovery actions.**
