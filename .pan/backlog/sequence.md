@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
+_Last sequenced: 2026-06-27T02:54:51Z · model: zai/glm-5.2 · open: 552_
 
 
 | rank | issue | size | importance | condition | depends-on | why |
@@ -23,6 +23,7 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 24 | PAN-1560 | L | high | ok |  | Re-review after a PR head moves (sync-main/rebase) doesn't re-post the required review status. |
 | 25 | PAN-1499 | M | high | ok | PAN-1454 | Substrate pattern-2: block pan done when close-out honestly defers work ('will do X') with no follow-up. |
 | 26 | PAN-1084 | M | high | ok |  | Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops. |
+| 27 | PAN-2086 | M | high | ok |  | Startup speedup: incremental pan sync (skip-when-unchanged) + traefik precheck + listen-before-merge. |
 | 28 | PAN-1557 | L | medium | ok |  | Run convoy reviewers as interactive, attachable sessions with hook-owned completion (not headless --print). |
 | 29 | PAN-955 | M | high | ok |  | Devcontainer template has no versioning — template changes never re-render existing workspaces. |
 | 30 | PAN-1193 | L | high | ok |  | Swarm slots branch independently with no file-overlap arbitration — two slots can clobber the same file. |
@@ -33,6 +34,7 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 35 | PAN-1498 | M | high | ok | PAN-1454 | Substrate pattern-1: require a live-code-path trace in review so code doesn't land in the wrong file. |
 | 36 | PAN-1618 | M | high | ok |  | Work-spawn docker-health gate has no autonomous recovery — a sick container blocks all spawns until manual fix. |
 | 37 | PAN-1698 | M | high | ok |  | main CI RED: model-count + schema-version + substrate-smoke tests failing on HEAD. |
+| 38 | PAN-2085 | L | high | needs-refinement |  | Auto-isolate project conversations in a disposable git worktree (Conductor/Cursor pattern) — stop polluting shared main. |
 | 39 | PAN-1766 | M | high | ok |  | Work agents hang on Claude Code settings-file protection prompts (class-2 scope split from PAN-1616). |
 | 40 | PAN-1770 | M | high | ok |  | pan-dir auto-commit rebase races live .pan/continues during convoy bursts — rebase-failed storms. |
 | 41 | PAN-1783 | M | high | ok | PAN-1698 | main CI RED after Command Deck redesign: resource-strip Playwright fixture failing. |
@@ -61,7 +63,7 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 64 | PAN-1681 | S | high | ok |  | In-review PRs strand at test=pending though tests pass — blocks ship→ready_for_merge. |
 | 65 | PAN-1824 | S | high | ok |  | Main CI flaky: ~5s timeouts on suites that pass locally (94/94 in 2.5s). |
 | 66 | PAN-1913 | S | medium | ok |  | Add project 'description' field + bundle config niceties (project list polish). |
-| 67 | PAN-2054 | S | high | ok | PAN-2055 | Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model. |
+| 67 | PAN-2054 | S | high | ok |  | Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model. |
 | 68 | PAN-2065 | L | high | needs-refinement |  | Unified provider usage & headroom panel — 2026-06-26 fleet stalled 10h on a silently-exhausted z.ai plan limit. |
 | 69 | PAN-2059 | XL | high | needs-refinement |  | Epic: operator Plan→Release pickup gate + AI Objection (5th state) + Flywheel relevance-vetting. Mockups committed. |
 | 70 | PAN-1436 | L | high | ok |  | Header 'stopped' count still mis-includes some running agents (follow-up to PAN-1419). |
@@ -151,15 +153,23 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 154 | PAN-1652 | S | high | ok |  | Fix: Conversation title regeneration 500s on large transcripts — claude title invocation times out at 30s |
 | 155 | PAN-1673 | S | high | ok |  | Fix: Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 156 | PAN-1674 | S | high | ok |  | Fix: TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC |
+| 157 | PAN-1775 | M | medium | ok |  | remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
+| 158 | PAN-2075 | XL | high | needs-refinement |  | [EPIC] Boot Reconciliation + Operator Inbox: informed per-agent boot decisions + durable notification spine (local+remote). |
+| 159 | PAN-2079 | L | high | needs-refinement |  | Operator Inbox: durable server-side queue + in-dashboard surface — the notification spine every producer posts to. |
 | 160 | PAN-1718 | S | high | ok |  | Fix: Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes |
 | 161 | PAN-1722 | S | high | ok |  | Fix: Awareness rail activity entries don't survive page load — snapshot doesn't seed recentActivity, only live events accumulate |
 | 162 | PAN-1781 | S | high | ok |  | Fix: Context-overflow recovery: claude --resume bypasses panopticon-native compact boundaries (~50% of the time) — compaction is a silent... |
+| 163 | PAN-2077 | L | high | needs-refinement | PAN-1775 | One substrate-complete reconciliation inventory (local tmux + remote Fly) the dashboard and CLI both consume. |
+| 164 | PAN-2076 | L | medium | needs-refinement | PAN-2077, PAN-2079 | Boot Reconciliation dashboard surface: informed per-agent Resume/Freeze/Kill replacing the all-or-nothing banner. |
 | 165 | PAN-1793 | M | high | ok |  | Fix: pan handoff kickoff message is not delivered to pi-harness conversations |
 | 166 | PAN-1795 | S | high | ok |  | Fix: Codebase map bootstrapped in planning worktree is never promoted to main (PAN-1788 WI-6 wiring gap) |
 | 167 | PAN-1816 | S | high | ok |  | Fix: Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag +... |
 | 168 | PAN-1817 | S | high | ok |  | Fix: Linear API quota exhausted by IssueDataService polling (2500/hr ceiling hit, 84+ poll errors) — regression of the pre-safeguard trac... |
+| 169 | PAN-2080 | M | medium | needs-refinement | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) for offline reach; fast-follow to the inbox spine. |
 | 170 | PAN-1828 | S | high | ok |  | Fix: Conversation fork/handoff harness defaults ignore source conversation harness — silent claude-code coercion |
 | 171 | PAN-1830 | M | high | ok |  | Fix: Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
+| 172 | PAN-2078 | M | medium | needs-refinement | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all/--select/--freeze/--kill-remote. |
+| 173 | PAN-2084 | L | medium | needs-refinement | PAN-2085 | Auto-create lightweight conversation worktrees (conv/<slug> branch, fetch-first, bun install only). |
 | 174 | PAN-1897 | M | high | ok |  | Fix: pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error) |
 | 175 | PAN-1900 | S | high | ok |  | Fix: UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle (3 for 0614) |
 | 176 | PAN-1912 | S | high | ok |  | Fix: Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
@@ -202,7 +212,7 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 213 | PAN-294 | M | medium | stale |  | Ship: Surface module initialization errors as system-level, not per-issue |
 | 214 | PAN-450 | M | medium | stale |  | Ship: Adopt remaining Effect patterns — Schema, Platform, Streams, Logging, Testing |
 | 215 | PAN-452 | M | medium | stale |  | Ship: Conversation input bar — mode/permissions/workspace selectors |
-| 216 | PAN-454 | M | medium | stale |  | Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| 216 | PAN-2081 | M | medium | needs-refinement |  | Make the sequencer epic-aware: epics are containers (not auto-pickable), children stay grouped in waves/DAG. |
 | 217 | PAN-456 | M | medium | stale |  | Ship: Store Claude Code session IDs for agent resume after crash/restart |
 | 218 | PAN-463 | M | medium | stale |  | Ship: Add Qwen 3.6+ model support |
 | 219 | PAN-465 | M | medium | stale |  | Ship: Add OpenRouter as a model provider |
@@ -273,6 +283,8 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 284 | PAN-1991 | M | medium | ok |  | Ship: Issue cockpit redesign — incremental rollout (tracking) |
 | 285 | PAN-1995 | M | medium | ok |  | Ship: infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
 | 286 | PAN-2004 | M | medium | ok |  | Ship: Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 287 | PAN-2082 | S | medium | ok |  | Composer: a single send failure clears ALL in-flight optimistic bubbles, reopening a data-loss window. |
+| 288 | PAN-2083 | S | medium | ok |  | Composer: a failed first send leaves text in BOTH composer and retry outbox — double-send hazard. |
 | 289 | PAN-2024 | M | medium | ok |  | Ship: ohmypi: frontend Tools-toggle for conversation view |
 | 290 | PAN-2025 | M | medium | ok |  | Ship: ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
 | 291 | PAN-2026 | M | medium | ok |  | Ship: ohmypi: surface 35+ provider matrix in dashboard model picker |
@@ -287,7 +299,7 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 300 | PAN-2053 | M | medium | ok |  | Ship: Dashboard: read-only "why this model" (resolved + weighted distribution + hash) at the top of the agent Start/Restart submenu (foll... |
 | 301 | PAN-1533 | M | medium | ok |  | Fork-into-worktree from conversation branch chip |
 | 302 | PAN-1696 | M | medium | ok |  | decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view |
-| 303 | PAN-1775 | M | medium | ok |  | remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
+| 303 | PAN-1592 | M | medium | ok |  | Composer: persist pending images + unsent/failed text across reload (draft-text parity). |
 | 304 | PAN-2005 | M | medium | ok |  | Backlog Sequencer: Pickup Forecast — visualize Flywheel pickup order (waves, lanes, planning bottleneck) |
 | 305 | PAN-2006 | M | medium | ok |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
 | 306 | PAN-1101 | M | medium | ok |  | Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire |
@@ -464,7 +476,7 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 477 | PAN-1572 | M | medium | ok |  | Settings permission-mode can desync from resolved config — agents silently use --dangerously-skip-permissions despite 'Auto' |
 | 478 | PAN-1573 | M | medium | ok |  | Consideration for reintroducing ability to --dangerously-skip-permissions, DO NOT act on this issue |
 | 479 | PAN-1581 | M | medium | ok |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 480 | PAN-1592 | M | medium | ok |  | Composer: make pasted images reload-durable (persist across page reload, not just conversation switches) |
+| 480 | PAN-2069 | M | medium | ok |  | Caveman follow-up gaps: review-agent mode never set at spawn, no hook-execution test, missing Settings toggle. |
 | 481 | PAN-1619 | M | medium | ok |  | Bridge host Codex auth into workspace containers + honest gpt-5.5 lock reason |
 | 482 | PAN-1620 | M | medium | ok |  | Awaiting-Merge button is clickable on a conflicting/CI-failing PR (stale blockerReasons) |
 | 483 | PAN-1621 | M | medium | ok |  | pan close human-only gate over-blocks operator conv-* sessions |
@@ -537,6 +549,14 @@ _Last sequenced: 2026-06-27T01:05:29Z · model: zai/glm-5.2 · open: 532_
 | 550 | PAN-1884 | M | medium | ok |  | Migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer; complete on main. |
 | 551 | PAN-2063 | XS | low | ok |  | UAT stack health panel should display collapsed by default to reduce clutter during active work. |
 | 552 | PAN-2066 | L | low | ok |  | OKF knowledge skill — deferred v2 capabilities (hybrid search, viz, lease writes, MCP, semantic auditor). |
+| 553 | PAN-2074 | S | low | needs-refinement |  | Research: evaluate ponytail (prompt compression) and decide build-vs-integrate vs Caveman/TLDR/RTK. |
+| 554 | PAN-2073 | S | low | ok |  | Docs: add user-facing page for the Desktop App (install, tray, embedded server, updates). |
+| 555 | PAN-2072 | S | low | ok |  | Docs: add user-facing page for Beads (task tracking) — lifecycle, bd CLI, dashboard view, enforcement gate. |
+| 556 | PAN-2071 | S | low | ok |  | Docs: add user-facing page for the Hooks system (lifecycle events, registration, built-ins, contract). |
+| 557 | PAN-2070 | S | low | ok |  | Docs: add user-facing page for the Flywheel orchestrator (start/stop, prioritization, health, config). |
+| 558 | PAN-2068 | S | low | ok |  | Docs: add user-facing page for Caveman (agent output compression) — modes, config, A/B, savings. |
+| 559 | PAN-2067 | S | low | ok |  | Docs: add user-facing page for RTK (Bash output compression) — toggle, config, savings, caveats. |
+| 560 | PAN-454 | M | low | needs-refinement |  | Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
 
 ## Rationale detail
 
@@ -612,6 +632,10 @@ One of the two substrate anti-patterns from the PAN-1454 audit: close-out commen
 
 A work agent observed a subagent stuck on a permission prompt and self-approved it by sending keystrokes to the subagent's tmux session. This both masks the underlying permission-config bug and is a real safety hazard: an agent that learns 'send 2 to approve' can silently authorize a destructive operation (rm -rf, force-push, outbound HTTP) the operator never intended. The fix is an explicit prompt prohibition plus a hook/denylist that blocks tmux send-keys targeting non-self sessions. Ready+planned and in pipeline, so immediately actionable; placed in the high tier as a permission-safety hardening.
 
+### PAN-2086 (rank 27)
+
+Ranked high: well-scoped, high-frequency startup-perf win; grounded in already-landed instrumentation commits.
+
 ### PAN-1557 (rank 28)
 
 Making convoy reviewers attachable TUI sessions (per the work-agents-must-be-live rule) lets operators watch/interact with a reviewer and gives a reliable hook-owned completion signal — fixing the orphaned-reviewer class (PAN-1207/1725). Architecture enhancement central to reliable review.
@@ -651,6 +675,10 @@ pan start's docker-health check fails-open or fails-closed with no recovery, so 
 ### PAN-1698 (rank 37)
 
 main's test job fails (9 tests) on HEAD, and every verify/ship gate and pan strike runs the full suite, so red main jams the whole pipeline. Same severity class as PAN-2057/1783 — green main is table stakes.
+
+### PAN-2085 (rank 38)
+
+Strategic high-impact: closes the core worktree-discipline gap every competitor already solves; large/needs-refinement.
 
 ### PAN-1766 (rank 39)
 
@@ -827,10 +855,10 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-27T01:05:29Z",
+  "generatedAt": "2026-06-27T02:54:51Z",
   "model": "zai/glm-5.2",
   "pass": "incremental",
-  "openCount": 532,
+  "openCount": 552,
   "nodes": [
     {
       "issue": "PAN-1919",
@@ -1065,6 +1093,33 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-1084",
+      "rank": 26,
+      "size": "M",
+      "importance": "high",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops.",
+      "rationale": "A work agent observed a subagent stuck on a permission prompt and self-approved it by sending keystrokes to the subagent's tmux session. This both masks the underlying permission-config bug and is a real safety hazard: an agent that learns 'send 2 to approve' can silently authorize a destructive operation (rm -rf, force-push, outbound HTTP) the operator never intended. The fix is an explicit prompt prohibition plus a hook/denylist that blocks tmux send-keys targeting non-self sessions. Ready+planned and in pipeline, so immediately actionable; placed in the high tier as a permission-safety hardening.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2086",
+      "rank": 27,
+      "size": "M",
+      "importance": "high",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Startup speedup: incremental pan sync (skip-when-unchanged) + traefik precheck + listen-before-merge.",
+      "rationale": "Ranked high: well-scoped, high-frequency startup-perf win; grounded in already-landed instrumentation commits.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
       "issue": "PAN-1557",
       "rank": 28,
       "size": "L",
@@ -1195,6 +1250,20 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "rationale": "main's test job fails (9 tests) on HEAD, and every verify/ship gate and pan strike runs the full suite, so red main jams the whole pipeline. Same severity class as PAN-2057/1783 — green main is table stakes.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2085",
+      "rank": 38,
+      "size": "L",
+      "importance": "high",
+      "score": 36,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Auto-isolate project conversations in a disposable git worktree (Conductor/Cursor pattern) — stop polluting shared main.",
+      "rationale": "Strategic high-impact: closes the core worktree-discipline gap every competitor already solves; large/needs-refinement.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
     },
     {
       "issue": "PAN-1766",
@@ -1575,11 +1644,35 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "importance": "high",
       "score": 22,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-2055"
-      ],
+      "dependsOn": [],
       "why": "Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model.",
       "rationale": "A fully closed-out issue still appears on the Command Deck as active because close-out doesn't clear the read-model entry. Read-model correctness; pollutes the operator's active-work view.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2065",
+      "rank": 68,
+      "size": "L",
+      "importance": "high",
+      "score": 51,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Unified provider usage & headroom panel — 2026-06-26 fleet stalled 10h on a silently-exhausted z.ai plan limit.",
+      "rationale": "On 2026-06-26 the entire flywheel fleet routed to z.ai/GLM silently exhausted the weekly/monthly limit at ~04:08Z and sat dead-looping for ~10 hours with zero dashboard warning — the only signal was a rate_limit_error buried in an agent tmux pane. There is no single surface showing remaining quota across the plans the fleet runs on (z.ai, Anthropic, Codex, OpenRouter). This builds a unified usage/headroom panel with reset countdowns and pre-exhaustion alerts, and degrades gracefully where a provider exposes no usage API. High impact (prevents repeat multi-hour outages) but planning-gated (interactive-mockup hard gate), so needs-refinement and placed at the top-tier edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2059",
+      "rank": 69,
+      "size": "XL",
+      "importance": "high",
+      "score": 50,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Epic: operator Plan→Release pickup gate + AI Objection (5th state) + Flywheel relevance-vetting. Mockups committed.",
+      "rationale": "Today an issue is auto-pickable the instant it is ready+planned — no operator review beat between 'a plan exists' and 'go work it,' and no way for the AI to push back on harmful/redundant/superseded work before an agent burns time on it. This epic adds a Released gate and an AI Objection state to the shared pickup model (single source of truth for Flywheel + forecast), giving the operator explicit release control and the planner a refuse-to-plan path surfaced as a reviewable objection. Design mockups are committed and the FR set is detailed; placed at the top-tier edge as a high-strategic-value, planning-gated architecture epic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2643,6 +2736,47 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-1775",
+      "rank": 157,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
+      "rationale": "Promoted: now has a PRD (hasPrd flipped true) and is a hard dependency of the new Boot Reconciliation epic (PAN-2077 depends on it), making it actionable and central.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2075",
+      "rank": 158,
+      "size": "XL",
+      "importance": "high",
+      "score": 38,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "[EPIC] Boot Reconciliation + Operator Inbox: informed per-agent boot decisions + durable notification spine (local+remote).",
+      "rationale": "New epic: unifies crash-recovery (#454), remote-agent visibility (#1775), and scattered notifications into one informed surface.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
+      "issue": "PAN-2079",
+      "rank": 159,
+      "size": "L",
+      "importance": "high",
+      "score": 34,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Operator Inbox: durable server-side queue + in-dashboard surface — the notification spine every producer posts to.",
+      "rationale": "Architectural spine of the Operator Inbox — build once; boot-reconciliation is its first producer.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
       "issue": "PAN-1718",
       "rank": 160,
       "size": "S",
@@ -2677,6 +2811,39 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "why": "Fix: Context-overflow recovery: claude --resume bypasses panopticon-native compact boundaries (~50% of the time) — compaction is a silent...",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2077",
+      "rank": 163,
+      "size": "L",
+      "importance": "high",
+      "score": 32,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-1775"
+      ],
+      "why": "One substrate-complete reconciliation inventory (local tmux + remote Fly) the dashboard and CLI both consume.",
+      "rationale": "Backend resolver both dashboard and CLI consume; depends on PAN-1775 (remote-agent identity).",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2076",
+      "rank": 164,
+      "size": "L",
+      "importance": "medium",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-2077",
+        "PAN-2079"
+      ],
+      "why": "Boot Reconciliation dashboard surface: informed per-agent Resume/Freeze/Kill replacing the all-or-nothing banner.",
+      "rationale": "Dashboard half of the epic; supersedes PAN-454; depends on the inventory + inbox spine.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
     },
     {
       "issue": "PAN-1793",
@@ -2727,6 +2894,22 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-2080",
+      "rank": 169,
+      "size": "M",
+      "importance": "medium",
+      "score": 26,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-2079"
+      ],
+      "why": "Operator Inbox external transports (email/Slack/push/TTS) for offline reach; fast-follow to the inbox spine.",
+      "rationale": "Fast-follow transports; depends on the inbox spine; absorbs #43.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
       "issue": "PAN-1828",
       "rank": 170,
       "size": "S",
@@ -2749,6 +2932,38 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "why": "Fix: Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696)",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2078",
+      "rank": 172,
+      "size": "M",
+      "importance": "medium",
+      "score": 28,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-2077"
+      ],
+      "why": "CLI parity for boot reconciliation: pan boot status + pan resume --all/--select/--freeze/--kill-remote.",
+      "rationale": "CLI parity for boot reconciliation; depends on the inventory resolver.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2084",
+      "rank": 173,
+      "size": "L",
+      "importance": "medium",
+      "score": 30,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-2085"
+      ],
+      "why": "Auto-create lightweight conversation worktrees (conv/<slug> branch, fetch-first, bun install only).",
+      "rationale": "Implementation slice of the conversation-worktree pattern; depends on the PAN-2085 strategic umbrella.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
     },
     {
       "issue": "PAN-1897",
@@ -3255,16 +3470,18 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-454",
+      "issue": "PAN-2081",
       "rank": 216,
       "size": "M",
       "importance": "medium",
-      "score": 8,
-      "condition": "stale",
+      "score": 24,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup",
+      "why": "Make the sequencer epic-aware: epics are containers (not auto-pickable), children stay grouped in waves/DAG.",
+      "rationale": "Meta: make this sequencer epic-aware so containers like #2075 aren't auto-pickable and children stay grouped.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "auto",
+      "isEpic": false
     },
     {
       "issue": "PAN-456",
@@ -4107,6 +4324,34 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
+      "issue": "PAN-2082",
+      "rank": 287,
+      "size": "S",
+      "importance": "medium",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Composer: a single send failure clears ALL in-flight optimistic bubbles, reopening a data-loss window.",
+      "rationale": "Data-loss-class composer bug: failSend wipes all in-flight optimistic bubbles and their compaction safety-net.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2083",
+      "rank": 288,
+      "size": "S",
+      "importance": "medium",
+      "score": 16,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Composer: a failed first send leaves text in BOTH composer and retry outbox — double-send hazard.",
+      "rationale": "Composer double-send hazard: failed-send text stays in both composer and retry outbox.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
       "issue": "PAN-2024",
       "rank": 289,
       "size": "M",
@@ -4275,14 +4520,15 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1775",
+      "issue": "PAN-1592",
       "rank": 303,
       "size": "M",
       "importance": "medium",
-      "score": 6,
+      "score": 14,
       "condition": "ok",
       "dependsOn": [],
-      "why": "remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
+      "why": "Composer: persist pending images + unsent/failed text across reload (draft-text parity).",
+      "rationale": "Promoted: body materially expanded to cover unsent/failed-text durability (data-loss-adjacent), tying it to the new composer-bug cluster (PAN-2082/2083).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6400,16 +6646,18 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1592",
+      "issue": "PAN-2069",
       "rank": 480,
       "size": "M",
       "importance": "medium",
-      "score": 0,
+      "score": 20,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Composer: make pasted images reload-durable (persist across page reload, not just conversation switches)",
+      "why": "Caveman follow-up gaps: review-agent mode never set at spawn, no hook-execution test, missing Settings toggle.",
+      "rationale": "Caveman follow-up gaps; includes a high-severity gap — review agents never get caveman active at spawn.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "auto",
+      "isEpic": false
     },
     {
       "issue": "PAN-1619",
@@ -7241,45 +7489,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1084",
-      "rank": 26,
-      "size": "M",
-      "importance": "high",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops.",
-      "rationale": "A work agent observed a subagent stuck on a permission prompt and self-approved it by sending keystrokes to the subagent's tmux session. This both masks the underlying permission-config bug and is a real safety hazard: an agent that learns 'send 2 to approve' can silently authorize a destructive operation (rm -rf, force-push, outbound HTTP) the operator never intended. The fix is an explicit prompt prohibition plus a hook/denylist that blocks tmux send-keys targeting non-self sessions. Ready+planned and in pipeline, so immediately actionable; placed in the high tier as a permission-safety hardening.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2065",
-      "rank": 68,
-      "size": "L",
-      "importance": "high",
-      "score": 51,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Unified provider usage & headroom panel — 2026-06-26 fleet stalled 10h on a silently-exhausted z.ai plan limit.",
-      "rationale": "On 2026-06-26 the entire flywheel fleet routed to z.ai/GLM silently exhausted the weekly/monthly limit at ~04:08Z and sat dead-looping for ~10 hours with zero dashboard warning — the only signal was a rate_limit_error buried in an agent tmux pane. There is no single surface showing remaining quota across the plans the fleet runs on (z.ai, Anthropic, Codex, OpenRouter). This builds a unified usage/headroom panel with reset countdowns and pre-exhaustion alerts, and degrades gracefully where a provider exposes no usage API. High impact (prevents repeat multi-hour outages) but planning-gated (interactive-mockup hard gate), so needs-refinement and placed at the top-tier edge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2059",
-      "rank": 69,
-      "size": "XL",
-      "importance": "high",
-      "score": 50,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Epic: operator Plan→Release pickup gate + AI Objection (5th state) + Flywheel relevance-vetting. Mockups committed.",
-      "rationale": "Today an issue is auto-pickable the instant it is ready+planned — no operator review beat between 'a plan exists' and 'go work it,' and no way for the AI to push back on harmful/redundant/superseded work before an agent burns time on it. This epic adds a Released gate and an AI Objection state to the shared pickup model (single source of truth for Flywheel + forecast), giving the operator explicit release control and the planner a refuse-to-plan path surfaced as a reviewable objection. Design mockups are committed and the FR set is detailed; placed at the top-tier edge as a high-strategic-value, planning-gated architecture epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1884",
       "rank": 550,
       "size": "M",
@@ -7315,6 +7524,117 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "dependsOn": [],
       "why": "OKF knowledge skill — deferred v2 capabilities (hybrid search, viz, lease writes, MCP, semantic auditor).",
       "rationale": "Tracks five capabilities deliberately deferred out of v1 of the OKF knowledge skill (hybrid BM25+semantic search, graph visualizer, lease-based concurrent writes, MCP read server, LLM semantic auditor). None is needed for conformant shared-knowledge authoring in v1; each has a stated deferral rationale and acceptance criterion. Low-priority tracking issue; placed at the tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2074",
+      "rank": 553,
+      "size": "S",
+      "importance": "low",
+      "score": 8,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Research: evaluate ponytail (prompt compression) and decide build-vs-integrate vs Caveman/TLDR/RTK.",
+      "rationale": "Research spike; non-blocking; outcome is a build-vs-integrate recommendation.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2073",
+      "rank": 554,
+      "size": "S",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs: add user-facing page for the Desktop App (install, tray, embedded server, updates).",
+      "rationale": "Docs gap: Desktop App has no user-facing page.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2072",
+      "rank": 555,
+      "size": "S",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs: add user-facing page for Beads (task tracking) — lifecycle, bd CLI, dashboard view, enforcement gate.",
+      "rationale": "Docs gap: Beads has no user-facing page.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2071",
+      "rank": 556,
+      "size": "S",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs: add user-facing page for the Hooks system (lifecycle events, registration, built-ins, contract).",
+      "rationale": "Docs gap: Hooks system has no user-facing page.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2070",
+      "rank": 557,
+      "size": "S",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs: add user-facing page for the Flywheel orchestrator (start/stop, prioritization, health, config).",
+      "rationale": "Docs gap: Flywheel has no user-facing page.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2068",
+      "rank": 558,
+      "size": "S",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs: add user-facing page for Caveman (agent output compression) — modes, config, A/B, savings.",
+      "rationale": "Docs gap: Caveman has no user-facing page.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-2067",
+      "rank": 559,
+      "size": "S",
+      "importance": "low",
+      "score": 5,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docs: add user-facing page for RTK (Bash output compression) — toggle, config, savings, caveats.",
+      "rationale": "Docs gap: RTK has no user-facing page.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": false
+    },
+    {
+      "issue": "PAN-454",
+      "rank": 560,
+      "size": "M",
+      "importance": "low",
+      "score": 3,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup",
+      "rationale": "Demoted: superseded by PAN-2076 — the Boot Reconciliation epic absorbs this crash-recovery UI work as its dashboard surface.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -7410,6 +7730,83 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2076",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2077",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2078",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2079",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2075",
+      "to": "PAN-2080",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1775",
+      "to": "PAN-2077",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2077",
+      "to": "PAN-2076",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2079",
+      "to": "PAN-2076",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2077",
+      "to": "PAN-2078",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2079",
+      "to": "PAN-2080",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2085",
+      "to": "PAN-2084",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }

@@ -421,8 +421,10 @@ export function insertUatGenerationSync(
   const createdAtMs = millisFromIso(createdAt) ?? nowMs;
 
   const tx = db.transaction(() => {
+    db.prepare('DELETE FROM uat_generation_members WHERE uat_name = ?').run(gen.name);
+    db.prepare('DELETE FROM uat_generation_resolutions WHERE uat_name = ?').run(gen.name);
     db.prepare(`
-      INSERT INTO uat_generations (
+      INSERT OR REPLACE INTO uat_generations (
         name, worktree_path, project_root, base_sha, status,
         stack_started_at, cleaned_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

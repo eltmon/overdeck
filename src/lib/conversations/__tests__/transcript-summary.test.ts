@@ -11,6 +11,7 @@ import {
   fallbackTranscriptTitle,
   sanitizeTitle,
   serializeConversationTranscript,
+  titleTranscriptWindow,
 } from '../transcript-summary.js';
 
 describe('serializeConversationTranscript', () => {
@@ -104,5 +105,27 @@ describe('fallbackTranscriptTitle', () => {
 
   it('returns empty for transcripts without titleable text', () => {
     expect(fallbackTranscriptTitle('[… middle of the conversation omitted for length …]')).toBe('');
+  });
+});
+
+describe('titleTranscriptWindow', () => {
+  it('leaves already-small transcripts unchanged', () => {
+    const transcript = 'User: fix title generation\n\nAssistant: inspecting it';
+    expect(titleTranscriptWindow(transcript)).toBe(transcript);
+  });
+
+  it('keeps the opening and latest context for large transcripts', () => {
+    const transcript = [
+      'User: opening context '.padEnd(3_000, 'h'),
+      'Assistant: middle context '.padEnd(5_000, 'm'),
+      'User: latest direction '.padEnd(3_000, 't'),
+    ].join('\n\n');
+
+    const windowed = titleTranscriptWindow(transcript);
+
+    expect(windowed).toContain('[… middle of the conversation omitted for title generation …]');
+    expect(windowed.startsWith('User: opening context')).toBe(true);
+    expect(windowed.endsWith('t'.repeat(100))).toBe(true);
+    expect(windowed.length).toBeLessThan(8_000);
   });
 });

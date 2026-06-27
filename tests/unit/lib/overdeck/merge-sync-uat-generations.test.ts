@@ -107,6 +107,40 @@ describe('insert + get round-trip', () => {
   it('returns null for an unknown name', () => {
     expect(getUatGenerationSync('uat/nope-0101')).toBeNull();
   });
+
+  it('resets an existing deterministic daily generation on insert', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedIssue(db, 'PAN-2');
+    seedIssue(db, 'PAN-3');
+
+    const first = makeGeneration({
+      name: 'uat/pan-otter-0610',
+      status: 'ready',
+      heldOut: [{ issueId: 'PAN-3', reason: 'old conflict' }],
+      resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['old.ts'], commitSha: 'old-sha' }],
+    });
+    insertUatGenerationSync(first);
+
+    const replacement = makeGeneration({
+      name: 'uat/pan-otter-0610',
+      baseSha: 'new-main',
+      status: 'assembling',
+      members: [],
+      heldOut: [],
+      resolutions: [],
+      createdAt: '2026-06-10T03:00:00.000Z',
+    });
+    insertUatGenerationSync(replacement);
+
+    const loaded = getUatGenerationSync('uat/pan-otter-0610')!;
+    expect(loaded.baseSha).toBe('new-main');
+    expect(loaded.status).toBe('assembling');
+    expect(loaded.members).toEqual([]);
+    expect(loaded.heldOut).toEqual([]);
+    expect(loaded.resolutions).toEqual([]);
+    expect(loaded.createdAt).toBe('2026-06-10T03:00:00.000Z');
+  });
 });
 
 describe('listUatGenerationsSync', () => {
@@ -138,7 +172,7 @@ describe('listUatGenerationsSync', () => {
     expect(live).toHaveLength(3);
   });
 
-  it('lists all names for collision checks', () => {
+  it('lists existing generation names', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
     seedIssue(db, 'PAN-2');

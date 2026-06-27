@@ -168,6 +168,7 @@ import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.j
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
+import { cleanupOrphanedInspectSessions } from './inspect-session-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
@@ -5269,6 +5270,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const inspectTimeoutActions = await checkInspectAgentTimeouts();
   actions.push(...inspectTimeoutActions);
   for (const a of inspectTimeoutActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1559: reap untracked inspect tmux sessions. Inspect agents now write
+  // state.json at spawn, but this safety net kills older leaked sessions and
+  // any future dead inspect panes before they burn compute indefinitely.
+  const inspectReaperActions = await cleanupOrphanedInspectSessions();
+  actions.push(...inspectReaperActions);
+  for (const a of inspectReaperActions) addLog('action', a, state.patrolCycle);
 
   // Detect new commits pushed after review passed before any test/merge path can
   // act on stale review approval.

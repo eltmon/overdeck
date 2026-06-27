@@ -121,12 +121,14 @@ describe('assembleUatGeneration — happy path', () => {
     expect(store.rows.get(gen.name)!.status).toBe('ready');
   });
 
-  it('never reuses a taken codename', async () => {
+  it('reuses the same deterministic daily branch on rebuild', async () => {
     const store = makeFakeStore();
     const git = makeFakeGit();
     const first = await assembleUatGeneration(input(), deps(git, store));
     const second = await assembleUatGeneration(input(), deps(git, store));
-    expect(second.name).not.toBe(first.name);
+    expect(second.name).toBe(first.name);
+    expect(git.calls.pushed).toEqual([first.name, first.name]);
+    expect(store.rows.get(first.name)!.status).toBe('ready');
   });
 });
 

@@ -6,8 +6,8 @@
  *
  *  - `summarizeFirstMessageTitle()` — the conversation-creation auto-title
  *    (titles from the opening user message only).
- *  - `summarizeTranscriptTitle()` — a fresh title generated from the *whole*
- *    conversation, used by the explicit "regenerate title" action.
+ *  - `summarizeTranscriptTitle()` — a fresh title generated from bounded
+ *    transcript excerpts, used by the explicit "regenerate title" action.
  *  - `summarizeTranscriptAbout()` — a few-sentence description of what the
  *    conversation has been about, used by the conversation "About" drawer.
  *
@@ -38,6 +38,10 @@ const PER_MESSAGE_LIMIT = 1_800;
 const HEAD_BUDGET = 8_000;
 /** ...and this many trailing characters (captures the current direction). */
 const TAIL_BUDGET = 15_000;
+/** Title generation only needs enough context to name the thread, not the full summary window. */
+const TITLE_TRANSCRIPT_BUDGET = 8_000;
+const TITLE_HEAD_BUDGET = 2_500;
+const TITLE_TAIL_BUDGET = 5_000;
 
 const TITLE_SCHEMA = {
   type: 'object',
@@ -137,6 +141,21 @@ export function fallbackTranscriptTitle(transcript: string): string {
     .replace(/\s+(?:and|or|to|for|with)$/i, '')
     .replace(/[.,:;!?]+$/g, '');
   return sanitizeTitle(title);
+}
+
+/**
+ * Keep title-generation prompts small and latency-bounded. The serialized
+ * transcript can be large enough for About summaries, but title generation only
+ * needs the opening intent and current direction.
+ */
+export function titleTranscriptWindow(transcript: string): string {
+  if (transcript.length <= TITLE_TRANSCRIPT_BUDGET) {
+    return transcript;
+  }
+
+  const head = transcript.slice(0, TITLE_HEAD_BUDGET);
+  const tail = transcript.slice(transcript.length - TITLE_TAIL_BUDGET);
+  return `${head}\n\n[… middle of the conversation omitted for title generation …]\n\n${tail}`;
 }
 
 /**
@@ -252,20 +271,21 @@ export async function summarizeFirstMessageTitle(
   return sanitizeTitle(typeof result['title'] === 'string' ? (result['title'] as string) : '');
 }
 
-/** Generate a fresh 3-8 word title from the whole conversation (explicit retitle action). */
+/** Generate a fresh 3-8 word title from bounded conversation excerpts (explicit retitle action). */
 export async function summarizeTranscriptTitle(
   transcript: string,
   model = CONVERSATION_TITLE_MODEL,
   timeoutMs = 30_000,
 ): Promise<string> {
+  const titleTranscript = titleTranscriptWindow(transcript);
   const prompt = [
     'You write concise thread titles for coding conversations.',
-    'Read the whole conversation below and write a 3-8 word title that captures',
+    'Read the conversation excerpts below and write a 3-8 word title that captures',
     'what it is *currently* about. If the topic shifted, favor the most recent direction.',
     'Avoid quotes, filler, prefixes, and trailing punctuation.',
     '',
     'Conversation:',
-    transcript,
+    titleTranscript,
   ].join('\n');
   const result = await invokeClaudeStructured(model, prompt, TITLE_SCHEMA, timeoutMs, 'titleRefinement');
   return sanitizeTitle(typeof result['title'] === 'string' ? (result['title'] as string) : '');

@@ -1,19 +1,133 @@
 {
   "issueId": "PAN-1900",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Fix the bug WITHIN the PAN-1737 generations-chain architecture; do NOT revert to a single force-reset branch per day. The issue's literal 'Suggested fix #1' is declined because it would tear out the deliberately shipped multi-generation chain + per-generation live stacks. The issue quotes the OLD PAN-1691 design intent, apparently unaware PAN-1737 replaced it on purpose.",
+      "recordedAt": "2026-06-14T21:14:39.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Two independent root-cause defects, two beads. Defect 1 (proliferation): roles/flywheel.md tells the orchestrator to POST /api/flywheel/assemble-uat every tick, but that endpoint is now a FORCED reconcile (runUatTrainReconcile({force:true})) that bypasses the liveSignatureMatches idempotency guard and assembles a new generation every cycle. Defect 2 (non-determinism): makeUatCandidateName defaults its start index to Math.random, so even legitimate new generations get unordered names.",
+      "recordedAt": "2026-06-14T21:14:39.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Codename determinism is a ONE-LINE change: default makeUatCandidateName's pick to () => 0 instead of Math.random. The existing collision-walk then assigns otter -> falcon -> cedar in generation order. No generations-store changes; the append-only chain is untouched. (Considered + rejected: bundle-content-hash naming, because it would require name-reuse / in-place row mutation that breaks the append-only chain.)",
+      "recordedAt": "2026-06-14T21:14:39.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Surface the active candidate via a revived dedicated read endpoint GET /api/flywheel/uat-candidate (newest 'ready' generation: branchName + bundled issue IDs + status), NOT by adding a field to the shared FlywheelStatus Effect-Schema contract. The issue accepts either ('GET /api/flywheel/current ... or a uat-candidate read endpoint'); the dedicated endpoint has the smaller blast radius and revives the endpoint roles/flywheel.md already references but which PAN-1737 removed.",
+      "recordedAt": "2026-06-14T21:14:39.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "No reaper code change. buildUatGenerationCleanupGit().deleteBranch already runs 'git push origin --delete' + local delete with keep=3; the 4-branch pile-up is keep=3 outpaced by per-tick proliferation, which self-corrects once Defect 1 is fixed. Verify-not-fix (investigate-before-fixing).",
+      "recordedAt": "2026-06-14T21:14:39.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "ARCHITECTURAL FORK (loud): the issue's Suggested fix #1 ('make the codename deterministic per day so each assembly force-resets the SAME uat/<label>-<MMDD> branch') would collapse the PAN-1737 generations chain to one branch/day. This plan deliberately does NOT do that — generations legitimately differ when the bundle changes (e.g. RUN-35's cobalt bundled PAN-1242 that birch/willow did not). A work agent must NOT read the issue literally and rip out the generations chain.",
+      "mitigation": "NonGoals in the vBRIEF explicitly forbid the revert (review enforces NonGoals as must-not constraints). The fix targets redundant same-bundle proliferation (Bead A) + unordered names (Bead B), not legitimate generation turnover. If the operator actually wants single-branch-per-day, that is a separate decision to escalate, not this bug."
+    },
+    {
+      "id": "H2",
+      "summary": "Regression risk: removing the every-tick forced assemble could stop UAT assembly entirely if the internal reconciler did not cover the require_uat case.",
+      "mitigation": "Verified during planning: startUatTrainReconciler() is wired unconditionally in main.ts:400; the internal 60s reconciler auto-assembles whenever isMergeTrainEnabled() + active run, independent of require_uat. So assembly continues without the forced call. When merge_train is off, even the forced endpoint no-ops via isEnabled() — no edge regression."
+    },
+    {
+      "id": "H3",
+      "summary": "A RUNNING flywheel will not pick up roles/flywheel.md changes (Bead A) until a new run / restart. The fix won't take effect on the live RUN until then.",
+      "mitigation": "Operational, not a code concern. Note it in the PR/handoff so the operator restarts the flywheel run after merge to apply the role-doc fix."
+    },
+    {
+      "id": "H4",
+      "summary": "Bead A is the only behavioral proliferation fix but is a role-PROMPT edit, so it cannot be locked by a unit test; the work agent could misread 'stop forcing' and remove UAT assembly altogether.",
+      "mitigation": "The PRD gives exact before/after role-doc text so the diff is mechanically verifiable. Bead A's acceptance criteria assert the doc no longer contains an unconditional per-tick forced-assemble instruction and references the live endpoints."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-14T21:02:12.741Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1900",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "timestamp": "2026-06-14T21:14:39.000Z",
+      "reason": "planning",
+      "note": "Root-caused two independent defects (stale force-every-tick role doc + random codename); chose fix-within-generations over the issue's literal single-branch revert. 3 beads (role-doc fix, deterministic codename, uat-candidate read endpoint). Advisor-reviewed.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": [],
   "created": "2026-06-23T16:22:55.945Z",
-  "updated": "2026-06-23T16:22:55.945Z",
+  "updated": "2026-06-27T03:19:39.524Z",
   "pipeline": {
     "issueId": "PAN-1900",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-23T16:22:55.945Z"
+    "updatedAt": "2026-06-27T03:19:39.483Z",
+    "testNotes": "Skipped: issue is already merged"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 20,
+            "output": 770,
+            "cacheRead": 35834,
+            "cacheWrite": 85427
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 13052,
+            "output": 171,
+            "cacheRead": 16236,
+            "cacheWrite": 48417
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 1352,
+            "output": 347,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 20,
+          "output": 770,
+          "cacheRead": 35834,
+          "cacheWrite": 85427
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 13052,
+          "output": 171,
+          "cacheRead": 16236,
+          "cacheWrite": 48417
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 1352,
+          "output": 347,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.49449600000000005,
+        "pricingAsOf": "2026-06-27T03:19:39.524Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
