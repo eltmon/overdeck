@@ -23,7 +23,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T02:46:24.299Z",
-  "updated": "2026-06-27T07:16:38.373Z",
+  "updated": "2026-06-27T07:45:21.773Z",
   "pipeline": {
     "issueId": "PAN-2081",
     "reviewStatus": "pending",
@@ -97,6 +97,9 @@
     "epic-data-thread": "completed",
     "epic-data-thread.ac1": "completed",
     "epic-data-thread.ac2": "completed",
-    "epic-data-thread.ac3": "completed"
+    "epic-data-thread.ac3": "completed",
+    "forecast-epic-grouping": "completed",
+    "dag-epic-ui": "completed",
+    "md-table-epic-column": "completed"
   }
 }
