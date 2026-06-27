@@ -37,6 +37,8 @@ export const WORKFLOW_LABELS = [
   'needs-close-out', 'verifying-on-main', 'ready-for-merge',
 ];
 
+export const POST_MERGE_RESIDUE_LABELS = ['merged', 'ready'];
+
 /** Options for close-issue */
 export interface CloseIssueOptions {
   /** IssueTracker instance (preferred — uses abstraction layer) */

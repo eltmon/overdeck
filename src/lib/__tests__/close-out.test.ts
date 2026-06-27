@@ -81,6 +81,13 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
     expect(mocks.markRecordPipelineClosedOutSync.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.clearReviewStatus.mock.invocationCallOrder[0],
     );
+    const commands = mocks.exec.mock.calls.map((call) => String(call[0]));
+    expect(commands).toContain(
+      'gh issue edit 2054 --repo eltmon/overdeck --remove-label "merged" 2>/dev/null || true',
+    );
+    expect(commands).toContain(
+      'gh issue edit 2054 --repo eltmon/overdeck --remove-label "ready" 2>/dev/null || true',
+    );
   });
 
   it('records a skipped marker step without aborting close-out when the marker throws', async () => {

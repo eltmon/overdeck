@@ -31,7 +31,7 @@ vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
 }));
 
 import { Effect } from 'effect';
-import { closeIssue as closeIssueProgram, WORKFLOW_LABELS } from '../../../../src/lib/lifecycle/close-issue.js';
+import { closeIssue as closeIssueProgram, POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from '../../../../src/lib/lifecycle/close-issue.js';
 
 const closeIssue = (...args: Parameters<typeof closeIssueProgram>) =>
   Effect.runPromise(closeIssueProgram(...args));
@@ -185,5 +185,13 @@ describe('WORKFLOW_LABELS — canonical current-phase labels stripped on close',
 
   it("includes 'planned' (regression: its absence left ~82 closed issues falsely labelled)", () => {
     expect(WORKFLOW_LABELS).toContain('planned');
+  });
+});
+
+describe('POST_MERGE_RESIDUE_LABELS — non-terminal post-merge labels stripped on close-out', () => {
+  it("contains exactly 'merged' and 'ready' without changing WORKFLOW_LABELS", () => {
+    expect(POST_MERGE_RESIDUE_LABELS).toEqual(['merged', 'ready']);
+    expect(WORKFLOW_LABELS).not.toContain('merged');
+    expect(WORKFLOW_LABELS).not.toContain('ready');
   });
 });
