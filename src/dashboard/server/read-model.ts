@@ -690,6 +690,7 @@ export const ReadModelServiceLive = Layer.effect(
         // strand fresh issues — the subsequent `pushSnapshot` would either
         // hit a null callback or be skipped by `issuesChanged()` because
         // `lastFetchedIssues` already matched the new GitHub fetch.
+        const mergeT0 = performance.now();
         const currentIssues = cleanIssues(issueService.getIssues());
         if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
           const newIssues = discoverNewIssues(state.issuesRaw, currentIssues);
@@ -708,6 +709,7 @@ export const ReadModelServiceLive = Layer.effect(
             issuesRaw: mergeIssuesByIdentifier(state.issuesRaw, currentIssues),
           };
         }
+        console.log(`[boot-timing] ReadModel bootstrap merge completed at +${Math.round(performance.now() - mergeT0)}ms`);
 
         // Wire live issue updates — when IssueDataService polls new data,
         // update the read model directly AND emit to event store for

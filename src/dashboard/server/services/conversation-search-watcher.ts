@@ -82,6 +82,7 @@ export class ConversationSearchWatcher {
     if (this.stopped) return;
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
+    const startupT0 = performance.now();
     this.startupTask = this.indexAll({ config: this.config, roots: this.roots, signal })
       .then((result) => {
         if (signal.aborted || this.stopped) return;
@@ -90,9 +91,11 @@ export class ConversationSearchWatcher {
         } else {
           this.log.log(`[conversation-search] startup indexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}`);
         }
+        this.log.log(`[boot-timing] conversation-search startup index completed at +${Math.round(performance.now() - startupT0)}ms`);
       })
       .catch((error) => {
         if (!isAbortError(error)) this.log.warn('[conversation-search] startup index failed:', error);
+        this.log.log(`[boot-timing] conversation-search startup index failed at +${Math.round(performance.now() - startupT0)}ms`);
       })
       .finally(() => {
         this.startupTask = null;
