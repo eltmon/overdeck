@@ -39,6 +39,11 @@
       "reason": "feedback",
       "note": "[2026-06-27T05:09Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-27T05:09:18.105Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T05:18:51.483Z"
     }
   ],
   "feedback": [
@@ -58,20 +63,20 @@
     }
   ],
   "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-06-27T05:09:18.105Z",
+  "updated": "2026-06-27T05:18:55.823Z",
   "pipeline": {
     "issueId": "PAN-2054",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T05:09:17.411Z",
-    "reviewNotes": "terminal close-out changes are not wired into lifecycle closeOut production path",
+    "updatedAt": "2026-06-27T05:18:55.806Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "workspace-m9lki passed: reapIssueResidue matches the vBRIEF helper requirements, uses the merge guard before disk/branch cleanup, uses execAsync plus Effect killSession, and introduces no prohibited execSync/sendKeys pattern.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2092",
-    "lastVerifiedCommit": "d07fa71d8bd054a6ed9ca067d9fcc79f1b61839a",
+    "lastVerifiedCommit": "9ce404869ab723f66deae5e8fd21ed0c86d1f4b5",
     "reviewRequestedAt": "2026-06-27T05:05:39.099Z"
   },
   "closeOut": {
@@ -124,7 +129,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.125394,
-        "pricingAsOf": "2026-06-27T05:09:17.451Z"
+        "pricingAsOf": "2026-06-27T05:18:55.822Z"
       }
     },
     "merges": [
