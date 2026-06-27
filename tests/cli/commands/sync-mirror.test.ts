@@ -57,6 +57,8 @@ vi.mock('../../../src/lib/sync.js', () => ({
   mirrorProjectSkillsSync: mockMirrorProjectSkills,
   syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
   syncPiSettingsSync: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
+  isStartupSyncNeededSync: vi.fn(() => ({ needed: true, reason: 'test' })),
+  writeSyncManifestSync: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({

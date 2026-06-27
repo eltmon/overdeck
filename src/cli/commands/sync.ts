@@ -9,7 +9,21 @@ import { loadConfigSync } from '../../lib/config.js';
 import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
 import { resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { createBackupSync } from '../../lib/backup.js';
-import { planSyncSync, executeSyncSync, refreshCacheSync, migrateStalePersonalContentSync, removeLegacySkills070Sync, planHooksSyncSync, syncHooksSync, syncStatuslineSync, mirrorProjectSkillsSync, syncPiSettingsSync, syncContextLayersSync } from '../../lib/sync.js';
+import {
+  planSyncSync,
+  executeSyncSync,
+  refreshCacheSync,
+  migrateStalePersonalContentSync,
+  removeLegacySkills070Sync,
+  planHooksSyncSync,
+  syncHooksSync,
+  syncStatuslineSync,
+  mirrorProjectSkillsSync,
+  syncPiSettingsSync,
+  syncContextLayersSync,
+  isStartupSyncNeededSync,
+  writeSyncManifestSync,
+} from '../../lib/sync.js';
 import { SYNC_TARGET, SYNC_SOURCES, isDevMode } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -40,6 +54,29 @@ interface SyncOptions {
 }
 
 export async function syncCommand(options: SyncOptions): Promise<void> {
+  const timings: Array<{ phase: string; ms: number }> = [];
+  function time<T>(phase: string, fn: () => T): T {
+    const start = performance.now();
+    try {
+      return fn();
+    } finally {
+      timings.push({ phase, ms: Math.round(performance.now() - start) });
+    }
+  }
+  async function timeAsync<T>(phase: string, fn: () => Promise<T>): Promise<T> {
+    const start = performance.now();
+    try {
+      return await fn();
+    } finally {
+      timings.push({ phase, ms: Math.round(performance.now() - start) });
+    }
+  }
+  function printTimings(): void {
+    if (timings.length === 0) return;
+    const summary = timings.map((t) => `${t.phase}=${t.ms}ms`).join(', ');
+    console.log(chalk.dim(`[sync-timing] ${summary}`));
+  }
+
   // PAN-1201: warn once if the deprecated sync.devroot is still configured.
   const devrootWarning = checkDevrootDeprecation();
   if (devrootWarning) {
@@ -147,11 +184,12 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
     console.log('');
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
+    printTimings();
     return;
   }
 
   // Run one-time migration: strip legacy sync targets from config.toml
-  const syncMigration = migrateSyncTargetsSync();
+  const syncMigration = time('migrate-sync-targets', () => migrateSyncTargetsSync());
   if (syncMigration.migrated) {
     if (syncMigration.hadNonClaudeTargets) {
       console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Overdeck now syncs to Claude Code only).'));
@@ -159,13 +197,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   // Run one-time migration: remove Overdeck-managed symlinks from legacy runtime dirs
-  const cleanupResult = cleanupLegacyRuntimeSymlinksSync();
+  const cleanupResult = time('cleanup-legacy-runtimes', () => cleanupLegacyRuntimeSymlinksSync());
   if (cleanupResult.cleaned.length > 0) {
     console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
   }
 
   // One-time migration: remove Overdeck symlinks from ~/.claude/ (devroot replaces this)
-  const migration = migrateStalePersonalContentSync();
+  const migration = time('migrate-stale-personal', () => migrateStalePersonalContentSync());
   if (migration.removedSymlinks.length > 0) {
     console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Overdeck symlink(s) from ~/.claude/`));
     if (migration.preservedUserContent.length > 0) {
@@ -174,7 +212,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   // 0.7.0 upgrade: remove renamed/deleted legacy skills from ~/.claude/skills/
-  const removedLegacy = removeLegacySkills070Sync();
+  const removedLegacy = time('remove-legacy-skills', () => removeLegacySkills070Sync());
   if (removedLegacy.length > 0) {
     console.log(chalk.dim(`Removed ${removedLegacy.length} legacy skill(s) from upgrade to 0.7.0: ${removedLegacy.join(', ')}`));
   }
@@ -183,7 +221,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Create backup if enabled
   if (config.sync.backup_before_sync) {
-    const spinner = ora('Creating backup...').start();
+    const backupSpinner = ora('Creating backup...').start();
 
     const backupDirs = [
       SYNC_TARGET.skills,
@@ -191,22 +229,23 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       SYNC_TARGET.agents,
     ];
 
-    const backup = createBackupSync(backupDirs);
+    const backup = time('backup', () => createBackupSync(backupDirs));
 
     if (backup.targets.length > 0) {
-      spinner.succeed(`Backup created: ${backup.timestamp}`);
+      backupSpinner.succeed(`Backup created: ${backup.timestamp}`);
     } else {
-      spinner.info('No existing content to backup');
+      backupSpinner.info('No existing content to backup');
     }
 
     if (options.backupOnly) {
+      printTimings();
       return;
     }
   }
 
   // Refresh cache from repo source
   const cacheSpinner = ora('Refreshing cache from repo...').start();
-  const cacheResult = refreshCacheSync();
+  const cacheResult = time('refresh-cache', () => refreshCacheSync());
   const cacheParts = [];
   if (cacheResult.skills.copied > 0) cacheParts.push(`${cacheResult.skills.copied} skills`);
   if (cacheResult.agents.copied > 0) cacheParts.push(`${cacheResult.agents.copied} agents`);
@@ -215,7 +254,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Distribute bundled skills + agents into the user's Claude Code home.
   const spinner = ora('Distributing skills and agents to ~/.claude/...').start();
-  const result = executeSyncSync({ force: options.force, diff: options.diff });
+  const result = time('execute-sync', () => executeSyncSync({ force: options.force, diff: options.diff }));
   const totalSynced = result.created.length + result.updated.length + result.adopted.length;
   const adoptionSummary = result.adopted.length > 0
     ? `, ${result.adopted.length} adopted (legacy pre-manifest installs)`
@@ -258,7 +297,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Render the layered context into harness CLAUDE.md files (PAN-1201).
   const ctxSpinner = ora('Rendering context layers...').start();
-  const ctx = syncContextLayersSync();
+  const ctx = time('context-layers', () => syncContextLayersSync());
   const ctxParts: string[] = [];
   if (ctx.globalStubCreated) ctxParts.push('seeded global.md');
   if (ctx.globalWritten) ctxParts.push('~/.claude/CLAUDE.md');
@@ -298,7 +337,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Sync hooks (bin scripts)
   const hooksSpinner = ora('Syncing hooks...').start();
-  const hooksResult = syncHooksSync();
+  const hooksResult = time('sync-hooks', () => syncHooksSync());
 
   if (hooksResult.errors.length > 0) {
     hooksSpinner.warn(`Synced ${hooksResult.synced.length} hooks, ${hooksResult.errors.length} errors`);
@@ -349,7 +388,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Sync statusline to all runtimes
   const statuslineSpinner = ora('Syncing statusline...').start();
-  const statuslineResult = syncStatuslineSync();
+  const statuslineResult = time('sync-statusline', () => syncStatuslineSync());
 
   if (statuslineResult.errors.length > 0) {
     statuslineSpinner.warn(`Synced statusline to ${statuslineResult.synced.length} runtime(s), ${statuslineResult.errors.length} error(s)`);
@@ -700,4 +739,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   } catch (auditErr: any) {
     console.warn(`[pan sync] vBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
   }
+
+  // Record the input hash so a future startup sync can skip when nothing changed.
+  time('write-sync-manifest', () => writeSyncManifestSync());
+
+  printTimings();
 }
