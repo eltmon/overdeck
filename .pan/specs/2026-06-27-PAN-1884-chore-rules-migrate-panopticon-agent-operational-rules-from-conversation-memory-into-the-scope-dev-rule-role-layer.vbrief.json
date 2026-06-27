@@ -1,0 +1,95 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-27T17:14:04.911Z",
+    "updated": "2026-06-27T17:15:26.498Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1884: chore(rules): migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1884",
+    "title": "chore(rules): migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer",
+    "status": "running",
+    "uid": "ef41a758-3fc0-430a-b99e-4ef77e759f95",
+    "author": "overdeck/auto-start",
+    "sequence": 3,
+    "created": "2026-06-27T17:14:04.911Z",
+    "updated": "2026-06-27T17:15:26.498Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1884",
+        "label": "PAN-1884",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-27-PAN-1884-chore-rules-migrate-panopticon-agent-operational-rules-from-conversation-memory-into-the-scope-dev-rule-role-layer.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "**PRD:** [`.pan/drafts/pan-1884.md`](https://github.com/eltmon/panopticon-cli/blob/main/.pan/drafts/pan-1884.md) _(v2 — incorporates GPT-5.5 review)_\n\n## Problem\n\nA set of **panopticon agent operational rules** lives **only in the orchestrator's conversation memory** (`~/.claude/projects/.../memory/*.md`) — advisory background for one session, invisible to the work/review/flywheel agents they were written for. Same root cause that let RUN-34 misdiagnose pipeline state (#1883).\n\n## Fix (this issue)\n\nMigrate qualifying memories into the **rule layer**, separating two change classes:\n- **(A) tracked repo** — 7 new `sync-sources/rules/*.md` (all `scope: dev`) + flywheel rules added to **both** `roles/flywheel.md` **and** `docs/flywheel-brief.md` (red-main CI-conclusion gate, admin-merge-only-when-green, **cadence fix 1200→~1000**, and **settle the `pan close` contradiction** between the two files). Committed immediately after `pan sync`.\n- **(B) local memory** — slim 4 already-promoted memories to pointers; **delete** the stale `planning_artifacts` (cites deleted `.planning/`, `docs/prds/active/`). This is machine-local, **not** in the git commit — reported separately.\n\nWording guards: `no-oneshot-agents` and `handoff-not-pipeline-agents` must not contradict the existing work-agents-via-pan rule; red-main rule is mechanically checkable (`gh run list --branch main --workflow CI ... --json status,conclusion`). Scope guard: only panopticon-dev agent rules; nothing personal/non-panopticon.\n\n## Related issues\n- Addresses the systemic root behind #1883; the migrated red-main/admin-merge rules help the orchestrator avoid the traps that silently empty the merge gate — relating to #1880, #1824, #1783.\n- Sibling fixes executed together: #1883, #1877.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T17:14:04.911Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1884",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "**PRD:** [`.pan/drafts/pan-1884.md`](https://github.com/eltmon/panopticon-cli/blob/main/.pan/drafts/pan-1884.md) _(v2 — incorporates GPT-5.5 review)_\n\n## Problem\n\nA set of **panopticon agent operational rules** lives **only in the orchestrator's conversation memory** (`~/.claude/projects/.../memory/*.md`) — advisory background for one session, invisible to the work/review/flywheel agents they were written for. Same root cause that let RUN-34 misdiagnose pipeline state (#1883).\n\n## Fix (this issue)\n\nMigrate qualifying memories into the **rule layer**, separating two change classes:\n- **(A) tracked repo** — 7 new `sync-sources/rules/*.md` (all `scope: dev`) + flywheel rules added to **both** `roles/flywheel.md` **and** `docs/flywheel-brief.md` (red-main CI-conclusion gate, admin-merge-only-when-green, **cadence fix 1200→~1000**, and **settle the `pan close` contradiction** between the two files). Committed immediately after `pan sync`.\n- **(B) local memory** — slim 4 already-promoted memories to pointers; **delete** the stale `planning_artifacts` (cites deleted `.planning/`, `docs/prds/active/`). This is machine-local, **not** in the git commit — reported separately.\n\nWording guards: `no-oneshot-agents` and `handoff-not-pipeline-agents` must not contradict the existing work-agents-via-pan rule; red-main rule is mechanically checkable (`gh run list --branch main --workflow CI ... --json status,conclusion`). Scope guard: only panopticon-dev agent rules; nothing personal/non-panopticon.\n\n## Related issues\n- Addresses the systemic root behind #1883; the migrated red-main/admin-merge rules help the orchestrator avoid the traps that silently empty the merge gate — relating to #1880, #1824, #1783.\n- Sibling fixes executed together: #1883, #1877."
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "**(A) tracked repo** — 7 new sync-sources/rules/*.md (all scope: dev) + flywheel rules added to **both** roles/flywheel.md **and** docs/flywheel-brief.md (red-main CI-conclusion gate, admin-merge-only-when-green, **cadence fix 1200→~1000**, and **settle the pan close contradiction** between the two files). Committed immediately after pan sync.",
+            "status": "pending",
+            "created": "2026-06-27T17:14:04.911Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "**(B) local memory** — slim 4 already-promoted memories to pointers; **delete** the stale planning_artifacts (cites deleted .planning/, docs/prds/active/). This is machine-local, **not** in the git commit — reported separately.",
+            "status": "pending",
+            "created": "2026-06-27T17:14:04.911Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Addresses the systemic root behind #1883; the migrated red-main/admin-merge rules help the orchestrator avoid the traps that silently empty the merge gate — relating to #1880, #1824, #1783.",
+            "status": "pending",
+            "created": "2026-06-27T17:14:04.911Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Sibling fixes executed together: #1883, #1877.",
+            "status": "pending",
+            "created": "2026-06-27T17:14:04.911Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
