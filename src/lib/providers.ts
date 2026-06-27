@@ -74,11 +74,18 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
-    defaultHarness: 'ohmypi',
+    // claude-code, not ohmypi (PAN-2102). omp v16.1.16 renamed Kimi's provider
+    // (kimi-coding → kimi-code), changed its model ids (kimi-k2.7-code →
+    // kimi-for-coding), and switched it to OAuth, so omp can no longer launch a
+    // Kimi work agent — it exits immediately and the tmux session orphans. Kimi
+    // exposes an Anthropic-compatible endpoint (api.kimi.com/coding + sk-kimi-*
+    // token), so claude-code talks to it natively — no omp, no CLIProxy, no
+    // 200k-window deadlock.
+    defaultHarness: 'claude-code',
     models: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
-    description: 'Route directly to Kimi Anthropic-compatible endpoints; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
+    description: 'Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
   },
 
   openai: {
