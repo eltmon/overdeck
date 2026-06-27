@@ -23,7 +23,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-06-27T16:15:50.580Z",
+  "updated": "2026-06-27T17:01:27.454Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "pending",
@@ -126,6 +126,23 @@
     "cold-boot-breakdown.ac1": "completed",
     "cold-boot-breakdown.ac2": "completed",
     "defer-readmodel-merge": "cancelled",
-    "defer-readmodel-merge.ac3": "completed"
+    "defer-readmodel-merge.ac3": "completed",
+    "sync-incremental-core": "completed",
+    "sync-incremental-core.ac1": "completed",
+    "sync-incremental-core.ac2": "completed",
+    "sync-incremental-core.ac3": "completed",
+    "sync-incremental-core.ac4": "completed",
+    "traefik-skip-when-up": "completed",
+    "traefik-skip-when-up.ac1": "completed",
+    "traefik-skip-when-up.ac2": "completed",
+    "traefik-skip-when-up.ac3": "completed",
+    "document-electron-install": "completed",
+    "document-electron-install.ac1": "completed",
+    "document-electron-install.ac2": "completed",
+    "batch-lifecycle-log": "completed",
+    "batch-lifecycle-log.ac1": "completed",
+    "batch-lifecycle-log.ac2": "completed",
+    "batch-lifecycle-log.ac3": "completed",
+    "batch-lifecycle-log.ac4": "completed"
   }
 }
