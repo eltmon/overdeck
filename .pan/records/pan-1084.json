@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-1084",
   "schemaVersion": 2,
-  "created": "2026-06-26T03:33:27.321Z",
-  "updated": "2026-06-26T03:33:51.574Z",
-  "pipeline": {
-    "issueId": "PAN-1084",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-26T03:33:27.321Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-1084: Work agent must not auto-approve permission prompts in subagent sessions",
       "timestamp": "2026-06-26T03:33:51.574Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-26T03:33:27.321Z",
+  "updated": "2026-06-27T16:43:23.220Z",
+  "pipeline": {
+    "issueId": "PAN-1084",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T16:43:23.192Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 20548,
+            "output": 3769,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 28876,
+            "output": 24260,
+            "cacheRead": 2126851,
+            "cacheWrite": 217485
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 20548,
+          "output": 3769,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 28876,
+          "output": 24260,
+          "cacheRead": 2126851,
+          "cacheWrite": 217485
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 3.173589,
+        "pricingAsOf": "2026-06-27T16:43:23.219Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code"
 }
