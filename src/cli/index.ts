@@ -641,7 +641,9 @@ program
   .action(async (options) => {
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
-    const { spawn, execSync } = await import('child_process');
+    const { spawn, execSync, exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { readFileSync, existsSync } = await import('fs');
@@ -810,10 +812,17 @@ program
           }
 
           console.log(chalk.dim('Starting Traefik...'));
-          execSync('docker compose up -d', {
-            cwd: traefikDir,
-            stdio: 'pipe',
-          });
+          const { stdout } = await execAsync(
+            'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
+          );
+          if (stdout.trim().includes('overdeck-traefik')) {
+            console.log(chalk.dim('Traefik already running'));
+          } else {
+            execSync('docker compose up -d', {
+              cwd: traefikDir,
+              stdio: 'pipe',
+            });
+          }
           console.log(chalk.green('✓ Traefik started'));
           console.log(chalk.dim(`  Dashboard: https://traefik.${traefikDomain}:8080\n`));
         } catch (error) {
