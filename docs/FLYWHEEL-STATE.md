@@ -2505,3 +2505,99 @@ productive (PAN-2081, PAN-2088). ohmypi work spawns still orphan LIVE (deploy bl
 
 - Next tick: watch PAN-2081/PAN-2088 (codex) → review; once operator deploys (PAN-2095 workaround), re-spawn the
   ohmypi-orphaned 2086/1718 and close PAN-2093/2094. MIN-831/846 still operator UAT/merge-gated.
+
+
+## RUN-22 tick 1 (2026-06-27 ~13:02-13:22Z) — ohmypi 120s fix is DEPLOYED but INSUFFICIENT (PAN-2100 contradicted); drained PAN-2093/2094
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Cohort (17): 1919, 1982, 806,
+1864, 1084, 2086, 2054, 1559, 1638, 1652, 1718, 1722, 1793, 1900, 2081, 1884, 2063. Of these
+1559/1638/1652/1900 were already CLOSED (closed-out) at start; 2054/2081 merged (UAT batch
+`9681cc95`) awaiting close-out.
+
+- **DURABLE LESSON — the PAN-2093/2094 ohmypi-readiness fix (30s→120s) is DEPLOYED LIVE but INSUFFICIENT.**
+  Verified end-to-end: primary HEAD `9f160fbf` contains all three fixes (`99359a040` resume-crashed-ohmypi,
+  `73ad6fd99` PAN-2093, `0973c8c8d` PAN-2094); dist rebuilt 12:57Z; dashboard restarted ~12:59Z (after build).
+  `pan start PAN-1718 --auto` then WAITED 120s (proving the new timeout is live, not 30s) — but the agent
+  STILL orphaned. lifecycle.log: omp hit `running` at 13:11:02, died 15s later (`running → stopped:
+  orphaned: tmux session missing`). **The omp process crashes within ~15s of launch, before writing
+  `ready.json` OR any session id — no `output.log` is captured, so the crash is SILENT** (exactly the
+  opacity gap PAN-2100 flags).
+
+- **DURABLE LESSON — PAN-2100's ENOSPC-only diagnosis is CONTRADICTED by live evidence.** PAN-2100 asserts
+  "the disk has since been cleaned up, so the orphaned-agent readiness failures should no longer reproduce."
+  FALSE: agent-pan-1718 orphaned at `[freeDisk=165760MiB]` (165GB free) and again at `165697MiB`. ENOSPC is
+  NOT the sole (or current) cause; the omp crash reproduces post-cleanup at ample disk. The real crash
+  reason is unobserved (no captured stderr). Future runs: do NOT trust "disk cleaned → ohmypi fixed"; treat
+  kimi/ohmypi `pan start` as BROKEN until PAN-2100's diagnosability lands AND the actual crash is found.
+
+- **DURABLE LESSON — `--harness codex` CANNOT override kimi→ohmypi routing on `pan start`.** Ran
+  `pan start PAN-1718 --auto --harness codex` explicitly; it STILL logged "harness ohmypi chosen by provider
+  default" + `[DEBUG] Selected model: kimi-k2.7-code` and orphaned on ohmypi. The provider default
+  (kimi→ohmypi) wins over the flag for work spawns. So while ohmypi is broken there is NO reliable `pan start`
+  path for kimi-model issues — only `pan strike --harness codex` reliably routes to codex (and only for
+  scoped single-fix issues). Multi-bead kimi work (PAN-1718, 2086) is structurally blocked on PAN-2100.
+  (Reaffirms/strengthens the RUN-20 "codex strikes are the only reliable execution" lesson with the
+  `--harness` flag caveat.)
+
+- **DURABLE LESSON — the deacon auto-resume retry (99359a040) FIRES but cannot recover an orphaned ohmypi
+  spawn.** lifecycle.log shows `resumeAgent called` at 13:12, 13:13 → BLOCKED "no resumable session id found
+  — no session.id file, no sessions.json entry, no recoverable session transcript." Because omp crashed
+  before writing any session id, there is nothing to resume. So the retry logic helps only when the session
+  id exists; a crash-before-session-id orphan is permanent until a fresh `pan start` (which re-orphans on
+  ohmypi). PAN-2100-class.
+
+- **Drained 2 cohort members: closed PAN-2093 + PAN-2094 via `pan close <id> --force`.** Both merged +
+  `verifying-on-main`; verify-merged gate passed. NOTE: the close ceremony's label step fails non-fatally
+  (`'in-planning' not found` — that label doesn't exist in the repo) but the issue still closes correctly.
+  `--force` is the non-interactive flag (the bare command prompts `[y/N]` and exits 13). PAN-2093's close
+  killed its live (zombie) plan session + removed 4 agent state dirs cleanly.
+
+- **Did NOT force-close PAN-2054/2081 (merged, but `in-review`+`merged` not `verifying-on-main`).** They
+  carry LIVE role agents (agent-pan-2054-test running, inspect-pan-2081-workspace running, agent-pan-2081-plan).
+  They're stuck at the wrong label precisely because PAN-2054's OWN close-out-terminality fix wasn't active
+  at its merge — the fix-itself-caught-in-its-own-bug case. Deferred force-close; surfaced as a merge
+  suggestion. PAN-1762 stays OPERATOR-HELD (parked) — do not start.
+
+- **Main CI: in_progress** at `a68f31d5c` (displayTitle "Merge remote-tracking branch 'origin/main'" — the
+  operator running the PAN-2095 deploy-stale workaround: fetch+merge origin/main into the primary worktree
+  before `pan reload`). Prior two runs were `success` (`99359a040`, `9681cc95`). NOT red. RAM 15.8/64 GB,
+  swap clear. ~8 live agent sessions (many zombies on merged/closed issues; only agent-pan-2054-test +
+  inspect-pan-2081 are plausibly doing work).
+
+- Next tick: (1) re-verify main went green + that the operator's `pan reload` made the ohmypi fix live did
+  NOT help (already confirmed insufficient); (2) decide whether to strike PAN-2100 on codex (scoped
+  diagnosability fix — add free-disk + output.log tail to the readiness-timeout error + pre-spawn preflight)
+  to unblock all kimi work; (3) investigate the stopped strikes PAN-1722/PAN-1793 (landed or abandoned?);
+  (4) the 6 stack-broken ready+planned issues (1084/1884/2063/1982/806/1864) need PAN-1618 self-heal spawn
+  — but only non-kimi ones will run. MIN-831/846 still operator UAT/merge-gated.
+
+
+### RUN-22 tick 1 — strike outcomes + follow-through (2026-06-27 ~13:24-13:30Z)
+
+- **Struck PAN-2100 on codex → landed `60655c57b` but INSUFFICIENT (the RUN-20 "lands green, doesn't fix the bug"
+  pattern, again).** The strike found a `describeOhmypiSpawnFailure` helper already reports free-disk (true — the
+  orphan error showed `[freeDisk=165760MiB]`), so its entire diff was: `export` the helper (1 line in agents.ts),
+  an 18-line regression test, and 2 stale "kimi→pi"→"kimi→ohmypi" text fixes (roles/flywheel.md + a bundled rule).
+  It did NOT touch the launcher or capture omp output, so the AC's "recent omp output" is still an empty tail and
+  the crash stays silent. LESSON REINFORCED: a strike that finds the AC "already partially done" will land a near-
+  no-op; verify the strike's diff actually changes the failing behavior, not just that tests are green.
+
+- **DURABLE — `--harness codex` is honored on `pan strike` but IGNORED on `pan start` (for kimi issues).**
+  `pan strike PAN-2100 --harness codex` and `pan strike PAN-2101 --harness codex` both routed to codex/gpt-5.5
+  cleanly. `pan start PAN-1718 --auto --harness codex` was overridden to ohmypi/kimi and orphaned. So the reliable
+  execution lever while ohmypi is broken is **`pan strike --harness codex`**; `pan start` for kimi-model issues
+  always orphans regardless of the flag. (Sharpens the RUN-20 codex-strike lesson with the start/strike asymmetry.)
+
+- **Filed PAN-2101 + struck it on codex in the SAME tick** (follow-through on the incomplete 2100 landing). PAN-2101
+  is the actual diagnostic fix: redirect omp stdout/stderr to `<agentDir>/output.log` in the rendered launcher +
+  have `describeOhmypiSpawnFailure` read+tail it in the thrown error + a test reproducing a crashing omp spawn.
+  strike-pan-2101 in flight (codex/gpt-5.5). Posted live evidence as a comment on PAN-2100 (orphan at 165GB free,
+  no output.log, deacon retry blocked).
+
+- **Cohort status end of tick 1: 8/17 terminal** (1559/1638/1652/1900/1722/1793 CLOSED; 2054/2081 merged awaiting
+  close-out; 2093/2094 closed this tick but were mid-run pickups, not cohort). Active/blocked: 1718 (kimi, orphan),
+  2086 (plan running), 1919 (PR #1950 merge-conflict), 1084/1884/2063 (ready+planned, stack-broken, kimi-blocked),
+  1982/806/1864 (planning stopped, stack-broken). The critical path to unblocking the kimi-blocked majority:
+  PAN-2101 lands → operator reconciles primary (PAN-2095) + `pan reload` → re-spawn kimi agent → read the now-
+  captured output.log crash → file/fix the real omp root cause.
