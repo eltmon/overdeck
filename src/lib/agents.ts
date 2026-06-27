@@ -289,7 +289,9 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
   return false;
 }
 
-async function waitForOhmypiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+export const OHMYPI_AGENT_READY_TIMEOUT_SECONDS = 120;
+
+async function waitForOhmypiAgentReady(agentId: string, timeoutSec = OHMYPI_AGENT_READY_TIMEOUT_SECONDS): Promise<boolean> {
   const { readyPath } = ohmypiFifoPaths(agentId);
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
@@ -425,7 +427,7 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
   }
 }
 
-async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = OHMYPI_AGENT_READY_TIMEOUT_SECONDS): Promise<void> {
   const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForOhmypiAgentReady(agentId, timeoutSec);
   if (!ready) {
