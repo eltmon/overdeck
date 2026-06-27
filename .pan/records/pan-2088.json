@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2088",
   "schemaVersion": 2,
-  "created": "2026-06-27T03:27:37.390Z",
-  "updated": "2026-06-27T03:27:50.226Z",
-  "pipeline": {
-    "issueId": "PAN-2088",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T03:27:37.390Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-2088: Full programmatic control surface for pi/oh-my-pi conversations via the extension API — steer/follow_up delivery, thinking-level (effort), model, compact, + first-class quick-abort",
       "timestamp": "2026-06-27T03:27:50.225Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-27T03:27:37.390Z",
+  "updated": "2026-06-27T07:09:44.364Z",
+  "pipeline": {
+    "issueId": "PAN-2088",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T07:09:44.346Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 24239,
+            "output": 5034,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 33039,
+            "output": 76114,
+            "cacheRead": 6770548,
+            "cacheWrite": 327129
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 24239,
+          "output": 5034,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 33039,
+          "output": 76114,
+          "cacheRead": 6770548,
+          "cacheWrite": 327129
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.49788,
+        "pricingAsOf": "2026-06-27T07:09:44.362Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
