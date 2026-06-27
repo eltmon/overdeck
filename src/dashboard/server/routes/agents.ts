@@ -1670,6 +1670,35 @@ const getAgentRuntimeRoute = HttpRouter.add(
 // header. Work agents don't have a conversation row to enrich, so the panel
 // queries this dedicated endpoint instead.
 
+/**
+ * True when the agent has a concrete workspace + issue we can evaluate git
+ * state for. When false, the git-info route must NOT claim the worktree is
+ * missing — an unresolvable session id (e.g. a legacy / JSONL-only "Planning
+ * state" node) or an agent that never got a workspace is "unknown", not
+ * "workspace gone from disk". Conflating the two made such nodes falsely render
+ * "Worktree missing" in the SessionPanel chip (PAN-1718).
+ */
+export function agentHasResolvableWorkspace(
+  agentState: AgentState | null,
+): agentState is AgentState {
+  return Boolean(agentState?.workspace && agentState.issueId);
+}
+
+/**
+ * Benign git-info response for a session we cannot resolve to a workspace-bound
+ * agent. workspaceMissing is false (not true): we have no path to stat, so we
+ * cannot assert the worktree is gone. The frontend chip hides on this shape
+ * (showChip = actualBranch || workspaceMissing). The genuine on-disk
+ * "workspace missing" case is detected separately by resolveAgentGitInfo, which
+ * stats the real path. See PAN-1718.
+ */
+export const UNRESOLVABLE_AGENT_GIT_INFO = {
+  actualBranch: null,
+  branchDrifted: false,
+  workspaceMissing: false,
+  expectedBranch: null,
+} as const;
+
 const getAgentGitInfoRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/git-info',
@@ -1681,13 +1710,12 @@ const getAgentGitInfoRoute = HttpRouter.add(
     }
 
     const agentState = yield* getAgentState(id);
-    if (!agentState?.workspace || !agentState.issueId) {
-      return jsonResponse({
-        actualBranch: null,
-        branchDrifted: false,
-        workspaceMissing: true,
-        expectedBranch: null,
-      });
+    if (!agentHasResolvableWorkspace(agentState)) {
+      // PAN-1718: unknown session id / no workspace bound → "unknown", not
+      // "worktree missing". Return the benign shape so the chip hides instead of
+      // flashing a false alarm. Real on-disk absence is caught by
+      // resolveAgentGitInfo below.
+      return jsonResponse(UNRESOLVABLE_AGENT_GIT_INFO);
     }
 
     const expectedBranch = `feature/${agentState.issueId.toLowerCase()}`;
