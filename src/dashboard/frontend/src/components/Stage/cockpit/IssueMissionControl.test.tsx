@@ -5,9 +5,15 @@ import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
 
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
-  useActivityQuery: () => ({ data: { sections: [{ type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 }] } }),
-  useIssueCheckRunsQuery: () => ({
+const queryMocks = vi.hoisted(() => {
+  const activityQuery = {
+    data: {
+      sections: [
+        { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
+      ],
+    },
+  }
+  const issueCheckRunsQuery = {
     isLoading: false,
     data: {
       issueId: 'PAN-1661',
@@ -15,10 +21,10 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
       checkRuns: [{ id: 1, name: 'lint', status: 'completed', conclusion: 'success', htmlUrl: 'https://github/checks/1' }],
       summary: { total: 1, passed: 1, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 },
     },
-  }),
-  usePlanningQuery: () => ({ data: { prd: '# PRD', state: '# STATE' }, isLoading: false }),
-  usePrQuery: () => ({ data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }),
-  useReviewStatusQuery: () => ({
+  }
+  const planningQuery = { data: { prd: '# PRD', state: '# STATE' }, isLoading: false }
+  const prQuery = { data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
+  const reviewStatusQuery = {
     data: {
       issueId: 'PAN-1661',
       reviewStatus: 'blocked',
@@ -29,9 +35,20 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
       readyForMerge: false,
       updatedAt: '2026-06-07T00:00:00Z',
     },
-  }),
-  useIssueCostsQuery: () => ({ data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }),
-  useWorkspaceQuery: () => ({ data: null, isLoading: false }),
+  }
+  const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
+  const workspaceQuery = { data: null, isLoading: false }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
+})
+
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
+  useActivityQuery: () => queryMocks.activityQuery,
+  useIssueCheckRunsQuery: () => queryMocks.issueCheckRunsQuery,
+  usePlanningQuery: () => queryMocks.planningQuery,
+  usePrQuery: () => queryMocks.prQuery,
+  useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
+  useIssueCostsQuery: () => queryMocks.issueCostsQuery,
+  useWorkspaceQuery: () => queryMocks.workspaceQuery,
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
@@ -87,6 +104,10 @@ vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>Review card</div> }))
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
+vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
+vi.mock('./BeadsRail', () => ({ BeadsRail: () => <div>Beads rail</div> }))
+vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
+vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 
 import { IssueMissionControl } from './IssueMissionControl'
 
@@ -119,12 +140,12 @@ describe('IssueMissionControl', () => {
   it('renders the mission header, issue tree, and persistent top tabs', () => {
     renderMissionControl()
 
-    expect(screen.getByText('Issue Cockpit · Mission Control')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Mission control' })).toBeTruthy()
     expect(screen.getAllByText('PAN-1661').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Issue tree')).toBeTruthy()
     expect(screen.getAllByText('Work').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /PR & CI/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Code/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
   })
 
@@ -143,13 +164,12 @@ describe('IssueMissionControl', () => {
     expect(screen.getAllByText('Issues').length).toBeGreaterThan(0)
   })
 
-  it('keeps the Overview faithful to the mockup: spotlight + Now / Issue cards', () => {
+  it('keeps the Overview faithful to the current cockpit summary', () => {
     renderMissionControl()
 
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
-    expect(screen.getByText('Now')).toBeTruthy()
-    expect(screen.getByText('Issue')).toBeTruthy()
-    expect(screen.getByText('work agent fixes → re-review')).toBeTruthy()
+    expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()
+    expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
   })
 
   it('moves the launch composition into the Conversation tab', () => {
@@ -174,7 +194,7 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-selected')).toBe('false')
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
-    expect(screen.getByText('Now')).toBeTruthy()
+    expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
 
@@ -195,12 +215,12 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', { name: 'Wipe' })).toBeTruthy()
   })
 
-  it('shows first-class CI checks from the PR & CI tab', () => {
+  it('shows first-class CI checks from the Code tab', () => {
     renderMissionControl()
 
-    const prCiTab = screen.getAllByRole('button', { name: /PR & CI/ }).at(-1)
-    expect(prCiTab).toBeTruthy()
-    fireEvent.click(prCiTab!)
+    const codeTab = screen.getAllByRole('button', { name: /Code/ }).at(-1)
+    expect(codeTab).toBeTruthy()
+    fireEvent.click(codeTab!)
 
     expect(screen.getAllByText('GitHub CI/CD').length).toBeGreaterThan(0)
     expect(screen.getByText('lint')).toBeTruthy()

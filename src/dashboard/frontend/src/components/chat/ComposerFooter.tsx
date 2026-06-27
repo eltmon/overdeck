@@ -61,7 +61,7 @@ interface ComposerFooterProps {
   agentBusy?: boolean;
 }
 
-type DeliverAs = 'steer' | 'follow_up';
+type DeliverAs = 'auto' | 'steer' | 'follow_up';
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
@@ -88,7 +88,7 @@ export function ComposerFooter({
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
-  const [deliverAs, setDeliverAs] = useState<DeliverAs>('steer');
+  const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending images, and their upload pump live in the module-level
   // composerStore, keyed by conversation name (the same key drafts use). The
@@ -409,7 +409,7 @@ export function ComposerFooter({
         submitConversationName,
         composedMessage,
         agentId,
-        piConversation ? deliverAs : undefined,
+        piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
       );
       onSendAcknowledged?.(composedMessage);
 
@@ -594,6 +594,7 @@ export function ComposerFooter({
                 aria-label="Pi delivery mode"
                 disabled={!conversation.sessionAlive}
               >
+                <option value="auto">Auto</option>
                 <option value="steer">Steer</option>
                 <option value="follow_up">Follow-up</option>
               </select>
