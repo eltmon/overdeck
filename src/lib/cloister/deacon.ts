@@ -5747,6 +5747,29 @@ function isRapidPostResumeDeath(state: AgentState): boolean {
 }
 
 /**
+ * PAN-1718: a work agent that reached a tmux session but lost it before ever
+ * delivering its kickoff never started doing real work — this is a launch
+ * crash, not a healthy run that later died. Work agents set
+ * kickoffDelivered=false at spawn and =true once the kickoff lands.
+ *
+ * Why this exists alongside isRapidPostResumeDeath: that guard keys off
+ * lastResumeAt, so it only catches rapid death after a *resume*. A
+ * fundamentally-broken work agent (crashing harness, dead model) is
+ * re-dispatched by the orphan-proposed reconciler as a *fresh start* each
+ * time, which has no lastResumeAt — and its startedAt→orphan span can exceed
+ * the rapid window purely because the spawn itself is slow (e.g. ~2 min to
+ * reach `running`). Without this, the orphan path resets the failure counter
+ * every cycle, so consecutiveFailures oscillates 1→0→1 and never reaches
+ * maxConsecutiveFailures — the troubled gate never trips and the agent
+ * crash-loops forever. Treating a pre-kickoff orphan as an accumulating
+ * failure lets it trip `troubled` after maxConsecutiveFailures, which the
+ * reconciler then honors (it skips troubled agents) and the loop stops.
+ */
+function isPreKickoffLaunchDeath(state: AgentState): boolean {
+  return state.role === 'work' && state.kickoffDelivered === false;
+}
+
+/**
  * PAN-1908: event-driven orphan recovery. A single agent has been declared
  * heartbeat-dead (tmux session gone). Mark it stopped, record a failure for
  * auto-resume tracking, and notify subscribers. Does NOT enumerate directories —
@@ -5833,12 +5856,22 @@ export async function handleAgentHeartbeatDeadEvent(agentId: string, context?: s
   const completedReviewArtifact = hasCompletedReviewArtifact(state);
   if (state.stoppedByUser !== true && isResumableRole && !completedReviewArtifact) {
     const rapidPostResumeDeath = isRapidPostResumeDeath(state);
-    if (!rapidPostResumeDeath) {
+    const preKickoffLaunchDeath = isPreKickoffLaunchDeath(state);
+    // PAN-1718: preserve (accumulate) the failure counter for deaths that prove
+    // the agent never came up healthy — a rapid post-resume death, or a death
+    // before the kickoff was ever delivered. Resetting on these lets a
+    // fundamentally-broken agent that the reconciler re-dispatches as a fresh
+    // start zero its counter every cycle and crash-loop forever without ever
+    // tripping the troubled gate.
+    const accumulatingDeath = rapidPostResumeDeath || preKickoffLaunchDeath;
+    if (!accumulatingDeath) {
       resetAgentFailureCount(agentId);
     }
     const failureReason = rapidPostResumeDeath
       ? `rapid post-resume death: tmux session missing within ${RAPID_POST_RESUME_DEATH_MS / 1000}s (${context ?? 'event'})`
-      : `orphaned: tmux session missing (${context ?? 'event'})`;
+      : preKickoffLaunchDeath
+        ? `launch crash: tmux session lost before kickoff delivery (${context ?? 'event'})`
+        : `orphaned: tmux session missing (${context ?? 'event'})`;
     const failedState = await Effect.runPromise(recordAgentFailure(agentId, failureReason));
     if (failedState) {
       notifyAgentStatusChanged(failedState, oldStatus, false);

@@ -227,6 +227,33 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(mockRecordAgentFailure).toHaveBeenCalled();
     });
 
+    // PAN-1718: a work agent that orphans before its kickoff was delivered never
+    // came up healthy. The reconciler re-dispatches it as a fresh start, so the
+    // failure counter must ACCUMULATE (not reset) across cycles — otherwise it
+    // oscillates 1→0→1 and never trips the troubled gate, crash-looping forever.
+    it('accumulates (does not reset) failures for a pre-kickoff work-agent launch crash', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: false }));
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
+      expect(mockRecordAgentFailure.mock.calls[0][1]).toContain('launch crash');
+      expect(mockResetAgentFailureCount).not.toHaveBeenCalled();
+    });
+
+    // The complement: a work agent that DID deliver its kickoff and later orphans
+    // is a healthy run that died — it should get a clean retry (counter reset).
+    it('resets failures for a normal work-agent orphan that already delivered its kickoff', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockResetAgentFailureCount).toHaveBeenCalled();
+      expect(mockRecordAgentFailure.mock.calls[0][1]).toContain('orphaned: tmux session missing');
+    });
+
     it('marks a review sub-role with a completed report stopped without recording orphan failure', async () => {
       const outputPath = join(tempDir, 'security.md');
       writeFileSync(outputPath, '## Findings\n\nNone.\n');
