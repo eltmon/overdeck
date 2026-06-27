@@ -427,7 +427,7 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
   }
 }
 
-async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = OHMYPI_AGENT_READY_TIMEOUT_SECONDS): Promise<void> {
   const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForOhmypiAgentReady(agentId, timeoutSec);
   if (!ready) {
