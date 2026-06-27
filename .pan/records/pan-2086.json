@@ -116,6 +116,16 @@
     "dashboard-auto-open": "completed",
     "dashboard-auto-open.ac1": "completed",
     "dashboard-auto-open.ac2": "completed",
-    "dashboard-auto-open.ac3": "completed"
+    "dashboard-auto-open.ac3": "completed",
+    "sync-incremental-wire": "completed",
+    "sync-incremental-wire.ac1": "completed",
+    "sync-incremental-wire.ac2": "completed",
+    "sync-incremental-wire.ac3": "completed",
+    "sync-incremental-wire.ac4": "completed",
+    "cold-boot-breakdown": "completed",
+    "cold-boot-breakdown.ac1": "completed",
+    "cold-boot-breakdown.ac2": "completed",
+    "defer-readmodel-merge": "cancelled",
+    "defer-readmodel-merge.ac3": "completed"
   }
 }
