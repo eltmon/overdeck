@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
-import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
+import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { findLatestRollout, extractThreadIdFromRollout } from './runtimes/codex.js';
@@ -507,24 +507,39 @@ export async function getAgentRuntimeBaseCommand(
   }
 
   const provider = getProviderForModelSync(validatedModel);
-  const permissionFlags = getClaudePermissionFlagsStringSync();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
-  const effortFlag = effort ? ` --effort ${effort}` : '';
-  // PAN-982: When agentDefinition is provided, pass it directly to --agent.
-  // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
-  // Still pass --model when launching with an agent definition so explicit model
-  // routing (state.json model, switch-model, cloister settings) wins over any
-  // frontmatter default model.
-  const agentFlag = agentDefinition ? ` --agent ${agentDefinition}` : '';
-  // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
-  // in config), --dangerously-skip-permissions is added on top of --agent. The agent
-  // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
-  // cross-directory reads (e.g. ~/.overdeck/cliproxy/, ~/pan-tts/) still prompt without
-  // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
-  // resolved.
-  const bypassWithAgent = agentDefinition ? bypassPrefixForAgentFlagSync() : '';
+
+  // Classify agentDefinition. A registered agent NAME (e.g. pan-review-agent,
+  // resolved from ~/.claude/agents/*.md) still launches via `--agent <name>` —
+  // Claude Code 2.1.195 resolves names natively, and its frontmatter owns
+  // permissionMode/tools/effort. A role definition FILE (roles/<role>.md) can no
+  // longer be passed to --agent (PAN-2087: 2.1.195 dropped --agent file support),
+  // so its frontmatter-stripped body is injected as an appended system prompt.
+  const defIsRoleFile = !!agentDefinition
+    && existsSync(resolve(agentDefinition))
+    && statSync(resolve(agentDefinition)).isFile();
+
+  if (agentDefinition && !defIsRoleFile) {
+    // Registered agent NAME — unchanged. --model still wins over any frontmatter
+    // default model; permissionMode/effort come from the named agent's frontmatter.
+    const agentFlag = ` --agent ${agentDefinition}`;
+    const effortFlag = effort ? ` --effort ${effort}` : '';
+    if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
+      const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
+      return `claude${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    }
+    return `claude${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
+  }
+
+  // PAN-2087: role FILE (inject body + effort) or no definition. permissionMode
+  // comes from the global permission flags; the role's hooks fire globally via
+  // ~/.claude/settings.json. roleInject folds in effort when a role file is
+  // present; otherwise --effort is passed directly.
+  const permissionFlags = getClaudePermissionFlagsStringSync();
+  const roleInject = defIsRoleFile ? roleSystemPromptInjectionSync(agentDefinition as string, effort) : '';
+  const effortFlag = (!defIsRoleFile && effort) ? ` --effort ${effort}` : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
@@ -533,23 +548,10 @@ export async function getAgentRuntimeBaseCommand(
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    if (agentDefinition) {
-      // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
-    }
-    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude ${permissionFlags}${roleInject} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
-  if (agentDefinition) {
-    // --model is always passed when state has a resolved model so explicit
-    // overrides (state.json model, switch-model, cloister routing) win over
-    // the agent frontmatter's default model. Without this, Anthropic-direct
-    // launches silently fall back to the frontmatter model and ignore the
-    // user's selection — observed when switching PAN-977 to Opus 4.7 left
-    // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
-  }
-  return `claude ${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+  return `claude ${permissionFlags}${roleInject} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /**
@@ -576,6 +578,46 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
     return null;
   }
   return `roles/${role}.md`;
+}
+
+/**
+ * PAN-2087: Claude Code 2.1.195 removed support for passing an agent DEFINITION
+ * FILE to `--agent` — it now resolves only registered agent NAMES (from
+ * `~/.claude/agents/*.md`). Role definitions live as files (`roles/<role>.md`),
+ * so `claude --agent roles/<role>.md` started failing with "agent not found" and
+ * the agent exited on launch. Instead of `--agent`, inject the role's BODY as an
+ * appended system prompt and translate its `effort:` frontmatter to `--effort`.
+ *
+ * Nothing critical is lost: the role frontmatter's hooks (heartbeat, stop,
+ * permission-event, …) are ALSO installed globally in `~/.claude/settings.json`
+ * and fire for every claude session regardless of `--agent`; permissionMode is
+ * covered by the launcher's permission flags. The YAML frontmatter is stripped
+ * so it never leaks into the system prompt as literal text. The stripped body is
+ * cached under `~/.overdeck/role-prompts/<role>.md` and referenced by absolute
+ * path, so it no longer depends on `roles/` existing in the agent's cwd.
+ *
+ * Returns the flags (with a leading space) to splice in place of the old
+ * `--agent <file>` flag, or '' when the definition file is missing.
+ */
+function roleSystemPromptInjectionSync(definitionPath: string, explicitEffort?: RoleEffort): string {
+  const abs = resolve(definitionPath);
+  if (!existsSync(abs)) return '';
+  const raw = readFileSync(abs, 'utf8');
+  let body = raw;
+  let frontmatterEffort: string | undefined;
+  const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (fm) {
+    body = raw.slice(fm[0].length);
+    const m = fm[1].match(/^effort:[ \t]*([A-Za-z]+)[ \t]*$/m);
+    if (m) frontmatterEffort = m[1];
+  }
+  const dir = join(getOverdeckHome(), 'role-prompts');
+  mkdirSync(dir, { recursive: true });
+  const outPath = join(dir, basename(definitionPath));
+  writeFileSync(outPath, body);
+  const effort = explicitEffort ?? (frontmatterEffort as RoleEffort | undefined);
+  const effortFlag = effort ? ` --effort ${effort}` : '';
+  return ` --append-system-prompt-file '${outPath}'${effortFlag}`;
 }
 
 /** Build a Claude/ohmypi base command for role-based runs. */
@@ -610,18 +652,18 @@ export async function getRoleRuntimeBaseCommand(
   if (requestedDefinitionPath && !definitionPath && !missingRoleDefinitionWarnings.has(requestedDefinitionPath)) {
     missingRoleDefinitionWarnings.add(requestedDefinitionPath);
     console.warn(
-      `[agents] Role definition ${resolve(requestedDefinitionPath)} does not exist; launching ${role} without --agent`,
+      `[agents] Role definition ${resolve(requestedDefinitionPath)} does not exist; launching ${role} without its role system prompt`,
     );
   }
-  const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
+  // PAN-2087: inject the role body (+ effort frontmatter) as an appended system
+  // prompt instead of `--agent <file>` (Claude Code dropped --agent file support).
+  const roleInject = definitionPath ? roleSystemPromptInjectionSync(definitionPath, effort) : '';
   const nameFlag = ` --name ${agentName}`;
-  const effortFlag = effort ? ` --effort ${effort}` : '';
-  // Roles with no usable `--agent` definition (convoy sub-roles, or a stale
-  // roleAgentDefinitionPath pointing at a missing file) won't pick up a
-  // frontmatter permissionMode. Fall back to the global Claude permission flags
-  // so the run still launches with the user's bypass/plan settings honored.
-  const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
-  const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
+  const effortFlag = (!definitionPath && effort) ? ` --effort ${effort}` : '';
+  // permissionMode now comes from the global permission flags for EVERY role
+  // (the old --agent path relied on role frontmatter, which Claude Code no longer
+  // applies). This honors the user's bypass/auto setting uniformly.
+  const permissionFlags = ` ${getClaudePermissionFlagsStringSync()}`;
 
   // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
   // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
@@ -630,10 +672,10 @@ export async function getRoleRuntimeBaseCommand(
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude${printFlag}${roleInject}${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+  return `claude${printFlag}${roleInject}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -3087,11 +3129,6 @@ export async function buildAgentLaunchConfig(opts: {
     // --dangerously-skip-permissions on resume too.
     // Use the shared helper so the only string literal for DSP lives in
     // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
-    // bypassPrefixForAgentFlag returns ' --dangerously-skip-permissions' (leading
-    // space) or ''; the resume command needs it as a TRAILING-space token, so
-    // re-trim and re-append.
-    const bypassPrefix = bypassPrefixForAgentFlagSync();
-    const bypassFlag = bypassPrefix ? `${bypassPrefix.trim()} ` : '';
     const launcherContent = generateLauncherScriptSync({
       role: launchRole,
       spawnMode: 'resume',
@@ -3099,12 +3136,14 @@ export async function buildAgentLaunchConfig(opts: {
       changeDir: false,
       setTerminalEnv: true,
       providerExports,
-      // PAN-1048 + PAN-1055: claude-code resumes load the role-specific
-      // frontmatter (roleAgentDefinitionPath); ohmypi/codex resumes route through
-      // getAgentRuntimeBaseCommand which short-circuits to the omp rpc form.
+      // PAN-2087: claude-code resumes inject the role body (+ effort) as an
+      // appended system prompt instead of `--agent <file>` (Claude Code 2.1.195
+      // dropped --agent file support); permission flags come from the global
+      // resolver. ohmypi/codex resumes route through getAgentRuntimeBaseCommand
+      // which short-circuits to the omp/codex form.
       baseCommand: opts.harness === 'ohmypi' || opts.harness === 'codex'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
+        : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
       model: opts.harness === 'ohmypi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: opts.harness === 'ohmypi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,

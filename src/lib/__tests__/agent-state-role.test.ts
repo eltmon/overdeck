@@ -69,7 +69,10 @@ describe('AgentState role persistence', () => {
     expect(spawnRun).toEqual(expect.any(Function));
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1048-review', 'review');
-    expect(command).toContain('--agent roles/review.md');
+    // PAN-2087: role FILES are injected as a system prompt (Claude Code 2.1.195
+    // dropped --agent file support), not passed to --agent.
+    expect(command).not.toContain('--agent ');
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/review\.md'/);
     expect(command).toContain("--model 'claude-opus-4-7'");
     expect(command).toContain('--name agent-pan-1048-review');
     expect(command).not.toContain('pan-review-agent');
@@ -79,7 +82,8 @@ describe('AgentState role persistence', () => {
     const { getRoleRuntimeBaseCommand } = await import('../agents.js');
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
-    expect(command).toContain('--agent roles/flywheel.md');
+    expect(command).not.toContain('--agent ');
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/flywheel\.md'/);
     expect(command).toContain("--model 'claude-opus-4-7'");
     expect(command).toContain('--effort low');
   });
