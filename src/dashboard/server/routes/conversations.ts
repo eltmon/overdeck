@@ -85,6 +85,7 @@ import {
 } from '../../../lib/overdeck/conversations.js';
 import {
   sendRawKeystroke,
+  sendKeysAsync,
   MessageDeliveryFailed,
   capturePane,
   sessionExists,
@@ -1263,6 +1264,7 @@ type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | '
 type ConversationControlCommandInput = Omit<ControlCommand, 'id'>;
 
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const satisfies readonly ThinkingLevel[];
+const PI_CONVERSATION_ABORT_KEY = 'Escape';
 
 function isPiControlChannelHarness(harness: RuntimeName): boolean {
   return harness === 'ohmypi' || harness === 'pi';
@@ -1386,6 +1388,32 @@ export async function handleConversationCompact(
 
   await sendConversationControlCommand(conv, { type: 'compact' });
   return jsonResponse({ ok: true });
+}
+
+export async function handleConversationAbort(
+  name: string,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (!isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Abort control endpoint is only supported for Pi conversations' }, { status: 400 });
+  }
+
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
+  // NFR-4: this single TUI interrupt key is the only sanctioned remaining
+  // tmux write for pi/oh-my-pi conversations. All message and live-control
+  // traffic must use the extension control channel; the extension API exposes
+  // no turn-abort primitive, and Escape was verified to cancel a running omp
+  // turn while keeping the TUI session alive.
+  await sendKeysAsync(conv.tmuxSession, PI_CONVERSATION_ABORT_KEY, 'conversation-abort');
+  return jsonResponse({ ok: true, key: PI_CONVERSATION_ABORT_KEY });
 }
 
 export async function handleConversationSwitchModel(
@@ -3184,6 +3212,29 @@ const postConversationCompactRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] compact conversation failed:', msg);
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationAbortRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/abort',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationAbort(name);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] abort conversation failed:', msg);
         return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
@@ -5186,6 +5237,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationSwitchModelRoute,
   postConversationThinkingLevelRoute,
   postConversationCompactRoute,
+  postConversationAbortRoute,
   postConversationRestartAllRoute,
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,

@@ -18,6 +18,7 @@ import {
   getPendingConversationControlAckCount,
   getInFlightForkPipelineCount,
   deliverConversationViaControlChannel,
+  handleConversationAbort,
   handleConversationCompact,
   handleConversationControlAck,
   handleConversationSwitchModel,
@@ -33,10 +34,16 @@ import {
   waitForInFlightForkPipelines,
 } from '../conversations.js';
 import { deliverAgentMessage } from '../../../../lib/agents.js';
+import { sendKeysAsync } from '../../../../lib/tmux.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
   return { ...(actual as object), deliverAgentMessage: vi.fn().mockResolvedValue(undefined) };
+});
+
+vi.mock('../../../../lib/tmux.js', async () => {
+  const actual = await vi.importActual('../../../../lib/tmux.js');
+  return { ...(actual as object), sendKeysAsync: vi.fn().mockResolvedValue(undefined) };
 });
 
 // ─── Sanitize / name generation logic ────────────────────────────────────────
@@ -443,6 +450,7 @@ describe('conversations route — DB integration', () => {
   describe('conversation live control endpoints', () => {
     afterEach(() => {
       clearPendingConversationControlAcksForTests();
+      vi.mocked(sendKeysAsync).mockClear();
     });
 
     it('writes a thinking-level command and persists the effort', async () => {
@@ -565,6 +573,44 @@ describe('conversations route — DB integration', () => {
       expect(response.status).toBe(409);
       expect(body.error).toBe('Conversation model is locked once a conversation has started');
       expect(existsSync(join(process.env.OVERDECK_HOME!, 'agents', 'conv-claude-switch-model', 'control'))).toBe(false);
+    });
+
+    it('sends the verified Escape interrupt key for pi abort', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-abort',
+        tmuxSession: 'conv-pi-abort',
+        cwd: process.cwd(),
+        harness: 'pi',
+        status: 'active',
+      });
+
+      const response = await handleConversationAbort('pi-abort');
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true, key: 'Escape' });
+      expect(sendKeysAsync).toHaveBeenCalledWith('conv-pi-abort', 'Escape', 'conversation-abort');
+    });
+
+    it('rejects abort for non-pi conversations without sending a tmux key', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'claude-abort',
+        tmuxSession: 'conv-claude-abort',
+        cwd: process.cwd(),
+        harness: 'claude-code',
+        status: 'active',
+      });
+
+      const response = await handleConversationAbort('claude-abort');
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Abort control endpoint is only supported for Pi conversations');
+      expect(sendKeysAsync).not.toHaveBeenCalled();
     });
   });
 

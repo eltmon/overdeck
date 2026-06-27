@@ -1090,6 +1090,17 @@ export const sendRawKeystroke = (
     catch: (cause) => toTmuxError('send-raw-key', cause),
   });
 
+export async function sendKeysAsync(
+  sessionName: string,
+  key: string,
+  caller?: string,
+): Promise<void> {
+  validateSessionName(sessionName);
+  const target = exactPaneTarget(sessionName);
+  logSendKeys(sessionName, key, caller ?? 'send-keys-async');
+  await tmuxExecAsync(['send-keys', '-t', target, key], { encoding: 'utf-8' });
+}
+
 export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promise<void> {
   validateSessionName(sessionName);
   const target = exactPaneTarget(sessionName);
