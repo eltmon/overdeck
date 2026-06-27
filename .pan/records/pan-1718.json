@@ -16,6 +16,11 @@
       "reason": "feedback",
       "note": "[2026-06-27T15:53Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-06-27T15:53:16.821Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T15:56:12.984Z"
     }
   ],
   "feedback": [
@@ -31,17 +36,23 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T15:53:16.095Z",
-    "reviewNotes": "Committed .pan record marks readyForMerge/passed while carrying failed and unrelated verification evidence",
+    "updatedAt": "2026-06-27T16:03:28.383Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-06-27T16:03:28.331Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "reviewedAtCommit": "971e35ab67f71d736fa2902a6984481c7c1efc3f",
-    "lastVerifiedCommit": "971e35ab67f71d736fa2902a6984481c7c1efc3f"
+    "reviewedAtCommit": "45cd53244f9fcbb59c0c80c2255679737061ad87",
+    "lastVerifiedCommit": "45cd53244f9fcbb59c0c80c2255679737061ad87"
   },
   "closeOut": {
     "usage": {
@@ -56,8 +67,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 142567,
-            "output": 8940,
+            "input": 147922,
+            "output": 10849,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -72,9 +83,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1083974,
-            "output": 120579,
-            "cacheRead": 51584256,
+            "input": 1105316,
+            "output": 125951,
+            "cacheRead": 58994432,
             "cacheWrite": 0
           }
         }
@@ -87,8 +98,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 142567,
-          "output": 8940,
+          "input": 147922,
+          "output": 10849,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -99,15 +110,15 @@
           "cacheWrite": 335117
         },
         "custom/kimi-k2.7-code": {
-          "input": 1083974,
-          "output": 120579,
-          "cacheRead": 51584256,
+          "input": 1105316,
+          "output": 125951,
+          "cacheRead": 58994432,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.17941,
-        "pricingAsOf": "2026-06-27T15:53:16.122Z"
+        "usd": 20.629102,
+        "pricingAsOf": "2026-06-27T16:03:28.429Z"
       }
     },
     "merges": [
@@ -116,7 +127,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-27T15:53:16.821Z",
+  "updated": "2026-06-27T16:03:28.443Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
