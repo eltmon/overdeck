@@ -61,6 +61,7 @@ import {
   updateConversationTitle,
   updateConversationCost,
   setConversationModel,
+  setConversationEffort,
   setConversationHarness,
   setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
@@ -109,6 +110,7 @@ import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config
 import {
   writeConversationControlCommand,
   type ControlCommand,
+  type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
@@ -1258,9 +1260,18 @@ async function waitForConversationRuntimeReady(tmuxSession: string, harness: Run
 }
 
 type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | 'steer' | 'follow_up'>;
+type ConversationControlCommandInput = Omit<ControlCommand, 'id'>;
+
+const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const satisfies readonly ThinkingLevel[];
 
 function isPiControlChannelHarness(harness: RuntimeName): boolean {
   return harness === 'ohmypi' || harness === 'pi';
+}
+
+function parseThinkingLevel(value: unknown): ThinkingLevel | null {
+  return typeof value === 'string' && (THINKING_LEVELS as readonly string[]).includes(value)
+    ? value as ThinkingLevel
+    : null;
 }
 
 function isConversationMidTurn(conv: Pick<Conversation, 'tmuxSession'>): boolean {
@@ -1289,21 +1300,15 @@ export function pickDeliverAs(
   return isConversationMidTurn(conv) ? 'steer' : 'prompt';
 }
 
-export async function deliverConversationViaControlChannel(
+export async function sendConversationControlCommand(
   conv: Pick<Conversation, 'tmuxSession'>,
-  message: string,
-  options: {
-    source: 'operator' | 'orchestrator'
-    deliverAs: ConversationControlDeliverAs
-  },
+  commandInput: ConversationControlCommandInput,
 ): Promise<void> {
   const id = randomUUID();
   const ackPromise = registerConversationControlAck(id);
   const command: ControlCommand = {
     id,
-    type: options.deliverAs,
-    message,
-    source: options.source,
+    ...commandInput,
   };
 
   try {
@@ -1316,6 +1321,145 @@ export async function deliverConversationViaControlChannel(
     });
   }
   await ackPromise;
+}
+
+export async function deliverConversationViaControlChannel(
+  conv: Pick<Conversation, 'tmuxSession'>,
+  message: string,
+  options: {
+    source: 'operator' | 'orchestrator'
+    deliverAs: ConversationControlDeliverAs
+  },
+): Promise<void> {
+  await sendConversationControlCommand(conv, {
+    type: options.deliverAs,
+    message,
+    source: options.source,
+  });
+}
+
+export async function handleConversationThinkingLevel(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (!isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Thinking level control is only supported for Pi conversations' }, { status: 400 });
+  }
+
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
+  const level = parseThinkingLevel(body['level']);
+  if (!level) {
+    return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
+  }
+
+  await sendConversationControlCommand(conv, { type: 'set_thinking_level', level });
+  setConversationEffort(name, level);
+  const updated = getConversationByName(name) ?? conv;
+  return jsonResponse({ ok: true, effort: updated.effort ?? level });
+}
+
+export async function handleConversationCompact(
+  name: string,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (!isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Compact control endpoint is only supported for Pi conversations' }, { status: 400 });
+  }
+
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
+  await sendConversationControlCommand(conv, { type: 'compact' });
+  return jsonResponse({ ok: true });
+}
+
+export async function handleConversationSwitchModel(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const model = typeof body['model'] === 'string' && body['model'].trim()
+    ? body['model'].trim()
+    : (conv.model ?? undefined);
+
+  const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
+  const requestedHarness = body['harness'];
+  let harness: RuntimeName = currentHarness;
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
+    if (requestedHarness !== currentHarness) {
+      const policyModel = model ?? conv.model ?? '';
+      const decision = canUseHarnessSync(
+        requestedHarness,
+        policyModel,
+        await getProviderAuthMode(policyModel),
+      );
+      if (!decision.allowed) {
+        return jsonResponse(
+          { error: decision.reason ?? 'Harness not allowed for this model' },
+          { status: 400 },
+        );
+      }
+    }
+    harness = requestedHarness;
+  }
+  const harnessChanged = harness !== currentHarness;
+
+  if (!(await validateCwdContainment(conv.cwd))) {
+    return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+  }
+
+  if (model && !SAFE_MODEL_PATTERN.test(model)) {
+    return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+  }
+
+  const livePiSwitch = isPiControlChannelHarness(currentHarness) && conv.status !== 'ended';
+  if (conv.claudeSessionId && harnessChanged) {
+    return jsonResponse(
+      { error: 'Conversation harness is locked once a conversation has started' },
+      { status: 409 },
+    );
+  }
+  if (conv.claudeSessionId && !livePiSwitch) {
+    return jsonResponse(
+      { error: 'Conversation model is locked once a conversation has started' },
+      { status: 409 },
+    );
+  }
+
+  if (model) {
+    if (livePiSwitch) {
+      await sendConversationControlCommand(conv, { type: 'set_model', model });
+    }
+    setConversationModel(name, model);
+  }
+  if (harnessChanged) setConversationHarness(name, harness);
+
+  const updated = getConversationByName(name) ?? conv;
+  return jsonResponse({
+    ...updated,
+    model: model ?? updated.model,
+    harness,
+    sessionAlive: false,
+  });
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
@@ -2971,8 +3115,9 @@ const postConversationResumeRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
 //
-// Update the model/harness only for a brand-new conversation before any runtime
-// session exists. Once a conversation has a session id, the model is locked.
+// Update the model/harness for a brand-new conversation before any runtime
+// session exists. Pi conversations can also receive live model changes through
+// the control channel; Claude conversations remain locked after start.
 
 const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
@@ -2988,70 +3133,57 @@ const postConversationSwitchModelRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        if (conv.claudeSessionId) {
-          return jsonResponse(
-            { error: 'Conversation model is locked once a conversation has started' },
-            { status: 409 },
-          );
-        }
-
-        const model = typeof body['model'] === 'string' && body['model'].trim()
-          ? body['model'].trim()
-          : (conv.model ?? undefined);
-
-        // Harness is PINNED per conversation. It changes ONLY when the request
-        // explicitly asks for a different one — never silently re-derived from
-        // the model (that flipped Pi conversations to Claude Code, P0). An
-        // explicit change is validated against the ToS policy gate and fails
-        // loudly rather than silently downgrading.
-        const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
-        const requestedHarness = body['harness'];
-        let harness: RuntimeName = currentHarness;
-        if (requestedHarness === 'ohmypi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
-          if (requestedHarness !== currentHarness) {
-            const policyModel = model ?? conv.model ?? '';
-            const decision = canUseHarnessSync(
-              requestedHarness,
-              policyModel,
-              await getProviderAuthMode(policyModel),
-            );
-            if (!decision.allowed) {
-              return jsonResponse(
-                { error: decision.reason ?? 'Harness not allowed for this model' },
-                { status: 400 },
-              );
-            }
-          }
-          harness = requestedHarness;
-        }
-        const harnessChanged = harness !== currentHarness;
-
-        if (!(await validateCwdContainment(conv.cwd))) {
-          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-        }
-
-        // Validate model before persisting so invalid values never reach the DB.
-        if (model && !SAFE_MODEL_PATTERN.test(model)) {
-          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-        }
-
-        if (model) setConversationModel(name, model);
-        if (harnessChanged) setConversationHarness(name, harness);
-
-        const updated = getConversationByName(name) ?? conv;
-        return jsonResponse({
-          ...updated,
-          model: model ?? updated.model,
-          harness,
-          sessionAlive: false,
-        });
+        return await handleConversationSwitchModel(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationThinkingLevelRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/thinking-level',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationThinkingLevel(name, body);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] set thinking level failed:', msg);
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationCompactRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/compact',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationCompact(name);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] compact conversation failed:', msg);
         return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
@@ -5052,6 +5184,8 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationStopRoute,
   postConversationResumeRoute,
   postConversationSwitchModelRoute,
+  postConversationThinkingLevelRoute,
+  postConversationCompactRoute,
   postConversationRestartAllRoute,
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,

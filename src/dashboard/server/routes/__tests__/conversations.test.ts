@@ -18,7 +18,10 @@ import {
   getPendingConversationControlAckCount,
   getInFlightForkPipelineCount,
   deliverConversationViaControlChannel,
+  handleConversationCompact,
   handleConversationControlAck,
+  handleConversationSwitchModel,
+  handleConversationThinkingLevel,
   parseSummaryForkFocus,
   pickDeliverAs,
   readExistingHandoffDoc,
@@ -174,6 +177,15 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
 function decodeTextResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
+}
+
+async function readPendingControlCommand(agentId: string): Promise<Record<string, unknown>> {
+  const controlDir = join(process.env.OVERDECK_HOME!, 'agents', agentId, 'control');
+  await vi.waitFor(() => {
+    expect(readdirSync(controlDir).filter((name) => name.endsWith('.json'))).toHaveLength(1);
+  });
+  const file = join(controlDir, readdirSync(controlDir).find((name) => name.endsWith('.json'))!);
+  return JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
 }
 
 describe('buildForkRequest', () => {
@@ -428,6 +440,134 @@ afterEach(async () => {
 });
 
 describe('conversations route — DB integration', () => {
+  describe('conversation live control endpoints', () => {
+    afterEach(() => {
+      clearPendingConversationControlAcksForTests();
+    });
+
+    it('writes a thinking-level command and persists the effort', async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-thinking',
+        tmuxSession: 'conv-pi-thinking',
+        cwd: process.cwd(),
+        harness: 'pi',
+        status: 'active',
+      });
+
+      const responsePromise = handleConversationThinkingLevel('pi-thinking', { level: 'high' });
+      const command = await readPendingControlCommand('conv-pi-thinking');
+
+      expect(command).toMatchObject({
+        type: 'set_thinking_level',
+        level: 'high',
+      });
+
+      handleConversationControlAck({ id: command.id, ok: true });
+      const response = await responsePromise;
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true, effort: 'high' });
+      expect(getConversationByName('pi-thinking')?.effort).toBe('high');
+    });
+
+    it('rejects invalid thinking levels without writing a command', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-bad-thinking',
+        tmuxSession: 'conv-pi-bad-thinking',
+        cwd: process.cwd(),
+        harness: 'pi',
+        status: 'active',
+      });
+
+      const response = await handleConversationThinkingLevel('pi-bad-thinking', { level: 'turbo' });
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Invalid thinking level');
+      expect(existsSync(join(process.env.OVERDECK_HOME!, 'agents', 'conv-pi-bad-thinking', 'control'))).toBe(false);
+    });
+
+    it('writes a compact command for pi conversations', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-compact',
+        tmuxSession: 'conv-pi-compact',
+        cwd: process.cwd(),
+        harness: 'ohmypi',
+        status: 'active',
+      });
+
+      const responsePromise = handleConversationCompact('pi-compact');
+      const command = await readPendingControlCommand('conv-pi-compact');
+
+      expect(command).toMatchObject({ type: 'compact' });
+
+      handleConversationControlAck({ id: command.id, ok: true });
+      const response = await responsePromise;
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true });
+    });
+
+    it('updates a running pi conversation model through the control channel', async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-switch-model',
+        tmuxSession: 'conv-pi-switch-model',
+        cwd: process.cwd(),
+        harness: 'pi',
+        model: 'old-model',
+        claudeSessionId: 'pi-session-jsonl',
+        status: 'active',
+      });
+
+      const responsePromise = handleConversationSwitchModel('pi-switch-model', { model: 'new-model' });
+      const command = await readPendingControlCommand('conv-pi-switch-model');
+
+      expect(command).toMatchObject({
+        type: 'set_model',
+        model: 'new-model',
+      });
+
+      handleConversationControlAck({ id: command.id, ok: true });
+      const response = await responsePromise;
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body.model).toBe('new-model');
+      expect(getConversationByName('pi-switch-model')?.model).toBe('new-model');
+    });
+
+    it('keeps started claude-code conversations locked to their model', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'claude-switch-model',
+        tmuxSession: 'conv-claude-switch-model',
+        cwd: process.cwd(),
+        harness: 'claude-code',
+        model: 'old-model',
+        claudeSessionId: 'claude-session-jsonl',
+        status: 'active',
+      });
+
+      const response = await handleConversationSwitchModel('claude-switch-model', { model: 'new-model' });
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(409);
+      expect(body.error).toBe('Conversation model is locked once a conversation has started');
+      expect(existsSync(join(process.env.OVERDECK_HOME!, 'agents', 'conv-claude-switch-model', 'control'))).toBe(false);
+    });
+  });
+
   it('keeps claude-code composer delivery on deliverAgentMessage', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { handleConversationMessage } = await import('../conversations.js');
