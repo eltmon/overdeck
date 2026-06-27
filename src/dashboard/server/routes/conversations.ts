@@ -25,7 +25,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import { readLauncherPinnedSessionId, resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
-import { validateOrigin } from './origin-validation.js';
+import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
@@ -61,6 +61,7 @@ import {
   updateConversationTitle,
   updateConversationCost,
   setConversationModel,
+  setConversationEffort,
   setConversationHarness,
   setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
@@ -84,6 +85,7 @@ import {
 } from '../../../lib/overdeck/conversations.js';
 import {
   sendRawKeystroke,
+  sendKeysAsync,
   MessageDeliveryFailed,
   capturePane,
   sessionExists,
@@ -106,6 +108,11 @@ import {
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
+import {
+  writeConversationControlCommand,
+  type ControlCommand,
+  type ThinkingLevel,
+} from '../../../lib/runtimes/conversation-control.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
  * module default when config is unavailable. */
@@ -329,6 +336,11 @@ function shellQuote(str: string): string {
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+const PI_CONVERSATION_SOURCE_CONTRACT = [
+  'Pi conversation source contract:',
+  "A message marked source:'extension' was injected by the Overdeck orchestrator or another agent, not typed by the human operator.",
+  'Treat it as coordination guidance; do not attribute it to the human operator.',
+].join(' ');
 
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
@@ -826,6 +838,97 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+export const CONTROL_ACK_TIMEOUT_MS = 10_000;
+
+export interface ConversationControlAck {
+  id: string
+  ok: boolean
+  error?: string
+}
+
+interface PendingConversationControlAck {
+  resolve: () => void
+  reject: (error: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+const pendingConversationControlAcks = new Map<string, PendingConversationControlAck>();
+
+export function registerConversationControlAck(
+  commandId: string,
+  timeoutMs: number = CONTROL_ACK_TIMEOUT_MS,
+): Promise<void> {
+  const existing = pendingConversationControlAcks.get(commandId);
+  if (existing) {
+    clearTimeout(existing.timer);
+    existing.reject(new Error(`Replaced pending conversation control ack ${commandId}`));
+    pendingConversationControlAcks.delete(commandId);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingConversationControlAcks.delete(commandId);
+      reject(new Error(`Timed out waiting for conversation control ack ${commandId}`));
+    }, timeoutMs);
+    pendingConversationControlAcks.set(commandId, {
+      resolve: () => {
+        clearTimeout(timer);
+        pendingConversationControlAcks.delete(commandId);
+        resolve();
+      },
+      reject: (error: Error) => {
+        clearTimeout(timer);
+        pendingConversationControlAcks.delete(commandId);
+        reject(error);
+      },
+      timer,
+    });
+  });
+}
+
+export function resolveConversationControlAck(ack: ConversationControlAck): 'resolved' | 'rejected' | 'unknown' {
+  const pending = pendingConversationControlAcks.get(ack.id);
+  if (!pending) return 'unknown';
+  if (ack.ok) {
+    pending.resolve();
+    return 'resolved';
+  }
+  pending.reject(new Error(ack.error || `Conversation control command ${ack.id} failed`));
+  return 'rejected';
+}
+
+export function getPendingConversationControlAckCount(): number {
+  return pendingConversationControlAcks.size;
+}
+
+export function clearPendingConversationControlAcksForTests(): void {
+  for (const pending of pendingConversationControlAcks.values()) {
+    clearTimeout(pending.timer);
+  }
+  pendingConversationControlAcks.clear();
+}
+
+export function handleConversationControlAck(
+  body: Record<string, unknown>,
+): { status: number; body: { ok: true; outcome: 'resolved' | 'rejected' | 'unknown' } | { error: string } } {
+  const id = typeof body['id'] === 'string' ? body['id'].trim() : '';
+  if (!id) return { status: 400, body: { error: 'id is required' } };
+  const ok = body['ok'] === true;
+  const error = typeof body['error'] === 'string' ? body['error'] : undefined;
+  const outcome = resolveConversationControlAck({ id, ok, ...(error !== undefined ? { error } : {}) });
+  return { status: 200, body: { ok: true, outcome } };
+}
+
+export function validateConversationControlAckOrigin(
+  headers: HeaderMap,
+  method = 'POST',
+): { ok: true } | { ok: false; error: string } {
+  const origin = getHeaderFromMap(headers, 'origin');
+  const referer = getHeaderFromMap(headers, 'referer');
+  if (!origin && !referer) return { ok: true };
+  return validateOriginHeaders(headers, method);
+}
+
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
   if (value === undefined || value === null) return { ok: true, focus: undefined };
   if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
@@ -1063,50 +1166,57 @@ export async function handleConversationMessage(
     );
   }
 
-  // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
-  // eaten-by-compaction watcher below can tell whether this message ever
-  // landed. Claude-only — the probe parses Claude-format JSONL.
-  let watchFromByteOffset: number | null = null;
-  if (harness === 'claude-code' && conv.claudeSessionId) {
-    const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
-    watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
-  }
-
-  try {
-    await deliverAgentMessage(
-      conv.tmuxSession,
-      deliveredMessage,
-      'conversation-message',
-      resolveConversationDeliveryMethod(conv),
-    );
-  } catch (deliveryErr: unknown) {
-    const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
-    if (errMsg.includes('MessageDeliveryFailed')) {
-      return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
-    }
-    throw deliveryErr;
-  }
-
-  // Watch in the background for Claude Code's submit-time compaction eating
-  // the just-delivered prompt (compact boundary lands, message doesn't) and
-  // redeliver once. The POST already returned ok by the time this matters.
-  if (watchFromByteOffset !== null && conv.claudeSessionId) {
-    void watchForEatenConversationMessage({
-      conversationName: conv.name,
-      tmuxSession: conv.tmuxSession,
-      cwd: conv.cwd,
-      sessionId: conv.claudeSessionId,
-      message: deliveredMessage,
-      deliveryMethod: resolveConversationDeliveryMethod(conv),
-      fromByteOffset: watchFromByteOffset,
-    }).then((outcome) => {
-      if (outcome === 'redelivered') {
-        console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
-      }
-    }).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+  if (isPiControlChannelHarness(harness)) {
+    await deliverConversationViaControlChannel(conv, deliveredMessage, {
+      source: 'operator',
+      deliverAs: pickDeliverAs(conv, body['deliverAs']),
     });
+  } else {
+    // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
+    // eaten-by-compaction watcher below can tell whether this message ever
+    // landed. Claude-only — the probe parses Claude-format JSONL.
+    let watchFromByteOffset: number | null = null;
+    if (harness === 'claude-code' && conv.claudeSessionId) {
+      const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
+      watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
+    }
+
+    try {
+      await deliverAgentMessage(
+        conv.tmuxSession,
+        deliveredMessage,
+        'conversation-message',
+        resolveConversationDeliveryMethod(conv),
+      );
+    } catch (deliveryErr: unknown) {
+      const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
+      if (errMsg.includes('MessageDeliveryFailed')) {
+        return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
+      }
+      throw deliveryErr;
+    }
+
+    // Watch in the background for Claude Code's submit-time compaction eating
+    // the just-delivered prompt (compact boundary lands, message doesn't) and
+    // redeliver once. The POST already returned ok by the time this matters.
+    if (watchFromByteOffset !== null && conv.claudeSessionId) {
+      void watchForEatenConversationMessage({
+        conversationName: conv.name,
+        tmuxSession: conv.tmuxSession,
+        cwd: conv.cwd,
+        sessionId: conv.claudeSessionId,
+        message: deliveredMessage,
+        deliveryMethod: resolveConversationDeliveryMethod(conv),
+        fromByteOffset: watchFromByteOffset,
+      }).then((outcome) => {
+        if (outcome === 'redelivered') {
+          console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
+        }
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+      });
+    }
   }
 
   // Generate AI title for conversations created via instant-start (no message at creation)
@@ -1151,9 +1261,243 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
     && process.env.PAN_DOCKER !== '1';
 }
 
-function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
-  const harness = conv.harness ?? 'claude-code';
-  return conv.deliveryMethod ?? (harness === 'ohmypi' ? 'tmux' : 'auto');
+export function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
+  // No-loss retirement for pi/oh-my-pi message bodies: the old tmux path only
+  // provided fire-and-forget text delivery, now replaced by the acknowledged
+  // extension control channel. It provided no other pi/oh-my-pi behavior. The
+  // WI-7 Escape abort key remains the only sanctioned tmux write for Pi.
+  if (isPiControlChannelHarness(conv.harness)) return 'auto';
+  return conv.deliveryMethod ?? 'auto';
+}
+
+type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | 'steer' | 'follow_up'>;
+type ConversationControlCommandInput = Omit<ControlCommand, 'id'>;
+
+const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const satisfies readonly ThinkingLevel[];
+const PI_CONVERSATION_ABORT_KEY = 'Escape';
+
+function isPiControlChannelHarness(harness: RuntimeName): boolean {
+  return harness === 'ohmypi' || harness === 'pi';
+}
+
+function parseThinkingLevel(value: unknown): ThinkingLevel | null {
+  return typeof value === 'string' && (THINKING_LEVELS as readonly string[]).includes(value)
+    ? value as ThinkingLevel
+    : null;
+}
+
+function isConversationMidTurn(conv: Pick<Conversation, 'tmuxSession'>): boolean {
+  const heartbeatPath = join(getOverdeckHome(), 'heartbeats', `${conv.tmuxSession}.json`);
+  if (!existsSync(heartbeatPath)) return false;
+  try {
+    const heartbeat = JSON.parse(readFileSync(heartbeatPath, 'utf8')) as {
+      timestamp?: string
+      last_action?: string
+    };
+    if (!heartbeat.timestamp) return false;
+    const ageMs = Date.now() - new Date(heartbeat.timestamp).getTime();
+    if (!Number.isFinite(ageMs) || ageMs > 60_000) return false;
+    return heartbeat.last_action !== 'turn_end';
+  } catch {
+    return false;
+  }
+}
+
+export function pickDeliverAs(
+  conv: Pick<Conversation, 'tmuxSession'>,
+  bodyDeliverAs: unknown,
+): ConversationControlDeliverAs {
+  if (bodyDeliverAs === 'follow_up') return 'follow_up';
+  if (bodyDeliverAs === 'steer') return 'steer';
+  return isConversationMidTurn(conv) ? 'steer' : 'prompt';
+}
+
+export async function sendConversationControlCommand(
+  conv: Pick<Conversation, 'tmuxSession'>,
+  commandInput: ConversationControlCommandInput,
+): Promise<void> {
+  const id = randomUUID();
+  const ackPromise = registerConversationControlAck(id);
+  const command: ControlCommand = {
+    id,
+    ...commandInput,
+  };
+
+  try {
+    await writeConversationControlCommand(conv.tmuxSession, command);
+  } catch (err) {
+    resolveConversationControlAck({
+      id,
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  await ackPromise;
+}
+
+export async function deliverConversationViaControlChannel(
+  conv: Pick<Conversation, 'tmuxSession'>,
+  message: string,
+  options: {
+    source: 'operator' | 'orchestrator'
+    deliverAs: ConversationControlDeliverAs
+  },
+): Promise<void> {
+  await sendConversationControlCommand(conv, {
+    type: options.deliverAs,
+    message,
+    source: options.source,
+  });
+}
+
+export async function handleConversationThinkingLevel(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (!isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Thinking level control is only supported for Pi conversations' }, { status: 400 });
+  }
+
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
+  const level = parseThinkingLevel(body['level']);
+  if (!level) {
+    return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
+  }
+
+  await sendConversationControlCommand(conv, { type: 'set_thinking_level', level });
+  setConversationEffort(name, level);
+  const updated = getConversationByName(name) ?? conv;
+  return jsonResponse({ ok: true, effort: updated.effort ?? level });
+}
+
+export async function handleConversationCompact(
+  name: string,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (!isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Compact control endpoint is only supported for Pi conversations' }, { status: 400 });
+  }
+
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
+  await sendConversationControlCommand(conv, { type: 'compact' });
+  return jsonResponse({ ok: true });
+}
+
+export async function handleConversationAbort(
+  name: string,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  if (!isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Abort control endpoint is only supported for Pi conversations' }, { status: 400 });
+  }
+
+  if (conv.status === 'ended') {
+    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
+  }
+
+  // NFR-4: this single TUI interrupt key is the only sanctioned remaining
+  // tmux write for pi/oh-my-pi conversations. All message and live-control
+  // traffic must use the extension control channel; the extension API exposes
+  // no turn-abort primitive, and Escape was verified to cancel a running omp
+  // turn while keeping the TUI session alive.
+  await sendKeysAsync(conv.tmuxSession, PI_CONVERSATION_ABORT_KEY, 'conversation-abort');
+  return jsonResponse({ ok: true, key: PI_CONVERSATION_ABORT_KEY });
+}
+
+export async function handleConversationSwitchModel(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+
+  const model = typeof body['model'] === 'string' && body['model'].trim()
+    ? body['model'].trim()
+    : (conv.model ?? undefined);
+
+  const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
+  const requestedHarness = body['harness'];
+  let harness: RuntimeName = currentHarness;
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
+    if (requestedHarness !== currentHarness) {
+      const policyModel = model ?? conv.model ?? '';
+      const decision = canUseHarnessSync(
+        requestedHarness,
+        policyModel,
+        await getProviderAuthMode(policyModel),
+      );
+      if (!decision.allowed) {
+        return jsonResponse(
+          { error: decision.reason ?? 'Harness not allowed for this model' },
+          { status: 400 },
+        );
+      }
+    }
+    harness = requestedHarness;
+  }
+  const harnessChanged = harness !== currentHarness;
+
+  if (!(await validateCwdContainment(conv.cwd))) {
+    return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+  }
+
+  if (model && !SAFE_MODEL_PATTERN.test(model)) {
+    return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+  }
+
+  const livePiSwitch = isPiControlChannelHarness(currentHarness) && conv.status !== 'ended';
+  if (conv.claudeSessionId && harnessChanged) {
+    return jsonResponse(
+      { error: 'Conversation harness is locked once a conversation has started' },
+      { status: 409 },
+    );
+  }
+  if (conv.claudeSessionId && !livePiSwitch) {
+    return jsonResponse(
+      { error: 'Conversation model is locked once a conversation has started' },
+      { status: 409 },
+    );
+  }
+
+  if (model) {
+    if (livePiSwitch) {
+      await sendConversationControlCommand(conv, { type: 'set_model', model });
+    }
+    setConversationModel(name, model);
+  }
+  if (harnessChanged) setConversationHarness(name, harness);
+
+  const updated = getConversationByName(name) ?? conv;
+  return jsonResponse({
+    ...updated,
+    model: model ?? updated.model,
+    harness,
+    sessionAlive: false,
+  });
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
@@ -1388,11 +1732,20 @@ async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[
   return files;
 }
 
+async function ensurePiConversationSourceContractFile(): Promise<string> {
+  const contextDir = join(getOverdeckHome(), 'context');
+  await mkdir(contextDir, { recursive: true });
+  const path = join(contextDir, 'pi-conversation-source-contract.md');
+  await writeFile(path, `${PI_CONVERSATION_SOURCE_CONTRACT}\n`, 'utf-8');
+  return path;
+}
+
 // PAN-1566: Pi conversations are launched with --no-context-files and the
 // extension fold no-ops (no ctx.appendSystemPrompt), so the global rules layer
 // must be delivered as launcher --append-system-prompt files. Mirror the Claude
-// conversation files but prepend the Pi-rendered global layer (pi-global.md).
-async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+// conversation files but prepend the Pi-rendered global layer (pi-global.md)
+// and the source-attribution contract used by extension-delivered messages.
+export async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
   const files: string[] = [];
   const globalFile = piGlobalContextFile();
   try {
@@ -1401,6 +1754,7 @@ async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
   } catch (error) {
     if (!isNotFound(error)) throw error;
   }
+  files.push(await ensurePiConversationSourceContractFile());
   const contextFile = workspaceContextFile(cwd);
   try {
     await stat(contextFile);
@@ -1493,9 +1847,9 @@ export async function spawnConversationSession(
 
       // Conversations run Pi in TUI mode (the default Pi terminal UI). This
       // gives users an actual terminal in the tmux pane — they can type
-      // directly into Pi, and dashboard-composer messages are delivered via
-      // tmux paste-buffer (sendKeysAsync) just like Claude Code. Pi still
-      // writes JSONL session files to --session-dir, so cost parsing and
+      // directly into Pi, while dashboard-composer messages and live controls
+      // are delivered through the acknowledged extension control channel. Pi
+      // still writes JSONL session files to --session-dir, so cost parsing and
       // resume keep working.
       //
       // Work-agents (spawned elsewhere) keep --mode rpc + FIFO because
@@ -2820,8 +3174,9 @@ const postConversationResumeRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
 //
-// Update the model/harness only for a brand-new conversation before any runtime
-// session exists. Once a conversation has a session id, the model is locked.
+// Update the model/harness for a brand-new conversation before any runtime
+// session exists. Pi conversations can also receive live model changes through
+// the control channel; Claude conversations remain locked after start.
 
 const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
@@ -2837,70 +3192,80 @@ const postConversationSwitchModelRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        if (conv.claudeSessionId) {
-          return jsonResponse(
-            { error: 'Conversation model is locked once a conversation has started' },
-            { status: 409 },
-          );
-        }
-
-        const model = typeof body['model'] === 'string' && body['model'].trim()
-          ? body['model'].trim()
-          : (conv.model ?? undefined);
-
-        // Harness is PINNED per conversation. It changes ONLY when the request
-        // explicitly asks for a different one — never silently re-derived from
-        // the model (that flipped Pi conversations to Claude Code, P0). An
-        // explicit change is validated against the ToS policy gate and fails
-        // loudly rather than silently downgrading.
-        const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
-        const requestedHarness = body['harness'];
-        let harness: RuntimeName = currentHarness;
-        if (requestedHarness === 'ohmypi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
-          if (requestedHarness !== currentHarness) {
-            const policyModel = model ?? conv.model ?? '';
-            const decision = canUseHarnessSync(
-              requestedHarness,
-              policyModel,
-              await getProviderAuthMode(policyModel),
-            );
-            if (!decision.allowed) {
-              return jsonResponse(
-                { error: decision.reason ?? 'Harness not allowed for this model' },
-                { status: 400 },
-              );
-            }
-          }
-          harness = requestedHarness;
-        }
-        const harnessChanged = harness !== currentHarness;
-
-        if (!(await validateCwdContainment(conv.cwd))) {
-          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-        }
-
-        // Validate model before persisting so invalid values never reach the DB.
-        if (model && !SAFE_MODEL_PATTERN.test(model)) {
-          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-        }
-
-        if (model) setConversationModel(name, model);
-        if (harnessChanged) setConversationHarness(name, harness);
-
-        const updated = getConversationByName(name) ?? conv;
-        return jsonResponse({
-          ...updated,
-          model: model ?? updated.model,
-          harness,
-          sessionAlive: false,
-        });
+        return await handleConversationSwitchModel(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationThinkingLevelRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/thinking-level',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationThinkingLevel(name, body);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] set thinking level failed:', msg);
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationCompactRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/compact',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationCompact(name);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] compact conversation failed:', msg);
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+const postConversationAbortRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/abort',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        return await handleConversationAbort(name);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] abort conversation failed:', msg);
         return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
@@ -3368,6 +3733,31 @@ const postConversationDeliveryMethodRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] update delivery method failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: POST /api/conversations/:name/control-ack ────────────────────────
+
+const postConversationControlAckRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/control-ack',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateConversationControlAckOrigin(request.headers as HeaderMap, request.method);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const result = handleConversationControlAck(body);
+        return jsonResponse(result.body, { status: result.status });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] control ack failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
@@ -4874,6 +5264,9 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationStopRoute,
   postConversationResumeRoute,
   postConversationSwitchModelRoute,
+  postConversationThinkingLevelRoute,
+  postConversationCompactRoute,
+  postConversationAbortRoute,
   postConversationRestartAllRoute,
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,
@@ -4884,6 +5277,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationMessageRoute,
   postConversationCodexApprovalRoute,
   postConversationDeliveryMethodRoute,
+  postConversationControlAckRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
   postConversationSummaryForkRoute,
