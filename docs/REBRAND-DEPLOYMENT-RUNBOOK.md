@@ -28,11 +28,11 @@
 
 ## Phase 2a — Landing site: stand up `overdeck.ai` on Vercel
 
-> **Status (2026-06-26): DEPLOYED.** The site is live at
-> `https://overdeck.vercel.app` (HTTP 200, verified). The Vercel project
-> `eltmons-projects/overdeck` is created, GitHub-connected, and the custom domains
-> `overdeck.ai` + `www.overdeck.ai` are attached. **Only the Cloudflare DNS records
-> remain** to activate the custom domain.
+> **Status (2026-06-26): ✅ LIVE.** `https://overdeck.ai` and `https://www.overdeck.ai`
+> serve the landing page over HTTPS (HTTP/2 200, Vercel, Let's Encrypt cert provisioned).
+> Cloudflare A records `@` + `www` → `76.76.21.21` (DNS-only) are set and propagated.
+> The Vercel project `eltmons-projects/overdeck` is created, GitHub-connected, and both
+> domains are attached + verified.
 
 **Deploy note:** the repo root is a monorepo with 20MB+ of tracked media, which exceeds
 Vercel's 10MB CLI upload limit. Deploy from a clean dir containing only `site/` +
