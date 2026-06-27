@@ -31,29 +31,9 @@ import {
   useConversationSending,
   useConversationImages,
   getConversationImages,
+  sendConversationMessage,
 } from '../../lib/composerStore';
 import styles from '../CommandDeck/styles/command-deck.module.css';
-
-// ─── API ──────────────────────────────────────────────────────────────────────
-
-async function sendConversationMessage(
-  conversationName: string,
-  message: string,
-  agentId?: string,
-): Promise<void> {
-  const endpoint = agentId
-    ? `/api/agents/${encodeURIComponent(agentId)}/message`
-    : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
-  }
-}
 
 // Pasted-image state and its upload pump live in `lib/composerStore.ts` so they
 // survive a pane unmount (PAN-1591 renders only the active pane). `PendingImage`,

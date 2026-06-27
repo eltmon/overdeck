@@ -78,6 +78,34 @@ function isEmptySlice(s: ComposerSlice): boolean {
   );
 }
 
+// ─── Message send (shared by the composer and the retry outbox) ─────────────────
+
+/**
+ * POST a message to a conversation (or agent) session. The single source of
+ * truth for the send endpoint + payload, used by both the composer's first send
+ * (ComposerFooter.handleSubmit) and the failed-message retry (retryFailed
+ * below). Throws on a non-2xx response so callers can move the message to the
+ * retry outbox.
+ */
+export async function sendConversationMessage(
+  conversationName: string,
+  message: string,
+  agentId?: string,
+): Promise<void> {
+  const endpoint = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/message`
+    : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
+  }
+}
+
 // ─── Image API + upload pump (module-level, survives component unmount) ─────────
 
 async function uploadConversationImage(conversationName: string, file: File): Promise<string> {
@@ -204,8 +232,24 @@ interface ComposerStore {
 
   /** A send POST failed: drop the optimistic copy and add to the retry outbox. */
   failSend(conversationName: string, text: string): void;
-  addFailed(conversationName: string, text: string): void;
   removeFailed(conversationName: string, id: string): void;
+
+  /**
+   * Re-send a message from the retry outbox. Mirrors the composer's first-send
+   * path so a retry is exactly as robust as a first send: the text is moved from
+   * the outbox to an optimistic "Sending…" bubble BEFORE the POST (so it is
+   * always on a recoverable surface and the stall/compaction safety net in
+   * ConversationView re-arms for it), then POSTed. On POST failure the message
+   * returns to the outbox via failSend; a retry whose POST succeeds but is then
+   * eaten by a compaction is caught by that same net instead of vanishing.
+   */
+  retryFailed(
+    conversationName: string,
+    failedId: string,
+    text: string,
+    serverBaseCount: number,
+    agentId?: string,
+  ): Promise<void>;
 }
 
 /** Immutably update one conversation's slice, pruning it when it becomes empty. */
@@ -346,17 +390,6 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       })),
     })),
 
-  addFailed: (conversationName, text) =>
-    set((state) => ({
-      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
-        ...s,
-        failed: [
-          ...s.failed,
-          { id: `failed-${Date.now()}`, text, createdAt: new Date().toISOString() },
-        ],
-      })),
-    })),
-
   removeFailed: (conversationName, id) =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
@@ -364,6 +397,24 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         failed: s.failed.filter((failed) => failed.id !== id),
       })),
     })),
+
+  retryFailed: async (conversationName, failedId, text, serverBaseCount, agentId) => {
+    const { addOptimistic, removeFailed, failSend } = get();
+    // Move the text onto a recoverable surface (an optimistic "Sending…" bubble)
+    // BEFORE clearing the outbox entry and BEFORE the POST — the message is never
+    // outbox → void. The optimistic bubble also re-arms the stall/compaction
+    // safety net in ConversationView, so a retry the agent eats during a
+    // compaction re-fails back to the outbox instead of being lost silently.
+    addOptimistic(conversationName, text, serverBaseCount);
+    removeFailed(conversationName, failedId);
+    try {
+      await sendConversationMessage(conversationName, text, agentId);
+    } catch {
+      // failSend clears the optimistic copy and re-adds the text to the outbox —
+      // identical to the first-send failure path (ComposerFooter onSendFailed).
+      failSend(conversationName, text);
+    }
+  },
 }));
 
 // ─── Selectors ──────────────────────────────────────────────────────────────────

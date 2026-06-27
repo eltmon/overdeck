@@ -1185,8 +1185,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
   const failSend = useComposerStore((s) => s.failSend);
-  const addFailed = useComposerStore((s) => s.addFailed);
   const removeFailed = useComposerStore((s) => s.removeFailed);
+  const retryFailed = useComposerStore((s) => s.retryFailed);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1237,27 +1237,12 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     onSendFailedProp?.();
   }, [failSend, conversation.name, onSendFailedProp]);
 
-  const handleRetryFailed = useCallback(async (failedId: string, text: string) => {
-    // Remove from failed list and re-send
-    removeFailed(conversation.name, failedId);
-    try {
-      const endpoint = agentId
-        ? `/api/agents/${encodeURIComponent(agentId)}/message`
-        : `/api/conversations/${encodeURIComponent(conversation.name)}/message`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
-      }
-    } catch {
-      // Re-add to failed list on retry failure
-      addFailed(conversation.name, text);
-    }
-  }, [conversation.name, agentId, removeFailed, addFailed]);
+  // Retry funnels through the same store action a first send uses, so the text
+  // becomes an optimistic "Sending…" bubble (covered by the stall/compaction
+  // safety net) instead of being removed from the outbox into the void.
+  const handleRetryFailed = useCallback((failedId: string, text: string) => {
+    void retryFailed(conversation.name, failedId, text, serverMessages.length, agentId);
+  }, [retryFailed, conversation.name, serverMessages.length, agentId]);
 
   const handleDiscardFailed = useCallback((failedId: string) => {
     removeFailed(conversation.name, failedId);
