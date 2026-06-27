@@ -205,9 +205,13 @@ describe('agents auth routing', () => {
   });
 
   it('keeps role agent definition and --name for direct Kimi launches', async () => {
-    expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'roles/work.md')).toBe(
-      "claude --agent roles/work.md --model 'kimi-k2.6' --name agent-pan-964"
-    );
+    const command = await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'roles/work.md');
+
+    expect(command).toMatch(/^claude --permission-mode bypassPermissions /);
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/);
+    expect(command).toContain('--effort high');
+    expect(command).toContain("--model 'kimi-k2.6'");
+    expect(command).toContain('--name agent-pan-964');
   });
 
   it('clears stale provider env before exporting Anthropic settings', async () => {

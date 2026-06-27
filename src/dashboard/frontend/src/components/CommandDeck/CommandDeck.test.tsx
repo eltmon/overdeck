@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CommandDeck } from './index';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -416,5 +416,30 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
 
     fireEvent.click(screen.getByTestId('conv-test'));
     expect(panes('test-project').some(p => p.paneType === 'agent' && p.conversationId === 'test-conv')).toBe(true);
+  });
+
+  it('re-syncs the /conv URL when an already-selected conversation is clicked again', async () => {
+    // Repro: open a conversation (URL → /conv/1), navigate to another page so the
+    // URL leaves /conv (convId prop is null) while the deck keeps the conversation
+    // selected, then click that same row again. Because `selectedConversation`
+    // does not change value, the state→URL sync effect never re-runs — so the
+    // click handler itself must drive onConvIdChange or the URL stays on
+    // /command-deck/<project>.
+    const onConvIdChange = vi.fn();
+    renderCommandDeck({ selectedProject: 'test-project', convId: null, onConvIdChange });
+    await screen.findAllByTestId('project-node');
+
+    // First click selects + opens the conversation and writes /conv/1. Retry
+    // until the conversations query has settled so the id lookup resolves.
+    await waitFor(() => {
+      fireEvent.click(screen.getByTestId('conv-test'));
+      expect(onConvIdChange).toHaveBeenCalledWith('1');
+    });
+
+    // The conversation is now selected but convId is still null (URL moved away).
+    // Re-clicking the same row must restore /conv/1 even though state is unchanged.
+    onConvIdChange.mockClear();
+    fireEvent.click(screen.getByTestId('conv-test'));
+    await waitFor(() => expect(onConvIdChange).toHaveBeenCalledWith('1'));
   });
 });

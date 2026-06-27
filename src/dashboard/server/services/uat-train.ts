@@ -271,6 +271,27 @@ export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]
   return payload;
 }
 
+export interface UatCandidatePayload {
+  branchName: string;
+  bundled: string[];
+  status: 'ready';
+}
+
+/** The authoritative active UAT candidate, if one is ready to test/ship. */
+export async function getUatCandidatePayload(): Promise<UatCandidatePayload | null> {
+  const [candidate] = listUatGenerationsSync({
+    projectRoot: projectRoot(),
+    statuses: ['ready'],
+    limit: 1,
+  });
+  if (!candidate) return null;
+  return {
+    branchName: candidate.name,
+    bundled: candidate.members.map((member) => member.issueId),
+    status: 'ready',
+  };
+}
+
 export async function postUatGenerationStackPayload(name: string): Promise<
   { ok: true; frontendUrl: string; evicted: string[] } | { ok: false; error: string; status: number }
 > {

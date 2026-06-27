@@ -6692,6 +6692,10 @@ const RESUME_LOAD_FACTOR = 1.5;
 // Pause between consecutive resume spawns so the herd is spread across the cycle.
 const RESUME_STAGGER_MS = 150;
 
+function shouldRetryUndeliveredKickoff(state: AgentState): boolean {
+  return state.role === 'work' && state.kickoffDelivered === false;
+}
+
 interface HandleAgentStoppedOptions {
   /** When true, the caller is managing global concurrency/load gates. */
   skipGlobalGates?: boolean;
@@ -6830,7 +6834,7 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
   } else {
     const runtimeState = getAgentRuntimeStateSync(agentId);
-    if (runtimeState?.state === 'idle') {
+    if (runtimeState?.state === 'idle' && !shouldRetryUndeliveredKickoff(state)) {
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — idle (runtime.state=idle, no review feedback)`);
       return null;
     }
