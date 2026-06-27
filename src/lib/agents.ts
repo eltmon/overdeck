@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, rm, stat as statAsync, writeFile, writeFile a
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
 import { homedir } from 'os';
+import { parse as parseYaml } from 'yaml';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
@@ -588,13 +589,22 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
  * the agent exited on launch. Instead of `--agent`, inject the role's BODY as an
  * appended system prompt and translate its `effort:` frontmatter to `--effort`.
  *
- * Nothing critical is lost: the role frontmatter's hooks (heartbeat, stop,
- * permission-event, …) are ALSO installed globally in `~/.claude/settings.json`
- * and fire for every claude session regardless of `--agent`; permissionMode is
- * covered by the launcher's permission flags. The YAML frontmatter is stripped
- * so it never leaks into the system prompt as literal text. The stripped body is
- * cached under `~/.overdeck/role-prompts/<role>.md` and referenced by absolute
- * path, so it no longer depends on `roles/` existing in the agent's cwd.
+ * Everything the role frontmatter used to supply via `--agent` is reconstituted
+ * as flags:
+ *   - body        → `--append-system-prompt-file` (frontmatter stripped)
+ *   - `effort:`   → `--effort`
+ *   - `mcpServers:` → a generated `--mcp-config` JSON (PAN-2090)
+ *   - `tools:`    → `--allowedTools` (PAN-2090), with each declared MCP server
+ *     appended as `mcp__<name>` so the role can still call its own MCP tools —
+ *     otherwise the strict allow-list would block e.g. playwright for `test`.
+ *
+ * The role frontmatter's hooks are deliberately NOT reconstituted: they are
+ * installed globally in `~/.claude/settings.json` and fire for every claude
+ * session, and per the PAN-1402 note Claude Code never honored path-form
+ * `--agent` frontmatter hooks anyway. permissionMode is covered by the
+ * launcher's permission flags. Generated artifacts are cached under
+ * `~/.overdeck/role-prompts/` and referenced by absolute path, so they do not
+ * depend on `roles/` existing in the agent's cwd.
  *
  * Returns the flags (with a leading space) to splice in place of the old
  * `--agent <file>` flag, or '' when the definition file is missing.
@@ -604,20 +614,63 @@ function roleSystemPromptInjectionSync(definitionPath: string, explicitEffort?: 
   if (!existsSync(abs)) return '';
   const raw = readFileSync(abs, 'utf8');
   let body = raw;
-  let frontmatterEffort: string | undefined;
+  let frontmatter: Record<string, unknown> = {};
   const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   if (fm) {
     body = raw.slice(fm[0].length);
-    const m = fm[1].match(/^effort:[ \t]*([A-Za-z]+)[ \t]*$/m);
-    if (m) frontmatterEffort = m[1];
+    try {
+      const parsed = parseYaml(fm[1]);
+      if (parsed && typeof parsed === 'object') frontmatter = parsed as Record<string, unknown>;
+    } catch {
+      // Malformed frontmatter — fall back to body-only injection.
+    }
   }
+
   const dir = join(getOverdeckHome(), 'role-prompts');
   mkdirSync(dir, { recursive: true });
-  const outPath = join(dir, basename(definitionPath));
+  const stem = basename(definitionPath).replace(/\.md$/, '');
+  const outPath = join(dir, `${stem}.md`);
   writeFileSync(outPath, body);
-  const effort = explicitEffort ?? (frontmatterEffort as RoleEffort | undefined);
-  const effortFlag = effort ? ` --effort ${effort}` : '';
-  return ` --append-system-prompt-file '${outPath}'${effortFlag}`;
+
+  const flags: string[] = [` --append-system-prompt-file '${outPath}'`];
+
+  const effort = explicitEffort ?? (typeof frontmatter.effort === 'string' ? (frontmatter.effort as RoleEffort) : undefined);
+  if (effort) flags.push(` --effort ${effort}`);
+
+  // mcpServers: a YAML list of single-key maps ({ playwright: { … } }). Flatten
+  // into one { mcpServers: { name: def } } config loaded via --mcp-config. It is
+  // additive (the launcher's channels --mcp-config still applies; no
+  // --strict-mcp-config), so the role keeps any project/global MCP servers too.
+  const mcpNames: string[] = [];
+  if (Array.isArray(frontmatter.mcpServers) && frontmatter.mcpServers.length > 0) {
+    const servers: Record<string, unknown> = {};
+    for (const entry of frontmatter.mcpServers) {
+      if (entry && typeof entry === 'object') {
+        for (const [name, def] of Object.entries(entry as Record<string, unknown>)) {
+          servers[name] = def;
+          mcpNames.push(name);
+        }
+      }
+    }
+    if (Object.keys(servers).length > 0) {
+      const mcpPath = join(dir, `${stem}.mcp.json`);
+      writeFileSync(mcpPath, JSON.stringify({ mcpServers: servers }, null, 2));
+      flags.push(` --mcp-config '${mcpPath}'`);
+    }
+  }
+
+  // tools: allow-list → --allowedTools (comma-joined single arg so the variadic
+  // never swallows later flags). Append `mcp__<server>` for each declared MCP
+  // server so its tools survive the strict allow-list.
+  if (Array.isArray(frontmatter.tools)) {
+    const toolNames = frontmatter.tools.filter((t): t is string => typeof t === 'string');
+    if (toolNames.length > 0) {
+      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`)];
+      flags.push(` --allowedTools '${allowed.join(',')}'`);
+    }
+  }
+
+  return flags.join('');
 }
 
 /** Build a Claude/ohmypi base command for role-based runs. */
