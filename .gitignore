@@ -203,3 +203,4 @@ __pycache__/
 /.agents/
 # Test-run output logs (e2e/unit/playwright/dashboard) — generated per run
 /reports/
+.vercel
