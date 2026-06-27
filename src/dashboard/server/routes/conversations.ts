@@ -336,6 +336,11 @@ function shellQuote(str: string): string {
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+const PI_CONVERSATION_SOURCE_CONTRACT = [
+  'Pi conversation source contract:',
+  "A message marked source:'extension' was injected by the Overdeck orchestrator or another agent, not typed by the human operator.",
+  'Treat it as coordination guidance; do not attribute it to the human operator.',
+].join(' ');
 
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
@@ -1246,9 +1251,13 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
     && process.env.PAN_DOCKER !== '1';
 }
 
-function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
-  const harness = conv.harness ?? 'claude-code';
-  return conv.deliveryMethod ?? (harness === 'ohmypi' ? 'tmux' : 'auto');
+export function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
+  // No-loss retirement for pi/oh-my-pi message bodies: the old tmux path only
+  // provided fire-and-forget text delivery, now replaced by the acknowledged
+  // extension control channel. It provided no other pi/oh-my-pi behavior. The
+  // WI-7 Escape abort key remains the only sanctioned tmux write for Pi.
+  if (isPiControlChannelHarness(conv.harness)) return 'auto';
+  return conv.deliveryMethod ?? 'auto';
 }
 
 type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | 'steer' | 'follow_up'>;
@@ -1713,11 +1722,20 @@ async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[
   return files;
 }
 
+async function ensurePiConversationSourceContractFile(): Promise<string> {
+  const contextDir = join(getOverdeckHome(), 'context');
+  await mkdir(contextDir, { recursive: true });
+  const path = join(contextDir, 'pi-conversation-source-contract.md');
+  await writeFile(path, `${PI_CONVERSATION_SOURCE_CONTRACT}\n`, 'utf-8');
+  return path;
+}
+
 // PAN-1566: Pi conversations are launched with --no-context-files and the
 // extension fold no-ops (no ctx.appendSystemPrompt), so the global rules layer
 // must be delivered as launcher --append-system-prompt files. Mirror the Claude
-// conversation files but prepend the Pi-rendered global layer (pi-global.md).
-async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+// conversation files but prepend the Pi-rendered global layer (pi-global.md)
+// and the source-attribution contract used by extension-delivered messages.
+export async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
   const files: string[] = [];
   const globalFile = piGlobalContextFile();
   try {
@@ -1726,6 +1744,7 @@ async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
   } catch (error) {
     if (!isNotFound(error)) throw error;
   }
+  files.push(await ensurePiConversationSourceContractFile());
   const contextFile = workspaceContextFile(cwd);
   try {
     await stat(contextFile);
@@ -1818,9 +1837,9 @@ export async function spawnConversationSession(
 
       // Conversations run Pi in TUI mode (the default Pi terminal UI). This
       // gives users an actual terminal in the tmux pane — they can type
-      // directly into Pi, and dashboard-composer messages are delivered via
-      // tmux paste-buffer (sendKeysAsync) just like Claude Code. Pi still
-      // writes JSONL session files to --session-dir, so cost parsing and
+      // directly into Pi, while dashboard-composer messages and live controls
+      // are delivered through the acknowledged extension control channel. Pi
+      // still writes JSONL session files to --session-dir, so cost parsing and
       // resume keep working.
       //
       // Work-agents (spawned elsewhere) keep --mode rpc + FIFO because

@@ -29,7 +29,9 @@ import {
   recoverStuckForks,
   registerConversationControlAck,
   registerInFlightForkPipeline,
+  resolveConversationDeliveryMethod,
   resolveConversationControlAck,
+  piConversationSystemPromptFiles,
   shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
@@ -383,6 +385,28 @@ describe('conversation control channel delivery', () => {
     expect(pickDeliverAs({ tmuxSession: 'conv-idle' }, undefined)).toBe('prompt');
     expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, undefined)).toBe('steer');
     expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, 'follow_up')).toBe('follow_up');
+  });
+});
+
+describe('pi conversation source contract and delivery retirement', () => {
+  it('adds the extension source contract to pi system prompt files', async () => {
+    const files = await piConversationSystemPromptFiles(process.cwd());
+    const contractFile = files.find((file) => file.endsWith('pi-conversation-source-contract.md'));
+
+    expect(contractFile).toBeDefined();
+    const contract = readFileSync(contractFile!, 'utf8');
+    expect(contract).toContain("source:'extension'");
+    expect(contract).toContain('Overdeck orchestrator or another agent');
+    expect(contract).toContain('not typed by the human operator');
+    expect(contract).toContain('Treat it as coordination guidance');
+  });
+
+  it('does not default pi or ohmypi conversation body delivery to tmux', () => {
+    expect(resolveConversationDeliveryMethod({ harness: 'pi', deliveryMethod: null } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'pi', deliveryMethod: 'tmux' } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'ohmypi', deliveryMethod: null } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'ohmypi', deliveryMethod: 'tmux' } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'claude-code', deliveryMethod: 'tmux' } as never)).toBe('tmux');
   });
 });
 
