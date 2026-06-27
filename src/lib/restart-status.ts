@@ -111,6 +111,24 @@ async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   await appendRestartEvent(entry);
 }
 
+async function readRestartEventsPromise(limit?: number): Promise<RestartStatus[]> {
+  try {
+    const content = await readFile(restartEventsPath(), 'utf8');
+    const events: RestartStatus[] = [];
+    for (const line of content.split('\n')) {
+      const event = parseRestartEventLine(line);
+      if (event) events.push(event);
+    }
+    if (limit !== undefined && limit >= 0 && events.length > limit) {
+      return events.slice(-limit);
+    }
+    return events;
+  } catch (error) {
+    if (isErrnoException(error) && error.code === 'ENOENT') return [];
+    return [];
+  }
+}
+
 async function readRestartStatusPromise(): Promise<RestartStatus | null> {
   try {
     const parsed = JSON.parse(await readFile(restartStatusPath(), 'utf8')) as Partial<RestartStatus>;
@@ -150,6 +168,31 @@ async function readRestartStatusPromise(): Promise<RestartStatus | null> {
   }
 }
 
+/** Detect successful restart-status writes within `windowMs` of each other
+ *  that were produced by different processes. */
+export function detectConcurrentRestartWriters(
+  events: RestartStatus[],
+  windowMs = 60000,
+): RestartStatus[] {
+  const successful = events.filter((event) => event.success);
+  const writers: RestartStatus[] = [];
+  for (let i = 0; i < successful.length; i++) {
+    for (let j = i + 1; j < successful.length; j++) {
+      const a = successful[i];
+      const b = successful[j];
+      if (a.pid === undefined || b.pid === undefined || a.pid === b.pid) continue;
+      const aTs = new Date(a.ts).getTime();
+      const bTs = new Date(b.ts).getTime();
+      if (!Number.isFinite(aTs) || !Number.isFinite(bTs)) continue;
+      if (Math.abs(aTs - bTs) <= windowMs) {
+        if (!writers.includes(a)) writers.push(a);
+        if (!writers.includes(b)) writers.push(b);
+      }
+    }
+  }
+  return writers;
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Tagged error for restart-status Effect variants. */
@@ -180,6 +223,20 @@ export const readRestartStatus = (): Effect.Effect<RestartStatus | null, Restart
     catch: (cause) =>
       new RestartStatusError({
         operation: 'readRestartStatus',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `readRestartEvents`. */
+export const readRestartEvents = (
+  limit?: number,
+): Effect.Effect<RestartStatus[], RestartStatusError> =>
+  Effect.tryPromise({
+    try: () => readRestartEventsPromise(limit),
+    catch: (cause) =>
+      new RestartStatusError({
+        operation: 'readRestartEvents',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
