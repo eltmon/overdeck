@@ -1,19 +1,41 @@
 {
   "issueId": "PAN-2101",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-06-27T13:32:40.598Z",
-  "updated": "2026-06-27T13:32:40.598Z",
+  "updated": "2026-06-27T13:41:41.385Z",
   "pipeline": {
     "issueId": "PAN-2101",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T13:32:40.598Z"
+    "updatedAt": "2026-06-27T13:41:41.360Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 171,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 171,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-06-27T13:41:41.385Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
