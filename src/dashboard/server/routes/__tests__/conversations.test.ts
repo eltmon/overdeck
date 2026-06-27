@@ -12,13 +12,18 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
+  clearPendingConversationControlAcksForTests,
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
+  getPendingConversationControlAckCount,
   getInFlightForkPipelineCount,
+  handleConversationControlAck,
   parseSummaryForkFocus,
   readExistingHandoffDoc,
   recoverStuckForks,
+  registerConversationControlAck,
   registerInFlightForkPipeline,
+  resolveConversationControlAck,
   shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
@@ -251,6 +256,69 @@ describe('in-flight fork pipeline shutdown grace', () => {
     finish();
     await pipeline;
     expect(getInFlightForkPipelineCount()).toBe(0);
+  });
+});
+
+describe('conversation control ack registry', () => {
+  afterEach(() => {
+    clearPendingConversationControlAcksForTests();
+    vi.useRealTimers();
+  });
+
+  it('resolves a pending command when a successful ack arrives', async () => {
+    const pending = registerConversationControlAck('cmd-1');
+
+    expect(getPendingConversationControlAckCount()).toBe(1);
+    expect(handleConversationControlAck({ id: 'cmd-1', ok: true })).toEqual({
+      status: 200,
+      body: { ok: true, outcome: 'resolved' },
+    });
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(getPendingConversationControlAckCount()).toBe(0);
+  });
+
+  it('rejects and cleans up when no ack arrives before the timeout', async () => {
+    vi.useFakeTimers();
+    const pending = registerConversationControlAck('cmd-timeout', 2_000);
+    const rejection = expect(pending).rejects.toThrow('Timed out waiting for conversation control ack cmd-timeout');
+
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await rejection;
+    expect(getPendingConversationControlAckCount()).toBe(0);
+  });
+
+  it('ignores unknown ack ids without affecting pending commands', async () => {
+    const pending = registerConversationControlAck('cmd-real');
+
+    expect(handleConversationControlAck({ id: 'cmd-missing', ok: true })).toEqual({
+      status: 200,
+      body: { ok: true, outcome: 'unknown' },
+    });
+    expect(getPendingConversationControlAckCount()).toBe(1);
+    expect(resolveConversationControlAck({ id: 'cmd-real', ok: true })).toBe('resolved');
+
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('rejects malformed endpoint payloads without mutating pending commands', () => {
+    registerConversationControlAck('cmd-real');
+
+    expect(handleConversationControlAck({ ok: true })).toEqual({
+      status: 400,
+      body: { error: 'id is required' },
+    });
+    expect(getPendingConversationControlAckCount()).toBe(1);
+  });
+
+  it('rejects a pending command when the ack reports failure', async () => {
+    const pending = registerConversationControlAck('cmd-fail');
+
+    expect(resolveConversationControlAck({ id: 'cmd-fail', ok: false, error: 'unsupported' })).toBe('rejected');
+
+    await expect(pending).rejects.toThrow('unsupported');
+    expect(getPendingConversationControlAckCount()).toBe(0);
   });
 });
 

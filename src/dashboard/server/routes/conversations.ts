@@ -827,6 +827,87 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+export const CONTROL_ACK_TIMEOUT_MS = 10_000;
+
+export interface ConversationControlAck {
+  id: string
+  ok: boolean
+  error?: string
+}
+
+interface PendingConversationControlAck {
+  resolve: () => void
+  reject: (error: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+const pendingConversationControlAcks = new Map<string, PendingConversationControlAck>();
+
+export function registerConversationControlAck(
+  commandId: string,
+  timeoutMs: number = CONTROL_ACK_TIMEOUT_MS,
+): Promise<void> {
+  const existing = pendingConversationControlAcks.get(commandId);
+  if (existing) {
+    clearTimeout(existing.timer);
+    existing.reject(new Error(`Replaced pending conversation control ack ${commandId}`));
+    pendingConversationControlAcks.delete(commandId);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingConversationControlAcks.delete(commandId);
+      reject(new Error(`Timed out waiting for conversation control ack ${commandId}`));
+    }, timeoutMs);
+    pendingConversationControlAcks.set(commandId, {
+      resolve: () => {
+        clearTimeout(timer);
+        pendingConversationControlAcks.delete(commandId);
+        resolve();
+      },
+      reject: (error: Error) => {
+        clearTimeout(timer);
+        pendingConversationControlAcks.delete(commandId);
+        reject(error);
+      },
+      timer,
+    });
+  });
+}
+
+export function resolveConversationControlAck(ack: ConversationControlAck): 'resolved' | 'rejected' | 'unknown' {
+  const pending = pendingConversationControlAcks.get(ack.id);
+  if (!pending) return 'unknown';
+  if (ack.ok) {
+    pending.resolve();
+    return 'resolved';
+  }
+  pending.reject(new Error(ack.error || `Conversation control command ${ack.id} failed`));
+  return 'rejected';
+}
+
+export function getPendingConversationControlAckCount(): number {
+  return pendingConversationControlAcks.size;
+}
+
+export function clearPendingConversationControlAcksForTests(): void {
+  for (const pending of pendingConversationControlAcks.values()) {
+    clearTimeout(pending.timer);
+  }
+  pendingConversationControlAcks.clear();
+}
+
+export function handleConversationControlAck(
+  body: Record<string, unknown>,
+): { status: number; body: { ok: true; outcome: 'resolved' | 'rejected' | 'unknown' } | { error: string } } {
+  const id = typeof body['id'] === 'string' ? body['id'].trim() : '';
+  if (!id) return { status: 400, body: { error: 'id is required' } };
+  const ok = body['ok'] === true;
+  const error = typeof body['error'] === 'string' ? body['error'] : undefined;
+  const outcome = resolveConversationControlAck({ id, ok, ...(error !== undefined ? { error } : {}) });
+  return { status: 200, body: { ok: true, outcome } };
+}
+
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
   if (value === undefined || value === null) return { ok: true, focus: undefined };
   if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
@@ -3373,6 +3454,31 @@ const postConversationDeliveryMethodRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/control-ack ────────────────────────
+
+const postConversationControlAckRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/control-ack',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const result = handleConversationControlAck(body);
+        return jsonResponse(result.body, { status: result.status });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] control ack failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
 
 const MAX_TITLE_LENGTH = 200;
@@ -4884,6 +4990,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationMessageRoute,
   postConversationCodexApprovalRoute,
   postConversationDeliveryMethodRoute,
+  postConversationControlAckRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
   postConversationSummaryForkRoute,
