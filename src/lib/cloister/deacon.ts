@@ -6672,10 +6672,18 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
 
     // Build the nudge: tell the agent what's next, do not just ping.
     const firstBead = openBeads[0]?.replace(/^[○◐]\s+/, '').slice(0, 200) ?? '';
+    // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
+    // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
+    // agent running with NO original context — only this nudge. Point it at the
+    // brief on disk so it can self-recover the full plan/role/decisions/hazards
+    // instead of guessing from the bead title alone.
+    const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
     const message = [
       `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
       ``,
       `Next ready bead: ${firstBead}`,
+      ``,
+      `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
       ``,
       `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
       `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
