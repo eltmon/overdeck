@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-1884",
   "schemaVersion": 2,
-  "created": "2026-06-26T03:32:56.369Z",
-  "updated": "2026-06-26T03:33:14.214Z",
-  "pipeline": {
-    "issueId": "PAN-1884",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-26T03:32:56.369Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-1884: chore(rules): migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer",
       "timestamp": "2026-06-26T03:33:14.213Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-26T03:32:56.369Z",
+  "updated": "2026-06-27T17:15:05.425Z",
+  "pipeline": {
+    "issueId": "PAN-1884",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T17:15:05.408Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 19730,
+            "output": 4888,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 27768,
+            "output": 19055,
+            "cacheRead": 1389526,
+            "cacheWrite": 204001
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 19730,
+          "output": 4888,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 27768,
+          "output": 19055,
+          "cacheRead": 1389526,
+          "cacheWrite": 204001
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 2.584986,
+        "pricingAsOf": "2026-06-27T17:15:05.425Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code"
 }
