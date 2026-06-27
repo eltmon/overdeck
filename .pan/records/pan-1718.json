@@ -64,5 +64,24 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-opus-4-8",
+  "statusOverrides": {
+    "reload-lock-first": "completed",
+    "reload-lock-first.ac1": "completed",
+    "reload-lock-first.ac2": "completed",
+    "reload-lock-first.ac3": "completed",
+    "restart-events-journal": "completed",
+    "restart-events-journal.ac1": "completed",
+    "restart-events-journal.ac2": "completed",
+    "restart-events-journal.ac3": "completed",
+    "restart-events-journal.ac4": "completed",
+    "status-restart-writer-surface": "completed",
+    "status-restart-writer-surface.ac1": "completed",
+    "status-restart-writer-surface.ac2": "completed",
+    "status-restart-writer-surface.ac3": "completed",
+    "supervisor-cycle-wait-verify": "completed",
+    "supervisor-cycle-wait-verify.ac1": "completed",
+    "supervisor-cycle-wait-verify.ac2": "completed",
+    "supervisor-cycle-wait-verify.ac3": "completed"
+  }
 }
