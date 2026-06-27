@@ -31,10 +31,10 @@ export function parseSequenceMd(markdown: string): ParseSequenceMdResult {
 }
 
 function renderTable(nodes: SequenceNode[]): string {
-  const header = '| rank | issue | size | importance | condition | depends-on | why |';
-  const sep = '|------|-------|------|------------|-----------|------------|-----|';
+  const header = '| rank | issue | size | importance | condition | epic | depends-on | why |';
+  const sep = '|------|-------|------|------------|-----------|------|------------|-----|';
   const rows = nodes.map((n) =>
-    `| ${n.rank} | ${n.issue} | ${n.size} | ${n.importance} | ${n.condition} | ${n.dependsOn.join(', ')} | ${n.why} |`
+    `| ${n.rank} | ${n.issue} | ${n.size} | ${n.importance} | ${n.condition} | ${n.isEpic ? '✓' : ''} | ${n.dependsOn.join(', ')} | ${n.why} |`
   );
   return [header, sep, ...rows].join('\n');
 }
