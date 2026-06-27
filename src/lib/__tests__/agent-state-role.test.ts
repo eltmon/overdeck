@@ -596,6 +596,13 @@ describe('AgentState role persistence', () => {
     }
   });
 
+  it('PAN-2093: gives ohmypi work-agent readiness more than the old 30s window', async () => {
+    const { OHMYPI_AGENT_READY_TIMEOUT_SECONDS } = await import('../agents.js');
+
+    expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBe(120);
+    expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBeGreaterThan(30);
+  });
+
   it('does not block when workspace stack health is healthy', async () => {
     vi.doMock('../workspace/stack-health.js', () => ({
       getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-05-16T00:00:00.000Z' })),

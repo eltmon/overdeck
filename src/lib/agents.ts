@@ -289,7 +289,9 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
   return false;
 }
 
-async function waitForOhmypiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+export const OHMYPI_AGENT_READY_TIMEOUT_SECONDS = 120;
+
+async function waitForOhmypiAgentReady(agentId: string, timeoutSec = OHMYPI_AGENT_READY_TIMEOUT_SECONDS): Promise<boolean> {
   const { readyPath } = ohmypiFifoPaths(agentId);
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
