@@ -98,7 +98,7 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
     await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('codex');
-    await expect(resolveHarness({ model: 'kimi-k2.6' })).resolves.toBe('ohmypi');
+    await expect(resolveHarness({ model: 'kimi-k2.6' })).resolves.toBe('claude-code');
     await expect(resolveHarness({ model: 'gemini-3.1-pro-preview' })).resolves.toBe('ohmypi');
     await expect(resolveHarness({ model: 'glm-5.1' })).resolves.toBe('ohmypi');
   });
@@ -166,6 +166,6 @@ describe('resolveHarness', () => {
 
     expect(infoSpy).toHaveBeenCalledTimes(2);
     expect(infoSpy).toHaveBeenNthCalledWith(1, 'harness codex chosen by provider default — override in Settings → Providers');
-    expect(infoSpy).toHaveBeenNthCalledWith(2, 'harness ohmypi chosen by provider default — override in Settings → Providers');
+    expect(infoSpy).toHaveBeenNthCalledWith(2, 'harness claude-code chosen by provider default — override in Settings → Providers');
   });
 });

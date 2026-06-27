@@ -1,0 +1,134 @@
+---
+title: TLDR — Token-Efficient Code Analysis
+description: Automatic code summarization that reduces file-read token usage by up to 88%
+---
+
+# TLDR — Token-Efficient Code Analysis
+
+TLDR intercepts large file reads and substitutes compact, structured summaries — giving agents the context they need (function signatures, call graph, line numbers) at a fraction of the token cost.
+
+## How It Works
+
+When an agent reads a source file, the TLDR hook intercepts the call and returns a summary instead of the full content. The summary includes:
+
+- **Exported functions and classes** with signatures and line numbers
+- **Call graph relationships** — what calls what
+- **Import/export map** for the file
+- **Key type definitions**
+
+The agent can then do a targeted `offset`/`limit` read to see exact content for the lines it actually needs to edit. Full reads are only needed when TLDR bypasses (see [Quality Gates](#quality-gates) below).
+
+### Token Savings
+
+Across the Overdeck codebase (243 files > 3 KB):
+
+| Metric | Value |
+|--------|-------|
+| Files intercepted | 206 (85%) |
+| Tokens without TLDR | 704,342 |
+| Tokens with TLDR | 82,907 |
+| **Savings** | **88%** |
+
+For a typical agent session reading 20 files, this saves roughly $0.18 on Sonnet and $0.90 on Opus per session.
+
+## Availability
+
+TLDR is available when a `.venv` directory exists in the project root (or any ancestor directory). Overdeck sets this up automatically for new projects via `pan admin hooks install`.
+
+To set it up manually in an existing project:
+
+```bash
+cd /path/to/project
+python3 -m venv .venv
+.venv/bin/pip install llm-tldr
+.venv/bin/tldr warm .
+```
+
+## Enabling and Disabling
+
+TLDR is **enabled by default** when `.venv` is present.
+
+### Settings UI
+
+Toggle it in the dashboard **Settings** page under the Experimental section — look for the "TLDR code-aware reads" toggle. The change takes effect for new agent sessions immediately.
+
+### config.yaml
+
+```yaml
+agents:
+  tldr:
+    enabled: false
+```
+
+## Quality Gates
+
+TLDR automatically bypasses (allowing a normal full read) in cases where a summary would not be useful:
+
+| Condition | Behavior |
+|-----------|----------|
+| File smaller than 3 KB | Bypass — full read |
+| Non-code file (`.json`, `.md`, `.yaml`, etc.) | Bypass — full read |
+| Read with `offset` or `limit` (targeted edit read) | Bypass — full read |
+| No `.venv` ancestor found | Bypass — TLDR not available |
+| Summary is too sparse (< 100 tokens for a file > 5 KB) | Fallback to `extract`, then bypass if still empty |
+| Test files with `describe`/`it` blocks only | Bypass — tree-sitter can't extract test structure |
+
+Because targeted reads (with `offset`/`limit`) always bypass, agents can always get exact content for editing without any special handling.
+
+## MCP Tools
+
+When TLDR is active, the following tools are available in agent sessions:
+
+| Tool | Input | Use For |
+|------|-------|---------|
+| `tldr_context` | Module path (no extension), `--lang` | File structure, exports, call graph |
+| `tldr_structure` | Directory path | Directory layout and file relationships |
+| `tldr_calls` | Function name + file | What calls this function |
+| `tldr_impact` | Function name + file | What this function calls |
+| `tldr_semantic` | Natural-language query | Find code by description |
+
+**Important:** `tldr_context` expects module paths **without** a file extension (e.g. `src/lib/agents`, not `src/lib/agents.ts`). Always pass `--lang typescript` for TypeScript projects — the default is Python.
+
+```bash
+# Examples
+.venv/bin/tldr context src/lib/agents --lang typescript
+.venv/bin/tldr extract src/dashboard/frontend/src/components/App.tsx
+.venv/bin/tldr structure src/lib/
+```
+
+## Index Management
+
+The TLDR index lives in `.tldr/` at the project root and is kept up to date automatically:
+
+- **On `pan up`** — main daemon starts
+- **After 10 file edits** — background re-warm triggered
+- **After a merge** — main index re-warmed so new workspaces get a fresh copy
+- **On workspace creation** — index copied from main, then delta-updated
+
+To manually rebuild the index:
+
+```bash
+pan admin tldr warm
+```
+
+To check daemon status:
+
+```bash
+pan admin tldr status
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| No TLDR summaries appearing | Run `pan admin tldr warm` to build the index |
+| `tldr: command not found` | Use `.venv/bin/tldr` or activate the venv |
+| `context` returns "~25 tokens" | Check you're passing a module path without extension and `--lang typescript` |
+| Stale results after edits | Run `pan admin tldr warm`, or make 10+ edits to trigger auto-warm |
+| Daemon not starting | Delete `~/.overdeck/tldr/*/daemon.json` and run `pan admin tldr start` |
+
+## Related
+
+- [RTK — Bash Output Compression](/features/rtk) — companion cost-reduction feature
+- [Settings](/configuration/projects) — project-level configuration reference
+- [pan admin tldr](/cli/core-commands) — CLI reference

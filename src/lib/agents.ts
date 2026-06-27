@@ -1,15 +1,16 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, statfsSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, rm, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
 import { homedir } from 'os';
+import { parse as parseYaml } from 'yaml';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
-import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
+import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync } from './claude-permissions.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, isPaneDead, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { findLatestRollout, extractThreadIdFromRollout } from './runtimes/codex.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
@@ -48,6 +49,7 @@ import { resetPipelineVerdictsForWorkStartSync } from './review-status.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
 import { createOhmypiFifo, ohmypiFifoPaths, writeOhmypiCommandSync, OhmypiNotReady } from './runtimes/ohmypi-fifo.js';
+import { resolveLatestOhmypiSessionId } from './runtimes/ohmypi.js';
 import { Effect } from 'effect';
 import { FsError, TmuxError } from './errors.js';
 import { assertIssueHasBeads, BeadsMissingError } from './beads-query.js';
@@ -288,7 +290,9 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
   return false;
 }
 
-async function waitForOhmypiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+export const OHMYPI_AGENT_READY_TIMEOUT_SECONDS = 120;
+
+async function waitForOhmypiAgentReady(agentId: string, timeoutSec = OHMYPI_AGENT_READY_TIMEOUT_SECONDS): Promise<boolean> {
   const { readyPath } = ohmypiFifoPaths(agentId);
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
@@ -296,6 +300,35 @@ async function waitForOhmypiAgentReady(agentId: string, timeoutSec = 30): Promis
     await new Promise((r) => setTimeout(r, 500));
   }
   return false;
+}
+
+/**
+ * PAN-2100: build a diagnostic suffix for an ohmypi readiness failure.
+ *
+ * An ENOSPC (disk-full) omp crash surfaces as an opaque "did not become ready"
+ * timeout — omp cannot write `ready.json` when the disk is full. That exact
+ * condition crashed flywheel-orchestrator (RUN-20) and the only record of it sat
+ * unread in output.log for hours, sending the flywheel down a wrong "kimi→ohmypi
+ * misroute" diagnosis. Surface the real signals at throw time: free disk on the
+ * Overdeck-home filesystem and the tail of the agent's output.log. Best-effort:
+ * every probe is independently guarded so diagnostics never mask the real error.
+ */
+export function describeOhmypiSpawnFailure(agentId: string): string {
+  const parts: string[] = [];
+  try {
+    const { bavail, bsize } = statfsSync(getOverdeckHome());
+    const freeMb = Math.round((bavail * bsize) / (1024 * 1024));
+    parts.push(`freeDisk=${freeMb}MiB`);
+    if (freeMb < 512) parts.push('(DISK NEARLY FULL — likely ENOSPC crash)');
+  } catch { /* statfs best-effort */ }
+  try {
+    const logPath = join(getAgentDir(agentId), 'output.log');
+    if (existsSync(logPath)) {
+      const tail = readFileSync(logPath, 'utf8').slice(-1500).trim().split('\n').slice(-8).join('\n');
+      if (tail) parts.push(`output.log tail:\n${tail}`);
+    }
+  } catch { /* best-effort */ }
+  return parts.length ? ` [${parts.join(' ')}]` : '';
 }
 
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
@@ -424,11 +457,11 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
   }
 }
 
-async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSec = OHMYPI_AGENT_READY_TIMEOUT_SECONDS): Promise<void> {
   const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForOhmypiAgentReady(agentId, timeoutSec);
   if (!ready) {
-    throw new Error(`ohmypi agent ${agentId} did not become ready within ${timeoutSec}s`);
+    throw new Error(`ohmypi agent ${agentId} did not become ready within ${timeoutSec}s${describeOhmypiSpawnFailure(agentId)}`);
   }
   try {
     writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
@@ -507,24 +540,39 @@ export async function getAgentRuntimeBaseCommand(
   }
 
   const provider = getProviderForModelSync(validatedModel);
-  const permissionFlags = getClaudePermissionFlagsStringSync();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
-  const effortFlag = effort ? ` --effort ${effort}` : '';
-  // PAN-982: When agentDefinition is provided, pass it directly to --agent.
-  // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
-  // Still pass --model when launching with an agent definition so explicit model
-  // routing (state.json model, switch-model, cloister settings) wins over any
-  // frontmatter default model.
-  const agentFlag = agentDefinition ? ` --agent ${agentDefinition}` : '';
-  // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
-  // in config), --dangerously-skip-permissions is added on top of --agent. The agent
-  // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
-  // cross-directory reads (e.g. ~/.overdeck/cliproxy/, ~/pan-tts/) still prompt without
-  // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
-  // resolved.
-  const bypassWithAgent = agentDefinition ? bypassPrefixForAgentFlagSync() : '';
+
+  // Classify agentDefinition. A registered agent NAME (e.g. pan-review-agent,
+  // resolved from ~/.claude/agents/*.md) still launches via `--agent <name>` —
+  // Claude Code 2.1.195 resolves names natively, and its frontmatter owns
+  // permissionMode/tools/effort. A role definition FILE (roles/<role>.md) can no
+  // longer be passed to --agent (PAN-2087: 2.1.195 dropped --agent file support),
+  // so its frontmatter-stripped body is injected as an appended system prompt.
+  const defIsRoleFile = !!agentDefinition
+    && existsSync(resolve(agentDefinition))
+    && statSync(resolve(agentDefinition)).isFile();
+
+  if (agentDefinition && !defIsRoleFile) {
+    // Registered agent NAME — unchanged. --model still wins over any frontmatter
+    // default model; permissionMode/effort come from the named agent's frontmatter.
+    const agentFlag = ` --agent ${agentDefinition}`;
+    const effortFlag = effort ? ` --effort ${effort}` : '';
+    if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
+      const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
+      return `claude${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    }
+    return `claude${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
+  }
+
+  // PAN-2087: role FILE (inject body + effort) or no definition. permissionMode
+  // comes from the global permission flags; the role's hooks fire globally via
+  // ~/.claude/settings.json. roleInject folds in effort when a role file is
+  // present; otherwise --effort is passed directly.
+  const permissionFlags = getClaudePermissionFlagsStringSync();
+  const roleInject = defIsRoleFile ? roleSystemPromptInjectionSync(agentDefinition as string, effort) : '';
+  const effortFlag = (!defIsRoleFile && effort) ? ` --effort ${effort}` : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
@@ -533,23 +581,10 @@ export async function getAgentRuntimeBaseCommand(
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    if (agentDefinition) {
-      // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
-    }
-    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude ${permissionFlags}${roleInject} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
-  if (agentDefinition) {
-    // --model is always passed when state has a resolved model so explicit
-    // overrides (state.json model, switch-model, cloister routing) win over
-    // the agent frontmatter's default model. Without this, Anthropic-direct
-    // launches silently fall back to the frontmatter model and ignore the
-    // user's selection — observed when switching PAN-977 to Opus 4.7 left
-    // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
-  }
-  return `claude ${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+  return `claude ${permissionFlags}${roleInject} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /**
@@ -576,6 +611,98 @@ export function roleAgentDefinitionPath(role: Role, subRole?: string): string | 
     return null;
   }
   return `roles/${role}.md`;
+}
+
+/**
+ * PAN-2087: Claude Code 2.1.195 removed support for passing an agent DEFINITION
+ * FILE to `--agent` — it now resolves only registered agent NAMES (from
+ * `~/.claude/agents/*.md`). Role definitions live as files (`roles/<role>.md`),
+ * so `claude --agent roles/<role>.md` started failing with "agent not found" and
+ * the agent exited on launch. Instead of `--agent`, inject the role's BODY as an
+ * appended system prompt and translate its `effort:` frontmatter to `--effort`.
+ *
+ * Everything the role frontmatter used to supply via `--agent` is reconstituted
+ * as flags:
+ *   - body        → `--append-system-prompt-file` (frontmatter stripped)
+ *   - `effort:`   → `--effort`
+ *   - `mcpServers:` → a generated `--mcp-config` JSON (PAN-2090)
+ *   - `tools:`    → `--allowedTools` (PAN-2090), with each declared MCP server
+ *     appended as `mcp__<name>` so the role can still call its own MCP tools —
+ *     otherwise the strict allow-list would block e.g. playwright for `test`.
+ *
+ * The role frontmatter's hooks are deliberately NOT reconstituted: they are
+ * installed globally in `~/.claude/settings.json` and fire for every claude
+ * session, and per the PAN-1402 note Claude Code never honored path-form
+ * `--agent` frontmatter hooks anyway. permissionMode is covered by the
+ * launcher's permission flags. Generated artifacts are cached under
+ * `~/.overdeck/role-prompts/` and referenced by absolute path, so they do not
+ * depend on `roles/` existing in the agent's cwd.
+ *
+ * Returns the flags (with a leading space) to splice in place of the old
+ * `--agent <file>` flag, or '' when the definition file is missing.
+ */
+function roleSystemPromptInjectionSync(definitionPath: string, explicitEffort?: RoleEffort): string {
+  const abs = resolve(definitionPath);
+  if (!existsSync(abs)) return '';
+  const raw = readFileSync(abs, 'utf8');
+  let body = raw;
+  let frontmatter: Record<string, unknown> = {};
+  const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (fm) {
+    body = raw.slice(fm[0].length);
+    try {
+      const parsed = parseYaml(fm[1]);
+      if (parsed && typeof parsed === 'object') frontmatter = parsed as Record<string, unknown>;
+    } catch {
+      // Malformed frontmatter — fall back to body-only injection.
+    }
+  }
+
+  const dir = join(getOverdeckHome(), 'role-prompts');
+  mkdirSync(dir, { recursive: true });
+  const stem = basename(definitionPath).replace(/\.md$/, '');
+  const outPath = join(dir, `${stem}.md`);
+  writeFileSync(outPath, body);
+
+  const flags: string[] = [` --append-system-prompt-file '${outPath}'`];
+
+  const effort = explicitEffort ?? (typeof frontmatter.effort === 'string' ? (frontmatter.effort as RoleEffort) : undefined);
+  if (effort) flags.push(` --effort ${effort}`);
+
+  // mcpServers: a YAML list of single-key maps ({ playwright: { … } }). Flatten
+  // into one { mcpServers: { name: def } } config loaded via --mcp-config. It is
+  // additive (the launcher's channels --mcp-config still applies; no
+  // --strict-mcp-config), so the role keeps any project/global MCP servers too.
+  const mcpNames: string[] = [];
+  if (Array.isArray(frontmatter.mcpServers) && frontmatter.mcpServers.length > 0) {
+    const servers: Record<string, unknown> = {};
+    for (const entry of frontmatter.mcpServers) {
+      if (entry && typeof entry === 'object') {
+        for (const [name, def] of Object.entries(entry as Record<string, unknown>)) {
+          servers[name] = def;
+          mcpNames.push(name);
+        }
+      }
+    }
+    if (Object.keys(servers).length > 0) {
+      const mcpPath = join(dir, `${stem}.mcp.json`);
+      writeFileSync(mcpPath, JSON.stringify({ mcpServers: servers }, null, 2));
+      flags.push(` --mcp-config '${mcpPath}'`);
+    }
+  }
+
+  // tools: allow-list → --allowedTools (comma-joined single arg so the variadic
+  // never swallows later flags). Append `mcp__<server>` for each declared MCP
+  // server so its tools survive the strict allow-list.
+  if (Array.isArray(frontmatter.tools)) {
+    const toolNames = frontmatter.tools.filter((t): t is string => typeof t === 'string');
+    if (toolNames.length > 0) {
+      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`)];
+      flags.push(` --allowedTools '${allowed.join(',')}'`);
+    }
+  }
+
+  return flags.join('');
 }
 
 /** Build a Claude/ohmypi base command for role-based runs. */
@@ -610,18 +737,18 @@ export async function getRoleRuntimeBaseCommand(
   if (requestedDefinitionPath && !definitionPath && !missingRoleDefinitionWarnings.has(requestedDefinitionPath)) {
     missingRoleDefinitionWarnings.add(requestedDefinitionPath);
     console.warn(
-      `[agents] Role definition ${resolve(requestedDefinitionPath)} does not exist; launching ${role} without --agent`,
+      `[agents] Role definition ${resolve(requestedDefinitionPath)} does not exist; launching ${role} without its role system prompt`,
     );
   }
-  const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
+  // PAN-2087: inject the role body (+ effort frontmatter) as an appended system
+  // prompt instead of `--agent <file>` (Claude Code dropped --agent file support).
+  const roleInject = definitionPath ? roleSystemPromptInjectionSync(definitionPath, effort) : '';
   const nameFlag = ` --name ${agentName}`;
-  const effortFlag = effort ? ` --effort ${effort}` : '';
-  // Roles with no usable `--agent` definition (convoy sub-roles, or a stale
-  // roleAgentDefinitionPath pointing at a missing file) won't pick up a
-  // frontmatter permissionMode. Fall back to the global Claude permission flags
-  // so the run still launches with the user's bypass/plan settings honored.
-  const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
-  const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
+  const effortFlag = (!definitionPath && effort) ? ` --effort ${effort}` : '';
+  // permissionMode now comes from the global permission flags for EVERY role
+  // (the old --agent path relied on role frontmatter, which Claude Code no longer
+  // applies). This honors the user's bypass/auto setting uniformly.
+  const permissionFlags = ` ${getClaudePermissionFlagsStringSync()}`;
 
   // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
   // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
@@ -630,10 +757,10 @@ export async function getRoleRuntimeBaseCommand(
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
-    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
+    return `claude${printFlag}${roleInject}${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
+  return `claude${printFlag}${roleInject}${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -2724,6 +2851,16 @@ export function getLatestSessionIdSync(agentId: string): string | null {
     }
   } catch { /* non-fatal */ }
 
+  // 5. ohmypi (omp) — PAN-2098. omp never writes a `session.id` file, so none of
+  //    the claude-code/codex sources above can find it; the real id lives inside
+  //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
+  //    resolution so the deacon recovery path can resume a crashed ohmypi agent
+  //    instead of only respawning it fresh and losing context.
+  if (getAgentStateSync(agentId)?.harness === 'ohmypi') {
+    const ohmypiSessionId = resolveLatestOhmypiSessionId(agentId);
+    if (ohmypiSessionId) return ohmypiSessionId;
+  }
+
   return null;
 }
 
@@ -3087,11 +3224,6 @@ export async function buildAgentLaunchConfig(opts: {
     // --dangerously-skip-permissions on resume too.
     // Use the shared helper so the only string literal for DSP lives in
     // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
-    // bypassPrefixForAgentFlag returns ' --dangerously-skip-permissions' (leading
-    // space) or ''; the resume command needs it as a TRAILING-space token, so
-    // re-trim and re-append.
-    const bypassPrefix = bypassPrefixForAgentFlagSync();
-    const bypassFlag = bypassPrefix ? `${bypassPrefix.trim()} ` : '';
     const launcherContent = generateLauncherScriptSync({
       role: launchRole,
       spawnMode: 'resume',
@@ -3099,12 +3231,14 @@ export async function buildAgentLaunchConfig(opts: {
       changeDir: false,
       setTerminalEnv: true,
       providerExports,
-      // PAN-1048 + PAN-1055: claude-code resumes load the role-specific
-      // frontmatter (roleAgentDefinitionPath); ohmypi/codex resumes route through
-      // getAgentRuntimeBaseCommand which short-circuits to the omp rpc form.
+      // PAN-2087: claude-code resumes inject the role body (+ effort) as an
+      // appended system prompt instead of `--agent <file>` (Claude Code 2.1.195
+      // dropped --agent file support); permission flags come from the global
+      // resolver. ohmypi/codex resumes route through getAgentRuntimeBaseCommand
+      // which short-circuits to the omp/codex form.
       baseCommand: opts.harness === 'ohmypi' || opts.harness === 'codex'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
-        : `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
+        : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
       model: opts.harness === 'ohmypi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: opts.harness === 'ohmypi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,
@@ -4841,8 +4975,18 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // are still rejected below because they never produced a resumable session.
   // The lifecycle UI model already treats runtime=stopped as isStopped, so this
   // keeps the gate consistent with the Resume button that model enables.
-  const isCrashed = (agentState?.status === 'running' || agentState?.status === 'starting')
-    && !(await Effect.runPromise(sessionExists(normalizedId)));
+  // PAN-2098: a crash leaves the agent at status='running'/'starting' but with no
+  // live process. Two shapes: (a) tmux session gone entirely, or (b) the tmux
+  // session is still up while the harness process inside its pane has exited — a
+  // "keep-alive corpse" (remain-on-exit leaves a dead pane in a live session).
+  // The old check used `!sessionExists` alone, so a corpse (session present, pane
+  // dead) was misclassified as a healthy running agent and refused resume with a
+  // reasonless "Cannot resume … runtime=active, status=running". Treat a dead pane
+  // as crashed too, matching the start path (flywheel-actions.ts isPaneDead).
+  const isRunningOrStarting = agentState?.status === 'running' || agentState?.status === 'starting';
+  const sessionAlive = isRunningOrStarting ? await Effect.runPromise(sessionExists(normalizedId)) : false;
+  const paneDead = isRunningOrStarting && (!sessionAlive || await Effect.runPromise(isPaneDead(normalizedId)));
+  const isCrashed = isRunningOrStarting && paneDead;
 
   // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
   // context-wedged agent, which is typically status='running' with a LIVE (but
@@ -4862,7 +5006,12 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     || isCompactRecovery;
 
   if (!canResume) {
-    const reason = `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`;
+    // PAN-2098: never refuse without a concrete reason. A running/starting agent
+    // that reached here has a live session AND a live pane (a crash would have set
+    // isCrashed above), so it is genuinely healthy and there is nothing to resume.
+    const reason = isRunningOrStarting
+      ? `Cannot resume ${normalizedId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`
+      : `Cannot resume ${normalizedId}: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'} is not a resumable state.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
@@ -4873,7 +5022,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // Get saved session ID from any available source
   const sessionId = getLatestSessionIdSync(normalizedId);
   if (!sessionId) {
-    const reason = 'No saved session ID found — this agent is not resumable. Start a fresh agent instead.';
+    // PAN-2098: state the concrete reason. ohmypi now resolves from its session
+    // JSONL (see getLatestSessionIdSync); reaching here means no id exists in any
+    // source for this harness, so a fresh start is genuinely the only option.
+    const harnessLabel = agentState?.harness ?? 'unknown';
+    const reason = `Cannot resume ${normalizedId} (harness=${harnessLabel}): no resumable session id found — no session.id file, no sessions.json entry, and no recoverable session transcript on disk. Start a fresh agent instead.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,

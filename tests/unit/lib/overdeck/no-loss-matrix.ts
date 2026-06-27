@@ -239,6 +239,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/flywheel/brief',                             kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
   { surface: 'POST /api/flywheel/brief',                            kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
   { surface: 'GET /api/flywheel/merge-queue',                       kind: 'http', disposition: 'READ',        door: 'MergeResolver.listQueues (duplicate of /api/merge-queue)' },
+  { surface: 'GET /api/flywheel/uat-candidate',                     kind: 'http', disposition: 'READ',        door: 'MergeResolver.getActiveUatCandidate' },
   { surface: 'GET /api/flywheel/uat-generations',                   kind: 'http', disposition: 'READ',        door: 'MergeResolver.listUatGenerations' },
   { surface: 'POST /api/flywheel/uat-generations/:name/stack',      kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.startUatStack' },
   { surface: 'POST /api/flywheel/uat-generations/:name/promote',    kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.promoteUat' },

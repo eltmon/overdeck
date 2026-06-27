@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -84,5 +84,42 @@ describe('upsertBacklogSequence full-sync (PAN-2010)', { timeout: 30_000 }, () =
     upsertBacklogSequence('p', doc([node('PAN-1', 1)], '2026-01-01T00:00:00Z'));
     upsertBacklogSequence('p', doc([], '2026-01-02T00:00:00Z'));
     expect(getBacklogSequence('p')).toEqual([]);
+  });
+});
+
+describe('getBacklogSequenceForRoot epic enrichment (PAN-2081)', { timeout: 30_000 }, () => {
+  const node = (issue: string, rank: number, isEpic?: boolean) => ({
+    issue, rank, size: 'M', importance: 'high', score: 50,
+    condition: 'ok', dependsOn: [], why: 'why', gate: 'auto', planning: 'auto',
+    ...(isEpic === undefined ? {} : { isEpic }),
+  });
+
+  it('surfaces isEpic from sequence.md while preserving contains edges', async () => {
+    const { getBacklogSequenceForRoot } = await import('../backlog-sequence-db.js');
+    const projectRoot = join(TEST_HOME, 'project');
+    mkdirSync(join(projectRoot, '.pan', 'backlog'), { recursive: true });
+    const doc = {
+      version: 1,
+      project: 'p',
+      generatedAt: '2026-01-01T00:00:00Z',
+      model: 'test',
+      pass: 'creation',
+      openCount: 2,
+      nodes: [node('PAN-2075', 1, true), node('PAN-2076', 2, false)],
+      edges: [{ from: 'PAN-2075', to: 'PAN-2076', type: 'contains', source: 'ai-inferred', confidence: 1 }],
+    };
+    writeFileSync(
+      join(projectRoot, '.pan', 'backlog', 'sequence.md'),
+      `# Backlog Sequence\n\n\`\`\`json\n${JSON.stringify(doc, null, 2)}\n\`\`\`\n`,
+      'utf-8',
+    );
+
+    const result = getBacklogSequenceForRoot(projectRoot);
+
+    expect(result.nodes.map((n) => ({ issueId: n.issueId, isEpic: n.isEpic }))).toEqual([
+      { issueId: 'PAN-2075', isEpic: true },
+      { issueId: 'PAN-2076', isEpic: false },
+    ]);
+    expect(result.edges).toEqual([{ from: 'PAN-2075', to: 'PAN-2076', type: 'contains' }]);
   });
 });

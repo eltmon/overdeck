@@ -84,7 +84,8 @@
               "features/workspaces",
               "features/convoys",
               "features/swarm",
-              "features/merge-batches"
+              "features/merge-batches",
+              "features/tldr"
             ]
           }
         ]

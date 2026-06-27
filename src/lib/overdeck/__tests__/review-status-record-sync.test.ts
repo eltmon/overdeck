@@ -19,7 +19,7 @@ vi.mock('../../pan-dir/records.js', () => ({
   updateIssueRecordForIssue: mocks.updateIssueRecordForIssue,
 }));
 
-import { enrichReviewNotesFromRecordSync } from '../review-status-record-sync.js';
+import { enrichReviewNotesFromRecordSync, readJournalStatusSync } from '../review-status-record-sync.js';
 
 const baseStatus: ReviewStatus = {
   issueId: 'PAN-1866',
@@ -66,5 +66,34 @@ describe('enrichReviewNotesFromRecordSync (PAN-1988)', () => {
     const input = { ...baseStatus, reviewNotes: 'kept' };
     expect(() => enrichReviewNotesFromRecordSync('PAN-1866', input)).not.toThrow();
     expect(enrichReviewNotesFromRecordSync('PAN-1866', input).reviewNotes).toBe('kept');
+  });
+});
+
+describe('readJournalStatusSync terminal markers (PAN-2054)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck' });
+    mocks.getProjectSync.mockReturnValue({ key: 'overdeck', path: '/repo' });
+  });
+
+  it('projects closedOut and closedOutAt from the pipeline block', () => {
+    mocks.readIssueRecordSync.mockReturnValue({
+      pipeline: {
+        issueId: 'PAN-2054',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'running',
+        mergeStatus: 'pending',
+        readyForMerge: false,
+        closedOut: true,
+        closedOutAt: '2026-06-27T00:00:00.000Z',
+        updatedAt: '2026-06-27T00:00:00.000Z',
+      },
+    });
+
+    const journal = readJournalStatusSync('PAN-2054');
+
+    expect(journal?.durable.closedOut).toBe(true);
+    expect(journal?.durable.closedOutAt).toBe('2026-06-27T00:00:00.000Z');
   });
 });

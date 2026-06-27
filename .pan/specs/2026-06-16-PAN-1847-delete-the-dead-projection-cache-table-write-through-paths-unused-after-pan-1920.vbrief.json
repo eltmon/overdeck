@@ -4,17 +4,17 @@
     "created": "2026-06-16T15:59:52.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1847: delete the dead projection_cache table + write-through paths (unused after PAN-1920)",
-    "updated": "2026-06-16T17:00:41.387Z"
+    "updated": "2026-06-27T08:34:38.105Z"
   },
   "plan": {
     "id": "pan-1847",
     "title": "Delete the dead projection_cache table + write-through paths (unused after PAN-1920)",
-    "status": "running",
+    "status": "completed",
     "uid": "25645f1c-b6f8-487c-8dbc-e3314457ac46",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-06-16T15:59:52.000Z",
-    "updated": "2026-06-16T17:00:41.387Z",
+    "updated": "2026-06-27T08:34:38.105Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1847",
@@ -460,5 +460,5 @@
       "canonicalFilename": "2026-06-16-PAN-1847-delete-the-dead-projection-cache-table-write-through-paths-unused-after-pan-1920.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

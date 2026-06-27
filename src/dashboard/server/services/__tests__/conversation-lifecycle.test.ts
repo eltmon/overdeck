@@ -10,6 +10,7 @@ const mockMarkConversationEnded = vi.fn();
 const mockCleanupUnreferencedConversationAttachments = vi.fn();
 const mockListSessionNames = vi.fn();
 const mockIsHarnessProcessAlive = vi.fn();
+const mockListPaneValues = vi.fn();
 const mockCreateConversation = vi.fn();
 const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
@@ -40,6 +41,7 @@ vi.mock('../conversation-attachments.js', () => ({
 vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: mockListSessionNames,
   isHarnessProcessAlive: mockIsHarnessProcessAlive,
+  listPaneValues: mockListPaneValues,
 }));
 
 const mockIsRespawnPending = vi.fn();
@@ -57,6 +59,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     // Default: harness alive in sessions that exist (corpse cases set false explicitly).
     mockIsHarnessProcessAlive.mockResolvedValue(true);
     mockIsRespawnPending.mockReturnValue(false);
+    // Default: no dead-pane status available (corpse-diagnostics cases set it).
+    mockListPaneValues.mockReturnValue(Effect.succeed([]));
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -181,6 +185,44 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(summaryCalls[0][0]).toMatch(/marked 3 conversation\(s\) ended \(2 session\(s\) gone, 1 keep-alive corpses\)/);
 
     consoleSpy.mockRestore();
+  });
+
+  it('captures pane exit status + output.log tail when marking a keep-alive corpse (PAN-2099)', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'odh-'));
+    const prevHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = home;
+    const agentDir = join(home, 'agents', 'conv-diag');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(
+      join(agentDir, 'output.log'),
+      'earlier noise line\n[Uncaught Exception] Error: ENOSPC: no space left on device, write\nPane is dead (status 1)\n',
+    );
+
+    mockListActiveConversations.mockReturnValue([
+      { name: 'diag', tmuxSession: 'conv-diag', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-diag']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+    mockListPaneValues.mockReturnValue(Effect.succeed(['1']));
+    mockCleanupUnreferencedConversationAttachments.mockResolvedValue(undefined);
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    let loggedLines: string[] = [];
+    try {
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+      loggedLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+      if (prevHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = prevHome;
+    }
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('diag');
+    const corpseLine = loggedLines.find((l) => l.includes('keep-alive corpse'));
+    expect(corpseLine).toBeDefined();
+    expect(corpseLine).toContain('exitStatus=1');
+    expect(corpseLine).toContain('ENOSPC');
   });
 
   it('does NOT mark a corpse ended while a respawn is in flight for its session', async () => {

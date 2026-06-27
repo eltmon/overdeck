@@ -14,7 +14,7 @@
  *   2. createOhmypiFifo
  *   3. write launcher.sh via generateLauncherScript({ harness: 'ohmypi', ... })
  *   4. tmux new-session running launcher.sh
- *   5. wait for ~/.overdeck/agents/<id>/ready.json (max 30s)
+ *   5. wait for ~/.overdeck/agents/<id>/ready.json (max 120s)
  *
  * Runtime divergences vs pi (omp contract AC-1b, AC-3):
  *   - omp binary requires Bun >=1.3.14 (shebang #!/usr/bin/env bun).
@@ -55,7 +55,7 @@ function shellQuote(value: string): string {
 }
 
 const ACTIVE_HEARTBEAT_TTL_MS = 60_000
-const SPAWN_READY_TIMEOUT_MS = 30_000
+const SPAWN_READY_TIMEOUT_MS = 120_000
 
 function overdeckDir(): string {
   return getOverdeckHome()
@@ -70,7 +70,7 @@ function agentsDir(): string {
 export class OhmypiSpawnTimeout extends Error {
   readonly code = 'OHMYPI_SPAWN_TIMEOUT' as const
   constructor(agentId: string) {
-    super(`omp agent ${agentId} did not write ready.json within ${SPAWN_READY_TIMEOUT_MS}ms`)
+    super(`omp agent ${agentId} did not write ready.json within ${SPAWN_READY_TIMEOUT_MS}ms${describeSpawnFailure(agentId)}`)
     this.name = 'OhmypiSpawnTimeout'
   }
 }
@@ -84,6 +84,17 @@ export interface OhmypiSpawnConfig extends SpawnConfig {
 
 function agentDirFor(agentId: string): string {
   return join(agentsDir(), agentId)
+}
+
+function describeSpawnFailure(agentId: string): string {
+  const outputPath = join(agentDirFor(agentId), 'output.log')
+  if (!existsSync(outputPath)) return ''
+  try {
+    const tail = readFileSync(outputPath, 'utf8').slice(-1500).trim().split('\n').slice(-8).join('\n')
+    return tail ? ` [output.log tail:\n${tail}]` : ''
+  } catch {
+    return ''
+  }
 }
 
 function ohmypiSessionDirFor(agentId: string): string {
@@ -116,8 +127,13 @@ function readStoredSessionId(agentId: string): string | null {
 /**
  * Resolve the real omp session id from the freshest session JSONL (PAN-1988 parity).
  * Returns null when no prior session exists on disk.
+ *
+ * Exported (PAN-2098) so the generic recovery path in agents.ts
+ * (`getLatestSessionIdSync`) can resume a crashed ohmypi agent — omp never
+ * writes a `session.id` file, so without this fallback the deacon reports
+ * "no saved session id" and can only respawn fresh, losing context.
  */
-function resolveLatestOhmypiSessionId(agentId: string): string | null {
+export function resolveLatestOhmypiSessionId(agentId: string): string | null {
   const root = ohmypiSessionDirFor(agentId)
   if (!existsSync(root)) return null
   const files: { path: string; mtime: number }[] = []

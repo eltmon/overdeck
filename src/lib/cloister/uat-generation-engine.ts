@@ -1,17 +1,16 @@
 /**
  * UAT generation assembly engine (PAN-1737: UAT batch trains).
  *
- * Builds one *generation* — a throwaway `uat/<label>-<codename>-<MMDD>` branch
+ * Builds one *generation* — a deterministic-per-day `uat/<label>-<codename>-<MMDD>` branch
  * off current main containing as many ready features as possible, merged in
  * queue order, with cross-feature conflicts resolved on the branch by the
  * injected `resolveConflict` hook (the assembly agent). A feature whose
  * conflict cannot be resolved is *held out* with a human-readable reason and
  * assembly continues — a single bad merge never blocks the batch.
  *
- * Unlike the PAN-1691 candidate (one force-reset branch per day), generations
- * accumulate: each assembly creates a NEW branch + persistent worktree under
- * `<projectRoot>/workspaces/`, so the previous generation stays fully testable
- * (and its live stack keeps serving) while the next one builds.
+ * Each rebuild for the same label/day force-resets the same branch + persistent
+ * worktree under `<projectRoot>/workspaces/`, keeping one authoritative current
+ * UAT candidate instead of proliferating stale branches.
  *
  * Pure orchestrator: all git and store I/O is injected (see
  * uat-generation-deps.ts for the real wiring), so every path — happy,
@@ -56,7 +55,7 @@ export interface ConflictResolutionResult {
 export interface GenerationGitDeps {
   /** `git fetch origin main` and return the origin/main head SHA. */
   fetchMain(): Promise<string>;
-  /** Create the generation worktree on a new branch off origin/main. */
+  /** Create or reset the generation worktree branch off origin/main. */
   createWorktree(branchName: string, worktreePath: string): Promise<void>;
   /** Head SHA of a feature branch (origin-first). */
   branchHeadSha(branch: string): Promise<string>;
@@ -75,12 +74,13 @@ export interface GenerationGitDeps {
 }
 
 export interface GenerationStorePort {
+  /** Insert or reset the generation row at assembly start. */
   insert(gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'>): void;
   update(
     name: string,
     patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt'>>,
   ): void;
-  /** Every generation name ever used — codename collision check. */
+  /** Existing generation names. */
   listNames(): string[];
   listChain(projectRoot: string, statuses?: readonly UatGenerationStatus[]): UatGeneration[];
 }
@@ -93,7 +93,7 @@ export interface AssembleGenerationInput {
   dateIso: string;
   /** Ready features in merge-queue order. */
   features: readonly ReadyFeature[];
-  /** Branch names (beyond the store) already taken, e.g. live git refs. */
+  /** Branch names (beyond the store) already present, e.g. live git refs. */
   takenBranchNames?: readonly string[];
 }
 
@@ -124,13 +124,11 @@ export async function assembleUatGeneration(
   deps: AssembleGenerationDeps,
 ): Promise<UatGeneration> {
   const log = deps.log ?? (() => {});
-  const taken = new Set<string>([...deps.store.listNames(), ...(input.takenBranchNames ?? [])]);
 
   const baseSha = await deps.git.fetchMain();
   const name = makeUatCandidateName({
     label: input.label,
     dateIso: input.dateIso,
-    isTaken: (branch) => taken.has(branch),
   });
   const worktreePath = `${input.projectRoot}/workspaces/${generationFolderName(name)}`;
 

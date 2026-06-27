@@ -1,12 +1,97 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
+
+const mocks = vi.hoisted(() => ({
+  execFile: vi.fn(),
+  getAgentRuntimeState: vi.fn(),
+  getGitHubConfig: vi.fn(),
+  getReviewStatusSync: vi.fn(),
+  issueService: {
+    getIssues: vi.fn(),
+  },
+  listProjectsSync: vi.fn(),
+  listSessionNames: vi.fn(),
+  openPullRequests: [] as unknown[],
+  resolveAgentGitInfo: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  execFile: mocks.execFile,
+}));
+
+vi.mock('../../../../../src/lib/agents.js', () => ({
+  getAgentRuntimeState: mocks.getAgentRuntimeState,
+}));
+
+vi.mock('../../../../../src/lib/projects.js', () => ({
+  listProjectsSync: mocks.listProjectsSync,
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+}));
+
+vi.mock('../../../../../src/lib/tmux.js', () => ({
+  listSessionNames: mocks.listSessionNames,
+}));
+
+vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
+  getReviewStatusSync: mocks.getReviewStatusSync,
+}));
+
+vi.mock('../../../../../src/dashboard/server/services/git-info.js', () => ({
+  resolveAgentGitInfo: mocks.resolveAgentGitInfo,
+}));
+
+vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => ({
+  getGitHubConfig: mocks.getGitHubConfig,
+}));
+
+vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
+  getSharedIssueService: vi.fn(async () => mocks.issueService),
+}));
 
 import type { ResourceAllocatedIssue } from '../../../../../src/dashboard/server/services/resource-discovery.js';
 import {
+  discoverResourceAllocatedIssues,
   groupResourceAllocatedIssuesByProject,
   isDiscoverableAgentSession,
   resetResourceAllocatedIssuesCacheForTests,
   sanitizeResourceAllocatedIssues,
 } from '../../../../../src/dashboard/server/services/resource-discovery.js';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetResourceAllocatedIssuesCacheForTests();
+  mocks.issueService.getIssues.mockReturnValue([]);
+  mocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+    state: 'idle',
+    lastActivity: '2026-06-27T00:00:00.000Z',
+  }));
+  mocks.getGitHubConfig.mockReturnValue({ repos: [] });
+  mocks.getReviewStatusSync.mockReturnValue(null);
+  mocks.listProjectsSync.mockReturnValue([
+    { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN' } },
+  ]);
+  mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+  mocks.openPullRequests = [];
+  mocks.resolveAgentGitInfo.mockResolvedValue({
+    actualBranch: null,
+    branchDrifted: false,
+    workspaceMissing: false,
+  });
+  mocks.resolveProjectFromIssueSync.mockImplementation((issueId: string) => ({
+    projectKey: 'overdeck',
+    projectName: 'overdeck',
+    projectPath: '/tmp/overdeck',
+    issueId,
+  }));
+  mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
+    if (command === 'gh' && args[0] === 'pr') {
+      callback(null, { stdout: JSON.stringify(mocks.openPullRequests) });
+      return;
+    }
+    callback(null, { stdout: '' });
+  });
+});
 
 describe('resource-discovery grouping', () => {
   it('groups issues by project and sorts project names and issue ids', () => {
@@ -181,6 +266,48 @@ describe('resource-discovery sanitization', () => {
     });
     expect(sanitized[0]?.resourceDetails.localBranchCount).toBe(1);
     expect(sanitized[0]?.resourceDetails.tmuxSessionCount).toBe(1);
+  });
+});
+
+describe('resource-discovery terminal issue filtering', () => {
+  it('excludes closed close-out residue unless the issue still has an open PR', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      {
+        identifier: 'PAN-2054',
+        title: 'Close-out residue',
+        state: 'closed',
+        rawTrackerState: 'CLOSED',
+      },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-2054']));
+
+    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([]);
+
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.getGitHubConfig.mockReturnValue({ repos: [{ owner: 'eltmon', repo: 'overdeck' }] });
+    mocks.openPullRequests = [
+      {
+        number: 2054,
+        title: 'PAN-2054 PR',
+        url: 'https://github.com/eltmon/overdeck/pull/2054',
+        state: 'OPEN',
+        isDraft: false,
+        headRefName: 'PAN-2054',
+        baseRefName: 'main',
+      },
+    ];
+
+    const withOpenPr = await discoverResourceAllocatedIssues();
+
+    expect(mocks.getGitHubConfig).toHaveBeenCalled();
+    expect(mocks.execFile).toHaveBeenCalledWith(
+      'gh',
+      expect.arrayContaining(['pr', 'list']),
+      expect.any(Object),
+      expect.any(Function),
+    );
+    expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
+    expect(withOpenPr[0]?.resourceSources).toContain('pr');
   });
 });
 

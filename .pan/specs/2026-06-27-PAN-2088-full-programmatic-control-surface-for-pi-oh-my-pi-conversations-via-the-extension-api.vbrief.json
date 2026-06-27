@@ -1,0 +1,537 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-27T03:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2088: Full programmatic control surface for pi/oh-my-pi conversations via the extension API",
+    "updated": "2026-06-27T07:09:53.361Z"
+  },
+  "plan": {
+    "id": "pan-2088",
+    "title": "Full programmatic control surface for pi/oh-my-pi conversations via the extension API",
+    "status": "running",
+    "uid": "b2f88e10-2088-4c44-9a31-0c9f7d4e8a21",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-06-27T03:40:00.000Z",
+    "updated": "2026-06-27T07:09:53.361Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2088",
+        "label": "PAN-2088",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1958",
+        "label": "#1958",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "pi",
+      "ohmypi",
+      "extension-api",
+      "dashboard",
+      "backend",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "pi/oh-my-pi CONVERSATIONS run in TUI mode and deliver operator composer messages by tmux paste-buffer — fire-and-forget keystrokes with no ack, no correlation id, ambiguous submit timing while the agent is mid-turn, and silent loss if the pane dies. The 'message eaten -> redeliver' safety net is claude-code-only, and the 'Sending...' bubble clears only when the user's own message echoes back in the parsed transcript, so a paste that never submits hangs forever. The triggering incident: two messages to a busy GLM-5.2/oh-my-pi conversation sat on 'Sending...' indefinitely and were lost when the session ended with no recoverable transcript. The extension API (already loaded into every conversation) also lacks any turn-abort method, so the operator has no reliable quick-stop.",
+      "Proposal": "Drive the pi extension API (loaded into every conversation alongside the live TUI) over a per-agent file-drop CONTROL CHANNEL instead of tmux paste. The server writes typed commands (prompt/steer/follow_up/set_thinking_level/set_model/compact) atomically into ~/.overdeck/agents/<id>/control/; the extension watches that dir from session_start, dispatches each command to the matching pi.* call, and HTTP-POSTs an ack back to a new dashboard endpoint so 'Sending...' clears on a real ack — not transcript echo. This gives structured steer/follow_up mid-turn delivery, live setThinkingLevel (the composer effort control, which is dropped today), live setModel, manual compact, and source attribution (folds in #1958). Abort is the one capability the extension API does not expose: it gets a dedicated mechanism — send pi/omp's TUI interrupt keystroke via the async tmux primitive (sendKeysAsync), verified at an implementation checkpoint, shipping as a documented 501 with an upstream pi.abort() request if no clean key exists. Both the ohmypi and pi extension packages get identical changes. Claude Code conversation delivery is untouched. Message HISTORY stays on JSONL parsing; the channel is the control/input plane only.",
+      "NonGoals": "- No change to Claude Code conversation delivery (its supervisor / eaten-message redeliver path and native-compaction interception stay exactly as-is). - No change to WORK agents: they keep their headless --mode rpc + FIFO path; this issue is conversations (TUI) only. - No re-rendering of pi's event stream for history — the dashboard keeps parsing pi/omp JSONL for message history. - No FIFO or headless RPC transport for conversations (that would kill the attended TUI); transport is the file-drop control dir. - pi.exec (run bash from the extension) is declared optional in the API widening but is NOT wired to a dashboard affordance in this issue (low priority for conversations). - No faked abort: if no keystroke cleanly interrupts a turn without killing the session, abort ships as a 501 with an upstream request, never a no-op pretending to work."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Transport = per-agent file-drop inbox directory ~/.overdeck/agents/<id>/control/, atomic temp-file + rename, drained and fs.watch-ed from session_start. Not a FIFO, not headless RPC.",
+        "rationale": "PRD decision. The extension is in-process with the TUI; a dir gives natural persistence, simple draining of a startup backlog, and no open-fd/backpressure handling. Work agents keep their FIFO unchanged. Reuses ohmypiFifoPaths(agentId).agentDir as the base dir."
+      },
+      {
+        "summary": "Ack = the extension HTTP-POSTs { id, ok, error? } to a new POST /api/conversations/:name/control-ack endpoint; the server keeps an in-memory Map<id, resolve> so the awaiting delivery route resolves on ack, with a timeout fallback to the existing failSend retry-outbox path.",
+        "rationale": "PRD decision. The extension already POSTs lifecycle signals to the dashboard (existing POST helper + OVERDECK_DASHBOARD_URL at packages/ohmypi-extension/src/index.ts:111). Replaces the transcript-echo guessing game with a real correlation-id ack."
+      },
+      {
+        "summary": "Abort = send pi/omp's TUI interrupt keystroke via sendKeysAsync (async tmux primitive). This is the only sanctioned remaining tmux write for pi/omp conversations; recorded in code per NFR-4.",
+        "rationale": "PRD decision. The extension API has no abort method (ctx.signal is for nested work only). The exact interrupt key is an implementation checkpoint (prefer Escape, else Ctrl-C, verified in a throwaway omp TUI on the overdeck socket so the turn aborts while the session survives). Fallback if no clean key: file an upstream pi.abort() request and ship abort as a documented 501 with an actionable message — never faked."
+      },
+      {
+        "summary": "Both the ohmypi and pi extension packages get identical changes; new API methods are declared OPTIONAL so a stale installed runtime degrades gracefully (capability probe disables the command, server returns 501, never a throw).",
+        "rationale": "PRD decision (FR-8). packages/ohmypi-extension and packages/pi-extension share an identical extension shape. NOTE for executor: ohmypi-extension/src/index.ts:23 has `export type PiExtensionAPI = OhmypiExtensionAPI` (alias), but the separate pi-extension/src/index.ts:13 declares its OWN PiExtensionAPI interface that must be widened in parallel."
+      },
+      {
+        "summary": "Message history stays on JSONL parsing; the control channel is the control/input plane only. Claude Code conversations are entirely untouched.",
+        "rationale": "PRD decision (NFR-5). Keeps the change incremental and avoids re-rendering Pi's event stream. The pi/omp message-delivery branch is the only delivery change; claude-code keeps deliverAgentMessage + supervisor + eaten-watcher."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-widen-extension-api",
+        "title": "WI-1: Widen the extension API types + add a runtime-capability probe (both packages)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/ohmypi-extension/src/index.ts (interface OhmypiExtensionAPI at :14) append OPTIONAL method/event declarations so the dispatcher can call them type-safely while a stale runtime still type-checks: add types `ThinkingLevel = 'off'|'minimal'|'low'|'medium'|'high'|'xhigh'`, `SendUserMessageOptions { deliverAs?: 'steer'|'followUp' }`, `InputEvent { source?: 'interactive'|'rpc'|'extension'; text?: string }`; add `on(event: 'input', handler)`, and optional members `sendUserMessage?(content, options?)`, `setThinkingLevel?(level)`, `getThinkingLevel?()`, `setModel?(model)`. Add a small capability probe helper that, given the live `omp`/`pi` object, reports which of these methods exist (typeof === 'function') so callers can fail-safe (log + no-op / 501) when a method is absent. Mirror the SAME widening verbatim in packages/pi-extension/src/index.ts — note it declares its OWN PiExtensionAPI interface at :13 (NOT the ohmypi alias), so widen that interface directly. Keep ohmypi-extension's `export type PiExtensionAPI = OhmypiExtensionAPI` alias (:23) intact. IMPLEMENTATION CHECKPOINT: confirm the INSTALLED omp/pi runtime actually exposes sendUserMessage, setThinkingLevel, setModel, and the 'input' event. FALLBACK if absent: bump the pinned runtime version; if still unavailable, the probe disables that command type (server returns 501 not-supported with a clear operator message) and message delivery falls back to the existing tmux path so conversations never hard-break.",
+          "Why": "The dispatcher in WI-2 must call pi.sendUserMessage / setThinkingLevel / setModel type-safely. Optional declarations + a runtime probe let a stale runtime degrade gracefully (no throw) instead of crashing the conversation — the fail-safe foundation for the whole control channel."
+        },
+        "items": [
+          {
+            "id": "wi1-widen-extension-api.ac1",
+            "title": "Given a runtime object that exposes sendUserMessage, setThinkingLevel, and setModel, when the capability probe runs, then it reports each of those methods as supported.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-widen-extension-api.ac2",
+            "title": "Given a fake runtime missing setThinkingLevel, when a set_thinking_level command is dispatched, then the dispatcher no-ops (treats it as unsupported) and does not throw.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-widen-extension-api.ac3",
+            "title": "Given both extension packages, when npm run typecheck runs, then OhmypiExtensionAPI (ohmypi-extension) and the separate PiExtensionAPI (pi-extension) both expose the new optional members and the 'input' event with no type errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-control-channel-primitive",
+        "title": "WI-2: Control-channel primitive — server writer + extension watch/drain/dispatch/ack (both packages + lib)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "hard",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create new server-side lib module src/lib/runtimes/conversation-control.ts exporting: `conversationControlPaths(agentId, home?)` (control dir under ohmypiFifoPaths(agentId).agentDir i.e. ~/.overdeck/agents/<id>/control/), `writeConversationControlCommand(agentId, command, home?)` that writes ONE JSON file per command via atomic temp-file + rename into control/ at mode 0600 (dir created at 0700), and the `ControlCommand` union: `{ id; type: 'prompt'|'steer'|'follow_up'; message; source: 'operator'|'orchestrator' } | { id; type: 'set_thinking_level'; level: ThinkingLevel } | { id; type: 'set_model'; model } | { id; type: 'compact' }`. Extension side (BOTH packages, inside the session_start handler at ohmypi-extension/src/index.ts:652, after the existing context handlers — never from the module factory per NFR-3): drain any pre-existing control files, then fs.watch the control/ dir; for each command file parse, dispatch to the matching pi.* call guarded by the WI-1 capability probe, unlink the file, and HTTP-POST an ack { id, ok, error? } reusing the existing dashboard POST helper. Also register `omp.on('input', e => ...)` to record event.source for FR-7. Tolerate malformed files (skip + log, never crash the watcher).",
+          "Why": "This is the core transport that replaces fragile tmux paste with structured, ack'd, per-agent command delivery. It is the generalization of #1958's inbox into typed control commands. Atomic writes + 0600 perms + startup-backlog drain make delivery reliable and never lose a queued command on restart."
+        },
+        "items": [
+          {
+            "id": "wi2-control-channel-primitive.ac1",
+            "title": "Given writeConversationControlCommand is called for an agent, when it returns, then exactly one JSON command file exists under <agentDir>/control/ at mode 0600 and the control/ dir is mode 0700.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-control-channel-primitive.ac2",
+            "title": "Given a malformed (non-JSON) file present in control/, when the extension watcher processes it, then it is skipped and logged and the watcher keeps running (no crash).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-control-channel-primitive.ac3",
+            "title": "Given a 'steer' command file is dropped into control/, when the extension dispatches it, then pi.sendUserMessage(text, { deliverAs: 'steer' }) is called, the file is unlinked, and an ack POST is sent to the dashboard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-control-channel-primitive.ac4",
+            "title": "Given pre-existing command files in control/ at session_start, when the extension starts, then it drains and dispatches that backlog before watching for new files (and the watcher is started only in session_start, never the module factory).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-ack-endpoint-registry",
+        "title": "WI-4: Server ack endpoint + pending-command registry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts (or a small sibling service) add an in-memory `Map<commandId, { resolve, reject, timer }>` pending-command registry, and a new endpoint `POST /api/conversations/:name/control-ack` (mirror the route shape at conversations.ts:3346 delivery-method) that the extension POSTs `{ id, ok, error? }` to; on receipt resolve/reject the pending entry and clear its timer. Provide the awaitable primitive used by WI-3: register a pending entry keyed by command id and return a promise that resolves on ack or rejects on a CONTROL_ACK_TIMEOUT_MS timeout. An unknown ack id is a no-op. TEST RULE: use fake timers (vi.useFakeTimers() + vi.advanceTimersByTimeAsync()) for the timeout — never real setTimeout.",
+          "Why": "The ack is what lets 'Sending...' clear on real confirmation instead of transcript echo. WI-3's delivery awaits a promise from this registry; the timeout path feeds the existing failSend retry outbox so a dropped ack degrades to retry, not a permanent hang."
+        },
+        "items": [
+          {
+            "id": "wi4-ack-endpoint-registry.ac1",
+            "title": "Given a pending command id in the registry, when POST /api/conversations/:name/control-ack arrives with { id, ok: true }, then the awaiting delivery promise resolves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ack-endpoint-registry.ac2",
+            "title": "Given a pending command with no ack, when CONTROL_ACK_TIMEOUT_MS elapses (verified with fake timers), then the promise rejects and the entry/timer is cleaned up.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-ack-endpoint-registry.ac3",
+            "title": "Given an id not in the registry, when POST control-ack arrives, then it is a no-op (no throw, no effect on other pending entries).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-route-delivery-via-channel",
+        "title": "WI-3: Route pi/omp conversation message delivery through the control channel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts message handler (around :1054-1088, route registered at :2940 '/api/conversations/:name/messages') add `deliverConversationViaControlChannel(conv, text, { source, deliverAs })` that writes a prompt|steer|follow_up command via writeConversationControlCommand and awaits the ack (the WI-4 registry promise) with a timeout. Add `pickDeliverAs(conv, bodyDeliverAs)`: if the agent is currently running a turn (reuse the existing pending/working detection used for the composer state) default 'steer', else plain 'prompt'; an operator 'follow_up' override comes from the request body `deliverAs`. In the handler branch on harness: pi/omp -> deliverConversationViaControlChannel with source 'operator'; claude-code -> UNCHANGED (existing deliverAgentMessage + supervisor + eaten-watcher). Keep injectPiConversationMemory (:1059) — it still augments the text before delivery. Keep the catch/error mapping unchanged.",
+          "Why": "This is the actual cutover of operator composer messages from tmux paste to the structured channel, with correct mid-turn steer/follow_up semantics and source tagging — directly fixing the lost-message bug while leaving claude-code delivery untouched."
+        },
+        "items": [
+          {
+            "id": "wi3-route-delivery-via-channel.ac1",
+            "title": "Given an idle pi/omp conversation, when the operator sends a composer message, then a 'prompt' control command is written (no tmux paste) and the request resolves on the ack.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-route-delivery-via-channel.ac2",
+            "title": "Given a pi/omp conversation whose agent is mid-turn, when the operator sends a message with no override, then a 'steer' command is written; when the operator selects follow_up, then a 'follow_up' command is written.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-route-delivery-via-channel.ac3",
+            "title": "Given a claude-code conversation, when the operator sends a message, then delivery still goes through deliverAgentMessage/supervisor unchanged (no control-channel write).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-control-endpoints",
+        "title": "WI-6: Server thinking-level, model, and compact control endpoints",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts (mirror switch-model at :2828 and delivery-method at :3346): add `POST /api/conversations/:name/thinking-level` { level } that validates level against ThinkingLevel (invalid -> 400), writes a set_thinking_level command for pi/omp + awaits ack, and persists the level on the conversation record so resume keeps it. Extend the existing `POST /api/conversations/:name/switch-model` (:2828): for pi/omp RUNNING conversations additionally write a set_model command so the change is LIVE (verify the current behavior — likely record/relaunch only — and keep that for claude). Add `POST /api/conversations/:name/compact`: pi/omp -> write a compact command (Claude keeps its native-compaction interception at ~:998-1010 — do NOT change). Leave conversations.ts:1668 --effort gate as-is for claude, but note pi/omp effort now flows through the channel (set_thinking_level), not --effort.",
+          "Why": "Makes effort/thinking-level (dropped entirely for pi/omp today), model, and compact first-class LIVE controls over the channel, satisfying FR-4/FR-5/FR-6 without disturbing claude's native paths."
+        },
+        "items": [
+          {
+            "id": "wi6-control-endpoints.ac1",
+            "title": "Given POST /api/conversations/:name/thinking-level with a valid level for a pi/omp conversation, when handled, then a set_thinking_level command is written, the ack is awaited, and the level is persisted on the conversation record.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-control-endpoints.ac2",
+            "title": "Given POST thinking-level with an invalid level value, when handled, then the endpoint returns 400 and writes no command.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-control-endpoints.ac3",
+            "title": "Given POST /api/conversations/:name/switch-model for a running pi/omp conversation, when handled, then a set_model command is written so the change is live; the claude-code switch-model behavior is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-control-endpoints.ac4",
+            "title": "Given POST /api/conversations/:name/compact for a pi/omp conversation, when handled, then a compact command is written; the claude-code native-compaction interception path is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-quick-abort",
+        "title": "WI-7: Quick-abort mechanism via TUI interrupt keystroke (the one API gap)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "hard",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `POST /api/conversations/:name/abort` in src/dashboard/server/routes/conversations.ts that sends pi/omp's TUI interrupt key to the pane via sendKeysAsync (async primitive from src/lib/tmux.ts) — NEVER sendKeys (sync). Record in a code comment that this single control-key send is the ONLY sanctioned remaining tmux write for pi/omp conversations (per NFR-4), because the extension API exposes no abort. IMPLEMENTATION CHECKPOINT — verify the interrupt key before wiring: launch a throwaway omp TUI in a `overdeck`-socket tmux session, start a long turn, send Escape (then Ctrl-C if needed), and `tmux -L overdeck capture-pane -e -p` to confirm the turn aborts AND the session SURVIVES (not exits). DECISION RULE: use the key that interrupts the turn while keeping the session alive — prefer Escape, else Ctrl-C. FALLBACK: if no keystroke cleanly interrupts without killing the session, (a) file an upstream request for pi.abort() in the extension API, and (b) ship abort as a documented 501 with an actionable message — do NOT fake it. (If a bash tool is mid-run a second control key may be needed — note but defer unless the checkpoint shows it is required.)",
+          "Why": "The operator specifically prioritized a reliable instant Stop. A single control key is reliable (unlike text paste) and keeps the attended TUI alive. This is the one capability the extension API cannot provide, so it earns a dedicated, verified mechanism with an honest 501 fallback."
+        },
+        "items": [
+          {
+            "id": "wi7-quick-abort.ac1",
+            "title": "Given POST /api/conversations/:name/abort for a running pi/omp conversation, when handled, then the resolved interrupt control key is sent via sendKeysAsync to the correct tmux target (no sync sendKeys is called).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-quick-abort.ac2",
+            "title": "Given the empirically verified interrupt key, when abort is sent during a turn, then the turn stops and the tmux session survives (does not exit) — OR, if no key cleanly interrupts without killing the session, the endpoint returns 501 with an actionable message and an upstream pi.abort() request is filed (never a faked no-op).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-quick-abort.ac3",
+            "title": "Given the abort endpoint code, when reviewed, then a code comment records that this single control-key send is the only sanctioned remaining tmux write for pi/omp conversations (NFR-4).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-frontend-controls",
+        "title": "WI-5: Frontend — ack-based Sending, steer/follow_up, Stop button, live effort + compact",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/ (ConversationPanel.tsx, ComposerFooter.tsx, MessagesTimeline.tsx; effort/model pickers already exist as EffortPicker.tsx / ModelPicker.tsx): (1) Sending... clears on ACK for pi/omp conversations — treat the POST resolution as the clear signal rather than waiting for transcript echo (ConversationPanel.tsx:1222 echo logic), keeping the stall-timeout failSend fallback (:1267-1282). (2) Stop/Abort button — always visible while a turn runs; calls POST .../abort (WI-7); optimistic 'Stopping...' with sub-second feedback. (3) Effort dropdown -> live: on change POST .../thinking-level (WI-6) and reflect the selected level. (4) Compact action — a menu/button -> POST .../compact. (5) deliverAs control — a small toggle (default steer when busy) included in the send payload. Add component tests (mirror the existing chat component test style under src/dashboard/frontend/src/components/chat/__tests__/): Sending clears on ack; Stop calls abort; effort change posts thinking-level.",
+          "Why": "Surfaces the new control surface as first-class dashboard affordances and fixes the user-visible symptom — 'Sending...' hanging forever — by clearing on a real ack. Without this the backend channel is invisible to the operator."
+        },
+        "items": [
+          {
+            "id": "wi5-frontend-controls.ac1",
+            "title": "Given a pi/omp conversation, when a sent message is ack'd, then the 'Sending...' indicator clears on the ack (not on transcript echo); when no ack arrives, the stall-timeout failSend fallback still moves the bubble to the retry outbox.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-frontend-controls.ac2",
+            "title": "Given a running turn, when the operator clicks the always-visible Stop button, then POST .../abort is called and an optimistic 'Stopping...' state appears within sub-second.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-frontend-controls.ac3",
+            "title": "Given the composer effort dropdown, when the operator changes it, then POST .../thinking-level is called with the selected level and the UI reflects the new level.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-frontend-controls.ac4",
+            "title": "Given the composer, when the operator triggers the Compact action, then POST .../compact is called; a steer/follow_up toggle (default steer when the agent is busy) is present and its value is included in the send payload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-source-contract-retire-tmux",
+        "title": "WI-8: System-prompt the source contract + retire tmux paste for pi/omp conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T03:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2088",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "(1) Add a short contract line to the append-system-prompt content assembled for pi/omp conversations (the --append-system-prompt files in buildOhmypiCommand, launcher-generator.ts:616-630; content assembled server-side): a message arriving with source 'extension' is from the orchestrator / another agent, NOT the human operator — and how to treat it (FR-7). (2) Once WI-3 is proven, retire tmux-paste body delivery for pi/omp: resolveConversationDeliveryMethod (conversations.ts:1154) no longer routes pi/omp MESSAGE BODIES to tmux (the WI-7 abort key is excepted). Add a no-loss note in a code comment: the only behavior the old tmux-paste path provided for pi/omp conversations was (1) text delivery -> now the channel, and (2) nothing else. Do NOT touch the claude-code delivery path (NFR-5).",
+          "Why": "Closes the source-attribution half of #1958 (the agent knows operator vs orchestrator input) and completes the cutover by removing the fragile tmux-paste path now that the channel is proven — with an explicit no-loss audit recorded in code so nothing the old path did is silently dropped."
+        },
+        "items": [
+          {
+            "id": "wi8-source-contract-retire-tmux.ac1",
+            "title": "Given a pi/omp conversation launch, when the system prompt is assembled, then it includes a contract line stating that a message with source:'extension' is from the orchestrator/another agent, not the human operator, and how to treat it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-source-contract-retire-tmux.ac2",
+            "title": "Given a pi/omp conversation message body, when delivered, then resolveConversationDeliveryMethod no longer routes it to tmux (the WI-7 abort key excepted), with a no-loss note recorded in a code comment.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-source-contract-retire-tmux.ac3",
+            "title": "Given the claude-code conversation delivery path, when reviewed, then it is unchanged (NFR-5).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-source-contract-retire-tmux.ac4",
+            "title": "Given the full change set, when npm run typecheck, npm run lint, and npm test run, then they pass with no new failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-widen-extension-api",
+        "to": "wi2-control-channel-primitive",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-control-channel-primitive",
+        "to": "wi4-ack-endpoint-registry",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-ack-endpoint-registry",
+        "to": "wi3-route-delivery-via-channel",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-route-delivery-via-channel",
+        "to": "wi6-control-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-control-endpoints",
+        "to": "wi7-quick-abort",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-control-endpoints",
+        "to": "wi5-frontend-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-quick-abort",
+        "to": "wi5-frontend-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-quick-abort",
+        "to": "wi8-source-contract-retire-tmux",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-route-delivery-via-channel",
+        "to": "wi8-source-contract-retire-tmux",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-27-PAN-2088-full-programmatic-control-surface-for-pi-oh-my-pi-conversations-via-the-extension-api.vbrief.json"
+    }
+  },
+  "status": "active"
+}

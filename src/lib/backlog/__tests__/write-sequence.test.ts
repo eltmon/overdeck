@@ -50,6 +50,42 @@ describe('writeSequenceMd + parseSequenceMd round-trip', () => {
     }
   });
 
+  it('renders an epic column with a mark only for isEpic nodes', () => {
+    const doc: SequenceDoc = {
+      ...SAMPLE_DOC,
+      nodes: [
+        { ...SAMPLE_DOC.nodes[0]!, issue: 'PAN-1', isEpic: true },
+        { ...SAMPLE_DOC.nodes[1]!, issue: 'PAN-2' },
+      ],
+    };
+    writeSequenceMd(tmpDir, doc);
+    const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');
+
+    expect(md).toContain('| rank | issue | size | importance | condition | epic | depends-on | why |');
+    expect(md).toContain('| 1 | PAN-1 | M | high | ok | ✓ |  | Foundation. |');
+    expect(md).toContain('| 2 | PAN-2 | S | medium | ok |  | PAN-1 | Depends on PAN-1. |');
+  });
+
+  it('preserves isEpic nodes and contains edges through the machine block', () => {
+    const doc: SequenceDoc = {
+      ...SAMPLE_DOC,
+      nodes: [
+        { ...SAMPLE_DOC.nodes[0]!, issue: 'PAN-1', isEpic: true },
+        { ...SAMPLE_DOC.nodes[1]!, issue: 'PAN-2' },
+      ],
+      edges: [{ from: 'PAN-1', to: 'PAN-2', type: 'contains', source: 'github-ref', confidence: 1 }],
+    };
+    writeSequenceMd(tmpDir, doc);
+    const result = parseSequenceMd(readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8'));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.doc.nodes.find((n) => n.issue === 'PAN-1')?.isEpic).toBe(true);
+      expect(result.doc.nodes.find((n) => n.issue === 'PAN-2')?.isEpic).toBeUndefined();
+      expect(result.doc.edges).toEqual([{ from: 'PAN-1', to: 'PAN-2', type: 'contains', source: 'github-ref', confidence: 1 }]);
+    }
+  });
+
   it('includes rationale paragraph only for top-tier nodes with rationale field', () => {
     writeSequenceMd(tmpDir, SAMPLE_DOC);
     const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');

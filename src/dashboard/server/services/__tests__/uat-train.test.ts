@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getUatGenerationsPayload } from '../uat-train.js';
+import { getUatCandidatePayload, getUatGenerationsPayload } from '../uat-train.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
 
 const mocks = vi.hoisted(() => ({
@@ -143,5 +143,35 @@ describe('getUatGenerationsPayload', () => {
     expect(maxActiveReads).toBeLessThanOrEqual(4);
     expect(mocks.findVBriefByIssue).toHaveBeenCalledTimes(8);
     expect(mocks.readVBriefDocument).toHaveBeenCalledTimes(8);
+  });
+});
+
+describe('getUatCandidatePayload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the newest ready generation as the active UAT candidate', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([gen([
+      { issueId: 'PAN-1', title: 'One', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 },
+      { issueId: 'PAN-2', title: 'Two', branch: 'feature/pan-2', headSha: 'h2', mergeOrder: 2 },
+    ])]);
+
+    await expect(getUatCandidatePayload()).resolves.toEqual({
+      branchName: 'uat/pan-otter-0610',
+      bundled: ['PAN-1', 'PAN-2'],
+      status: 'ready',
+    });
+    expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith({
+      projectRoot: process.cwd(),
+      statuses: ['ready'],
+      limit: 1,
+    });
+  });
+
+  it('returns null when no ready UAT candidate exists', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+
+    await expect(getUatCandidatePayload()).resolves.toBeNull();
   });
 });

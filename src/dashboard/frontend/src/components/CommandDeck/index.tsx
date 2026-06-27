@@ -1028,8 +1028,18 @@ export function CommandDeck({
       // deck's project without writing /command-deck/<project> over it.
       if (projectName !== selectedProject) onSelectProject?.(projectName, { updateUrl: false });
       openConversationTabIn(projectName, name, conv?.title ?? 'Agent');
+      // A click is an explicit intent to open this conversation, so drive the
+      // /conv/<id> URL directly. Re-clicking the already-selected conversation
+      // leaves `selectedConversation` unchanged, so the state->URL sync effect
+      // never re-runs — without this the URL would stay on /command-deck/<project>
+      // (e.g. after navigating to another page and back). prevSelectedRef is kept
+      // in sync so that effect skips the redundant follow-up call.
+      if (conv && onConvIdChange) {
+        prevSelectedRef.current = name;
+        onConvIdChange(String(conv.id));
+      }
     }
-  }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn]);
+  }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn, onConvIdChange]);
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 

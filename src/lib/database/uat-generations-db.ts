@@ -1,10 +1,9 @@
 /**
  * UAT Generations SQLite Storage (PAN-1737: UAT batch trains)
  *
- * Persistent chain of assembled UAT batch branches (`uat/<codename>-<mmdd>`).
- * One row per generation. The chain is append-only: lifecycle transitions are
- * status flips, rows are never deleted — the table is the auditable history of
- * what was bundled, which conflicts were resolved, and what was promoted.
+ * Persistent record of assembled UAT batch branches (`uat/<codename>-<mmdd>`).
+ * The deterministic per-day branch name is reused across rebuilds, so inserting
+ * a generation resets that row to the latest assembly attempt.
  *
  * Public API stays synchronous to match the established database module style
  * (see merge-queue-db.ts / review-status-db.ts). Full conversion to
@@ -114,7 +113,7 @@ function rowToGeneration(row: UatGenerationRow): UatGeneration {
   };
 }
 
-/** Insert a new generation row (typically status 'assembling'). */
+/** Insert or reset a generation row (typically status 'assembling'). */
 export function insertUatGenerationSync(
   gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'> & { createdAt?: string },
 ): UatGeneration {
@@ -122,7 +121,7 @@ export function insertUatGenerationSync(
   const now = new Date().toISOString();
   const createdAt = gen.createdAt ?? now;
   db.prepare(`
-    INSERT INTO uat_generations (
+    INSERT OR REPLACE INTO uat_generations (
       name, worktree_path, project_root, base_sha, status,
       members, held_out, resolutions, stack_started_at, cleaned_at, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -179,7 +178,7 @@ export function listUatGenerationsSync(options: {
   return rows.map(rowToGeneration);
 }
 
-/** Names of all generations ever created — codename collision checks. */
+/** Names of existing generation rows. */
 export function listUatGenerationNamesSync(): string[] {
   const db = getDatabase();
   const rows = db.prepare(`SELECT name FROM uat_generations`).all() as Array<{ name: string }>;

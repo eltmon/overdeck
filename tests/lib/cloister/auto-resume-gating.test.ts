@@ -414,6 +414,43 @@ describe('auto-resume gates', () => {
     expect(state?.consecutiveFailures).toBe(1);
   });
 
+  it('retries stopped work agents whose initial kickoff was never delivered even when runtime is idle', async () => {
+    const agentId = 'agent-pan-2093';
+    resumeAgentMock.mockResolvedValue({ success: true });
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    const reviewStatus = await import('../../../src/lib/review-status.js');
+    vi.mocked(reviewStatus.getReviewStatusSync).mockReturnValue({
+      issueId: 'PAN-2093',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: BASE_TIME.toISOString(),
+    });
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-2093',
+      workspace: workspaceFor(agentId),
+      harness: 'ohmypi',
+      role: 'work',
+      model: 'kimi-k2.7-code',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      kickoffDelivered: false,
+      consecutiveFailures: 1,
+      lastFailureReason: 'orphaned: tmux session missing (reconcile)',
+    });
+    await agents.saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: BASE_TIME.toISOString(),
+    });
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual([agentId]);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+  });
+
   it('recovers orphaned strike agents whose registered session is missing', async () => {
     const agentId = 'strike-pan-1820';
     const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();

@@ -482,7 +482,10 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
 
   // PAN-1402: Tool-event hooks briefly lived in per-agent frontmatter during
   // PAN-982, but Claude Code did not honor them when Overdeck invoked agents
-  // with path-form `--agent roles/<role>.md`, so these registrations are global again.
+  // with path-form `--agent roles/<role>.md`, so these registrations are global.
+  // PAN-2087: path-form `--agent` is gone entirely (Claude Code 2.1.195 dropped
+  // file support; roles are now injected via --append-system-prompt-file), so
+  // global registration here is the ONLY hook delivery path — keep it.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
   // Auto-approve tool calls for Overdeck agents (self-scoped via
   // OVERDECK_AGENT_ID inside the hook) — replaces launching agents with

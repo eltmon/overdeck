@@ -69,7 +69,10 @@ describe('AgentState role persistence', () => {
     expect(spawnRun).toEqual(expect.any(Function));
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1048-review', 'review');
-    expect(command).toContain('--agent roles/review.md');
+    // PAN-2087: role FILES are injected as a system prompt (Claude Code 2.1.195
+    // dropped --agent file support), not passed to --agent.
+    expect(command).not.toContain('--agent ');
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/review\.md'/);
     expect(command).toContain("--model 'claude-opus-4-7'");
     expect(command).toContain('--name agent-pan-1048-review');
     expect(command).not.toContain('pan-review-agent');
@@ -79,9 +82,29 @@ describe('AgentState role persistence', () => {
     const { getRoleRuntimeBaseCommand } = await import('../agents.js');
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
-    expect(command).toContain('--agent roles/flywheel.md');
+    expect(command).not.toContain('--agent ');
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/flywheel\.md'/);
     expect(command).toContain("--model 'claude-opus-4-7'");
     expect(command).toContain('--effort low');
+  });
+
+  it('PAN-2090: review role reconstitutes its tools: allow-list via --allowedTools (no MCP)', async () => {
+    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1-review', 'review');
+    expect(command).toContain("--allowedTools 'Read,Grep,Glob,Bash'");
+    expect(command).not.toContain('--mcp-config'); // review.md declares no mcpServers
+  });
+
+  it('PAN-2090: test role reconstitutes mcpServers via --mcp-config and keeps playwright in --allowedTools', async () => {
+    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1-test', 'test');
+    // playwright MCP wired, AND included in the allow-list so the strict list does not block it.
+    expect(command).toMatch(/--mcp-config '[^']*role-prompts\/test\.mcp\.json'/);
+    expect(command).toMatch(/--allowedTools 'Read,Grep,Glob,Bash,mcp__playwright'/);
+    // the generated config is valid JSON declaring the playwright stdio server.
+    const m = command.match(/--mcp-config '([^']*)'/);
+    const cfg = JSON.parse(readFileSync(m![1], 'utf-8'));
+    expect(cfg.mcpServers.playwright).toMatchObject({ command: 'npx' });
   });
 
   it('preserves first-class runtime session ids during normalization', async () => {
@@ -571,6 +594,31 @@ describe('AgentState role persistence', () => {
       consoleErrorSpy.mockRestore();
       rmSync(workspace, { recursive: true, force: true });
     }
+  });
+
+  it('PAN-2093: gives ohmypi work-agent readiness more than the old 30s window', async () => {
+    const { OHMYPI_AGENT_READY_TIMEOUT_SECONDS } = await import('../agents.js');
+
+    expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBe(120);
+    expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBeGreaterThan(30);
+  });
+
+  it('PAN-2100: reports disk space and recent output when ohmypi readiness times out', async () => {
+    const agentId = 'agent-pan-2100';
+    const agentDir = join(tempHome, 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'output.log'), [
+      'starting omp',
+      'Error: ENOSPC: no space left on device, write ready.json',
+    ].join('\n'));
+
+    const { describeOhmypiSpawnFailure } = await import('../agents.js');
+    const description = describeOhmypiSpawnFailure(agentId);
+
+    expect(description).toContain('freeDisk=');
+    expect(description).toContain('output.log tail:');
+    expect(description).toContain('ENOSPC');
+    expect(description).toContain('ready.json');
   });
 
   it('does not block when workspace stack health is healthy', async () => {

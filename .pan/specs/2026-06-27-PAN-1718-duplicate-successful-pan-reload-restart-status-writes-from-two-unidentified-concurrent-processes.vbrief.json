@@ -1,0 +1,262 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-27T04:29:47.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1718: Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes",
+    "updated": "2026-06-27T15:15:32.390Z"
+  },
+  "plan": {
+    "id": "pan-1718",
+    "title": "Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes",
+    "status": "approved",
+    "uid": "66d33eca-9c69-41d7-9a71-a88e52bbbb35",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 16,
+    "created": "2026-06-27T04:29:47.000Z",
+    "updated": "2026-06-27T15:15:32.390Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1718",
+        "label": "PAN-1718",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "restart",
+      "reliability",
+      "concurrency",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "One physical dashboard restart produced two successful trigger='pan reload' writes to restart-status.json from two processes, despite a fail-fast restart lock. Provable cause: pan reload's `pan dev` SIGUSR2 branch (reload.ts:94-111) records success=true and returns BEFORE acquireRestartLock (reload.ts:113), bypassing mutual exclusion. The single-entry restart-status.json also makes it impossible to identify a second concurrent writer after the fact (last-write-wins). A dead supervisor.pid in the same window points at a supervisor stop/start cycle that left a pidfile pointing at a process that died on EADDRINUSE.",
+      "Proposal": "(1) Acquire the restart lock at the top of reloadCommand, before the dev-marker branch, so every reload path is mutually excluded or visibly fails. (2) Append every restart-status write to an append-only restart-events.jsonl journal and add a pure concurrent-writer detector. (3) Surface the restart writer's pid/initiator and a concurrent-writer warning in `pan status`. (4) Make the supervisor stop/start cycle wait for actual death and verify child survival so it never leaves a dead pidfile.",
+      "NonGoals": "- Do NOT redesign the supervisor supervision/health/watchdog model — only make stop wait-for-exit and start verify-survival.\n- Do NOT change restart-status.json's single-entry last-write-wins contract; the journal is additive.\n- Do NOT add a distributed/OS-level lock; the existing fail-fast advisory restart lock is retained.\n- Do NOT claim a definitive proven mechanism for the original two long writes; the journal is the means to identify it on next occurrence.\n- Do NOT alter the restart announcer's polling/announce behavior beyond what reading existing fields requires."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Acquire the restart lock at the very top of reloadCommand, before the pan dev SIGUSR2 branch, releasing it in a single try/finally around both paths.",
+        "rationale": "It is the one provable lock bypass and directly satisfies acceptance criterion 2 (concurrent flows excluded or visibly fail). Minimal, surgical, single-file."
+      },
+      {
+        "summary": "Wire the append-only journal INSIDE writeRestartStatusPromise rather than at each of the four call sites.",
+        "rationale": "DRY and guarantees all writers (reload, restart, watchdog x2) are captured with no risk of a forgotten call site; matches the single-source-of-truth tenet for the writer."
+      },
+      {
+        "summary": "Include the supervisor stop/start robustness fix (Finding C) in this issue rather than deferring it.",
+        "rationale": "The issue body presents the dead supervisor.pid as part of the same concurrent-restart-flow root cause; fixing it closes the corroborating symptom. Scoped tightly via NonGoals to avoid a supervisor redesign."
+      },
+      {
+        "summary": "Do not enforce a 'must hold the lock to write success' invariant on writeRestartStatus.",
+        "rationale": "The watchdog legitimately writes status after releasing the lock, and failure-status writes by a blocked process are valid; such an invariant would break correct flows. The lock-on-restart plus append-journal is the right model."
+      }
+    ],
+    "items": [
+      {
+        "id": "reload-lock-first",
+        "title": "Acquire the restart lock before the pan reload dev-marker SIGUSR2 branch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T04:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1718",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/reload.ts, restructure reloadCommand so acquireRestartLock('pan reload') runs immediately after the health-timeout parse and BEFORE the `pan dev` marker check (currently lines 94-111, before the lock at line 113). Wrap the dev-marker branch and the detached-restart branch in a single try { ... } finally { await lock.release(); }. If the lock is not acquired, record success=false with 'restart in progress (held by ...)' and exit 2 WITHOUT reading the dev marker, signalling SIGUSR2, or restarting. On the dev path with the lock held: send SIGUSR2, recordReloadStatus(true), and return (lock released by finally). Keep the existing detached-path behavior byte-for-byte otherwise."
+        },
+        "items": [
+          {
+            "id": "reload-lock-first.ac1",
+            "title": "Given a `pan dev` marker is present AND the restart lock is already held, when `pan reload` runs, then it records success=false (trigger='pan reload'), does NOT call process.kill(...SIGUSR2), and exits with code 2.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-lock-first.ac2",
+            "title": "Given a `pan dev` marker is present AND the lock is free, when `pan reload` runs, then it acquires the lock, sends SIGUSR2 to the dev pid, records success=true, and releases the lock (existing PAN-1662 test stays green and additionally asserts acquireRestartLock was called).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-lock-first.ac3",
+            "title": "Given no dev marker and the lock is held by another process, when `pan reload` runs, then it records success=false 'restart in progress' and exits 2 without running bun install or the build (existing detached-path behavior preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-events-journal",
+        "title": "Append every restart-status write to an append-only restart-events.jsonl journal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T04:29:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1718",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "status-restart-writer-surface"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/restart-status.ts: after the existing tmp+rename of restart-status.json inside writeRestartStatusPromise, append one JSON line (the same RestartStatus entry) to `${getOverdeckHome()}/restart-events.jsonl` using appendFile (O_APPEND). Make the append best-effort (a journal failure must not fail the primary status write or throw). Add readRestartEvents(limit?: number): Promise<RestartStatus[]> that reads the journal, parses each line (skipping malformed lines), and returns the last `limit` entries. Add a pure detectConcurrentRestartWriters(events: RestartStatus[], windowMs = 60000): RestartStatus[] that returns the set of successful entries whose ts fall within windowMs of each other but carry different pids (empty when none). Bound journal growth to the last ~200 entries (trim on append when the line count exceeds the cap). Export Effect variants consistent with the file's existing pattern."
+        },
+        "items": [
+          {
+            "id": "restart-events-journal.ac1",
+            "title": "Given two writeRestartStatus calls in sequence, when the journal is read with readRestartEvents(), then it returns BOTH entries in order while restart-status.json still contains only the last entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-events-journal.ac2",
+            "title": "Given two successful entries 2.6s apart with different pids, when detectConcurrentRestartWriters() runs, then it returns both entries; given the same pid or entries >60s apart, then it returns an empty array.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-events-journal.ac3",
+            "title": "Given the journal already holds 200 lines, when another entry is appended, then the file is trimmed to the most recent 200 entries.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-events-journal.ac4",
+            "title": "Given the journal path is unwritable, when writeRestartStatus runs, then restart-status.json is still written successfully and no error propagates to the caller.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-restart-writer-surface",
+        "title": "Surface the restart writer (pid + initiator) and concurrent-writer warning in pan status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T04:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1718",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/status.ts, extract the restart line construction into a pure exported helper formatRestartStatusLines(status: RestartStatus | null, events: RestartStatus[]): string[] that (a) appends `pid <n>` and, when present, the initiator to the existing 'Last dashboard restart' line, and (b) when detectConcurrentRestartWriters(events) is non-empty, adds a yellow warning line naming each concurrent writer's pid and initiator. Have statusCommand call readRestartEvents() and pass the result in. Add a new test file src/cli/commands/__tests__/status-restart.test.ts covering the pure helper (no status harness needed)."
+        },
+        "items": [
+          {
+            "id": "status-restart-writer-surface.ac1",
+            "title": "Given a restart-status with pid=1733121 and initiator='conv-20260610-573d', when `pan status` renders, then the restart line includes 'pid 1733121' and the initiator.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-restart-writer-surface.ac2",
+            "title": "Given the journal contains two successful pan reload entries 2.6s apart with different pids, when formatRestartStatusLines runs, then it emits a warning line naming both pids.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-restart-writer-surface.ac3",
+            "title": "Given no concurrent writers in the journal, when formatRestartStatusLines runs, then no warning line is emitted and the existing single-line format is preserved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-cycle-wait-verify",
+        "title": "Supervisor stop waits for exit; start verifies survival — no dead pidfile",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T04:29:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1718",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/supervisor.ts: (1) stopSupervisorProcessSync — after SIGTERM, poll isProcessAlive(pid) with a bounded sync wait (total ~2s; escalate to SIGKILL at ~1.5s) BEFORE unlinking the pidfile and returning, so the stop actually takes effect. (2) startSupervisorProcessSync — after writeFileSync(pid), wait ~150ms (sync) and re-check isProcessAlive(child.pid); if the child has already died (e.g. EADDRINUSE against the still-running old supervisor), log a clear error and unlink the pidfile so no dead pid is left behind. Use a sync sleep via Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) — never a busy-spin and never execSync('sleep')."
+        },
+        "items": [
+          {
+            "id": "supervisor-cycle-wait-verify.ac1",
+            "title": "Given a live supervisor pid, when stopSupervisorProcessSync runs, then it does not unlink the pidfile or return until isProcessAlive(pid) is false (or the SIGKILL-escalation bound elapses).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-cycle-wait-verify.ac2",
+            "title": "Given startSupervisorProcessSync spawns a child that dies immediately, when start completes, then it logs an error and leaves NO pidfile pointing at the dead pid.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-cycle-wait-verify.ac3",
+            "title": "Given the bounded sync waits, when reviewed, then they use Atomics.wait (not a busy-loop and not execSync) and total stop-wait never exceeds ~2s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "restart-events-journal",
+        "to": "status-restart-writer-surface",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-27-PAN-1718-duplicate-successful-pan-reload-restart-status-writes-from-two-unidentified-concurrent-processes.vbrief.json"
+    }
+  },
+  "status": "active"
+}

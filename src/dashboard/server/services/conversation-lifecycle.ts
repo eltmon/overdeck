@@ -14,7 +14,7 @@
  * spawn-only.
  */
 
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, stat, open } from 'fs/promises';
 import { createReadStream, existsSync } from 'fs';
 import { createInterface } from 'readline';
 import { homedir } from 'os';
@@ -30,9 +30,9 @@ import {
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
-import { listSessionNames, isHarnessProcessAlive } from '../../../lib/tmux.js';
+import { listSessionNames, isHarnessProcessAlive, listPaneValues } from '../../../lib/tmux.js';
 import { isRespawnPending } from './pending-respawn.js';
-import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
@@ -51,6 +51,47 @@ const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship']);
 // Tmux session prefixes that are NOT specialist agents and must be left alone
 // by the backfill pass even if they happen to be missing a row.
 const NON_AGENT_PREFIXES = ['conv-', 'inspect-', 'planning-'];
+
+/**
+ * PAN-2099: read the last `maxBytes` of a file without loading the whole thing.
+ * output.log can grow to many MB; this keeps the corpse-diagnostic path bounded
+ * on the server poll loop.
+ */
+async function tailFile(path: string, maxBytes: number): Promise<string> {
+  const handle = await open(path, 'r');
+  try {
+    const { size } = await handle.stat();
+    const start = Math.max(0, size - maxBytes);
+    const buf = Buffer.alloc(size - start);
+    await handle.read(buf, 0, buf.length, start);
+    return buf.toString('utf8');
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * PAN-2099: gather death evidence for a keep-alive corpse — the pane's exit
+ * status (`#{pane_dead_status}`) and the tail of the agent's output.log. Returns
+ * a "; "-prefixed suffix for the log line, or "" when nothing is available.
+ * Every probe is independently guarded so a diagnostics failure never throws.
+ */
+async function captureCorpseDiagnostics(tmuxSession: string): Promise<string> {
+  const parts: string[] = [];
+  try {
+    const values = await Effect.runPromise(listPaneValues(tmuxSession, '#{pane_dead_status}'));
+    const status = values.find((v) => v.trim() !== '')?.trim();
+    if (status) parts.push(`exitStatus=${status}`);
+  } catch { /* tmux best-effort */ }
+  try {
+    const logPath = join(getOverdeckHome(), 'agents', tmuxSession, 'output.log');
+    if (existsSync(logPath)) {
+      const lines = (await tailFile(logPath, 1500)).trim().split('\n').slice(-8).join('\n');
+      if (lines) parts.push(`output.log tail:\n${lines}`);
+    }
+  } catch { /* best-effort */ }
+  return parts.length ? `; ${parts.join('; ')}` : '';
+}
 
 interface AgentStateFile {
   id?: string;
@@ -79,6 +120,7 @@ export async function pollConversations(): Promise<void> {
     const endedConversations: typeof conversations = [];
     let sessionGoneCount = 0;
     let keepAliveCorpseCount = 0;
+    const keepAliveCorpseDiagnostics: string[] = [];
     const now = Date.now();
     for (const conv of conversations) {
       const ageMs = now - new Date(conv.createdAt).getTime();
@@ -126,6 +168,14 @@ export async function pollConversations(): Promise<void> {
             : `[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`,
         );
       }
+      if (!sessionGone) {
+        // PAN-2099: a keep-alive corpse means the harness process crashed/exited
+        // while tmux kept the (now dead) pane. Capture the death evidence — pane
+        // exit status + output.log tail — instead of the old reasonless line, so
+        // an ENOSPC/uncaught-exception death is diagnosable from this log alone.
+        const diag = await captureCorpseDiagnostics(conv.tmuxSession);
+        if (diag) keepAliveCorpseDiagnostics.push(`${conv.tmuxSession}${diag}`);
+      }
       markConversationEnded(conv.name);
       endedConversations.push(conv);
       if (sessionGone) sessionGoneCount++;
@@ -133,8 +183,11 @@ export async function pollConversations(): Promise<void> {
     }
 
     if (endedConversations.length > 0) {
+      const diagnosticsSuffix = keepAliveCorpseDiagnostics.length
+        ? `; keep-alive corpse diagnostics: ${keepAliveCorpseDiagnostics.join(' | ')}`
+        : '';
       console.log(
-        `[conversation-lifecycle] marked ${endedConversations.length} conversation(s) ended (${sessionGoneCount} session(s) gone, ${keepAliveCorpseCount} keep-alive corpses)`,
+        `[conversation-lifecycle] marked ${endedConversations.length} conversation(s) ended (${sessionGoneCount} session(s) gone, ${keepAliveCorpseCount} keep-alive corpses)${diagnosticsSuffix}`,
       );
     }
     // Batch attachment cleanup to avoid an unbounded fan-out when many

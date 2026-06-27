@@ -80,6 +80,21 @@ describe('OhmypiRuntime.spawnAgent precondition checks', () => {
     expect(err.code).toBe('OHMYPI_SPAWN_TIMEOUT')
     expect(err.message).toMatch(/agent-x/)
   })
+
+  it('PAN-2101: timeout includes crash text captured in output.log', () => {
+    const dir = join(h.home, '.overdeck', 'agents', 'agent-crash')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'output.log'), [
+      'starting omp rpc mode',
+      'Error: synthetic omp crash before ready.json',
+    ].join('\n'))
+
+    const err = new OhmypiSpawnTimeout('agent-crash')
+
+    expect(err.message).toContain('output.log tail:')
+    expect(err.message).toContain('synthetic omp crash')
+    expect(err.message).toContain('ready.json')
+  })
 })
 
 describe('OhmypiRuntime.getHeartbeat (AC4)', () => {

@@ -111,7 +111,10 @@ describe('resolveHarness — PAN-1984: provider-default-only (explicit/role over
   });
 
   it('AC(PAN-1989): provider that previously defaulted to pi now resolves to ohmypi via built-in default', async () => {
-    // kimi → built-in default ohmypi (was pi before PAN-1989).
+    // Mechanism test: resolveHarness returns whatever getBuiltInDefaultHarness gives.
+    // The built-in default is mocked here, so this exercises the flow-through, not a
+    // real provider value. (Kimi's real default has since moved to claude-code —
+    // PAN-2102 — but the ohmypi flow-through still holds for google/zai/minimax/etc.)
     providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
     providerMocks.getBuiltInDefaultHarness.mockReturnValue('ohmypi');
     configMock.loadConfigSync.mockReturnValue({ config: {} });

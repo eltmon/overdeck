@@ -1,0 +1,486 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-27T03:58:53.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2054: Close-out is not terminal — closed/closed-out issues linger in the pipeline",
+    "updated": "2026-06-27T04:12:47.439Z"
+  },
+  "plan": {
+    "id": "pan-2054",
+    "title": "Make close-out terminal: stop closed/closed-out issues lingering in the pipeline",
+    "status": "running",
+    "uid": "78a6e9c3-f74a-4847-b3c5-5adb23a642a2",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 4,
+    "created": "2026-06-27T03:58:53.000Z",
+    "updated": "2026-06-27T04:12:47.439Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2054",
+        "label": "PAN-2054",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "pipeline",
+      "deacon",
+      "lifecycle",
+      "reaper"
+    ],
+    "narratives": {
+      "Problem": "A closed + closed-out issue keeps appearing in the Command Deck as active pipeline work because close-out is not terminal: it leaves (1) a paused agent's live tmux session [AC1 already fixed in resource-discovery.ts], (2) workspace + feature branch + agent-state on disk, (3) a stale durable `pipeline` journal block that getReviewStatusSync re-derives an active state from, and (4) non-terminal labels `merged`/`ready` that close-out never strips. Repro: PAN-1832 lingered for hours and its agent-state dir still exists.",
+      "Proposal": "Make close-out terminal at the source of truth. A) Mark the durable record's pipeline block terminal with a new `closedOut` flag and short-circuit getReviewStatusSync to null for closed-out issues so no active state can be re-derived. B) Strip `merged`/`ready` at close-out via a new terminal-only label list. C) Add an idempotent, merge-guarded deacon reaper that removes residue (tmux session, workspace worktree, merged feature branch local+remote, agent-state dir) for closed issues — including the pure-disk case with no running agent — reusing isBranchMerged so unmerged work is never destroyed. D) Lock the behavior with tests, including a regression test for the already-shipped resource-tree exclusion (FR-5).",
+      "NonGoals": "- Refactoring close-out's existing inline teardown (steps 3/5) to call the new reapIssueResidue helper (dedup deferred).\n- Changing postMergeLifecycle's decision to pause the work agent at merge.\n- Any change to resource-discovery filtering beyond a regression-lock test (FR-5 already shipped).\n- Adding `merged`/`ready` to WORKFLOW_LABELS (would affect other in-flight callers).\n- Manual one-off scripts to delete PAN-1832 residue (the new patrol does it on first run).\n- SQLite schema changes or any new direct store access outside the two doors."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use an explicit `closedOut`/`closedOutAt` flag on the pipeline record + getReviewStatusSync short-circuit, not merely mergeStatus='merged'.",
+        "rationale": "A dedicated terminal flag is robust against future reviewGatesPassedSync changes and gives the read door an unambiguous 'not active' signal; the issue explicitly allows 'reset to terminal (or clear it)'."
+      },
+      {
+        "summary": "Reaping lives in the extended deacon reaper patrol (idempotent, merge-guarded), not only in a one-shot close-out step.",
+        "rationale": "PAN-1832's residue survived because an agent reappeared AFTER close-out ran; only a re-running patrol catches that. It also auto-reaps PAN-1832 on first run with no manual step."
+      },
+      {
+        "summary": "Strip `merged`/`ready` via a new separate POST_MERGE_RESIDUE_LABELS const, not by extending WORKFLOW_LABELS.",
+        "rationale": "WORKFLOW_LABELS is documented as current-phase labels and shared by other close paths; merged/ready are post-merge/backlog labels that in-flight callers legitimately keep."
+      },
+      {
+        "summary": "Leave close-out's inline teardown (steps 3/5) unchanged; add reapIssueResidue additively.",
+        "rationale": "Keeps beads surgical and avoids destabilizing the working close-out path; unification is a deferred NonGoal."
+      },
+      {
+        "summary": "PAN-1832's specific disk residue is reaped by the new patrol on first run; no manual teardown bead.",
+        "rationale": "It is closed + merged, so the merge guard passes and the disk scan finds it."
+      }
+    ],
+    "items": [
+      {
+        "id": "closedout-record-field",
+        "title": "Add `closedOut`/`closedOutAt` to the pipeline record + write-door marker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2054",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "readdoor-terminal-shortcircuit",
+            "closeout-marks-terminal"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pan-dir/record.ts: add optional `closedOut?: boolean` and `closedOutAt?: string` to interface PanIssuePipelineRecord (record.ts:60). Add a write-door helper `markRecordPipelineClosedOutSync(project, issueId)` modeled exactly on clearRecordFeedbackSync (record.ts:520): ensureIssueRecordSync → set record.pipeline.closedOut=true, record.pipeline.closedOutAt=<ISO now>, record.pipeline.readyForMerge=false, record.pipeline.verificationStatus=undefined, record.pipeline.mergeStatus='merged', record.pipeline.updatedAt=<ISO now> → writeIssueRecordSync → queueIssueRecordCommit. Ensure projectPipeline (records.ts:83) preserves closedOut/closedOutAt when rebuilding from an existing record so a later updateIssueRecordForIssue does not drop the flag. Re-export markRecordPipelineClosedOutSync from src/lib/pan-dir/records.ts. No direct file/DB access outside writeIssueRecordSync."
+        },
+        "items": [
+          {
+            "id": "closedout-record-field.ac1",
+            "title": "Given a PanIssuePipelineRecord, the type accepts `closedOut: true` and `closedOutAt: <ISO string>` and the project typechecks (npm run typecheck passes).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closedout-record-field.ac2",
+            "title": "Calling markRecordPipelineClosedOutSync(project, issueId) persists pipeline.closedOut=true, closedOutAt set, readyForMerge=false, verificationStatus=undefined, mergeStatus='merged' to <projectRoot>/.pan/records/<issue>.json (verified by reading the record back in a unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closedout-record-field.ac3",
+            "title": "After markRecordPipelineClosedOutSync, a subsequent updateIssueRecordForIssue(issueId, status) preserves closedOut=true (projectPipeline carries the flag forward).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closedout-record-field.ac4",
+            "title": "markRecordPipelineClosedOutSync writes only via writeIssueRecordSync/queueIssueRecordCommit — no new direct fs.writeFile to .pan/records or SQLite (verified by code inspection / the single-source-of-truth CI guard staying green).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readdoor-terminal-shortcircuit",
+        "title": "getReviewStatusSync returns terminal (null) for a closed-out journal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Surface closedOut/closedOutAt in readJournalStatusSync.durable (src/lib/overdeck/review-status-record-sync.ts:57). In getReviewStatusSync (src/lib/review-status.ts:707): immediately after `const journal = readJournalStatusSync(issueId)`, if journal?.durable.closedOut === true, best-effort dbDelete(issueId) and `return null` — BEFORE the `journalNewer` reconcile block (hazard H1), so a stale verificationStatus:'running' can never be re-derived. Add a short comment citing PAN-2054."
+        },
+        "items": [
+          {
+            "id": "readdoor-terminal-shortcircuit.ac1",
+            "title": "Given a journal with pipeline.closedOut=true and a stale durable verificationStatus:'running', getReviewStatusSync(issueId) returns null (unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readdoor-terminal-shortcircuit.ac2",
+            "title": "Given a journal WITHOUT closedOut (normal in-flight issue), getReviewStatusSync still reconciles and returns the active ReviewStatus exactly as before (existing review-status tests stay green).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readdoor-terminal-shortcircuit.ac3",
+            "title": "readJournalStatusSync(issueId).durable includes closedOut and closedOutAt when present in the record's pipeline block (unit test against review-status-record-sync).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-marks-terminal",
+        "title": "close-out marks the pipeline journal terminal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/close-out.ts executeCloseOutPromise, add a step alongside step 8 ('Clear review status', close-out.ts:507) that calls markRecordPipelineClosedOutSync for ctx.issueId. Order: mark the journal terminal FIRST, then clearReviewStatus(DB), so a concurrent read can never observe DB-cleared-but-journal-active. Resolve the ProjectConfig from ctx (close-out already has projectPath; use getProjectConfigFromWorkspacePath/resolveProjectForIssue). Push a CloseOutStep {name:'Mark pipeline terminal', status:'passed'|'skipped'} like the other steps; non-fatal on error (skipped + warning), matching step 8's tolerance."
+        },
+        "items": [
+          {
+            "id": "closeout-marks-terminal.ac1",
+            "title": "After executeCloseOutPromise succeeds for an issue, its .pan/records/<issue>.json pipeline block has closedOut=true and readyForMerge=false (integration assertion in close-out test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-marks-terminal.ac2",
+            "title": "The close-out steps array contains a 'Mark pipeline terminal' step that passes on the happy path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-marks-terminal.ac3",
+            "title": "If markRecordPipelineClosedOutSync throws, close-out still returns success:true with the step recorded as 'skipped' (close-out is not aborted by the marker failing).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strip-terminal-labels",
+        "title": "close-out strips `merged` and `ready` labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Export a new const POST_MERGE_RESIDUE_LABELS = ['merged', 'ready'] in src/lib/lifecycle/close-issue.ts next to WORKFLOW_LABELS (close-issue.ts:35), kept SEPARATE from WORKFLOW_LABELS. In close-out.ts step 7 (close-out.ts:452-458), after the existing WORKFLOW_LABELS removal loop, remove each POST_MERGE_RESIDUE_LABELS entry for both the GitHub path (gh issue edit --remove-label \"<label>\" 2>/dev/null || true) and the Linear path (drop the matching labelIds). Keep present-label tolerance."
+        },
+        "items": [
+          {
+            "id": "strip-terminal-labels.ac1",
+            "title": "A unit test asserts POST_MERGE_RESIDUE_LABELS contains exactly 'merged' and 'ready', and that WORKFLOW_LABELS preserves its original entries (unchanged).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-terminal-labels.ac2",
+            "title": "Given a GitHub issue carrying `merged` and `ready`, close-out's label step issues `gh issue edit --remove-label merged` and `--remove-label ready` (verified via a mocked exec asserting both remove-label calls fire).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-terminal-labels.ac3",
+            "title": "An issue lacking `merged`/`ready` still passes close-out's label step (the `|| true` tolerance means absent labels do not fail the step).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reap-residue-helper",
+        "title": "Idempotent, merge-guarded reapIssueResidue helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2054",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "patrol-reaps-residue"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "New module src/lib/cloister/reap-issue-residue.ts exporting `reapIssueResidue(projectPath: string, issueId: string): Promise<string[]>`, idempotent and merge-guarded. Steps, each best-effort and each appending an action string: (a) kill tmux sessions agent-<issue>, test-<issue>, merge-<issue>, and review-<issue>-<ts>-* via Effect killSession (mirror close-out.ts:269-290). (b) MERGE GUARD: call isBranchMerged('feature/<issue>', projectPath) (import/reuse from close-out.ts:38) — proceed to disk/branch deletion ONLY when status is 'merged' or 'no-branch'; on 'unmerged' append 'skipped reap for <issue> — branch unmerged' and return immediately. (c) git worktree remove <workspacePath> --force via execAsync, fallback rmSync (mirror close-out.ts:300-311). (d) delete local (git branch -D) and remote (git push origin --delete) feature/<issue>. (e) rmSync ~/.overdeck/agents/agent-<issue> and planning-<issue> (AGENTS_DIR from paths.js). Use execAsync + Effect killSession ONLY — never execSync (no-execsync rule). Re-running on already-clean residue is a no-op that returns []."
+        },
+        "items": [
+          {
+            "id": "reap-residue-helper.ac1",
+            "title": "Given a closed issue with a MERGED feature branch + workspace dir + agent-state dir, reapIssueResidue removes the worktree, deletes the local feature/<issue> branch, and removes ~/.overdeck/agents/agent-<issue> (verified in a tmp-fixture unit test); it returns a non-empty action list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-residue-helper.ac2",
+            "title": "Given an UNMERGED feature branch, reapIssueResidue deletes NOTHING on disk and returns an action containing 'skipped' and 'unmerged' (merge-guard test, NFR-1).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-residue-helper.ac3",
+            "title": "Calling reapIssueResidue twice in a row is idempotent: the second call finds no residue and returns an empty action list without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-residue-helper.ac4",
+            "title": "reapIssueResidue contains no execSync call (uses execAsync + Effect killSession); grep for execSync in the new module returns nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-reaps-residue",
+        "title": "Wire reapIssueResidue into the closed-issue reaper patrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/closed-issue-reaper.ts: (1) After the existing agent/session stop loops in BOTH handleIssueStatusChangedClosed (closed-issue-reaper.ts:35) and reconcileClosedIssueAgents (:77), call reapIssueResidue(projectPath, issueId) for each CLOSED issue and append its actions. Resolve projectPath via resolveProjectForIssue/getProjectConfigFromWorkspacePath. (2) Add a pure-disk scan in reconcileClosedIssueAgents (hazard H4/H5): enumerate <projectRoot>/workspaces/feature-* dirs and ~/.overdeck/agents/agent-* dirs across configured projects, map each to an issue id, and for ids that isIssueClosed() returns true, call reapIssueResidue (the internal merge guard keeps it safe). Keep the existing `if (getNoResumeMode().active) return []` early-return at the top (NFR-3). Dedup so an issue already reaped via its running agent is not scanned again."
+        },
+        "items": [
+          {
+            "id": "patrol-reaps-residue.ac1",
+            "title": "Given a closed issue whose branch is merged and which has NO running agent (pure-disk residue), one reconcileClosedIssueAgents cycle calls reapIssueResidue for it and its workspace/branch/agent-state are removed (test with mocked listRunningAgents=[] + a disk fixture).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-reaps-residue.ac2",
+            "title": "When getNoResumeMode().active is true, reconcileClosedIssueAgents returns [] and reapIssueResidue is never called (test asserts the mock is not invoked).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-reaps-residue.ac3",
+            "title": "Given an OPEN (not closed) issue with a workspace on disk, the disk scan preserves it — reapIssueResidue is not called (isIssueClosed gate).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-reaps-residue.ac4",
+            "title": "The existing closed-issue-reaper.test.ts suite passes after the change (agents/sessions are still stopped for closed issues).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "integration-test-closeout-terminal",
+        "title": "Integration test: close-out leaves no re-derivable active state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an integration test (e.g. src/lib/__tests__/close-out-terminal.test.ts or extend review-status-record-sync.test.ts) that reproduces PAN-1832's state: seed a per-issue record whose pipeline block is stale-active (verificationStatus:'running', mergeStatus:'pending'), call markRecordPipelineClosedOutSync, then clearReviewStatus, then assert getReviewStatusSync(issueId) returns null AND the record's pipeline.closedOut===true. Use tmp fixtures; do not hit the network or the real ~/.overdeck. Follow fake-timers rules only if any delay is involved (none expected here)."
+        },
+        "items": [
+          {
+            "id": "integration-test-closeout-terminal.ac1",
+            "title": "The test seeds a stale-active journal, runs markRecordPipelineClosedOutSync + clearReviewStatus, and asserts getReviewStatusSync returns null (re-derivation prevented).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integration-test-closeout-terminal.ac2",
+            "title": "The test confirms the durable record persists pipeline.closedOut===true and readyForMerge===false after the sequence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "integration-test-closeout-terminal.ac3",
+            "title": "The test passes under `npm test` without requiring maxForks=1 (no real timers / no real network).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "regression-test-resource-tree-exclusion",
+        "title": "Regression test: terminal+closed-out issue excluded from the resource tree (FR-5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T03:58:53.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/unit/dashboard/server/services/resource-discovery.test.ts, add a regression test locking the already-shipped exclusion (resource-discovery.ts ~:635-665): a CLOSED + closed-out issue with NO open PR is excluded from the resource-allocated tree; the SAME issue WITH an open PR is retained. If an equivalent assertion already exists, extend it to cover both the no-PR (excluded) and open-PR (retained) branches rather than duplicating."
+        },
+        "items": [
+          {
+            "id": "regression-test-resource-tree-exclusion.ac1",
+            "title": "Given a CLOSED issue with trackerState='closed' and no open PR, the resource-discovery result does NOT include it (test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "regression-test-resource-tree-exclusion.ac2",
+            "title": "Given the same CLOSED issue but WITH an open PR, the resource-discovery result DOES include it (open-PR exception retained).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "closedout-record-field",
+        "to": "readdoor-terminal-shortcircuit",
+        "type": "blocks"
+      },
+      {
+        "from": "closedout-record-field",
+        "to": "closeout-marks-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "reap-residue-helper",
+        "to": "patrol-reaps-residue",
+        "type": "blocks"
+      },
+      {
+        "from": "readdoor-terminal-shortcircuit",
+        "to": "integration-test-closeout-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "closeout-marks-terminal",
+        "to": "integration-test-closeout-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "strip-terminal-labels",
+        "to": "integration-test-closeout-terminal",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-27-PAN-2054-make-close-out-terminal-stop-closed-closed-out-issues-lingering-in-the-pipeline.vbrief.json"
+    }
+  },
+  "status": "active"
+}

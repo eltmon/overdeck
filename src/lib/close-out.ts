@@ -22,7 +22,7 @@ import { findPrdAtStatusSync, canonicalPrdSubdirSync } from './prd-locations.js'
 import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
-import { WORKFLOW_LABELS } from './lifecycle/close-issue.js';
+import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-issue.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 
 const execAsync = promisify(exec);
@@ -35,7 +35,7 @@ const execAsync = promisify(exec);
  * Also checks review-status.json as authoritative — the merge specialist
  * validates the merge before setting mergeStatus to 'merged'.
  */
-async function isBranchMerged(
+export async function isBranchMerged(
   branchName: string,
   projectPath: string,
 ): Promise<{ status: 'merged' | 'unmerged' | 'no-branch'; message: string }> {
@@ -456,6 +456,12 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
           { encoding: 'utf-8' }
         );
       }
+      for (const label of POST_MERGE_RESIDUE_LABELS) {
+        await execAsync(
+          `gh issue edit ${ctx.number} --repo ${ctx.owner}/${ctx.repo} --remove-label "${label}" 2>/dev/null || true`,
+          { encoding: 'utf-8' }
+        );
+      }
       steps.push({ name: 'Apply closed-out label', status: 'passed', message: `Added '${CLOSED_OUT_LABEL}' label` });
     } else {
       // Linear: add label if possible
@@ -488,7 +494,10 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
               }
               if (labelId) {
                 const existingLabels = await issue.labels();
-                const labelIds = existingLabels.nodes.map(l => l.id);
+                const residueLabelNames = new Set(POST_MERGE_RESIDUE_LABELS);
+                const labelIds = existingLabels.nodes
+                  .filter(l => !residueLabelNames.has(l.name))
+                  .map(l => l.id);
                 if (!labelIds.includes(labelId)) {
                   labelIds.push(labelId);
                   await issue.update({ labelIds });
@@ -504,7 +513,16 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     steps.push({ name: 'Apply closed-out label', status: 'skipped', message: `Warning: ${(err as Error).message}` });
   }
 
-  // Step 8: Clear review status
+  // Step 8: Mark the durable pipeline journal terminal before clearing the DB cache.
+  try {
+    const { markRecordPipelineClosedOutSync } = await import('./pan-dir/records.js');
+    markRecordPipelineClosedOutSync({ name: 'inferred', path: ctx.projectPath }, ctx.issueId.toUpperCase());
+    steps.push({ name: 'Mark pipeline terminal', status: 'passed', message: 'Pipeline journal marked closed-out' });
+  } catch (err) {
+    steps.push({ name: 'Mark pipeline terminal', status: 'skipped', message: `Warning: ${(err as Error).message}` });
+  }
+
+  // Step 9: Clear review status
   try {
     // Dynamically import to avoid circular dependency with server
     const { clearReviewStatus } = await import('./review-status.js');
@@ -579,4 +597,3 @@ export const executeCloseOut = (
         cause,
       }),
   });
-

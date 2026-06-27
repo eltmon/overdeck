@@ -37,6 +37,9 @@ export const WORKFLOW_LABELS = [
   'needs-close-out', 'verifying-on-main', 'ready-for-merge',
 ];
 
+export const POST_MERGE_RESIDUE_LABELS = ['merged', 'ready'];
+const CLOSE_OUT_LABELS_TO_REMOVE = [...WORKFLOW_LABELS, ...POST_MERGE_RESIDUE_LABELS];
+
 /** Options for close-issue */
 export interface CloseIssueOptions {
   /** IssueTracker instance (preferred — uses abstraction layer) */
@@ -429,7 +432,7 @@ function applyLabelViaTracker(
   const step = 'close-issue:label';
   return Effect.gen(function* () {
     const issue = yield* tracker.getIssue(ctx.issueId);
-    const newLabels = issue.labels.filter((l: string) => !WORKFLOW_LABELS.includes(l));
+    const newLabels = issue.labels.filter((l: string) => !CLOSE_OUT_LABELS_TO_REMOVE.includes(l));
     if (!newLabels.includes(CLOSED_OUT_LABEL)) {
       newLabels.push(CLOSED_OUT_LABEL);
     }
@@ -464,7 +467,7 @@ async function applyLabelGitHubImpl(ctx: LifecycleContext): Promise<StepResult> 
       `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
       { encoding: 'utf-8' },
     );
-    const removeLabelArgs = WORKFLOW_LABELS
+    const removeLabelArgs = CLOSE_OUT_LABELS_TO_REMOVE
       .map(label => `--remove-label "${label}"`)
       .join(' ');
     await execAsync(
@@ -525,11 +528,13 @@ async function applyLabelLinearImpl(ctx: LifecycleContext, apiKey: string): Prom
 
     if (labelId) {
       const existingLabels = await issue.labels();
-      const labelIds = existingLabels.nodes.map(l => l.id);
+      const labelIds = existingLabels.nodes
+        .filter(l => !CLOSE_OUT_LABELS_TO_REMOVE.includes(l.name))
+        .map(l => l.id);
       if (!labelIds.includes(labelId)) {
         labelIds.push(labelId);
-        await issue.update({ labelIds });
       }
+      await issue.update({ labelIds });
     }
 
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on Linear`]);

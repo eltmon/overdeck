@@ -255,3 +255,23 @@ export function computeStats(nodes: readonly SequenceNode[], lk: ClassifyLookups
   }
   return stats;
 }
+
+export interface EpicGroups {
+  epics: Array<{ issue: string; rank: number }>;
+  contains: Array<{ epic: string; child: string }>;
+}
+
+export function computeEpicGroups(
+  nodes: readonly SequenceNode[],
+  edges: readonly { from: string; to: string; type: string }[],
+  lk: ClassifyLookups,
+): EpicGroups {
+  const epics = nodes
+    .filter((node) => classifyIssue(node, lk).epic)
+    .map((node) => ({ issue: node.issue, rank: node.rank }))
+    .sort((a, b) => a.rank - b.rank);
+  const contains = edges
+    .filter((edge) => edge.type === 'contains')
+    .map((edge) => ({ epic: edge.from, child: edge.to }));
+  return { epics, contains };
+}

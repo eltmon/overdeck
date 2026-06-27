@@ -30,6 +30,7 @@ import { compactBeads } from './compact-beads.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { getProjectConfigFromWorkspacePath, markRecordPipelineClosedOutSync } from '../pan-dir/record.js';
 
 const execAsync = promisify(exec);
 
@@ -212,7 +213,11 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start);
     }
 
-    // 8. Clear review status
+    // 8. Mark durable pipeline terminal before clearing the DB cache.
+    const markTerminal = yield* markPipelineClosedOutStep(ctx);
+    allSteps.push(markTerminal);
+
+    // 9. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
     allSteps.push(clearResult);
 
@@ -221,6 +226,22 @@ export function closeOut(
 
     return buildResult('close-out', ctx.issueId, allSteps, start);
   });
+}
+
+function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepResult> {
+  const step = 'close-out:mark-pipeline-terminal';
+  return Effect.try({
+    try: () => {
+      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
+      markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
+      return stepOk(step, ['Marked durable pipeline journal closed-out']);
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped(step, [`Pipeline terminal marker failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
+    ),
+  );
 }
 
 /**

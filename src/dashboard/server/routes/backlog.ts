@@ -16,7 +16,7 @@ import {
   applyIssueObjectionLabel, removeIssueObjectionLabel,
 } from '../../../lib/backlog/label-ops.js';
 import {
-  normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats,
+  normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats, computeEpicGroups,
   type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
@@ -124,6 +124,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             score: r.score,
             condition: r.condition,
             dependsOn: r.dependsOn,
+            isEpic: (r as { isEpic?: boolean }).isEpic ?? false,
             why: r.why,
             gate: r.gate,
             planning: r.planning,
@@ -298,7 +299,7 @@ const getBacklogForecastRoute = HttpRouter.add(
         const projectRoot = process.cwd();
         const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
         if (!existsSync(seqPath)) {
-          return jsonResponse({ n, stats: null, inFlight: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [] });
+          return jsonResponse({ n, stats: null, inFlight: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [], epics: [], contains: [] });
         }
         const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
         if (!parsed.ok) throw new Error(`parse error: ${parsed.error}`);
@@ -342,8 +343,13 @@ const getBacklogForecastRoute = HttpRouter.add(
         };
         const cohort = computeCohort(nodes, lk, n);
         const stats = computeStats(nodes, lk);
+        const groups = computeEpicGroups(nodes, parsed.doc.edges, lk);
+        const epics = groups.epics.map((e) => ({
+          issue: e.issue,
+          title: titleByIssue.get(e.issue.toUpperCase()) ?? '',
+        }));
 
-        return jsonResponse({ n, stats, inFlight, waves, lanes, cohort });
+        return jsonResponse({ n, stats, inFlight, waves, lanes, cohort, epics, contains: groups.contains });
       },
       catch: (err) => new Error(String(err)),
     });

@@ -56,7 +56,7 @@ export function enrichReviewNotesFromRecordSync(issueId: string, status: ReviewS
  */
 export function readJournalStatusSync(
   issueId: string,
-): { updatedAt: string; durable: Partial<ReviewStatus> } | null {
+): { updatedAt: string; durable: Partial<ReviewStatus> & { closedOut?: boolean; closedOutAt?: string } } | null {
   const p = readPipelineSync(issueId);
   if (!p) return null;
   return {
@@ -82,6 +82,8 @@ export function readJournalStatusSync(
       deaconIgnored: p.deaconIgnored,
       deaconIgnoredAt: p.deaconIgnoredAt,
       deaconIgnoredReason: p.deaconIgnoredReason,
+      closedOut: p.closedOut,
+      closedOutAt: p.closedOutAt,
     },
   };
 }

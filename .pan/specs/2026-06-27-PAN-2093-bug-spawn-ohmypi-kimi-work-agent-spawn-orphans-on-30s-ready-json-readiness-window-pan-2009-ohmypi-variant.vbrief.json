@@ -1,0 +1,225 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-27T05:25:08.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2093: ohmypi/kimi work-agent spawn orphans on the 30s ready.json readiness window (PAN-2009 ohmypi variant)",
+    "updated": "2026-06-27T15:01:38.587Z"
+  },
+  "plan": {
+    "id": "pan-2093",
+    "title": "bug(spawn): ohmypi/kimi work-agent spawn orphans on the 30s ready.json readiness window (PAN-2009 ohmypi variant)",
+    "status": "running",
+    "uid": "c178a696-924c-4a0a-a8fe-453a4de53213",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 9,
+    "created": "2026-06-27T05:25:08.000Z",
+    "updated": "2026-06-27T15:01:38.587Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2093",
+        "label": "PAN-2093",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2009",
+        "label": "PAN-2009 (pi/ohmypi dead-resume fix)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "spawn",
+      "ohmypi",
+      "kimi",
+      "deacon",
+      "readiness",
+      "lifecycle"
+    ],
+    "narratives": {
+      "Problem": "A freshly spawned ohmypi/kimi-k2.7-code WORK agent silently orphans. `pan start <id> --auto` logs 'ohmypi prompt delivery failed: ... did not become ready within 30s', prints '✔ Agent spawned', but NO live work tmux session exists; the Deacon marks it 'orphaned: tmux session missing (reconcile)' and it is stuck. Four independent root causes verified at f2bbe0291: RC-1 the readiness window is a hard-coded 30s, too short for kimi cold starts (waitForOhmypiAgentReady/writeOhmypiAgentPrompt timeoutSec=30 at src/lib/agents.ts:292,:428; SPAWN_READY_TIMEOUT_MS=30_000 at src/lib/runtimes/ohmypi.ts:58). RC-2 the work-agent spawn `spawnAgent` (src/lib/agents.ts:3778) NEVER sets tmux remain-on-exit (zero setOption calls in its body 3778-4130; buildNewSessionArgs doesn't either, src/lib/tmux.ts:651-672); the launcher runs `exec omp ...` (src/lib/launcher-generator.ts:638) so when omp exits the pane closes and the single-pane session is DESTROYED — the literal 'tmux session missing'. claude-code work agents are unaffected because Claude stays alive at its prompt. RC-3 the Deacon's dead-pane orphan check is gated to `planning-` sessions only (src/lib/cloister/deacon.ts:5800-5815), so once remain-on-exit is set a dead omp work pane would be mistaken for 'still running'. RC-4 orphan recovery calls resetAgentFailureCount outside the 120s rapid-post-resume-death window (src/lib/cloister/deacon.ts:5834-5842; RAPID_POST_RESUME_DEATH_MS=120_000 at :5742), so a slow re-orphan loop can fail to accrue to 'troubled' (maxConsecutiveFailures=3, backoff [5,30,120]s — src/lib/cloister/auto-resume-config.ts:9-13). The PAN-2009 dead-omp fresh-launch guard already covers ohmypi resume (agents.ts:5015-5099).",
+      "Proposal": "Fix all four root causes, scoping every behavioural change to the ohmypi harness (NFR-1). (1) Raise the ohmypi readiness window 30s->90s via a single named constant OHMYPI_READY_TIMEOUT_SEC, in both src/lib/agents.ts and the src/lib/runtimes/ohmypi.ts SPAWN_READY_TIMEOUT_MS, keeping it strictly below WORK_LAUNCHER_GRACE_MS (120s) — free on the happy path. (2) Set remain-on-exit=on + destroy-unattached=off on ohmypi work sessions in spawnAgent right after createSession (mirroring spawnRun:3724-3725), and extend the Deacon dead-pane check from `planning-` to also ohmypi work sessions so a dead omp pane is recovered, not treated as running. (3) Bound the Deacon re-spawn of orphaned ohmypi work agents so they accrue toward 'troubled' instead of looping forever, after first reproducing to confirm the exact current behaviour.",
+      "NonGoals": "- Do NOT re-implement PAN-2009's dead-process fresh-launch guard for ohmypi resume — it already exists (agents.ts:5015-5099).\n- Do NOT make the PTY supervisor eligible for the ohmypi harness; supervisor:ineligible:harness-ohmypi is correct (ohmypi delivers via FIFO, not PTY).\n- Do NOT introduce per-provider readiness-window classification or a new env config knob; a single raised ohmypi constant below the grace is sufficient.\n- Do NOT change the readiness window, remain-on-exit, dead-pane detection, or orphan-recovery/auto-resume behaviour for the claude-code or codex harnesses; every change is gated on harness === 'ohmypi'.\n- Do NOT alter the [5,30,120] backoff schedule, the maxConsecutiveFailures=3 cap, or the OVERDECK_NO_RESUME global kill switch.\n- Do NOT raise the readiness window to or above WORK_LAUNCHER_GRACE_MS (120s)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Raise the ohmypi readiness window to a named constant OHMYPI_READY_TIMEOUT_SEC = 90 (90_000ms in the runtime), not an env config knob.",
+        "rationale": "Simplicity first; matches the existing SPAWN_READY_TIMEOUT_MS constant style and lives in one place. An env knob would also need clamping below the 120s grace, adding complexity for little gain."
+      },
+      {
+        "summary": "Choose 90s specifically (not 120s) and preserve the invariant window < WORK_LAUNCHER_GRACE_MS (120s) via a comment + test.",
+        "rationale": "90s comfortably exceeds observed kimi cold starts while staying strictly below the work startup grace, so the Deacon cannot orphan the agent mid-cold-start while status='starting'."
+      },
+      {
+        "summary": "Scope remain-on-exit + dead-pane detection + re-spawn-bounding to the ohmypi harness only (gate on harness === 'ohmypi').",
+        "rationale": "claude-code/codex work panes stay alive at the prompt, so they neither vanish nor need the dead-pane branch. Gating keeps the blast radius minimal and satisfies NFR-1."
+      },
+      {
+        "summary": "Treat `supervisor:ineligible:harness-ohmypi` as expected, not a bug; do not broaden the PTY supervisor to ohmypi.",
+        "rationale": "The supervisor delivers prompts only for claude-code/codex; ohmypi correctly falls back to FIFO-RPC, which works once the readiness window is honoured."
+      }
+    ],
+    "items": [
+      {
+        "id": "raise-ohmypi-ready-window",
+        "title": "Raise the ohmypi ready.json readiness window from 30s to 90s",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T05:27:05.453Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Introduce `const OHMYPI_READY_TIMEOUT_SEC = 90;` in src/lib/agents.ts and use it as the default timeoutSec for BOTH waitForOhmypiAgentReady (:292) and writeOhmypiAgentPrompt (:428) — replacing the literal `= 30` defaults. This covers all five callers (spawnAgent :4085, spawnRun :3730, resumeAgent :5191, restartAgent :5398, recoverAgent :5582), which pass no override and inherit the default. Change SPAWN_READY_TIMEOUT_MS 30_000 -> 90_000 in src/lib/runtimes/ohmypi.ts (:58) for parity, keeping the OhmypiSpawnTimeout message accurate. Add a comment at BOTH constants documenting the invariant: the readiness window (90_000ms) MUST stay strictly below WORK_LAUNCHER_GRACE_MS (120_000ms, src/lib/cloister/agent-grace.ts:1) so the Deacon does not orphan the agent mid-cold-start. Verify no caller passes an explicit 30 that shadows the new default. Tests use fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync), NEVER real setTimeout."
+        },
+        "items": [
+          {
+            "id": "raise-ohmypi-ready-window.ac1",
+            "title": "Given ohmypi readiness, when ready.json appears at ~45s (after the old 30s deadline), then waitForOhmypiAgentReady resolves true and writeOhmypiAgentPrompt delivers the prompt — a fake-timer test that previously failed at 30s now passes at 90s.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "raise-ohmypi-ready-window.ac2",
+            "title": "Given ready.json never appears, then the ohmypi readiness wait gives up only after 90s (not 30s) on every ohmypi readiness path (work spawn, role-run, resume, restart, recover) and the runtime SPAWN_READY_TIMEOUT_MS defaults to 90_000ms.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "raise-ohmypi-ready-window.ac3",
+            "title": "A guard unit test fails (exits non-zero) when the readiness window is not strictly below WORK_LAUNCHER_GRACE_MS, i.e. it asserts OHMYPI_READY_TIMEOUT_SEC * 1000 < WORK_LAUNCHER_GRACE_MS (90s < 120s).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ohmypi-work-session-survives",
+        "title": "Keep the ohmypi work tmux session alive when omp is slow or exits, and detect dead omp panes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-27T05:27:05.453Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2093",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "bound-deacon-orphan-respawn"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "RC-2 fix: in src/lib/agents.ts spawnAgent (:3778), immediately after createSession(...) at :4056, when resolvedHarness === 'ohmypi', set `await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));` and `await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));` — copying spawnRun's :3724-3725 (setOption/exactPaneTarget are already imported at agents.ts:13). RC-3 fix: in src/lib/cloister/deacon.ts handleAgentHeartbeatDeadEvent (:5800-5815), broaden the dead-pane branch from `if (agentId.startsWith('planning-'))` to `if (agentId.startsWith('planning-') || state.harness === 'ohmypi')`, keeping the same pane_dead check body (state is in scope, used at :5826); a dead pane (pane_dead === '1') is killed and falls through to the orphan/stopped path, a live slow-booting pane still returns []. IMPLEMENTATION CHECKPOINT (slow-vs-dead omp): reproduce on a kimi-routed issue with remain-on-exit applied and capture the pane. If omp is alive but slow, Item raise-ohmypi-ready-window's larger window makes the kickoff succeed and the session stays live (done). If omp exits early with an auth/CLIProxy/model error, the now-preserved dead pane exposes it — file a SEPARATE substrate issue for that orthogonal omp-startup failure; PAN-2093's session-survival + recovery still apply. FALLBACK if no live repro is available: implement as specified (correct under both hypotheses) and note the deferred live confirmation in the PR. Use async tmux primitives only (setOption); NO execSync (deacon.ts is server-reachable). Tests use fake timers where any delay is involved."
+        },
+        "items": [
+          {
+            "id": "ohmypi-work-session-survives.ac1",
+            "title": "Given an ohmypi WORK agent spawned via spawnAgent, when createSession completes, then the session has remain-on-exit=on and destroy-unattached=off; given a claude-code or codex work agent spawned the same way, then NEITHER option is set (NFR-1).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ohmypi-work-session-survives.ac2",
+            "title": "Given an ohmypi work session whose omp process has exited (pane_dead=1), when handleAgentHeartbeatDeadEvent runs, then the agent is reset to 'stopped' (orphan recorded); given the pane is alive (omp still cold-starting), then it is left running; claude-code/codex dead/alive handling is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ohmypi-work-session-survives.ac3",
+            "title": "Given `pan start <id> --auto` on an ohmypi/kimi-routed issue with a slow omp cold start, then a live work tmux session is present in `tmux -L overdeck ls` (agent-<id>, not only agent-<id>-plan), the agent receives its kickoff and advances a bead, and there is no 'tmux session missing' for the merely-slow start.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bound-deacon-orphan-respawn",
+        "title": "Bound the Deacon's re-spawn of orphaned ohmypi work agents so they reach troubled instead of looping forever",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-27T05:27:05.453Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "IMPLEMENTATION CHECKPOINT FIRST: reproduce an orphaned ohmypi work agent on a kimi-routed issue and capture deacon.log plus the state.json transitions before editing the Deacon. Branch A (retried-but-not-bounding): orphan recovery calls resetAgentFailureCount (src/lib/cloister/deacon.ts:5837) for re-orphans that fall OUTSIDE the 120s rapid-post-resume-death window (isRapidPostResumeDeath / RAPID_POST_RESUME_DEATH_MS=120_000, :5742), so consecutiveFailures stays at 1 and the agent never reaches 'troubled' (maxConsecutiveFailures=3 within troubledWindowMs=10min; backoff [5,30,120]s — src/lib/cloister/auto-resume-config.ts:9-13) — fix by NOT resetting the count for readiness/orphan-class recurrences of an ohmypi work agent (mirror the existing isRapidPostResumeDeath skip-reset at :5836) so failures accrue and the agent bounds to 'troubled'. Branch B (never retried): a gate drops it (e.g. the backoff gate at deacon.ts:6762-6768 or the idle gate at :6831-6836) — fix the specific gate so an orphaned ohmypi work agent is eligible for bounded re-spawn. EITHER branch's change MUST be scoped so claude-code/codex orphan recovery is byte-for-byte unchanged (regression-test). This item depends on ohmypi-work-session-survives producing the recoverable 'stopped' state for dead ohmypi work panes. Record the reproduction findings in .pan/continue.json before the edit. All backoff/troubled tests use fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync), NEVER real waits (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "bound-deacon-orphan-respawn.ac1",
+            "title": "Given an ohmypi work agent that repeatedly orphans on readiness, when Deacon recovery runs across cycles, then consecutiveFailures accrues and the agent becomes 'troubled' after maxConsecutiveFailures within the troubled window (bounded retries) — verified by a fake-timer unit test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-deacon-orphan-respawn.ac2",
+            "title": "Given an orphaned ohmypi work agent within the troubled window and past its backoff, when the auto-resume patrol runs, then it re-spawns the agent (resumeAgent creates a fresh tmux session) rather than leaving it permanently stopped; given the agent is troubled or mid-backoff, then it is NOT re-spawned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-deacon-orphan-respawn.ac3",
+            "title": "Given an orphaned claude-code or codex agent, when Deacon recovery runs, then its failure-count and troubled behaviour are unchanged from before this change (regression test passes) (NFR-1).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "raise-ohmypi-ready-window",
+        "to": "ohmypi-work-session-survives",
+        "type": "blocks"
+      },
+      {
+        "from": "ohmypi-work-session-survives",
+        "to": "bound-deacon-orphan-respawn",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-27-PAN-2093-bug-spawn-ohmypi-kimi-work-agent-spawn-orphans-on-30s-ready-json-readiness-window-pan-2009-ohmypi-variant.vbrief.json"
+    }
+  },
+  "status": "active"
+}
