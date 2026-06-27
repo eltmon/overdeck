@@ -223,6 +223,25 @@ async function describePid(pid: number): Promise<string> {
     stage: 'dashboard',
     reason: `health check at ${url} did not pass within ${timeoutMs}ms (last: ${lastError})`,
   });
+}async function waitForTraefikHealthPromise(
+  traefikDomain: string,
+  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+): Promise<boolean> {
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const pollIntervalMs = opts.pollIntervalMs ?? 250;
+  const url = `https://${traefikDomain}/api/health`;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) return true;
+    } catch {
+      // ignore — keep polling until deadline
+    }
+    await sleep(pollIntervalMs);
+  }
+  return false;
 }async function isTraefikContainerRunningPromise(): Promise<boolean> {
   try {
     const { stdout } = await execAsync(
@@ -354,6 +373,13 @@ export const waitForDashboardHealth = (
   opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => waitForDashboardHealthPromise(apiPort, opts), catch: stageErrorOf('waitForDashboardHealth') });
+
+/** Effect variant of {@link waitForTraefikHealth}. Returns true when Traefik serves 200. */
+export const waitForTraefikHealth = (
+  traefikDomain: string,
+  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+): Effect.Effect<boolean, never> =>
+  Effect.promise(() => waitForTraefikHealthPromise(traefikDomain, opts));
 
 /** Effect variant of {@link isTraefikContainerRunning}. */
 export const isTraefikContainerRunning = (): Effect.Effect<boolean, never> =>

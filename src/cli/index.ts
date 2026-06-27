@@ -628,6 +628,45 @@ program
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
   .action(devCommand);
 
+/**
+ * Wait for the dashboard to be healthy, then — when Traefik is enabled — wait for
+ * the Traefik-routed URL to return 200. Returns the URL that should be announced
+ * and opened. Falls back to the direct localhost API port when Traefik is not
+ * ready within the bounded timeout.
+ */
+async function resolveDashboardReadyUrl(config: {
+  traefikEnabled: boolean;
+  traefikDomain: string;
+  dashboardPort: number;
+  dashboardApiPort: number;
+  healthTimeoutMs?: number;
+  traefikTimeoutMs?: number;
+}): Promise<{ readyUrl: string; apiUrl: string; traefikReady: boolean }> {
+  const { waitForDashboardHealth, waitForTraefikHealth } = await import('../lib/platform-lifecycle.js');
+  await Effect.runPromise(
+    waitForDashboardHealth(config.dashboardApiPort, { timeoutMs: config.healthTimeoutMs ?? 15_000 }),
+  );
+  if (config.traefikEnabled) {
+    const traefikReady = await Effect.runPromise(
+      waitForTraefikHealth(config.traefikDomain, { timeoutMs: config.traefikTimeoutMs ?? 10_000 }),
+    );
+    if (traefikReady) {
+      return {
+        readyUrl: `https://${config.traefikDomain}`,
+        apiUrl: `https://${config.traefikDomain}/api`,
+        traefikReady: true,
+      };
+    }
+    const readyUrl = `http://localhost:${config.dashboardApiPort}`;
+    return { readyUrl, apiUrl: readyUrl, traefikReady: false };
+  }
+  return {
+    readyUrl: `http://localhost:${config.dashboardPort}`,
+    apiUrl: `http://localhost:${config.dashboardApiPort}`,
+    traefikReady: false,
+  };
+}
+
 program
   .command('up')
   .description('Start dashboard (and Traefik if enabled)')
@@ -1107,30 +1146,68 @@ program
       // dashboard can't masquerade as healthy. On timeout we log a warning but
       // do NOT tear down CLIProxy/TLDR below — keeping the system in the best
       // recoverable state (dashboard-side failure, sidecars still usable).
+      let readyUrl: string;
+      let apiUrl: string;
       try {
-        const { waitForDashboardHealth } = await import('../lib/platform-lifecycle.js');
-        await Effect.runPromise(waitForDashboardHealth(dashboardApiPort, { timeoutMs: 15_000 }));
+        const resolved = await resolveDashboardReadyUrl({
+          traefikEnabled,
+          traefikDomain,
+          dashboardPort,
+          dashboardApiPort,
+        });
+        readyUrl = resolved.readyUrl;
+        apiUrl = resolved.apiUrl;
         console.log(chalk.green('✓ Dashboard started in background and passed /api/health'));
+        if (traefikEnabled && !resolved.traefikReady) {
+          console.log(
+            chalk.yellow(
+              `⚠ Traefik routing warming up — use ${readyUrl} meanwhile`,
+            ),
+          );
+        }
       } catch (err: any) {
+        readyUrl = traefikEnabled
+          ? `https://${traefikDomain}`
+          : `http://localhost:${dashboardPort}`;
+        apiUrl = traefikEnabled
+          ? `https://${traefikDomain}/api`
+          : `http://localhost:${dashboardApiPort}`;
         console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
         console.log(chalk.dim('  CLIProxy and Traefik have been left running — recover with `pan restart --dashboard` once the issue is fixed.'));
       }
-      if (traefikEnabled) {
-        console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
-        console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
-      } else {
-        console.log(`  Frontend: ${chalk.cyan(`http://localhost:${dashboardPort}`)}`);
-        console.log(`  API:      ${chalk.cyan(`http://localhost:${dashboardApiPort}`)}`);
-      }
+      console.log(`  Frontend: ${chalk.cyan(readyUrl)}`);
+      console.log(`  API:      ${chalk.cyan(apiUrl)}`);
     } else {
       // Run in foreground
-      if (traefikEnabled) {
-        console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
-        console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
-      } else {
-        console.log(`  Frontend: ${chalk.cyan(`http://localhost:${dashboardPort}`)}`);
-        console.log(`  API:      ${chalk.cyan(`http://localhost:${dashboardApiPort}`)}`);
+      let readyUrl: string;
+      let apiUrl: string;
+      try {
+        const resolved = await resolveDashboardReadyUrl({
+          traefikEnabled,
+          traefikDomain,
+          dashboardPort,
+          dashboardApiPort,
+        });
+        readyUrl = resolved.readyUrl;
+        apiUrl = resolved.apiUrl;
+        if (traefikEnabled && !resolved.traefikReady) {
+          console.log(
+            chalk.yellow(
+              `⚠ Traefik routing warming up — use ${readyUrl} meanwhile`,
+            ),
+          );
+        }
+      } catch (err: any) {
+        readyUrl = traefikEnabled
+          ? `https://${traefikDomain}`
+          : `http://localhost:${dashboardPort}`;
+        apiUrl = traefikEnabled
+          ? `https://${traefikDomain}/api`
+          : `http://localhost:${dashboardApiPort}`;
+        console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
       }
+      console.log(`  Frontend: ${chalk.cyan(readyUrl)}`);
+      console.log(`  API:      ${chalk.cyan(apiUrl)}`);
       console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
 
       const child = spawn(node22, [bundledServer], {
