@@ -34,7 +34,7 @@
     }
   ],
   "created": "2026-06-27T03:27:37.390Z",
-  "updated": "2026-06-27T08:12:28.404Z",
+  "updated": "2026-06-27T08:18:49.868Z",
   "pipeline": {
     "issueId": "PAN-2088",
     "reviewStatus": "blocked",
@@ -42,7 +42,7 @@
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T08:12:26.784Z",
+    "updatedAt": "2026-06-27T08:18:49.841Z",
     "reviewNotes": "control-ack route rejects extension POSTs without Origin, so every control-channel command times out",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2097",
     "reviewRequestedAt": "2026-06-27T08:09:53.029Z"
@@ -83,7 +83,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.49788,
-        "pricingAsOf": "2026-06-27T08:12:26.814Z"
+        "pricingAsOf": "2026-06-27T08:18:49.867Z"
       }
     },
     "merges": [
