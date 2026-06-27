@@ -1,12 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
   getNoResumeMode: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
+  listProjectsSync: vi.fn(),
   listSessionNames: vi.fn(),
+  reapIssueResidue: vi.fn(),
+  resolveProjectForIssue: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -17,6 +23,20 @@ vi.mock('../../agents.js', () => ({
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntrySync,
+}));
+
+vi.mock('../../paths.js', () => ({
+  get AGENTS_DIR() {
+    return `${process.env.OVERDECK_HOME ?? '/tmp'}/agents`;
+  },
+}));
+
+vi.mock('../../projects.js', () => ({
+  listProjectsSync: mocks.listProjectsSync,
+}));
+
+vi.mock('../../pan-dir/record.js', () => ({
+  resolveProjectForIssue: mocks.resolveProjectForIssue,
 }));
 
 vi.mock('../../tmux.js', () => ({
@@ -31,16 +51,32 @@ vi.mock('../issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
 }));
 
+vi.mock('../reap-issue-residue.js', () => ({
+  reapIssueResidue: mocks.reapIssueResidue,
+}));
+
 import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
 
 describe('reconcileClosedIssueAgents', () => {
+  let overdeckHome: string;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    overdeckHome = mkdtempSync(join(tmpdir(), 'closed-issue-reaper-'));
+    process.env.OVERDECK_HOME = overdeckHome;
     mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
+    mocks.listProjectsSync.mockReturnValue([]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.reapIssueResidue.mockResolvedValue([]);
+    mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
     mocks.isIssueClosed.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    rmSync(overdeckHome, { recursive: true, force: true });
+    delete process.env.OVERDECK_HOME;
   });
 
   it('stops running agents whose parent issue is closed', async () => {
@@ -156,6 +192,48 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.listRunningAgents).not.toHaveBeenCalled();
     expect(mocks.listSessionNames).not.toHaveBeenCalled();
     expect(mocks.isIssueClosed).not.toHaveBeenCalled();
+    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
     expect(mocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('reaps closed pure-disk residue discovered from configured project workspaces', async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'closed-project-'));
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-5555'), { recursive: true });
+    mocks.listProjectsSync.mockReturnValue([{ key: 'overdeck', config: { name: 'Overdeck', path: projectPath } }]);
+    mocks.isIssueClosed.mockImplementation(async (issueId: string) => issueId === 'PAN-5555');
+    mocks.reapIssueResidue.mockResolvedValue(['removed residue PAN-5555']);
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual(['removed residue PAN-5555']);
+
+    expect(mocks.reapIssueResidue).toHaveBeenCalledTimes(1);
+    expect(mocks.reapIssueResidue).toHaveBeenCalledWith(projectPath, 'PAN-5555');
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('reaps closed pure-disk residue discovered from agent state directories', async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'closed-project-'));
+    mkdirSync(join(overdeckHome, 'agents', 'agent-pan-5556'), { recursive: true });
+    mocks.resolveProjectForIssue.mockReturnValue({ name: 'Overdeck', path: projectPath });
+    mocks.isIssueClosed.mockImplementation(async (issueId: string) => issueId === 'PAN-5556');
+    mocks.reapIssueResidue.mockResolvedValue(['removed agent residue PAN-5556']);
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual(['removed agent residue PAN-5556']);
+
+    expect(mocks.reapIssueResidue).toHaveBeenCalledTimes(1);
+    expect(mocks.reapIssueResidue).toHaveBeenCalledWith(projectPath, 'PAN-5556');
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('preserves open pure-disk residue', async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'open-project-'));
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-5557'), { recursive: true });
+    mocks.listProjectsSync.mockReturnValue([{ key: 'overdeck', config: { name: 'Overdeck', path: projectPath } }]);
+    mocks.isIssueClosed.mockResolvedValue(false);
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-5557');
+    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
+    rmSync(projectPath, { recursive: true, force: true });
   });
 });

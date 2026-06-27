@@ -1,10 +1,16 @@
 import { Effect } from 'effect';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { listRunningAgents, stopAgent } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
+import { AGENTS_DIR } from '../paths.js';
+import { listProjectsSync } from '../projects.js';
+import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { listSessionNames } from '../tmux.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { isIssueClosed } from './issue-closed.js';
+import { reapIssueResidue } from './reap-issue-residue.js';
 
 // Sessions reaped by NAME as a backstop: inspect sessions never have agent
 // state, and strike sessions can outlive their state entry (e.g. state already
@@ -12,6 +18,69 @@ import { isIssueClosed } from './issue-closed.js';
 function issueIdFromStatelessSession(sessionName: string): string | null {
   const match = sessionName.match(/^(?:inspect|strike)-([a-z0-9]+-\d+)(?:-|$)/i);
   return match ? match[1].toUpperCase() : null;
+}
+
+function issueIdFromFeatureWorkspace(entryName: string): string | null {
+  const match = entryName.match(/^feature-([a-z]+-\d+)$/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function issueIdFromAgentDir(entryName: string): string | null {
+  const match = entryName.match(/^agent-([a-z]+-\d+)$/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+async function isClosedIssue(
+  issueId: string,
+  closedChecks: Map<string, Promise<boolean>>,
+): Promise<boolean> {
+  let promise = closedChecks.get(issueId);
+  if (!promise) {
+    promise = isIssueClosed(issueId);
+    closedChecks.set(issueId, promise);
+  }
+  return promise;
+}
+
+async function reapClosedIssueResidue(
+  projectPath: string,
+  issueId: string,
+  actions: string[],
+  reapedIssueKeys: Set<string>,
+): Promise<void> {
+  const key = `${projectPath}:${issueId}`;
+  if (reapedIssueKeys.has(key)) return;
+  reapedIssueKeys.add(key);
+  actions.push(...await reapIssueResidue(projectPath, issueId));
+}
+
+async function reapResolvedIssueResidue(
+  issueId: string,
+  actions: string[],
+  reapedIssueKeys: Set<string>,
+): Promise<void> {
+  const project = resolveProjectForIssue(issueId);
+  if (!project) return;
+  await reapClosedIssueResidue(project.path, issueId, actions, reapedIssueKeys);
+}
+
+function listConfiguredProjects(): Array<{ path: string }> {
+  try {
+    return listProjectsSync().map(({ config }) => ({ path: config.path }));
+  } catch {
+    return [];
+  }
+}
+
+function listDirectoryNames(path: string): string[] {
+  if (!existsSync(path)) return [];
+  try {
+    return readdirSync(path, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
 }
 
 async function stopClosedAgent(agentId: string, issueId: string, actions: string[]): Promise<void> {
@@ -44,6 +113,7 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
 
   const actions: string[] = [];
   const reapedAgentIds = new Set<string>();
+  const reapedIssueKeys = new Set<string>();
 
   // Stop running agents for this issue.
   const agents = await Effect.runPromise(listRunningAgents());
@@ -67,6 +137,7 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
     reapedAgentIds.add(sessionName);
   }
 
+  await reapResolvedIssueResidue(upperIssueId, actions, reapedIssueKeys);
   return actions;
 }
 
@@ -81,6 +152,8 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   const actions: string[] = [];
   const closedChecks = new Map<string, Promise<boolean>>();
   const reapedAgentIds = new Set<string>();
+  const closedIssueIds = new Set<string>();
+  const reapedIssueKeys = new Set<string>();
   const agents = await Effect.runPromise(listRunningAgents());
 
   for (const agent of agents) {
@@ -89,15 +162,11 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     const issueId = (agent.issueId ?? '').trim().toUpperCase();
     if (!issueId) continue;
 
-    let promise = closedChecks.get(issueId);
-    if (!promise) {
-      promise = isIssueClosed(issueId);
-      closedChecks.set(issueId, promise);
-    }
-    if (!await promise) continue;
+    if (!await isClosedIssue(issueId, closedChecks)) continue;
 
     await stopClosedAgent(agent.id, issueId, actions);
     reapedAgentIds.add(agent.id);
+    closedIssueIds.add(issueId);
   }
 
   const sessionNames = await Effect.runPromise(listSessionNames());
@@ -107,15 +176,32 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     const issueId = issueIdFromStatelessSession(sessionName);
     if (!issueId) continue;
 
-    let promise = closedChecks.get(issueId);
-    if (!promise) {
-      promise = isIssueClosed(issueId);
-      closedChecks.set(issueId, promise);
-    }
-    if (!await promise) continue;
+    if (!await isClosedIssue(issueId, closedChecks)) continue;
 
     await stopClosedAgent(sessionName, issueId, actions);
     reapedAgentIds.add(sessionName);
+    closedIssueIds.add(issueId);
+  }
+
+  for (const issueId of closedIssueIds) {
+    await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
+  }
+
+  for (const project of listConfiguredProjects()) {
+    const workspacesDir = join(project.path, 'workspaces');
+    for (const entryName of listDirectoryNames(workspacesDir)) {
+      const issueId = issueIdFromFeatureWorkspace(entryName);
+      if (!issueId) continue;
+      if (!await isClosedIssue(issueId, closedChecks)) continue;
+      await reapClosedIssueResidue(project.path, issueId, actions, reapedIssueKeys);
+    }
+  }
+
+  for (const entryName of listDirectoryNames(AGENTS_DIR)) {
+    const issueId = issueIdFromAgentDir(entryName);
+    if (!issueId) continue;
+    if (!await isClosedIssue(issueId, closedChecks)) continue;
+    await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
   }
 
   return actions;

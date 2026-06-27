@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 let mockExecAsync: ReturnType<typeof vi.fn>;
 
+const { mockLinearIssues, mockLinearIssueLabels } = vi.hoisted(() => ({
+  mockLinearIssues: vi.fn().mockResolvedValue({ nodes: [] }),
+  mockLinearIssueLabels: vi.fn().mockResolvedValue({ nodes: [] }),
+}));
+
 vi.mock('child_process', () => ({
   exec: vi.fn(),
   execFile: vi.fn(),
@@ -30,8 +35,18 @@ vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
   getLinearApiKey: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('@linear/sdk', () => ({
+  LinearClient: vi.fn().mockImplementation(function () {
+    return {
+      issues: mockLinearIssues,
+      issueLabels: mockLinearIssueLabels,
+      createIssueLabel: vi.fn(),
+    };
+  }),
+}));
+
 import { Effect } from 'effect';
-import { closeIssue as closeIssueProgram, WORKFLOW_LABELS } from '../../../../src/lib/lifecycle/close-issue.js';
+import { closeIssue as closeIssueProgram, POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from '../../../../src/lib/lifecycle/close-issue.js';
 
 const closeIssue = (...args: Parameters<typeof closeIssueProgram>) =>
   Effect.runPromise(closeIssueProgram(...args));
@@ -44,6 +59,8 @@ describe('close-issue', () => {
       if (command.includes('gh pr list')) return { stdout: '', stderr: '' };
       return { stdout: '', stderr: '' };
     });
+    mockLinearIssues.mockResolvedValue({ nodes: [] });
+    mockLinearIssueLabels.mockResolvedValue({ nodes: [] });
   });
 
   afterEach(() => {
@@ -142,6 +159,8 @@ describe('close-issue', () => {
       expect(editCalls).toHaveLength(1);
       expect(editCalls[0]).toContain('--remove-label "verifying-on-main"');
       expect(editCalls[0]).toContain('--remove-label "needs-close-out"');
+      expect(editCalls[0]).toContain('--remove-label "merged"');
+      expect(editCalls[0]).toContain('--remove-label "ready"');
     });
 
     it('should skip labels when applyLabel is false', async () => {
@@ -174,6 +193,62 @@ describe('close-issue', () => {
       expect(closeResult).toBeUndefined();
     });
   });
+
+  describe('tracker label management', () => {
+    it('removes workflow and post-merge residue labels through the tracker abstraction', async () => {
+      const updateIssue = vi.fn(() => Effect.succeed(undefined));
+      const tracker = {
+        name: 'github',
+        transitionIssue: vi.fn(() => Effect.succeed(undefined)),
+        addComment: vi.fn(() => Effect.succeed(undefined)),
+        getIssue: vi.fn(() => Effect.succeed({
+          labels: ['bug', 'merged', 'ready', 'needs-close-out', 'verifying-on-main'],
+        })),
+        updateIssue,
+      } as any;
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: '/tmp/test',
+      };
+
+      await closeIssue(ctx, { tracker, applyLabel: true });
+
+      expect(updateIssue).toHaveBeenCalledWith('PAN-100', {
+        labels: ['bug', 'closed-out'],
+      });
+    });
+  });
+
+  describe('Linear label management', () => {
+    it('removes workflow and post-merge residue labels when applying closed-out', async () => {
+      const update = vi.fn().mockResolvedValue(undefined);
+      const labels = vi.fn().mockResolvedValue({
+        nodes: [
+          { id: 'bug-id', name: 'bug' },
+          { id: 'merged-id', name: 'merged' },
+          { id: 'ready-id', name: 'ready' },
+          { id: 'needs-close-out-id', name: 'needs-close-out' },
+        ],
+      });
+      mockLinearIssues.mockResolvedValue({
+        nodes: [{ labels, update }],
+      });
+      mockLinearIssueLabels.mockResolvedValue({
+        nodes: [{ id: 'closed-out-id', name: 'closed-out' }],
+      });
+      const { getLinearApiKey } = await import('../../../../src/lib/lifecycle/types.js');
+      vi.mocked(getLinearApiKey).mockResolvedValueOnce('linear-key');
+      const ctx = {
+        issueId: 'MIN-100',
+        projectPath: '/tmp/test',
+      };
+
+      const results = await closeIssue(ctx, { applyLabel: true, labelOnly: true });
+
+      expect(results.find(r => r.step === 'close-issue:label')?.success).toBe(true);
+      expect(update).toHaveBeenCalledWith({ labelIds: ['bug-id', 'closed-out-id'] });
+    });
+  });
 });
 
 describe('WORKFLOW_LABELS — canonical current-phase labels stripped on close', () => {
@@ -185,5 +260,13 @@ describe('WORKFLOW_LABELS — canonical current-phase labels stripped on close',
 
   it("includes 'planned' (regression: its absence left ~82 closed issues falsely labelled)", () => {
     expect(WORKFLOW_LABELS).toContain('planned');
+  });
+});
+
+describe('POST_MERGE_RESIDUE_LABELS — non-terminal post-merge labels stripped on close-out', () => {
+  it("contains exactly 'merged' and 'ready' without changing WORKFLOW_LABELS", () => {
+    expect(POST_MERGE_RESIDUE_LABELS).toEqual(['merged', 'ready']);
+    expect(WORKFLOW_LABELS).not.toContain('merged');
+    expect(WORKFLOW_LABELS).not.toContain('ready');
   });
 });

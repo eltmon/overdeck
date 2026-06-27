@@ -82,6 +82,8 @@ export interface PanIssuePipelineRecord {
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;
   deaconIgnoredReason?: string;
+  closedOut?: boolean;
+  closedOutAt?: string;
   reviewerVerdicts?: unknown;
   updatedAt: string;
 }
@@ -523,6 +525,23 @@ export function clearRecordFeedbackSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   record.feedback = [];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Mark the durable pipeline journal as terminal after close-out (sync). */
+export function markRecordPipelineClosedOutSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  const now = new Date().toISOString();
+  record.pipeline.closedOut = true;
+  record.pipeline.closedOutAt = now;
+  record.pipeline.readyForMerge = false;
+  record.pipeline.verificationStatus = undefined;
+  record.pipeline.mergeStatus = 'merged';
+  record.pipeline.updatedAt = now;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }

@@ -16,6 +16,7 @@ const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
 const mockListOverdeckAgentStatesSync = vi.hoisted(() => vi.fn());
+const mockGetProjectSync = vi.hoisted(() => vi.fn());
 
 // records.ts now imports from overdeck/cost-sync (not database/cost-events-db)
 vi.mock('../../overdeck/cost-sync.js', () => ({
@@ -43,6 +44,7 @@ vi.mock('../../projects.js', async () => {
   const actual = await vi.importActual<typeof import('../../projects.js')>('../../projects.js');
   return {
     ...actual,
+    getProjectSync: mockGetProjectSync,
     resolveProjectFromIssueSync: mockResolveProjectFromIssueSync,
   };
 });
@@ -52,9 +54,11 @@ vi.mock('../../projects.js', async () => {
 import {
   buildIssueRecord,
   getIssueRecordPath,
+  markRecordPipelineClosedOutSync,
   writeIssueRecordSync,
   queueIssueRecordCommit,
   readIssueRecord,
+  updateIssueRecordForIssue,
   claimIssueOwner,
   clearIssueOwner,
 } from '../records.js';
@@ -262,6 +266,94 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
       paths: [recordPath],
       subject: 'chore(records): update PAN-1908 per-issue record',
     });
+  });
+});
+
+describe('markRecordPipelineClosedOutSync', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-closed-out-'));
+    mockQueueAutoCommit.mockClear();
+    mockGetProjectSync.mockReset();
+    mockResolveProjectFromIssueSync.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('marks the durable pipeline journal closed-out and terminal', () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-2054', {
+      issueId: 'PAN-2054',
+      schemaVersion: 2,
+      pipeline: {
+        issueId: 'PAN-2054',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'running',
+        mergeStatus: 'pending',
+        readyForMerge: true,
+        updatedAt: '2026-06-15T00:00:00.000Z',
+      },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+
+    markRecordPipelineClosedOutSync(project, 'PAN-2054');
+
+    const record = readIssueRecordSync(project, 'PAN-2054');
+    expect(record?.pipeline.closedOut).toBe(true);
+    expect(record?.pipeline.closedOutAt).toEqual(expect.any(String));
+    expect(Number.isNaN(Date.parse(record?.pipeline.closedOutAt ?? ''))).toBe(false);
+    expect(record?.pipeline.readyForMerge).toBe(false);
+    expect(record?.pipeline.verificationStatus).toBeUndefined();
+    expect(record?.pipeline.mergeStatus).toBe('merged');
+    expect(record?.pipeline.updatedAt).toBe(record?.pipeline.closedOutAt);
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+
+  it('preserves closed-out markers when updateIssueRecordForIssue rebuilds the record', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-2054', {
+      issueId: 'PAN-2054',
+      schemaVersion: 2,
+      pipeline: {
+        issueId: 'PAN-2054',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+        mergeStatus: 'merged',
+        closedOut: true,
+        closedOutAt: '2026-06-27T00:00:00.000Z',
+        updatedAt: '2026-06-27T00:00:00.000Z',
+      },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
+    mockGetCostForIssueFromDb.mockReturnValue(null);
+    mockGetMergeSetSync.mockReturnValue(null);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
+    mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'test', projectPath: project.path });
+    mockGetProjectSync.mockReturnValue(project);
+
+    await updateIssueRecordForIssue('PAN-2054', {
+      issueId: 'PAN-2054',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      verificationStatus: 'pending',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: '2026-06-27T01:00:00.000Z',
+    });
+
+    const record = readIssueRecordSync(project, 'PAN-2054');
+    expect(record?.pipeline.closedOut).toBe(true);
+    expect(record?.pipeline.closedOutAt).toBe('2026-06-27T00:00:00.000Z');
   });
 });
 

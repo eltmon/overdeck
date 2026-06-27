@@ -11,10 +11,11 @@ import { tmpdir } from 'os';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync, mockClearReviewStatus, mockResetPostMergeState } = vi.hoisted(() => ({
+const { mockExecAsync, mockClearReviewStatus, mockResetPostMergeState, mockMarkRecordPipelineClosedOutSync } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
   mockResetPostMergeState: vi.fn(),
+  mockMarkRecordPipelineClosedOutSync: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -61,6 +62,15 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: mockClearReviewStatus,
 }));
+
+vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/pan-dir/record.js')>();
+  return {
+    ...actual,
+    getProjectConfigFromWorkspacePath: vi.fn((workspacePath: string) => ({ name: 'inferred', path: workspacePath })),
+    markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
+  };
+});
 
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
   resetPostMergeState: mockResetPostMergeState,
@@ -318,6 +328,38 @@ describe('workflows', () => {
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
+    });
+
+    it('marks the durable pipeline terminal before clearing review status', async () => {
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      const markerIdx = result.steps.findIndex(s => s.step === 'close-out:mark-pipeline-terminal');
+      const clearIdx = result.steps.findIndex(s => s.step === 'clear-review-status');
+      expect(markerIdx).toBeGreaterThanOrEqual(0);
+      expect(clearIdx).toBeGreaterThanOrEqual(0);
+      expect(markerIdx).toBeLessThan(clearIdx);
+      expect(mockMarkRecordPipelineClosedOutSync).toHaveBeenCalledWith(
+        { name: 'inferred', path: testDir },
+        'PAN-100',
+      );
+    });
+
+    it('preserves close-out success when the durable pipeline marker fails', async () => {
+      mockMarkRecordPipelineClosedOutSync.mockImplementationOnce(() => {
+        throw new Error('record unavailable');
+      });
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      const marker = result.steps.find(s => s.step === 'close-out:mark-pipeline-terminal');
+      expect(marker?.success).toBe(true);
+      expect(marker?.skipped).toBe(true);
+      expect(marker?.details?.[0]).toContain('record unavailable');
+      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(true);
+      expect(result.success).toBe(true);
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {
