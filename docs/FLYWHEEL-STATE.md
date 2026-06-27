@@ -2601,3 +2601,65 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
   1982/806/1864 (planning stopped, stack-broken). The critical path to unblocking the kimi-blocked majority:
   PAN-2101 lands → operator reconciles primary (PAN-2095) + `pan reload` → re-spawn kimi agent → read the now-
   captured output.log crash → file/fix the real omp root cause.
+
+## RUN-30 tick 1 (2026-06-27 ~16:34Z) — RED MAIN (stale kimi→ohmypi tests after PAN-2102); ohmypi-orphan saga RESOLVED (kimi→claude-code LIVE)
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. Cohort (17): 1919, 1982, 806,
+1864, 1084, 2086, 2054, 1559, 1638, 1652, 1718, 1722, 1793, 1900, 2081, 1884, 2063.
+
+- **DURABLE LESSON — the ohmypi-orphan saga is OVER. PAN-2102 routed kimi→claude-code and it is
+  DEPLOYED LIVE.** `agent-pan-1718` and `agent-pan-2086` (both Model kimi-k2.7-code, Role work)
+  are RUNNING on Harness **claude-code** for 76-79 min with NO orphaning. omp v16.1.16 broke
+  ohmypi's kimi launch; kimi now exposes a native Anthropic-compatible endpoint (api.kimi.com/coding
+  + sk-kimi-* token), so claude-code talks to it directly — no omp, no CLIProxy, no orphan. **All
+  prior "pan start is structurally blocked for kimi / only codex strikes work" lessons (RUN-20/22)
+  are SUPERSEDED — `pan start` for kimi issues now flows.** The dist grep for the code comment
+  returns 0 only because tsdown strips comments; verify routing by inspecting RUNNING agent rows,
+  not the dist binary.
+
+- **RED MAIN (P0): stale unit tests still expect kimi→ohmypi after the intentional PAN-2102 source
+  change.** Main CI `failure` since `4e8ebb068` (~15:08Z), still red at HEAD `cfff78aff`. 4 assertions
+  across `tests/unit/lib/providers.test.ts` (lines 10, 35) and `tests/unit/lib/harness-resolve.test.ts`
+  (lines 101, 169) assert the OLD `ohmypi` default; the source (`src/lib/providers.ts:77-84`, with an
+  explicit "claude-code, not ohmypi (PAN-2102)" comment) returns `claude-code`. The change is
+  INTENTIONAL and correct; the tests were never updated. The red commit `cfff78aff` (PAN-2102 idle-nudge)
+  did NOT touch providers.ts — it is just the commit CI happened to run on; red began at the prior
+  beads-sync run. Red main empties the merge gate: PAN-1718 (PR #2103) and PAN-1919 (PR #1950) inherit
+  the failing `test` check.
+
+- **Filed PAN-2104 (red-main, bug/critical/blocks-main) + struck it on codex in the same tick.**
+  `pan strike PAN-2104 --harness codex` → `strike-pan-2104` (test-only fix: update the 4 stale
+  assertions to expect claude-code). Strike ran the full gate, correctly distinguished the broad
+  local test failures as SANDBOX EPERM (git spawnSync/socket listen/read-only Vite cache) — not its
+  change — and reran with auto-approved escalation. Competent, flowing, not wedged.
+
+- **Cohort is GATE-BOUND, not capacity-bound — do NOT pile more into a jammed gate.** 8/17 terminal-or-
+  parked (1559/1638/1652/1722/1793/1900 terminal; 1864 parked). The 9 active are held by: red main
+  (1718/1919, clearing via strike-2104), operator UAT/merge (require_uat=true), close-out tail
+  (2054/2081/2088 merged but stuck — see below), broken docker stacks (1084/1884/2063/1982/806), and
+  human-held objection (806). minAgents=2 already exceeded by productive kimi agents (1718/2086) +
+  strike-2104. Launched NO additional ready+planned work this tick — the bottleneck is the gate, and
+  the ready+planned cohort members (1084/1884/2063) all have BROKEN workspace stacks.
+
+- **PAN-2054 close-out-terminality fix IS deployed (9681cc95 in primary HEAD; server started after
+  the providers change landed) but 2054/2081/2088 REMAIN stuck at `in-review`/`merged`.** This is the
+  fix-itself-caught-in-its-own-bug case (RUN-22): they merged BEFORE the fix was active and the
+  close-out tail never advanced. Now-deployed close-out machinery does NOT retroactively re-process
+  already-stuck issues — they need a close-out re-trigger or operator force-close. `pan close` is
+  gated to verifying-on-main/completed (these are still in-review+merged), so the flywheel cannot
+  cleanly close them this tick. Surfaced as an unblock/merge suggestion.
+
+- **The 3 ready+planned cohort members (PAN-1084 critical/security, PAN-1884, PAN-2063) are blocked
+  by BROKEN workspace docker stacks** ("No Docker containers found" / services exited 130/143/255),
+  same family as the RUN-3 stack-broken stall. PAN-1618 self-heal should rebuild on a fresh spawn,
+  but their planning agents are stopped at the `Boot --no-resume` gate. After red main clears and the
+  gate unjams, re-engaging these via `pan start <id>` (now kimi→claude-code safe) is the next lever;
+  expect the self-heal rebuild on spawn.
+
+- Next tick: (1) verify strike-2104 landed green on origin/main → main CI green → close PAN-2104;
+  (2) re-check PAN-1718/1919 gate (1919 still has a merge_conflict independent of red main — needs
+  rebase, `pan sync-main` is flywheel-forbidden → surface); (3) decide on the 2054/2081/2088 close-out
+  tail (re-trigger vs operator force-close); (4) once gate unjams, `pan start` the stack-broken ready+
+  planned cohort members (1084/1884/2063) — kimi spawns are now safe. MIN-831/846 still operator
+  UAT/merge-gated.
