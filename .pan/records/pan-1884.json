@@ -10,6 +10,13 @@
     }
   ],
   "feedback": [],
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed",
+    "auto-start.ac2": "completed",
+    "auto-start.ac3": "completed",
+    "auto-start.ac4": "completed"
+  },
   "created": "2026-06-26T03:32:56.369Z",
   "updated": "2026-06-27T17:15:05.425Z",
   "pipeline": {
