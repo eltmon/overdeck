@@ -31,28 +31,44 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).toMatch(/--permission-mode auto/)
   })
 
-  it('Anthropic + Auto + work role: uses roles/work.md, preserves model override, and no DSP or permission flag', async () => {
+  // PAN-2087: Claude Code 2.1.195 dropped `--agent <file>` support, so role
+  // definition FILES (roles/<role>.md) are injected as an appended system prompt
+  // instead. Registered agent NAMES (pan-*-agent) still launch via `--agent`.
+
+  it('Anthropic + Auto + work role: injects roles/work.md as system prompt, preserves model override, no DSP', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/work.md')
-    expect(cmd).toMatch(/--agent roles\/work\.md/)
+    expect(cmd).not.toMatch(/--agent /)                                   // no --agent for role FILES
+    expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/)
+    expect(cmd).toMatch(/--effort high/)                                  // from roles/work.md frontmatter
     expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
-    expect(cmd).not.toMatch(/--agent pan-work-agent/)
+    expect(cmd).toMatch(/--permission-mode auto/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('Anthropic + Auto + plan role: uses roles/plan.md and no DSP or permission flag', async () => {
+  it('Anthropic + Auto + plan role: injects roles/plan.md as system prompt, no DSP', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-opus-4-7', 'planning-pan-1', 'roles/plan.md')
-    expect(cmd).toMatch(/--agent roles\/plan\.md/)
-    expect(cmd).not.toMatch(/--agent pan-planning-agent/)
+    expect(cmd).not.toMatch(/--agent /)
+    expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/plan\.md'/)
+    expect(cmd).toMatch(/--permission-mode auto/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('role runtime command uses --agent when the role definition file exists', async () => {
-    const cmd = await getRoleRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
-    expect(cmd).toMatch(/--agent roles\/work\.md/)
+  it('registered agent NAME still launches via --agent <name> (not a file → not injected)', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'pan-review-agent')
+    expect(cmd).toMatch(/--agent pan-review-agent/)
+    expect(cmd).not.toMatch(/--append-system-prompt-file/)
     expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
-    expect(cmd).not.toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+  })
+
+  it('role runtime command injects the role system prompt when the role definition file exists', async () => {
+    const cmd = await getRoleRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
+    expect(cmd).not.toMatch(/--agent /)
+    expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/)
+    expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
+    expect(cmd).toMatch(/--permission-mode auto/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
   })
 
@@ -129,12 +145,15 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).toMatch(/bypassPermissions/)
   })
 
-  it('Anthropic + PAN_YOLO=true + --agent: launches via role definition, never DSP', async () => {
+  it('Anthropic + PAN_YOLO=true + work role: injects role system prompt, bypass via --permission-mode, never DSP', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/work.md')
-    // The --agent path defers permission mode to the role frontmatter — no DSP, no flag.
+    // PAN-2087: role FILES are injected, not passed to --agent. Bypass is expressed
+    // via --permission-mode bypassPermissions (DSP was removed 2026-05-30), never DSP.
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
-    expect(cmd).toMatch(/--agent roles\/work\.md/)
+    expect(cmd).not.toMatch(/--agent /)
+    expect(cmd).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/)
+    expect(cmd).toMatch(/bypassPermissions/)
   })
 
   // ── Sanity: command never emits DSP under Auto across the surface ─────────

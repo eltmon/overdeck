@@ -2039,3 +2039,186 @@ Operator nudged a 4th time. PAN-1790 strike also failed worktree creation (3 of 
   - **The recurring local-main divergence blocks strike landings.** Strikes using the main-push pattern refuse to push
     when local main is ahead of origin with unrelated record/state commits. Reconcile (commit doc → `git pull --rebase`
     → push) at the first sign of strike-landing friction. (Reaffirmed; main self-reconciled via close-outs this time.)
+
+
+## RUN-17 tick 1 (2026-06-26 ~03:33Z) — RED MAIN from PAN-2059 filed+struck; snapshot emitted
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false` (assumed default), `require_uat_before_merge=true` (assumed default).
+Run ID RUN-17 follows RUN-16 (2026-06-25); the older RUN-32/34/35 entries above are a prior numbering era.
+No `cohort.json` was written for this run (manual orchestrator start) → cohort-drain completion cannot be
+mechanically determined; treat in-flight + the red-main fix as the de-facto cohort.
+
+- **MAIN RED at origin `75d5ec23f` (CI `failure`, run 28215144023).** The 3 most recent commits are all
+  PAN-2059 (backlog pickup controls): `cd74bfce0` → `d5ab0c3ad` → `75d5ec23f`. Previous green run was
+  `7a40f988c` (2026-06-25 21:25Z). PAN-2059 is definitively the regression.
+- **3 failing tests, root-caused:**
+  1. `tests/unit/lib/overdeck/no-loss-matrix.test.ts:95` — **deterministic.** New route
+     `GET /api/backlog/issue-state` (`src/dashboard/server/routes/backlog.ts:388`) has NO `NO_LOSS_MATRIX`
+     entry. All sibling backlog routes are at matrix lines 638-646; this one was missed. Fix = one `READ`
+     entry (door = same classifier as `GET /api/backlog/sequence`).
+  2. `tests/e2e/styleguide-conformance.spec.ts:301` — Pipeline drawer `[data-component="drawer-action-bar"]`
+     never renders after `/pipeline?issue=PAN-1148&tab=overview` (count 0, expected 1).
+  3. `tests/e2e/styleguide-conformance.spec.ts:343` — Agents `[data-testid="issue-drawer"]` never opens
+     (count 0). Both #2/#3 are drawer-render regressions consistent with PAN-2059's drawer refactor, NOT
+     generic flakes (board/command-deck/agent-card assertions in the same test PASS).
+- **ACTION: filed PAN-2064 + `pan strike PAN-2064` → `strike-pan-2064` (codex/gpt-5.5, branch
+  `strike/pan-2064`).** Operator fallback if the strike can't scope the drawer fix: `git revert` PAN-2059's
+  3 commits. No `--model` passed (Cloister routed to gpt-5.5) per the trust-provider-default rule.
+- **emit-status requires a FULL hand-authored `FlywheelStatus` JSON** — it does NOT auto-derive
+  orchestrator/system/agents (those are only populated by `pan flywheel start`'s
+  `createInitialFlywheelStatus`, which must NOT be called from a live run). And the schema rejects `pr: null`
+  (use `pr: <number>` or omit). Confirmed: emitted OK with the loopback override
+  (`OVERDECK_DASHBOARD_URL=http://localhost:3011 pan flywheel emit-status --file …`).
+- **DURABLE LESSON — the G3 no-loss-matrix is a recurring CI-tripwire.** Any new HTTP route must get a
+  matrix entry or CI fails (`PAN-1783`, `PAN-1698`, now `PAN-2059` class). The matrix is at
+  `tests/unit/lib/overdeck/no-loss-matrix.ts`; the guard at `no-loss-matrix.test.ts`. Adding a route =
+  adding a matrix entry in the same change. (Reaffirms the recurring red-main-from-missing-matrix pattern.)
+- **`pan flywheel status` "Main HEAD" can disagree with origin** — it showed `ebb3948` (stale/local) while
+  origin/main + CI were at `75d5ec23f`. CI conclusion (`gh run list --branch main --workflow CI`) is ground
+  truth; do not trust the status HEAD. (Reaffirms the RUN-32/34 lesson.)
+- **System healthy:** RAM 28.7/64.1 GB, swap 2/8.2 GB. ~13 pipeline agents already running (not
+  flywheel-initiated): PAN-1919 convoy (work+review+test), PAN-2063 plan, strikes 1722/1793/2045, sequencer,
+  PAN-1084/1884 plans. Flywheel-initiated this tick: only strike-pan-2064.
+- **MIN-831 + MIN-846 at the merge gate** (review+test passed) but blocked on green main + operator UAT
+  (`require_uat_before_merge=true`). Not flywheel-actionable; surfaced as merge suggestions gated on red-main.
+
+## RUN-17 tick 2 (2026-06-26 ~03:49Z) — RED MAIN RESOLVED (PAN-2064 fixed+closed, CI green); PAN-2061 struck
+
+- **RED MAIN RESOLVED END-TO-END in ~16 min.** `strike-pan-2064` (codex/gpt-5.5) landed `e78112013
+  fix(dashboard): restore pickup drawer tests` via the remote ff-push pattern (`git push origin
+  strike/pan-2064:main` — needed because the primary worktree holds `main`, so `git switch main`
+  is blocked locally). CI green (run 28215806679, conclusion success). `pan done --strike` handed
+  it to verifying_on_main; `pan close PAN-2064` closed it out (verify-merged gate ✓, GitHub #2064
+  closed, agent state cleaned).
+- **Strike fix was correct + hardened, not a test-loosening:** (1) added the `GET /api/backlog/issue-state`
+  no-loss-matrix `READ` entry; (2) made `PickupGateControls` REJECT malformed pickup-state responses
+  instead of crashing the drawer (the real component fix); (3) added the `/api/backlog/issue-state` mock
+  to the E2E test's `newContext()` route layer (the drawer-action-bar/issue-drawer assertions stay `=== 1`).
+  Root cause of the 2 E2E failures: PAN-2059's PickupGateControls fetches the new route, but the E2E
+  mock had no handler → fetch threw → drawer didn't render.
+- **DURABLE LESSON — E2E route-mock gap is a recurring red-main class.** When a component adds a new
+  `/api/...` fetch, the Playwright `newContext()` mock layer (`tests/e2e/styleguide-conformance.spec.ts`)
+  must gain a handler for it or any route that renders that component times out. Sibling of the no-loss-matrix
+  gap. Both trip CI together when a feature adds a backend route.
+- **+1 substrate launch: `pan strike PAN-2061`** (strike-worktree-skip; root-caused RUN-16, fix pending).
+  Fresh strike got a real worktree fine (the bug only bites RE-strikes with a stale dir). Working on
+  branch `strike/pan-2061`. High-leverage: fixes a core pipeline primitive every strike depends on.
+- **`pan close` is interactive** — prompts `[y/N]` and exits code 13 if stdin isn't answered. Pipe
+  `printf 'y\n' | pan close <id>` from the orchestrator. Non-fatal cosmetic: label-edit step can fail
+  ('in-planning' not found) and the ff-push makes `teardown:strike-worktree` falsely say "not merged
+  to main" — both harmless; the verify-merged gate is authoritative.
+
+## RUN-17 ticks 3-4 (2026-06-26 ~04:08–04:25Z) — PAN-2061 + PAN-2062 fixed+closed; 3 substrate bugs this run
+
+**Run total: 3 substrate bugs FIXED+CLOSED, main GREEN at `585a80baa`.** Dev-loop had real teeth this run.
+
+- **PAN-2061 (strike worktree-skip) FIXED+CLOSED** (`4d17dc467`). `strike-pan-2061` (12m23s): `strike.ts` now
+  verifies the workspace path is a registered git worktree on the expected `strike/<id>` branch before reuse;
+  stale non-worktree dirs removed + recreated; +41-line real-git regression in `strike.test.ts`. Fresh strike got
+  a worktree fine (the bug only bites RE-strikes with a stale dir) — no self-abort. CI green. Closed.
+- **PAN-2062 (nobody-owned node_modules breaks strike verification) FIXED+CLOSED** (3 commits, `585a80baa`).
+  `strike-pan-2062` (19m54s) discovered the problem was DEEPER than the issue scoped (Vite resolves the whole
+  frontend dep graph from a worktree without local deps — not just 2 imports). Landed a COMPLETE fix, not the
+  partial first commit: (1) `ec5e40c17` Vitest runner config loader in test scripts; (2) `66a61fb5c` resolve
+  frontend deps correctly in worktrees; (3) `585a80baa` worktree-safe frontend Vitest config. CI green. Closed.
+  **DURABLE LESSON — a strike landing a green first commit may KEEP iterating on a deeper layer and push more
+  commits.** strike-pan-2062 landed `ec5e40c17` green, then continued 10+ min on the frontend-dep layer. Orchestrator
+  can't `pan tell`/`pan kill` (forbidden) to bound it — only monitor. The thoroughness produced a better fix, but
+  it's watch-item: a strike iterating past its first green commit could destabilize. Verify CI on the FINAL commit,
+  not the first.
+- **The strike ff-push pattern is now the norm, not the exception.** All 3 strikes pushed `strike/<id>:main`
+  directly (remote ff) because the primary worktree holds `main` locally. `pan close`'s verify-merged gate accepts
+  this; the "teardown:strike-worktree: not merged to main" line is a false negative — harmless.
+- **`pan close` cosmetic label-edit failure is recurring + harmless** — `gh issue edit --remove-label "in-planning"`
+  fails ('in-planning' not found) every close-out. The verify-merged gate + tracker-close still succeed. Candidate
+  minor substrate fix: make the label-edit tolerant of missing labels (best-effort per-label instead of all-or-none).
+- **NEXT-RUN HANDOFF:** main green at `585a80baa`; 3 top strike-friction bugs resolved (red main, worktree-skip,
+  node_modules-ownership). The strike path is now materially more reliable. Remaining eligible substrate candidates
+  to vet next run: PAN-2054 (close-out not terminal — directly relevant, observed during this run's close-outs),
+  PAN-1781/1769 (context-overflow/compaction + delivery families), PAN-1824 (flaky main CI real-timer family).
+  ~12 agents still running (PAN-1919 convoy, PAN-2063 plan, strikes 1722/1793/2045, sequencer). MIN-831/846 at the
+  operator UAT/merge gate (require_uat_before_merge=true) — not flywheel-actionable.
+
+## RUN-18 tick 1 (2026-06-27 ~02:52Z) — drained pipeline, not frozen; launched 2 substrate plans (PAN-2054, PAN-1781)
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`. No `cohort.json` (manual
+orchestrator start, like RUN-17) → de-facto cohort = in-flight + the two launched substrate plans. Assumes
+`auto_pickup_backlog=false` + `require_uat_before_merge=true` (defaults), Release gate (PAN-2059) active.
+
+- **MAIN GREEN at `8f42c4b6`** (CI `success`, run 28275580363, 02:15Z). Local main in sync with origin (0/0).
+  RAM 9.0/64.1 GB, **swap clear (0/8.2)**. Dashboard `node dist/dashboard/server.js` (no `--no-resume` flag).
+
+- **The pipeline is DRAINED + gate-bound, NOT frozen/wedged.** First read looked like ~90 agents "stopped" — but the
+  deacon log is decisive: `autoResumeStoppedWorkAgents started: 15 candidate(s) ... completed: no agents resumed`, and
+  every `handleAgentStoppedEvent` is `skipped — verify-paused (awaiting close-out) | troubled | workspace-missing |
+  already-merged`. `OVERDECK_NO_RESUME=1` is set (skips `reconcileAgentLiveness`), but that only gates orphan-recovery,
+  not fresh launches — and the candidates aren't resumable anyway (legitimate skip-states). Do NOT misdiagnose this as
+  a stuck pipeline or file a "deacon won't resume" bug: the in-flight work reached terminal/near-terminal states
+  (merged-awaiting-close-out, troubled, done). Bottleneck is operator UAT/merge/close-out, not the deacon.
+
+- **tmux ground-truth ≠ `pan status` "stopped" rows — reaffirmed.** `pan status` shows nearly everything stopped with
+  stale `Boot --no-resume` gates (the RUN-32/34 documented pattern: gates persist across reboots and mislead). Live
+  `tmux -L overdeck ls` shows 3 planning chains running (my 2054/1781 + operator's 2081) + sequencer + overdeck-init.
+  **Always check tmux, not the status rows, for "is anything actually running."**
+
+- **Launched 2 substrate plans (both clean, no existing workspace, eltmon-authored bugs):**
+  - `pan plan PAN-2054 --auto` → `planning-pan-2054` (close-out not terminal — the root cause of the ~9 merged issues
+    lingering as paused agents + workspaces + stale pipeline records; highest pipeline leverage).
+  - `pan plan PAN-1781 --auto` → `planning-pan-1781` (context-overflow recovery; recurring gpt-5.5/CLIProxy agent-killer).
+  Both chosen as PIPELINE-SUBSTRATE bugs (dev-loop purpose; operator non-objection to substrate striking established
+  RUN-16/17). Ordinary backlog (composer bugs PAN-2082/2083, ohmypi enhancements, docs) is gated under Release +
+  auto_pickup_off → surfaced as suggestions, NOT autonomously launched.
+
+- **MIN-831 + MIN-846 at the merge gate** (review+test passed, main green) but `require_uat_before_merge=true` →
+  operator UAT+merge is the only flywheel-forbidden advance. Surfaced as `urgent`/`high` merge suggestions.
+
+- **PAN-2054 explains the lingering close-out cluster:** only 2 open issues carry the `verifying-on-main` GitHub label,
+  yet ~9 agents show "Paused (awaiting close-out)" — because close-out leaves runtime residue (the bug). Fixing PAN-2054
+  is what drains that tail.
+
+- Next tick: check whether the 2 plans finalized→proposed; if so, `pan start` them to spin up work agents (planning
+  agents are short-lived — won't keep minAgents=2 alone). Vet next-wave substrate strikes (PAN-1769, PAN-1824).
+  Primary main working tree is DIRTY (`.gitignore`, `docs.json`, `record-cost-event.js.map`, untracked `.vercelignore`/
+  `features/tldr.mdx` — NOT mine; pre-existing operator/other-agent changes) → reconcile (commit only FLYWHEEL-STATE.md,
+  pull --rebase, push) BEFORE any strike that needs to land on main (RUN-16 lesson).
+
+## RUN-18 tick 2 (2026-06-27 ~02:55Z) — PAN-2087 (claude-code BROKEN) killed the plan launches; pivoted to codex strikes
+
+**TICK-1's 2 plan launches were DEAD on arrival.** Re-checking the panes: `planning-pan-2054`/`planning-pan-1781` both
+printed `--agent 'roles/plan.md' not found ... Planning agent has exited. Session kept alive for review.` and produced
+NO spec. So does the operator's own `planning-pan-2081`. **Always verify a launched agent is PROGRESSING (two-snapshot
+pane diff / commits advancing), not just that the tmux session exists** — the launcher keeps a dead session alive and
+`pan plan` reports "session started" even when the agent exited on spawn.
+
+- **Root cause = PAN-2087 (CRITICAL, operator-filed today):** Claude Code **2.1.195** auto-upgraded at the Jun-26 20:50
+  reboot and **dropped `--agent <file>`** (now accepts only registered agent NAMES from `~/.claude/agents/*.md`). Every
+  claude-code plan/work/test spawn uses `claude --agent roles/<role>.md` (PAN-982/1048 design) → all fail on spawn.
+  Blast radius per the issue: BROKEN = plan/work/test; UNAFFECTED = **review (inlined prompts), Pi/ohmypi, codex,
+  conversations**. `roles/*.md` files still exist; Claude Code just won't load them as `--agent`.
+
+- **DURABLE LESSON — `pan plan --harness codex` is IGNORED; only `pan strike --harness codex` bypasses PAN-2087.**
+  Retried `pan plan PAN-2054 --auto --harness codex` → state.json STILL `harness: claude-code`, SAME `roles/plan.md not
+  found` error. The planning spawn path (`spawn-planning-session.ts`) hardcodes claude-code; `--harness` does not
+  propagate to it. But `pan strike <id> --harness codex` IS honored (dry-run confirms "Harness: codex"; codex-cli 0.142.3
+  is a separate binary, untouched by the claude-code regression). **While PAN-2087 is open, the ONLY working launch
+  primitive is `pan strike --harness codex` (and pi/ohmypi for non-role work).** Fix options for PAN-2087 are in its body
+  (inject role body via `--append-system-prompt-file`, or register roles as named agents); mitigation = downgrade
+  `@anthropic-ai/claude-code` to the last `--agent <file>` version.
+
+- **Pivoted to codex strikes for forward motion (minAgents=2).** Struck 2 clean, well-specified substrate bugs:
+  - `pan strike PAN-1900 --harness codex` → `strike-pan-1900` (UAT branch codename non-determinism — flywheel-core;
+    had a commit `e498caaab` on `strike/pan-1900` within ~30s, progressing).
+  - `pan strike PAN-1559 --harness codex` → `strike-pan-1559` (orphaned inspect sessions escape all reapers — additive,
+    low blast radius; directly relevant to the lingering inspect sessions in the current fleet).
+  Both chosen as clean-scoped pipeline-substrate bugs (dev-loop purpose; RUN-16/17 operator non-objection to substrate
+  strikes). PAN-2054/PAN-1781 (complex multi-part) DEFERRED to plan once claude-code is restored — too high blast-radius
+  to strike blind. `pan close` is a NO-OP on the merged tail: all 9 awaiting-close-out issues are already CLOSED on the
+  tracker (`closed-out` label); only PAN-2054 residue (agent/workspace/record) lingers.
+
+- **Emitted corrected tick-2 snapshot** (tick-1 had wrongly claimed the 2 plans were running). PAN-2087 surfaced as
+  `urgent` investigate + openQuestion asking the operator to restore claude-code (downgrade vs. code-fix vs. endorse
+  codex-only routing). The run config requests `harness=claude-code`, which is unworkable under PAN-2087.
+
+- Next tick: verify the 2 codex strikes landed green on main (CI), then close them out; if claude-code restored,
+  re-plan PAN-2054 + PAN-1781. Watch for ff-push races if both strikes finish near-simultaneously.

@@ -14,7 +14,7 @@
  *   2. createOhmypiFifo
  *   3. write launcher.sh via generateLauncherScript({ harness: 'ohmypi', ... })
  *   4. tmux new-session running launcher.sh
- *   5. wait for ~/.overdeck/agents/<id>/ready.json (max 30s)
+ *   5. wait for ~/.overdeck/agents/<id>/ready.json (max 120s)
  *
  * Runtime divergences vs pi (omp contract AC-1b, AC-3):
  *   - omp binary requires Bun >=1.3.14 (shebang #!/usr/bin/env bun).
@@ -55,7 +55,7 @@ function shellQuote(value: string): string {
 }
 
 const ACTIVE_HEARTBEAT_TTL_MS = 60_000
-const SPAWN_READY_TIMEOUT_MS = 30_000
+const SPAWN_READY_TIMEOUT_MS = 120_000
 
 function overdeckDir(): string {
   return getOverdeckHome()

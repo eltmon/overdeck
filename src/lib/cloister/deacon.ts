@@ -168,6 +168,7 @@ import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.j
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
+import { cleanupOrphanedInspectSessions } from './inspect-session-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
@@ -5270,6 +5271,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...inspectTimeoutActions);
   for (const a of inspectTimeoutActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-1559: reap untracked inspect tmux sessions. Inspect agents now write
+  // state.json at spawn, but this safety net kills older leaked sessions and
+  // any future dead inspect panes before they burn compute indefinitely.
+  const inspectReaperActions = await cleanupOrphanedInspectSessions();
+  actions.push(...inspectReaperActions);
+  for (const a of inspectReaperActions) addLog('action', a, state.patrolCycle);
+
   // Detect new commits pushed after review passed before any test/merge path can
   // act on stale review approval.
   const postReviewActions = await checkPostReviewCommits();
@@ -6684,6 +6692,10 @@ const RESUME_LOAD_FACTOR = 1.5;
 // Pause between consecutive resume spawns so the herd is spread across the cycle.
 const RESUME_STAGGER_MS = 150;
 
+function shouldRetryUndeliveredKickoff(state: AgentState): boolean {
+  return state.role === 'work' && state.kickoffDelivered === false;
+}
+
 interface HandleAgentStoppedOptions {
   /** When true, the caller is managing global concurrency/load gates. */
   skipGlobalGates?: boolean;
@@ -6822,7 +6834,7 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
   } else {
     const runtimeState = getAgentRuntimeStateSync(agentId);
-    if (runtimeState?.state === 'idle') {
+    if (runtimeState?.state === 'idle' && !shouldRetryUndeliveredKickoff(state)) {
       logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — idle (runtime.state=idle, no review feedback)`);
       return null;
     }
