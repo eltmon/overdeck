@@ -80,7 +80,11 @@ function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisi
 
 // ─── Pipeline projection ──────────────────────────────────────────────────────
 
-function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssuePipelineRecord {
+function projectPipeline(
+  issueId: string,
+  status: ReviewStatus | null,
+  existing?: PanIssuePipelineRecord,
+): PanIssuePipelineRecord {
   const base: PanIssuePipelineRecord = {
     issueId,
     reviewStatus: status?.reviewStatus ?? 'pending',
@@ -89,6 +93,8 @@ function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssue
     inspectStatus: status?.inspectStatus,
     mergeStatus: status?.mergeStatus,
     readyForMerge: status?.readyForMerge ?? false,
+    closedOut: existing?.closedOut,
+    closedOutAt: existing?.closedOutAt,
     updatedAt: status?.updatedAt ?? new Date().toISOString(),
   };
 
@@ -201,7 +207,7 @@ export async function buildIssueRecord(
   const existing = await readIssueRecord(project, issueId);
   const legacyContinueText = await readLegacyContinueText(project.path, issueId);
   const continueSubset = projectContinue(legacyContinueText ? (JSON.parse(legacyContinueText) as ContinueFile) : null);
-  const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null);
+  const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null, existing?.pipeline);
   const usageRecord = projectUsage(issueId);
   const merges = projectMerges(issueId);
 
@@ -238,6 +244,7 @@ export async function buildIssueRecord(
 // Re-export core record I/O from the PAN-1919 single-writer module.
 export {
   getIssueRecordPath,
+  markRecordPipelineClosedOutSync,
   writeIssueRecordSync,
   readIssueRecord,
   queueIssueRecordCommit,
