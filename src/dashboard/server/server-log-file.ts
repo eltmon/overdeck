@@ -49,14 +49,30 @@ export function stdoutAlreadyTargetsLog(logPath: string): boolean {
  * preserved so the real terminal/pipe behaves exactly as before. A failure to
  * write the log copy never breaks the real stream.
  */
+/** True when `chunk` (string or bytes) ends in a newline. */
+function endsWithNewline(chunk: unknown): boolean {
+  if (typeof chunk === 'string') return chunk.endsWith('\n');
+  if (chunk instanceof Uint8Array) return chunk.length > 0 && chunk[chunk.length - 1] === 0x0a;
+  return false;
+}
+
 export function teeStreamToFile(
   target: Pick<NodeJS.WriteStream, 'write'>,
   file: WriteStream,
 ): void {
   const original = target.write.bind(target) as NodeJS.WriteStream['write'];
+  // Prefix each line in the FILE copy with an ISO timestamp so the log is
+  // self-diagnosing — boot phases, the gap before "Listening", and the cost of
+  // any slow handler are all attributable from the file alone. The terminal
+  // copy (the `original` write below) is left untouched, so foreground output
+  // is unchanged. Stamping only at line starts keeps mid-line writes intact and
+  // costs one `Date` per logged line.
+  let atLineStart = true;
   target.write = ((chunk: unknown, encoding?: unknown, cb?: unknown): boolean => {
     try {
+      if (atLineStart) file.write(`[${new Date().toISOString()}] `);
       file.write(chunk as string | Uint8Array);
+      atLineStart = endsWithNewline(chunk);
     } catch {
       // Logging is best-effort — never let a log-file write break stdout/stderr.
     }

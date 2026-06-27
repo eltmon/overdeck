@@ -68,6 +68,12 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
+// Boot-timing anchor: performance.now() here is ms since process start, so this
+// first line's value is the cost of loading/evaluating the bundled module graph
+// (everything before the first statement runs). Combined with the per-line
+// timestamps in dashboard.log and the "Listening" line, it makes the whole
+// spawn→listen window attributable. See server.ts for the matching listen mark.
+console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)

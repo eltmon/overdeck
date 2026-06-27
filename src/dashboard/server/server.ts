@@ -401,6 +401,7 @@ export const makeServerLayer = Layer.unwrap(
       Effect.gen(function* () {
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
+          console.log(`[boot-timing] HTTP server listening at +${Math.round(performance.now())}ms (since process start)`);
           console.log(`[overdeck] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';
           emitActivityEntrySync({
