@@ -313,7 +313,7 @@ async function waitForOhmypiAgentReady(agentId: string, timeoutSec = OHMYPI_AGEN
  * Overdeck-home filesystem and the tail of the agent's output.log. Best-effort:
  * every probe is independently guarded so diagnostics never mask the real error.
  */
-function describeOhmypiSpawnFailure(agentId: string): string {
+export function describeOhmypiSpawnFailure(agentId: string): string {
   const parts: string[] = [];
   try {
     const { bavail, bsize } = statfsSync(getOverdeckHome());

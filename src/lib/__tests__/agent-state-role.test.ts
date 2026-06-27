@@ -603,6 +603,24 @@ describe('AgentState role persistence', () => {
     expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBeGreaterThan(30);
   });
 
+  it('PAN-2100: reports disk space and recent output when ohmypi readiness times out', async () => {
+    const agentId = 'agent-pan-2100';
+    const agentDir = join(tempHome, 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'output.log'), [
+      'starting omp',
+      'Error: ENOSPC: no space left on device, write ready.json',
+    ].join('\n'));
+
+    const { describeOhmypiSpawnFailure } = await import('../agents.js');
+    const description = describeOhmypiSpawnFailure(agentId);
+
+    expect(description).toContain('freeDisk=');
+    expect(description).toContain('output.log tail:');
+    expect(description).toContain('ENOSPC');
+    expect(description).toContain('ready.json');
+  });
+
   it('does not block when workspace stack health is healthy', async () => {
     vi.doMock('../workspace/stack-health.js', () => ({
       getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-05-16T00:00:00.000Z' })),

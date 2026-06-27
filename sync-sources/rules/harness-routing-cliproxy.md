@@ -9,7 +9,7 @@ gemini-via-pi, etc. Claude Code routes those through CLIProxy, which advertises 
 context window; long sessions sail past it and **deadlock** (the "200k-window illusion",
 PAN-1865). A $22 silent burn and a stranded critical red-main strike both came from exactly this.
 
-**Trust the provider default routing — it exists to prevent this:** kimi → pi, gpt-5.5 → codex,
+**Trust the provider default routing — it exists to prevent this:** kimi → ohmypi (omp), gpt-5.5 → codex,
 native Anthropic models (`claude-*`) → claude-code. Run `pan strike <id>` / `pan start <id>` with
 **no `--harness`** (and no `--model`) unless the operator explicitly asked — and never pair
 `--harness claude-code` with a CLIProxy model. `claude-code` is correct only for native Anthropic
