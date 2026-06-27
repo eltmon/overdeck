@@ -2222,3 +2222,105 @@ pane diff / commits advancing), not just that the tmux session exists** — the 
 
 - Next tick: verify the 2 codex strikes landed green on main (CI), then close them out; if claude-code restored,
   re-plan PAN-2054 + PAN-1781. Watch for ff-push races if both strikes finish near-simultaneously.
+
+## RUN-18 tick 3 (2026-06-27 ~03:22Z) — 2 codex strikes FIXED+CLOSED; +2 launched; codex bypass fully validated
+
+- **CODEX STRIKE BYPASS IS PROVEN END-TO-END.** Both first-wave strikes landed clean on main and closed out:
+  - **PAN-1559** FIXED+CLOSED — `2e6712433 fix(deacon): reap orphaned inspect sessions` (new `inspect-session-reaper.ts`
+    + test + deacon wiring). CI green on `629b6cee3`. Closed (#1559).
+  - **PAN-1900** FIXED+CLOSED — `5bb276fcc fix: reuse daily UAT candidate branch` (deterministic daily UAT branch).
+    Strike's own verify: typecheck + 732 root tests passed / 32 frontend. CI green. Closed (#1900).
+  Both via `pan strike <id> --harness codex` → ff-push `strike/<id>:main` → `pan done --strike` → verifying-on-main.
+  **This is the reliable autonomous path while PAN-2087 is open.**
+
+- **DURABLE LESSON — the codex strike ff-push DID race, but self-resolved.** PAN-1559 landed first (`2e6712433`),
+  then PAN-1900's branch was briefly behind the moved main; the strike agent rebased + ff-pushed cleanly (RUN-17
+  behavior held). No manual intervention needed. Sequential launch (PAN-1900 then PAN-1559) did NOT prevent the race —
+  landing order is nondeterministic — but codex handles the rebase. **Multiple concurrent codex strikes are safe.**
+
+- **DURABLE LESSON — strike ff-push sweeps local-ahead commits onto origin.** strike-pan-1900 noted a pre-existing
+  local commit `04f3e9558 docs(flywheel): run 1` (not mine; sequencer/operator) was in its ff ancestry and got pushed
+  to origin/main. Benign here (docs), but reaffirms RUN-16: the primary main diverges (now ahead 3 / behind 4 per the
+  strike's `git status`) as origin advances under strikes. Reconcile at end-of-run (commit FLYWHEEL-STATE.md, pull
+  --rebase) — but the operator's uncommitted files (.gitignore/docs.json/record-cost-event.js.map/.vercelignore/
+  features/tldr.mdx) are NOT mine to commit, so a rebase may need care or deferral to `pan flywheel report`.
+
+- **+2 codex strikes launched (next wave):** `pan strike PAN-1638 --harness codex` (conversation active-status
+  liveness probe) + `pan strike PAN-1652 --harness codex` (title-regen 500 timeout). Both clean/deterministic,
+  different files (conversation-lifecycle.ts vs title route) → low landing-conflict risk. minAgents=2 sustained.
+
+- **`pan close` cosmetic failures confirmed recurring + harmless** — `gh issue edit --remove-label "in-planning"`
+  fails ('in-planning' not found) every close-out; `teardown:strike-worktree: not merged to main` is a FALSE NEGATIVE
+  (ff-push pattern; verify-merged gate is authoritative). Both non-fatal. (Reaffirms RUN-17.)
+
+- Next tick: when 1638/1652 land green, close them out; launch next codex wave. If operator restores claude-code,
+  re-plan PAN-2054 (close-out terminality) + PAN-1781 (context-overflow). Watch main CI for the new-wave landings.
+
+## RUN-18 tick 4 (2026-06-27 ~03:52Z) — RED MAIN resolved (PAN-2089 filed+struck+closed); claude-code RESTORED; 6 bugs closed; PAN-2054/1781 re-planned on Opus
+
+**RUN TOTAL: 6 substrate bugs FIXED+CLOSED** (PAN-1559, 1900, 1652, 1638, 1637, 2089) + PAN-2087 fixed by operator.
+Main GREEN at `4f1e208bf`. claude-code launches WORKING again. Pipeline fully restored.
+
+- **RED MAIN (P0) hit mid-run from the operator's own PAN-2087 fix.** `d224b4363` (inject role as system prompt)
+  correctly switched the launcher `--agent roles/<role>.md` → `--append-system-prompt-file <tmp>/role-prompts/<role>.md`,
+  but `tests/lib/agents-auth-routing.test.ts:207-209` still asserted the OLD `--agent` form → 1 test failure → red main.
+  **Filed PAN-2089 + `pan strike PAN-2089 --harness codex`** → `4f1e208bf test: update auth routing role prompt
+  assertion` (path-agnostic assertion). CI green. Closed. **~20 min P0 turnaround** (file→strike→land→CI green→close).
+  This is the textbook red-main protocol (RUN-17 PAN-2064 pattern): file + strike in the SAME tick.
+
+- **DURABLE LESSON — a legitimate launcher change leaves a stale-assertion test tripwire.** PAN-2087 (PAN-982/1048
+  `--agent <file>` design) had a test asserting the exact old command string; the fix changed the string shape (temp
+  path is nondeterministic) so the test needed a path-agnostic rewrite, not a literal swap. **When changing a launcher
+  command shape, grep tests for the old flag form AND update them in the same change** (the PAN-2087 fix missed its
+  own test). Sibling of the no-loss-matrix / E2E-route-mock CI tripwires.
+
+- **claude-code RESTORED + VERIFIED LIVE.** Operator fixed PAN-2087 (`d224b4363`) + closed it + RESTARTED the
+  dashboard (old PID 7428 gone — `pan reload`/restart deployed the rebuilt dist). Verified by re-planning PAN-2054:
+  `planning-pan-2054` now runs Claude Code v2.1.195 / Opus 4.8, reading files, ctx advancing — NO `--agent ... not
+  found` error. **The 3-check verify-live rule held: merged → deployed (restart) → observed firing.** No `pan reload`
+  from this role (outside allowed surface) — the operator deployed it.
+
+- **Re-engaged the 2 highest-leverage deferred substrate bugs on the restored harness:** `pan plan PAN-2054 --auto`
+  + `pan plan PAN-1781 --auto` (claude-code/Opus, the configured harness — no more codex deviation needed). Both
+  alive + progressing. Next: when they reach proposed, `pan start` to spin up work agents.
+
+- **PAN-1637 ALSO closed** — fixed by the same operator commit `ab4ba668c` that fixed PAN-1638 (probe harness
+  liveness for conversation resume + status); was still OPEN/todo, close-out's verify-merged gate confirmed the
+  squash-merge and closed it. (Strike-pan-1638 had correctly detected its fix was already on main.)
+
+- **Codex-strike deviation served its purpose:** while claude-code was down (PAN-2087), `pan strike --harness codex`
+  kept the pipeline productive (4 bugs landed). Now that claude-code is restored, the normal plan→work pipeline
+  resumes; codex strikes remain a viable fallback for future harness outages.
+
+- Next tick: monitor PAN-2054/1781 plans → proposed → `pan start`. MIN-831/846 still at the operator UAT/merge gate
+  (require_uat_before_merge=true). Vet next substrate candidates (PAN-1769 message-delivery, PAN-1824 flaky-CI
+  real-timer — note: orphan-proposed-reconciler.test.ts timed out under load during PAN-2089 verify but passed in
+  isolation = the PAN-1824 family; CI didn't flake on the final run but it's live).
+
+## RUN-18 tick 5 (2026-06-27 ~04:18Z) — PAN-2054 WORKING (8 beads); PAN-1781 CLOSED as already-fixed (contradiction-halt)
+
+- **PAN-2054 plan finalized → proposed (8 beads) → `pan start PAN-2054 --auto` spawned `agent-pan-2054`.** Reaffirms
+  the RUN-17/state lesson: **`pan plan --auto` stops at `proposed`; follow with `pan start`** to spawn the work agent
+  (finalize's auto-promote CHAINS to complete-planning + kills the planning tmux session — that's why the planning
+  session disappears after a successful finalize; state.json shows "stopped" cosmetically, NOT a crash). The work
+  agent is implementing close-out terminality: a `markPipelineJournalTerminal` helper + threading preservation
+  through `buildIssueRecord` (the durable-record reset that stops `getReviewStatusSync` re-deriving active).
+
+- **PAN-2054 work agent routed to codex/gpt-5.5, NOT the configured claude-code** — Cloister's provider default
+  picked codex (`harness codex chosen by provider default — override in Settings → Providers`). With claude-code
+  restored, this is surprising, but codex is proven-working this run and gpt-5.5 is strong for the substrate scope.
+  Did NOT override (respect Cloister routing). Watch-item: a `pan start` sync-main hit a non-blocking conflict in
+  `.pan/records/pan-2054.json` (records metadata, not source); spawn proceeded, but reconcile before merge.
+
+- **PAN-1781 CLOSED as already-fixed** — the planning agent (Opus) ran a forensic audit and found the central premise
+  is no longer true on main: native compaction recovery (`cee6da534`/`d00e0cd68`, PAN-1675 keystone) spawns a fresh
+  session id with a bounded seed instead of resuming the wedged session. Fix landed under sibling/checkpoint commits
+  (`2848e011b` + PAN-1792/1980 tests), never a PAN-1781 PR — which is why it stayed open. Agent correctly
+  **contradiction-halted** (no duplicate beads; audit + hazards to `.pan/drafts/PAN-1781.md`). **DURABLE: this is the
+  prescribed triage outcome for "issue's premise is already false on main" — investigate, document, close with
+  evidence rather than manufacture a re-implementation** (sibling of RUN-32 PAN-1507 "closed as non-bug"). Closed
+  directly via `gh issue close` + comment (no PR → `pan close` verify-merged gate wouldn't apply; direct tracker
+  close with on-main evidence is legitimate triage cleanup).
+
+- **RUN TOTAL: 7 substrate issues resolved** (6 fixed+closed: 2087-operator, 2089, 1559, 1900, 1652, 1638; +1
+  triaged+closed: 1781). Main GREEN. claude-code RESTORED. Pipeline healthy. PAN-2054 (highest leverage) in flight.
