@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2086",
   "schemaVersion": 2,
-  "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-06-27T04:15:41.781Z",
-  "pipeline": {
-    "issueId": "PAN-2086",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T03:24:50.930Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -39,5 +20,61 @@
       "note": "Planning session started for PAN-2086: perf+UX(startup): finish overdeck up speedup & reboot experience — incremental sync, traefik readiness, auto-open, cold-boot, lifecycle log batching",
       "timestamp": "2026-06-27T04:15:41.781Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-27T03:24:50.930Z",
+  "updated": "2026-06-27T07:08:20.967Z",
+  "pipeline": {
+    "issueId": "PAN-2086",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T07:08:20.950Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 44351,
+            "output": 5691,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 45548,
+            "output": 79685,
+            "cacheRead": 9488354,
+            "cacheWrite": 478941
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 44351,
+          "output": 5691,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 45548,
+          "output": 79685,
+          "cacheRead": 9488354,
+          "cacheWrite": 478941
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.957429,
+        "pricingAsOf": "2026-06-27T07:08:20.966Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "ohmypi",
+  "model": "kimi-k2.7-code"
 }
