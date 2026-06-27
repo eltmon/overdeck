@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T04:24:19.383Z",
-  "updated": "2026-06-27T14:56:46.886Z",
+  "updated": "2026-06-27T15:14:23.188Z",
   "pipeline": {
     "issueId": "PAN-1718",
     "reviewStatus": "pending",
@@ -64,5 +64,5 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code"
+  "model": "claude-opus-4-8"
 }

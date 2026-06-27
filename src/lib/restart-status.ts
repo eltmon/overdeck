@@ -1,7 +1,9 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
+
+const MAX_JOURNAL_ENTRIES = 200;
 
 export type RestartTrigger = 'pan reload' | 'pan restart' | 'watchdog';
 
@@ -29,15 +31,87 @@ function restartStatusPath(): string {
   return join(getOverdeckHome(), 'restart-status.json');
 }
 
+function restartEventsPath(): string {
+  return join(getOverdeckHome(), 'restart-events.jsonl');
+}
+
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
-}async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
+}
+
+function parseRestartEventLine(line: string): RestartStatus | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as Partial<RestartStatus>;
+    if (
+      typeof parsed.ts !== 'string' ||
+      (parsed.trigger !== 'pan reload' && parsed.trigger !== 'pan restart' && parsed.trigger !== 'watchdog') ||
+      typeof parsed.success !== 'boolean' ||
+      typeof parsed.durationMs !== 'number' ||
+      !Number.isFinite(parsed.durationMs) ||
+      typeof parsed.attempts !== 'number' ||
+      !Number.isFinite(parsed.attempts) ||
+      (parsed.error !== undefined && typeof parsed.error !== 'string') ||
+      (parsed.gaveUp !== undefined && typeof parsed.gaveUp !== 'boolean') ||
+      (parsed.reason !== undefined && typeof parsed.reason !== 'string') ||
+      (parsed.pid !== undefined && typeof parsed.pid !== 'number') ||
+      (parsed.initiator !== undefined && typeof parsed.initiator !== 'string') ||
+      (parsed.issueId !== undefined && typeof parsed.issueId !== 'string')
+    ) {
+      return null;
+    }
+    return {
+      ts: parsed.ts,
+      trigger: parsed.trigger,
+      success: parsed.success,
+      error: parsed.error,
+      durationMs: parsed.durationMs,
+      attempts: parsed.attempts,
+      gaveUp: parsed.gaveUp,
+      reason: parsed.reason,
+      pid: parsed.pid,
+      initiator: parsed.initiator,
+      issueId: parsed.issueId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function trimRestartEvents(path: string): Promise<void> {
+  try {
+    const content = await readFile(path, 'utf8');
+    const lines = content.split('\n').filter((line) => line.trim() !== '');
+    if (lines.length <= MAX_JOURNAL_ENTRIES) return;
+    const trimmed = lines.slice(-MAX_JOURNAL_ENTRIES);
+    await writeFile(path, `${trimmed.join('\n')}\n`, 'utf8');
+  } catch {
+    // Best-effort cap.
+  }
+}
+
+async function appendRestartEvent(entry: RestartStatus): Promise<void> {
+  try {
+    const path = restartEventsPath();
+    await mkdir(dirname(path), { recursive: true });
+    await appendFile(path, `${JSON.stringify(entry)}\n`, 'utf8');
+    await trimRestartEvents(path);
+  } catch {
+    // Journal append is best-effort and must never fail the primary status write.
+  }
+}
+
+async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   const path = restartStatusPath();
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tmp, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
   await rename(tmp, path);
-}async function readRestartStatusPromise(): Promise<RestartStatus | null> {
+  await appendRestartEvent(entry);
+}
+
+async function readRestartStatusPromise(): Promise<RestartStatus | null> {
   try {
     const parsed = JSON.parse(await readFile(restartStatusPath(), 'utf8')) as Partial<RestartStatus>;
     if (
