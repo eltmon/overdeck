@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { toCodexSandboxValue } from './runtimes/codex.js';
 import { qualifyPiModel } from './providers.js';
@@ -572,7 +573,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
  *      --extension <piExtensionPath> \
  *      [--resume <resumeSessionId>] \
  *      [--append-system-prompt "$prompt"] \
- *      <> <piFifoPath>
+ *      <> <piFifoPath> >> <agentDir>/output.log 2>&1
  *
  * TUI mode (conversations):
  *   omp --model <model> \
@@ -632,7 +633,8 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
 
   if (piMode === 'rpc') {
-    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)}`;
+    const outputLogPath = join(dirname(config.piFifoPath!), 'output.log');
+    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
   }
 
   return [useExec ? `exec ${cmd}` : cmd];

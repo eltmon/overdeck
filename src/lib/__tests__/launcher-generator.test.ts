@@ -794,6 +794,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).toMatch(/--session-dir '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/sessions'/);
     // FIFO redirection is `<>` (non-blocking), same as pi.
     expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/rpc\.in'/);
+    expect(script).toMatch(/>> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/output\.log' 2>&1/);
   });
 
   it('ohmypi: uses --resume (not --session) for resumeSessionId (AC1, contract)', () => {

@@ -70,7 +70,7 @@ function agentsDir(): string {
 export class OhmypiSpawnTimeout extends Error {
   readonly code = 'OHMYPI_SPAWN_TIMEOUT' as const
   constructor(agentId: string) {
-    super(`omp agent ${agentId} did not write ready.json within ${SPAWN_READY_TIMEOUT_MS}ms`)
+    super(`omp agent ${agentId} did not write ready.json within ${SPAWN_READY_TIMEOUT_MS}ms${describeSpawnFailure(agentId)}`)
     this.name = 'OhmypiSpawnTimeout'
   }
 }
@@ -84,6 +84,17 @@ export interface OhmypiSpawnConfig extends SpawnConfig {
 
 function agentDirFor(agentId: string): string {
   return join(agentsDir(), agentId)
+}
+
+function describeSpawnFailure(agentId: string): string {
+  const outputPath = join(agentDirFor(agentId), 'output.log')
+  if (!existsSync(outputPath)) return ''
+  try {
+    const tail = readFileSync(outputPath, 'utf8').slice(-1500).trim().split('\n').slice(-8).join('\n')
+    return tail ? ` [output.log tail:\n${tail}]` : ''
+  } catch {
+    return ''
+  }
 }
 
 function ohmypiSessionDirFor(agentId: string): string {
