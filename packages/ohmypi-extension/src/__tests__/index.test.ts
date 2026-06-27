@@ -10,8 +10,11 @@ import overdeckOhmypiExtension, {
   handleSessionBriefingContext,
   handleWorkspaceContext,
   overdeckPathsFor,
+  probeOhmypiExtensionCapabilities,
+  setThinkingLevelIfSupported,
   type OhmypiExtensionAPI,
   type OhmypiCommand,
+  type ThinkingLevel,
 } from '../index.js'
 
 // Aliases so existing tests need no further changes.
@@ -230,6 +233,53 @@ describe('Pi system prompt context', () => {
 
     expect(appended).toEqual(['workspace context', 'live briefing context'])
     expect(ctx.appendSystemPrompt).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('extension control capabilities', () => {
+  it('reports supported runtime control methods', () => {
+    const runtime = {
+      on: () => {},
+      registerCommand: () => {},
+      sendUserMessage: () => {},
+      setThinkingLevel: () => {},
+      getThinkingLevel: () => 'high' as ThinkingLevel,
+      setModel: () => {},
+      exec: () => {},
+    } satisfies OhmypiExtensionAPI
+    const ctx = { compact: () => {} }
+
+    expect(probeOhmypiExtensionCapabilities(runtime, ctx)).toEqual({
+      sendUserMessage: true,
+      setThinkingLevel: true,
+      getThinkingLevel: true,
+      setModel: true,
+      exec: true,
+      compact: true,
+    })
+  })
+
+  it('no-ops instead of throwing when setThinkingLevel is unsupported', async () => {
+    const runtime = {
+      on: () => {},
+      registerCommand: () => {},
+      sendUserMessage: () => {},
+      setModel: () => {},
+    } satisfies OhmypiExtensionAPI
+
+    await expect(setThinkingLevelIfSupported(runtime, 'high')).resolves.toBe(false)
+  })
+
+  it('dispatches setThinkingLevel when the runtime supports it', async () => {
+    const setThinkingLevel = vi.fn()
+    const runtime = {
+      on: () => {},
+      registerCommand: () => {},
+      setThinkingLevel,
+    } satisfies OhmypiExtensionAPI
+
+    await expect(setThinkingLevelIfSupported(runtime, 'low')).resolves.toBe(true)
+    expect(setThinkingLevel).toHaveBeenCalledWith('low')
   })
 })
 
