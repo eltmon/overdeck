@@ -17,6 +17,14 @@ set +e
 
 INPUT=$(cat 2>/dev/null || echo '{}')
 
+# Only enforce for work agents (agent-<prefix>-<number>). Planning, test, review,
+# inspect, strike, flywheel, conversation, and human sessions must keep normal
+# tmux behavior — this guard is not meant for them.
+case "${OVERDECK_AGENT_ID:-}" in
+  agent-*[0-9]) : ;;
+  *) exit 0 ;;
+esac
+
 if ! command -v jq >/dev/null 2>&1; then
   # Without jq we cannot safely parse the payload. Allow the call.
   exit 0

@@ -116,19 +116,19 @@ describe('tmux-send-keys-guard', () => {
     expect(parsed.hookSpecificOutput?.updatedInput?.command).toContain('inspect-pan-1059-workspace-hiq5')
   })
 
-  it('blocks tmux send-keys when the agent ID cannot be determined and a target is explicit', async () => {
-    const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'tmux send-keys -t some-other-session C-m' } })
-    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: undefined })
+  it.each([
+    ['planning agent', 'planning-pan-1084'],
+    ['plan agent with suffix', 'agent-pan-1084-plan'],
+    ['test agent', 'agent-pan-1084-test'],
+    ['inspect agent', 'inspect-pan-1084-workspace-abc12'],
+    ['flywheel orchestrator', 'flywheel-orchestrator'],
+    ['conversation session', 'conv-20260627-1234'],
+    ['unset agent ID', undefined],
+  ] as const)('stays silent for %s', async (_label, agentId) => {
+    const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'tmux -L overdeck send-keys -t inspect-pan-1059-workspace-hiq5 2 C-m' } })
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: agentId })
 
     expect(code).toBe(0)
-    const parsed = JSON.parse(stdout) as {
-      hookSpecificOutput?: {
-        hookEventName?: string
-        updatedInput?: { command?: string }
-      }
-    }
-    expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
-    expect(parsed.hookSpecificOutput?.updatedInput?.command).toContain('false')
-    expect(parsed.hookSpecificOutput?.updatedInput?.command).toContain('some-other-session')
+    expect(stdout.trim()).toBe('')
   })
 })
