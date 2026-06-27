@@ -35,7 +35,7 @@ const execAsync = promisify(exec);
  * Also checks review-status.json as authoritative — the merge specialist
  * validates the merge before setting mergeStatus to 'merged'.
  */
-async function isBranchMerged(
+export async function isBranchMerged(
   branchName: string,
   projectPath: string,
 ): Promise<{ status: 'merged' | 'unmerged' | 'no-branch'; message: string }> {
