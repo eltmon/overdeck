@@ -322,7 +322,7 @@ describe('createSession', () => {
     delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
   });
 
-  it('creates an empty session and sends the command after configuring survive options', async () => {
+  it('creates headless sessions with a usable default pane size', async () => {
     await Effect.runPromise(createSession('agent-pan-2023', '/tmp/workspace', 'bash launcher.sh'));
 
     const newSessionCall = mockedExecFile.mock.calls.find(
@@ -332,24 +332,6 @@ describe('createSession', () => {
     expect(newSessionCall).toBeDefined();
     const argv = newSessionCall![1] as string[];
     expect(argv).toEqual(expect.arrayContaining(['new-session', '-x', '200', '-y', '50']));
-    // The command must NOT be passed to new-session; we configure the window to
-    // survive fast-exiting launchers first, then send the command in separately.
-    expect(argv).not.toContain('bash launcher.sh');
-
-    const destroyDetachedCall = mockedExecFile.mock.calls.find(
-      (call) => call[0] === 'tmux' && Array.isArray(call[1]) && call[1].includes('set-option') && call[1].includes('destroy-unattached'),
-    );
-    expect(destroyDetachedCall).toBeDefined();
-
-    const remainOnExitCall = mockedExecFile.mock.calls.find(
-      (call) => call[0] === 'tmux' && Array.isArray(call[1]) && call[1].includes('set-option') && call[1].includes('remain-on-exit'),
-    );
-    expect(remainOnExitCall).toBeDefined();
-
-    const sendKeysCall = mockedExecFile.mock.calls.find(
-      (call) => call[0] === 'tmux' && Array.isArray(call[1]) && call[1].includes('send-keys') && call[1].includes('C-m'),
-    );
-    expect(sendKeysCall).toBeDefined();
   });
 
   it('preserves explicit pane size overrides', async () => {

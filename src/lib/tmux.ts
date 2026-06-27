@@ -1029,27 +1029,7 @@ export const createSession = (
       // PAN-1798: every spawn path must ensure the shared server lives in its
       // dedicated unit before creating a session, so no client becomes the founder.
       await ensureOverdeckTmuxServerAsync(buildChildEnvSync());
-      // Create the session without an initial command so we can configure the
-      // window before the pane process has a chance to exit. Passing the
-      // command directly to `new-session` risks the window closing (and the
-      // session being destroyed) before callers can set `remain-on-exit on` or
-      // `destroy-unattached off` — especially for harnesses whose launcher can
-      // fail fast. We send the command into the ready shell after configuring it.
-      await tmuxExecAsync(buildNewSessionArgs(name, cwd, undefined, options), { encoding: 'utf-8' });
-      // Configure the session to survive detached clients and keep dead panes
-      // visible. Do this immediately while the initial window is guaranteed to
-      // exist. Note: `destroy-unattached` is a session option and tmux rejects
-      // the exact-match `=name` form for session option targets, so pass the
-      // bare session name; `remain-on-exit` is a window option and needs the
-      // `=name:` exact-window form.
-      await tmuxExecAsync(
-        ['set-option', '-t', name, 'destroy-unattached', 'off'],
-        { encoding: 'utf-8' },
-      );
-      await tmuxExecAsync(
-        ['set-option', '-t', `${exactSession(name)}:`, 'remain-on-exit', 'on'],
-        { encoding: 'utf-8' },
-      );
+      await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
       // Stamp the initial window's background with the dashboard theme so tmux
       // answers OSC 11 background queries even with no client attached. Claude
       // Code's `theme: auto` queries once at startup; without this, headless
@@ -1065,12 +1045,6 @@ export const createSession = (
         );
       } catch {
         // Best-effort: a failed theme stamp must not fail session creation.
-      }
-      if (initialCommand) {
-        // Send the initial command into the now-configured shell. Using
-        // sendKeys follows the async tmux delivery primitive and gives the
-        // load-buffer+paste-buffer reliability for long commands.
-        await Effect.runPromise(sendKeys(name, initialCommand, 'createSession:initial-command'));
       }
     },
     catch: (cause) => toTmuxError('create-session', cause),
