@@ -1,9 +1,21 @@
 {
   "issueId": "PAN-2063",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-27T19:13Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-27T19:13:06.215Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T12:47:05.454Z"
+    }
+  ],
   "feedback": [],
-  "created": "2026-06-26T03:22:41.601Z",
-  "updated": "2026-06-29T12:55:50.683Z",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2063",
     "reviewStatus": "pending",
@@ -11,7 +23,15 @@
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T12:55:50.591Z",
+    "updatedAt": "2026-06-29T12:53:52.084Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-29T12:51:28.390Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110"
   },
   "closeOut": {
@@ -19,8 +39,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 40329,
-            "output": 5150,
+            "input": 39414,
+            "output": 4666,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -52,8 +72,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 40329,
-          "output": 5150,
+          "input": 39414,
+          "output": 4666,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -78,7 +98,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.655044,
-        "pricingAsOf": "2026-06-29T12:55:50.674Z"
+        "pricingAsOf": "2026-06-29T12:53:52.114Z"
       }
     },
     "merges": [
@@ -86,6 +106,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "created": "2026-06-27T18:34:19.239Z",
+  "updated": "2026-06-29T12:53:52.125Z"
 }
