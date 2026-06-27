@@ -47,6 +47,11 @@
       "reason": "feedback",
       "note": "[2026-06-27T13:32Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-06-27T13:32:45.583Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T13:37:01.182Z"
     }
   ],
   "feedback": [
@@ -66,16 +71,16 @@
     }
   ],
   "created": "2026-06-27T03:27:37.390Z",
-  "updated": "2026-06-27T13:32:45.583Z",
+  "updated": "2026-06-27T13:37:05.829Z",
   "pipeline": {
     "issueId": "PAN-2088",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T13:32:44.957Z",
-    "reviewNotes": "frontend forces idle Pi sends to steer, bypassing normal prompt delivery",
+    "updatedAt": "2026-06-27T13:37:05.747Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed verification error",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - sync-sources/hooks/record-cost-event.js.map",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2097",
     "reviewRequestedAt": "2026-06-27T08:09:53.029Z"
@@ -116,7 +121,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.49788,
-        "pricingAsOf": "2026-06-27T13:32:44.991Z"
+        "pricingAsOf": "2026-06-27T13:37:05.804Z"
       }
     },
     "merges": [
