@@ -6,23 +6,39 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-06-27T15:46:20.468Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T15:51:23.201Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-27T15:53Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-27T15:53:16.821Z"
     }
   ],
-  "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-27T15:53:16Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nCommitted .pan record marks readyForMerge/passed while carrying failed and unrelated verification evidence\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
+    }
+  ],
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-06-27T15:46:37.137Z",
-    "reviewNotes": "Verification failed at vbrief-ac",
-    "testNotes": "Verification complete. All quality gates passed: typecheck (✓), lint (✓), test suite (716 test files, 7399 tests ✓). Browser UAT: (1) LegacyImportDialog component wired in SettingsPage.tsx line 4176, (2) Button 'Import conversations from old Panopticon' visible in Experimental section (line 4157), (3) Dialog structure verified: role='dialog', checkboxes with alreadyImported disabled state, Select-all/Select-none controls (lines 235,246), N/M counter (line 249), (4) GET /api/settings/legacy-import/conversations endpoint returns preview data with conversations array, hasFavorite, claudeSessionId, alreadyImported fields. (5) Component tree verified: checkboxes, summary on import complete. All 5 beads complete, feature fully implemented and tested.",
-    "verificationNotes": "Acceptance criteria check FAILED — 13/13 AC incomplete:\n\n### Acquire the restart lock before the pan reload dev-marker SIGUSR2 branch (3/3 incomplete)\n  - [ ] Given a `pan dev` marker is present AND the restart lock is already held, when `pan reload` runs, then it records success=false (trigger='pan reload'), does NOT call process.kill(...SIGUSR2), and exits with code 2.\n  - [ ] Given a `pan dev` marker is present AND the lock is free, when `pan reload` runs, then it acquires the lock, sends SIGUSR2 to the dev pid, records success=true, and releases the lock (existing PAN-1662 test stays green and additionally asserts acquireRestartLock was called).\n  - [ ] Given no dev marker and the lock is held by another process, when `pan reload` runs, then it records success=false 'restart in progress' and exits 2 without running bun install or the build (existing detached-path behavior preserved).\n\n### Append every restart-status write to an append-only restart-events.jsonl journal (4/4 incomplete)\n  - [ ] Given two writeRestartStatus calls in sequence, when the journal is read with readRestartEvents(), then it returns BOTH entries in order while restart-status.json still contains only the last entry.\n  - [ ] Given two successful entries 2.6s apart with different pids, when detectConcurrentRestartWriters() runs, then it returns both entries; given the same pid or entries >60s apart, then it returns an empty array.\n  - [ ] Given the journal already holds 200 lines, when another entry is appended, then the file is trimmed to the most recent 200 entries.\n  - [ ] Given the journal path is unwritable, when writeRestartStatus runs, then restart-status.json is still written successfully and no error propagates to the caller.\n\n### Surface the restart writer (pid + initiator) and concurrent-writer warning in pan status (3/3 incomplete)\n  - [ ] Given a restart-status with pid=1733121 and initiator='conv-20260610-573d', when `pan status` renders, then the restart line includes 'pid 1733121' and the initiator.\n  - [ ] Given the journal contains two successful pan reload entries 2.6s apart with different pids, when formatRestartStatusLines runs, then it emits a warning line naming both pids.\n  - [ ] Given no concurrent writers in the journal, when formatRestartStatusLines runs, then no warning line is emitted and the existing single-line format is preserved.\n\n### Supervisor stop waits for exit; start verifies survival — no dead pidfile (3/3 incomplete)\n  - [ ] Given a live supervisor pid, when stopSupervisorProcessSync runs, then it does not unlink the pidfile or return until isProcessAlive(pid) is false (or the SIGKILL-escalation bound elapses).\n  - [ ] Given startSupervisorProcessSync spawns a child that dies immediately, when start completes, then it logs an error and leaves NO pidfile pointing at the dead pid.\n  - [ ] Given the bounded sync waits, when reviewed, then they use Atomics.wait (not a busy-loop and not execSync) and total stop-wait never exceeds ~2s.",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T15:53:16.095Z",
+    "reviewNotes": "Committed .pan record marks readyForMerge/passed while carrying failed and unrelated verification evidence",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
     "reviewedAtCommit": "971e35ab67f71d736fa2902a6984481c7c1efc3f",
     "lastVerifiedCommit": "971e35ab67f71d736fa2902a6984481c7c1efc3f"
@@ -40,8 +56,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 133684,
-            "output": 4157,
+            "input": 142567,
+            "output": 8940,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -56,9 +72,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 716134,
-            "output": 107565,
-            "cacheRead": 40883712,
+            "input": 1083974,
+            "output": 120579,
+            "cacheRead": 51584256,
             "cacheWrite": 0
           }
         }
@@ -71,8 +87,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 133684,
-          "output": 4157,
+          "input": 142567,
+          "output": 8940,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -83,15 +99,15 @@
           "cacheWrite": 335117
         },
         "custom/kimi-k2.7-code": {
-          "input": 716134,
-          "output": 107565,
-          "cacheRead": 40883712,
+          "input": 1083974,
+          "output": 120579,
+          "cacheRead": 51584256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 16.744804,
-        "pricingAsOf": "2026-06-27T15:46:37.170Z"
+        "usd": 19.17941,
+        "pricingAsOf": "2026-06-27T15:53:16.122Z"
       }
     },
     "merges": [
@@ -100,7 +116,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-27T15:46:37.241Z",
+  "updated": "2026-06-27T15:53:16.821Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
