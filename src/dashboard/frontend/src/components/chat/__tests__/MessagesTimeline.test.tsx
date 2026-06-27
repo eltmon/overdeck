@@ -54,6 +54,24 @@ function makeMessage(id: string, role: ChatMessage['role'], offsetMs: number, te
 }
 
 describe('MessagesTimeline — search', () => {
+  it('clears the Sending indicator for acknowledged optimistic messages', () => {
+    render(
+      <MessagesTimeline
+        messages={[
+          {
+            ...makeMessage('optimistic-ack', 'user', 0, 'acked message'),
+            acknowledged: true,
+          },
+        ]}
+        workLog={[]}
+        streaming={false}
+      />,
+    );
+
+    expect(screen.getByText('acked message')).toBeInTheDocument();
+    expect(screen.queryByText('Sending…')).not.toBeInTheDocument();
+  });
+
   it('handles target-message scroll requests once per target key', async () => {
     const messages: ChatMessage[] = [
       makeMessage('u1', 'user', 0, 'hello'),

@@ -11,7 +11,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, Mic, MicOff, SendHorizontal, X, Loader2 } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
@@ -45,6 +45,8 @@ interface ComposerFooterProps {
   conversation: Conversation;
   /** Called with the message text the instant it is sent — use for optimistic display */
   onSend?: (text: string) => void;
+  /** Called after the send POST resolves successfully. */
+  onSendAcknowledged?: (text: string) => void;
   /** Called when the POST fails — parent should move the optimistic message to the failed outbox */
   onSendFailed?: (text: string) => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
@@ -55,6 +57,14 @@ interface ComposerFooterProps {
    * placement (right side, just before the send button).
    */
   contextWindowUsage?: ContextWindowSnapshot | null;
+  /** True while the runtime is mid-turn. Used to choose Pi delivery defaults. */
+  agentBusy?: boolean;
+}
+
+type DeliverAs = 'steer' | 'follow_up';
+
+function isPiConversation(conversation: Conversation): boolean {
+  return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -62,9 +72,11 @@ interface ComposerFooterProps {
 export function ComposerFooter({
   conversation,
   onSend,
+  onSendAcknowledged,
   onSendFailed,
   agentId,
   contextWindowUsage = null,
+  agentBusy = false,
 }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   // Existing conversations are bound to the harness they were spawned with.
@@ -76,6 +88,8 @@ export function ComposerFooter({
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
+  const [deliverAs, setDeliverAs] = useState<DeliverAs>('steer');
+  const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending images, and their upload pump live in the module-level
   // composerStore, keyed by conversation name (the same key drafts use). The
   // PAN-1591 Stage renders only the active pane, so switching conversations
@@ -100,6 +114,7 @@ export function ComposerFooter({
   const currentConversationNameRef = useRef(conversation.name);
   currentConversationNameRef.current = conversation.name;
 
+  const piConversation = isPiConversation(conversation);
   const isDisabled = !conversation.sessionAlive || sending;
   const canEditModelBeforeStart = !agentId && !conversation.sessionAlive && !conversation.claudeSessionId;
   const isEmpty = text.trim() === '';
@@ -151,6 +166,47 @@ export function ComposerFooter({
     setHarness(newHarness);
     saveStoredHarness(newHarness);
   }, []);
+
+  const handleEffortChange = useCallback((nextEffort: EffortLevel) => {
+    const previousEffort = effort;
+    setEffort(nextEffort);
+    if (!piConversation || agentId || !conversation.sessionAlive) return;
+    void (async () => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/thinking-level`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: nextEffort }),
+      });
+      if (!res.ok) {
+        setEffort(previousEffort);
+        const body = await res.text().catch(() => '');
+        throw new Error(`Failed to set thinking level (${res.status})${body ? `: ${body}` : ''}`);
+      }
+    })().catch((err: unknown) => {
+      console.error('[ComposerFooter] Failed to set thinking level:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to set thinking level');
+    });
+  }, [agentId, conversation.name, conversation.sessionAlive, effort, piConversation]);
+
+  const handleCompact = useCallback(() => {
+    if (!piConversation || agentId || compactPending) return;
+    setCompactPending(true);
+    void (async () => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/compact`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Failed to compact conversation (${res.status})${body ? `: ${body}` : ''}`);
+      }
+      toast.success('Compaction requested');
+    })().catch((err: unknown) => {
+      console.error('[ComposerFooter] Failed to compact:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to compact conversation');
+    }).finally(() => {
+      setCompactPending(false);
+    });
+  }, [agentId, compactPending, conversation.name, piConversation]);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
     if (sending) {
@@ -349,7 +405,13 @@ export function ComposerFooter({
       // Optimistic: notify parent immediately so message appears before server round-trip
       onSend?.(composedMessage);
 
-      await sendConversationMessage(submitConversationName, composedMessage, agentId);
+      await sendConversationMessage(
+        submitConversationName,
+        composedMessage,
+        agentId,
+        piConversation ? deliverAs : undefined,
+      );
+      onSendAcknowledged?.(composedMessage);
 
       // The send consumed this conversation's images — revoke their previews and
       // drop them from the store. Target submitConversationName explicitly so the
@@ -378,7 +440,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, harness, isDisabled, model, onSend, onSendFailed, sending, setSendingFor, consumeImagesForConversation]);
+  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, consumeImagesForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -520,7 +582,33 @@ export function ComposerFooter({
             </span>
           )}
           <div className={styles.composerToolbarDivider} />
-          <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+          <EffortPicker value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+
+          {piConversation && !agentId && (
+            <>
+              <select
+                className={styles.deliveryMethodSelect}
+                value={deliverAs}
+                onChange={(event) => setDeliverAs(event.target.value as DeliverAs)}
+                title={agentBusy ? 'Pi delivery mode while busy' : 'Pi delivery mode'}
+                aria-label="Pi delivery mode"
+                disabled={!conversation.sessionAlive}
+              >
+                <option value="steer">Steer</option>
+                <option value="follow_up">Follow-up</option>
+              </select>
+              <button
+                className={styles.voiceToolbarButton}
+                onClick={handleCompact}
+                disabled={!conversation.sessionAlive || compactPending}
+                type="button"
+                title="Compact context"
+                aria-label="Compact context"
+              >
+                {compactPending ? <Loader2 size={16} className={styles.spinner} /> : <Scissors size={16} />}
+              </button>
+            </>
+          )}
 
           <div className={styles.composerToolbarSpacer} />
 

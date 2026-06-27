@@ -931,7 +931,7 @@ function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage; cwd?:
     return <ReviewerContextBlock message={message} cwd={cwd} issueId={issueId} />;
   }
 
-  const isPending = message.id.startsWith('optimistic-');
+  const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
   return (
     <div className={styles.userMessageRow}>
       <div
