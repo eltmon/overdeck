@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2081",
   "schemaVersion": 2,
-  "created": "2026-06-27T02:46:24.299Z",
-  "updated": "2026-06-27T04:54:59.647Z",
-  "pipeline": {
-    "issueId": "PAN-2081",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T02:46:24.299Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -39,5 +20,61 @@
       "note": "Planning session started for PAN-2081: Epic-aware backlog sequencer — recognize epics as containers (not workable), keep children coherent, group in forecast/DAG",
       "timestamp": "2026-06-27T04:54:59.647Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-27T02:46:24.299Z",
+  "updated": "2026-06-27T07:07:48.277Z",
+  "pipeline": {
+    "issueId": "PAN-2081",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T07:06:29.267Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 55256,
+            "output": 7593,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 48232,
+            "output": 95707,
+            "cacheRead": 15036963,
+            "cacheWrite": 499090
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 55256,
+          "output": 7593,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 48232,
+          "output": 95707,
+          "cacheRead": 15036963,
+          "cacheWrite": 499090
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 13.27164,
+        "pricingAsOf": "2026-06-27T07:06:29.284Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-4-8"
 }
