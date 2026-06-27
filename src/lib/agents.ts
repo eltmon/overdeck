@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, statfsSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, rm, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
@@ -10,7 +10,7 @@ import { randomUUID } from 'crypto';
 import { AGENTS_DIR, encodeClaudeProjectDir, getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, isPaneDead, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { findLatestRollout, extractThreadIdFromRollout } from './runtimes/codex.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
@@ -49,6 +49,7 @@ import { resetPipelineVerdictsForWorkStartSync } from './review-status.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
 import { createOhmypiFifo, ohmypiFifoPaths, writeOhmypiCommandSync, OhmypiNotReady } from './runtimes/ohmypi-fifo.js';
+import { resolveLatestOhmypiSessionId } from './runtimes/ohmypi.js';
 import { Effect } from 'effect';
 import { FsError, TmuxError } from './errors.js';
 import { assertIssueHasBeads, BeadsMissingError } from './beads-query.js';
@@ -301,6 +302,35 @@ async function waitForOhmypiAgentReady(agentId: string, timeoutSec = OHMYPI_AGEN
   return false;
 }
 
+/**
+ * PAN-2100: build a diagnostic suffix for an ohmypi readiness failure.
+ *
+ * An ENOSPC (disk-full) omp crash surfaces as an opaque "did not become ready"
+ * timeout — omp cannot write `ready.json` when the disk is full. That exact
+ * condition crashed flywheel-orchestrator (RUN-20) and the only record of it sat
+ * unread in output.log for hours, sending the flywheel down a wrong "kimi→ohmypi
+ * misroute" diagnosis. Surface the real signals at throw time: free disk on the
+ * Overdeck-home filesystem and the tail of the agent's output.log. Best-effort:
+ * every probe is independently guarded so diagnostics never mask the real error.
+ */
+function describeOhmypiSpawnFailure(agentId: string): string {
+  const parts: string[] = [];
+  try {
+    const { bavail, bsize } = statfsSync(getOverdeckHome());
+    const freeMb = Math.round((bavail * bsize) / (1024 * 1024));
+    parts.push(`freeDisk=${freeMb}MiB`);
+    if (freeMb < 512) parts.push('(DISK NEARLY FULL — likely ENOSPC crash)');
+  } catch { /* statfs best-effort */ }
+  try {
+    const logPath = join(getAgentDir(agentId), 'output.log');
+    if (existsSync(logPath)) {
+      const tail = readFileSync(logPath, 'utf8').slice(-1500).trim().split('\n').slice(-8).join('\n');
+      if (tail) parts.push(`output.log tail:\n${tail}`);
+    }
+  } catch { /* best-effort */ }
+  return parts.length ? ` [${parts.join(' ')}]` : '';
+}
+
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
@@ -431,7 +461,7 @@ async function writeOhmypiAgentPrompt(agentId: string, prompt: string, timeoutSe
   const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForOhmypiAgentReady(agentId, timeoutSec);
   if (!ready) {
-    throw new Error(`ohmypi agent ${agentId} did not become ready within ${timeoutSec}s`);
+    throw new Error(`ohmypi agent ${agentId} did not become ready within ${timeoutSec}s${describeOhmypiSpawnFailure(agentId)}`);
   }
   try {
     writeOhmypiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
@@ -2821,6 +2851,16 @@ export function getLatestSessionIdSync(agentId: string): string | null {
     }
   } catch { /* non-fatal */ }
 
+  // 5. ohmypi (omp) — PAN-2098. omp never writes a `session.id` file, so none of
+  //    the claude-code/codex sources above can find it; the real id lives inside
+  //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
+  //    resolution so the deacon recovery path can resume a crashed ohmypi agent
+  //    instead of only respawning it fresh and losing context.
+  if (getAgentStateSync(agentId)?.harness === 'ohmypi') {
+    const ohmypiSessionId = resolveLatestOhmypiSessionId(agentId);
+    if (ohmypiSessionId) return ohmypiSessionId;
+  }
+
   return null;
 }
 
@@ -4935,8 +4975,18 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // are still rejected below because they never produced a resumable session.
   // The lifecycle UI model already treats runtime=stopped as isStopped, so this
   // keeps the gate consistent with the Resume button that model enables.
-  const isCrashed = (agentState?.status === 'running' || agentState?.status === 'starting')
-    && !(await Effect.runPromise(sessionExists(normalizedId)));
+  // PAN-2098: a crash leaves the agent at status='running'/'starting' but with no
+  // live process. Two shapes: (a) tmux session gone entirely, or (b) the tmux
+  // session is still up while the harness process inside its pane has exited — a
+  // "keep-alive corpse" (remain-on-exit leaves a dead pane in a live session).
+  // The old check used `!sessionExists` alone, so a corpse (session present, pane
+  // dead) was misclassified as a healthy running agent and refused resume with a
+  // reasonless "Cannot resume … runtime=active, status=running". Treat a dead pane
+  // as crashed too, matching the start path (flywheel-actions.ts isPaneDead).
+  const isRunningOrStarting = agentState?.status === 'running' || agentState?.status === 'starting';
+  const sessionAlive = isRunningOrStarting ? await Effect.runPromise(sessionExists(normalizedId)) : false;
+  const paneDead = isRunningOrStarting && (!sessionAlive || await Effect.runPromise(isPaneDead(normalizedId)));
+  const isCrashed = isRunningOrStarting && paneDead;
 
   // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
   // context-wedged agent, which is typically status='running' with a LIVE (but
@@ -4956,7 +5006,12 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     || isCompactRecovery;
 
   if (!canResume) {
-    const reason = `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`;
+    // PAN-2098: never refuse without a concrete reason. A running/starting agent
+    // that reached here has a live session AND a live pane (a crash would have set
+    // isCrashed above), so it is genuinely healthy and there is nothing to resume.
+    const reason = isRunningOrStarting
+      ? `Cannot resume ${normalizedId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`
+      : `Cannot resume ${normalizedId}: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'} is not a resumable state.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
@@ -4967,7 +5022,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // Get saved session ID from any available source
   const sessionId = getLatestSessionIdSync(normalizedId);
   if (!sessionId) {
-    const reason = 'No saved session ID found — this agent is not resumable. Start a fresh agent instead.';
+    // PAN-2098: state the concrete reason. ohmypi now resolves from its session
+    // JSONL (see getLatestSessionIdSync); reaching here means no id exists in any
+    // source for this harness, so a fresh start is genuinely the only option.
+    const harnessLabel = agentState?.harness ?? 'unknown';
+    const reason = `Cannot resume ${normalizedId} (harness=${harnessLabel}): no resumable session id found — no session.id file, no sessions.json entry, and no recoverable session transcript on disk. Start a fresh agent instead.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,

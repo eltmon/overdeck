@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyIssue,
+  computeEpicGroups,
   isAutoPickable,
   isUnblockEligible,
   pickableQueue,
@@ -81,5 +82,32 @@ describe('pickup epic exclusion (PAN-2081)', () => {
       new Set(['PAN-2075', 'PAN-2076', 'PAN-2077']),
     );
     expect(pickableQueue(nodes, lk).map((n) => n.issue)).toEqual(['PAN-2076', 'PAN-2077']);
+  });
+
+  it('computeEpicGroups returns #2075 and the five #2075 contains pairs', () => {
+    const nodes = [
+      node('PAN-2075', { rank: 1, isEpic: true }),
+      node('PAN-2076', { rank: 2 }),
+      node('PAN-2077', { rank: 3 }),
+      node('PAN-2078', { rank: 4 }),
+      node('PAN-2079', { rank: 5 }),
+      node('PAN-2080', { rank: 6 }),
+    ];
+    const edges = ['PAN-2076', 'PAN-2077', 'PAN-2078', 'PAN-2079', 'PAN-2080'].map((child) => ({
+      from: 'PAN-2075',
+      to: child,
+      type: 'contains',
+    }));
+    const groups = computeEpicGroups(nodes, edges, lookups({}, new Set()));
+
+    expect(groups.epics).toEqual([{ issue: 'PAN-2075', rank: 1 }]);
+    expect(groups.epics.map((e) => e.issue)).not.toContain('PAN-2076');
+    expect(groups.contains).toEqual([
+      { epic: 'PAN-2075', child: 'PAN-2076' },
+      { epic: 'PAN-2075', child: 'PAN-2077' },
+      { epic: 'PAN-2075', child: 'PAN-2078' },
+      { epic: 'PAN-2075', child: 'PAN-2079' },
+      { epic: 'PAN-2075', child: 'PAN-2080' },
+    ]);
   });
 });
