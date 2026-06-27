@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T05:15:56.806Z",
-  "updated": "2026-06-27T13:21:22.547Z",
+  "updated": "2026-06-27T15:01:23.074Z",
   "pipeline": {
     "issueId": "PAN-2093",
     "reviewStatus": "passed",
@@ -65,6 +65,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "ohmypi",
+  "harness": "claude-code",
   "model": "kimi-k2.7-code"
 }
