@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2093",
   "schemaVersion": 2,
-  "created": "2026-06-27T05:15:56.806Z",
-  "updated": "2026-06-27T05:16:05.851Z",
-  "pipeline": {
-    "issueId": "PAN-2093",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T05:15:56.806Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,63 @@
       "note": "Planning session started for PAN-2093: bug(spawn): ohmypi/kimi work-agent spawn orphans on 30s ready.json readiness window (PAN-2009 ohmypi variant)",
       "timestamp": "2026-06-27T05:16:05.851Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-27T05:15:56.806Z",
+  "updated": "2026-06-27T13:21:22.547Z",
+  "pipeline": {
+    "issueId": "PAN-2093",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-27T13:07:33.970Z",
+    "testNotes": "Skipped: issue is already merged",
+    "closedOut": true,
+    "closedOutAt": "2026-06-27T13:07:33.970Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 29891,
+            "output": 1785,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 35388,
+            "output": 122803,
+            "cacheRead": 12762205,
+            "cacheWrite": 414860
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 29891,
+          "output": 1785,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 35388,
+          "output": 122803,
+          "cacheRead": 12762205,
+          "cacheWrite": 414860
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 12.220998,
+        "pricingAsOf": "2026-06-27T06:57:33.974Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "ohmypi",
+  "model": "kimi-k2.7-code"
 }
