@@ -4,17 +4,17 @@
     "created": "2026-06-27T05:25:08.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2093: ohmypi/kimi work-agent spawn orphans on the 30s ready.json readiness window (PAN-2009 ohmypi variant)",
-    "updated": "2026-06-27T13:07:29.287Z"
+    "updated": "2026-06-27T15:01:38.587Z"
   },
   "plan": {
     "id": "pan-2093",
     "title": "bug(spawn): ohmypi/kimi work-agent spawn orphans on the 30s ready.json readiness window (PAN-2009 ohmypi variant)",
-    "status": "completed",
+    "status": "running",
     "uid": "c178a696-924c-4a0a-a8fe-453a4de53213",
     "author": "agent:claude-opus-4-8",
-    "sequence": 7,
+    "sequence": 9,
     "created": "2026-06-27T05:25:08.000Z",
-    "updated": "2026-06-27T13:07:29.287Z",
+    "updated": "2026-06-27T15:01:38.587Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2093",
@@ -221,5 +221,5 @@
       "canonicalFilename": "2026-06-27-PAN-2093-bug-spawn-ohmypi-kimi-work-agent-spawn-orphans-on-30s-ready-json-readiness-window-pan-2009-ohmypi-variant.vbrief.json"
     }
   },
-  "status": "completed"
+  "status": "active"
 }
