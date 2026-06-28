@@ -22,6 +22,12 @@
 export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex';
 
 /**
+ * Legacy harness strings that can still appear in persisted state or older
+ * call sites while PAN-1989 normalization moves them onto current runtimes.
+ */
+export type HarnessName = RuntimeName | 'pi';
+
+/**
  * Health state of an agent
  */
 export type HealthState = 'active' | 'stale' | 'warning' | 'stuck' | 'wedged';
@@ -108,6 +114,42 @@ export interface Agent {
   startedAt: Date;
 }
 
+export type HarnessLaunchCommandKind = 'claude-code' | 'ohmypi-rpc' | 'codex-work-tui';
+export type HarnessDeliveryKind = 'pty-supervisor' | 'rpc-fifo' | 'codex-exec-resume' | 'tmux-paste';
+export type HarnessReadinessKind = 'claude-session-signal' | 'ohmypi-ready-file' | 'codex-tui-prompt';
+export type HarnessTranscriptKind = 'claude-jsonl' | 'ohmypi-jsonl' | 'codex-rollout-jsonl';
+export type HarnessSessionIdSource = 'launcher-session-id' | 'transcript-jsonl' | 'codex-thread-id';
+export type HarnessContextLayerKind = 'claude' | 'pi' | 'codex';
+export type HarnessFeedKind = 'claude_code' | 'pi' | 'codex';
+
+/**
+ * Behavior switches that previously lived as scattered harness conditionals.
+ * These values are intentionally descriptive, not aspirational: each runtime
+ * returns today's behavior so old branches can be replaced without semantics
+ * changing during Phase 2.
+ */
+export interface HarnessBehavior {
+  readonly displayName: string;
+  readonly executableName: string;
+  readonly processNames: readonly string[];
+  readonly launchCommandKind: HarnessLaunchCommandKind;
+  readonly deliveryKind: HarnessDeliveryKind;
+  readonly readinessKind: HarnessReadinessKind;
+  readonly transcriptKind: HarnessTranscriptKind;
+  readonly sessionIdSource: HarnessSessionIdSource;
+  readonly contextLayerKind: HarnessContextLayerKind;
+  readonly feedKind: HarnessFeedKind;
+  readonly supportsPtySupervisor: boolean;
+  readonly supportsChannelsBridge: boolean;
+  readonly supportsConversationStreaming: boolean;
+  readonly supportsPatchProjection: boolean;
+  readonly usesRpcFifo: boolean;
+  readonly usesCodexHome: boolean;
+  readonly injectsPromptTimeMemory: boolean;
+  readonly workAgentMode: 'claude-code' | 'ohmypi-rpc' | 'codex-work-tui';
+  readonly readyTimeoutSeconds: number;
+}
+
 /**
  * Runtime abstraction for agent health monitoring
  *
@@ -119,6 +161,11 @@ export interface AgentRuntimeSync {
    * Runtime identifier
    */
   readonly name: RuntimeName;
+
+  /**
+   * Return the stable behavior matrix for this runtime.
+   */
+  getHarnessBehavior(): HarnessBehavior;
 
   /**
    * Get the path to the session file/directory for an agent
@@ -255,6 +302,7 @@ export type AgentRuntimeError =
  */
 export interface AgentRuntime {
   readonly name: RuntimeName;
+  getHarnessBehavior(): HarnessBehavior;
   getSessionPath(agentId: string): string | null;
   getLastActivity(agentId: string): Date | null;
   getHeartbeat(agentId: string): Heartbeat | null;
