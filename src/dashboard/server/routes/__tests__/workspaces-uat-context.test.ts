@@ -3,7 +3,7 @@ import {
   assembleUatContextGitFields,
   assembleUatContextPlanFields,
   emptyUatContextGitFields,
-} from '../workspaces.js';
+} from '../workspaces/workspace-data.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
