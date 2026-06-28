@@ -45,6 +45,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   },
   review: {
     model: 'workhorse:expensive',
+    mode: 'quick',
     sub: {
       security: { model: 'workhorse:expensive' },
       correctness: { model: 'workhorse:mid' },
@@ -284,6 +285,9 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   }
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
+  }
+  if (roleConfig.mode !== undefined && roleConfig.mode !== 'quick' && roleConfig.mode !== 'full') {
+    throw new Error(`config.yaml: roles.${role}.mode must be quick or full`);
   }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
