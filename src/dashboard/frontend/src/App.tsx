@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
-import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
-import { AskUserQuestionDialog, type AskUserQuestionSubject } from './components/AskUserQuestionDialog';
+import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
@@ -18,24 +18,17 @@ import { Sidebar } from './components/Sidebar';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
-import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
+import { useDashboardStore, selectAgents, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { usePanesStore } from './lib/panesStore';
-import { refreshDashboardState } from './lib/refresh-dashboard-state';
-import { fetchWithTimeout } from './lib/apiFetch';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
-import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 import {
   describeConversationHitOpenFailure,
   fetchBackendHealth,
   fetchCliproxyStatus,
-  fetchConfirmations,
   fetchConversationMessageLocator,
   fetchTrackerStatus,
   getCachedSupervisorUrl,
-  respondToChannelPermission,
-  respondToConfirmation,
   restartCliproxy,
 } from './App/api';
 import {
@@ -55,6 +48,7 @@ import {
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { AppChrome } from './App/AppChrome';
+import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
 
 export {
   buildConversationUrl,
@@ -210,7 +204,6 @@ export default function App() {
   }, [queryClient, recentActivity]);
 
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
-  const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   // Issue prefix of the deck's selected project, reported by CommandDeck — scopes
   // the app-bar search to that project (PAN-1593).
@@ -499,471 +492,23 @@ export default function App() {
     () => agents.filter((a) => ['running', 'active', 'starting', 'thinking', 'working'].includes(a.status)).length,
     [agents],
   );
-  const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
-  const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
-  const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
-    useState<Set<string>>(new Set());
-  // PAN-1520 / PAN-1563 — AUQs the operator already answered (so the dialog hides
-  // immediately, before the next enrichment poll clears the field) and subjects
-  // dismissed without answering. These live in the shared askUserQuestionUiStore
-  // so the "Needs you" sidebar honors them too — otherwise an answered card
-  // lingered there after the dialog closed.
-  const optimisticallyAnsweredAskUserQuestionIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
-  const dismissedAskUserQuestionAgentIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
-  const markAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.markAnswered);
-  const unmarkAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.unmarkAnswered);
-  const markAskUserQuestionDismissed = useAskUserQuestionUiStore((s) => s.markDismissed);
-  const undismissAskUserQuestion = useAskUserQuestionUiStore((s) => s.undismiss);
-  const reconcileAnsweredAskUserQuestions = useAskUserQuestionUiStore((s) => s.reconcileAnswered);
-  const reconcileDismissedAskUserQuestions = useAskUserQuestionUiStore((s) => s.reconcileDismissed);
-
-  // PAN-1395 — a subject the operator explicitly asked to re-open from the
-  // Activity Feed / Project Activity "Needs you" list. Prioritised over the
-  // default oldest-first selection (so clicking a specific question shows THAT
-  // one) and un-dismissed (so an ESC-dismissed question becomes reachable again).
-  const [focusedAskUserQuestionId, setFocusedAskUserQuestionId] = useState<string | null>(null);
-  const askUserQuestionReopenId = useAskUserQuestionUiStore((s) => s.reopenId);
-  const askUserQuestionReopenNonce = useAskUserQuestionUiStore((s) => s.reopenNonce);
-  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
-  useEffect(() => {
-    if (!askUserQuestionReopenId) return;
-    // Bug 3 (TIN-1): a notification's Open/Answer can be clicked AFTER the asking
-    // session stopped and its pending AUQ cleared (e.g. planning auto-completed).
-    // Un-dismiss + focus so the dialog reopens if the question is still live; if
-    // it's already resolved, tell the operator instead of silently no-opping.
-    const agentEntry = useDashboardStore.getState().agentsById[askUserQuestionReopenId];
-    // Only an agent subject (present in agentsById) can be confidently judged
-    // resolved here; conversation subjects are tracked via a separate poll, so
-    // never claim those are "no longer waiting".
-    const knownAgent = agentEntry != null;
-    const stillPending = agentEntry?.pendingAskUserQuestion != null;
-    undismissAskUserQuestion(askUserQuestionReopenId);
-    setFocusedAskUserQuestionId(askUserQuestionReopenId);
-    if (knownAgent && !stillPending) {
-      toast.info('That question is no longer waiting', {
-        description: 'The agent stopped or already received an answer.',
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [askUserQuestionReopenNonce]);
-
   // Issues from Zustand store (event-sourced via snapshot — no polling)
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
-  const visibleChannelPermissionRequests = channelPermissionRequests.filter(
-    (request) => !optimisticallyResolvedChannelPermissionRequestIds.has(request.requestId)
-  );
-  const currentChannelPermissionRequest = visibleChannelPermissionRequests[0] ?? null;
-  const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
-    ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
-
-  // PAN-1520 — poll conversations for pending AskUserQuestion. PAN-1705:
-  // uses the dedicated pending-input feed (scans only tmux-alive sessions,
-  // returns only rows that need attention) instead of pulling the full
-  // 0.5 MB enriched list every 4s.
-  type ConvAskUserQuestionRow = {
-    name: string;
-    title?: string | null;
-    issueId?: string | null;
-    pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
-  };
-  const { data: convAskUserQuestionRows = [] } = useQuery({
-    queryKey: ['conv-ask-user-question'],
-    queryFn: async ({ signal }): Promise<ConvAskUserQuestionRow[]> => {
-      const res = await fetchWithTimeout('/api/conversations/pending-input', { signal });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    refetchInterval: 4000,
-    refetchIntervalInBackground: true,
-  });
-
-  // PAN-1520 — surface the oldest unresolved AskUserQuestion from either an
-  // agent or a conversation. Filter out:
-  //   - questions the operator just optimistically answered (by toolUseId)
-  //   - subjects the operator dismissed without answering
-  const askUserQuestionSubjects: Array<AskUserQuestionSubject & { kind: 'agent' | 'conv'; askedAt: string }> = [
-    ...agentsWithAskUserQuestion.map((a) => ({
-      kind: 'agent' as const,
-      id: a.id,
-      issueId: a.issueId ?? null,
-      kindLabel: 'Agent',
-      // PAN-1520 — prefer the issue title over the raw agent id (e.g.
-      // "planning-pan-1395") so the dialog/toast read like a human label.
-      title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
-      pendingAskUserQuestion: a.pendingAskUserQuestion,
-      askedAt: a.pendingAskUserQuestion?.askedAt ?? '',
-    })),
-    ...convAskUserQuestionRows.map((c) => ({
-      kind: 'conv' as const,
-      id: c.name,
-      issueId: c.issueId ?? null,
-      kindLabel: 'Conversation',
-      title: c.title ?? null,
-      pendingAskUserQuestion: c.pendingAskUserQuestion,
-      askedAt: c.pendingAskUserQuestion?.askedAt ?? '',
-    })),
-  ];
-  askUserQuestionSubjects.sort((a, b) => (a.askedAt === b.askedAt ? a.id.localeCompare(b.id) : a.askedAt.localeCompare(b.askedAt)));
-  const visibleAskUserQuestionSubjects = askUserQuestionSubjects.filter((s) => {
-    const toolUseId = s.pendingAskUserQuestion?.toolUseId;
-    if (!toolUseId) return false;
-    if (optimisticallyAnsweredAskUserQuestionIds.has(toolUseId)) return false;
-    if (dismissedAskUserQuestionAgentIds.has(s.id)) return false;
-    return true;
-  });
-  const currentAskUserQuestionSubject =
-    (focusedAskUserQuestionId
-      ? visibleAskUserQuestionSubjects.find((s) => s.id === focusedAskUserQuestionId)
-      : undefined) ??
-    visibleAskUserQuestionSubjects[0] ??
-    null;
-
-  useEffect(() => {
-    setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
-      const next = new Set<string>();
-      const visibleRequestIds = new Set(channelPermissionRequests.map((request) => request.requestId));
-      for (const requestId of prev) {
-        if (visibleRequestIds.has(requestId)) {
-          next.add(requestId);
-        }
-      }
-      if (next.size === prev.size && Array.from(next).every((requestId) => prev.has(requestId))) {
-        return prev;
-      }
-      return next;
-    });
-  }, [channelPermissionRequests]);
-
-  // Poll for pending confirmations
-  const { data: confirmations = [] } = useQuery({
-    queryKey: ['confirmations'],
-    queryFn: fetchConfirmations,
-    refetchInterval: 10000,
-  });
-
-  // Show the most recent confirmation request
-  useEffect(() => {
-    if (confirmations.length > 0 && !currentConfirmation) {
-      setCurrentConfirmation(confirmations[0]);
-    }
-  }, [confirmations, currentConfirmation]);
-
-  // PAN-1520 — desktop-notification permission grant on first interaction.
-  // Browsers require user gesture for `Notification.requestPermission()` in
-  // many configurations; we attempt once and silently degrade to toast-only.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      // Don't auto-prompt — wait for the first user gesture. We piggyback on
-      // the existing pointerdown handler so this never fires on hostile pages.
-      const ask = (): void => {
-        Notification.requestPermission().catch(() => { /* ignore */ });
-        window.removeEventListener('pointerdown', ask);
-      };
-      window.addEventListener('pointerdown', ask, { once: true });
-      return (): void => { window.removeEventListener('pointerdown', ask); };
-    }
-    return undefined;
-  }, []);
-
-  // PAN-1520 — fire a desktop notification (+ in-app toast) when a subject
-  // (agent OR conversation) transitions into a "needs operator input" state.
-  // We track unique (subjectId, toolUseId) tuples in a ref so a single AUQ
-  // only fires once.
-  const notifiedPendingInputRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    // #1102 — clicking the toast or desktop notification re-opens the dialog
-    // for that subject (focus + un-dismiss), not just focuses the window.
-    const announce = (id: string, subjectId: string, title: string, body: string): void => {
-      const key = id;
-      if (notifiedPendingInputRef.current.has(key)) return;
-      notifiedPendingInputRef.current.add(key);
-      const reopen = (): void => requestAskUserQuestionReopen(subjectId);
-      toast.info(title, {
-        description: body,
-        duration: 12000,
-        action: { label: 'Answer', onClick: reopen },
-      });
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        try {
-          const n = new Notification(title, { body, tag: key });
-          n.onclick = (): void => { window.focus(); reopen(); n.close(); };
-        } catch { /* ignore */ }
-      }
-    };
-
-    for (const a of agentsWithAskUserQuestion) {
-      const toolUseId = a.pendingAskUserQuestion?.toolUseId;
-      if (!toolUseId) continue;
-      const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      const label = (a.issueId ? issues.find((i) => i.id === a.issueId)?.title : undefined) ?? a.issueId ?? a.id;
-      announce(`agent::${a.id}::${toolUseId}`, a.id, `${label} is waiting on you`, body);
-    }
-    for (const c of convAskUserQuestionRows) {
-      const toolUseId = c.pendingAskUserQuestion?.toolUseId;
-      if (!toolUseId) continue;
-      const body = c.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      const label = c.title ?? c.name;
-      announce(`conv::${c.name}::${toolUseId}`, c.name, `"${label}" is waiting on you`, body);
-    }
-
-    // Garbage-collect notification keys for AUQs that have cleared.
-    const liveKeys = new Set<string>();
-    for (const a of agentsWithAskUserQuestion) {
-      const id = a.pendingAskUserQuestion?.toolUseId;
-      if (id) liveKeys.add(`agent::${a.id}::${id}`);
-    }
-    for (const c of convAskUserQuestionRows) {
-      const id = c.pendingAskUserQuestion?.toolUseId;
-      if (id) liveKeys.add(`conv::${c.name}::${id}`);
-    }
-    for (const k of notifiedPendingInputRef.current) {
-      if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
-    }
-  }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
-
-  // (PAN-1520) The former planning-specific "needs input" toast was removed —
-  // the unified pending-input notifier above already covers planning agents
-  // (with the issue title and an Answer action), so it was double-firing with
-  // stale "open the Plan dialog" guidance.
-
-  // PAN-1520 — answer an AskUserQuestion. Routes to the right endpoint based
-  // on subject kind: agents go through /api/agents/:id/answer-question
-  // (formats a "Q/A" message and delivers via deliverAgentMessage); conv
-  // sessions use the regular POST /api/conversations/:name/message channel.
-  const askUserQuestionAnswerMutation = useMutation({
-    mutationFn: async ({ kind, id, answers, questions }: {
-      kind: 'agent' | 'conv';
-      id: string;
-      /** Friendly display label (issue/conversation title) for the toast. */
-      label?: string;
-      answers: string[];
-      questions: AskUserQuestionSubject['pendingAskUserQuestion'] extends infer T
-        ? T extends { questions: infer Q } ? Q : never : never;
-    }) => {
-      if (kind === 'agent') {
-        const res = await fetch(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers }),
-        });
-        if (!res.ok) {
-          let message = `Failed to deliver answer (${res.status})`;
-          try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-          throw new Error(message);
-        }
-        return res.json();
-      }
-      // conv: compose the Q/A message ourselves and post via the regular
-      // message channel — that's the path conversation input already uses.
-      const lines: string[] = [];
-      const qArr = (questions ?? []) as ReadonlyArray<{ question: string }>;
-      for (let i = 0; i < answers.length && i < qArr.length; i++) {
-        const q = qArr[i]?.question ?? `Question ${i + 1}`;
-        lines.push(`Q: ${q}\nA: ${answers[i]}`);
-      }
-      const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: composed }),
-      });
-      if (!res.ok) {
-        let message = `Failed to deliver answer (${res.status})`;
-        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-        throw new Error(message);
-      }
-      return res.json();
-    },
-    onMutate: (variables) => {
-      const toolUseId = currentAskUserQuestionSubject?.pendingAskUserQuestion?.toolUseId;
-      if (toolUseId) {
-        markAskUserQuestionAnswered(toolUseId);
-      }
-      return { subjectId: variables.id, toolUseId };
-    },
-    onSuccess: (_data, variables) => {
-      toast.success(`Answer delivered to ${variables.label?.trim() || variables.id}`);
-    },
-    onError: (error: Error, _variables, context) => {
-      if (context?.toolUseId) {
-        unmarkAskUserQuestionAnswered(context.toolUseId);
-      }
-      toast.error(`Failed to deliver answer: ${error.message}`);
-    },
-  });
-
-  // PAN-1690 — answer a Codex TUI approval menu. The selected option's label
-  // is prefixed with its number ("1. Yes, proceed"); we send that number to the
-  // codex-approval endpoint, which drives the menu via Down×(n-1) + Enter.
-  const codexApprovalMutation = useMutation({
-    mutationFn: async ({ id, optionNumber }: {
-      id: string;
-      optionNumber: number;
-      label?: string;
-      toolUseId?: string;
-    }) => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ optionNumber }),
-      });
-      if (!res.ok) {
-        let message = `Failed to send approval (${res.status})`;
-        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-        throw new Error(message);
-      }
-      return res.json();
-    },
-    onMutate: ({ toolUseId }) => {
-      if (toolUseId) markAskUserQuestionAnswered(toolUseId);
-      return { toolUseId };
-    },
-    onSuccess: (_data, variables) => {
-      toast.success(`Approval sent to ${variables.label?.trim() || variables.id}`);
-    },
-    onError: (error: Error, _variables, context) => {
-      if (context?.toolUseId) unmarkAskUserQuestionAnswered(context.toolUseId);
-      toast.error(`Failed to send approval: ${error.message}`);
-    },
-  });
-
-  const handleSubmitAskUserQuestion = useCallback((answers: string[]) => {
-    if (!currentAskUserQuestionSubject) return;
-    const subject = currentAskUserQuestionSubject;
-    const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
-    // PAN-1690 — Codex approval: route the numbered choice to the keystroke
-    // endpoint instead of delivering prose into the pane.
-    if (toolUseId?.startsWith('codex-approval:')) {
-      const match = /^\s*(\d+)/.exec(answers[0] ?? '');
-      const optionNumber = match ? Number(match[1]) : NaN;
-      if (!Number.isInteger(optionNumber)) {
-        toast.error('Could not determine which option was selected');
-        return;
-      }
-      codexApprovalMutation.mutate({
-        id: subject.id,
-        optionNumber,
-        label: subject.title?.trim() || subject.id,
-        toolUseId,
-      });
-      return;
-    }
-    askUserQuestionAnswerMutation.mutate({
-      kind: (subject as AskUserQuestionSubject & { kind?: 'agent' | 'conv' }).kind ?? 'agent',
-      id: subject.id,
-      label: subject.title?.trim() || subject.id,
-      answers,
-      questions: subject.pendingAskUserQuestion?.questions as never,
-    });
-  }, [askUserQuestionAnswerMutation, codexApprovalMutation, currentAskUserQuestionSubject]);
-
-  const handleDismissAskUserQuestion = useCallback(() => {
-    if (!currentAskUserQuestionSubject) return;
-    markAskUserQuestionDismissed(currentAskUserQuestionSubject.id);
-  }, [currentAskUserQuestionSubject, markAskUserQuestionDismissed]);
-
-  // PAN-1520 — purge optimistic state for AUQs that have actually cleared
-  // server-side, and re-allow dismissed subjects whose tool-use id has
-  // changed. Cleans up across both agent and conv sources.
-  useEffect(() => {
-    const liveAgentToolUseIds = agentsWithAskUserQuestion
-      .map((a) => a.pendingAskUserQuestion?.toolUseId)
-      .filter((id): id is string => typeof id === 'string');
-    const liveConvToolUseIds = convAskUserQuestionRows
-      .map((c) => c.pendingAskUserQuestion?.toolUseId)
-      .filter((id): id is string => typeof id === 'string');
-    const liveToolUseIds = new Set<string>([...liveAgentToolUseIds, ...liveConvToolUseIds]);
-    reconcileAnsweredAskUserQuestions(liveToolUseIds);
-    const liveSubjectIds = new Set<string>([
-      ...agentsWithAskUserQuestion.map((a) => a.id),
-      ...convAskUserQuestionRows.map((c) => c.name),
-    ]);
-    reconcileDismissedAskUserQuestions(liveSubjectIds);
-    // PAN-1395 — drop the focus once its subject is no longer pending.
-    setFocusedAskUserQuestionId((prev) => (prev && liveSubjectIds.has(prev) ? prev : null));
-  }, [agentsWithAskUserQuestion, convAskUserQuestionRows, reconcileAnsweredAskUserQuestions, reconcileDismissedAskUserQuestions]);
-
-  const channelPermissionResponseMutation = useMutation({
-    mutationFn: ({
-      agentId,
-      requestId,
-      behavior,
-    }: {
-      agentId: string;
-      requestId: string;
-      behavior: ClaudeChannelPermissionBehavior;
-    }) => respondToChannelPermission(agentId, requestId, behavior),
-    onMutate: async (variables) => {
-      setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
-        const next = new Set(prev);
-        next.add(variables.requestId);
-        return next;
-      });
-    },
-    onSuccess: async (_data, variables) => {
-      await refreshDashboardState(queryClient);
-      toast.success(
-        variables.behavior === 'allow'
-          ? `Allowed ${variables.agentId} to continue`
-          : `Denied permission request for ${variables.agentId}`,
-      );
-    },
-    onError: (error: Error, variables) => {
-      setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
-        if (!prev.has(variables.requestId)) {
-          return prev;
-        }
-        const next = new Set(prev);
-        next.delete(variables.requestId);
-        return next;
-      });
-      toast.error(`Permission response failed: ${error.message}`);
-    },
-  });
-
-  const handleConfirm = useCallback(async () => {
-    if (!currentConfirmation) return;
-    try {
-      await respondToConfirmation(currentConfirmation.id, true);
-      setCurrentConfirmation(null);
-    } catch (error) {
-      console.error('Failed to confirm:', error);
-    }
-  }, [currentConfirmation]);
-
-  const handleDeny = useCallback(async () => {
-    if (!currentConfirmation) return;
-    try {
-      await respondToConfirmation(currentConfirmation.id, false);
-      setCurrentConfirmation(null);
-    } catch (error) {
-      console.error('Failed to deny:', error);
-    }
-  }, [currentConfirmation]);
-
-  const handleAllowChannelPermission = useCallback(() => {
-    if (!currentChannelPermissionRequest) return;
-    channelPermissionResponseMutation.mutate({
-      agentId: currentChannelPermissionRequest.agentId,
-      requestId: currentChannelPermissionRequest.requestId,
-      behavior: 'allow',
-    });
-  }, [channelPermissionResponseMutation, currentChannelPermissionRequest]);
-
-  const handleDenyChannelPermission = useCallback(() => {
-    if (!currentChannelPermissionRequest) return;
-    channelPermissionResponseMutation.mutate({
-      agentId: currentChannelPermissionRequest.agentId,
-      requestId: currentChannelPermissionRequest.requestId,
-      behavior: 'deny',
-    });
-  }, [channelPermissionResponseMutation, currentChannelPermissionRequest]);
-
-  const handleCloseConfirmation = useCallback(() => {
-    setCurrentConfirmation(null);
-  }, []);
+  const {
+    currentChannelPermissionRequest,
+    currentChannelPermissionIssueId,
+    isChannelPermissionSubmitting,
+    handleAllowChannelPermission,
+    handleDenyChannelPermission,
+    currentAskUserQuestionSubject,
+    isAskUserQuestionSubmitting,
+    handleSubmitAskUserQuestion,
+    handleDismissAskUserQuestion,
+    currentConfirmation,
+    handleConfirm,
+    handleDeny,
+    handleCloseConfirmation,
+  } = usePendingInputDialogs({ agents, issues });
 
   // Global keyboard shortcuts: / for search, Cmd+K for command palette
   useEffect(() => {
@@ -1189,7 +734,7 @@ export default function App() {
         request={currentChannelPermissionRequest}
         issueId={currentChannelPermissionIssueId}
         isOpen={!!currentChannelPermissionRequest}
-        isSubmitting={channelPermissionResponseMutation.isPending}
+        isSubmitting={isChannelPermissionSubmitting}
         onAllow={handleAllowChannelPermission}
         onDeny={handleDenyChannelPermission}
       />
@@ -1199,7 +744,7 @@ export default function App() {
       <AskUserQuestionDialog
         subject={currentAskUserQuestionSubject}
         isOpen={!!currentAskUserQuestionSubject && !currentChannelPermissionRequest}
-        isSubmitting={askUserQuestionAnswerMutation.isPending || codexApprovalMutation.isPending}
+        isSubmitting={isAskUserQuestionSubmitting}
         onSubmit={handleSubmitAskUserQuestion}
         onDismiss={handleDismissAskUserQuestion}
       />
