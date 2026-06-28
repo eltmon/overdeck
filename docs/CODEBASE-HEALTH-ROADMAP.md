@@ -42,17 +42,29 @@ What we measured, and which symptom it drives:
 
 Install mechanical ratchets so the debt can only shrink. Pure-gain, low blast radius, cheap-model-executable. **A must land before B** — extraction without a working type-checker just produces more runtime breakage.
 
-| # | Work | Executor | Branch | Status |
+| # | Work | Executor | PR | Status |
 |---|---|---|---|---|
-| **A1** | ESLint `no-explicit-any` ratchet (plugin + `.eslintrc.cjs` + generated baseline allowlist) | GPT-5.5 | `codebase-health/a1` | ☐ in progress |
-| **A2** | Adopt `ts-reset` (safe granular rules; fix surfaced typecheck errors) | GLM-5.2 | `codebase-health/a2` | ☐ queued |
-| **A3** | File-size ceiling guard (`scripts/lint-file-size.sh` + baseline) | Kimi-2.7 | `codebase-health/a3` | ☐ queued |
+| **A1** | ESLint `no-explicit-any` ratchet (plugin + `.eslintrc.cjs` + generated baseline allowlist) | GPT-5.5 | #2113 | ✅ merged 2026-06-28 |
+| **A2** | Adopt `ts-reset` (safe granular rules: `filter-boolean` + `array-includes`) | GLM-5.2 | #2114 | ✅ merged 2026-06-28 |
+| **A3** | File-size ceiling guard (`scripts/lint-file-size.sh` + 45-file baseline) | Kimi-2.7 | #2115 | ✅ merged 2026-06-28 |
 
-PRDs: [`docs/codebase-health/`](./codebase-health/).
+PRDs: [`docs/codebase-health/`](./codebase-health/). **Epic A complete** — combined `main` CI green.
 
 ### Epic B — Carve deep modules + unify the harness abstraction
 
-Decompose the god files into deep modules (narrow interface, hidden complexity) and replace the 396 harness branches with a single `Harness` interface (`spawn` / `deliver` / `resume` / `capabilities`) plus one implementation per harness. **Prereq: Epic A.**
+Decompose the god files into deep modules (narrow interface, hidden complexity) and replace the ~46 harness branch sites with a single `Harness` interface (extend the existing `src/lib/runtimes/AgentRuntimeSync`) plus one implementation per harness. **Prereq: Epic A (done).**
+
+**Sequencing decision:** B is far riskier than A — the highest-value seams (deacon auto-resume/merge, the harness migration, the `agents.ts` spawn path) touch the exact code behind our worst failure modes. So B proceeds in **waves, safest-first**: each wave extracts the *single lowest-risk seam* in a god file, behavior-preserving, compiler+test-verified, to prove the extraction pattern before the scary seams. Analysis maps for each file live in the agents' reports; the per-file full seam ladder is in each PRD's appendix.
+
+**Wave 1 (in flight) — the safest seam in each of the three god files, one per model, fully independent (different files, no `package.json` touches):**
+
+| # | Work | File → new module | Risk | Executor | Branch |
+|---|---|---|---|---|---|
+| **B1** | Extract inspect/timeout cluster | `deacon.ts` (7,180) → `deacon-inspect.ts` | LOW | GPT-5.5 | `codebase-health/b1` |
+| **B2** | Extract container/docker routes | `routes/workspaces.ts` (6,638) → `routes/workspaces/container-ops.ts` | LOW | GLM-5.2 | `codebase-health/b2` |
+| **B3** | Extract read-only agent queries | `agents.ts` (5,824) → `agents/queries.ts` | LOW | Kimi-2.7 | `codebase-health/b3` |
+
+PRDs: [`docs/codebase-health/`](./codebase-health/) (`B1-*`, `B2-*`, `B3-*`). Later waves tackle api-recovery/review/merge/auto-resume (deacon), workspace-data/review-pipeline/merge-ops (route), termination/delivery/state (agents), then the `Harness` interface migration.
 
 ### Epic C — Fitness functions (evals + a frozen kernel)
 
@@ -77,10 +89,13 @@ These changes modify the agents' **own substrate** — lint rules, the build, th
 
 ## Progress
 
-- [ ] **A1** — `no-explicit-any` ratchet — GPT-5.5 — `codebase-health/a1`
-- [ ] **A2** — `ts-reset` — GLM-5.2 — `codebase-health/a2`
-- [ ] **A3** — file-size guard — Kimi-2.7 — `codebase-health/a3`
-- [ ] **B** — deep-module extraction + harness seam (PRDs TBD after A lands)
+- [x] **A1** — `no-explicit-any` ratchet — GPT-5.5 — merged #2113
+- [x] **A2** — `ts-reset` — GLM-5.2 — merged #2114
+- [x] **A3** — file-size guard — Kimi-2.7 — merged #2115
+- [ ] **B1** — extract `deacon-inspect.ts` — GPT-5.5 — `codebase-health/b1`
+- [ ] **B2** — extract `container-ops.ts` — GLM-5.2 — `codebase-health/b2`
+- [ ] **B3** — extract `agents/queries.ts` — Kimi-2.7 — `codebase-health/b3`
+- [ ] **B (later waves)** — api-recovery/review/merge/auto-resume · workspace-data/review-pipeline/merge-ops · termination/delivery/state · `Harness` interface
 - [ ] **C** — evals + frozen kernel (PRDs TBD)
 - [ ] **D** — process gates (PRDs TBD)
 
