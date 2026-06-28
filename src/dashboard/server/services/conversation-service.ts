@@ -14,6 +14,7 @@ import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogE
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
 import { isPiSessionFile, parsePiConversationMessages } from './pi-conversation-parser.js';
@@ -993,17 +994,15 @@ export async function summarizeConversationActivity(
 ): Promise<ConversationActivitySummary> {
   const fileStats = await stat(sessionFile);
   const cacheKey = `${options.harness ?? 'claude-code'}:${sessionFile}`;
+  const behavior = getHarnessBehavior(options.harness as Parameters<typeof getHarnessBehavior>[0]);
   const cached = activitySummaryCache.get(cacheKey);
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
     return cached.summary;
   }
 
-  const parsed = options.harness === 'codex'
-    ? await parseCodexConversationMessages(sessionFile)
-    : options.harness === 'ohmypi' || isOhmypiSessionFile(sessionFile)
-      ? await parseOhmypiConversationMessages(sessionFile)
-      : options.harness === 'pi' || isPiSessionFile(sessionFile)
-      ? await parsePiConversationMessages(sessionFile)
+  const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
+    : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
+    : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
       // re-reading potentially megabytes of history on every list enrichment tick.
       // Pass an empty priorState so pendingToolUse stays populated rather than being
@@ -1049,7 +1048,7 @@ export async function summarizeConversationActivity(
         currentTool = entry.toolTitle;
       }
     }
-    if (!currentTool && options.harness === 'codex') {
+    if (!currentTool && behavior.transcriptKind === 'codex-rollout-jsonl') {
       for (const entry of workLog) {
         if (entry.tone === 'tool' && !entry.result && (entry.sequence ?? -1) > maxSequence) {
           maxSequence = entry.sequence ?? -1;
