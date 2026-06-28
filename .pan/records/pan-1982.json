@@ -82,22 +82,49 @@
     {
       "reason": "resume",
       "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-29T03:02:12.851Z"
+      "timestamp": "2026-06-29T14:25:14.785Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T14:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T14:26:05.250Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T14:26Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T14:26:07.219Z"
     }
   ],
-  "feedback": [],
-  "created": "2026-06-29T03:02:12.715Z",
-  "updated": "2026-06-29T03:02:12.851Z",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T14:26:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1982\n\nWorkspace is detached at e4f9fee2 instead of on feature/pan-1982\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1982 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T14:26:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1982\n\nWorkspace is detached at e4f9fee2 instead of on feature/pan-1982\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1982 -m \"Fixed review issues\"`"
+    }
+  ],
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1982",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T03:02:12.728Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2112"
+    "updatedAt": "2026-06-29T14:26:05.210Z",
+    "reviewNotes": "Workspace is detached at e4f9fee2 instead of on feature/pan-1982",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2112",
+    "lastVerifiedCommit": "6aa2afa4f37b76c3b6d57a14c10b99b0bf8fcbf5"
   },
   "closeOut": {
     "usage": {
@@ -120,8 +147,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 30730,
-            "output": 3598,
+            "input": 65848,
+            "output": 13528,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -136,10 +163,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 162,
-            "output": 8879,
-            "cacheRead": 5301281,
-            "cacheWrite": 561344
+            "input": 27979,
+            "output": 26512,
+            "cacheRead": 14063212,
+            "cacheWrite": 1708110
           }
         }
       },
@@ -157,21 +184,21 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 30730,
-          "output": 3598,
+          "input": 65848,
+          "output": 13528,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 162,
-          "output": 8879,
-          "cacheRead": 5301281,
-          "cacheWrite": 561344
+          "input": 27979,
+          "output": 26512,
+          "cacheRead": 14063212,
+          "cacheWrite": 1708110
         }
       },
       "costAtCloseOut": {
-        "usd": 9.011455,
-        "pricingAsOf": "2026-06-29T03:02:12.811Z"
+        "usd": 11.437081,
+        "pricingAsOf": "2026-06-29T14:26:05.239Z"
       }
     },
     "merges": [
@@ -179,36 +206,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "config-review-mode": "completed",
-    "config-review-mode.ac1": "completed",
-    "config-review-mode.ac2": "completed",
-    "config-review-mode.ac3": "completed",
-    "review-mode-resolver": "completed",
-    "review-mode-resolver.ac1": "completed",
-    "review-mode-resolver.ac2": "completed",
-    "review-mode-resolver.ac3": "completed",
-    "review-mode-resolver.ac4": "completed",
-    "review-mode-cli-setter": "completed",
-    "review-mode-cli-setter.ac1": "completed",
-    "review-mode-cli-setter.ac2": "completed",
-    "review-mode-cli-setter.ac3": "completed",
-    "review-mode-cli-setter.ac4": "completed",
-    "reviewer-tree-gate": "completed",
-    "reviewer-tree-gate.ac1": "completed",
-    "reviewer-tree-gate.ac2": "completed",
-    "unpark-convoy-spawn": "completed",
-    "unpark-convoy-spawn.ac1": "completed",
-    "unpark-convoy-spawn.ac2": "completed",
-    "unpark-convoy-spawn.ac3": "completed",
-    "unpark-convoy-spawn.ac4": "completed",
-    "reverify-parked-convoy-bugs": "completed",
-    "reverify-parked-convoy-bugs.ac1": "completed",
-    "reverify-parked-convoy-bugs.ac2": "completed",
-    "convoy-cross-harness-resume-test": "completed",
-    "convoy-cross-harness-resume-test.ac1": "completed",
-    "convoy-cross-harness-resume-test.ac2": "completed"
-  }
+  "created": "2026-06-29T03:03:17.555Z",
+  "updated": "2026-06-29T14:26:07.219Z"
 }
