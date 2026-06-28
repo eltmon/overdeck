@@ -32,5 +32,101 @@
       "timestamp": "2026-06-20T23:57:03.003Z"
     }
   ],
+  "bugDispositions": [
+    {
+      "issue": "PAN-1861",
+      "url": "https://github.com/eltmon/overdeck/issues/1861",
+      "disposition": "obsolete",
+      "reason": "The parent no longer depends solely on receiving every REVIEWER_READY signal. monitorReviewConvoySignals now backs up missing reviewer signals from fresh report files, and nudgeSynthesisForCompleteReviewerReports detects all four on-disk reports for the active run. If the parent is dead or has already been nudged, Deacon writes synthesis.md directly from the reports and updates review status.",
+      "verifiedAgainst": [
+        "src/lib/cloister/deacon.ts:6154",
+        "src/lib/cloister/deacon.ts:6208",
+        "src/lib/cloister/deacon.ts:6214",
+        "src/lib/cloister/deacon.ts:6215",
+        "src/lib/cloister/deacon.ts:6434",
+        "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts:326",
+        "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts:372"
+      ],
+      "followUp": null
+    },
+    {
+      "issue": "PAN-1864",
+      "url": "https://github.com/eltmon/overdeck/issues/1864",
+      "disposition": "obsolete",
+      "reason": "The nudge-only failure mode is now covered by deterministic Deacon-side synthesis. When reports are present and the parent is unavailable or has already ignored a nudge, synthesizeReviewFromReports writes synthesis.md, setReviewStatusSync records passed or blocked, blocked verdicts deliver feedback host-side, and the wedged parent is killed if still alive.",
+      "verifiedAgainst": [
+        "src/lib/cloister/deacon.ts:6037",
+        "src/lib/cloister/deacon.ts:6208",
+        "src/lib/cloister/deacon.ts:6214",
+        "src/lib/cloister/deacon.ts:6215",
+        "src/lib/cloister/deacon.ts:6219",
+        "src/lib/cloister/deacon.ts:6228",
+        "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts:372"
+      ],
+      "followUp": null
+    },
+    {
+      "issue": "PAN-1130",
+      "url": "https://github.com/eltmon/overdeck/issues/1130",
+      "disposition": "obsolete",
+      "reason": "The old headless claude --print reviewer lifecycle is gone. Review sub-role launchers are interactive and no longer carry --print, launcher pid files, or embedded REVIEWER_READY/REVIEWER_TIMEOUT signal blocks. Generic API-error recovery skips review sub-role sessions, and heartbeat-dead handling marks a review sub-role with a completed report stopped without recording a crash failure.",
+      "verifiedAgainst": [
+        "src/lib/agents.ts:3702",
+        "src/lib/cloister/deacon.ts:995",
+        "src/lib/cloister/deacon.ts:5799",
+        "tests/integration/agent-spawning.test.ts:1029",
+        "src/lib/cloister/__tests__/deacon-stuck-skip.test.ts:341",
+        "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts:257"
+      ],
+      "followUp": null
+    },
+    {
+      "issue": "PAN-1207",
+      "url": "https://github.com/eltmon/overdeck/issues/1207",
+      "disposition": "obsolete",
+      "reason": "Synthesis is no longer gated on stale state.json status. monitorReviewConvoySignals reads current agent state through the agents table with a legacy state fallback, treats fresh report files as READY even if the persisted state still says running, and falls back to direct synthesis when all active-run reports are present. Heartbeat-dead handling also treats completed review artifacts as normal stopped state rather than failures.",
+      "verifiedAgainst": [
+        "src/lib/cloister/deacon.ts:4231",
+        "src/lib/cloister/deacon.ts:5799",
+        "src/lib/cloister/deacon.ts:6278",
+        "src/lib/cloister/deacon.ts:6357",
+        "src/lib/cloister/deacon.ts:6401",
+        "src/lib/cloister/deacon.ts:6434",
+        "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts:291",
+        "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts:257"
+      ],
+      "followUp": null
+    },
+    {
+      "issue": "PAN-838",
+      "url": "https://github.com/eltmon/overdeck/issues/838",
+      "disposition": "obsolete",
+      "reason": "The current review lifecycle does not produce synthesis.json. The synthesis contract is synthesis.md only: roles/review.md tells the synthesis agent to write .pan/review/<runId>/synthesis.md, Deacon fallback also writes synthesis.md, and repository search finds no active synthesis.json producer.",
+      "verifiedAgainst": [
+        "roles/review.md:73",
+        "roles/review.md:140",
+        "src/lib/cloister/deacon.ts:6214",
+        "src/dashboard/server/routes/reviewer-tree.ts:101"
+      ],
+      "followUp": null
+    },
+    {
+      "issue": "PAN-1131",
+      "url": "https://github.com/eltmon/overdeck/issues/1131",
+      "disposition": "obsolete",
+      "reason": "The review idempotency guard no longer equates a live synthesis pane with an active review. It probes the current HEAD, compares it to the persisted synthesis reviewRunId, treats mismatches as stale, kills the convoy, and respawns. Fresh and resumed review sessions also persist the current runId so the guard has a reliable discriminator.",
+      "verifiedAgainst": [
+        "src/lib/cloister/review-agent.ts:426",
+        "src/lib/cloister/review-agent.ts:439",
+        "src/lib/cloister/review-agent.ts:446",
+        "src/lib/cloister/review-agent.ts:466",
+        "src/lib/cloister/review-agent.ts:470",
+        "src/lib/cloister/review-agent.ts:645",
+        "src/lib/cloister/review-agent.ts:670",
+        "tests/lib/cloister/review-agent.test.ts:604"
+      ],
+      "followUp": null
+    }
+  ],
   "feedback": []
 }
