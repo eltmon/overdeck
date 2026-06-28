@@ -31,7 +31,6 @@ import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar'
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { FlywheelPage } from './pages/FlywheelPage';
 import { BacklogSequencerPage } from './pages/BacklogSequencerPage';
-import { FlywheelConversationPane } from './components/flywheel/FlywheelConversationPane';
 import { HomePage } from './pages/HomePage';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
 import { Tab } from './components/Header';
@@ -42,10 +41,6 @@ import { AgentsSkeleton } from './components/skeletons/AgentsSkeleton';
 import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
-import { StandaloneTerminal } from './components/StandaloneTerminal';
-import { DiffPanel } from './components/DiffPanel';
-import { DiffWorkerPoolProvider } from './components/DiffWorkerPoolProvider';
-import type { TurnDiffSummary } from './components/chat/chat-types';
 import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
 import { LowCostModePill } from './components/LowCostModePill';
@@ -66,8 +61,12 @@ import { fetchWithTimeout } from './lib/apiFetch';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
 import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
-import { ConversationPanel } from './components/chat/ConversationPanel';
-import type { Conversation } from './components/CommandDeck/ConversationList';
+import {
+  StandaloneConversationPopoutRoute,
+  StandaloneDiffPopoutRoute,
+  StandaloneFlywheelPopoutRoute,
+  StandaloneTerminalRoute,
+} from './App/StandaloneRoutes';
 
 interface TrackerStatusItem {
   type: string;
@@ -347,140 +346,6 @@ async function fetchCliproxyStatus(): Promise<CliproxyStatus> {
 async function restartCliproxy(): Promise<void> {
   const res = await fetch('/api/cliproxy/restart', { method: 'POST' });
   if (!res.ok) throw new Error('Failed to restart CLIProxy');
-}
-
-function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; token?: string }) {
-  useCodexAutoRetry();
-  return (
-    <div className="h-screen overflow-hidden bg-[#0d1117]">
-      <EventRouter />
-      <StandaloneTerminal sessionName={sessionName} token={token} />
-    </div>
-  );
-}
-
-function StandaloneFlywheelPopoutRoute() {
-  useCodexAutoRetry();
-  return (
-    <div className="h-screen overflow-hidden bg-background">
-      <EventRouter />
-      <FlywheelConversationPane />
-    </div>
-  );
-}
-
-/**
- * Standalone diff popout (/popout/diff). Renders ONLY the diff — not the host
- * conversation/agent page. The pop-out button in DiffPanel passes `prefix` (the
- * diff fetch base, e.g. /api/conversations/<name>/diffs) plus the selected
- * turn/file via query params; this route refetches the turn summaries from that
- * base and mounts a bare full-width DiffPanel. Theme is applied at module load
- * from localStorage, and diffs are REST-driven, so no EventRouter is needed.
- */
-
-/**
- * Standalone conversation popout (/popout/conversation/<id>). Renders ONLY the
- * conversation — no sidebar, awareness rail, status pills, or other dashboard
- * chrome. This is the target for the in-pane "Detach" button, drag-to-detach
- * in the PaneBar, and the ⋮ → "Pop out to window" menu item; users want to
- * focus on one conversation, not duplicate the whole app.
- *
- * Fetches the conversation by numeric id via /api/conversations/<id> (the same
- * endpoint the host app uses), then mounts <ConversationPanel> directly. The
- * EventRouter is included so live updates (new messages, status changes) keep
- * flowing in via the existing WebSocket transport — standalone != disconnected.
- *
- * Optional query params:
- *   view=terminal   start in terminal mode (matches the /conv/<id>?view=... deep-link).
- */
-function StandaloneConversationPopoutRoute({ conversationId }: { conversationId: string }) {
-  useCodexAutoRetry();
-  const numericId = Number(conversationId);
-  const viewParam = new URLSearchParams(window.location.search).get('view');
-  const viewMode: ConversationViewMode = viewParam === 'terminal' ? 'terminal' : 'conversation';
-  const { data: conversation, isError, isLoading } = useQuery({
-    queryKey: ['popout-conversation', numericId],
-    queryFn: async () => {
-      const res = await fetch(`/api/conversations/${numericId}`);
-      if (!res.ok) throw new Error(`Failed to load conversation: ${res.status}`);
-      return (await res.json()) as Conversation;
-    },
-    enabled: Number.isFinite(numericId) && numericId > 0,
-    // Same cadence as the inline panel — keeps status (sessionAlive, etc.) fresh
-    // without hammering the server. The EventRouter handles the streaming path.
-    refetchInterval: 5000,
-  });
-
-  return (
-    <div className="h-screen overflow-hidden bg-background">
-      <EventRouter />
-      {!Number.isFinite(numericId) || numericId <= 0 ? (
-        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          Invalid conversation id.
-        </div>
-      ) : isLoading && conversation === undefined ? (
-        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          Loading conversation…
-        </div>
-      ) : isError || conversation === undefined ? (
-        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          Couldn’t load this conversation. It may have been archived or deleted.
-        </div>
-      ) : (
-        <ConversationPanel
-          conversation={conversation}
-          viewMode={viewMode}
-          onArchived={() => window.close()}
-        />
-      )}
-    </div>
-  );
-}
-
-function StandaloneDiffPopoutRoute() {
-  useCodexAutoRetry();
-  const search = new URLSearchParams(window.location.search);
-  const prefix = search.get('prefix') ?? '';
-  const agentId = search.get('agentId') ?? prefix;
-  const { data, isError } = useQuery({
-    queryKey: ['popout-diff-summaries', prefix],
-    queryFn: async () => {
-      const res = await fetch(prefix);
-      if (!res.ok) throw new Error(`Failed to load diff summaries: ${res.status}`);
-      return (await res.json()) as { summaries: TurnDiffSummary[] };
-    },
-    enabled: prefix.length > 0,
-    // Same cadence as the inline panel (ConversationPanel) — keeps summaries
-    // fresh as turns complete AND self-heals after a transient backend outage
-    // (e.g. a watchdog dashboard restart) instead of dead-ending on the error
-    // state after the default 3 retries.
-    refetchInterval: 5000,
-  });
-  return (
-    <div className="h-screen overflow-hidden bg-background">
-      {prefix.length === 0 || (isError && data === undefined) ? (
-        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          {prefix.length === 0 ? 'Missing diff source.' : 'Failed to load this diff — retrying…'}
-        </div>
-      ) : data === undefined ? (
-        // The summaries endpoint shells out to git per turn and can take seconds
-        // on a long conversation — without this gate, DiffPanel mounts with an
-        // empty summary list and shows a misleading "No completed turns yet."
-        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          Loading diff…
-        </div>
-      ) : (
-        <DiffWorkerPoolProvider>
-          <DiffPanel
-            mode="sheet"
-            agentId={agentId}
-            turnDiffSummaries={data.summaries}
-            diffUrlPrefix={prefix}
-          />
-        </DiffWorkerPoolProvider>
-      )}
-    </div>
-  );
 }
 
 export default function App() {
