@@ -401,16 +401,15 @@ describe('pan down integration (PAN-931)', () => {
 // The route must use 'failed' for reviewStatus so the type contract is maintained.
 
 describe('reviewStatus type-safety regression', () => {
-  it('workspaces.ts request-review route does not write reviewStatus=dispatch_failed', async () => {
+  it('review-pipeline.ts request-review route does not write reviewStatus=dispatch_failed', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -436,12 +435,11 @@ describe('request-review fresh convoy regression', () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -504,11 +502,11 @@ describe('stale synthesis session detection (PAN-1131)', () => {
 });
 
 describe('passed-state rerun regression', () => {
-  it('workspaces.ts request-review route rejects dirty workspaces before rerun dispatch', async () => {
+  it('review-pipeline.ts request-review route rejects dirty workspaces before rerun dispatch', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
 
@@ -522,11 +520,11 @@ describe('passed-state rerun regression', () => {
     expect(rerunBlock).toContain('dirty workspace on rerun path');
   });
 
-  it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
+  it('review-pipeline.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
 
@@ -746,16 +744,15 @@ describe('deacon gated review deferral', () => {
 // dispatch error (e.g., tmux not ready, file-system issue).
 
 describe('dispatch failure reviewStatus regression', () => {
-  it('workspaces.ts request-review route blocks dirty worktrees before verification', async () => {
+  it('review-pipeline.ts request-review route blocks dirty worktrees before verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -770,16 +767,15 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
-  it('workspaces.ts request-review route yields the verification Effect directly', async () => {
+  it('review-pipeline.ts request-review route yields the verification Effect directly', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -809,16 +805,15 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(restartBlock).toContain('{ status: 409 }');
   });
 
-  it('workspaces.ts review request routes treat gated dispatches as deferrals', async () => {
+  it('review-pipeline.ts review request routes treat gated dispatches as deferrals', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -854,17 +849,15 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(approveBlock).toContain('setReviewStatusBase(issueId, {');
   });
 
-  it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
+  it('review-pipeline.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
-    // Extract the request-review route block
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
