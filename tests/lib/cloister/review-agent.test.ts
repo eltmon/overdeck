@@ -23,6 +23,8 @@ import {
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
+  resolveReviewMode,
+  isExtendedReviewEnabled,
   spawnReviewRoleForIssue,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
@@ -40,6 +42,9 @@ const {
   mockSetReviewStatus,
   mockGetReviewStatus,
   mockArchiveFeedbackFiles,
+  mockLoadConfigSync,
+  mockReadIssueRecordSync,
+  mockResolveProjectForIssue,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +58,9 @@ const {
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
   mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
+  mockLoadConfigSync: vi.fn(() => ({ config: {} })),
+  mockReadIssueRecordSync: vi.fn(() => null),
+  mockResolveProjectForIssue: vi.fn(() => ({ name: 'test', path: '/tmp/project' })),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -84,8 +92,13 @@ vi.mock('../../../src/lib/agents.js', () => ({
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
-  loadConfigSync: vi.fn(() => ({ config: {} })),
+  loadConfigSync: mockLoadConfigSync,
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
+}));
+
+vi.mock('../../../src/lib/pan-dir/record.js', () => ({
+  readIssueRecordSync: mockReadIssueRecordSync,
+  resolveProjectForIssue: mockResolveProjectForIssue,
 }));
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
@@ -116,10 +129,44 @@ beforeEach(() => {
   mockMessageAgent.mockResolvedValue(undefined);
   mockGetAgentState.mockReturnValue(null);
   mockGetReviewStatus.mockReturnValue(null);
+  mockLoadConfigSync.mockReturnValue({ config: {} });
+  mockReadIssueRecordSync.mockReturnValue(null);
+  mockResolveProjectForIssue.mockReturnValue({ name: 'test', path: '/tmp/project' });
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+});
+
+describe('review mode resolution', () => {
+  it('defaults to quick when neither the issue record nor config sets review mode', () => {
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+
+    expect(mockResolveProjectForIssue).toHaveBeenCalledWith('PAN-1982');
+    expect(mockReadIssueRecordSync).toHaveBeenCalledWith({ name: 'test', path: '/tmp/project' }, 'PAN-1982');
+    expect(mockLoadConfigSync).toHaveBeenCalled();
+  });
+
+  it('uses full mode from merged config when no per-issue override exists', () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
+    });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
+  });
+
+  it('uses per-issue reviewMode over merged project and global config', () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'quick' } } },
+    });
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'full' });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
+    expect(mockLoadConfigSync).not.toHaveBeenCalled();
+  });
 });
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
