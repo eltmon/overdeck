@@ -110,7 +110,7 @@ vi.mock('../../../../../src/lib/database/index.js', () => ({
 
 // ─── Import under test (after mocks) ─────────────────────────────────────────
 
-import { pushApproveMain } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { pushApproveMain } from '../../../../../src/dashboard/server/routes/workspaces/approve-ops.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 

@@ -26,7 +26,7 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
-import { isBranchAlreadyRebased } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { isBranchAlreadyRebased } from '../../../../../src/dashboard/server/routes/workspaces/merge-ops.js';
 
 const WORKSPACE = '/tmp/test-workspace';
 const BRANCH = 'feature/pan-850';
