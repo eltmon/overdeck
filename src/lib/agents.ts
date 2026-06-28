@@ -128,7 +128,8 @@ async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName |
   files.push(await ensureSessionContextBriefingFile());
 
   // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.contextLayerKind === 'pi') {
     const { piGlobalContextFile } = await import('./context-layers/index.js');
     const globalFile = piGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -137,7 +138,7 @@ async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName |
   }
 
   // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  if (harness === 'codex') {
+  if (behavior.contextLayerKind === 'codex') {
     const { codexGlobalContextFile } = await import('./context-layers/index.js');
     const globalFile = codexGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -514,7 +515,8 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
  * Build the base command that the launcher will exec for an agent.
  *
  * The `harness` parameter (PAN-636) selects between Claude Code (default)
- * and ohmypi/Pi. When `harness === 'ohmypi'` the function short-circuits to a
+ * and ohmypi/Pi. When the harness uses the ohmypi RPC command, the function
+ * short-circuits to a
  * `omp --mode rpc --model <model>` line; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
  * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
@@ -530,10 +532,11 @@ export async function getAgentRuntimeBaseCommand(
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
-  if (harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
   }
-  if (harness === 'codex') {
+  if (behavior.launchCommandKind === 'codex-work-tui') {
     // buildCodexCommand in launcher-generator builds the full Codex command;
     // return a stub base command so the launcher generator can short-circuit.
     return `codex`;
@@ -722,10 +725,11 @@ export async function getRoleRuntimeBaseCommand(
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
-  if (harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
   }
-  if (harness === 'codex') {
+  if (behavior.launchCommandKind === 'codex-work-tui') {
     return `codex`;
   }
 
@@ -1823,7 +1827,7 @@ export function decideChannelsForWorkAgent(
     return { eligible: false, reason: 'not-a-work-agent' };
   }
 
-  if (state.harness !== 'claude-code') {
+  if (!state.harness || !getHarnessBehavior(state.harness).supportsChannelsBridge) {
     log(false, `harness-${state.harness ?? 'unknown'}`);
     return { eligible: false, reason: `harness-${state.harness ?? 'unknown'}` };
   }
@@ -2323,10 +2327,11 @@ export async function buildAgentLaunchConfig(opts: {
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
-  const piLauncherFields = opts.harness === 'ohmypi'
+  const behavior = getHarnessBehavior(opts.harness);
+  const piLauncherFields = behavior.usesRpcFifo
     ? await getOhmypiLauncherFields(opts.agentId, model)
     : {};
-  const codexLauncherFields = opts.harness === 'codex'
+  const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
     : {};
 
@@ -2361,12 +2366,12 @@ export async function buildAgentLaunchConfig(opts: {
       // dropped --agent file support); permission flags come from the global
       // resolver. ohmypi/codex resumes route through getAgentRuntimeBaseCommand
       // which short-circuits to the omp/codex form.
-      baseCommand: opts.harness === 'ohmypi' || opts.harness === 'codex'
+      baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
         : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
-      model: opts.harness === 'ohmypi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
-      extraArgs: opts.harness === 'ohmypi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,
+      model: behavior.launchCommandKind !== 'claude-code' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: behavior.launchCommandKind !== 'claude-code' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
       extraEnvExports: opts.extraEnvExports,
       useSupervisor: opts.useSupervisor,
@@ -2387,9 +2392,10 @@ export async function buildAgentLaunchConfig(opts: {
 
   // PAN-982: pass the role definition path + agentId through getAgentRuntimeBaseCommand so it
   // emits 'claude --agent roles/<role>.md --name <agentId>'.
-  // PAN-636: when harness === 'pi' the helper short-circuits to a pi --mode rpc
-  // line and the agentName/agentDefinition arguments are ignored (Pi has no agent
-  // definitions). The launcher generator's pi branch then layers --session-dir
+  // PAN-636: when the harness uses the ohmypi RPC command, the helper
+  // short-circuits to an omp --mode rpc line and the
+  // agentName/agentDefinition arguments are ignored (Pi has no agent
+  // definitions). The launcher generator's Pi branch then layers --session-dir
   // and the fifo redirect on top.
   const agentDefinition = roleAgentDefinitionPath(launchRole);
   const launcherContent = generateLauncherScriptSync({
@@ -2400,7 +2406,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
-    sessionId: opts.harness === 'claude-code' ? opts.sessionId : undefined,
+    sessionId: behavior.sessionIdSource === 'launcher-session-id' ? opts.sessionId : undefined,
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -3821,7 +3827,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // not become ready within 30s" hang) — and there is no live transcript to
   // protect, so it must be fresh-launched (recovery, not rotation). A live
   // (suspended) omp process stays on the normal resume path.
-  const piProcessWasAlive = agentState.harness === 'ohmypi'
+  const piProcessWasAlive = getHarnessBehavior(agentState.harness).usesRpcFifo
     ? await hasAgentRuntimeInSession(normalizedId, 'ohmypi')
     : false;
 
