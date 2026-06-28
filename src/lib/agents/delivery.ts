@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { AgentState } from '../agents.js';
 import {
   normalizeAgentId,
@@ -363,7 +364,7 @@ export async function deliverInitialPromptWithRetry(
   let deliveredPrompt = prompt;
   try {
     const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
-    if (codexState?.harness === 'codex' && codexState.workspace) {
+    if (codexState?.harness && getHarnessBehavior(codexState.harness).usesCodexHome && codexState.workspace) {
       const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
       mkdirSync(dirname(kickoffPath), { recursive: true });
       writeFileSync(kickoffPath, prompt, 'utf-8');
@@ -390,7 +391,8 @@ export async function deliverInitialPromptWithRetry(
     if (!ready) {
       const alive = await Effect.runPromise(sessionExists(normalizeAgentId(agentId)));
       lastFailure = alive ? 'ready-signal-timeout' : SESSION_EXITED_BEFORE_KICKOFF;
-      console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
+      const displayName = getHarnessBehavior(harness).displayName;
+      console.error(`[${agentId}] ${displayName} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
       if (!alive) break;
       continue;
     }

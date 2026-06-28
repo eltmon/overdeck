@@ -13,6 +13,7 @@ import {
 import { encodeClaudeProjectDir } from '../paths.js';
 import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { FsError } from '../errors.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
@@ -201,7 +202,8 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
   //    resolution so the deacon recovery path can resume a crashed ohmypi agent
   //    instead of only respawning it fresh and losing context.
-  if (getAgentStateSync(agentId)?.harness === 'ohmypi') {
+  const agentState = getAgentStateSync(agentId);
+  if (agentState?.harness && getHarnessBehavior(agentState.harness).sessionIdSource === 'transcript-jsonl') {
     const ohmypiSessionId = resolveLatestOhmypiSessionId(agentId);
     if (ohmypiSessionId) return ohmypiSessionId;
   }
