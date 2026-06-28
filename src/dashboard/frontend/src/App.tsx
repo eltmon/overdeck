@@ -1,45 +1,19 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
-import { KanbanBoard } from './components/KanbanBoard';
-import { FleetAgentsView } from './components/Agents/FleetAgentsView';
-import { HealthDashboard } from './components/HealthDashboard';
-import { SkillsList } from './components/SkillsList';
-import { ActivityPanel } from './components/ActivityPanel';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay, triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { AskUserQuestionDialog, type AskUserQuestionSubject } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
-import { MetricsSummaryRow } from './components/MetricsSummaryRow';
-import { MetricsPage } from './components/MetricsPage';
-import { CostsPage } from './components/CostsPage';
-import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
-import { CommandDeck } from './components/CommandDeck';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
-import { PipelineView } from './components/Pipeline/PipelineView';
-import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
-import { ResourcesPanel } from './components/ResourcesPanel';
-import { GodViewPage } from './components/GodView';
-import { DeaconActivityView } from './components/DeaconActivityView';
-import { ContextPage } from './components/context/ContextPage';
-import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
-import { AutoPresoView } from './components/autopreso/AutoPresoView';
-import { FlywheelPage } from './pages/FlywheelPage';
-import { BacklogSequencerPage } from './pages/BacklogSequencerPage';
-import { HomePage } from './pages/HomePage';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
-import { BootstrapGate } from './components/BootstrapGate';
-import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
-import { AgentsSkeleton } from './components/skeletons/AgentsSkeleton';
-import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
-import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
 import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
@@ -88,6 +62,7 @@ import {
   StandaloneFlywheelPopoutRoute,
   StandaloneTerminalRoute,
 } from './App/StandaloneRoutes';
+import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 
 export {
   buildConversationUrl,
@@ -249,13 +224,7 @@ export default function App() {
   // the app-bar search to that project (PAN-1593).
   const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [pendingConversationTarget, setPendingConversationTarget] = useState<{
-    conversationName: string;
-    messageId: string;
-    messageIndex: number;
-    nonce: number;
-    label: string;
-  } | null>(null);
+  const [pendingConversationTarget, setPendingConversationTarget] = useState<PendingConversationTarget | null>(null);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
@@ -1334,156 +1303,30 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
-          {activeTab === 'home' && (
-            <div className="w-full h-full overflow-hidden">
-              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} onNewProject={handleNewProject} onSelectProject={handleSelectProject} onOpenSettings={() => setActiveTab('settings')} />
-            </div>
-          )}
-          {activeTab === 'command-deck' && (
-            <div className="w-full h-full">
-              <CommandDeck
-                issues={issues}
-                convId={selectedConvId}
-                conversationViewMode={conversationViewMode}
-                onConvIdChange={setSelectedConvId}
-                onConversationViewModeChange={setConversationViewMode}
-                pendingConversationTarget={pendingConversationTarget}
-                onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
-                selectedProject={selectedProjectKey}
-                onSelectProject={handleSelectProject}
-                onProjectPrefixChange={setSearchProjectPrefix}
-                cockpitIssue={cockpitRoute}
-                onCockpitChange={onCockpitChange}
-              />
-            </div>
-          )}
-          {activeTab === 'pipeline' && (
-          <BootstrapGate fallback={<PipelineSkeleton />}>
-            <div className="w-full h-full overflow-hidden">
-              <PipelineView onSearchOpen={() => setIsSearchOpen(true)} onTabChange={(tab) => setActiveTab(tab as Parameters<typeof setActiveTab>[0])} />
-            </div>
-          </BootstrapGate>
-        )}
-        {activeTab === 'awaiting-merge' && (
-          <div className="w-full h-full overflow-auto">
-            <AwaitingMergePage />
-          </div>
-        )}
-        {activeTab === 'kanban' && (
-          <BootstrapGate fallback={
-            <div className="flex-1 overflow-auto p-6 w-full">
-              <KanbanSkeleton />
-            </div>
-          }>
-            <>
-              <div className="flex-1 overflow-auto p-6 w-full">
-                <MetricsSummaryRow />
-                <KanbanBoard
-                  selectedIssue={null}
-                  onSelectIssue={(issueId) => {
-                    if (issueId) openIssue(issueId);
-                  }}
-                  onPlanDialogChange={setPlanDialogIssueId}
-                />
-              </div>
-            </>
-          </BootstrapGate>
-        )}
-        {activeTab === 'agents' && (
-          <BootstrapGate fallback={<AgentsSkeleton />}>
-            <div className="h-full w-full overflow-y-auto">
-              <FleetAgentsView onNavigateToIssues={() => setActiveTab('kanban')} />
-            </div>
-          </BootstrapGate>
-        )}
-        {activeTab === 'resources' && (
-          <div className="w-full h-full overflow-hidden">
-            <ResourcesPanel
-              onNavigateToAgents={(agentId) => {
-                setSelectedAgent(agentId);
-                setActiveTab('agents');
-              }}
-            />
-          </div>
-        )}
-        {activeTab === 'skills' && (
-          <div className="p-6 w-full overflow-auto">
-            <SkillsList />
-          </div>
-        )}
-        {activeTab === 'context' && (
-          <div className="w-full h-full overflow-hidden">
-            <ContextPage />
-          </div>
-        )}
-        {activeTab === 'health' && (
-          <div className="p-6 w-full overflow-auto">
-            <HealthDashboard />
-          </div>
-        )}
-        {activeTab === 'activity' && (
-          <div className="w-full h-full">
-            <ActivityPanel onClose={() => setActiveTab('kanban')} />
-          </div>
-        )}
-        {activeTab === 'metrics' && (
-          <div className="w-full overflow-auto">
-            <MetricsPage />
-          </div>
-        )}
-        {activeTab === 'costs' && (
-          <div className="w-full overflow-auto">
-            <CostsPage />
-          </div>
-        )}
-        {activeTab === 'autopreso' && (
-          <div className="w-full h-full overflow-hidden">
-            <AutoPresoView />
-          </div>
-        )}
-        {activeTab === 'flywheel' && (
-          <div className="w-full h-full overflow-hidden">
-            <FlywheelPage
-              onOpenSettings={() => setActiveTab('settings')}
-              onNavigateAgent={(agentId) => {
-                setSelectedAgent(agentId);
-                setActiveTab('agents');
-              }}
-              onNavigateIssue={(issueId) => openIssue(issueId)}
-            />
-          </div>
-        )}
-        {activeTab === 'backlog' && (
-          <div className="w-full h-full overflow-hidden">
-            <BacklogSequencerPage onIssueAction={handleBacklogIssueAction} />
-          </div>
-        )}
-        {activeTab === 'settings' && (
-          <div className="p-6 w-full overflow-auto">
-            <SettingsPage />
-          </div>
-        )}
-        {activeTab === 'sessions' && (
-          <div className="w-full h-full overflow-hidden">
-            <ConversationsPage />
-          </div>
-        )}
-        {activeTab === 'god-view' && (
-          <BootstrapGate fallback={
-            <div className="w-full h-full overflow-hidden">
-              <GodViewSkeleton />
-            </div>
-          }>
-            <div className="w-full h-full overflow-hidden">
-              <GodViewPage />
-            </div>
-          </BootstrapGate>
-        )}
-        {activeTab === 'deacon' && (
-          <div className="w-full h-full overflow-hidden">
-            <DeaconActivityView />
-          </div>
-        )}
+          <AppRoutes
+            activeTab={activeTab}
+            issues={issues}
+            selectedConvId={selectedConvId}
+            conversationViewMode={conversationViewMode}
+            selectedProjectKey={selectedProjectKey}
+            pendingConversationTarget={pendingConversationTarget}
+            cockpitRoute={cockpitRoute}
+            onOpenWorkspaceHome={handleOpenWorkspaceHome}
+            onNewProject={handleNewProject}
+            onSelectProject={handleSelectProject}
+            onOpenSettings={() => setActiveTab('settings')}
+            onConvIdChange={setSelectedConvId}
+            onConversationViewModeChange={setConversationViewMode}
+            onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
+            onProjectPrefixChange={setSearchProjectPrefix}
+            onCockpitChange={onCockpitChange}
+            onSearchOpen={() => setIsSearchOpen(true)}
+            onTabChange={setActiveTab}
+            onOpenIssue={openIssue}
+            onPlanDialogChange={setPlanDialogIssueId}
+            onSelectAgent={setSelectedAgent}
+            onBacklogIssueAction={handleBacklogIssueAction}
+          />
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
             this global feed, so don't double it up there. */}
