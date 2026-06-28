@@ -64,6 +64,10 @@ const PROVIDER_MANAGEMENT_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/ProviderManagementSection.tsx'),
   'utf8',
 );
+const TTS_CONFIGURATION_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/TtsConfigurationSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -78,25 +82,25 @@ describe('SettingsPage role model routing panels', () => {
 
   it('includes the TTS sidebar item and settings section controls', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('id="tts"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ enabled:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<TtsSystemVoicePicker');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ voice: voiceId })');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ statusVoice: voiceId })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('id="tts"');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ enabled:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ volume:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ rate:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('<TtsSystemVoicePicker');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ voice: voiceId })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ statusVoice: voiceId })');
   });
 
   it('includes advanced TTS voice map, muted sources, and template controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('fetchTtsVoices');
-    expect(SETTINGS_PAGE_SOURCE).toContain('TTS_EVENT_KEYS.map');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsVoiceMapChange(eventKey');
-    expect(SETTINGS_PAGE_SOURCE).toContain('ACTIVITY_SOURCE_OPTIONS.map');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsMutedSourceChange(source');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleAddTtsTemplate');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('fetchTtsVoices');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('TTS_EVENT_KEYS.map');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsVoiceMapChange(eventKey');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('ACTIVITY_SOURCE_OPTIONS.map');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsMutedSourceChange(source');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleAddTtsTemplate');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsTemplateChange(eventKey');
   });
 
   it('serializes all settings autosaves through one latest-snapshot queue', () => {
@@ -125,9 +129,9 @@ describe('SettingsPage role model routing panels', () => {
     expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
     expect(AUTOSAVE_PIPELINE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
     expect(AUTOSAVE_PIPELINE_SOURCE).toContain('setTimeout(() => {');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
   });
 
   it('surfaces remote work-agent provisioning controls', () => {
