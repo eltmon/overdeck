@@ -6,15 +6,6 @@ import {
   DndContext,
   DragOverlay,
   closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragStartEvent,
-  type DragOverEvent,
-  type DragEndEvent,
-  defaultDropAnimationSideEffects,
-  type DropAnimation,
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
@@ -51,6 +42,7 @@ import {
   SyncPromptDialog,
   UndoToast,
 } from './KanbanBoard/dialogs';
+import { useDragDrop } from './KanbanBoard/hooks/useDragDrop';
 import {
   COLUMN_COLORS,
   COLUMN_TITLES,
@@ -603,11 +595,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     });
   }, []);
 
-  const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
-  const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
-  const [activeOverId, setActiveOverId] = useState<string | null>(null);
-  const [columnOrderOverrides, setColumnOrderOverrides] = useState<Record<string, string[]>>({});
-
   // Undo state
   const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
   const [showUndoToast, setShowUndoToast] = useState(false);
@@ -630,6 +617,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   // Event-sourced state from Zustand store (PAN-433 read model)
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
+  const {
+    activeDragIssue,
+    activeDragStatus,
+    activeOverId,
+    columnOrderOverrides,
+    dropAnimation,
+    handleDragEnd,
+    handleDragOver,
+    handleDragStart,
+    sensors,
+  } = useDragDrop(issues);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
   // PAN-1048 — derive specialist-role agents (review / test / ship) from the
@@ -749,15 +747,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     bulkSelection.clear();
   }, [bulkSelection]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor)
-  );
-
   // Move status mutation
   const moveStatusMutation = useMutation({
     mutationFn: async ({ issueId, targetStatus, syncToTracker }: { issueId: string; targetStatus: CanonicalState; syncToTracker?: boolean }) => {
@@ -822,50 +811,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     setUndoTimeoutId(timeoutId);
   }, [undoTimeoutId]);
 
-  // Handle drag start
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event;
-    const issueId = active.id as string;
-    const issue = issues?.find(i => i.id === issueId);
-    if (issue) {
-      setActiveDragIssue(issue);
-      setActiveDragStatus(STATUS_LABELS[issue.status] as CanonicalState);
-    }
-  }, [issues]);
-
-  // Handle drag over
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    setActiveOverId((event.over?.id as string) ?? null);
-  }, []);
-
-  // Handle drag end
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    const activeIssue = active.data.current?.issue as Issue | undefined;
-    const overIssue = issues.find((issue) => issue.id === over?.id || issue.identifier === over?.id);
-
-    if (activeIssue && overIssue && activeIssue.id !== overIssue.id) {
-      const activeStatus = STATUS_LABELS[activeIssue.status] as CanonicalState | undefined;
-      const overStatus = STATUS_LABELS[overIssue.status] as CanonicalState | undefined;
-      if (activeStatus && activeStatus === overStatus) {
-        setColumnOrderOverrides((prev) => {
-          const sourceOrder = prev[activeStatus] ?? issues
-            .filter((issue) => STATUS_LABELS[issue.status] === activeStatus)
-            .map((issue) => issue.identifier);
-          const nextOrder = sourceOrder.filter((id) => id !== activeIssue.identifier);
-          const overIndex = nextOrder.indexOf(overIssue.identifier);
-          if (overIndex === -1) return prev;
-          nextOrder.splice(overIndex, 0, activeIssue.identifier);
-          return { ...prev, [activeStatus]: nextOrder };
-        });
-      }
-    }
-
-    setActiveDragIssue(null);
-    setActiveDragStatus(null);
-    setActiveOverId(null);
-  }, [issues]);
-
   // Confirm agent warning
   const confirmAgentMove = useCallback(() => {
     const { issue, targetStatus } = agentWarningDialog;
@@ -923,16 +868,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     }
   }, [syncPromptDialog, moveStatusMutation, showUndoNotification, agents, queryClient]);
-
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: '0.5',
-        },
-      },
-    }),
-  };
 
   // Fetch costs for all issues
   const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
