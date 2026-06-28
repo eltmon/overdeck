@@ -583,11 +583,43 @@ function buildSelfReviewPrompt(opts: {
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    // PAN-1981 (quick path to production): self-review — the review agent reviews
-    // the diff itself. The convoy prompt builder + the four-reviewer spawn below
-    // are kept (commented out, not deleted) to restore later as an opt-in; #1982.
-    // const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
-    const prompt = buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+    const fullReview = isExtendedReviewEnabled(opts.issueId);
+    const prompt = fullReview
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
+      : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+
+    const spawnConvoyReviewers = async (synthesisAgentId: string) => {
+      const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
+        const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
+        const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+          issueId: opts.issueId,
+          workspace: opts.workspace,
+          subRole,
+          runId,
+          outputPath,
+          contextManifestPath,
+          synthesisAgentId,
+          ...(opts.model ? { model: opts.model } : {}),
+          ...(opts.harness ? { harness: opts.harness } : {}),
+          allowHost,
+        }));
+        if (!result.success) {
+          try {
+            const { messageAgent } = await import('../agents.js');
+            await messageAgent(synthesisAgentId, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
+          } catch (signalErr) {
+            console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${synthesisAgentId}:`, signalErr);
+          }
+        }
+        return result;
+      }));
+
+      const failedReviewers = reviewerResults.filter(r => !r.success);
+      if (failedReviewers.length > 0) {
+        console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
+      }
+      return reviewerResults;
+    };
 
     // PAN-1862: RESUME the saved review session by default. The review agent keeps the prior
     // review's context (the files it read, the findings it raised), so a re-review checks the
@@ -614,6 +646,10 @@ function buildSelfReviewPrompt(opts: {
           const resumed = getAgentStateSync(reviewAgentId);
           if (resumed) { resumed.reviewRunId = runId; await Effect.runPromise(saveAgentState(resumed)); }
         } catch { /* non-fatal */ }
+        if (fullReview) {
+          await spawnConvoyReviewers(reviewAgentId);
+          return { success: true, message: `Convoy review resumed (session preserved): ${reviewAgentId}` };
+        }
         return { success: true, message: `Review resumed (session preserved): ${reviewAgentId}` };
       }
       console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeResult.error}`);
@@ -641,46 +677,18 @@ function buildSelfReviewPrompt(opts: {
     } catch (saveErr) {
       console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
     }
+    if (fullReview) {
+      await spawnConvoyReviewers(run.id);
+      console.log(`[review-agent] Review role (convoy synthesis) spawned for ${opts.issueId}: ${run.id}`);
+      emitActivityEntrySync({ source: 'review', level: 'info', message: `Convoy review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+      return {
+        success: true,
+        message: `Convoy review spawned: ${run.id}`,
+      };
+    }
+
     console.log(`[review-agent] Review role (self-review) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntrySync({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
-
-    // PAN-1981 (quick path to production): the convoy is DISABLED — the review
-    // agent self-reviews (see buildSelfReviewPrompt) and signals the verdict
-    // directly via `pan admin specialists done review`. The four-reviewer fan-out
-    // below is commented out, NOT deleted, to restore later as an opt-in. We'll
-    // decide convoy-vs-self-review policy (and better per-harness transmission) in
-    // the #1982 fast-follow; for now self-review is the only behavior.
-    /*
-    const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
-      const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
-      const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
-        issueId: opts.issueId,
-        workspace: opts.workspace,
-        subRole,
-        runId,
-        outputPath,
-        contextManifestPath,
-        synthesisAgentId: run.id,
-        ...(opts.model ? { model: opts.model } : {}),
-        ...(opts.harness ? { harness: opts.harness } : {}),
-        allowHost,
-      }));
-      if (!result.success) {
-        try {
-          const { messageAgent } = await import('../agents.js');
-          await messageAgent(run.id, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
-        } catch (signalErr) {
-          console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${run.id}:`, signalErr);
-        }
-      }
-      return result;
-    }));
-
-    const failedReviewers = reviewerResults.filter(r => !r.success);
-    if (failedReviewers.length > 0) {
-      console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
-    }
-    */
 
     return {
       success: true,
