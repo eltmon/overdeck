@@ -13,3 +13,5 @@ export interface PlanningState {
   hasBeads: boolean;
   planningComplete: boolean;
 }
+
+export type CycleFilter = 'current' | 'all' | 'backlog' | 'canceled';
