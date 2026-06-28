@@ -1,6 +1,6 @@
 /**
  * Unit tests for the no-op rebase pre-check in triggerMerge
- * (src/dashboard/server/routes/workspaces.ts — isBranchAlreadyRebased).
+ * (src/dashboard/server/routes/workspaces/merge-ops.ts — isBranchAlreadyRebased).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -26,7 +26,7 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
-import { isBranchAlreadyRebased } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { isBranchAlreadyRebased } from '../../../../../src/dashboard/server/routes/workspaces/merge-ops.js';
 
 const WORKSPACE = '/tmp/test-workspace';
 const BRANCH = 'feature/pan-850';

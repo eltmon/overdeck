@@ -59,11 +59,11 @@ import {
   getWorkspaceInfoForIssue,
   getContainerStatusAsync,
   getPendingOperation,
-  reconcileGitHubMergeStatus,
   readJsonBody,
   spawnPanCommand,
   requireTrustedMutationOrigin,
 } from '../workspaces.js';
+import { reconcileGitHubMergeStatus } from './merge-ops.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);

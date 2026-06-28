@@ -51,7 +51,7 @@ function failureReason(result: MergeResult): string {
 }
 
 async function defaultMergeIssue(issueId: string): Promise<MergeResult> {
-  const { triggerMerge } = await import('../routes/workspaces.js');
+  const { triggerMerge } = await import('../routes/workspaces/merge-ops.js');
   return triggerMerge(issueId);
 }
 
