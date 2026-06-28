@@ -383,6 +383,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'tldr-post-edit',
     'rtk-bash-filter',
     'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
+    'tmux-send-keys-guard',    // PAN-1084: blocks work agents from driving other agents' tmux sessions
   ];
   for (const scriptName of hookScripts) {
     // Hook scripts ship under sync-sources/hooks/ (PAN-1201). SYNC_SOURCES.hooks
@@ -496,6 +497,9 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // deny still wins.
   addHookIfMissing('PreToolUse', 'auto-approve-hook');
   addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
+  // PAN-1084: mechanically prevent work agents from self-approving permission
+  // prompts in another agent's tmux session via tmux send-keys/paste-buffer.
+  addHookIfMissing('PreToolUse', 'tmux-send-keys-guard', 'Bash');
   // PAN-1520: block AskUserQuestion to prevent upstream silent-corruption
   // (option #1 fabricated as answer under --dangerously-skip-permissions).
   addHookIfMissing('PreToolUse', 'ask-user-question-hook', 'AskUserQuestion');
