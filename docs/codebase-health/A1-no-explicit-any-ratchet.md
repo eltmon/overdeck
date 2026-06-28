@@ -172,3 +172,7 @@ Append a short note to the bottom of [`docs/CODEBASE-HEALTH-ROADMAP.md`](../CODE
 - `no-unsafe-*` type-aware rules (separate, heavier sub-issue — needs `parserOptions.project`).
 - `ts-reset` (sub-issue A2) and the file-size guard (A3).
 - Migrating to ESLint flat config / ESLint 9.
+
+## Ratchet active
+
+Landed on 2026-06-28 with `@typescript-eslint/no-explicit-any` enforcing a baseline quarantine of 143 `src/` files covering 738 active rule reports; this is the authoritative ESLint baseline after `ignoreRestArgs: true`, test-file exemptions, and `--no-inline-config`. To shrink the allowlist, remove one cleaned file path from `eslint-any-allowlist.json`, replace that file's explicit `any` usages with real types, and confirm `npm run lint` passes before committing.
