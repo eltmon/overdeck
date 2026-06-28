@@ -60,6 +60,10 @@ const CONVERSATION_SEARCH_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/ConversationSearchSection.tsx'),
   'utf8',
 );
+const PROVIDER_MANAGEMENT_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/ProviderManagementSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -164,23 +168,23 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('renders provider harness selects as clearable built-in defaults', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? ''");
-    expect(SETTINGS_PAGE_SOURCE).toContain('const builtInHarness = formData.models.provider_default_harnesses?.[provider.id]');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<ProviderLogo provider={provider.id}');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<HarnessLogo harness={(providerHarness || builtInHarness) as Harness}');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<ProviderLogo provider="openrouter"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<option value="">Default ({harnessLabel(builtInHarness)})</option>');
-    expect(SETTINGS_PAGE_SOURCE).toContain("value={formData.models.provider_harnesses?.openrouter ?? ''}");
-    expect(SETTINGS_PAGE_SOURCE).toContain("Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})");
-    expect(SETTINGS_PAGE_SOURCE).not.toContain('icon: Lightbulb');
-    expect(SETTINGS_PAGE_SOURCE).not.toContain('<provider.icon');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? ''");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('const builtInHarness = formData.models.provider_default_harnesses?.[provider.id]');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<ProviderLogo provider={provider.id}');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<HarnessLogo harness={(providerHarness || builtInHarness) as Harness}');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<ProviderLogo provider="openrouter"');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<option value="">Default ({harnessLabel(builtInHarness)})</option>');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("value={formData.models.provider_harnesses?.openrouter ?? ''}");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).not.toContain('icon: Lightbulb');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).not.toContain('<provider.icon');
   });
 
   it('deletes provider harness override keys when the Default option is selected', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("if (harness === '')");
-    expect(SETTINGS_PAGE_SOURCE).toContain('delete nextProviderHarnesses[provider]');
-    expect(SETTINGS_PAGE_SOURCE).toContain('provider_harnesses: nextProviderHarnesses');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("if (harness === '')");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('delete nextProviderHarnesses[provider]');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('provider_harnesses: nextProviderHarnesses');
   });
 
   it('surfaces the RTK Bash compression toggle in experimental settings', () => {
@@ -199,9 +203,10 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces the harness/model permutations toggle in provider settings', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('Show all harness/model permutations');
-    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="show-harness-model-permutations-toggle"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('Show all harness/model permutations');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('data-testid="show-harness-model-permutations-toggle"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('onHarnessModelPermutationsToggle={handleHarnessModelPermutationsToggle}');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('onHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)');
   });
 });
 
