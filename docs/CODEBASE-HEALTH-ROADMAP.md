@@ -56,7 +56,7 @@ Decompose the god files into deep modules (narrow interface, hidden complexity) 
 
 **Sequencing decision:** B is far riskier than A — the highest-value seams (deacon auto-resume/merge, the harness migration, the `agents.ts` spawn path) touch the exact code behind our worst failure modes. So B proceeds in **waves, safest-first**: each wave extracts the *single lowest-risk seam* in a god file, behavior-preserving, compiler+test-verified, to prove the extraction pattern before the scary seams. Analysis maps for each file live in the agents' reports; the per-file full seam ladder is in each PRD's appendix.
 
-**Wave 1 (in flight) — the safest seam in each of the three god files, one per model, fully independent (different files, no `package.json` touches):**
+**Wave 1 — ✅ COMPLETE (merged 2026-06-28) — the safest seam in each of the three god files, one per model, fully independent (different files, no `package.json` touches):**
 
 | # | Work | File → new module | Risk | Executor | Branch |
 |---|---|---|---|---|---|
@@ -64,7 +64,7 @@ Decompose the god files into deep modules (narrow interface, hidden complexity) 
 | **B2** | Extract container/docker routes | `routes/workspaces.ts` (6,638) → `routes/workspaces/container-ops.ts` | LOW | GLM-5.2 | `codebase-health/b2` |
 | **B3** | Extract read-only agent queries | `agents.ts` (5,824) → `agents/queries.ts` | LOW | Kimi-2.7 | `codebase-health/b3` |
 
-PRDs: [`docs/codebase-health/`](./codebase-health/) (`B1-*`, `B2-*`, `B3-*`). Later waves tackle api-recovery/review/merge/auto-resume (deacon), workspace-data/review-pipeline/merge-ops (route), termination/delivery/state (agents), then the `Harness` interface migration.
+Merged: B1 #2117, B2 #2119, B3 #2118 — combined `main` CI green. PRDs: [`docs/codebase-health/`](./codebase-health/) (`B1-*`, `B2-*`, `B3-*`). Later waves tackle api-recovery/review/merge/auto-resume (deacon), workspace-data/review-pipeline/merge-ops (route), termination/delivery/state (agents), then the `Harness` interface migration.
 
 ### Epic C — Fitness functions (evals + a frozen kernel)
 
@@ -73,6 +73,10 @@ Adopt [`evalite`](https://github.com/mattpocock/evalite) for agent-behavior regr
 ### Epic D — Process
 
 One large migration at a time (finished before the next); a `/grilling` design-review gate before any feature that would widen a god file or add a harness branch; a "no new `any` / no god-file growth" checklist in the PR template.
+
+### Epic E — De-leak core (project-specifics out of Overdeck core)
+
+Core (`pan` CLI + dashboard server) must serve **any** project, but MYN-specific Postgres/Flyway database logic — including a hardcoded `myn` database name — is baked into core files. Same disease as the god files (wrong-layer logic), different flavor (domain leakage). **Tier 1:** de-hardcode `myn` → drive the DB name from project config (add a `name` field; replace ~6 hardcoded literals in `cli/commands/db.ts` and `routes/workspaces.ts`). **Tier 2 (direction TBD):** move the Flyway/Postgres machinery out of core — either invoke a project-declared command, or extract a plugin/extension. Full audit + plan: [`docs/codebase-health/E-de-leak-core.md`](./codebase-health/E-de-leak-core.md).
 
 ---
 
@@ -92,12 +96,13 @@ These changes modify the agents' **own substrate** — lint rules, the build, th
 - [x] **A1** — `no-explicit-any` ratchet — GPT-5.5 — merged #2113
 - [x] **A2** — `ts-reset` — GLM-5.2 — merged #2114
 - [x] **A3** — file-size guard — Kimi-2.7 — merged #2115
-- [ ] **B1** — extract `deacon-inspect.ts` — GPT-5.5 — `codebase-health/b1`
-- [ ] **B2** — extract `container-ops.ts` — GLM-5.2 — `codebase-health/b2`
-- [ ] **B3** — extract `agents/queries.ts` — Kimi-2.7 — `codebase-health/b3`
+- [x] **B1** — extract `deacon-inspect.ts` — GPT-5.5 — merged #2117
+- [x] **B2** — extract `container-ops.ts` — GLM-5.2 — merged #2119
+- [x] **B3** — extract `agents/queries.ts` — Kimi-2.7 — merged #2118
 - [ ] **B (later waves)** — api-recovery/review/merge/auto-resume · workspace-data/review-pipeline/merge-ops · termination/delivery/state · `Harness` interface
 - [ ] **C** — evals + frozen kernel (PRDs TBD)
 - [ ] **D** — process gates (PRDs TBD)
+- [ ] **E** — de-leak core: Tier 1 de-hardcode `myn` (ready) · Tier 2 de-core DB machinery (direction TBD) — see [`E-de-leak-core.md`](./codebase-health/E-de-leak-core.md)
 
 ---
 
