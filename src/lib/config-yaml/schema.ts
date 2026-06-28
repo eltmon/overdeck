@@ -336,12 +336,14 @@ export interface RoleSubConfig {
 
 export type RoleEffort = EffortLevel;
 export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type ReviewMode = 'quick' | 'full';
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
   model: RoleModelRef;
   harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
+  mode?: ReviewMode;
   /**
    * Target minimum concurrent agents the role should keep launched. The
    * orchestrator MUST be aggressive about reaching this number — if the active
