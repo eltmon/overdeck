@@ -1,10 +1,11 @@
 ---
 name: pan-review
-description: "pan review <subcommand> — manage the code review lifecycle: list pending work, re-request review, reset/abort/restart review cycles"
+description: "pan review <subcommand> — manage the code review lifecycle: list pending work, set quick/full mode, re-request review, reset/abort/restart review cycles"
 triggers:
   - pan review
   - review pending
   - request review
+  - review mode
   - reset review
   - restart review
   - abort review
@@ -27,6 +28,7 @@ pan review pending                                 # List completed work awaitin
 pan review pending --ready                         # List issues ready for merge
 pan review pending --blocked                       # List blocked review/test/merge issues
 pan review request <id>                            # Re-request review after fixing feedback
+pan review mode <id> <quick|full>                  # Set this issue's review mode override
 pan review reset <id> [--session]                  # Reset review/test/merge cycles (human override)
 pan review abort <id>                              # Kill all running reviewers, leave worker idle
 pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch a fresh review pipeline
@@ -44,6 +46,11 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
   re-triggers the review pipeline against the current branch state. Use this
   when the worker has committed fixes and you want the existing review pass
   to re-evaluate.
+- **`mode <id> <quick|full>`** — Sets a per-issue review-mode override in the
+  issue record. `quick` runs the single parent review agent. `full` opts the
+  issue into the convoy review: security, correctness, performance, and
+  requirements sub-reviewers plus synthesis. Use this only when heavier review
+  is worth the extra agent/runtime cost for this one issue.
 - **`reset <id>`** — Clears the review/test/merge state for an issue, so the
   pipeline can be re-dispatched from scratch. Use when the saved state is
   inconsistent or corrupt. `--session` additionally clears the saved Claude
@@ -68,6 +75,8 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 | "What's ready to merge?" | `pan review pending --ready` |
 | "What's blocked in review/test/merge?" | `pan review pending --blocked` |
 | Worker pushed a fix, want re-review | `pan review request <id>` |
+| This issue needs the full review convoy | `pan review mode <id> full` |
+| Return an issue to default quick review | `pan review mode <id> quick` |
 | Pipeline state is inconsistent, need a clean slate | `pan review reset <id>` |
 | Same as above plus reviewer Claude sessions are bad | `pan review reset <id> --session` |
 | Reviewer is hung, just kill it | `pan review abort <id>` |

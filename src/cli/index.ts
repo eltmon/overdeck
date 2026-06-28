@@ -73,6 +73,7 @@ import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
+import { reviewModeCommand } from './commands/review-mode.js';
 // PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
 // via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
 // spawned by the review role through `pan review spawn-reviewer`.
@@ -345,6 +346,11 @@ review
   .command('abort <id>')
   .description('Kill all running reviewer sessions and leave the worker idle')
   .action(abortReviewCommand);
+
+review
+  .command('mode <id> <mode>')
+  .description('Set per-issue review mode (quick or full)')
+  .action(reviewModeCommand);
 
 review
   .command('restart <id>')
