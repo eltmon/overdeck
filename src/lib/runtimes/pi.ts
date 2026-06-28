@@ -34,6 +34,7 @@ import type {
   AgentRuntime,
   AgentRuntimeSync,
   AgentRuntimeError,
+  HarnessBehavior,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -41,6 +42,7 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
+import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
 import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
@@ -138,6 +140,10 @@ function resolveLatestPiSessionId(agentId: string): string | null {
 // RuntimeName union). Class is kept for backward-compat exports only.
 export class PiRuntimeSync {
   readonly name: string = 'pi'
+
+  getHarnessBehavior(): HarnessBehavior {
+    return OHMYPI_BEHAVIOR
+  }
 
   /** Resolve the latest Pi session JSONL for an agent. Pi nests files under
    *  <agentDir>/sessions/<encoded-cwd>/<timestamp>_<id>.jsonl, but we tolerate
@@ -452,6 +458,9 @@ export class PiRuntime {
 
   getSessionPath(agentId: string): string | null {
     return this.inner.getSessionPath(agentId)
+  }
+  getHarnessBehavior(): HarnessBehavior {
+    return this.inner.getHarnessBehavior()
   }
   getLastActivity(agentId: string): Date | null {
     return this.inner.getLastActivity(agentId)

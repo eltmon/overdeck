@@ -13,6 +13,7 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync } from '.
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, isPaneDead, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { findLatestRollout, extractThreadIdFromRollout, initCodexHome } from './runtimes/codex.js';
+import { getHarnessBehavior } from './runtimes/behavior.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
@@ -161,7 +162,7 @@ function isNodeNotFound(error: unknown): boolean {
  * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
  */
 async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
-  const expectedProcessNames = harness === 'ohmypi' ? new Set(['omp']) : harness === 'codex' ? new Set(['codex']) : new Set(['claude']);
+  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
   const queue: string[] = [rootPid];
   const seen = new Set<string>();
   while (queue.length > 0) {
@@ -367,7 +368,7 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
 }
 
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
-  if (harness === 'codex') return waitForCodexTuiReady(agentId, timeoutSec);
+  if (getHarnessBehavior(harness).readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
 
@@ -1719,7 +1720,8 @@ export function decideSupervisorForWorkAgent(
     return { eligible: false, reason: 'docker-not-supported-yet' };
   }
 
-  if (state.harness !== 'claude-code' && state.harness !== 'codex') {
+  const behavior = state.harness ? getHarnessBehavior(state.harness) : null;
+  if (!behavior?.supportsPtySupervisor) {
     const reason = `harness-${state.harness ?? 'unknown'}`;
     log(false, reason);
     return { eligible: false, reason };
