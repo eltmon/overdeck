@@ -28,6 +28,7 @@ import {
   listProjectsSync,
 } from '../../../../lib/projects.js';
 import { DEVCONTAINER_DIRNAME } from '../../../../lib/workspace/devcontainer-renderer.js';
+import type { DatabaseConfig } from '../../../../lib/workspace-config.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -40,6 +41,29 @@ import {
 } from '../workspaces.js';
 
 const execAsync = promisify(exec);
+
+function requireDatabaseName(dbConfig: DatabaseConfig | undefined): string {
+  if (!dbConfig) {
+    throw new Error('No database configuration found in projects.yaml');
+  }
+  const name = dbConfig.name?.trim();
+  if (!name) {
+    throw new Error('Missing required database.name in projects.yaml database config');
+  }
+  return name;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function sqlIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function sqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
 
 // ─── Route: POST /api/workspaces/:issueId/containerize ───────────────────────
 
@@ -312,12 +336,13 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         pConfig?.workspace?.database?.migrations?.type === 'flyway' &&
         projectName
       ) {
+        const databaseName = requireDatabaseName(pConfig.workspace.database);
         const pgContainer = `${projectName}-postgres-1`;
         try {
           const result = yield* Effect.promise(() => repairFlywayIfNeeded(
             issueId,
             pgContainer,
-            'myn',
+            databaseName,
             pConfig,
             workspacePath!
           ));
@@ -419,6 +444,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
         { status: 400 }
       );
     }
+    const databaseName = requireDatabaseName(dbConfig);
 
     const seedFile = join(projectConfig.path, dbConfig.seed_file);
     if (!existsSync(seedFile)) {
@@ -490,28 +516,28 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => execAsync(
-      `docker exec "${pgContainer}" psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'myn' AND pid <> pg_backend_pid();"`,
+      `docker exec ${shellQuote(pgContainer)} psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${sqlString(databaseName)}' AND pid <> pg_backend_pid();"`,
       { encoding: 'utf-8', timeout: 10000 }
     ));
     yield* Effect.promise(() => execAsync(
-      `docker exec "${pgContainer}" psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS myn;"`,
+      `docker exec ${shellQuote(pgContainer)} psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS ${sqlIdentifier(databaseName)};"`,
       { encoding: 'utf-8', timeout: 10000 }
     ));
     yield* Effect.promise(() => execAsync(
-      `docker exec "${pgContainer}" psql -U postgres -d postgres -c "CREATE DATABASE myn OWNER postgres;"`,
+      `docker exec ${shellQuote(pgContainer)} psql -U postgres -d postgres -c "CREATE DATABASE ${sqlIdentifier(databaseName)} OWNER postgres;"`,
       { encoding: 'utf-8', timeout: 10000 }
     ));
 
     console.log(`[refresh-db] Loading seed file: ${seedFile}`);
     yield* Effect.promise(() => execAsync(
-      `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${seedFile}"`,
+      `docker exec -i ${shellQuote(pgContainer)} psql -U postgres -d ${shellQuote(databaseName)} < ${shellQuote(seedFile)}`,
       { encoding: 'utf-8', timeout: 600000 }
     ));
 
     const repairResult = yield* Effect.promise(() => repairFlywayIfNeeded(
       issueId,
       pgContainer,
-      'myn',
+      databaseName,
       projectConfig,
       workspacePath,
       (msg) => console.log(`[refresh-db] ${msg}`)
@@ -524,23 +550,23 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
       console.log(`[refresh-db] Could not start API container (may need manual start)`);
     }
 
-    let customerCount = 0;
-    try {
-      const { stdout } = yield* Effect.promise(() => execAsync(
-        `docker exec "${pgContainer}" psql -U postgres -d myn -t -A -c "SELECT count(*) FROM customer;"`,
-        { encoding: 'utf-8', timeout: 10000 }
-      ));
-      customerCount = parseInt(stdout.trim(), 10) || 0;
-    } catch {}
+    let seedVerifyResult: string | undefined;
+    if (dbConfig.seedVerifyQuery) {
+      try {
+        const { stdout } = yield* Effect.promise(() => execAsync(
+          `docker exec ${shellQuote(pgContainer)} psql -U postgres -d ${shellQuote(databaseName)} -t -A -c ${shellQuote(dbConfig.seedVerifyQuery)}`,
+          { encoding: 'utf-8', timeout: 10000 }
+        ));
+        seedVerifyResult = stdout.trim();
+      } catch {}
+    }
 
-    console.log(
-      `[refresh-db] DB refresh complete for ${issueId}: ${customerCount} customers`
-    );
+    console.log(`[refresh-db] DB refresh complete for ${issueId}`);
 
     return jsonResponse({
       success: true,
       message: `Database refreshed successfully`,
-      customerCount,
+      seedVerifyResult,
     });
   }))
 );

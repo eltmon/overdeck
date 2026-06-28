@@ -127,9 +127,13 @@ export interface QualityGateConfig {
   container_name?: string;
 }
 
-export interface DatabaseConfig {
+export interface DatabaseConfig extends Record<string, unknown> {
+  /** Database name used by workspace database commands */
+  name: string;
   /** Path to seed file for database initialization */
   seed_file?: string;
+  /** Optional SQL query to verify a seed after loading */
+  seedVerifyQuery?: string;
   /** Command to run after loading seed (e.g., sanitization script) */
   seed_command?: string;
   /** Command to create snapshots from external source (e.g., kubectl exec pg_dump) */
