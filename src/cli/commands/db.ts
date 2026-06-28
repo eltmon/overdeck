@@ -39,12 +39,35 @@ function findFullProjectByTeam(teamPrefix: string): ExtendedProjectConfig | null
   ) || null;
 }
 
+function requireDatabaseName(dbConfig: DatabaseConfig | undefined): string {
+  if (!dbConfig) {
+    throw new Error('No database configuration found in projects.yaml');
+  }
+  const name = dbConfig.name?.trim();
+  if (!name) {
+    throw new Error('Missing required database.name in projects.yaml database config');
+  }
+  return name;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function sqlIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function sqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
 export function registerDbCommands(program: Command): void {
   const db = program.command('db').description('Database seeding and management');
 
   db.command('snapshot')
     .description('Create a database snapshot from an external source')
-    .option('--project <key>', 'Project key (e.g., myn)')
+    .option('--project <key>', 'Project key')
     .option('--output <path>', 'Output file path')
     .option('--sanitize', 'Run sanitization script after snapshot')
     .action(snapshotCommand);
@@ -133,6 +156,7 @@ async function snapshotCommand(options: {
   ${projectConfig.key}:
     workspace:
       database:
+        name: myapp
         snapshot_command: "kubectl exec -n prod pod/postgres -- pg_dump -U app mydb"
         # or
         external_db:
@@ -253,6 +277,7 @@ async function seedCommand(
     }
 
     const dbConfig = projectConfig.workspace.database;
+    const databaseName = requireDatabaseName(dbConfig);
     const seedFile = options.file || dbConfig?.seed_file;
 
     if (!seedFile || !existsSync(seedFile)) {
@@ -285,7 +310,7 @@ async function seedCommand(
     if (!options.force) {
       try {
         const { stdout } = await execAsync(
-          `docker exec ${containerName} psql -U postgres -d myn -c "SELECT count(*) FROM flyway_schema_history" -t 2>/dev/null`
+          `docker exec ${shellQuote(containerName)} psql -U postgres -d ${shellQuote(databaseName)} -c "SELECT count(*) FROM flyway_schema_history" -t 2>/dev/null`
         );
         const count = parseInt(stdout.trim(), 10);
         if (count > 0) {
@@ -302,7 +327,7 @@ async function seedCommand(
       spinner.text = 'Dropping existing database...';
       try {
         await execAsync(
-          `docker exec ${containerName} psql -U postgres -c "DROP DATABASE IF EXISTS myn; CREATE DATABASE myn;"`
+          `docker exec ${shellQuote(containerName)} psql -U postgres -c "DROP DATABASE IF EXISTS ${sqlIdentifier(databaseName)}; CREATE DATABASE ${sqlIdentifier(databaseName)};"`
         );
       } catch (error: any) {
         spinner.warn(`Could not drop database: ${error.message}`);
@@ -311,11 +336,11 @@ async function seedCommand(
 
     // Copy seed file to container and execute
     spinner.text = 'Copying seed file to container...';
-    await execAsync(`docker cp "${seedFile}" ${containerName}:/tmp/seed.sql`);
+    await execAsync(`docker cp ${shellQuote(seedFile)} ${shellQuote(`${containerName}:/tmp/seed.sql`)}`);
 
     spinner.text = 'Executing seed...';
     try {
-      await execAsync(`docker exec ${containerName} psql -U postgres -d myn -f /tmp/seed.sql`, {
+      await execAsync(`docker exec ${shellQuote(containerName)} psql -U postgres -d ${shellQuote(databaseName)} -f /tmp/seed.sql`, {
         timeout: 600000, // 10 minute timeout for large seeds
       });
     } catch (error: any) {
@@ -327,14 +352,14 @@ async function seedCommand(
     }
 
     // Clean up
-    await execAsync(`docker exec ${containerName} rm /tmp/seed.sql`);
+    await execAsync(`docker exec ${shellQuote(containerName)} rm /tmp/seed.sql`);
 
     spinner.succeed('Database seeded successfully');
 
     // Show migration status
     try {
       const { stdout } = await execAsync(
-        `docker exec ${containerName} psql -U postgres -d myn -c "SELECT version, description FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 3" -t`
+        `docker exec ${shellQuote(containerName)} psql -U postgres -d ${shellQuote(databaseName)} -c "SELECT version, description FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 3" -t`
       );
       console.log(chalk.dim('\nRecent migrations:'));
       stdout
@@ -389,6 +414,8 @@ async function statusCommand(workspaceOrIssue?: string): Promise<void> {
       return;
     }
 
+    const databaseName = requireDatabaseName(projectConfig?.workspace?.database);
+
     spinner.text = `Checking container ${containerName}...`;
 
     // Check if container is running
@@ -407,7 +434,7 @@ async function statusCommand(workspaceOrIssue?: string): Promise<void> {
     // Check flyway version
     try {
       const { stdout: version } = await execAsync(
-        `docker exec ${containerName} psql -U postgres -d myn -c "SELECT version, description FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1" -t`
+        `docker exec ${shellQuote(containerName)} psql -U postgres -d ${shellQuote(databaseName)} -c "SELECT version, description FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1" -t`
       );
       const [ver, desc] = version.trim().split('|').map((s) => s.trim());
       console.log(chalk.green(`  Flyway: V${ver} - ${desc}`));
@@ -418,7 +445,7 @@ async function statusCommand(workspaceOrIssue?: string): Promise<void> {
     // Check table count
     try {
       const { stdout: tableCount } = await execAsync(
-        `docker exec ${containerName} psql -U postgres -d myn -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'" -t`
+        `docker exec ${shellQuote(containerName)} psql -U postgres -d ${shellQuote(databaseName)} -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'" -t`
       );
       console.log(chalk.dim(`  Tables: ${tableCount.trim()}`));
     } catch {
@@ -428,7 +455,7 @@ async function statusCommand(workspaceOrIssue?: string): Promise<void> {
     // Check database size
     try {
       const { stdout: dbSize } = await execAsync(
-        `docker exec ${containerName} psql -U postgres -d myn -c "SELECT pg_size_pretty(pg_database_size('myn'))" -t`
+        `docker exec ${shellQuote(containerName)} psql -U postgres -d ${shellQuote(databaseName)} -c "SELECT pg_size_pretty(pg_database_size('${sqlString(databaseName)}'))" -t`
       );
       console.log(chalk.dim(`  Size: ${dbSize.trim()}`));
     } catch {
@@ -598,11 +625,17 @@ async function configCommand(project?: string): Promise<void> {
     console.log(chalk.dim('\nAdd to projects.yaml under workspace:'));
     console.log(chalk.dim(`
   database:
+    name: myapp
     seed_file: /path/to/seed.sql
     snapshot_command: "kubectl exec -n prod pod/postgres -- pg_dump -U app db"
     container_name: "{{PROJECT}}-postgres-1"
 `));
     return;
+  }
+
+  console.log(`  Database: ${dbConfig.name || chalk.red('(missing database.name)')}`);
+  if (dbConfig.seedVerifyQuery) {
+    console.log(`  Seed verify query: ${dbConfig.seedVerifyQuery}`);
   }
 
   if (dbConfig.seed_file) {
