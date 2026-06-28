@@ -20,10 +20,10 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from '../lib/dashboard-utils';
-import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, Sparkles, XCircle, ScrollText, Pause } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, Sparkles, ScrollText } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
-import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
+import { parseDifficultyLabel } from '../../../../lib/cloister/complexity.js';
 // PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { CostBreakdownModal } from './CostBreakdownModal';
@@ -42,6 +42,10 @@ import { IssueActionMenu, useIssueActions } from './IssueActionMenu';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
+import {
+  DifficultyBadge,
+  TrackerShadowBadges,
+} from './KanbanBoard/badges';
 import {
   COLUMN_COLORS,
   COLUMN_TITLES,
@@ -69,25 +73,11 @@ export {
   shouldShowReviewReadyBadge,
 } from './KanbanBoard/kanban-utils';
 
-
-// Difficulty badge colors
-const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
-  trivial: 'badge-bg-success text-success-foreground',
-  simple: 'badge-bg-success text-success-foreground',
-  medium: 'badge-bg-warning text-warning-foreground',
-  complex: 'badge-bg-warning text-warning-foreground',
-  expert: 'badge-bg-destructive text-destructive-foreground',
-};
-
-// Difficulty badge component
-function DifficultyBadge({ level }: { level: ComplexityLevel }) {
-  const color = DIFFICULTY_COLORS[level];
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
-      {level}
-    </span>
-  );
-}
+export {
+  DeaconIgnoreButton,
+  DivergedBadge,
+  ReviewInfraStuckBadge,
+} from './KanbanBoard/badges';
 
 // Cost data for an issue
 export interface IssueCost {
@@ -113,50 +103,6 @@ async function fetchIssueCosts(): Promise<Record<string, IssueCost>> {
   } catch {
     return {};
   }
-}
-
-// Tracker vs Shadow state badges — shows when Rally state differs from Overdeck shadow state
-function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact?: boolean }) {
-  const trackerState = issue.rawTrackerState || issue.shadowTrackerStatus;
-  const shadowState = issue.shadowStatus || issue.targetCanonicalState;
-
-  // Only show when states diverge
-  if (!trackerState || !shadowState) return null;
-
-  // Map shadow canonical states to display names
-  const shadowLabel = shadowState === 'in_progress' ? 'In Progress' :
-                      shadowState === 'closed' ? 'Done' :
-                      shadowState === 'done' ? 'Done' :
-                      shadowState === 'in_review' ? 'In Review' :
-                      shadowState;
-
-  // Check if they're actually different
-  const trackerLower = trackerState.toLowerCase().replace(/[-_\s]/g, '');
-  const shadowLower = shadowLabel.toLowerCase().replace(/[-_\s]/g, '');
-  if (trackerLower === shadowLower) return null;
-
-  if (compact) {
-    return (
-      <span
-        className="w-2 h-2 rounded-full badge-bg-signal-review shrink-0"
-        title={`Rally: ${trackerState} → Pan: ${shadowLabel}`}
-      />
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1 text-xs">
-      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-foreground">
-        <ExternalLink className="w-2.5 h-2.5" />
-        {trackerState}
-      </span>
-      <span className="text-muted-foreground">→</span>
-      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded badge-bg-signal-review text-signal-review-foreground">
-        <Eye className="w-2.5 h-2.5" />
-        {shadowLabel}
-      </span>
-    </div>
-  );
 }
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
@@ -1944,270 +1890,6 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
         </div>
       </div>
     </div>
-  );
-}
-
-/** Diverged badge with Unstick button — shown when main diverged during git push */
-export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { issueIdentifier: string; stuckReason?: string | null; stuckDetails?: string | null }) {
-  const [unstickError, setUnstickError] = useState<string | null>(null);
-
-  // Parse SHA details stored by pushApproveMain when MainDivergedError was thrown
-  let shaInfo = '';
-  if (stuckDetails) {
-    try {
-      const d = JSON.parse(stuckDetails) as Record<string, unknown>;
-      const local = typeof d.localSha === 'string' ? d.localSha.slice(0, 7) : null;
-      const remote = typeof d.remoteSha === 'string' ? d.remoteSha.slice(0, 7) : null;
-      if (local && remote) shaInfo = ` (local: ${local}, remote: ${remote})`;
-      else if (remote) shaInfo = ` (remote: ${remote})`;
-    } catch { /* ignore malformed details */ }
-  }
-
-  const titleText = stuckReason
-    ? `Push blocked: ${stuckReason}${shaInfo}. Run: git reset --hard origin/main, then click Unstick to retry.`
-    : `Push blocked due to divergence from origin/main${shaInfo}. Run: git reset --hard origin/main, then click Unstick to retry.`;
-
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span
-        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/70 text-red-300 border border-red-500/60"
-        title={titleText}
-      >
-        <XCircle className="w-3 h-3" />
-        Diverged
-        <button
-          className="ml-1 underline text-red-200 hover:text-foreground text-xs leading-none"
-          onClick={async (e) => {
-            e.stopPropagation();
-            setUnstickError(null);
-            try {
-              const res = await fetch(`/api/workspaces/${encodeURIComponent(issueIdentifier)}/unstick`, { method: 'POST' });
-              if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                setUnstickError(body.error ?? res.statusText);
-              } else {
-                // Optimistic update: mirror what the server resets so the badge
-                // disappears immediately without waiting for the WS round-trip.
-                // Server sets: stuck=false, reviewStatus/testStatus/mergeStatus='pending', readyForMerge=false.
-                const state = useDashboardStore.getState();
-                const upperKey = issueIdentifier.toUpperCase();
-                const current = state.reviewStatusByIssueId[upperKey]
-                  ?? state.reviewStatusByIssueId[issueIdentifier];
-                if (current) {
-                  const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
-                  // Optimistic update: clear stuck fields and reset lifecycle.
-                  // Recovery requires `git reset --hard origin/main`, making prior results invalid.
-                  // The WS status_changed event from the server will reconcile the full state.
-                  useDashboardStore.setState((s) => ({
-                    reviewStatusByIssueId: {
-                      ...s.reviewStatusByIssueId,
-                      [key]: {
-                        ...current,
-                        stuck: undefined,
-                        stuckReason: undefined,
-                        stuckDetails: undefined,
-                        reviewStatus: 'pending',
-                        testStatus: 'pending',
-                        mergeStatus: 'pending',
-                        readyForMerge: false,
-                      },
-                    },
-                  }));
-                }
-              }
-            } catch (err: unknown) {
-              setUnstickError(err instanceof Error ? err.message : String(err));
-            }
-          }}
-        >
-          Unstick
-        </button>
-      </span>
-      {unstickError && (
-        <span className="text-xs text-red-400 px-1" title={unstickError}>
-          Unstick failed: {unstickError}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/**
- * PAN-794: Review-infrastructure breaker badge.
- *
- * Shown when the deacon trips the circuit breaker after repeated
- * parallel-review re-dispatch failures. Clicking Retry calls the unstick
- * endpoint, which skips the git-safe-state check for this reason and opens a
- * fresh recovery cycle.
- */
-export function ReviewInfraStuckBadge({ issueIdentifier, retries, recoveryStartedAt }: { issueIdentifier: string; retries: number; recoveryStartedAt?: string }) {
-  const [unstickError, setUnstickError] = useState<string | null>(null);
-
-  const recoveryAge = recoveryStartedAt
-    ? Math.floor((Date.now() - new Date(recoveryStartedAt).getTime()) / 60_000)
-    : undefined;
-  const recoveryAgeLabel = recoveryAge != null
-    ? recoveryAge >= 60 ? `${Math.floor(recoveryAge / 60)}h ${recoveryAge % 60}m` : `${recoveryAge}m`
-    : undefined;
-
-  const titleText =
-    `Review infrastructure failed after ${retries} retries (spawn/dispatch issue). ` +
-    (recoveryAgeLabel ? `Recovery cycle running for ${recoveryAgeLabel}. ` : '') +
-    `Parallel review is paused — click Retry to open a fresh recovery cycle.`;
-
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span
-        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/70 text-amber-200 border border-amber-500/60"
-        title={titleText}
-      >
-        <XCircle className="w-3 h-3" />
-        Review stuck{recoveryAgeLabel && <span className="text-amber-400/80 ml-0.5">({recoveryAgeLabel})</span>}
-        <button
-          className="ml-1 underline text-amber-100 hover:text-foreground text-xs leading-none"
-          onClick={async (e) => {
-            e.stopPropagation();
-            setUnstickError(null);
-            try {
-              const res = await fetch(`/api/workspaces/${encodeURIComponent(issueIdentifier)}/unstick`, { method: 'POST' });
-              if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                setUnstickError(body.error ?? res.statusText);
-              } else {
-                const state = useDashboardStore.getState();
-                const upperKey = issueIdentifier.toUpperCase();
-                const current = state.reviewStatusByIssueId[upperKey]
-                  ?? state.reviewStatusByIssueId[issueIdentifier];
-                if (current) {
-                  const key = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
-                  useDashboardStore.setState((s) => ({
-                    reviewStatusByIssueId: {
-                      ...s.reviewStatusByIssueId,
-                      [key]: {
-                        ...current,
-                        stuck: undefined,
-                        stuckReason: undefined,
-                        stuckDetails: undefined,
-                        reviewStatus: 'pending',
-                        testStatus: 'pending',
-                        mergeStatus: 'pending',
-                        readyForMerge: false,
-                        reviewRetryCount: 0,
-                        recoveryStartedAt: undefined,
-                      },
-                    },
-                  }));
-                }
-              }
-            } catch (err: unknown) {
-              setUnstickError(err instanceof Error ? err.message : String(err));
-            }
-          }}
-        >
-          Retry
-        </button>
-      </span>
-      {unstickError && (
-        <span className="text-xs text-red-400 px-1" title={unstickError}>
-          Retry failed: {unstickError}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/**
- * Per-issue "Pause Deacon" toggle. When activated, Deacon patrol skips this
- * issue entirely on every cycle until the operator clicks Resume. Distinct
- * from stuck/unstick — pause is an explicit human opt-out, not a failure
- * recovery path. Rendered prominently on every IssueCard.
- */
-export function DeaconIgnoreButton({
-  issueIdentifier,
-  ignored,
-  reason,
-}: {
-  issueIdentifier: string;
-  ignored: boolean;
-  reason?: string;
-}) {
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const toggle = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = !ignored;
-      const res = await fetch(`/api/workspaces/${encodeURIComponent(issueIdentifier)}/deacon-ignore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ignored: next }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error ?? res.statusText);
-      } else {
-        const state = useDashboardStore.getState();
-        const upperKey = issueIdentifier.toUpperCase();
-        const currentKey = state.reviewStatusByIssueId[upperKey] ? upperKey : issueIdentifier;
-        const current = state.reviewStatusByIssueId[currentKey];
-        if (current) {
-          useDashboardStore.setState((s) => ({
-            reviewStatusByIssueId: {
-              ...s.reviewStatusByIssueId,
-              [currentKey]: {
-                ...current,
-                deaconIgnored: next || undefined,
-                deaconIgnoredAt: next ? new Date().toISOString() : undefined,
-                deaconIgnoredReason: next ? current.deaconIgnoredReason : undefined,
-              },
-            },
-          }));
-        }
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (ignored) {
-    return (
-      <span className="flex flex-col gap-0.5">
-        <button
-          onClick={toggle}
-          disabled={busy}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-purple-900/70 text-purple-100 border border-purple-400/60 hover:bg-purple-800/80 disabled:opacity-60"
-          title={reason ? `Deacon paused: ${reason} — click to resume` : 'Deacon paused — click to resume patrol for this issue'}
-          data-testid={`card-pause-deacon-${issueIdentifier}`}
-        >
-          <Pause className="w-3 h-3" />
-          Deacon Paused
-          <span className="underline ml-1">Resume</span>
-        </button>
-        {error && <span className="text-xs text-red-400 px-1" title={error}>Failed: {error}</span>}
-      </span>
-    );
-  }
-
-  return (
-    <span className="flex flex-col gap-0.5">
-      <button
-        onClick={toggle}
-        disabled={busy}
-        className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-popover text-muted-foreground border border-white/10 hover:bg-purple-900/40 hover:text-purple-100 hover:border-purple-500/50 disabled:opacity-60"
-        title="Tell Deacon to stop patrolling this issue (no re-dispatch, no pokes, no auto-completion)"
-        data-testid={`card-pause-deacon-${issueIdentifier}`}
-      >
-        <Pause className="w-3 h-3" />
-        Pause Deacon
-      </button>
-      {error && <span className="text-xs text-red-400 px-1" title={error}>Failed: {error}</span>}
-    </span>
   );
 }
 
