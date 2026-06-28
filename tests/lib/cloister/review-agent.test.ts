@@ -825,11 +825,11 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).toContain('reviewNotes: result.message');
   });
 
-  it('workspaces.ts approve route treats gated dispatches as deferrals', async () => {
+  it('merge-ops.ts approve route treats gated dispatches as deferrals', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/merge-ops.ts'),
       'utf-8',
     );
 
