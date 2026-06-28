@@ -53,7 +53,17 @@ If, after exploring, **no target is feasibly eval-able without spinning a full a
 - "Chosen targets" section below is filled in with what you evaled and why.
 
 ## Chosen targets
-_(fill in during WI-2: which behavior(s) you evaled, the fixtures used, and the scorers.)_
+Target picked: **memory status rollup synthesis** through `synthesizeStatusRollup` in `src/lib/memory/rollup.ts`.
+
+Why this target: it is a real LLM-using Overdeck behavior with a callable boundary, fixed structured inputs (`MemoryObservation`, `PendingTurn`, archived `MemoryStatus`), and a checkable structured output (`MemoryStatus`). It does not require spinning a tmux agent. In this workspace there were no live provider credentials in the shell, so the foundation eval uses captured provider-shaped outputs rather than making a live model call. That still exercises the rollup prompt, provider-result boundary, schema validation, and behavior scoring; a live-provider eval is documented as follow-up in `evals/README.md`.
+
+Targets explored but not picked for the first pass:
+- **Review synthesis role** (`roles/review.md`) is the highest-value target, but the primary behavior is currently an agent prompt/session flow. The callable `synthesizeReviewFromReports` fallback in `src/lib/cloister/deacon.ts` is useful, but it is deterministic fallback synthesis over LLM-authored reviewer reports rather than the primary model-using synthesis role.
+- **Conversation embeddings** (`src/lib/conversation-search/embedding-provider.ts`) call a provider directly, but the first useful eval would mostly score vector shape/cost plumbing rather than agent behavior quality.
+
+Fixtures used: small realistic in-file cases based on memory rollup test shapes: observations, pending turns, an archived stale status, and captured provider-shaped `MemoryStatus` outputs.
+
+Scorers used: structural Evalite scorers for valid status synthesis, phase match, working-set recall, stale working-set removal, open blocker preservation, next-step preservation, and prompt replacement guidance.
 
 ## Intersecting rules (restated)
 No bandaids; additive/surgical; A1 ratchet (no new `any`); worktree discipline (branch = `codebase-health/evals`; never `git checkout <branch>` / `git stash`); conventional commits (`feat(evals): ...`), never `--no-verify`; **do NOT run `pan done` or open a PR** — report blockers/uncertainty to the orchestrator (this task has judgment calls; surfacing them is expected, not a failure).
