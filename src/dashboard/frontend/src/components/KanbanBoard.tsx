@@ -20,9 +20,8 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from '../lib/dashboard-utils';
-import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, Sparkles, ScrollText } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, X, Filter, FileText, List, DollarSign, RotateCcw, ChevronDown, ChevronRight, Sparkles, ScrollText } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
-import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel } from '../../../../lib/cloister/complexity.js';
 // PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
@@ -46,6 +45,12 @@ import {
   DifficultyBadge,
   TrackerShadowBadges,
 } from './KanbanBoard/badges';
+import {
+  AgentWarningDialog,
+  BeadsDialog,
+  SyncPromptDialog,
+  UndoToast,
+} from './KanbanBoard/dialogs';
 import {
   COLUMN_COLORS,
   COLUMN_TITLES,
@@ -1698,197 +1703,6 @@ function DragOverlayCard({ issue }: DragOverlayCardProps) {
         <span className="text-muted-foreground text-sm">{issue.identifier}</span>
       </div>
       <p className="text-sm text-foreground mt-1 line-clamp-2">{issue.title}</p>
-    </div>
-  );
-}
-
-// Agent Warning Dialog
-interface AgentWarningDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  issue: Issue | null;
-}
-
-function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningDialogProps) {
-  if (!isOpen || !issue) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-2 badge-bg-warning rounded-lg">
-            <AlertTriangle className="w-6 h-6 text-warning-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              Active Agent Warning
-            </h3>
-            <p className="text-foreground text-sm mb-4">
-              <strong>{issue.identifier}</strong> has an active agent working on it.
-              Moving this issue may disrupt the agent's work.
-            </p>
-            <p className="text-muted-foreground text-xs mb-6">
-              Are you sure you want to proceed?
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onConfirm}
-                className="px-4 py-2 bg-warning hover:bg-warning/90 text-foreground rounded-lg transition-colors text-sm"
-              >
-                Move Anyway
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Sync Prompt Dialog
-interface SyncPromptDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSync: (syncToTracker: boolean, options?: { cleanupWorkspace?: boolean; stopAgents?: boolean }) => void;
-  issue: Issue | null;
-}
-
-function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogProps) {
-  const [cleanupWorkspace, setCleanupWorkspace] = useState(false);
-  const [stopAgents, setStopAgents] = useState(false);
-
-  if (!isOpen || !issue) return null;
-
-  // Determine tracker type from issue source
-  const trackerName = issue.source === 'github' ? 'GitHub' : 'Linear';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-2 badge-bg-success rounded-lg">
-            <Check className="w-6 h-6 text-success-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              Move to Done
-            </h3>
-            <p className="text-foreground text-sm mb-4">
-              You're moving <strong>{issue.identifier}</strong> to Done.
-            </p>
-
-            {/* Cleanup options */}
-            <div className="space-y-2 mb-4 p-3 bg-popover/50 rounded-lg">
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={cleanupWorkspace}
-                  onChange={(e) => setCleanupWorkspace(e.target.checked)}
-                  className="rounded border-border bg-popover text-success focus:ring-ring"
-                />
-                Clean up workspace
-              </label>
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={stopAgents}
-                  onChange={(e) => setStopAgents(e.target.checked)}
-                  className="rounded border-border bg-popover text-success focus:ring-ring"
-                />
-                Stop running agents
-              </label>
-            </div>
-
-            <p className="text-muted-foreground text-xs mb-4">
-              Sync status change to {trackerName}?
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => onSync(false, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                Shadow Only
-              </button>
-              <button
-                onClick={() => onSync(true, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 bg-success hover:bg-success/90 text-foreground rounded-lg transition-colors text-sm"
-              >
-                Sync to {trackerName}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Undo Toast component
-interface UndoToastProps {
-  isVisible: boolean;
-  onUndo: () => void;
-  onClose: () => void;
-}
-
-function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
-  if (!isVisible) return null;
-
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-card border border-border rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
-        <span className="text-sm text-foreground">Issue moved</span>
-        <button
-          onClick={onUndo}
-          className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
-        >
-          <Undo className="w-4 h-4" />
-          Undo
-        </button>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-muted-foreground"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Simple Beads Dialog component
-function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <List className="w-5 h-5 text-success-foreground" />
-            <h2 className="font-semibold text-foreground">Tasks: {issue.identifier}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-foreground hover:bg-popover rounded transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* BeadsTasksPanel with list/graph toggle */}
-        <div className="flex-1 overflow-hidden">
-          <BeadsTasksPanel issueId={issue.identifier} />
-        </div>
-      </div>
     </div>
   );
 }
