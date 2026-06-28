@@ -85,6 +85,18 @@ export interface TtsConfig {
   mutedIssues?: string[];
 }
 
+export interface VoiceSettings {
+  stt: {
+    provider: 'moonshine' | 'google-cloud';
+    moonshine: { model: string };
+    googleCloud: { apiKey: string; model: string };
+  };
+  autopreso: {
+    provider: 'openai' | 'codex' | 'ollama';
+    model: string;
+  };
+}
+
 export interface MemorySettingsConfig {
   provider?: 'anthropic' | 'cliproxy';
   model?: string;

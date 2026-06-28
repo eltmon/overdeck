@@ -48,6 +48,10 @@ const SETTINGS_PAGE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../SettingsPage.tsx'),
   'utf8',
 );
+const AUTOSAVE_PIPELINE_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../hooks/useAutosavePipeline.ts'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -84,11 +88,11 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('serializes all settings autosaves through one latest-snapshot queue', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('pendingSaveRef = useRef<AutosavePayload | null>(null)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveInFlightRef');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const drainSaveQueue = useCallback');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const scheduleAutosave = useCallback');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const flushAutosave = useCallback');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('pendingSaveRef = useRef<AutosavePayload | null>(null)');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('saveInFlightRef');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const drainSaveQueue = useCallback');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const scheduleAutosave = useCallback');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const flushAutosave = useCallback');
   });
 
   it('autosaves every control — no global Save/Reset buttons', () => {
@@ -106,9 +110,9 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('debounces high-frequency autosaves', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('setTimeout(() => {');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('setTimeout(() => {');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');

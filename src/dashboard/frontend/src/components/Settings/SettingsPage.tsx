@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -31,7 +31,7 @@ import {
   Gauge,
   Globe,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, type VoiceSettings, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -49,9 +49,6 @@ import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 import { LegacyImportDialog } from './LegacyImportDialog';
-// PAN-1055: drop the cached available-models response when Settings is saved
-// so subsequent picker renders see the new provider/keys mix immediately.
-import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
 import { HarnessLogo, ProviderLogo } from '../shared/branding';
 import {
   SettingsLayout,
@@ -62,6 +59,7 @@ import {
   type NavItem,
 } from './primitives';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
+import { AUTOSAVE_DEBOUNCE_MS, useAutosavePipeline } from './hooks/useAutosavePipeline';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -332,18 +330,6 @@ async function saveCloisterConfig(config: CloisterConfig): Promise<void> {
   }
 }
 
-interface VoiceSettings {
-  stt: {
-    provider: 'moonshine' | 'google-cloud';
-    moonshine: { model: string };
-    googleCloud: { apiKey: string; model: string };
-  };
-  autopreso: {
-    provider: 'openai' | 'codex' | 'ollama';
-    model: string;
-  };
-}
-
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   stt: {
     provider: 'moonshine',
@@ -492,18 +478,6 @@ const TTS_EVENT_KEYS = [
   'mergeStatus.failed',
   'readyForMerge',
 ] as const;
-
-/**
- * Debounce window for autosaves driven by high-frequency inputs (text fields,
- * sliders). Click-style controls (toggles, selects, radios) save immediately.
- */
-const AUTOSAVE_DEBOUNCE_MS = 600;
-
-/** One pending autosave: the full settings + voice payload, latest-wins. */
-interface AutosavePayload {
-  settings: SettingsConfig;
-  voiceSettings: VoiceSettings;
-}
 
 const ACTIVITY_SOURCE_OPTIONS = [
   'merge-agent',
@@ -658,17 +632,19 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('model-routing');
   const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
-  // ── Autosave pipeline ───────────────────────────────────────────────────────
-  // Every control persists on change through one serialized latest-wins queue:
-  // rapid edits collapse into the newest snapshot, saves never overlap, and
-  // text inputs debounce so half-typed values don't hit the server.
-  const pendingSaveRef = useRef<AutosavePayload | null>(null);
-  const saveInFlightRef = useRef<Promise<void> | null>(null);
-  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cloisterSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSaveOkRef = useRef(true);
-  const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const {
+    cloisterSaveDebounceRef,
+    flushAutosave,
+    markSaveError,
+    markSaved,
+    saveStatus,
+    scheduleAutosave,
+    setSaveStatus,
+  } = useAutosavePipeline({
+    queryClient,
+    saveSettings,
+    saveVoiceSettings,
+  });
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
@@ -879,81 +855,6 @@ export function SettingsPage() {
     window.localStorage.setItem(VOICE_HARDWARE_STORAGE_KEY, JSON.stringify(voiceHardwareSettings));
   }, [voiceHardwareSettings]);
 
-  // Drain the autosave queue: one save in flight at a time, always taking the
-  // newest pending snapshot. Returns the in-flight drain so callers can await
-  // a flush (e.g. before triggering a paid reindex).
-  const drainSaveQueue = useCallback((): Promise<void> => {
-    if (saveInFlightRef.current) return saveInFlightRef.current;
-    const run = (async () => {
-      while (pendingSaveRef.current) {
-        const snapshot = pendingSaveRef.current;
-        pendingSaveRef.current = null;
-        setSaveStatus('saving');
-        try {
-          const [response, savedVoiceSettings] = await Promise.all([
-            saveSettings(snapshot.settings),
-            saveVoiceSettings(snapshot.voiceSettings),
-          ]);
-          lastSaveOkRef.current = true;
-          invalidateAvailableModelsCache();
-          queryClient.invalidateQueries({ queryKey: ['settings'] });
-          queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
-          queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
-          queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
-          if (response.warnings && response.warnings.length > 0) {
-            response.warnings.forEach((warning) => {
-              toast.warning(warning, { duration: 8000 });
-            });
-          }
-          setSaveStatus('saved');
-          if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
-          savedStatusResetRef.current = setTimeout(() => {
-            savedStatusResetRef.current = null;
-            setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
-          }, 2500);
-        } catch (error) {
-          lastSaveOkRef.current = false;
-          setSaveStatus('error');
-          toast.error(`Failed to save settings: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-    })();
-    saveInFlightRef.current = run.finally(() => {
-      saveInFlightRef.current = null;
-    });
-    return saveInFlightRef.current;
-  }, [queryClient]);
-
-  // Schedule an autosave of the given snapshot. Click-style controls save
-  // immediately; text inputs and sliders pass debounce to wait for typing to
-  // pause. A newer schedule always supersedes the pending snapshot.
-  const scheduleAutosave = useCallback((payload: AutosavePayload, opts: { debounce?: boolean } = {}) => {
-    pendingSaveRef.current = payload;
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current);
-      saveDebounceRef.current = null;
-    }
-    if (opts.debounce) {
-      saveDebounceRef.current = setTimeout(() => {
-        saveDebounceRef.current = null;
-        void drainSaveQueue();
-      }, AUTOSAVE_DEBOUNCE_MS);
-    } else {
-      void drainSaveQueue();
-    }
-  }, [drainSaveQueue]);
-
-  // Force any pending (possibly debounced) save through and report whether the
-  // final save succeeded. Used by flows that must persist before acting.
-  const flushAutosave = useCallback(async (): Promise<boolean> => {
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current);
-      saveDebounceRef.current = null;
-    }
-    await drainSaveQueue();
-    return lastSaveOkRef.current;
-  }, [drainSaveQueue]);
-
   const conversationSearchReindexMutation = useMutation({
     mutationFn: reindexConversationSearch,
     onSuccess: (result) => {
@@ -1054,17 +955,6 @@ export function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['tts-health'] });
     },
   });
-
-  // On unmount, flush any debounced edit immediately so navigating away
-  // doesn't drop the last change (the fetch survives SPA navigation).
-  useEffect(() => () => {
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current);
-      saveDebounceRef.current = null;
-      void drainSaveQueue();
-    }
-    if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
-  }, [drainSaveQueue]);
 
   // Shared chat-model <option> list (same catalog as the Conversations selects).
   // MUST be declared before the early returns below — it's a hook (PAN-1597 fix:
@@ -1404,18 +1294,11 @@ export function SettingsPage() {
     setSaveStatus('saving');
     try {
       await saveCloisterConfig(snapshot);
-      lastSaveOkRef.current = true;
       queryClient.setQueryData(['cloister-config'], snapshot);
       queryClient.invalidateQueries({ queryKey: ['cloister-config'] });
-      setSaveStatus('saved');
-      if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
-      savedStatusResetRef.current = setTimeout(() => {
-        savedStatusResetRef.current = null;
-        setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
-      }, 2500);
+      markSaved();
     } catch (error) {
-      lastSaveOkRef.current = false;
-      setSaveStatus('error');
+      markSaveError();
       toast.error(`Failed to save Cloister settings: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
