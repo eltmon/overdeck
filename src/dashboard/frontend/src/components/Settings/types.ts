@@ -97,6 +97,12 @@ export interface VoiceSettings {
   };
 }
 
+export interface VoiceHardwareSettings {
+  inputDevice: string;
+  outputDevice: string;
+  volume: number;
+}
+
 export interface MemorySettingsConfig {
   provider?: 'anthropic' | 'cliproxy';
   model?: string;
