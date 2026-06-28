@@ -800,9 +800,11 @@ describe('flywheel run payload helpers', () => {
     await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
     await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { overdeckHome });
 
+    // PAN-2108: with no active run set, both are orphaned (no terminal marker,
+    // not the active run) → aborted. This test asserts sort order, not status.
     await expect(getFlywheelRunsPayload({ overdeckHome })).resolves.toEqual([
-      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
-      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'aborted' },
+      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'aborted' },
     ]);
   });
 
@@ -812,7 +814,7 @@ describe('flywheel run payload helpers', () => {
     await mkdir(join(overdeckHome, 'flywheel', 'runs', 'not-a-run'), { recursive: true });
 
     await expect(getFlywheelRunsPayload({ overdeckHome, limit: 1 })).resolves.toEqual([
-      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'aborted' },
     ]);
   });
 
