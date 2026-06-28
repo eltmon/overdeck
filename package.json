@@ -93,7 +93,7 @@
     "pretypecheck": "npm run build:contracts",
     "typecheck": "tsc --noEmit && npm run typecheck:hooks",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
-    "lint": "eslint src/ && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts",
+    "lint": "eslint src/ --ext .js,.ts,.tsx && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts",
     "lint:effect": "node scripts/check-effect-versions.mjs",
     "lint:permissions": "bash scripts/lint-permissions.sh",
     "lint:state-writes": "bash scripts/lint-state-writes.sh",
