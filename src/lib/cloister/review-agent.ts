@@ -45,11 +45,12 @@ import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
-import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
+import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import { getAgentStateSync } from '../agents.js';
@@ -878,20 +879,27 @@ export function isReviewStaleSync(issueId: string): boolean {
   return listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review-`).length > 0;
 }
 
+export function resolveReviewMode(issueId?: string): ReviewMode {
+  if (issueId) {
+    const project = resolveProjectForIssue(issueId);
+    const issueMode = project ? readIssueRecordSync(project, issueId)?.reviewMode : undefined;
+    if (issueMode === 'quick' || issueMode === 'full') {
+      return issueMode;
+    }
+  }
+
+  const configMode = loadYamlConfig().config.roles?.review?.mode;
+  return configMode === 'full' ? 'full' : 'quick';
+}
+
 /**
- * Is EXTENDED (convoy) review enabled? Quick review — the single parent `agent-<id>-review`
- * reviews the whole diff itself — is the only live mode (PAN-1981); the convoy spawn +
- * synthesis machinery is parked (commented out in spawnReviewRoleForIssuePromise).
+ * Is EXTENDED (convoy) review enabled for this issue?
  *
- * This is the SINGLE seam that turns convoy back on. While it returns false:
- *   - no sub-reviewer lanes are surfaced in the issue tree (buildReviewerNodes returns []),
- *   - review messages must not claim "N parallel reviewers".
- * Any `agent-<id>-review-<subRole>` record while this is false is a ghost from a prior
- * convoy run, not a live lane. When extended review returns, flip this (and later wire it
- * to a per-issue config flag) — restoring lanes and multi-reviewer messaging in lockstep.
+ * `resolveReviewMode` is the single source of truth: per-issue record override
+ * beats merged project/global config, and quick remains the default.
  */
-export function isExtendedReviewEnabled(): boolean {
-  return false;
+export function isExtendedReviewEnabled(issueId?: string): boolean {
+  return resolveReviewMode(issueId) === 'full';
 }
 
 /**
