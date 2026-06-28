@@ -633,8 +633,23 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
 
   if (piMode === 'rpc') {
-    const outputLogPath = join(dirname(config.piFifoPath!), 'output.log');
-    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
+    // PAN-2108: capture omp's exit so a silent post-startup death leaves a trace.
+    // The launcher bash must OUTLIVE omp to record the exit code + timestamp, so
+    // the rpc path deliberately does NOT `exec` (exec would replace bash with omp
+    // and the exit would be lost — the failure mode that made the flywheel
+    // orchestrator's death undiagnosable). `remain-on-exit on` keeps the dead
+    // pane for `#{pane_exit_status}`; the exit-status file survives even if the
+    // pane is later reaped. The deacon reads both on death detection.
+    const agentDir = dirname(config.piFifoPath!);
+    const outputLogPath = join(agentDir, 'output.log');
+    const exitStatusPath = join(agentDir, 'exit-status');
+    const runLine = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
+    return [
+      runLine,
+      '__omp_exit=$?',
+      `printf '%s %s\\n' "$__omp_exit" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ${shellQuote(exitStatusPath)}`,
+      'exit $__omp_exit',
+    ];
   }
 
   return [useExec ? `exec ${cmd}` : cmd];
