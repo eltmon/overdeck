@@ -2796,3 +2796,37 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
 - Next tick: (1) watch PAN-1884 (only healthy producer) → review; (2) if operator merges PAN-1084 /
   recovers 2086/1718, reassess; (3) keep snapshots current. **The flywheel's autonomous levers are
   exhausted for this cohort state — further drain needs operator gate/recovery actions.**
+
+## RUN-31 tick 1 (2026-06-28 ~04:25Z) — fresh baseline; MAIN GREEN; closed verifying-on-main tail (2100/2101); cohort gate-bound on rebases the flywheel cannot perform
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. **Orchestrator routed to ohmypi/glm-5.2
+despite config requesting harness=claude-code** (Cloister provider-default routing; surfaced as openQuestion).
+
+- **Main GREEN** at `274b1873693e` (CI `success`, 2026-06-28T03:37Z). RAM 34.9/64.1 GB, swap 4.7/8.2 GB (cold-page eviction, not pressure). No P0.
+
+- **Cohort (17): 6 terminal** (PAN-1559/1638/1652/1722/1793/1900 CLOSED closed-out). **2 operator-held** (PAN-806 objection; PAN-1864 parked+objection — skip). **9 open**, almost all gate-bound.
+
+- **Closed the verifying-on-main tail (NON-cohort, hygiene):** `pan close PAN-2100 --force` + `pan close PAN-2101 --force` both succeeded (verify-merged gate passed; the missing-`in-planning` label step is the known non-fatal quirk). These were RUN-30 strikes already merged; frees the tail.
+
+- **DURABLE LESSON — PR #2103 (PAN-1718) "test FAILURE" is a STALE-BASE artifact, confirmed.** The 4 failing tests are ALL `expected 'claude-code' to be 'ohmypi'` provider-default assertions (`tests/unit/lib/harness-resolve.test.ts`, `tests/unit/lib/providers.test.ts`) — the branch is behind main's provider-default cutover. The kimi work agent received "Tests: passed" from Overdeck's `overdeck/test` role (the OTHER test signal) and declared done; GitHub CI's `test` check failed on the stale base. **Work agent is context-exhausted (256k) so it cannot self-rebase.** A rebase onto green main almost certainly clears it. This is the two-test-signals lesson + the stale-base lesson combined.
+
+- **DURABLE LESSON — the cohort's merge gate is jammed on REBASES the flywheel is structurally forbidden to perform.** PAN-1718/1884/2088 PRs are all CONFLICTING/behind main; their tests PASS once rebased (1884/2088 test=SUCCESS already; 1718 is stale-base). But `pan sync-main` is flywheel-forbidden and editing feature branches is barred, so the work agents must rebase — and all three work agents are context-exhausted (100%) or paused. **Net: three merge-ready-after-rebase items sit blocked behind an operator-only rebase step.** This is the real drain bottleneck for this cohort state, not capacity. Candidate substrate fix: a flywheel-safe rebase surface (overlaps PAN-2108's recovery-surface scope).
+
+- **PAN-2086 work agent WEDGED** (kimi `API 400 token limit 262144`, requested 272397) — confirmed unrecoverable (PAN-2108 family); 17 commits safe on branch. agent-pan-1084/1718/1884 all idle-at-prompt at ctx 100% (done or work-complete). The only genuinely PRODUCTIVE producers are the two Opus plan agents: agent-pan-2054-plan (close-out fix, in-review) and planning-pan-1781 (kimi/CLIProxy root-cause). minAgents=2 satisfied by those two.
+
+- **Did NOT launch new agents** — no eligible unstarted ready+planned+unblocked work exists (PAN-1982 stack-broken; PAN-806/1864 operator-held). Launching would churn an already-jammed gate. "0 producers (beyond the 2 plan engines) is a valid finding — repair > launch" held.
+
+- Next tick: (1) if operator merges PAN-1084 / rebases 1718/1884/2088, reassess + close out; (2) watch 2054-plan → if it lands, it may retroactively advance the close-out tail (2054/2081); (3) keep snapshots current. **Autonomous levers remain exhausted for the gate-bound items — the cohort drains on operator rebases + the PAN-1084 merge.**
+
+## RUN-31 tick 2 (2026-06-28 ~04:36Z) — operator has not acted on tick-1 levers; PAN-1982 producing; 7/17 terminal; gate still operator-blocked
+
+- **Operator took NO gate action between ticks** (PAN-1084 still unmerged; 1718/1884/2088 still conflicting). Merge blockers byte-identical to tick 1. Main still GREEN (274b1873693e). This confirms the drain is hard-blocked on operator rebases + the PAN-1084 merge.
+
+- **PAN-1781 is CLOSED (terminal) — 7/17 cohort terminal now** (`closed:true`; fix on main `74bb453dd fix(cli): default Kimi to claude-code`). planning-pan-1781 is a STALE idle session on the closed issue (received "close as already-fixed", already executed). agent-pan-2054-plan pane is DEAD — stale plan session; its close-out fix is already deployed/in-review.
+
+- **PAN-1982 (launched tick 1) is the SOLE active producer.** Validated the launch: clean main sync, committed `5ae65b029 feat: add review mode config` (bead 1/7), typecheck green, advancing. The broken stack self-healed on spawn (PAN-1618 recovery confirmed live AGAIN this run). gpt-5.5/codex routed by provider default.
+
+- **Scanned all open bugs for a clean pipeline-unblocker to strike as a 2nd producer — NONE qualify.** The gate is blocked on operator rebases, not a strikable substrate bug; auto_pickup_backlog=false bars ordinary backlog pickup; PAN-2106/2108 are filed-but-not-strikable (not active unblockers; 2108 architectural). Honest conclusion: minAgents=2 cannot be sustained autonomously here — repair>launch, not a stall. PAN-1982 is the one producer.
+
+- Next tick: (1) watch PAN-1982 → review; (2) if operator finally merges PAN-1084 / rebases 1718/1884/2088, drain + close out; (3) keep snapshots current. **The autonomous levers are genuinely exhausted; the cohort drains only on operator gate action. The operator-prompted "are you stuck" check is answered: not stuck — producing via 1982, and waiting on the operator-only rebases+merge.**
