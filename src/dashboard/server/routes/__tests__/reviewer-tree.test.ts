@@ -172,6 +172,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
       agentsDirOverride: agentsDir,
     });
     expect(nodes).toEqual([]);
+    expect(isExtendedReviewEnabledMock).toHaveBeenCalledWith(ISSUE_ID);
   });
 
   it('returns exactly four convoy nodes without a synthesis child', async () => {
