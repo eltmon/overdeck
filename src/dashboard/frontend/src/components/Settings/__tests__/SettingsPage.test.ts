@@ -52,6 +52,10 @@ const AUTOSAVE_PIPELINE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../hooks/useAutosavePipeline.ts'),
   'utf8',
 );
+const CONVERSATION_SEARCH_HOOK_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../hooks/useConversationSearch.ts'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -139,7 +143,7 @@ describe('SettingsPage role model routing panels', () => {
     // window.confirm was replaced by the confirm-modal + confirmationNonce flow
     // (reindex is a paid operation — server requires the nonce from the estimate).
     expect(SETTINGS_PAGE_SOURCE).toContain('confirmReindex');
-    expect(SETTINGS_PAGE_SOURCE).toContain('confirmationNonce');
+    expect(CONVERSATION_SEARCH_HOOK_SOURCE).toContain('confirmationNonce');
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
