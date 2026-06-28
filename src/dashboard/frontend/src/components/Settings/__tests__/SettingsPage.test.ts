@@ -56,6 +56,10 @@ const CONVERSATION_SEARCH_HOOK_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../hooks/useConversationSearch.ts'),
   'utf8',
 );
+const CONVERSATION_SEARCH_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/ConversationSearchSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -132,14 +136,14 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces conversation search controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Conversation Search');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('aria-label="Toggle conversation search"');
     // cee57d395: conversation search uses the standard API Keys section now.
-    expect(SETTINGS_PAGE_SOURCE).toContain('Using OpenAI key from API Keys section');
-    expect(SETTINGS_PAGE_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Using OpenAI key from API Keys section');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Last indexed:');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Estimated reindex cost:');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Estimate & reindex all conversations');
     // window.confirm was replaced by the confirm-modal + confirmationNonce flow
     // (reindex is a paid operation — server requires the nonce from the estimate).
     expect(SETTINGS_PAGE_SOURCE).toContain('confirmReindex');

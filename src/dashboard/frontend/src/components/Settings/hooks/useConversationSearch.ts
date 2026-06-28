@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import type { ConversationSearchConfig, SettingsConfig, VoiceSettings } from '../types';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../../lib/wsTransport';
 
-interface ConversationSearchStatusResponse {
+export interface ConversationSearchStatusResponse {
   enabled: boolean;
   available: boolean;
   unavailableReason?: string;
@@ -55,20 +55,20 @@ async function reindexConversationSearch(confirmationNonce?: string): Promise<{ 
   return res.json();
 }
 
-interface ConvConfig {
+export interface ConvConfig {
   embeddings: boolean;
   embeddingProvider: string;
   embeddingModel: string;
   embeddingAutoOnDeep: boolean;
 }
 
-interface ReindexConfirmState {
+export interface ReindexConfirmState {
   kind: 'manual' | 'model';
   newModel?: string;
   estimate: ConversationSearchCostEstimate | null;
 }
 
-interface ReindexProgress {
+export interface ReindexProgress {
   active: boolean;
   filesScanned: number;
   filesIndexed: number;
@@ -304,6 +304,7 @@ export function useConversationSearch({
     conversationSearchEnabled,
     conversationSearchEstimate,
     conversationSearchModel,
+    conversationSearchReindexPending,
     conversationSearchReindexMutation,
     conversationSearchStatus,
     convConfig,

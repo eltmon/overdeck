@@ -43,12 +43,12 @@ import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
 import { RolesPanel } from './RolesPanel';
 import { VoiceSettingsSection } from './sections/VoiceSettingsSection';
+import { ConversationSearchSection } from './sections/ConversationSearchSection';
 import { SavedVoicesTab } from './SavedVoicesTab';
 import { VoiceDesignTab } from './VoiceDesignTab';
 import { VoicePresetsTab } from './VoicePresetsTab';
 import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
-import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 import { LegacyImportDialog } from './LegacyImportDialog';
 import { HarnessLogo, ProviderLogo } from '../shared/branding';
 import {
@@ -62,6 +62,7 @@ import {
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
 import { AUTOSAVE_DEBOUNCE_MS, useAutosavePipeline } from './hooks/useAutosavePipeline';
 import { useConversationSearch } from './hooks/useConversationSearch';
+import { EMBEDDING_MODELS_BY_PROVIDER } from './embeddingModels';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -456,29 +457,6 @@ const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
   ttsSummarizer: 'background:ttsSummarizer',
 };
 
-/** Known embedding models per provider for the embeddings picker (PAN-1589). */
-interface EmbeddingModelOption {
-  id: string;
-  label: string;
-  description: string;
-}
-
-const EMBEDDING_MODELS_BY_PROVIDER: Record<string, EmbeddingModelOption[]> = {
-  openai: [
-    { id: 'text-embedding-3-small', label: 'text-embedding-3-small', description: 'Recommended · 1536-dim · $0.02 / 1M tokens — cheap & fast' },
-    { id: 'text-embedding-3-large', label: 'text-embedding-3-large', description: 'Higher quality · 3072-dim · $0.13 / 1M tokens' },
-    { id: 'text-embedding-ada-002', label: 'text-embedding-ada-002', description: 'Legacy · 1536-dim — prefer 3-small' },
-  ],
-  voyage: [
-    { id: 'voyage-code-3', label: 'voyage-code-3', description: 'Code-optimized · $0.18 / 1M tokens' },
-    { id: 'voyage-3', label: 'voyage-3', description: 'General-purpose semantic embeddings' },
-  ],
-  ollama: [
-    { id: 'nomic-embed-text', label: 'nomic-embed-text', description: 'Local via Ollama · free · nothing leaves your machine' },
-    { id: 'mxbai-embed-large', label: 'mxbai-embed-large', description: 'Local via Ollama · free · larger, higher quality' },
-  ],
-};
-
 const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
@@ -591,7 +569,7 @@ export function SettingsPage() {
     conversationSearchEnabled,
     conversationSearchEstimate,
     conversationSearchModel,
-    conversationSearchReindexMutation,
+    conversationSearchReindexPending,
     conversationSearchStatus,
     convConfig,
     convConfigDirty,
@@ -2056,282 +2034,35 @@ export function SettingsPage() {
             </button>
           </div>
 
-          <div className="border-t border-border my-2" />
-
-          <div className="px-4 py-3 rounded-lg bg-muted/15 border border-border/50">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-foreground">Conversation Search</span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Index Claude JSONL transcripts for Ctrl+K semantic search. Disabled by default; enabling sends transcript chunks to the configured embedding provider.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={conversationSearchEnabled}
-                aria-label="Toggle conversation search"
-                onClick={() => handleConversationSearchChange({ enabled: !conversationSearchEnabled })}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  conversationSearchEnabled ? 'bg-primary' : 'bg-muted'
-                }`}
-              >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  conversationSearchEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                }`} />
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <label className="text-xs text-muted-foreground">
-                Provider
-                <select
-                  value={conversationSearch.provider ?? 'openai'}
-                  onChange={(e) => handleConversationSearchChange({ provider: e.target.value as 'openai' })}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  <option value="openai">OpenAI</option>
-                </select>
-              </label>
-              <label className="text-xs text-muted-foreground">
-                Model
-                <select
-                  value={conversationSearchModel}
-                  onChange={(e) => handleEmbeddingModelChange(e.target.value)}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
-                    <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
-                  ))}
-                </select>
-                {(() => {
-                  const desc = (EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? [])
-                    .find((m) => m.id === conversationSearchModel)?.description;
-                  return desc ? <span className="mt-1 block text-[11px] leading-snug text-muted-foreground/80">{desc}</span> : null;
-                })()}
-              </label>
-              <div className="flex items-end text-xs">
-                {formData?.api_keys?.openai ? (
-                  <span className="text-success">✓ Using OpenAI key from API Keys section</span>
-                ) : (
-                  <span className="text-warning">No OpenAI key set — configure in API Keys above</span>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-              <div>
-                <span>Last indexed: </span>
-                <span className="text-foreground">
-                  {conversationSearchStatus?.lastIndexedAt
-                    ? conversationSearchStatus.lastIndexedAt.slice(0, 19).replace('T', ' ')
-                    : 'Never'}
-                </span>
-                {conversationSearchStatus && (
-                  <span className="ml-2">
-                    ({conversationSearchStatus.chunkCount} chunks · {conversationSearchStatus.indexedFileCount} files)
-                  </span>
-                )}
-                {conversationSearchStatus && !conversationSearchStatus.available && (
-                  <span className="ml-2 text-destructive">{conversationSearchStatus.unavailableReason}</span>
-                )}
-                {conversationSearchEstimate && !conversationSearchEstimate.disabled && (
-                  <span className="block mt-1">
-                    Estimated reindex cost: <span className="text-foreground">${conversationSearchEstimate.estimatedUsd.toFixed(4)}</span>
-                    {' '}({conversationSearchEstimate.tokenCount.toLocaleString()} tokens · {conversationSearchEstimate.chunksEstimated} chunks)
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleConversationSearchReindex()}
-                disabled={!conversationSearchEnabled || estimatingConversationSearch || conversationSearchReindexMutation.isPending}
-                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
-              >
-                {estimatingConversationSearch || conversationSearchReindexMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                Estimate & reindex all conversations
-              </button>
-            </div>
-
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
-              <span className="text-foreground">Estimate &amp; reindex</span> rebuilds the entire semantic-search index from your conversation transcripts: it shows the one-time embedding-API cost, asks you to confirm, then re-embeds every conversation. Run it after switching the model, or to pick up transcripts created before search was enabled.
-            </p>
-
-            {conversationSearchReindexMutation.isPending && reindexProgress && (
-              <div className="mt-2">
-                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-1">
-                  <span className="truncate">
-                    {reindexProgress.currentFile ? `Indexing ${reindexProgress.currentFile}…` : 'Finishing up…'}
-                  </span>
-                  <span className="text-foreground tabular-nums shrink-0">
-                    {reindexProgress.filesIndexed}/{reindexProgress.filesScanned || '—'} files · {reindexProgress.chunksIndexed.toLocaleString()} chunks
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-500"
-                    style={{ width: `${reindexProgress.filesScanned > 0 ? Math.min(100, Math.round((reindexProgress.filesIndexed / reindexProgress.filesScanned) * 100)) : 5}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="border-t border-border my-2" />
-
-          {convConfigLoading ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Loading embedding settings…
-            </div>
-          ) : convConfigError ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-xs text-warning">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-muted-foreground">{convConfigError}</span>
-              <button
-                type="button"
-                onClick={loadConvConfig}
-                className="ml-1 inline-flex items-center gap-1 text-foreground hover:underline"
-              >
-                <RefreshCw className="w-3 h-3" /> Retry
-              </button>
-            </div>
-          ) : convConfig ? (
-            <>
-              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">Semantic embeddings</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Store vector embeddings for semantic conversation search. Non-local providers receive session-derived summaries, tags, workspace paths, and tool names.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={convConfig.embeddings}
-                  aria-label="Toggle semantic embeddings"
-                  onClick={() => handleConvConfigChange({ embeddings: !convConfig.embeddings })}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                    convConfig.embeddings ? 'bg-primary' : 'bg-muted'
-                  }`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                    convConfig.embeddings ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`} />
-                </button>
-              </div>
-
-              {convConfig.embeddings && (
-                <>
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-foreground">Embedding provider</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Which API generates embeddings</p>
-                    </div>
-                    <select
-                      value={convConfig.embeddingProvider}
-                      onChange={(e) => {
-                        const provider = e.target.value;
-                        const defaultModel = provider === 'openai'
-                          ? 'text-embedding-3-small'
-                          : provider === 'voyage'
-                            ? 'voyage-code-3'
-                            : 'nomic-embed-text';
-                        handleConvConfigChange({ embeddingProvider: provider, embeddingModel: defaultModel });
-                      }}
-                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="openai">OpenAI</option>
-                      <option value="voyage">Voyage AI</option>
-                      <option value="ollama">Ollama (local)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-foreground">Embedding model</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Model name for the selected provider</p>
-                    </div>
-                    <input
-                      type="text"
-                      value={convConfig.embeddingModel}
-                      onChange={(e) => handleConvConfigChange({ embeddingModel: e.target.value })}
-                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary w-[220px]"
-                      placeholder="text-embedding-3-small"
-                    />
-                  </div>
-
-                  {convConfig.embeddingProvider !== 'ollama' && (
-                    <div className="px-4 py-3 rounded-lg bg-muted/20">
-                      <p className="text-xs text-muted-foreground">
-                        API key is read from{' '}
-                        <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">
-                          {convConfig.embeddingProvider === 'openai' ? 'OPENAI_API_KEY' : 'VOYAGE_API_KEY'}
-                        </code>{' '}
-                        or <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">~/.overdeck.env</code>.
-                        Session-derived summaries, tags, workspace paths, and tool names are sent to this provider.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-foreground">Auto-embed after deep enrichment</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Generate embeddings when a session is enriched at tier 2 or 3
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={convConfig.embeddingAutoOnDeep}
-                      aria-label="Toggle auto-embed after deep enrichment"
-                      onClick={() => handleConvConfigChange({ embeddingAutoOnDeep: !convConfig.embeddingAutoOnDeep })}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                        convConfig.embeddingAutoOnDeep ? 'bg-primary' : 'bg-muted'
-                      }`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                        convConfig.embeddingAutoOnDeep ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                      }`} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleTestEmbeddingConnection}
-                        disabled={testingEmbedding}
-                        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
-                      >
-                        {testingEmbedding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                        Test connection
-                      </button>
-                      {embeddingTestResult && (
-                        <span className={`text-xs flex items-center gap-1 ${embeddingTestResult.ok ? 'text-success' : 'text-destructive'}`}>
-                          {embeddingTestResult.ok
-                            ? <><CheckCircle className="w-3.5 h-3.5" /> Connected ({embeddingTestResult.latencyMs}ms)</>
-                            : <><AlertTriangle className="w-3.5 h-3.5" /> {embeddingTestResult.error}</>}
-                        </span>
-                      )}
-                    </div>
-                    {convConfigDirty && (
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveConvConfig()}
-                        disabled={convConfigSaving}
-                        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                      >
-                        {convConfigSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                        Save embeddings
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </>
-          ) : null}
+          <ConversationSearchSection
+            conversationSearch={conversationSearch}
+            conversationSearchEnabled={conversationSearchEnabled}
+            conversationSearchEstimate={conversationSearchEstimate}
+            conversationSearchModel={conversationSearchModel}
+            conversationSearchReindexPending={conversationSearchReindexPending}
+            conversationSearchStatus={conversationSearchStatus}
+            convConfig={convConfig}
+            convConfigDirty={convConfigDirty}
+            convConfigError={convConfigError}
+            convConfigLoading={convConfigLoading}
+            convConfigSaving={convConfigSaving}
+            embeddingTestResult={embeddingTestResult}
+            estimatingConversationSearch={estimatingConversationSearch}
+            hasOpenAiKey={Boolean(formData.api_keys.openai)}
+            loadConvConfig={loadConvConfig}
+            reindexConfirm={reindexConfirm}
+            reindexConfirmBusy={reindexConfirmBusy}
+            reindexProgress={reindexProgress}
+            testingEmbedding={testingEmbedding}
+            onCancelReindexConfirm={cancelReindexConfirm}
+            onConfirmReindex={confirmReindex}
+            onConversationSearchChange={handleConversationSearchChange}
+            onConversationSearchReindex={handleConversationSearchReindex}
+            onConvConfigChange={handleConvConfigChange}
+            onEmbeddingModelChange={handleEmbeddingModelChange}
+            onSaveConvConfig={handleSaveConvConfig}
+            onTestEmbeddingConnection={handleTestEmbeddingConnection}
+          />
         </div>
       </section>
 
@@ -3561,26 +3292,6 @@ export function SettingsPage() {
       </section>
 
       <LegacyImportDialog open={legacyImportOpen} onClose={() => setLegacyImportOpen(false)} />
-
-      <ReindexConfirmDialog
-        open={reindexConfirm !== null}
-        title={reindexConfirm?.kind === 'model' ? 'Switch embedding model?' : 'Reindex all conversations?'}
-        intro={reindexConfirm?.kind === 'model' ? (
-          <>
-            Switching to <span className="text-foreground font-medium">{reindexConfirm?.newModel}</span> invalidates
-            every cached embedding — vectors can&apos;t be reused across models — and runs a full reindex with the new
-            model. This is a one-time embedding-API cost:
-          </>
-        ) : (
-          <>This re-embeds every conversation transcript from scratch and replaces the existing index, calling the OpenAI embeddings API once for your whole history:</>
-        )}
-        estimate={reindexConfirm?.estimate ?? null}
-        estimating={estimatingConversationSearch && !reindexConfirm?.estimate}
-        confirmLabel={reindexConfirm?.kind === 'model' ? 'Switch & reindex' : 'Reindex now'}
-        busy={reindexConfirmBusy}
-        onConfirm={() => void confirmReindex()}
-        onCancel={cancelReindexConfirm}
-      />
 
     </SettingsLayout>
   );
