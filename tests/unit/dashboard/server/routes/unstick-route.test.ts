@@ -89,7 +89,7 @@ vi.mock('../../../../../src/lib/git/operations.js', () => ({
 
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
-import { processUnstickRequest } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { processUnstickRequest } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
 import {
   markWorkspaceStuck,
   getReviewStatusFromDbSync,
