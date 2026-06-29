@@ -1,0 +1,426 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T14:57:37.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2076: Boot Reconciliation surface (dashboard) — informed per-agent disposition replacing the all-or-nothing Resume-all banner",
+    "updated": "2026-06-29T15:05:52.690Z"
+  },
+  "plan": {
+    "id": "pan-2076",
+    "title": "Boot Reconciliation surface (dashboard) — grace window + durable decision + per-agent modal",
+    "status": "proposed",
+    "author": "agent:claude-opus-4-8",
+    "created": "2026-06-29T14:57:37.000Z",
+    "updated": "2026-06-29T15:05:52.690Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2076",
+        "label": "PAN-2076",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2075",
+        "label": "PAN-2075 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2076.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2076-mockup.html",
+        "label": "Visual mockup",
+        "type": "design"
+      },
+      {
+        "uri": "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
+        "label": "Architecture",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "deacon",
+      "boot",
+      "control-plane",
+      "frontend",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "On an unverified dashboard boot, agents are held frozen by the default-off resume gate (PAN-1963), surfaced only by an all-or-nothing 'Resume all' banner (NoResumeBanner.tsx). The operator cannot see what is held, why, or what it costs, and cannot decide per agent. The gate lives in process env (OVERDECK_NO_RESUME via boot-gates.ts:54 / no-resume-mode.ts:14), so a watchdog restart loses it and reverts the operator's choice — the env-loss death-loop class.",
+      "Proposal": "Replace the banner with an informed Boot Reconciliation surface backed by a durable decision in SQLite. On boot, compute the reconciliation set (agents that were running but whose tmux session on socket overdeck is now gone), open a bounded grace window (default 30s) during which the deacon holds resume/dispatch for that set, and present a modal (built to .pan/drafts/PAN-2076-mockup.html) with per-agent Resume/Leave-frozen/Kill plus four bulk actions. The decision persists through the settings door (two-door tenet) keyed by boot_id, so a watchdog restart honors it. On grace expiry the default action is RESUME (operator-approved). OVERDECK_NO_RESUME is demoted to a boot-only input (=> hold_all) and removed from every runtime gate.",
+      "NonGoals": "- pan boot status CLI + dashboard status panel (PAN-2078).\n- Unifying pause/ignore/troubled into one scoped-suppression surface (separate PAN-2075 issue).\n- Retiring the supervisor-env persistent-resume workaround (do only after AC-2 lands and is verified in production).\n- The inventory backend and Operator Inbox sibling issues: this issue consumes the existing agents-table candidate set and renders the decision UI; the remote ($) action contract and durable Inbox item come from those siblings and are not built here.\n- New RPC contract surface: the modal uses the existing HTTP-route + react-query pattern that NoResumeBanner already uses.",
+      "Requirements": "FR-1 Durable boot-reconciliation decision in SQLite via the settings door (decision/per_agent/decided_at/boot_id/grace_deadline). FR-2 Grace window holds the reconciliation set from resume/dispatch while decision==pending; expiry flips pending->resume_all after startup.reconciliation_grace_secs (default 30). FR-3 Apply: resume_all/hold_all/per_agent, idempotent, honoring PAN-1665 brakes. FR-4 Dashboard modal replaces NoResumeBanner; per-agent Resume/Leave-frozen/Kill + four bulk actions + live countdown; Review-each submits per_agent map. FR-5 OVERDECK_NO_RESUME demoted to boot input (=>hold_all); no runtime path consults it. FR-6 Watchdog restart honors an existing decision for the same boot_id (no re-prompt/revert). FR-7 'Freeze everything' routes to the existing deacon.globally_paused freeze. NFR-1 Boot-path change: no hot-patch — build, runtime-boot-test, pan reload --health-timeout >=120000 (orchestrator supervises deploy). NFR-2 Fake timers (vi.useFakeTimers + advanceTimersByTimeAsync) for grace/delay tests. NFR-3 Two-door: all control state via the settings resolver+writer; no direct SQLite/state.json/env reads for canonical control state. NFR-4 Replacement is no-loss: every NoResumeBanner affordance has a home in the new surface before deletion."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Build to operator-approved decisions in the PRD (grace=30s default; expiry=RESUME; OVERDECK_NO_RESUME demoted to boot input; freeze=existing deacon.globally_paused; decision durable in SQLite). Not re-litigated.",
+        "rationale": "The PRD marks these 'do not re-litigate' and the architecture doc carries operator approval; planning's job is to materialize them, not re-open them."
+      },
+      {
+        "summary": "D2: backend uses the existing HTTP-route + react-query pattern (new /api/boot-reconciliation GET + /api/boot-reconciliation/decision POST in misc.ts), NOT a new RPC contract.",
+        "rationale": "The surface being replaced (NoResumeBanner.tsx) already uses plain HTTP fetch routes (/api/no-resume-mode, /api/resume-all) + react-query polling — exactly the shape the countdown needs. Matching it is lower-risk, additive over the replaced surface, and avoids new PanRpcGroup contract surface. The PRD floated 'RPC' but the named methods getBootReconciliation/submitBootReconciliation map cleanly onto these two routes."
+      },
+      {
+        "summary": "WI-5 runtime surface is broader than the PRD's 'flywheel only' note: getNoResumeMode() has live runtime callers in deacon-auto-resume.ts, deacon-review-status.ts, idle-stack-reaper.ts, closed-issue-reaper.ts. All must be audited/neutered, not just the (already-cleared) flywheel one.",
+        "rationale": "Verified by grep at planning time. Leaving any runtime caller in place would keep the env-loss gate alive and defeat FR-5/AC-3."
+      },
+      {
+        "summary": "Reconciliation set is derived from the existing agents-table stopped-work-agent candidate query (deacon-auto-resume.ts:801-803), minus #1436 zombies and paused/troubled/ignored agents — not a new inventory backend.",
+        "rationale": "The inventory backend is a sibling issue; this issue's AC-1/AC-2 are satisfiable from the existing authoritative agents table. Remote ($) rows render from whatever the agents table already carries; the full remote action contract is the sibling's scope (NonGoals)."
+      }
+    ],
+    "items": [
+      {
+        "id": "durable-decision",
+        "title": "WI-1: Durable boot-reconciliation decision (control plane)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T14:57:37.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add durable boot-reconciliation control state to src/lib/database/app-settings.ts following the exact existing pattern (getSetting/setSetting + the deacon.globally_paused accessors at lines 49-77). Add key constants and typed accessors: BOOT_RECONCILIATION_DECISION_KEY='boot_reconciliation.decision' (value one of 'pending'|'resume_all'|'hold_all'|'per_agent'), BOOT_RECONCILIATION_PER_AGENT_KEY='boot_reconciliation.per_agent' (JSON map issueId->'resume'|'hold'), BOOT_RECONCILIATION_DECIDED_AT_KEY='boot_reconciliation.decided_at' (ISO string), BOOT_RECONCILIATION_BOOT_ID_KEY='boot_reconciliation.boot_id', BOOT_RECONCILIATION_GRACE_DEADLINE_KEY='boot_reconciliation.grace_deadline' (ISO string the modal countdown reads). Provide getBootReconciliationState(): { decision, perAgent, decidedAt, bootId, graceDeadline } and setBootReconciliationDecision(decision, perAgent?), stampBootReconciliation(bootId, graceDeadline) writing through setSetting only. The app_settings table already exists (schema v27) — NO new migration needed; these are new keys in the existing key/value table. Do NOT add any direct db.prepare calls outside app-settings.ts — all reads/writes go through these accessors (the two-door tenet; a CI guard fails the build on direct .pan/state.json/db access for canonical control state).",
+          "Why": "A durable decision in SQLite (not process env) is what survives a watchdog restart and fixes the env-loss death-loop class (PAN-2076 operator-approved decision: 'The decision is durable (SQLite) so a watchdog restart honors it instead of reverting')."
+        },
+        "items": [
+          {
+            "id": "durable-decision.ac1",
+            "title": "src/lib/database/app-settings.ts exports and persists the five boot_reconciliation.* keys via the getBootReconciliationState/setBootReconciliationDecision/stampBootReconciliation accessors; no new SQLite migration is created (keys store in the existing app_settings table).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-decision.ac2",
+            "title": "All boot-reconciliation control state stores and reads only through these accessors — grep shows no direct db.prepare/state.json/OVERDECK_NO_RESUME decision reads elsewhere; npm run lint (incl. the state-write CI guard) passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-decision.ac3",
+            "title": "A unit test stores each decision value and the per_agent map through the accessors and asserts the data survives a fresh getDatabase() handle.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grace-window",
+        "title": "WI-2: Grace window in the boot sequence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T14:57:37.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the boot sequence, compute the reconciliation set and open a bounded grace window. Reconciliation set = agents from the SQLite agents table (listAllAgents) that were role-relevant and running before this start but whose tmux session on socket 'overdeck' is now gone — i.e. the same stopped work-agent candidate set autoResumeStoppedWorkAgents already derives (src/lib/cloister/deacon-auto-resume.ts:801-803), additionally excluding #1436 stale stopped-agent zombies and paused/troubled/per-issue-ignored agents (those are read-only, never resume candidates — AC-2). On boot (src/dashboard/server/main.ts, near the Cloister auto-start at lines 583-610): stamp a fresh boot_id and call stampBootReconciliation(bootId, deadline) where deadline = now + startup.reconciliation_grace_secs (new cloister config key, default 30); set decision='pending' UNLESS OVERDECK_NO_RESUME is set at boot (then 'hold_all', skip grace — see WI-5). If WI-6 finds an existing decision for the SAME boot_id, do not re-stamp (idempotent). Gate the resume path: in autoResumeStoppedWorkAgents (deacon-auto-resume.ts:778) and the flywheel auto-launch, while getBootReconciliationState().decision==='pending', SKIP the reconciliation-set agents (return them un-resumed) — the patrol still runs for everything else. Arm a server-side timer of grace_secs that flips 'pending'->'resume_all' on expiry (the operator-approved default action is RESUME), then triggers WI-3 apply. The timer is authoritative; the modal countdown (WI-4) is display-only. TESTS MUST USE vi.useFakeTimers() + advanceTimersByTimeAsync — never real setTimeout (repo fake-timers rule; the grace is a real delay).",
+          "Why": "Retires no-resume-by-default: instead of holding agents frozen indefinitely behind an all-or-nothing banner, a bounded grace window lets the operator decide, then resumes by default on expiry. The set must be gated while pending so nothing races the operator's decision."
+        },
+        "items": [
+          {
+            "id": "grace-window.ac1",
+            "title": "Given a simulated unclean boot with a non-empty reconciliation set and no env set, the boot persists decision='pending' with a fresh boot_id and a grace deadline = now + grace_secs, and autoResumeStoppedWorkAgents and flywheel auto-launch skip (do not resume) the reconciliation-set agents while decision==='pending'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grace-window.ac2",
+            "title": "startup.reconciliation_grace_secs defaults to 30 from cloister config and sets the deadline; when fake timers advance past grace_secs the boot updates decision 'pending'->'resume_all' and the apply path (WI-3) runs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grace-window.ac3",
+            "title": "The reconciliation set excludes paused, troubled, and per-issue-ignored agents and #1436 stale stopped-agent zombies; the grace test passes using vi.useFakeTimers()/advanceTimersByTimeAsync (no real setTimeout).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "apply-decision",
+        "title": "WI-3: Apply the boot-reconciliation decision",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T14:57:37.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the apply step (a small new src/lib/cloister/boot-reconciliation.ts, or a function in deacon-auto-resume.ts) that reads getBootReconciliationState() and acts: 'resume_all' -> resume the whole reconciliation set via the existing handleAgentStoppedEvent/autoResumeStoppedWorkAgents path, SUBJECT TO the existing PAN-1665 concurrency brakes (work-slot budget + load ceiling + RESUME_STAGGER_MS in deacon-auto-resume.ts:778-840) — do not bypass them; 'hold_all' -> leave the set stopped (no-op resume); 'per_agent' -> resume only the issueIds marked 'resume' in the per_agent map, hold the rest. Must be idempotent: once decision!=='pending' the apply runs once and subsequent patrol ticks are a no-op for the set (guard on a decided/applied flag or on the decision already being non-pending + set already actioned). Re-applying across a patrol tick must not double-spawn. This function is invoked by the WI-2 grace-expiry timer and by the WI-4 submit route.",
+          "Why": "Translates the durable decision into the exact intended state transitions (AC-3 of the issue) while respecting the herd-control brakes so a resume_all of a large set does not stampede the scheduler."
+        },
+        "items": [
+          {
+            "id": "apply-decision.ac1",
+            "title": "resume_all resumes (spawns) every reconciliation-set agent through the existing PAN-1665-braked path; hold_all preserves them stopped; per_agent resumes only the 'resume'-marked issueIds and preserves the rest stopped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-decision.ac2",
+            "title": "Applying the same non-pending decision twice (grace-expiry timer then next patrol tick) produces no second resume — a unit test asserts the apply is idempotent and spawns each agent at most once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-decision.ac3",
+            "title": "The resume path respects the existing work-slot/load/stagger brakes and does not bypass them beyond what autoResumeStoppedWorkAgents already applies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-modal",
+        "title": "WI-4: Boot Reconciliation modal — replace the Resume-all banner (build to the mockup)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T14:57:37.000Z",
+        "metadata": {
+          "difficulty": "large",
+          "issueLabel": "pan-2076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the all-or-nothing NoResumeBanner (src/dashboard/frontend/src/components/NoResumeBanner.tsx, mounted in src/dashboard/frontend/src/App/AppChrome.tsx:63) with a Boot Reconciliation surface built to .pan/drafts/PAN-2076-mockup.html. BACKEND (follow the existing HTTP-route + react-query pattern that NoResumeBanner uses — NOT a new RPC contract; see decision D2): add to src/dashboard/server/routes/misc.ts two Effect HttpRouter routes next to the existing /api/no-resume-mode and /api/resume-all (misc.ts:54): GET /api/boot-reconciliation -> { decision, perAgent, graceDeadline, set: [{ issueId, role, model, whyStopped, lastActivity, cost, remote, readOnly }] } where readOnly=true for paused/troubled/ignored agents (AC-2); POST /api/boot-reconciliation/decision { decision, perAgent? } -> writes via setBootReconciliationDecision (WI-1) and invokes the WI-3 apply, returns the resulting transitions. FRONTEND: new src/dashboard/frontend/src/components/BootReconciliationModal.tsx mounted where NoResumeBanner was (AppChrome). Render only when decision==='pending'. Match the mockup: a countdown ring to graceDeadline (display-only; server timer is authoritative), the reconciliation set grouped by concern (running remote $, orphaned tmux-gone, stopped cleanly, paused/troubled read-only), per-row Resume/Leave-frozen(hold)/Kill controls, and the four bulk actions 'Resume all now' / 'Keep all stopped' / 'Review each' / 'Freeze everything'. 'Review each' reveals the per-agent Resume/Keep(hold) toggles and submits decision='per_agent' with the per_agent map. 'Freeze everything' calls the existing freeze (WI-4 FR-7: POST to the existing deacon.globally_paused freeze surface — reuse it, no new mechanism). Use react-query with refetchInterval like NoResumeBanner; poll graceDeadline and stop rendering once decision!=='pending'. NO-LOSS AUDIT (repo rule): the new surface must preserve every NoResumeBanner affordance — the bulk Resume (old 'Resume all' maps to 'Resume all now'), the since/boot-time context, and the single-agent guidance — before NoResumeBanner.tsx is deleted; delete NoResumeBanner.tsx and remove its mount and the now-orphaned NO_RESUME_QUERY_KEY import in IssueAgentCard.tsx only after the modal covers all of it. Verify dashboard rendering yourself with a Playwright screenshot (repo self-verify rule) — do not ask the operator to eyeball it. Follow pan-style-guide for typography/badges/colors.",
+          "Why": "Gives the operator an informed, per-agent disposition surface (what is held, why, what it costs) instead of an all-or-nothing banner — the core of PAN-2076. Reusing the existing HTTP-route/react-query pattern keeps the change additive over the surface it replaces and avoids new RPC contract surface."
+        },
+        "items": [
+          {
+            "id": "dashboard-modal.ac1",
+            "title": "AC-1: a simulated unclean boot renders all held agents (local + remote) grouped by concern with per-agent Resume/Leave-frozen/Kill controls, and resumes nothing without an explicit action while decision==='pending'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-modal.ac2",
+            "title": "AC-2: paused, troubled, and per-issue-ignored agents render read-only (the modal shows no Resume control for them) and refuses to resume them from this surface.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-modal.ac3",
+            "title": "AC-4: the modal renders the set with a live countdown to graceDeadline and sends each of the four actions; 'Review each' sends decision='per_agent' with the per-agent map (a component test covers all four paths).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-modal.ac4",
+            "title": "AC-5/FR-7: 'Freeze everything' routes to the existing deacon.globally_paused freeze with no new kill-switch (a test asserts the existing freeze surface receives the call).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-modal.ac5",
+            "title": "No-loss: the change deletes NoResumeBanner.tsx and removes its AppChrome mount and orphaned NO_RESUME_QUERY_KEY import only after the modal preserves the bulk-Resume CTA and boot-time context; a Playwright screenshot of the modal is captured and inspected; npm run typecheck/lint and the frontend vitest suite pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "demote-no-resume",
+        "title": "WI-5: Demote OVERDECK_NO_RESUME to a boot input only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T14:57:37.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Make OVERDECK_NO_RESUME a boot input that pre-selects 'hold_all' and skips the grace, and remove it as a RUNTIME gate. At boot (WI-2 path): if resolveBootGates / OVERDECK_NO_RESUME is truthy, stamp decision='hold_all' instead of 'pending' and skip the grace timer. Keep src/lib/boot-gates.ts resolveBootGates for the boot-time read; it may still surface the gate for logging, but no runtime path may consult it. Remove/neuter the RUNTIME callers of getNoResumeMode() (src/lib/cloister/no-resume-mode.ts:13). Audit each caller and replace the runtime gate with the durable decision where a gate is still wanted, or delete it where the grace/decision now covers it: deacon-auto-resume.ts (lines 116,252,574,792,848 — autoResumeStoppedWorkAgents/handleAgentStoppedEvent/reconcileAgentLiveness etc.), deacon-review-status.ts (333,538), idle-stack-reaper.ts (114), closed-issue-reaper.ts (105,149). PAN-2160 already cleared the flywheel caller. After this, getNoResumeMode() must have NO runtime callers that gate relaunch/dispatch/orphan-recovery (the env-loss bug class root); the only consultation of OVERDECK_NO_RESUME is the boot-time decision seed. disableNoResumeMode() (called today by /api/resume-all) is superseded by the decision plane — update or remove its caller accordingly so /api/resume-all (if kept transitionally) writes decision='resume_all' + applies, rather than flipping env. This shares src/lib/cloister/deacon-auto-resume.ts with WI-2/WI-3 — do the edits after those land (edge enforces serialization).",
+          "Why": "OVERDECK_NO_RESUME gating runtime behavior is the env-loss death-loop root: a watchdog restart loses the env and reverts the operator's choice. Demoting it to a boot-only seed of the durable decision removes that class entirely (operator-approved decision in the PRD)."
+        },
+        "items": [
+          {
+            "id": "demote-no-resume.ac1",
+            "title": "OVERDECK_NO_RESUME=1 at boot persists decision='hold_all' and skips the grace window; with no env set the boot persists decision='pending' + grace, so no-resume no longer defaults on.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "demote-no-resume.ac2",
+            "title": "getNoResumeMode() retains no runtime callers that gate relaunch/dispatch/orphan-recovery — a unit test or grep guard validates the runtime paths in deacon-auto-resume.ts, deacon-review-status.ts, idle-stack-reaper.ts, closed-issue-reaper.ts no longer consult it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "demote-no-resume.ac3",
+            "title": "The change updates the previous no-resume-mode unit tests to boot-input-only semantics; npm run typecheck/lint/test passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watchdog-preserve",
+        "title": "WI-6: Watchdog preserves the decision across restart",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T14:57:37.000Z",
+        "metadata": {
+          "difficulty": "small",
+          "issueLabel": "pan-2076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Ensure a watchdog restart honors an already-made decision instead of re-prompting or reverting. In src/supervisor/watchdog.ts (spawnRestart, the env-inheriting path), do NOT rely on env to carry resume intent. On the restarted dashboard, the boot sequence (WI-2) reads getBootReconciliationState(): if a decision exists for the SAME boot_id (i.e. this is a watchdog restart, not a genuine reboot), it must NOT re-stamp 'pending' or re-open the grace — it honors the persisted decision and (re-)applies it idempotently via WI-3. boot_id distinguishes a watchdog restart (same boot_id persisted) from a genuine operator reboot (fresh boot_id -> re-prompt). Decide boot_id continuity: the watchdog passes the prior boot_id forward (e.g. via a durable marker the restarted process reads), so the restarted dashboard recognizes the in-progress boot. Once AC-2 of the PRD is verified in production, the supervisor-env persistent-resume workaround can be retired (OUT OF SCOPE here — do not remove it in this issue).",
+          "Why": "This is the proper fix for the env-loss death-loop: the durable decision + boot_id continuity means a watchdog restart never reverts the operator's choice nor re-nags them."
+        },
+        "items": [
+          {
+            "id": "watchdog-preserve.ac1",
+            "title": "A decision written to the durable plane survives a simulated watchdog restart for the same boot_id: the restarted boot reads it, refuses to re-stamp 'pending', does not re-open the grace, and re-applies it idempotently (a test asserts persistence and no re-prompt).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watchdog-preserve.ac2",
+            "title": "A genuine reboot with a fresh boot_id re-stamps decision='pending' and re-opens the grace (a test asserts the boot_id discriminator marks the two cases differently).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watchdog-preserve.ac3",
+            "title": "The change preserves the supervisor-env persistent-resume workaround in place (its retirement is explicitly deferred); npm run typecheck/lint/test passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "durable-decision",
+        "to": "grace-window",
+        "type": "blocks"
+      },
+      {
+        "from": "durable-decision",
+        "to": "apply-decision",
+        "type": "blocks"
+      },
+      {
+        "from": "durable-decision",
+        "to": "dashboard-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "durable-decision",
+        "to": "demote-no-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "durable-decision",
+        "to": "watchdog-preserve",
+        "type": "blocks"
+      },
+      {
+        "from": "grace-window",
+        "to": "apply-decision",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-decision",
+        "to": "dashboard-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-decision",
+        "to": "demote-no-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-decision",
+        "to": "watchdog-preserve",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2076-boot-reconciliation-surface-dashboard.vbrief.json"
+    },
+    "sequence": 1
+  },
+  "status": "proposed"
+}
