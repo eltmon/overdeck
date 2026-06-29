@@ -1,0 +1,770 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T17:56:33.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2146: Decompose src/lib/agents.ts (4572 lines) into focused modules",
+    "updated": "2026-06-29T18:05:37.119Z"
+  },
+  "plan": {
+    "id": "pan-2146",
+    "title": "Decompose src/lib/agents.ts (4572 lines) into focused modules",
+    "status": "proposed",
+    "uid": "66125ef3-8d15-4b73-b22a-af00e22822aa",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-29T17:56:33.000Z",
+    "updated": "2026-06-29T18:05:37.119Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2146",
+        "label": "PAN-2146",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2146.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "god-file",
+      "behavior-preserving"
+    ],
+    "narratives": {
+      "Problem": "src/lib/agents.ts is 4572 lines (73 exported symbols + ~65 internal helpers/module-state) — the largest remaining backend god file and a hot path (spawn, resume, recover, message). It sits over the 1000-line file-size ceiling and is baselined as known debt. A prior pass extracted only 5 small modules (activity/delivery/queries/runtime-state/termination); the bulk remains.",
+      "Proposal": "Pure relocation behind a thin re-export barrel. Extract cohesive clusters from src/lib/agents.ts into new src/lib/agents/*.ts submodules (each < 1000 lines), and keep src/lib/agents.ts as a barrel that re-exports every symbol so all 64 call sites and every test resolve unchanged. No logic edits, no renamed exports, no signature changes. Extract foundation-first (agent-state owns Role + AgentState) so no submodule imports from the barrel (which would create a runtime ESM cycle). Run typecheck + lint + full suite after every seam; a frozen export-surface snapshot test is the no-loss audit gate.",
+      "NonGoals": "- No logic changes, bug fixes, or behavior changes of any kind — pure moves + re-exports.\n- No renamed or removed exports; the barrel's public named-export set is identical before and after.\n- No edits to call sites that import src/lib/agents.ts (all 64 stay unchanged).\n- No edits to the existing submodules' (queries/runtime-state/delivery/activity/termination) barrel-import paths.\n- No new explicit `any`; no new execSync or other sync primitives.\n- No splitting beyond what the 1000-line ceiling requires.\n- Not addressing other god files in the codebase-health backlog (separate issues)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse the existing src/lib/agents/ directory as the extraction target.",
+        "rationale": "It already holds 5 prior extractions and the barrel already re-exports from it; this is the established pattern, not a fresh convention."
+      },
+      {
+        "summary": "Role type + isRole move into agents/agent-state.ts (the type foundation); barrel re-exports them.",
+        "rationale": "Every consumer module needs Role/AgentState; co-locating them with state CRUD gives one dependency-free foundation and lets existing submodules keep importing Role/AgentState from the barrel via re-export."
+      },
+      {
+        "summary": "Split spawn (~1320 lines) into spawn-prep.ts + spawn.ts, and recovery (~919 lines) into resume.ts + recovery.ts, unconditionally.",
+        "rationale": "Both regions exceed the 1000-line ceiling once a module import header is added; splitting at the spawnRun / restartAgent boundaries yields cohesive, sub-ceiling files."
+      },
+      {
+        "summary": "Add a frozen export-surface snapshot test as the first bead.",
+        "rationale": "The additive-refactor / no-loss rule requires a mechanical audit gate; freezing the barrel's named-export set proves the public surface is preserved across every seam."
+      },
+      {
+        "summary": "Leave existing submodule barrel-import paths untouched; new modules import siblings directly.",
+        "rationale": "Existing submodules already import foundation symbols from the barrel and keep working via re-export; editing them is unnecessary churn. New modules import leaves directly to avoid a barrel runtime cycle."
+      },
+      {
+        "summary": "Full suite per seam = npx vitest run --configLoader runner (0 failed).",
+        "rationale": "Matches the command named in the issue body; the frontend-augmented npm test is broader than required here."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi-0-export-snapshot",
+        "title": "Add no-loss export-surface snapshot test for the agents barrel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Before any code moves, add src/lib/__tests__/agents-barrel-exports.test.ts. It imports `* as barrel` from '../agents.js', and asserts Object.keys(barrel).sort() deep-equals a frozen literal array captured from the current barrel. This is the no-loss audit gate every later seam must keep green."
+        },
+        "items": [
+          {
+            "id": "wi-0-export-snapshot.ac1",
+            "title": "Test file src/lib/__tests__/agents-barrel-exports.test.ts exists and contains a frozen literal array of the barrel's current named exports (captured from `import * as barrel`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-0-export-snapshot.ac2",
+            "title": "The test asserts the live barrel's sorted export keys deep-equal the frozen array, and the snapshot test passes against the unmodified barrel with 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-0-export-snapshot.ac3",
+            "title": "`npm run typecheck` passes and `npm run lint` passes with the new test present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-1-agent-state",
+        "title": "Extract agent state foundation into agents/agent-state.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2146",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "wi-3-provider-env",
+            "wi-4-runtime-command",
+            "wi-5-supervisor-channels",
+            "wi-6-spawn-prep",
+            "wi-7-spawn",
+            "wi-8-messaging",
+            "wi-9-resume",
+            "wi-10-recovery"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the Role type, isRole, AgentState interface, and the full state-persistence cluster (getAgentDir, getAgentStateFilePath, wipeAgentStateDirs, getAgentState(Sync), writeAgentStateJsonSync, saveAgentState(Sync), pause/troubled/failure functions, isAgentPaused/Troubled, markAgentRunning/StoppedState, GOVERNOR_SLOT_PAUSE_REASON_PREFIX, SESSION_EXITED_BEFORE_KICKOFF, __testInternals, and their private helpers + toAgentFsError) verbatim into src/lib/agents/agent-state.ts. Re-export all public symbols from the barrel. This is the type/state foundation every later module imports from './agent-state.js'."
+        },
+        "items": [
+          {
+            "id": "wi-1-agent-state.ac1",
+            "title": "Extraction produces src/lib/agents/agent-state.ts (under 1000 lines per the file-size guard) exporting Role, isRole, AgentState, and the state-persistence symbols listed in the PRD; declarations are byte-identical moves (no logic edits).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-agent-state.ac2",
+            "title": "src/lib/agents.ts re-exports every moved symbol and the export-surface snapshot test (wi-0) passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-agent-state.ac3",
+            "title": "agent-state.ts imports nothing from '../agents.js' (no barrel back-import); `npm run typecheck` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-agent-state.ac4",
+            "title": "`npm run lint` exits 0 (file-size guard reports agent-state.ts under ceiling) and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-2-identity",
+        "title": "Extract agent-id + ready-signal helpers into agents/identity.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Move normalizeAgentId, isQualifiedAgentId, resolveAgentTargetSync, clearReadySignal, waitForReadySignal, waitForAgentIdle (and private getReadySignalPath, isReadySignalPresent, AGENT_PREFIXES, SINGLETON_AGENT_IDS) verbatim into src/lib/agents/identity.ts; re-export from the barrel."
+        },
+        "items": [
+          {
+            "id": "wi-2-identity.ac1",
+            "title": "Extraction produces src/lib/agents/identity.ts (under 1000 lines) exporting normalizeAgentId, isQualifiedAgentId, resolveAgentTargetSync, clearReadySignal, waitForReadySignal, waitForAgentIdle as byte-identical moves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-identity.ac2",
+            "title": "The barrel re-exports the moved symbols and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-identity.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-3-provider-env",
+        "title": "Extract provider env + model selection into agents/provider-env.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Move getProviderEnvForModel, getProviderExportsForModel, buildSpawnEnvForModel, getProviderTmuxFlags, buildCavemanExports, determineModel (and PROVIDER_ENV_KEYS, CLI_PROXY_MODEL_ALIASES, WORK_AGENT_BROKEN_MODELS) verbatim into src/lib/agents/provider-env.ts. Import Role from './agent-state.js'. Re-export from the barrel."
+        },
+        "items": [
+          {
+            "id": "wi-3-provider-env.ac1",
+            "title": "Extraction produces src/lib/agents/provider-env.ts (under 1000 lines) exporting getProviderEnvForModel, getProviderExportsForModel, buildSpawnEnvForModel, getProviderTmuxFlags, buildCavemanExports, determineModel as byte-identical moves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-provider-env.ac2",
+            "title": "provider-env.ts imports Role from './agent-state.js' (not the barrel) and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-provider-env.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-4-runtime-command",
+        "title": "Extract harness launcher + runtime base-command into agents/runtime-command.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move describeOhmypiSpawnFailure, OHMYPI_AGENT_READY_TIMEOUT_SECONDS, waitForPromptReady, injectPiConversationMemory, getProviderAuthMode, getAgentRuntimeBaseCommand, roleAgentDefinitionPath, getRoleRuntimeBaseCommand (and the launcher-field / ready-waiter / prompt-writer private helpers, roleSystemPromptInjectionSync, claudeSystemPromptFiles, isNodeNotFound, hasAgentRuntimeInSubtree) verbatim into src/lib/agents/runtime-command.ts. Import Role/AgentState from './agent-state.js'. Re-export from the barrel."
+        },
+        "items": [
+          {
+            "id": "wi-4-runtime-command.ac1",
+            "title": "Extraction produces src/lib/agents/runtime-command.ts (under 1000 lines) exporting describeOhmypiSpawnFailure, OHMYPI_AGENT_READY_TIMEOUT_SECONDS, waitForPromptReady, injectPiConversationMemory, getProviderAuthMode, getAgentRuntimeBaseCommand, roleAgentDefinitionPath, getRoleRuntimeBaseCommand as byte-identical moves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-runtime-command.ac2",
+            "title": "The barrel re-exports the moved symbols (keeping the roleAgentDefinitionPath overload signatures) and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-runtime-command.ac3",
+            "title": "No execSync or other new sync primitive is introduced; `npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-5-supervisor-channels",
+        "title": "Extract supervisor + channels decisions into agents/supervisor-channels.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Move buildDefaultResumeContinueMessage, decideSupervisorForWorkAgent, decideChannelsForWorkAgent, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog (and private prepareSupervisorForFreshLaunch/Relaunch, resolvePtySupervisorScriptPath, buildResumeMessageForAgent, markKickoffRedelivered, recordKickoffDeliveryFailure) verbatim into src/lib/agents/supervisor-channels.ts. Import AgentState from './agent-state.js'. Re-export from the barrel."
+        },
+        "items": [
+          {
+            "id": "wi-5-supervisor-channels.ac1",
+            "title": "Extraction produces src/lib/agents/supervisor-channels.ts (under 1000 lines) exporting buildDefaultResumeContinueMessage, decideSupervisorForWorkAgent, decideChannelsForWorkAgent, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog as byte-identical moves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-supervisor-channels.ac2",
+            "title": "The barrel re-exports the moved symbols and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-supervisor-channels.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-6-spawn-prep",
+        "title": "Extract spawn preparation helpers into agents/spawn-prep.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Move SpawnOptions, SpawnRunOptions, transitionIssueToInProgress, transitionIssueToInReview, AgentLaunchConfig, buildAgentLaunchConfig, retrieveSpawnTimeMemoryContext, assertWorkspaceStackHealthyForSpawn (and private transitionIssueState, defaultRunWorkspace, runAgentId, withSpawnTimeMemoryContext, inferMemoryProjectId, spawnStackRebuildState + cooldown constants, flywheel env helpers normalizeFlywheelRunId/resolveFlywheelSpawnEnv/flywheelEnvExports) verbatim into src/lib/agents/spawn-prep.ts. Re-export public symbols from the barrel; module-level mutable spawnStackRebuildState has exactly one declaration."
+        },
+        "items": [
+          {
+            "id": "wi-6-spawn-prep.ac1",
+            "title": "Extraction produces src/lib/agents/spawn-prep.ts (under 1000 lines) exporting SpawnOptions, SpawnRunOptions, transitionIssueToInProgress, transitionIssueToInReview, AgentLaunchConfig, buildAgentLaunchConfig, retrieveSpawnTimeMemoryContext, assertWorkspaceStackHealthyForSpawn as byte-identical moves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-spawn-prep.ac2",
+            "title": "spawnStackRebuildState and the flywheel env helpers have exactly one declaration in the codebase (grep finds the move target only); the barrel re-exports the moved public symbols and the snapshot test reports 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-spawn-prep.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-7-spawn",
+        "title": "Extract spawnRun + spawnAgent into agents/spawn.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move spawnRun and spawnAgent verbatim into src/lib/agents/spawn.ts, importing their dependencies from './spawn-prep.js', './provider-env.js', './runtime-command.js', './supervisor-channels.js', './agent-state.js', './identity.js'. Re-export both from the barrel. The three pre-existing explicit `any` move with this code, so add spawn.ts to eslint-any-allowlist.json."
+        },
+        "items": [
+          {
+            "id": "wi-7-spawn.ac1",
+            "title": "Extraction produces src/lib/agents/spawn.ts (under 1000 lines) exporting spawnRun and spawnAgent as byte-identical moves; spawn.ts imports siblings directly, never from '../agents.js'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-spawn.ac2",
+            "title": "src/lib/agents/spawn.ts is added to eslint-any-allowlist.json; `npm run lint` exits 0 with no new explicit any reported.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-spawn.ac3",
+            "title": "The barrel re-exports spawnRun and spawnAgent and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-spawn.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed (including the agents-spawn-supervisor and agent-spawning suites).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-8-messaging",
+        "title": "Extract messageAgent into agents/messaging.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Move messageAgent (and private queueAgentMail, appendTellInterventionForUserSource, USER_MESSAGE_INTERVENTION_SOURCES) verbatim into src/lib/agents/messaging.ts. Import dependencies from leaf modules / existing './delivery.js'. Re-export messageAgent from the barrel."
+        },
+        "items": [
+          {
+            "id": "wi-8-messaging.ac1",
+            "title": "Extraction produces src/lib/agents/messaging.ts (under 1000 lines) exporting messageAgent as a byte-identical move.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-messaging.ac2",
+            "title": "The barrel re-exports messageAgent and the export-surface snapshot test passes with 0 differences (message-agent-interventions suite included).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-messaging.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-9-resume",
+        "title": "Extract resumeAgent + compact-recovery seed into agents/resume.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move buildCompactRecoverySeed and resumeAgent verbatim into src/lib/agents/resume.ts, importing dependencies from leaf modules and './spawn.js'. Re-export both from the barrel. The pre-existing explicit `any` at the resume continue-error catch moves with this code, so add resume.ts to eslint-any-allowlist.json."
+        },
+        "items": [
+          {
+            "id": "wi-9-resume.ac1",
+            "title": "Extraction produces src/lib/agents/resume.ts (under 1000 lines) exporting buildCompactRecoverySeed and resumeAgent as byte-identical moves; resume.ts imports siblings directly, never from '../agents.js'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-resume.ac2",
+            "title": "src/lib/agents/resume.ts is added to eslint-any-allowlist.json; `npm run lint` exits 0 with no new explicit any reported.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-resume.ac3",
+            "title": "The barrel re-exports buildCompactRecoverySeed and resumeAgent and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-resume.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed (including agents-compact-session and session-rotation suites).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-10-recovery",
+        "title": "Extract restart/recover/auto-recover into agents/recovery.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move RestartAgentOptions, restartAgent, detectCrashedAgents, recoverAgent, autoRecoverAgents (and private generateRecoveryPrompt, hasAgentRuntimeInSession, checkAndSetupHooks, writeTaskCache) verbatim into src/lib/agents/recovery.ts, importing dependencies from leaf modules, './spawn.js', './messaging.js', './resume.js'. Re-export public symbols from the barrel. The two pre-existing explicit `any` in checkAndSetupHooks move with this code, so add recovery.ts to eslint-any-allowlist.json."
+        },
+        "items": [
+          {
+            "id": "wi-10-recovery.ac1",
+            "title": "Extraction produces src/lib/agents/recovery.ts (under 1000 lines) exporting RestartAgentOptions, restartAgent, detectCrashedAgents, recoverAgent, autoRecoverAgents as byte-identical moves; recovery.ts imports siblings directly, never from '../agents.js'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-recovery.ac2",
+            "title": "src/lib/agents/recovery.ts is added to eslint-any-allowlist.json; `npm run lint` exits 0 with no new explicit any reported.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-recovery.ac3",
+            "title": "The barrel re-exports the moved symbols and the export-surface snapshot test passes with 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-recovery.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-11-barrel-trim",
+        "title": "Confirm thin barrel + ratchet the file-size baseline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T17:56:33.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2146",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "After all extractions, confirm src/lib/agents.ts contains only imports + re-export statements (no remaining domain logic). Update the src/lib/agents.ts entry in scripts/file-size-baseline.txt to its new (smaller) line count to ratchet the baseline down. Run the final full gate."
+        },
+        "items": [
+          {
+            "id": "wi-11-barrel-trim.ac1",
+            "title": "src/lib/agents.ts is materially smaller and contains only imports and `export ... from './agents/*.js'` re-export statements (no function/class bodies); the export-surface snapshot test reports 0 differences.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-11-barrel-trim.ac2",
+            "title": "The scripts/file-size-baseline.txt entry for src/lib/agents.ts equals the barrel's new line count, every new src/lib/agents/*.ts file is under 1000 lines, and the file-size guard passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-11-barrel-trim.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi-0-export-snapshot",
+        "to": "wi-1-agent-state",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-agent-state",
+        "to": "wi-3-provider-env",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-agent-state",
+        "to": "wi-4-runtime-command",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-agent-state",
+        "to": "wi-5-supervisor-channels",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-agent-state",
+        "to": "wi-6-spawn-prep",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-agent-state",
+        "to": "wi-8-messaging",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-provider-env",
+        "to": "wi-7-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4-runtime-command",
+        "to": "wi-7-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5-supervisor-channels",
+        "to": "wi-7-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-6-spawn-prep",
+        "to": "wi-7-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-7-spawn",
+        "to": "wi-9-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-8-messaging",
+        "to": "wi-10-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-9-resume",
+        "to": "wi-10-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2-identity",
+        "to": "wi-11-barrel-trim",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-10-recovery",
+        "to": "wi-11-barrel-trim",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2146-decompose-src-lib-agents-ts-4572-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
