@@ -1370,6 +1370,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       effort: resolvedEffort,
     });
 
+    if (agent.role === 'work' && agent.kickoffDelivered === false) {
+      spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
+      console.log('');
+      console.log(chalk.red(`Kickoff delivery did not land for ${agent.id}.`));
+      console.log(chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'));
+      console.log(chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'));
+      console.log(`  pan tell ${id} "continue from your kickoff brief"`);
+      process.exitCode = 1;
+      return;
+    }
+
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
