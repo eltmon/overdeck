@@ -11,7 +11,8 @@ import type { Harness } from '../../shared/ModelPicker';
 import { SessionNode } from './SessionNode';
 import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
-import { UatStackStatus, getUatStackSummary } from '../UatStackStatus';
+import { getUatStackSummary } from '../UatStackStatus';
+import { UatStackTreeGroup } from './UatStackTreeGroup';
 import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import {
   ContextMenuRoot,
@@ -1280,21 +1281,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {shouldShowUatStack && uatStackSummary && (
-        <div className={styles.uatStackTreeGroup}>
-          <div className={styles.uatStackTreeHeader}>
-            <ChevronDown size={12} />
-            <span>UAT environment</span>
-            <span className={styles.uatStackTreeSummary}>{uatStackSummary.label.replace(/^UAT stack\s*/i, '')}</span>
-          </div>
-          <UatStackStatus
-            containers={workspace?.containers}
-            stackHealth={workspace?.stackHealth}
-            frontendUrl={workspace?.frontendUrl}
-            apiUrl={workspace?.apiUrl}
-            pending={stackPending}
-            density="compact"
-          />
-        </div>
+        <UatStackTreeGroup summary={uatStackSummary} workspace={workspace} pending={Boolean(stackPending)} />
       )}
 
       {expanded && hasResources && detailIdentifiers && (
