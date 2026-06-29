@@ -23,8 +23,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck, Wrench, Search, X } from 'lucide-react';
 import type { WorkingPhase } from '../../lib/workingPhase';
-import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
-import type { FailedMessage } from './ConversationPanel';
+import type { CompactBoundary, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import { ChatMarkdown, ChatMarkdownSettingsProvider } from './ChatMarkdown';
 import { ChangedFilesTree } from './ChangedFilesTree';
 import { DiffStatLabel } from './DiffStatLabel';
@@ -39,190 +38,21 @@ import {
 import type { ChatMessage } from './chat-types';
 import type { RoundVerdict } from '../CommandDeck/RoundCard';
 import styles from '../CommandDeck/styles/command-deck.module.css';
+import type { MessagesTimelineProps, RoundMarker } from './messagesTimeline/types';
+import {
+  ALWAYS_UNVIRTUALIZED_TAIL_ROWS,
+  AUTO_SCROLL_THRESHOLD_PX,
+  MAX_VISIBLE_WORK_LOG_ENTRIES,
+  clearSearchHighlights,
+  escapeDataAttributeValue,
+  extractSearchHighlightTerms,
+  formatElapsed,
+  formatTimestamp,
+  getRowSearchText,
+  highlightSearchTermsInElement,
+} from './messagesTimeline/helpers';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
-const ALWAYS_UNVIRTUALIZED_TAIL_ROWS = 8;
-const AUTO_SCROLL_THRESHOLD_PX = 64;
-
-function stringifyToolInput(input: Record<string, unknown> | undefined): string {
-  if (!input) return '';
-  try {
-    return JSON.stringify(input);
-  } catch {
-    return '';
-  }
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function extractSearchHighlightTerms(query: string): string[] {
-  const matches = query.match(/[\p{L}\p{N}_-]+/gu) ?? [];
-  const dedup = new Set<string>();
-  for (const term of matches) {
-    if (term.length > 0) dedup.add(term);
-  }
-  return [...dedup].sort((a, b) => b.length - a.length);
-}
-
-// Match CommandPalette highlighting: quiet background-only amber, no text color swap.
-const SEARCH_HIGHLIGHT_CLASS = 'rounded-sm px-px text-inherit bg-amber-300/40 dark:bg-amber-400/20';
-const SEARCH_HIGHLIGHT_ATTR = 'data-conversation-search-highlight';
-
-function escapeDataAttributeValue(value: string): string {
-  const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape : null;
-  if (cssEscape) return cssEscape(value);
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function clearSearchHighlights(root: ParentNode): void {
-  const highlights = Array.from(root.querySelectorAll<HTMLElement>(`[${SEARCH_HIGHLIGHT_ATTR}]`));
-  for (const highlight of highlights) {
-    highlight.replaceWith(document.createTextNode(highlight.textContent ?? ''));
-  }
-}
-
-function highlightSearchTermsInElement(element: HTMLElement, terms: string[]): void {
-  clearSearchHighlights(element);
-  if (terms.length === 0) return;
-
-  const pattern = new RegExp(`(${terms.map(escapeRegex).join('|')})`, 'gi');
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      pattern.lastIndex = 0;
-      if (!node.textContent || !pattern.test(node.textContent)) return NodeFilter.FILTER_REJECT;
-      pattern.lastIndex = 0;
-      const parent = node.parentElement;
-      if (!parent || parent.closest(`[${SEARCH_HIGHLIGHT_ATTR}]`)) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  const textNodes: Text[] = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
-
-  for (const node of textNodes) {
-    const text = node.textContent ?? '';
-    const parts = text.split(pattern);
-    if (parts.length <= 1) continue;
-    const fragment = document.createDocumentFragment();
-    for (const part of parts) {
-      if (!part) continue;
-      if (terms.some((term) => part.toLocaleLowerCase() === term.toLocaleLowerCase())) {
-        const span = document.createElement('span');
-        span.className = SEARCH_HIGHLIGHT_CLASS;
-        span.setAttribute(SEARCH_HIGHLIGHT_ATTR, 'true');
-        span.textContent = part;
-        fragment.appendChild(span);
-      } else {
-        fragment.appendChild(document.createTextNode(part));
-      }
-    }
-    node.replaceWith(fragment);
-  }
-}
-
-function getRowSearchText(row: MessagesTimelineRow): string {
-  if (row.kind === 'message') return row.message.text;
-  if (row.kind === 'work') {
-    return row.groupedEntries
-      .map((entry) => [
-        entry.label,
-        entry.detail,
-        entry.result,
-        entry.command,
-        entry.toolTitle,
-        entry.changedFiles?.join('\n'),
-        stringifyToolInput(entry.toolInput),
-      ].filter(Boolean).join('\n'))
-      .join('\n');
-  }
-  if (row.kind === 'proposed-plan') return row.plan.plan;
-  if (row.kind === 'compact-boundary') return `Conversation compacted ${row.boundary.trigger ?? ''} ${row.boundary.model ?? ''}`;
-  if (row.kind === 'compacting') return 'Compacting conversation';
-  if (row.kind === 'working') return 'Working';
-  return '';
-}
-
-/** Format an ISO timestamp as a short time string (e.g., "3:42 PM" or "May 14, 3:42 PM"). */
-function formatTimestamp(iso: string): string {
-  try {
-    const date = new Date(iso);
-    const now = new Date();
-    const isSameDay =
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate();
-    if (isSameDay) {
-      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
-    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  } catch {
-    return '';
-  }
-}
-
-/** Format elapsed duration between two ISO timestamps (e.g., "1.5s", "2m 30s"). */
-function formatElapsed(startIso: string, endIso: string): string {
-  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  const rem = Math.round(s % 60);
-  return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
-}
-
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-/**
- * Visual divider injected into the timeline between review rounds.
- *
- * The divider renders immediately after the row whose id matches
- * `afterMessageId`. It is rendered inside the matching row's wrapper so
- * `useVirtualizer.measureElement` accounts for its height automatically;
- * no separate row index is needed and no row is hidden behind virtualization.
- */
-export interface RoundMarker {
-  /** Insert the divider after the row with this id (any row.id, message or work). */
-  afterMessageId: string;
-  round: number;
-  verdict: RoundVerdict;
-  /** Optional extra label suffix (e.g. "synthesis", "round-2"). */
-  label?: string;
-}
-
-export interface MessagesTimelineProps {
-  messages: ChatMessage[];
-  workLog: WorkLogEntry[];
-  streaming: boolean;
-  roundMarkers?: ReadonlyArray<RoundMarker>;
-  failedMessages?: FailedMessage[];
-  onRetryFailed?: (failedId: string, text: string) => void;
-  onDiscardFailed?: (failedId: string) => void;
-  proposedPlan?: ProposedPlan;
-  compactBoundaries?: CompactBoundary[];
-  compacting?: boolean;
-  conversationName?: string;
-  cwd?: string;
-  issueId?: string | null;
-  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
-  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
-  resolvedTheme?: 'light' | 'dark';
-  /** When true, pure tool-call work groups are collapsed to a single muted line. */
-  hideToolCalls?: boolean;
-  /** Current working phase — drives the working indicator icon. */
-  workingPhase?: WorkingPhase;
-  /** Message target requested by palette conversation search. */
-  targetMessageId?: string;
-  targetMessageIndex?: number;
-  targetMessageNonce?: number;
-  /** Called after a requested target message has been scrolled into view. */
-  onTargetMessageHandled?: () => void;
-}
+export type { MessagesTimelineProps, RoundMarker } from './messagesTimeline/types';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
