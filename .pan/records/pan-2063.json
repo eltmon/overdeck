@@ -23,15 +23,16 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2063",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:21:58.981Z",
-    "reviewNotes": "Agent re-review request (1/25): Completed acceptance criteria",
-    "verificationNotes": "Acceptance criteria check FAILED — 4/4 AC incomplete:\n\n### Default the UAT environment panel to collapsed with a working header toggle (4/4 incomplete)\n  - [ ] Given a ready-for-merge feature row with an unhealthy UAT stack and the row expanded, when it first renders, then the UAT panel renders collapsed — the 'UAT environment' label and the 'N/M healthy' header summary are present while the per-service rows (e.g. 'postgres', 'api') and the UatStackStatus body are not rendered.\n  - [ ] When the user clicks the UAT panel header, then the UatStackStatus per-service detail list renders; clicking the header again removes it.\n  - [ ] The UAT panel header renders as a button that exposes aria-expanded and a chevron reflecting state — ChevronRight when collapsed, ChevronDown when expanded — and preserves the existing muted, uppercase header styling.\n  - [ ] FeatureItem.test.tsx renders the UAT panel collapsed on mount (no 'postgres'/'api' service rows) and renders those service rows after a click on the UAT header; npm run typecheck and npm run lint produce no new errors and the frontend vitest suite is green.",
+    "updatedAt": "2026-06-29T13:23:17.883Z",
+    "reviewNotes": "No blocking findings; extracted UAT panel collapse meets requirements and non-goals.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
+    "reviewedAtCommit": "569242f66c1fa067ecd1625e5da9f9821e7bdd50",
     "lastVerifiedCommit": "fadde2df83f8c574392b735b36ac642c9a665c41"
   },
   "closeOut": {
@@ -98,7 +99,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.655044,
-        "pricingAsOf": "2026-06-29T13:21:59.029Z"
+        "pricingAsOf": "2026-06-29T13:23:17.914Z"
       }
     },
     "merges": [
@@ -107,7 +108,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-06-29T13:21:59.033Z",
+  "updated": "2026-06-29T13:23:17.914Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
