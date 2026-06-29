@@ -20,6 +20,11 @@ let linkedFrontendNodeModules = false;
 const linkedFrontendPackages: string[] = [];
 const projectRoot = process.cwd();
 const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
+const bootReconciliationSourceFiles = [
+  join(frontendRoot, 'src/components/BootReconciliationModal.tsx'),
+  join(frontendRoot, 'src/components/GraceCountdown.tsx'),
+];
+const forbiddenBootReconciliationColorClass = /\b(?:bg|text|border)-(?:neutral|orange|emerald|gray|zinc|sky|red)-|\btext-(?:white|black)\b/g;
 const packageResolutionRoots = [
   frontendRoot,
   projectRoot,
@@ -162,6 +167,52 @@ const feature = {
   },
 };
 
+const bootReconciliationState = {
+  decision: 'pending',
+  perAgent: {},
+  decidedAt: now,
+  bootId: 'boot-styleguide',
+  graceDeadline: new Date(Date.now() + 120_000).toISOString(),
+  set: [
+    {
+      id: 'agent-pan-2076',
+      issueId: 'PAN-2076',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      whyStopped: 'stopped cleanly',
+      concern: 'stopped_cleanly',
+      lastActivity: now,
+      cost: 1.25,
+      remote: false,
+      readOnly: false,
+    },
+    {
+      id: 'agent-pan-2077',
+      issueId: 'PAN-2077',
+      role: 'work',
+      model: 'kimi-k2',
+      whyStopped: 'running remote',
+      concern: 'running_remote',
+      lastActivity: now,
+      cost: 4.5,
+      remote: true,
+      readOnly: false,
+    },
+    {
+      id: 'agent-pan-2078',
+      issueId: 'PAN-2078',
+      role: 'work',
+      model: 'gpt-5.5',
+      whyStopped: 'paused: operator',
+      concern: 'paused_troubled',
+      lastActivity: now,
+      cost: null,
+      remote: false,
+      readOnly: true,
+    },
+  ],
+};
+
 const snapshot = {
   sequence: 1,
   timestamp: now,
@@ -180,7 +231,7 @@ const snapshot = {
 
 async function newContext(): Promise<BrowserContext> {
   const context = await browser.newContext();
-  await context.addInitScript(({ snapshotFixture, featureFixture }) => {
+  await context.addInitScript(({ snapshotFixture, featureFixture, bootReconciliationFixture }) => {
     localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: snapshotFixture, timestamp: new Date().toISOString() }));
     window.fetch = async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
@@ -195,6 +246,11 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/version') return json({ version: 'test', supervisorUrl: null });
       if (path === '/api/tracker-status') return json({ primary: 'github', configured: [] });
       if (path === '/api/confirmations') return json([]);
+      if (path === '/api/boot-reconciliation') {
+        return json(window.location.search.includes('bootReconciliation=1')
+          ? bootReconciliationFixture
+          : { ...bootReconciliationFixture, decision: null, set: [] });
+      }
       if (path === '/api/cloister/status') return json({
         running: true,
         lastCheck: new Date().toISOString(),
@@ -293,7 +349,7 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
-  }, { snapshotFixture: snapshot, featureFixture: feature });
+  }, { snapshotFixture: snapshot, featureFixture: feature, bootReconciliationFixture: bootReconciliationState });
   return context;
 }
 
@@ -382,6 +438,32 @@ afterAll(async () => {
 });
 
 describe('styleguide rendered surface conformance', () => {
+  it('keeps boot reconciliation countdown surfaces on semantic color tokens', async () => {
+    const violations: string[] = [];
+    for (const file of bootReconciliationSourceFiles) {
+      const source = await readFile(file, 'utf8');
+      const matches = source.match(forbiddenBootReconciliationColorClass) ?? [];
+      violations.push(...matches.map((match) => `${file}: ${match}`));
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('renders the boot reconciliation modal in light and dark modes', async () => {
+    const light = await openRoute('/home?bootReconciliation=1');
+    await expect.poll(() => light.page.locator('[data-testid="boot-reconciliation-modal"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => light.page.getByText('Boot Reconciliation').count(), renderPoll).toBeGreaterThan(0);
+    await expect.poll(() => light.page.getByTestId('boot-reconciliation-resume-all').isVisible(), renderPoll).toBe(true);
+    await light.context.close();
+
+    const dark = await openRoute('/home?bootReconciliation=1');
+    await dark.page.evaluate(() => document.documentElement.classList.add('dark'));
+    await expect.poll(() => dark.page.locator('[data-testid="boot-reconciliation-modal"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => dark.page.getByText('Boot Reconciliation').count(), renderPoll).toBeGreaterThan(0);
+    await expect.poll(() => dark.page.getByTestId('boot-reconciliation-resume-all').isVisible(), renderPoll).toBe(true);
+    await dark.context.close();
+  }, 45_000);
+
   it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
