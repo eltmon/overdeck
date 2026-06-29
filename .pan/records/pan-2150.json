@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2150",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T05:52Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-29T05:52:56.205Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 4,
@@ -16,12 +23,10 @@
     "issueId": "PAN-2150",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T05:52:55.623Z",
-    "reviewNotes": "Frontend build fails on unused extracted symbols",
-    "verificationNotes": "Acceptance criteria check FAILED — 22/22 AC incomplete:\n\n### WI-1: Extract module-level interfaces, constants, voice helpers, and buildMiniMaxFormData into co-located modules (3/3 incomplete)\n  - [ ] Given the moved interfaces/constants/helpers, when npm run typecheck runs, then SettingsPage.tsx compiles importing them from the new modules with no type errors.\n  - [ ] Given the test file unchanged, when npx vitest run src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts runs, then buildMiniMaxFormData still imports from '../SettingsPage' and all its cases pass.\n  - [ ] Given settingsPageConstants.ts now holds TRACKERS (icon: any), when npm run lint runs, then the any-ratchet passes because the file is listed in eslint-any-allowlist.json.\n\n### WI-2: Extract the permissions section into sections/PermissionsSection.tsx (3/3 incomplete)\n  - [ ] Given PermissionsSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.\n  - [ ] Given the refactor, when the diff is reviewed, then the permissions JSX is byte-for-byte the same except closed-over identifiers now come from props, and no export was renamed/removed.\n  - [ ] Given PermissionsSection.tsx, when wc -l runs on it, then it is under 1000 lines.\n\n### WI-3: Extract the cloister and remote sections into sections/CloisterSection.tsx and sections/RemoteSection.tsx (3/3 incomplete)\n  - [ ] Given CloisterSection.tsx and RemoteSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.\n  - [ ] Given the refactor, when the rendered Settings page is inspected, then the cloister and remote sections appear in the same order/position with identical controls.\n  - [ ] Given the moved remote JSX, when SettingsPage.test.ts runs, then its remote source-text assertions read from a new REMOTE_SECTION_SOURCE (sections/RemoteSection.tsx) and resolve, while the `{ id: 'remote' }` nav assertion still resolves against SettingsPage.tsx.\n\n### WI-4: Extract the memory section into sections/MemorySection.tsx (3/3 incomplete)\n  - [ ] Given MemorySection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.\n  - [ ] Given MemorySection.tsx, when wc -l runs on it, then it is under 1000 lines.\n  - [ ] Given the moved memory JSX, when SettingsPage.test.ts runs, then its memory source-text assertions read from a new MEMORY_SECTION_SOURCE (sections/MemorySection.tsx) and resolve, while the `{ id: 'memory' }` nav assertion still resolves against SettingsPage.tsx.\n\n### WI-5: Extract background-ai, terminal, and tracker-keys sections (2/2 incomplete)\n  - [ ] Given the three new section files, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.\n  - [ ] Given the new section files, when wc -l runs on each, then each is under 1000 lines.\n\n### WI-6: Extract the appearance and diff sections into sections/AppearanceSection.tsx and sections/DiffSection.tsx (2/2 incomplete)\n  - [ ] Given AppearanceSection.tsx and DiffSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.\n  - [ ] Given DiffSection.tsx, when wc -l runs on it, then it is under 1000 lines.\n\n### WI-7: Extract the maintenance and experimental sections (both carry catch (err: any)) (3/3 incomplete)\n  - [ ] Given MaintenanceSection.tsx and ExperimentalSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures and the any-ratchet passes (both files allowlisted).\n  - [ ] Given the experimental section, when its data-testid attributes are diffed, then every testid (experimental-section, experimental-features-toggle, experimental-rtk-toggle, experimental-tldr-toggle, experimental-claude-code-channels-toggle, experimental-streamdown-toggle) is preserved unchanged.\n  - [ ] Given the moved experimental JSX, when SettingsPage.test.ts runs, then its RTK and Streamdown source-text assertions read from a new EXPERIMENTAL_SECTION_SOURCE (sections/ExperimentalSection.tsx) and resolve.\n\n### WI-8: Final verification — SettingsPage thin entry, all files under ceiling, gates green, pure-move diff (3/3 incomplete)\n  - [ ] Given the completed refactor, when scripts/lint-file-size.sh runs, then it exits 0 (SettingsPage.tsx ≤ its 4200 baseline and materially smaller than 2043; no new file > 1000).\n  - [ ] Given the completed refactor, when npm run typecheck && npm run lint && npx vitest run --configLoader runner run, then all pass with 0 failures.\n  - [ ] Given the cumulative diff, when reviewed, then it is pure relocation: no logic edits, no renamed/removed exports, importers unchanged.",
+    "updatedAt": "2026-06-29T06:23:43.220Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2162",
     "reviewRequestedAt": "2026-06-29T05:39:42.933Z"
   },
@@ -61,7 +66,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.934204,
-        "pricingAsOf": "2026-06-29T05:52:55.648Z"
+        "pricingAsOf": "2026-06-29T06:23:43.239Z"
       }
     },
     "merges": [
@@ -70,12 +75,37 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T05:44:17.015Z",
-  "updated": "2026-06-29T05:52:56.205Z",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-06-29T05:52Z] verification-gate → FAILED — seq 4",
-      "timestamp": "2026-06-29T05:52:56.205Z"
-    }
-  ]
+  "updated": "2026-06-29T06:30:29.653Z",
+  "statusOverrides": {
+    "wi1-extract-module-level-shared": "completed",
+    "wi1-extract-module-level-shared.ac1": "completed",
+    "wi1-extract-module-level-shared.ac2": "completed",
+    "wi1-extract-module-level-shared.ac3": "completed",
+    "wi2-extract-permissions": "completed",
+    "wi2-extract-permissions.ac1": "completed",
+    "wi2-extract-permissions.ac2": "completed",
+    "wi2-extract-permissions.ac3": "completed",
+    "wi3-extract-cloister-remote": "completed",
+    "wi3-extract-cloister-remote.ac1": "completed",
+    "wi3-extract-cloister-remote.ac2": "completed",
+    "wi3-extract-cloister-remote.ac3": "completed",
+    "wi4-extract-memory": "completed",
+    "wi4-extract-memory.ac1": "completed",
+    "wi4-extract-memory.ac2": "completed",
+    "wi4-extract-memory.ac3": "completed",
+    "wi5-extract-backgroundai-terminal-trackerkeys": "completed",
+    "wi5-extract-backgroundai-terminal-trackerkeys.ac1": "completed",
+    "wi5-extract-backgroundai-terminal-trackerkeys.ac2": "completed",
+    "wi6-extract-appearance-diff": "completed",
+    "wi6-extract-appearance-diff.ac1": "completed",
+    "wi6-extract-appearance-diff.ac2": "completed",
+    "wi7-extract-maintenance-experimental": "completed",
+    "wi7-extract-maintenance-experimental.ac1": "completed",
+    "wi7-extract-maintenance-experimental.ac2": "completed",
+    "wi7-extract-maintenance-experimental.ac3": "completed",
+    "wi8-final-verification": "completed",
+    "wi8-final-verification.ac1": "completed",
+    "wi8-final-verification.ac2": "completed",
+    "wi8-final-verification.ac3": "completed"
+  }
 }
