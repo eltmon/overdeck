@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { sendEscapeKeyAsync, sendKeys } from './tmux.js';
+import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
 
 export const GRACEFUL_RESTART_GRACE_MS = 60_000;
@@ -13,7 +14,7 @@ export async function sendGracefulRestartWarning(
 ): Promise<void> {
   const warning = 'Restarting in 60s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
   try {
-    if (harness === 'claude-code' || harness === 'codex') {
+    if (harness && !getHarnessBehavior(harness).usesRpcFifo) {
       await sendEscapeKeyAsync(agentId, 2);
       await new Promise((r) => setTimeout(r, 1_000));
     }

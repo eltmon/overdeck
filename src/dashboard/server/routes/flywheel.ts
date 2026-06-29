@@ -629,7 +629,7 @@ async function defaultGetOrderedIssueIds(): Promise<string[]> {
 }
 
 async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const { triggerMerge } = await import('./workspaces.js');
+  const { triggerMerge } = await import('./workspaces/merge-ops.js');
   const r = await triggerMerge(issueId);
   return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
 }

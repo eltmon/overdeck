@@ -12,7 +12,8 @@ import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, isPaneDead, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
-import { findLatestRollout, extractThreadIdFromRollout } from './runtimes/codex.js';
+import { findLatestRollout, extractThreadIdFromRollout, initCodexHome } from './runtimes/codex.js';
+import { getHarnessBehavior } from './runtimes/behavior.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
@@ -63,6 +64,11 @@ import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import { sendGracefulRestartWarning } from './graceful-restart.js';
 import type { MemoryIdentity, AgentStatus } from '@overdeck/contracts';
+import { listRunningAgentsSync, listAgentStates, listRunningAgents, warnOnBareNumericIssueIds, dropLegacyAgentStatesMissingRoleAsync } from './agents/queries.js';
+import { stopAgent, stopAgentSync } from './agents/termination.js';
+import { getLatestSessionIdSync, saveSessionId } from './agents/activity.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, sessionResumeDriftReasons, type AgentRuntimeState } from './agents/runtime-state.js';
+import { deliverAgentMessage, deliverResumeMessageWithTranscriptConfirmation, deliverInitialPromptWithRetry, resilientDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -122,7 +128,8 @@ async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName |
   files.push(await ensureSessionContextBriefingFile());
 
   // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.contextLayerKind === 'pi') {
     const { piGlobalContextFile } = await import('./context-layers/index.js');
     const globalFile = piGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -131,7 +138,7 @@ async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName |
   }
 
   // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  if (harness === 'codex') {
+  if (behavior.contextLayerKind === 'codex') {
     const { codexGlobalContextFile } = await import('./context-layers/index.js');
     const globalFile = codexGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -156,7 +163,7 @@ function isNodeNotFound(error: unknown): boolean {
  * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
  */
 async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
-  const expectedProcessNames = harness === 'ohmypi' ? new Set(['omp']) : harness === 'codex' ? new Set(['codex']) : new Set(['claude']);
+  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
   const queue: string[] = [rootPid];
   const seen = new Set<string>();
   while (queue.length > 0) {
@@ -361,8 +368,8 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
   return false;
 }
 
-async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
-  if (harness === 'codex') return waitForCodexTuiReady(agentId, timeoutSec);
+export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
+  if (getHarnessBehavior(harness).readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
 
@@ -508,7 +515,8 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
  * Build the base command that the launcher will exec for an agent.
  *
  * The `harness` parameter (PAN-636) selects between Claude Code (default)
- * and ohmypi/Pi. When `harness === 'ohmypi'` the function short-circuits to a
+ * and ohmypi/Pi. When the harness uses the ohmypi RPC command, the function
+ * short-circuits to a
  * `omp --mode rpc --model <model>` line; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
  * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
@@ -524,10 +532,11 @@ export async function getAgentRuntimeBaseCommand(
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
-  if (harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
   }
-  if (harness === 'codex') {
+  if (behavior.launchCommandKind === 'codex-work-tui') {
     // buildCodexCommand in launcher-generator builds the full Codex command;
     // return a stub base command so the launcher generator can short-circuit.
     return `codex`;
@@ -716,10 +725,11 @@ export async function getRoleRuntimeBaseCommand(
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
-  if (harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return `omp --mode rpc --model ${quotedModel}`;
   }
-  if (harness === 'codex') {
+  if (behavior.launchCommandKind === 'codex-work-tui') {
     return `codex`;
   }
 
@@ -1015,13 +1025,6 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
   return isReadySignalPresent(readyPath);
 }
 
-function promptReadyTimeoutSeconds(): number {
-  const raw = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
-  if (!raw) return 30;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
-}
-
 /**
  * Wait until a hook-instrumented agent reports it is idle at the prompt, via the
  * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
@@ -1047,13 +1050,7 @@ export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promi
   return getAgentRuntimeStateSync(agentId)?.state === 'idle';
 }
 
-export type DeliveryResult = {
-  ok: boolean;
-  path: 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
-  failure?: string;
-};
-
-const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
+export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
 export interface AgentState {
   id: string;
@@ -1208,7 +1205,7 @@ export async function wipeAgentStateDirs(
   return { removed: targets, path: dirPath };
 }
 
-function isRole(value: unknown): value is Role {
+export function isRole(value: unknown): value is Role {
   return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer';
 }
 
@@ -1621,391 +1618,6 @@ export function isAgentTroubled(agentId: string): boolean {
   return getAgentStateSync(agentId)?.troubled === true;
 }
 
-/** Update just the delivery method on an agent's state file. */
-export async function setAgentDeliveryMethod(
-  agentId: string,
-  deliveryMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
-): Promise<void> {
-  const state = await Effect.runPromise(getAgentState(agentId));
-  if (!state) return;
-  state.deliveryMethod = deliveryMethod;
-  await Effect.runPromise(saveAgentState(state));
-}
-
-/**
- * PAN-1988: resume / feedback / continue delivery must be RESILIENT. When an agent is pinned to
- * the strict 'supervisor' transport — which throws with NO fallback when its echo-confirmation
- * fails (the recurring "input echo confirmation failed" that left review feedback undelivered to
- * the work agent every round) — deliver via 'auto' instead, so a supervisor failure falls back to
- * the proven tmux paste-buffer and the message still lands. Other explicit methods
- * ('tmux'/'channels'/'auto') are preserved. The strict 'supervisor' contract itself (PAN-1769) is
- * intentionally left intact in deliverAgentMessage for callers that opt into it directly.
- */
-function resilientDeliveryMethod(
-  method: 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined,
-): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
-  return method === 'supervisor' ? 'auto' : method;
-}
-
-/**
- * Resolve OVERDECK_HOME — same fallback semantics as overdeck-bridge.
- */
-function overdeckHomeForSockets(): string {
-  return process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
-}
-
-function overdeckHomeForChannels(): string {
-  return overdeckHomeForSockets();
-}
-
-/**
- * Append a delivery-event log line to the per-agent bridge log. Best-effort.
- */
-async function appendChannelDeliveryLog(
-  agentId: string,
-  entry: {
-    path: 'supervisor' | 'channel' | 'tmux';
-    reason?: string;
-    caller?: string;
-    'pty-supervisor'?: string;
-    channels?: string;
-  },
-): Promise<void> {
-  try {
-    const home = overdeckHomeForSockets();
-    const dir = join(home, 'logs');
-    await (await import('fs/promises')).mkdir(dir, { recursive: true });
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
-      agentId,
-      ...entry,
-    });
-    await (await import('fs/promises')).appendFile(
-      join(dir, `bridge-${agentId}.log`),
-      `${line}\n`,
-      'utf-8',
-    );
-  } catch {
-    // Non-critical
-  }
-}
-
-/**
- * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
- * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
- * error including socket-not-found, connection refused, write timeout, or
- * non-2xx status. Kept tiny on purpose: this is a hot path, only one caller,
- * and the whole point of a fallback to tmux is that we do not need a robust
- * HTTP client here.
- */
-async function postUnixSocketJson(
-  socketPath: string,
-  body: unknown,
-  timeoutMs: number,
-  token: string,
-  tokenHeader: string = BRIDGE_TOKEN_HEADER,
-): Promise<{ status: number; body: string }> {
-  const payload = JSON.stringify(body);
-
-  return new Promise((resolveCall, reject) => {
-    // Settle exactly once. Without this guard a late idle-timeout or
-    // post-response socket error could reject after the response already
-    // resolved the promise.
-    let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const clearClientTimeout = () => {
-      if (timeout) clearTimeout(timeout);
-      timeout = undefined;
-    };
-    const finishOk = (value: { status: number; body: string }) => {
-      if (settled) return;
-      settled = true;
-      clearClientTimeout();
-      resolveCall(value);
-    };
-    const finishErr = (err: Error) => {
-      if (settled) return;
-      settled = true;
-      clearClientTimeout();
-      reject(err);
-    };
-
-    const req = httpRequest(
-      {
-        socketPath,
-        path: '/',
-        method: 'POST',
-        agent: false,
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload),
-          [tokenHeader]: token,
-        },
-      },
-      (res) => {
-        let responseBody = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => {
-          responseBody += chunk;
-        });
-        res.on('end', () => {
-          const status = res.statusCode ?? 0;
-          if (status >= 200 && status < 300) {
-            finishOk({ status, body: responseBody });
-            return;
-          }
-          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
-        });
-      },
-    );
-
-    timeout = setTimeout(() => {
-      req.destroy(new Error('socket POST timeout'));
-    }, timeoutMs);
-    timeout.unref?.();
-    req.on('error', (err: Error) => {
-      finishErr(err);
-    });
-    req.write(payload);
-    req.end();
-  });
-}
-
-/**
- * Single delivery primitive for orchestrator-to-work-agent messages. Auto mode
- * tries the PTY supervisor socket, then legacy Channels MCP, then tmux. Explicit
- * socket methods are strict and throw instead of falling back.
- */
-export async function deliverAgentMessage(
-  agentId: string,
-  message: string,
-  caller: string = 'unknown',
-  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
-): Promise<DeliveryResult> {
-  const normalizedId = normalizeAgentId(agentId);
-
-  let channelsEnabled = false;
-  let resolvedMethod = deliveryMethod;
-  try {
-    const state = await Effect.runPromise(getAgentState(normalizedId));
-    channelsEnabled = Boolean(state?.channelsEnabled);
-    resolvedMethod ??= state?.deliveryMethod ?? 'auto';
-  } catch {
-    resolvedMethod ??= 'auto';
-  }
-
-  if (resolvedMethod === 'tmux') {
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return { ok: true, path: 'tmux' };
-  }
-
-  let supervisorFailure: string | undefined;
-  if (resolvedMethod === 'auto' || resolvedMethod === 'supervisor') {
-    const supervisorSocketPath = join(overdeckHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
-    const ptyToken = await readPtyToken(normalizedId);
-    if (!existsSync(supervisorSocketPath)) {
-      supervisorFailure = 'socket-missing';
-    } else if (!ptyToken) {
-      supervisorFailure = 'pty-token-missing';
-    } else {
-      try {
-        // Must exceed the supervisor's worst-case echo-confirmation path
-        // (2 attempts × 2.5s + 2 purges × 150ms ≈ 5.3s, pty-supervisor.ts).
-        // A shorter client timeout abandons the POST mid-retry and fires the
-        // tmux fallback while the supervisor is still writing — re-creating
-        // the duplicate-submit race PAN-1769 fixed.
-        await postUnixSocketJson(
-          supervisorSocketPath,
-          { content: message, meta: { caller } },
-          8_000,
-          ptyToken,
-          PTY_TOKEN_HEADER,
-        );
-        await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return { ok: true, path: 'supervisor' };
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        supervisorFailure = `socket-post-failed: ${reason}`;
-      }
-    }
-
-    if (resolvedMethod === 'supervisor') {
-      throw new Error(`MessageDeliveryFailed: PTY supervisor delivery failed for ${normalizedId} (${caller}): ${supervisorFailure}`);
-    }
-  }
-
-  if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
-    let channelFailure: string | undefined;
-    const socketPath = join(overdeckHomeForSockets(), 'sockets', `agent-${normalizedId}.sock`);
-    if (!channelsEnabled) {
-      channelFailure = 'channels-disabled';
-    } else if (!existsSync(socketPath)) {
-      channelFailure = 'socket-missing';
-    } else {
-      const bridgeToken = readBridgeTokenSync(normalizedId);
-      if (!bridgeToken) {
-        channelFailure = 'bridge-token-missing';
-      } else {
-        try {
-          await postUnixSocketJson(
-            socketPath,
-            { content: message, meta: { caller } },
-            2000,
-            bridgeToken,
-          );
-          await appendChannelDeliveryLog(normalizedId, {
-            path: 'channel',
-            caller,
-            ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
-          });
-          return { ok: true, path: 'channels' };
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : String(err);
-          channelFailure = `socket-post-failed: ${reason}`;
-        }
-      }
-    }
-
-    if (resolvedMethod === 'channels') {
-      throw new Error(`MessageDeliveryFailed: Channels delivery failed for ${normalizedId} (${caller}): ${channelFailure}`);
-    }
-
-    await appendChannelDeliveryLog(normalizedId, {
-      path: 'tmux',
-      reason: channelFailure,
-      caller,
-      ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
-      ...(channelFailure ? { channels: channelFailure } : {}),
-    });
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
-  }
-
-  await Effect.runPromise(sendKeys(normalizedId, message));
-  return { ok: true, path: 'tmux' };
-}
-
-const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 3_000;
-const RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS = 100;
-
-async function waitForTranscriptUserRecordLanding(
-  workspace: string,
-  sessionId: string,
-  before: TranscriptUserRecordSnapshot,
-  snapshot: typeof captureTranscriptUserRecordSnapshot,
-  timeoutMs = RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS,
-  intervalMs = RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS,
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  const fromByteOffset = before.readOffset ?? before.fileSize;
-  do {
-    const after = await snapshot(workspace, sessionId, { fromByteOffset });
-    if (hasNewTranscriptUserRecord(before, after)) return true;
-    await new Promise(resolve => setTimeout(resolve, intervalMs));
-  } while (Date.now() < deadline);
-
-  const after = await snapshot(workspace, sessionId, { fromByteOffset });
-  return hasNewTranscriptUserRecord(before, after);
-}
-
-export async function deliverResumeMessageWithTranscriptConfirmation(args: {
-  agentId: string;
-  workspace: string;
-  sessionId: string;
-  message: string;
-  caller: string;
-  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
-  timeoutMs?: number;
-  intervalMs?: number;
-  deliver?: typeof deliverAgentMessage;
-  snapshot?: typeof captureTranscriptUserRecordSnapshot;
-}): Promise<{ delivered: boolean; attempts: number; lastDelivery?: DeliveryResult }> {
-  const snapshot = args.snapshot ?? captureTranscriptUserRecordSnapshot;
-  const deliver = args.deliver ?? deliverAgentMessage;
-  const before = await snapshot(args.workspace, args.sessionId);
-  let lastDelivery: DeliveryResult | undefined;
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    lastDelivery = await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
-    if (lastDelivery.ok && await waitForTranscriptUserRecordLanding(
-      args.workspace,
-      args.sessionId,
-      before,
-      snapshot,
-      args.timeoutMs,
-      args.intervalMs,
-    )) {
-      return { delivered: true, attempts: attempt, lastDelivery };
-    }
-    if (attempt < 2) {
-      console.warn(`[resumeAgent] Auto-continue prompt did not land in ${args.sessionId}; redelivering once.`);
-    }
-  }
-
-  return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
-}
-
-async function deliverInitialPromptWithRetry(
-  agentId: string,
-  prompt: string,
-  caller: string,
-  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
-): Promise<DeliveryResult> {
-  // PAN-1803: the codex TUI mangles a large pasted kickoff prompt — a multi-
-  // thousand-character paste garbles its input and trips its "Create a plan?"
-  // mode hint, so the agent never executes. Write the full brief to a file and
-  // deliver a SHORT pointer instead (robust regardless of transport — the same
-  // pattern that makes file-backed handoffs reliable). Only codex needs this;
-  // claude-code/pi line-based input handle the full prompt fine.
-  let deliveredPrompt = prompt;
-  try {
-    const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
-    if (codexState?.harness === 'codex' && codexState.workspace) {
-      const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
-      mkdirSync(dirname(kickoffPath), { recursive: true });
-      writeFileSync(kickoffPath, prompt, 'utf-8');
-      deliveredPrompt =
-        'Your complete task brief has been written to `.pan/kickoff.md` in this workspace. '
-        + 'Read that file in full now and execute it exactly — it is your full set of work '
-        + 'instructions. Begin immediately and keep working autonomously until done; do not '
-        + 'wait for further input.';
-    }
-  } catch {
-    // Non-fatal: fall back to delivering the full prompt inline.
-  }
-
-  let lastFailure = 'not-attempted';
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    let harness: RuntimeName | undefined;
-    try {
-      harness = (await Effect.runPromise(getAgentState(normalizeAgentId(agentId))))?.harness;
-    } catch {
-      harness = undefined;
-    }
-    const readyTimeoutSeconds = promptReadyTimeoutSeconds();
-    const ready = await waitForPromptReady(agentId, harness, readyTimeoutSeconds);
-    if (!ready) {
-      const alive = await Effect.runPromise(sessionExists(normalizeAgentId(agentId)));
-      lastFailure = alive ? 'ready-signal-timeout' : SESSION_EXITED_BEFORE_KICKOFF;
-      console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
-      if (!alive) break;
-      continue;
-    }
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    try {
-      const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
-      if (result.ok) return result;
-      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
-    } catch (err) {
-      lastFailure = err instanceof Error ? err.message : String(err);
-    }
-    console.error(`[${agentId}] Kickoff delivery attempt ${attempt}/2 failed: ${lastFailure}`);
-  }
-
-  return { ok: false, path: 'tmux', failure: lastFailure };
-}
-
 async function recordStartupSessionExit(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<never> {
   await Effect.runPromise(recordAgentFailure(state.id, SESSION_EXITED_BEFORE_KICKOFF));
   const failedState = await Effect.runPromise(getAgentState(state.id));
@@ -2081,56 +1693,6 @@ async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, 
   });
 }
 
-export async function deliverAgentPermissionDecision(
-  agentId: string,
-  requestId: string,
-  behavior: 'allow' | 'deny',
-): Promise<void> {
-  const normalizedId = normalizeAgentId(agentId);
-
-  let state: AgentState | null = null;
-  try {
-    state = await Effect.runPromise(getAgentState(normalizedId));
-  } catch {
-    state = null;
-  }
-
-  if (!state?.channelsEnabled) {
-    throw new Error(`agent ${normalizedId} is not using Claude channels`);
-  }
-
-  const socketPath = join(overdeckHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
-  if (!existsSync(socketPath)) {
-    throw new Error(`bridge socket missing for ${normalizedId}`);
-  }
-
-  const bridgeToken = readBridgeTokenSync(normalizedId);
-  if (!bridgeToken) {
-    throw new Error(`bridge token missing for ${normalizedId}`);
-  }
-
-  await postUnixSocketJson(
-    socketPath,
-    {
-      type: 'permission_response',
-      requestId,
-      behavior,
-    },
-    2000,
-    bridgeToken,
-  );
-
-  await appendChannelDeliveryLog(normalizedId, {
-    path: 'channel',
-    caller: `permission-response:${requestId}:${behavior}`,
-  });
-}
-
-/**
- * Inputs to the channels eligibility decision. We pass through agentId,
- * SpawnOptions, and the in-construction AgentState so this function can be
- * called from the spawn path without re-reading the state file.
- */
 interface ChannelsDecision {
   eligible: boolean;
   reason?: string;
@@ -2162,7 +1724,8 @@ export function decideSupervisorForWorkAgent(
     return { eligible: false, reason: 'docker-not-supported-yet' };
   }
 
-  if (state.harness !== 'claude-code' && state.harness !== 'codex') {
+  const behavior = state.harness ? getHarnessBehavior(state.harness) : null;
+  if (!behavior?.supportsPtySupervisor) {
     const reason = `harness-${state.harness ?? 'unknown'}`;
     log(false, reason);
     return { eligible: false, reason };
@@ -2264,7 +1827,7 @@ export function decideChannelsForWorkAgent(
     return { eligible: false, reason: 'not-a-work-agent' };
   }
 
-  if (state.harness !== 'claude-code') {
+  if (!state.harness || !getHarnessBehavior(state.harness).supportsChannelsBridge) {
     log(false, `harness-${state.harness ?? 'unknown'}`);
     return { eligible: false, reason: `harness-${state.harness ?? 'unknown'}` };
   }
@@ -2459,440 +2022,6 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 
 // ============================================================================
 // Agent Runtime State (PAN-800: event-sourced, no more runtime.json)
-// ============================================================================
-//
-// Persistence: append-only `events` SQLite table → AgentStateService's
-// SubscriptionRef. The projection_cache write-through was removed in PAN-1847.
-//
-// Writes: emitAgentEvent POSTs to /api/agents/:id/heartbeat. Reads: in-process
-// lib uses getRuntimeSnapshot (Effect-native); CLI/out-of-process uses
-// getAgentRuntimeSnapshot (HTTP).
-//
-// The functions below are adapters over AgentRuntimeSnapshot. Each caller
-// ideally uses the typed snapshot directly — the adapters exist because
-// ~30 call sites across the cloister consumed the old shape and migrating
-// every field access in one PR would have been mechanical noise.
-
-import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
-import {
-  getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
-  emitAgentEvent,
-} from './agent-runtime.js';
-import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
-import { initCodexHome } from './runtimes/codex.js';
-
-export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
-
-/** Callers consume this shape; data comes from AgentRuntimeSnapshot. */
-export interface AgentRuntimeState {
-  // 'suspended' retained for backward-compat with callers that still compare
-  // against it defensively. The new event path never emits suspended — PAN-800
-  // drops the auto-suspend feature; PAN-188 reintroduces it.
-  state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized' | 'waiting-on-human';
-  lastActivity: string;
-  currentTool?: string;
-  claudeSessionId?: string;
-  sessionModel?: string;
-  sessionHarness?: RuntimeName;
-  /**
-   * For specialists: the issue currently being processed. Tracked per-agent in
-   * the AgentStateService snapshot (see agent.current_issue_set event).
-   */
-  currentIssue?: string;
-  resolution?: AgentResolution;
-  resolutionCount?: number;
-  resolutionUpdatedAt?: string;
-  waitingReason?: string;
-  waitingStartedAt?: string;
-  waitingNotification?: string;
-  contextSaturatedAt?: string;
-}
-
-function sessionResumeDriftReasons(
-  runtimeState: AgentRuntimeState | null,
-  model: string,
-  harness: RuntimeName,
-): string[] {
-  if (!runtimeState?.sessionModel || !runtimeState.sessionHarness) return [];
-  const reasons: string[] = [];
-  if (runtimeState.sessionModel !== model) {
-    reasons.push(`model ${runtimeState.sessionModel}→${model}`);
-  }
-  if (runtimeState.sessionHarness !== harness) {
-    reasons.push(`harness ${runtimeState.sessionHarness}→${harness}`);
-  }
-  return reasons;
-}
-
-function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
-  if (!snap) return null;
-  // Map Activity → legacy state. The legacy 'active' value collapses working
-  // and thinking — neither consumer ever distinguished them.
-  let state: AgentRuntimeState['state'];
-  switch (snap.activity) {
-    case 'working': state = 'active'; break;
-    case 'thinking': state = 'active'; break;
-    case 'idle': state = 'idle'; break;
-    case 'stopped': state = 'stopped'; break;
-    case 'waiting': state = 'waiting-on-human'; break;
-    default: state = 'uninitialized';
-  }
-  return {
-    state,
-    lastActivity: snap.lastActivity,
-    currentTool: snap.currentTool,
-    claudeSessionId: snap.claudeSessionId,
-    sessionModel: snap.sessionModel,
-    sessionHarness: normalizeHarness(snap.sessionHarness ?? null) ?? undefined,
-    currentIssue: snap.currentIssue,
-    resolution: snap.resolution as AgentResolution | undefined,
-    resolutionCount: snap.resolutionCount,
-    resolutionUpdatedAt: snap.resolutionUpdatedAt,
-    waitingReason: snap.waiting?.reason,
-    waitingStartedAt: snap.waiting?.startedAt,
-    waitingNotification: snap.waiting?.message,
-    contextSaturatedAt: snap.contextSaturatedAt,
-  };
-}
-
-export function getAgentRuntimeStateSync(agentId: string): AgentRuntimeState | null {
-  // Sync path: read from the in-process mirror (empty in fresh CLI processes,
-  // populated inside the dashboard server). CLI commands should use
-  // getAgentRuntimeStateProgram so they fall through to HTTP.
-  return snapshotToRuntimeState(Effect.runSync(getRuntimeSnapshot(agentId)));
-}
-
-export const getAgentRuntimeState = (agentId: string): Effect.Effect<AgentRuntimeState | null> =>
-  Effect.gen(function* () {
-    if (yield* isAgentStateServiceInProcess()) {
-      return snapshotToRuntimeState(yield* getRuntimeSnapshot(agentId));
-    }
-
-    const snap = yield* fetchAgentRuntimeSnapshot(agentId);
-    return snapshotToRuntimeState(snap);
-  });
-
-async function patchRuntimeJson(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
-  const agentDir = getAgentDir(agentId);
-  const runtimeFile = join(agentDir, 'runtime.json');
-  let runtime: Record<string, unknown> = {};
-
-  try {
-    runtime = JSON.parse(await readFile(runtimeFile, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    runtime = {};
-  }
-
-  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
-    if (patch.contextSaturatedAt === undefined) {
-      delete runtime.contextSaturatedAt;
-    } else {
-      runtime.contextSaturatedAt = patch.contextSaturatedAt;
-    }
-  }
-
-  await mkdir(agentDir, { recursive: true });
-  await writeFile(runtimeFile, JSON.stringify(runtime, null, 2));
-}
-
-/**
- * Emit events derived from a legacy-shape patch. Callers gradually migrate to
- * direct emitAgentEvent calls; this adapter keeps existing code working.
- */
-export async function saveAgentRuntimeState(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
-  if (patch.currentIssue !== undefined) {
-    await Effect.runPromise(emitAgentEvent(agentId, {
-      kind: 'current_issue_set',
-      currentIssue: patch.currentIssue || undefined,
-    }));
-  }
-
-  if (patch.resolution !== undefined && patch.resolutionCount !== undefined) {
-    await Effect.runPromise(emitAgentEvent(agentId, {
-      kind: 'resolution_set',
-      resolution: patch.resolution,
-      resolutionCount: patch.resolutionCount,
-    }));
-  }
-
-  if (patch.state !== undefined) {
-    if (patch.state === 'waiting-on-human') {
-      await Effect.runPromise(emitAgentEvent(agentId, {
-        kind: 'waiting_start',
-        reason: (patch.waitingReason as 'tool_permission' | 'user_question' | 'disambiguation' | 'other') || 'other',
-        message: patch.waitingNotification,
-      }));
-    } else if (patch.state === 'active') {
-      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
-    } else if (patch.state === 'idle') {
-      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'idle' }));
-    } else if (patch.state === 'stopped') {
-      await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'stopped' }));
-    }
-  } else if (patch.currentTool !== undefined) {
-    await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
-  }
-
-  if (patch.claudeSessionId || patch.sessionModel !== undefined || patch.sessionHarness !== undefined) {
-    // model_set requires a model — use existing snapshot's model if present.
-    const snap = getAgentRuntimeStateSync(agentId);
-    if (snap || patch.claudeSessionId || patch.sessionModel !== undefined || patch.sessionHarness !== undefined) {
-      const event: {
-        kind: 'model_set';
-        model: string;
-        claudeSessionId?: string;
-        sessionModel?: string;
-        sessionHarness?: RuntimeName;
-      } = {
-        kind: 'model_set',
-        model: 'unknown',
-      };
-      if (patch.claudeSessionId !== undefined) event.claudeSessionId = patch.claudeSessionId;
-      if (patch.sessionModel !== undefined) event.sessionModel = patch.sessionModel;
-      if (patch.sessionHarness !== undefined) event.sessionHarness = patch.sessionHarness;
-      await Effect.runPromise(emitAgentEvent(agentId, {
-        ...event,
-      }));
-    }
-  }
-
-  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
-    await patchRuntimeJson(agentId, patch);
-    await Effect.runPromise(emitAgentEvent(agentId, {
-      kind: 'context_saturation_changed',
-      contextSaturatedAt: patch.contextSaturatedAt,
-    }));
-  }
-}
-
-/** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
-export interface ActivityEntry {
-  ts: string;
-  tool: string;
-  action?: string;
-  state?: 'active' | 'idle';
-}
-
-/**
- * Append to activity log with automatic pruning to 100 entries
- */
-export function appendActivity(agentId: string, entry: ActivityEntry): void {
-  const dir = getAgentDir(agentId);
-  mkdirSync(dir, { recursive: true });
-
-  const activityFile = join(dir, 'activity.jsonl');
-
-  // Append entry
-  appendFileSync(activityFile, JSON.stringify(entry) + '\n');
-
-  // Prune to last 100 entries
-  if (existsSync(activityFile)) {
-    try {
-      const lines = readFileSync(activityFile, 'utf8').trim().split('\n');
-      if (lines.length > 100) {
-        const trimmed = lines.slice(-100);
-        writeFileSync(activityFile, trimmed.join('\n') + '\n');
-      }
-    } catch (error) {
-      // Ignore pruning errors - activity log is non-critical
-    }
-  }
-}
-
-/**
- * Read activity log (last N entries)
- */
-export function getActivity(agentId: string, limit = 100): ActivityEntry[] {
-  const activityFile = join(getAgentDir(agentId), 'activity.jsonl');
-
-  if (!existsSync(activityFile)) {
-    return [];
-  }
-
-  try {
-    const lines = readFileSync(activityFile, 'utf8').trim().split('\n');
-    const entries = lines
-      .filter(line => line.trim())
-      .map(line => JSON.parse(line) as ActivityEntry)
-      .slice(-limit);
-
-    return entries;
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Save Claude session ID for later resume
- */
-export function saveSessionId(agentId: string, sessionId: string): void {
-  const dir = getAgentDir(agentId);
-  mkdirSync(dir, { recursive: true });
-
-  writeFileSync(join(dir, 'session.id'), sessionId);
-}
-
-/**
- * Get saved Claude session ID
- */
-export function getSessionId(agentId: string): string | null {
-  const sessionFile = join(getAgentDir(agentId), 'session.id');
-
-  if (!existsSync(sessionFile)) {
-    return null;
-  }
-
-  try {
-    return readFileSync(sessionFile, 'utf8').trim();
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get the latest Claude session ID from any available source.
- * Checks session.id first (written by suspend), then sessions.json (written by heartbeat hook),
- * then runtime.json claudeSessionId field.
- */
-/**
- * PAN-1988 — for a codex agent, resolve its REAL resumable thread id. codex writes a placeholder
- * UUID into `session.id` at spawn; the resumable id is the codex thread, recorded in the rollout.
- * Prefer the explicitly-captured `codex-thread-id`, then fall back to the freshest rollout on disk
- * (always current — codex writes a new rollout per resume, so this self-heals across resume cycles
- * without depending on the capture poll landing). Returns null for non-codex agents.
- */
-function resolveCodexThreadIdSync(agentId: string): string | null {
-  const agentDir = getAgentDir(agentId);
-  const codexHome = join(agentDir, 'codex-home');
-  if (!existsSync(codexHome)) return null; // not a codex agent
-  try {
-    const threadIdPath = join(agentDir, 'codex-thread-id');
-    if (existsSync(threadIdPath)) {
-      const id = readFileSync(threadIdPath, 'utf-8').trim();
-      if (id) return id;
-    }
-  } catch { /* non-fatal */ }
-  try {
-    const rollout = findLatestRollout(codexHome);
-    if (rollout) {
-      const id = extractThreadIdFromRollout(rollout);
-      if (id) return id;
-    }
-  } catch { /* non-fatal */ }
-  return null;
-}
-
-/**
- * Sync mirror of jsonl-resolver.ts's pickFreshestSessionId: from a list of
- * candidate session ids, return the one whose JSONL transcript has the most
- * recent mtime, skipping ids with no file on disk. Falls back to the last
- * appended id when none have a transcript (e.g. workspace moved). Returns null
- * only when there are no usable candidates.
- */
-function pickFreshestExistingSessionIdSync(agentId: string, candidates: unknown[]): string | null {
-  const valid = candidates.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
-  if (valid.length === 0) return null;
-  const workspace = getAgentStateSync(agentId)?.workspace;
-  if (workspace) {
-    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
-    let best: { id: string; mtimeMs: number } | null = null;
-    for (const id of valid) {
-      try {
-        const s = statSync(join(projectDir, `${id}.jsonl`));
-        if (!best || s.mtimeMs > best.mtimeMs) best = { id, mtimeMs: s.mtimeMs };
-      } catch { /* no JSONL for this id — skip */ }
-    }
-    if (best) return best.id;
-  }
-  return valid[valid.length - 1] ?? null;
-}
-
-export function getLatestSessionIdSync(agentId: string): string | null {
-  // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
-  //    returning it would make resumeAgent target a non-existent thread and codex would drift into
-  //    a fresh rollout, losing conversation history (PAN-1988). The freshest rollout is the truth.
-  const codexThreadId = resolveCodexThreadIdSync(agentId);
-  if (codexThreadId) return codexThreadId;
-
-  // 1. session.id (written by auto-suspend) — the real id for claude-code.
-  const fromSessionFile = getSessionId(agentId);
-  if (fromSessionFile) return fromSessionFile;
-
-  // 2. sessions.json (append-only list of session ids the agent has used).
-  //    The array can hold aborted/empty ids (e.g. a fresh session that never
-  //    produced a transcript), so we can't trust "last entry" — pick the id
-  //    whose JSONL is freshest on disk, matching resolveClaudeSessionId
-  //    (jsonl-resolver.ts). Falls back to last-appended when none exist on disk.
-  const sessionsFile = join(getAgentDir(agentId), 'sessions.json');
-  try {
-    if (existsSync(sessionsFile)) {
-      const sessions = JSON.parse(readFileSync(sessionsFile, 'utf8'));
-      if (Array.isArray(sessions) && sessions.length > 0) {
-        const picked = pickFreshestExistingSessionIdSync(agentId, sessions);
-        if (picked) return picked;
-      }
-    }
-  } catch { /* non-fatal */ }
-
-  // 3. runtime.json claudeSessionId
-  const runtimeState = getAgentRuntimeStateSync(agentId);
-  if (runtimeState?.claudeSessionId) {
-    return runtimeState.claudeSessionId;
-  }
-
-  // 4. codex-thread-id (written after codex rollout appears; fallback so
-  //    resumeAgent can locate the Codex session even if session.id has a
-  //    stale random UUID from spawnRun's placeholder write).
-  const codexThreadIdPath = join(getAgentDir(agentId), 'codex-thread-id');
-  try {
-    if (existsSync(codexThreadIdPath)) {
-      const threadId = readFileSync(codexThreadIdPath, 'utf-8').trim();
-      if (threadId) return threadId;
-    }
-  } catch { /* non-fatal */ }
-
-  // 5. ohmypi (omp) — PAN-2098. omp never writes a `session.id` file, so none of
-  //    the claude-code/codex sources above can find it; the real id lives inside
-  //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
-  //    resolution so the deacon recovery path can resume a crashed ohmypi agent
-  //    instead of only respawning it fresh and losing context.
-  if (getAgentStateSync(agentId)?.harness === 'ohmypi') {
-    const ohmypiSessionId = resolveLatestOhmypiSessionId(agentId);
-    if (ohmypiSessionId) return ohmypiSessionId;
-  }
-
-  return null;
-}
-
-export const getLatestSessionId = (agentId: string): Effect.Effect<string | null> => {
-  const agentDir = getAgentDir(agentId);
-  const sessionFile = join(agentDir, 'session.id');
-  const sessionsFile = join(agentDir, 'sessions.json');
-
-  return Effect.gen(function* () {
-    const sessionId = yield* Effect.tryPromise({
-      try: () => readFile(sessionFile, 'utf8'),
-      catch: (cause) => toAgentFsError('read', sessionFile, cause),
-    }).pipe(
-      Effect.map((content) => content.trim()),
-      Effect.orElseSucceed(() => ''),
-    );
-    if (sessionId) return sessionId;
-
-    const latestSession = yield* Effect.tryPromise({
-      try: async () => JSON.parse(await readFile(sessionsFile, 'utf8')) as unknown,
-      catch: (cause) => toAgentFsError('read', sessionsFile, cause),
-    }).pipe(
-      Effect.map((sessions) => Array.isArray(sessions) && sessions.length > 0 ? String(sessions[sessions.length - 1]) : null),
-      Effect.orElseSucceed(() => null),
-    );
-    if (latestSession) return latestSession;
-
-    const runtimeState = yield* getAgentRuntimeState(agentId);
-    return runtimeState?.claudeSessionId ?? null;
-  });
-};
-
 export interface SpawnOptions {
   issueId: string;
   workspace: string;
@@ -3198,10 +2327,11 @@ export async function buildAgentLaunchConfig(opts: {
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
-  const piLauncherFields = opts.harness === 'ohmypi'
+  const behavior = getHarnessBehavior(opts.harness);
+  const piLauncherFields = behavior.usesRpcFifo
     ? await getOhmypiLauncherFields(opts.agentId, model)
     : {};
-  const codexLauncherFields = opts.harness === 'codex'
+  const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
     : {};
 
@@ -3236,12 +2366,12 @@ export async function buildAgentLaunchConfig(opts: {
       // dropped --agent file support); permission flags come from the global
       // resolver. ohmypi/codex resumes route through getAgentRuntimeBaseCommand
       // which short-circuits to the omp/codex form.
-      baseCommand: opts.harness === 'ohmypi' || opts.harness === 'codex'
+      baseCommand: behavior.launchCommandKind !== 'claude-code'
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
         : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
-      model: opts.harness === 'ohmypi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
-      extraArgs: opts.harness === 'ohmypi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,
+      model: behavior.launchCommandKind !== 'claude-code' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: behavior.launchCommandKind !== 'claude-code' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
       extraEnvExports: opts.extraEnvExports,
       useSupervisor: opts.useSupervisor,
@@ -3262,9 +2392,10 @@ export async function buildAgentLaunchConfig(opts: {
 
   // PAN-982: pass the role definition path + agentId through getAgentRuntimeBaseCommand so it
   // emits 'claude --agent roles/<role>.md --name <agentId>'.
-  // PAN-636: when harness === 'pi' the helper short-circuits to a pi --mode rpc
-  // line and the agentName/agentDefinition arguments are ignored (Pi has no agent
-  // definitions). The launcher generator's pi branch then layers --session-dir
+  // PAN-636: when the harness uses the ohmypi RPC command, the helper
+  // short-circuits to an omp --mode rpc line and the
+  // agentName/agentDefinition arguments are ignored (Pi has no agent
+  // definitions). The launcher generator's Pi branch then layers --session-dir
   // and the fifo redirect on top.
   const agentDefinition = roleAgentDefinitionPath(launchRole);
   const launcherContent = generateLauncherScriptSync({
@@ -3275,7 +2406,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
-    sessionId: opts.harness === 'claude-code' ? opts.sessionId : undefined,
+    sessionId: behavior.sessionIdSource === 'launcher-session-id' ? opts.sessionId : undefined,
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -4208,395 +3339,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   return state;
 }
 
-export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
-  // Match liveness against ALL overdeck-socket sessions, not just `agent-*`.
-  // Agent state dirs are named by role prefix (planning-/agent-/conv-/strike-);
-  // getAgentSessions only returns `agent-*`, so planning/conv/strike sessions
-  // would always read tmuxActive:false and get dropped by the enrichment poller.
-  const tmuxSessions = listSessionsSync();
-  const tmuxNames = new Set(tmuxSessions.map(s => s.name));
+export { listRunningAgentsSync, listAgentStates, listRunningAgents, warnOnBareNumericIssueIds, dropLegacyAgentStatesMissingRoleAsync };
+export { stopAgentSync, stopAgent } from './agents/termination.js';
+export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionIdSync, getLatestSessionId } from './agents/activity.js';
+export { type AgentResolution, type AgentRuntimeState, getAgentRuntimeStateSync, getAgentRuntimeState, saveAgentRuntimeState } from './agents/runtime-state.js';
+export { deliverAgentMessage, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
 
-  return listOverdeckAgentStatesSync().map((state) => {
-    const normalizedId = normalizeAgentId(state.id);
-    return {
-      ...state,
-      id: normalizedId,
-      tmuxActive: tmuxNames.has(normalizedId),
-    };
-  });
-}
-
-/**
- * PAN-1908: list all agents in the SQLite registry with optional filtering.
- * This is the replacement for enumerating ~/.overdeck/agents/ directories.
- */
-export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
-  return listOverdeckAgentStatesSync()
-    .filter((state) => {
-      if (options?.status && state.status !== options.status) return false;
-      if (options?.role && state.role !== options.role) return false;
-      return true;
-    });
-}
-
-
-export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
-  Effect.gen(function* () {
-    // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
-    //
-    // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
-    // session on the `overdeck` socket. Run this from a one-off `tsx -e`/CLI
-    // process that lacks access to that socket and `listSessions()` returns
-    // empty, so EVERY agent comes back `tmuxActive: false` — including ones that
-    // are genuinely running. Do not conclude "the agent isn't running" / "the
-    // enrichment poller skips it" from an out-of-server-process reading. Trust
-    // the live dashboard server's view (it owns the socket) or check the tmux
-    // session directly with `tmux -L overdeck list-sessions`.
-    //
-    // Use the UNFILTERED session list (not getAgentSessions, which is `agent-*`
-    // only): agent state dirs carry role prefixes (planning-/agent-/conv-/strike-),
-    // and planning/conv/strike sessions must read tmuxActive:true so the
-    // enrichment poller scans them for AskUserQuestion / pending input (PAN-1395).
-    const tmuxSessions = yield* listSessions();
-    const tmuxNames = new Set(tmuxSessions.map(s => s.name));
-
-    return listOverdeckAgentStatesSync().map((state) => {
-      const normalizedId = normalizeAgentId(state.id);
-      return {
-        ...state,
-        id: normalizedId,
-        tmuxActive: tmuxNames.has(normalizedId),
-      };
-    });
-  });
-
-/**
- * PAN-1048 P2: async startup migration.
- *
- * The previous synchronous version used readdirSync, readFileSync,
- * killSession (sync tmux subprocess), and rmSync — all on the Node
- * event loop. Called from warnOnBareNumericIssueIds() during dashboard
- * read-model bootstrap, this blocked all HTTP/WebSocket/PTY traffic on
- * server startup while it scanned every agent dir, killed stale tmux
- * sessions, and recursively deleted directories.
- *
- * This async variant does the same work using fs/promises and the
- * already-async killSessionAsync() so the bootstrap path no longer
- * stalls the event loop.
- */
-async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
-  if (!existsSync(AGENTS_DIR)) return 0;
-
-  const fsp = await import('fs/promises');
-  let entries: string[];
-  try {
-    entries = await fsp.readdir(AGENTS_DIR);
-  } catch {
-    return 0;
-  }
-
-  let dropped = 0;
-  await Promise.all(
-    entries.map(async (entry) => {
-      const dirPath = join(AGENTS_DIR, entry);
-      let stat;
-      try {
-        stat = await fsp.stat(dirPath);
-      } catch {
-        return;
-      }
-      if (!stat.isDirectory()) return;
-
-      const agentId = normalizeAgentId(entry);
-      const stateFile = getRollbackAgentStatePath(agentId);
-      let raw: { role?: unknown };
-      try {
-        const contents = await fsp.readFile(stateFile, 'utf8');
-        raw = JSON.parse(contents) as { role?: unknown };
-      } catch {
-        return;
-      }
-      if (isRole(raw.role)) return;
-
-      try { await Effect.runPromise(killSession(agentId)); } catch { /* best effort */ }
-      try {
-        await fsp.rm(dirPath, { recursive: true, force: true });
-        dropped++;
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[agents] Failed to drop legacy agent state ${agentId}: ${msg}`);
-      }
-    }),
-  );
-
-  return dropped;
-}
-
-/**
- * Scan ~/.overdeck/agents/ for state files with bare numeric issueIds
- * (e.g. "484" instead of "PAN-484") and log warnings to stderr.
- *
- * These workspaces were created before the pan- prefix convention and may
- * cause cross-tracker pollution if their in_review transition is triggered.
- * Called once at server startup to surface legacy state files.
- */
-/**
- * PAN-1048 P2: bootstrap-path migration is async.
- *
- * Sweeps legacy state files missing a `role` field and warns on bare
- * numeric issueIds. Both passes used to be synchronous (readdirSync,
- * readFileSync, killSession, rmSync), which blocked the dashboard
- * server's event loop on startup. The async version scans the same
- * directory once per concern and uses fs/promises throughout.
- */
-export async function warnOnBareNumericIssueIds(): Promise<void> {
-  const droppedLegacyAgents = await dropLegacyAgentStatesMissingRoleAsync();
-  if (droppedLegacyAgents > 0) {
-    console.warn(`[agents] Dropped ${droppedLegacyAgents} legacy agent state file(s) missing role`);
-  }
-
-  if (!existsSync(AGENTS_DIR)) return;
-
-  const fsp = await import('fs/promises');
-  let entries: string[];
-  try {
-    entries = await fsp.readdir(AGENTS_DIR);
-  } catch {
-    return;
-  }
-
-  const legacy: string[] = [];
-  await Promise.all(
-    entries.map(async (entry) => {
-      const dirPath = join(AGENTS_DIR, entry);
-      try {
-        const stat = await fsp.stat(dirPath);
-        if (!stat.isDirectory()) return;
-      } catch {
-        return;
-      }
-      const state = await Effect.runPromise(getAgentState(entry));
-      if (state?.issueId && /^\d+$/.test(state.issueId)) {
-        legacy.push(`${entry} (issueId: "${state.issueId}")`);
-      }
-    }),
-  );
-
-  if (legacy.length > 0) {
-    console.warn(
-      `[agents] WARNING: ${legacy.length} agent state file(s) have bare numeric issueIds ` +
-      `(created before the pan- prefix convention). These agents will not be able to ` +
-      `transition tracker state. Consider removing or updating them:\n` +
-      legacy.map(l => `  ~/.overdeck/agents/${l}`).join('\n')
-    );
-  }
-}
-
-/**
- * Find and kill any running `launcher.sh` process for the given agent.
- *
- * PAN-1527: `tmux kill-session` only signals tmux-managed children. Planning
- * agents (and any agent whose launcher escapes its tmux session) leave
- * orphan launcher.sh processes alive — state.json says stopped, but bash is
- * still burning CPU and tokens hours later. This locates them by command
- * line and walks SIGTERM → grace → SIGKILL.
- *
- * Sync version: callable from CLI (`pan kill`) and from the existing
- * `stopAgentSync`. Uses execSync only via `pgrep`, which is fast and
- * non-blocking in practice. Acceptable per CLAUDE.md because this path is
- * sync-by-nature already and is only called from CLI contexts and existing
- * sync internals.
- */
-/**
- * True when the PID is a tmux process (client or server). Used to keep the
- * per-agent launcher kill sweep from ever signalling the shared tmux server
- * (PAN-1798). Reads /proc/<pid>/comm; on non-Linux or read failure returns
- * false (fail-open matches pre-fix behavior for non-tmux processes).
- */
-function isTmuxProcessSync(pid: number): boolean {
-  try {
-    return readFileSync(`/proc/${pid}/comm`, 'utf-8').trim() === 'tmux';
-  } catch {
-    return false;
-  }
-}
-
-function killLauncherProcessSync(agentId: string): void {
-  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
-  let pidsOut: string;
-  try {
-    pidsOut = execSync(
-      `pgrep -f ${JSON.stringify(launcherPath)}`,
-      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
-    ).trim();
-  } catch {
-    return; // pgrep exits 1 when there are no matches — nothing to kill
-  }
-
-  const pids = pidsOut
-    .split('\n')
-    .map(s => Number.parseInt(s, 10))
-    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid)
-    // PAN-1798: when this agent's spawn FOUNDED the shared tmux server, the
-    // server's cmdline embeds this launcher path (`tmux ... new-session ...
-    // bash .../launcher.sh`), so pgrep -f matches the server itself. Killing
-    // it destroys every session on the socket — agents, reviews, and all
-    // conversations. Never signal a tmux process from the per-agent sweep.
-    .filter(pid => !isTmuxProcessSync(pid));
-  if (pids.length === 0) return;
-
-  for (const pid of pids) {
-    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
-  }
-
-  // ~500ms grace period for orderly shutdown. Sync spawn of `sleep` is
-  // acceptable in CLI context; this function is never reached from the
-  // dashboard server (which uses the async `stopAgent` Effect below).
-  try {
-    execSync('sleep 0.5', { stdio: 'ignore' });
-  } catch { /* ignore */ }
-
-  const survivors: number[] = [];
-  for (const pid of pids) {
-    try {
-      process.kill(pid, 0);
-      survivors.push(pid);
-    } catch {
-      /* already dead */
-    }
-  }
-  for (const pid of survivors) {
-    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
-  }
-}
-
-async function killLauncherProcessAsync(agentId: string): Promise<void> {
-  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
-  let pidsOut: string;
-  try {
-    const { stdout } = await execAsync(`pgrep -f ${JSON.stringify(launcherPath)}`);
-    pidsOut = stdout.trim();
-  } catch {
-    return; // pgrep exits 1 when there are no matches
-  }
-
-  const pids = pidsOut
-    .split('\n')
-    .map(s => Number.parseInt(s, 10))
-    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid)
-    // PAN-1798: see killLauncherProcessSync — the founding tmux server's
-    // cmdline embeds this launcher path; never signal tmux from this sweep.
-    .filter(pid => !isTmuxProcessSync(pid));
-  if (pids.length === 0) return;
-
-  for (const pid of pids) {
-    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
-  }
-
-  await new Promise<void>(resolve => setTimeout(resolve, 500));
-
-  for (const pid of pids) {
-    try {
-      process.kill(pid, 0);
-      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
-    } catch {
-      /* already dead */
-    }
-  }
-}
-
-export function stopAgentSync(agentId: string): void {
-  const normalizedId = normalizeAgentId(agentId);
-
-  if (sessionExistsSync(normalizedId)) {
-    // Capture tmux output before killing so logs remain viewable after stop
-    try {
-      const output = capturePaneSync(normalizedId, 5000);
-      if (output) {
-        const agentDir = getAgentDir(normalizedId);
-        mkdirSync(agentDir, { recursive: true });
-        writeFileSync(join(agentDir, 'output.log'), output);
-      }
-    } catch {
-      // Non-fatal — best effort log capture
-    }
-
-    killSessionSync(normalizedId);
-  }
-
-  // PAN-1527: kill orphan launcher.sh processes that escape tmux (planning
-  // agents, dashboard-spawned launchers, anything that survived tmux
-  // kill-session). Runs even when no tmux session existed in the first place.
-  killLauncherProcessSync(normalizedId);
-
-  const state = getAgentStateSync(normalizedId);
-  if (state) {
-    // Ensure id is set — runtime state files may lack it (PAN-150)
-    if (!state.id) state.id = normalizedId;
-
-    markAgentStoppedState(state);
-    saveAgentStateSync(state);
-  }
-
-  // Also mark runtime.json as stopped so Cloister/Deacon won't auto-restart.
-  // state.json and runtime.json are separate files — both must agree the agent
-  // was intentionally stopped to prevent race conditions with health check polls.
-  console.log(`[agents] Stopping ${normalizedId}: tmux=${sessionExistsSync(normalizedId)} stateStatus=${state?.status ?? 'none'}`);
-  saveAgentRuntimeState(normalizedId, {
-    state: 'stopped',
-    lastActivity: new Date().toISOString(),
-  });
-}
-
-
-export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxError> => {
-  const normalizedId = normalizeAgentId(agentId);
-
-  return Effect.gen(function* () {
-    if (yield* sessionExists(normalizedId)) {
-      yield* Effect.gen(function* () {
-        const output = yield* capturePane(normalizedId, 5000);
-        if (!output) return;
-
-        const agentDir = getAgentDir(normalizedId);
-        const outputFile = join(agentDir, 'output.log');
-        yield* Effect.tryPromise({
-          try: () => mkdirAsync(agentDir, { recursive: true }),
-          catch: (cause) => toAgentFsError('mkdir', agentDir, cause),
-        });
-        yield* Effect.tryPromise({
-          try: () => writeFileAsync(outputFile, output),
-          catch: (cause) => toAgentFsError('write', outputFile, cause),
-        });
-      }).pipe(Effect.catch(() => Effect.void));
-
-      yield* killSession(normalizedId);
-    }
-
-    // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after
-    // killSession so tmux gets the first chance to take everything down
-    // cleanly; falls through and kills any survivor by command-line match.
-    yield* Effect.tryPromise({
-      try: () => killLauncherProcessAsync(normalizedId),
-      catch: (cause): never => { throw cause; },
-    }).pipe(Effect.catch(() => Effect.void));
-
-    const state = yield* getAgentState(normalizedId);
-    if (state) {
-      if (!state.id) state.id = normalizedId;
-
-      markAgentStoppedState(state);
-      yield* saveAgentState(state);
-    }
-
-    const tmuxActive = yield* sessionExists(normalizedId);
-    console.log(`[agents] Stopping ${normalizedId} (async): tmux=${tmuxActive} stateStatus=${state?.status ?? 'none'}`);
-    yield* Effect.forkDetach(emitAgentEvent(normalizedId, {
-      kind: 'activity',
-      activity: 'stopped',
-    }));
-  });
-};
 
 function queueAgentMail(agentId: string, message: string): void {
   const mailDir = join(getAgentDir(agentId), 'mail');
@@ -5079,7 +3827,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // not become ready within 30s" hang) — and there is no live transcript to
   // protect, so it must be fresh-launched (recovery, not rotation). A live
   // (suspended) omp process stays on the normal resume path.
-  const piProcessWasAlive = agentState.harness === 'ohmypi'
+  const piProcessWasAlive = getHarnessBehavior(agentState.harness).usesRpcFifo
     ? await hasAgentRuntimeInSession(normalizedId, 'ohmypi')
     : false;
 

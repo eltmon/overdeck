@@ -48,6 +48,26 @@ const SETTINGS_PAGE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../SettingsPage.tsx'),
   'utf8',
 );
+const AUTOSAVE_PIPELINE_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../hooks/useAutosavePipeline.ts'),
+  'utf8',
+);
+const CONVERSATION_SEARCH_HOOK_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../hooks/useConversationSearch.ts'),
+  'utf8',
+);
+const CONVERSATION_SEARCH_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/ConversationSearchSection.tsx'),
+  'utf8',
+);
+const PROVIDER_MANAGEMENT_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/ProviderManagementSection.tsx'),
+  'utf8',
+);
+const TTS_CONFIGURATION_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/TtsConfigurationSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -62,33 +82,33 @@ describe('SettingsPage role model routing panels', () => {
 
   it('includes the TTS sidebar item and settings section controls', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('id="tts"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ enabled:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<TtsSystemVoicePicker');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ voice: voiceId })');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ statusVoice: voiceId })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('id="tts"');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ enabled:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ volume:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ rate:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('<TtsSystemVoicePicker');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ voice: voiceId })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ statusVoice: voiceId })');
   });
 
   it('includes advanced TTS voice map, muted sources, and template controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('fetchTtsVoices');
-    expect(SETTINGS_PAGE_SOURCE).toContain('TTS_EVENT_KEYS.map');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsVoiceMapChange(eventKey');
-    expect(SETTINGS_PAGE_SOURCE).toContain('ACTIVITY_SOURCE_OPTIONS.map');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsMutedSourceChange(source');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleAddTtsTemplate');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('fetchTtsVoices');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('TTS_EVENT_KEYS.map');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsVoiceMapChange(eventKey');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('ACTIVITY_SOURCE_OPTIONS.map');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsMutedSourceChange(source');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleAddTtsTemplate');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsTemplateChange(eventKey');
   });
 
   it('serializes all settings autosaves through one latest-snapshot queue', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('pendingSaveRef = useRef<AutosavePayload | null>(null)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveInFlightRef');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const drainSaveQueue = useCallback');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const scheduleAutosave = useCallback');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const flushAutosave = useCallback');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('pendingSaveRef = useRef<AutosavePayload | null>(null)');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('saveInFlightRef');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const drainSaveQueue = useCallback');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const scheduleAutosave = useCallback');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const flushAutosave = useCallback');
   });
 
   it('autosaves every control — no global Save/Reset buttons', () => {
@@ -106,12 +126,12 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('debounces high-frequency autosaves', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('setTimeout(() => {');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
+    expect(AUTOSAVE_PIPELINE_SOURCE).toContain('setTimeout(() => {');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
+    expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
   });
 
   it('surfaces remote work-agent provisioning controls', () => {
@@ -124,18 +144,18 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces conversation search controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Conversation Search');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('aria-label="Toggle conversation search"');
     // cee57d395: conversation search uses the standard API Keys section now.
-    expect(SETTINGS_PAGE_SOURCE).toContain('Using OpenAI key from API Keys section');
-    expect(SETTINGS_PAGE_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Using OpenAI key from API Keys section');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Last indexed:');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Estimated reindex cost:');
+    expect(CONVERSATION_SEARCH_SECTION_SOURCE).toContain('Estimate & reindex all conversations');
     // window.confirm was replaced by the confirm-modal + confirmationNonce flow
     // (reindex is a paid operation — server requires the nonce from the estimate).
     expect(SETTINGS_PAGE_SOURCE).toContain('confirmReindex');
-    expect(SETTINGS_PAGE_SOURCE).toContain('confirmationNonce');
+    expect(CONVERSATION_SEARCH_HOOK_SOURCE).toContain('confirmationNonce');
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
@@ -152,23 +172,23 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('renders provider harness selects as clearable built-in defaults', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? ''");
-    expect(SETTINGS_PAGE_SOURCE).toContain('const builtInHarness = formData.models.provider_default_harnesses?.[provider.id]');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<ProviderLogo provider={provider.id}');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<HarnessLogo harness={(providerHarness || builtInHarness) as Harness}');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<ProviderLogo provider="openrouter"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter');
-    expect(SETTINGS_PAGE_SOURCE).toContain('<option value="">Default ({harnessLabel(builtInHarness)})</option>');
-    expect(SETTINGS_PAGE_SOURCE).toContain("value={formData.models.provider_harnesses?.openrouter ?? ''}");
-    expect(SETTINGS_PAGE_SOURCE).toContain("Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})");
-    expect(SETTINGS_PAGE_SOURCE).not.toContain('icon: Lightbulb');
-    expect(SETTINGS_PAGE_SOURCE).not.toContain('<provider.icon');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? ''");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('const builtInHarness = formData.models.provider_default_harnesses?.[provider.id]');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<ProviderLogo provider={provider.id}');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<HarnessLogo harness={(providerHarness || builtInHarness) as Harness}');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<ProviderLogo provider="openrouter"');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('<option value="">Default ({harnessLabel(builtInHarness)})</option>');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("value={formData.models.provider_harnesses?.openrouter ?? ''}");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).not.toContain('icon: Lightbulb');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).not.toContain('<provider.icon');
   });
 
   it('deletes provider harness override keys when the Default option is selected', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("if (harness === '')");
-    expect(SETTINGS_PAGE_SOURCE).toContain('delete nextProviderHarnesses[provider]');
-    expect(SETTINGS_PAGE_SOURCE).toContain('provider_harnesses: nextProviderHarnesses');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain("if (harness === '')");
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('delete nextProviderHarnesses[provider]');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('provider_harnesses: nextProviderHarnesses');
   });
 
   it('surfaces the RTK Bash compression toggle in experimental settings', () => {
@@ -187,9 +207,10 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces the harness/model permutations toggle in provider settings', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('Show all harness/model permutations');
-    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="show-harness-model-permutations-toggle"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('Show all harness/model permutations');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('data-testid="show-harness-model-permutations-toggle"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('onHarnessModelPermutationsToggle={handleHarnessModelPermutationsToggle}');
+    expect(PROVIDER_MANAGEMENT_SECTION_SOURCE).toContain('onHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)');
   });
 });
 
