@@ -239,3 +239,14 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **GitHub GraphQL rate limit hit 0** mid-tick (reset ~21:55Z). The auto-merge schedule endpoint internally calls `gh pr view`, so it failed with a rate-limit error that LOOKED like a substrate bug but was quota exhaustion. Retried after reset -> PAN-1718 scheduled (id 8, fires 22:01:32Z). Back off gh polling when remaining is low.
 - **PAN-2054 bug is live.** `pan review pending --ready` listed PAN-2152 (merged commit 2a41e2ecbd) and PAN-1884 (2f83da8df1) as ready-for-merge even though both are merged + closed-out. Instance of PAN-2054 (close-out not terminal: closed-out issues reappear). PAN-2054 itself is closed-out but the bug persists; consider reopen. Do NOT schedule merges on these stale entries.
 - PAN-1718 reached ready-for-merge (review+test passed) and is scheduled to merge. PAN-2172 work agent still implementing (single 35m+ turn; watch for wedge). agent-pan-2086 unchanged zombie.
+
+## RUN-39 tick 7 (2026-06-29) — PAN-1718 stale-mergeability treadmill (PAN-2108 gap)
+
+- pan CLI healthy (no re-break). Main green (cf58ac2cba).
+- **PAN-1718 scheduled merge (22:01Z) did NOT land.** PR #2103 has ALL checks green (build/lint/test/smoke SUCCESS) but GitHub flipped it to CONFLICTING/DIRTY after main moved (my tick-6 push + state commits). The auto-merge engine read DIRTY and dropped it; re-schedule rejects "PR is not mergeable (state=dirty)".
+  - KEY: `git merge-tree --write-tree origin/main origin/feature/pan-1718` merges CLEAN (exit 0). So git says no real conflict; GitHub's mergeability is stale/lagging (likely a both-modified pipeline state file like .beads/issues.jsonl or .pan/records/pan-1718.json that git's ort auto-resolves but GitHub flags). Differing files are the PR's own code (reload.ts/status.ts/restart-status.ts/supervisor.ts) + state files.
+  - To clear it, the feature branch needs a re-push (rebase onto latest main) to force GitHub to recompute. The work agent (idle since 20:49, status=running) should do it via `pan done`, but it has no signal that main moved and the flywheel has no legal lever to re-trigger it (cannot pan tell/resume; pan start refuses 'running').
+  - This is exactly the **PAN-2108** gap (flywheel-safe rolling re-rebase: auto-rebase ready PRs when main moves). Without it, any ready PR can get stuck stale-DIRTY whenever main advances faster than the merge window.
+  - DISPOSITION: carry PAN-1718, re-check next tick. If GitHub recomputes to MERGEABLE, re-schedule and it drains. If it stays stuck across ticks, prioritize PAN-2108.
+- REUSABLE: when a ready PR won't merge with mergeable=CONFLICTING but `git merge-tree --write-tree` exits 0, it's stale GitHub mergeability, not a real conflict. Fix is a branch re-push; the systemic fix is PAN-2108.
+- PAN-2172 work progressing (35m then 8m turns, through beads). PAN-2086 unchanged zombie.
