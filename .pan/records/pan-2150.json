@@ -6,6 +6,11 @@
       "reason": "feedback",
       "note": "[2026-06-29T05:52Z] verification-gate → FAILED — seq 4",
       "timestamp": "2026-06-29T05:52:56.205Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T06:48:01.789Z"
     }
   ],
   "feedback": [
@@ -21,13 +26,14 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2150",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T06:23:43.220Z",
+    "updatedAt": "2026-06-29T06:48:04.296Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2162",
+    "lastVerifiedCommit": "2b173c1524d0616f0cf53a031b21be9b5eb37a49",
     "reviewRequestedAt": "2026-06-29T05:39:42.933Z"
   },
   "closeOut": {
@@ -35,8 +41,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 29193,
-            "output": 1620,
+            "input": 38562,
+            "output": 1753,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -52,8 +58,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 29193,
-          "output": 1620,
+          "input": 38562,
+          "output": 1753,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -66,7 +72,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.934204,
-        "pricingAsOf": "2026-06-29T06:23:43.239Z"
+        "pricingAsOf": "2026-06-29T06:48:04.322Z"
       }
     },
     "merges": [
@@ -75,7 +81,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T05:44:17.015Z",
-  "updated": "2026-06-29T06:30:29.653Z",
+  "updated": "2026-06-29T06:48:04.323Z",
   "statusOverrides": {
     "wi1-extract-module-level-shared": "completed",
     "wi1-extract-module-level-shared.ac1": "completed",
