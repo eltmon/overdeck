@@ -45,11 +45,12 @@ import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
-import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
+import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import { getAgentStateSync } from '../agents.js';
@@ -582,11 +583,43 @@ function buildSelfReviewPrompt(opts: {
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    // PAN-1981 (quick path to production): self-review — the review agent reviews
-    // the diff itself. The convoy prompt builder + the four-reviewer spawn below
-    // are kept (commented out, not deleted) to restore later as an opt-in; #1982.
-    // const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
-    const prompt = buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+    const fullReview = isExtendedReviewEnabled(opts.issueId);
+    const prompt = fullReview
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
+      : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+
+    const spawnConvoyReviewers = async (synthesisAgentId: string) => {
+      const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
+        const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
+        const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+          issueId: opts.issueId,
+          workspace: opts.workspace,
+          subRole,
+          runId,
+          outputPath,
+          contextManifestPath,
+          synthesisAgentId,
+          ...(opts.model ? { model: opts.model } : {}),
+          ...(opts.harness ? { harness: opts.harness } : {}),
+          allowHost,
+        }));
+        if (!result.success) {
+          try {
+            const { messageAgent } = await import('../agents.js');
+            await messageAgent(synthesisAgentId, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
+          } catch (signalErr) {
+            console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${synthesisAgentId}:`, signalErr);
+          }
+        }
+        return result;
+      }));
+
+      const failedReviewers = reviewerResults.filter(r => !r.success);
+      if (failedReviewers.length > 0) {
+        console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
+      }
+      return reviewerResults;
+    };
 
     // PAN-1862: RESUME the saved review session by default. The review agent keeps the prior
     // review's context (the files it read, the findings it raised), so a re-review checks the
@@ -613,6 +646,10 @@ function buildSelfReviewPrompt(opts: {
           const resumed = getAgentStateSync(reviewAgentId);
           if (resumed) { resumed.reviewRunId = runId; await Effect.runPromise(saveAgentState(resumed)); }
         } catch { /* non-fatal */ }
+        if (fullReview) {
+          await spawnConvoyReviewers(reviewAgentId);
+          return { success: true, message: `Convoy review resumed (session preserved): ${reviewAgentId}` };
+        }
         return { success: true, message: `Review resumed (session preserved): ${reviewAgentId}` };
       }
       console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeResult.error}`);
@@ -640,46 +677,18 @@ function buildSelfReviewPrompt(opts: {
     } catch (saveErr) {
       console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
     }
+    if (fullReview) {
+      await spawnConvoyReviewers(run.id);
+      console.log(`[review-agent] Review role (convoy synthesis) spawned for ${opts.issueId}: ${run.id}`);
+      emitActivityEntrySync({ source: 'review', level: 'info', message: `Convoy review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+      return {
+        success: true,
+        message: `Convoy review spawned: ${run.id}`,
+      };
+    }
+
     console.log(`[review-agent] Review role (self-review) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntrySync({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
-
-    // PAN-1981 (quick path to production): the convoy is DISABLED — the review
-    // agent self-reviews (see buildSelfReviewPrompt) and signals the verdict
-    // directly via `pan admin specialists done review`. The four-reviewer fan-out
-    // below is commented out, NOT deleted, to restore later as an opt-in. We'll
-    // decide convoy-vs-self-review policy (and better per-harness transmission) in
-    // the #1982 fast-follow; for now self-review is the only behavior.
-    /*
-    const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
-      const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
-      const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
-        issueId: opts.issueId,
-        workspace: opts.workspace,
-        subRole,
-        runId,
-        outputPath,
-        contextManifestPath,
-        synthesisAgentId: run.id,
-        ...(opts.model ? { model: opts.model } : {}),
-        ...(opts.harness ? { harness: opts.harness } : {}),
-        allowHost,
-      }));
-      if (!result.success) {
-        try {
-          const { messageAgent } = await import('../agents.js');
-          await messageAgent(run.id, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
-        } catch (signalErr) {
-          console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${run.id}:`, signalErr);
-        }
-      }
-      return result;
-    }));
-
-    const failedReviewers = reviewerResults.filter(r => !r.success);
-    if (failedReviewers.length > 0) {
-      console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
-    }
-    */
 
     return {
       success: true,
@@ -878,20 +887,27 @@ export function isReviewStaleSync(issueId: string): boolean {
   return listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review-`).length > 0;
 }
 
+export function resolveReviewMode(issueId?: string): ReviewMode {
+  if (issueId) {
+    const project = resolveProjectForIssue(issueId);
+    const issueMode = project ? readIssueRecordSync(project, issueId)?.reviewMode : undefined;
+    if (issueMode === 'quick' || issueMode === 'full') {
+      return issueMode;
+    }
+  }
+
+  const configMode = loadYamlConfig().config.roles?.review?.mode;
+  return configMode === 'full' ? 'full' : 'quick';
+}
+
 /**
- * Is EXTENDED (convoy) review enabled? Quick review — the single parent `agent-<id>-review`
- * reviews the whole diff itself — is the only live mode (PAN-1981); the convoy spawn +
- * synthesis machinery is parked (commented out in spawnReviewRoleForIssuePromise).
+ * Is EXTENDED (convoy) review enabled for this issue?
  *
- * This is the SINGLE seam that turns convoy back on. While it returns false:
- *   - no sub-reviewer lanes are surfaced in the issue tree (buildReviewerNodes returns []),
- *   - review messages must not claim "N parallel reviewers".
- * Any `agent-<id>-review-<subRole>` record while this is false is a ghost from a prior
- * convoy run, not a live lane. When extended review returns, flip this (and later wire it
- * to a per-issue config flag) — restoring lanes and multi-reviewer messaging in lockstep.
+ * `resolveReviewMode` is the single source of truth: per-issue record override
+ * beats merged project/global config, and quick remains the default.
  */
-export function isExtendedReviewEnabled(): boolean {
-  return false;
+export function isExtendedReviewEnabled(issueId?: string): boolean {
+  return resolveReviewMode(issueId) === 'full';
 }
 
 /**
