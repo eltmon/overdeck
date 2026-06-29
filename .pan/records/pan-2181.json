@@ -47,20 +47,45 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T23:05:47.339Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T23:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T23:07:01.294Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T23:07Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T23:07:02.184Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T23:07:01Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nNew countdown test leaks a mocked Date.now into later tests\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T23:07:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nNew countdown test leaks a mocked Date.now into later tests\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:05:51.223Z",
+  "updated": "2026-06-29T23:07:02.184Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:05:51.180Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-06-29T23:07:01.245Z",
+    "reviewNotes": "New countdown test leaks a mocked Date.now into later tests",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
     "lastVerifiedCommit": "de5b985233d2aeb8bc8b9b4fd20ec37ae2f52465",
     "reviewRequestedAt": "2026-06-29T22:56:43.964Z"
@@ -101,7 +126,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.290561,
-        "pricingAsOf": "2026-06-29T23:05:51.221Z"
+        "pricingAsOf": "2026-06-29T23:07:01.290Z"
       }
     },
     "merges": [

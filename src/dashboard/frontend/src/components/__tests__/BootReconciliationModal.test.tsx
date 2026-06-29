@@ -89,6 +89,7 @@ function renderModal(fetchMock: ReturnType<typeof vi.fn>) {
 describe('BootReconciliationModal', () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
