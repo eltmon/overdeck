@@ -1,0 +1,227 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T19:24:43.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2173: bug(flywheel): under-plans new ready+released backlog while busy draining a cohort",
+    "updated": "2026-06-29T19:30:36.287Z"
+  },
+  "plan": {
+    "id": "pan-2173",
+    "title": "Flywheel planning floor — plan new ready backlog while draining a cohort",
+    "status": "proposed",
+    "uid": "71e0960b-eedf-43cb-ae44-9246fed2b82d",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-29T19:24:43.000Z",
+    "updated": "2026-06-29T19:30:36.287Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2173",
+        "label": "PAN-2173",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "orchestrator",
+      "backlog",
+      "planning"
+    ],
+    "narratives": {
+      "Problem": "RUN-37/38 (opus, 2026-06-29): the flywheel spent every tick draining the in-flight cohort and never planned the new ready backlog — PAN-1894 and PAN-2076 sat unplanned for hours despite free capacity (3-7/20) and no objection/parked labels. Two root causes: (1) roles/flywheel.md step 5 has only soft prose ('keep planning aggressively') with no enforceable per-tick floor, and the PAN-2006 cohort-freeze wording biases the LLM toward drain-only; (2) the needsPlanning set is computed only as a COUNT (computeStats.needsPlanning) and never surfaced as a LIST the orchestrator reads each tick — GET /api/backlog/forecast returns inFlight/waves/cohort but unplanned-ready issues appear in none of them. A soft-prose-only fix would not work: RUN-37/38 already had the soft prose.",
+      "Proposal": "Make the planning floor data-driven and mandated, reusing the existing pure pickup model. (1) Add selectNeedsPlanning(nodes, lk, {cap}) in src/lib/backlog/pickup.ts mirroring selectUnblockTargets — returns the ranked needsPlanning issues. (2) Expose a needsPlanning[] list in GET /api/backlog/forecast (src/dashboard/server/routes/backlog.ts) alongside inFlight/waves/cohort. (3) Add an explicit 'Planning floor' rule to roles/flywheel.md step 5: each tick read needsPlanning[] and run `pan plan <id> --auto` for up to 2 that pass the author/assignee + parked/objection gates, EVEN while draining the cohort; reconcile with PAN-2006 (planning fills awaiting-release, never auto-starts, never extends the cohort); state the within-1-2-ticks SLA.",
+      "NonGoals": "- No change to existing forecast fields, stats.needsPlanning count semantics, or the Forecast UI.\n- No author/assignee filtering inside the forecast endpoint — it stays a pure model projection; the role applies the security gate per item.\n- No new `pan` CLI subcommand — reuse the existing forecast API + `pan plan --auto`.\n- No auto-START of planned work — the PAN-2059 Release gate is unchanged; the floor only PLANS (`pan plan --auto`, never `--auto-start`).\n- No change to cohort-freeze / run-completion logic (PAN-2006 computeCohort / saveRunCohort).\n- No code path that auto-fires planning agents — the orchestrator remains the sole launcher."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Floor cap = 2 planning launches per tick.",
+        "rationale": "Mirrors selectUnblockTargets' default cap of 2; small enough to coexist with cohort drain under the maxAgents ceiling, large enough to keep the awaiting-release queue from starving."
+      },
+      {
+        "summary": "The floor applies regardless of auto_pickup_backlog.",
+        "rationale": "Planning stops at the PAN-2059 Release gate and never auto-starts, so it cannot bypass operator control; step 5 already encourages aggressive planning unconditionally."
+      },
+      {
+        "summary": "The forecast endpoint exposes needsPlanning UN-filtered by author/assignee; the role applies the security gate.",
+        "rationale": "Keeps the endpoint a pure projection of the shared pickup model (consistent with stats/waves/cohort) and puts the security gate where roles/flywheel.md already enforces it per launch, avoiding divergent gating logic in two places."
+      },
+      {
+        "summary": "No code auto-launches planning agents; surface + mandate only.",
+        "rationale": "The orchestrator's #1 job is launching agents; a second uncontrolled launcher would race the LLM and the governor. Surfacing the list + a mandated rule fixes the root cause without a parallel launch path."
+      }
+    ],
+    "items": [
+      {
+        "id": "needs-planning-selector",
+        "title": "Add selectNeedsPlanning pure selector + unit test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T19:24:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2173",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/backlog/pickup.ts add `selectNeedsPlanning(nodes, lk, opts?: { cap?: number }): ForecastNode[]`, mirroring the existing `selectUnblockTargets` (pickup.ts ~:215). Map each node to { issue, rank, size, state: classifyIssue(node, lk) }, keep only the needsPlanning predicate already used by computeStats (pickup.ts:252): `s.ready && !s.planned && !s.parked && !s.vetoed && !s.objection && !s.inPipeline`, sort by rank ascending, and slice to cap (default 2, min 1, like selectUnblockTargets). Add unit tests in src/lib/backlog/__tests__/pickup.test.ts in a new `describe('selectNeedsPlanning')` block using the existing `node()` / `lookups()` helpers (mirror the selectUnblockTargets describe block at ~:173)."
+        },
+        "items": [
+          {
+            "id": "needs-planning-selector.ac1",
+            "title": "selectNeedsPlanning returns only ready-but-unplanned issues (ready && !planned), in ascending rank order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-planning-selector.ac2",
+            "title": "selectNeedsPlanning excludes issues that are planned, parked, vetoed, objected, or in-pipeline (returns none of them even when ready)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-planning-selector.ac3",
+            "title": "selectNeedsPlanning respects the cap option: with cap 1 it returns at most the single lowest-rank needsPlanning issue; defaults to cap 2 when omitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-planning-selector.ac4",
+            "title": "selectNeedsPlanning returns an empty array when no issue satisfies the needsPlanning predicate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forecast-needs-planning-field",
+        "title": "Expose needsPlanning[] in GET /api/backlog/forecast",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T19:24:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2173",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/backlog.ts forecast handler (~:292), import selectNeedsPlanning and compute `const needsPlanning = selectNeedsPlanning(nodes, lk, { cap: n * 2 }).map(enrich)` (reuse the existing `enrich` closure that adds title/importance/score/why, same as inFlight/waves). Add `needsPlanning` to the returned JSON object alongside the existing `inFlight`, `waves`, `lanes`, `cohort`, `stats`, `epics`, `contains` keys. Also add it (as `[]`) to the early empty-sequence return so the response shape is stable when sequence.md is absent. Do NOT modify any existing field or stats.needsPlanning."
+        },
+        "items": [
+          {
+            "id": "forecast-needs-planning-field.ac1",
+            "title": "GET /api/backlog/forecast returns a response containing a `needsPlanning` array of enriched nodes ({ issue, rank, title, ... }) derived from selectNeedsPlanning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forecast-needs-planning-field.ac2",
+            "title": "When sequence.md is absent the forecast handler returns `needsPlanning: []` (stable shape)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forecast-needs-planning-field.ac3",
+            "title": "Existing forecast fields (stats, inFlight, waves, lanes, cohort, epics, contains) are unchanged — typecheck passes and no existing field is renamed or removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-rule",
+        "title": "Add the Planning floor rule to roles/flywheel.md step 5",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T19:24:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2173",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend step 5 of roles/flywheel.md (the 'Launch agents aggressively' step, ~line 110) with an explicit 'Planning floor' rule. It must state: (a) each tick, call `GET /api/backlog/forecast` and read its `needsPlanning[]` list; (b) run `pan plan <id> --auto` (NEVER `--auto-start`) for up to 2 of those items, EVEN while draining the in-flight cohort; (c) apply the same author/assignee gate (verify via `gh issue view <num> --json author,assignees`) and skip parked/objection items before planning each one; (d) only plan while total active agents stays under maxAgents (capacity check); (e) the PAN-2006 reconciliation — planning fills the awaiting-release queue, does NOT auto-start, and does NOT extend the running cohort, so it is orthogonal to cohort drain; (f) the SLA — a ready, vetted, capacity-available issue is planned within ~1-2 ticks, not stranded for hours. Keep operator-facing wording self-contained (define needsPlanning/Release-gate inline) per the operator-message rule. Do not renumber other steps."
+        },
+        "items": [
+          {
+            "id": "flywheel-rule.ac1",
+            "title": "roles/flywheel.md step 5 contains a 'Planning floor' rule directing the orchestrator to read forecast `needsPlanning[]` and run `pan plan <id> --auto` (not --auto-start) for up to 2 items per tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-rule.ac2",
+            "title": "The rule contains the PAN-2006 reconciliation: planning proceeds EVEN while draining the cohort, fills awaiting-release, never auto-starts, and never extends the running cohort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-rule.ac3",
+            "title": "The rule contains the author/assignee gate and parked/objection exclusion as preconditions for planning each item, plus a capacity check against maxAgents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-rule.ac4",
+            "title": "The rule contains the SLA: a ready, vetted, capacity-available issue is planned within ~1-2 ticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "needs-planning-selector",
+        "to": "forecast-needs-planning-field",
+        "type": "blocks"
+      },
+      {
+        "from": "forecast-needs-planning-field",
+        "to": "flywheel-rule",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2173-flywheel-planning-floor-plan-new-ready-backlog-while-draining-a-cohort.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
