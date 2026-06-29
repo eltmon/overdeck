@@ -1,26 +1,23 @@
 {
   "vBRIEFInfo": {
     "version": "0.6",
-    "created": "2026-06-29T15:44:42.000Z",
-    "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2155: Decompose src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx (1620 lines) into focused modules",
-    "updated": "2026-06-29T15:50:35.476Z"
+    "created": "2026-06-29T16:05:00.000Z",
+    "updated": "2026-06-29T16:05:00.000Z",
+    "author": "agent:claude-opus-4-8",
+    "description": "Plan for PAN-2155: Decompose chat/MessagesTimeline.tsx (1620 lines) into focused submodules behind a thin barrel — behavior-preserving."
   },
   "plan": {
     "id": "pan-2155",
-    "title": "Decompose MessagesTimeline.tsx (1620 lines) into focused modules",
+    "uid": "24e762d5-78a2-46ce-b220-74566eb2ca14",
+    "title": "Decompose MessagesTimeline.tsx into focused modules",
     "status": "proposed",
-    "uid": "8b2049f9-3d82-4a40-af5c-642b89a8624e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
-    "created": "2026-06-29T15:44:42.000Z",
-    "updated": "2026-06-29T15:50:35.476Z",
+    "created": "2026-06-29T16:05:00.000Z",
+    "updated": "2026-06-29T16:05:00.000Z",
     "references": [
-      {
-        "uri": "https://github.com/eltmon/overdeck/issues/2155",
-        "label": "PAN-2155",
-        "type": "issue"
-      }
+      "src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx",
+      ".pan/drafts/PAN-2155.md",
+      "docs/codebase-health/REMAINING-BACKLOG.md"
     ],
     "tags": [
       "refactor",
@@ -28,255 +25,60 @@
       "frontend"
     ],
     "narratives": {
-      "Problem": "src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx is 1620 lines — over the 1,000-line file-size guard. It mixes search-highlight DOM utilities, time/duration formatters, the virtualized container component, the per-row dispatcher, the individual row renderers, the work-log tool renderers, and the divider/indicator components in one file.",
-      "Proposal": "Pure relocation behind a barrel. Extract cohesive symbol groups into sibling modules under a new camelCase directory chat/messagesTimeline/, one bead per module, and leave chat/MessagesTimeline.tsx as a thin re-export barrel. Dependency order: leaf helpers (constants, format, searchHighlight, types) -> row/divider components (messageRows, workLogRows, dividers) -> the per-row dispatcher (TimelineRowRenderer) -> the main component, which is then moved out and the original file collapsed to re-exports. No logic edits, no renamed exports, no call-site changes. typecheck + lint + the full vitest suite must be green after every seam.",
-      "NonGoals": "- No logic edits, no renamed or removed exports, no behavior change (pure moves + re-exports only).\n- Do NOT move or modify MessagesTimeline.logic.ts (already a separate sub-1000 sibling referenced as ./MessagesTimeline.logic).\n- No changes to any importing call site (TerminalPanel.tsx, ConversationPanel.tsx, CommandDeck/SessionView/SessionPanel.tsx, lib/deriveRoundMarkers.ts, the test).\n- No new tests, no test-behavior changes.\n- No eslint-any-allowlist.json edits (the file currently contains zero `any`)."
+      "Problem": "src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx is 1620 lines — baselined at 1620 in scripts/file-size-baseline.txt and over the 1000-line file-size guard ceiling. It mixes cohesive concerns in one file: 3 module constants (45-47), time/duration formatters (formatTimestamp 151, formatElapsed 169), search-highlight DOM utilities (49-148), the exported types RoundMarker (189) + MessagesTimelineProps (198), the virtualized container component MessagesTimeline (229-852), the per-row dispatcher TimelineRowRenderer (854-903), the message-row renderers (905-1100), the work-log tool renderers (1101-1449), and the divider/indicator components (1450-1620). A sibling MessagesTimeline.logic.ts already holds the data-transform layer and is out of scope.",
+      "Proposal": "Pure relocation behind a barrel. Extract cohesive groups into a new sibling directory src/dashboard/frontend/src/components/chat/messagesTimeline/ (camelCase; does not collide with the uppercase MessagesTimeline.tsx barrel on this case-sensitive filesystem), and leave chat/MessagesTimeline.tsx as a thin re-export barrel that still exports MessagesTimeline (value), RoundMarker (type), and MessagesTimelineProps (type). Modules: types.ts, helpers.ts, messageRows.tsx, workLogRows.tsx, dividers.tsx, TimelineRowRenderer.tsx, MessagesTimeline.tsx (component). Dependency order types/helpers -> messageRows/workLogRows/dividers -> TimelineRowRenderer -> component -> barrel; no cycles. RoundMarker lives in types.ts so dividers.tsx can use it without a cycle back to the component. Three seams (work items) in a linear blocks chain because all three edit chat/MessagesTimeline.tsx. Each seam ends with the FULL frontend-aware gate set green. No logic edits, no renamed exports, no call-site changes, no any introduced. Requirements: FR-1 barrel keeps the public surface; FR-2 every internal symbol relocated per the layout with no cycle; FR-3 zero call-site changes (TerminalPanel.tsx, ConversationPanel.tsx, CommandDeck/SessionView/SessionPanel.tsx, lib/deriveRoundMarkers.ts, all __tests__); FR-4 pure relocation (byte-for-byte moves + added imports only); NFR-1 each new file < 1000 lines and lint:file-size exits 0; NFR-2 any-ratchet green with no allowlist edit; NFR-3 the 4-part gate set green after each seam; NFR-4 no edit to scripts/file-size-baseline.txt or MessagesTimeline.logic.ts. GATE SET (after every seam — the issue's root-only checklist is INSUFFICIENT because root typecheck excludes src/dashboard/** and root vitest excludes src/dashboard/frontend/**): (1) npm run lint; (2) npx tsc --noEmit run from src/dashboard/frontend/; (3) npm --prefix src/dashboard/frontend run test (0 failed) — the behavior proof; (4) npm run typecheck && npx vitest run --configLoader runner.",
+      "NonGoals": "No logic edits, no renamed or removed exports, no behavior change of any kind (pure moves + re-exports). Do NOT move or modify MessagesTimeline.logic.ts. No changes to any importing call site (TerminalPanel.tsx, ConversationPanel.tsx, CommandDeck/SessionView/SessionPanel.tsx, lib/deriveRoundMarkers.ts, the tests). No new tests and no test-behavior changes. No eslint-any-allowlist.json edit (the file has no any). No scripts/file-size-baseline.txt edit (the shrunk barrel passes against its 1620 baseline; matches the PAN-2150 convention). No re-architecture of virtualization, search, rounds, or any feature — relocation only."
     },
-    "autoDecisions": [
-      {
-        "summary": "New sibling directory named chat/messagesTimeline/ (camelCase).",
-        "rationale": "Matches existing camelCase component-dir precedent (sessionFeed/, autopreso/) and avoids a name collision between the barrel file MessagesTimeline.tsx and a same-name MessagesTimeline/ directory, which some tooling resolves ambiguously."
-      },
-      {
-        "summary": "chat/MessagesTimeline.tsx becomes a pure thin barrel; the component body moves to chat/messagesTimeline/MessagesTimeline.tsx.",
-        "rationale": "The issue prefers a 'thin re-export barrel'. Although the component alone (~650 lines incl. imports) is already under 1000, a pure barrel is the cleaner, unambiguous target and keeps every importer resolving unchanged."
-      },
-      {
-        "summary": "Decompose into 9 beads (one per cohesive module + a final barrelize bead) rather than fewer larger beads.",
-        "rationale": "Each module is an independently reviewable, independently mergeable pure move that leaves the tree green; the planning guidance favors aggressive decomposition for refactors."
-      },
-      {
-        "summary": "requiresInspection=false on every bead.",
-        "rationale": "Each bead is a mechanical pure relocation; a wrong move surfaces immediately at typecheck/lint/full-suite rather than as silent foundation rot, so the inspection gate adds cost without catching a judgment-call defect."
-      }
-    ],
     "items": [
       {
-        "id": "extract-constants",
-        "title": "Extract module constants to messagesTimeline/constants.ts",
+        "id": "wi1-extract-types-and-helpers",
+        "title": "WI-1: Extract shared types and pure helpers into messagesTimeline/types.ts and messagesTimeline/helpers.ts",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/constants.ts exporting MAX_VISIBLE_WORK_LOG_ENTRIES, ALWAYS_UNVIRTUALIZED_TAIL_ROWS, AUTO_SCROLL_THRESHOLD_PX (currently MessagesTimeline.tsx:45-47). Remove the inline definitions from MessagesTimeline.tsx and import them from the new module."
-        },
-        "items": [
-          {
-            "id": "extract-constants.ac1",
-            "title": "messagesTimeline/constants.ts contains and exportsthe three numeric constants MAX_VISIBLE_WORK_LOG_ENTRIES, ALWAYS_UNVIRTUALIZED_TAIL_ROWS, AUTO_SCROLL_THRESHOLD_PX",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-constants.ac2",
-            "title": "MessagesTimeline.tsx no longer contains those constants inline and instead imports them from ./messagesTimeline/constants",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-constants.ac3",
-            "title": "npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "extract-format",
-        "title": "Extract time/duration formatters to messagesTimeline/format.ts",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/format.ts exporting formatTimestamp and formatElapsed (currently MessagesTimeline.tsx:151-177). Remove the inline definitions and import them from the new module."
-        },
-        "items": [
-          {
-            "id": "extract-format.ac1",
-            "title": "messagesTimeline/format.ts contains and exportsformatTimestamp and formatElapsed with identical signatures and bodies",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-format.ac2",
-            "title": "MessagesTimeline.tsx imports formatTimestamp/formatElapsed from ./messagesTimeline/format and no longer contains them inline",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-format.ac3",
-            "title": "npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "extract-search-highlight",
-        "title": "Extract search-highlight DOM utilities to messagesTimeline/searchHighlight.ts",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/searchHighlight.ts exporting stringifyToolInput, escapeRegex, extractSearchHighlightTerms, escapeDataAttributeValue, clearSearchHighlights, highlightSearchTermsInElement, getRowSearchText, and the SEARCH_HIGHLIGHT_CLASS / SEARCH_HIGHLIGHT_ATTR constants (currently MessagesTimeline.tsx:49-148). getRowSearchText needs the MessagesTimelineRow type from ./MessagesTimeline.logic. Remove the inline definitions and import what the component still uses."
-        },
-        "items": [
-          {
-            "id": "extract-search-highlight.ac1",
-            "title": "messagesTimeline/searchHighlight.ts contains and exportsthe search-highlight helpers and SEARCH_HIGHLIGHT_CLASS/ATTR; getRowSearchText imports MessagesTimelineRow from the relocated relative path",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-search-highlight.ac2",
-            "title": "MessagesTimeline.tsx imports the search-highlight helpers it uses from ./messagesTimeline/searchHighlight and no longer contains them inline",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-search-highlight.ac3",
-            "title": "The MessagesTimeline search test (highlighting + scroll-to-match) still passes; npx vitest run --configLoader runner exits 0 with 0 failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-search-highlight.ac4",
-            "title": "npm run typecheck and npm run lint each exits 0",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "extract-types",
-        "title": "Extract public prop/marker types to messagesTimeline/types.ts",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-2"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/types.ts exporting the RoundMarker interface and MessagesTimelineProps interface (currently MessagesTimeline.tsx:189-225), preserving their imported dependencies (RoundVerdict, ChatMessage, WorkLogEntry, FailedMessage, etc.). Import these types back into MessagesTimeline.tsx. These two types are part of the public barrel surface."
-        },
-        "items": [
-          {
-            "id": "extract-types.ac1",
-            "title": "messagesTimeline/types.ts contains and exportsRoundMarker and MessagesTimelineProps unchanged (same fields, same doc comments)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-types.ac2",
-            "title": "MessagesTimeline.tsx imports RoundMarker and MessagesTimelineProps from ./messagesTimeline/types and the existing external importers of RoundMarker (SessionPanel, ConversationPanel, deriveRoundMarkers, the test) still resolve unchanged, which preserves their import paths",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-types.ac3",
-            "title": "npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "extract-message-rows",
-        "title": "Extract user/assistant/context row components to messagesTimeline/messageRows.tsx",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
+        "priority": "high",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-2155",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "traces": [
-            "FR-1"
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
           ]
         },
         "narrative": {
-          "Action": "Create chat/messagesTimeline/messageRows.tsx containing isSummaryForkMessage, isReviewerContextMessage, parseSlashCommandMessage, UserMessageRow, ContextMessageBlock, ReviewerContextBlock, AssistantMessageRow (currently MessagesTimeline.tsx:905-1100). These use formatTimestamp/formatElapsed from ./format and other existing imports (ChatMarkdown, DiffStatLabel, ChangedFilesTree, summarizeTurnDiffStats, etc.). Export every component the per-row dispatcher uses (UserMessageRow, AssistantMessageRow, ContextMessageBlock). Remove the inline definitions and import them back."
+          "Action": "Create src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts and move RoundMarker (MessagesTimeline.tsx:189-196) and MessagesTimelineProps (:198-225) verbatim, with their type-only imports (ChatMessage/CompactBoundary/ProposedPlan/TurnDiffSummary/WorkLogEntry from chat-types, WorkingPhase from lib/workingPhase, FailedMessage from ConversationPanel, RoundVerdict from CommandDeck/RoundCard) repathed for the deeper directory (e.g. '../../lib/workingPhase' -> '../../../lib/workingPhase', './chat-types' -> '../chat-types'). Create messagesTimeline/helpers.ts and move the 3 constants (:45-47), formatTimestamp (:151-166), formatElapsed (:169-177), stringifyToolInput (:49-56), escapeRegex (:58-60), extractSearchHighlightTerms (:62-69), SEARCH_HIGHLIGHT_CLASS/ATTR (:72-73), escapeDataAttributeValue (:75-79), clearSearchHighlights (:81-86), highlightSearchTermsInElement (:88-126), and getRowSearchText (:128-148); helpers.ts imports the MessagesTimelineRow type from '../MessagesTimeline.logic'. Update chat/MessagesTimeline.tsx to import all moved symbols back from './messagesTimeline/types' and './messagesTimeline/helpers', and add `export type { RoundMarker, MessagesTimelineProps } from './messagesTimeline/types'` so external `import type { RoundMarker } from '.../MessagesTimeline'` keeps resolving. Pure move — no logic edits."
         },
         "items": [
           {
-            "id": "extract-message-rows.ac1",
-            "title": "messagesTimeline/messageRows.tsx is under 1,000 lines and contains exportedUserMessageRow, AssistantMessageRow, ContextMessageBlock (plus the message-classifier helpers it owns), importing formatTimestamp/formatElapsed from ./format",
+            "id": "wi1-extract-types-and-helpers.ac1",
+            "title": "Given the moved types and helpers, when `npx tsc --noEmit` runs from src/dashboard/frontend/, then chat/MessagesTimeline.tsx compiles importing RoundMarker, MessagesTimelineProps, the 3 constants, and every helper from the two new modules with no type errors.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "extract-message-rows.ac2",
-            "title": "MessagesTimeline.tsx no longer contains those row components inline and imports them from ./messagesTimeline/messageRows",
+            "id": "wi1-extract-types-and-helpers.ac2",
+            "title": "Given the new re-export, when lib/deriveRoundMarkers.ts and CommandDeck/SessionView/SessionPanel.tsx are typechecked, then `import type { RoundMarker } from '.../MessagesTimeline'` still resolves unchanged with no importer edited.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "extract-message-rows.ac3",
-            "title": "npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
+            "id": "wi1-extract-types-and-helpers.ac3",
+            "title": "Given the seam, when `npm run lint`, `npm --prefix src/dashboard/frontend run test`, and `npm run typecheck && npx vitest run --configLoader runner` all run, then every gate passes with 0 failures and the any-ratchet stays green with no eslint-any-allowlist.json edit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-extract-types-and-helpers.ac4",
+            "title": "Given types.ts and helpers.ts, when `wc -l` runs on each, then each is under 1000 lines.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -285,146 +87,10 @@
         ]
       },
       {
-        "id": "extract-worklog-rows",
-        "title": "Extract work-log tool renderers to messagesTimeline/workLogRows.tsx",
+        "id": "wi2-extract-leaf-rows-and-dividers",
+        "title": "WI-2: Extract leaf row and divider components into messagesTimeline/messageRows.tsx, workLogRows.tsx, and dividers.tsx",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/workLogRows.tsx containing WorkLogGroup, the TERMINAL_TOOLS and WORK_LOG_DETAIL_MAX constants, asString, firstLine, getWorkLogDisplayDetail, ToolUseExpanded, SimpleWorkEntryRow (currently MessagesTimeline.tsx:1101-1449). WorkLogGroup uses MAX_VISIBLE_WORK_LOG_ENTRIES from ./constants. Export WorkLogGroup (used by the dispatcher). Remove the inline definitions and import them back."
-        },
-        "items": [
-          {
-            "id": "extract-worklog-rows.ac1",
-            "title": "messagesTimeline/workLogRows.tsx is under 1,000 lines and contains exportedWorkLogGroup, and imports MAX_VISIBLE_WORK_LOG_ENTRIES from ./constants",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-worklog-rows.ac2",
-            "title": "MessagesTimeline.tsx no longer contains WorkLogGroup/ToolUseExpanded/SimpleWorkEntryRow or their helpers inline and imports WorkLogGroup from ./messagesTimeline/workLogRows",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-worklog-rows.ac3",
-            "title": "The Pi-harness tool-entry tests still pass; npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "extract-dividers",
-        "title": "Extract divider/indicator components to messagesTimeline/dividers.tsx",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/dividers.tsx containing WorkingIndicator, ROUND_VERDICT_COLOR, ROUND_VERDICT_LABEL, RoundDivider, SessionPermissionsRow, SlashCommandDivider, CompactBoundaryDivider, CompactingIndicator (currently MessagesTimeline.tsx:1450-1620). SlashCommandDivider uses formatTimestamp from ./format; RoundDivider uses the RoundMarker type from ./types. Export every component the dispatcher uses (WorkingIndicator, RoundDivider, SessionPermissionsRow, SlashCommandDivider, CompactBoundaryDivider, CompactingIndicator). Remove the inline definitions and import them back."
-        },
-        "items": [
-          {
-            "id": "extract-dividers.ac1",
-            "title": "messagesTimeline/dividers.tsx contains and exportsWorkingIndicator, RoundDivider, SessionPermissionsRow, SlashCommandDivider, CompactBoundaryDivider, CompactingIndicator, importing formatTimestamp from ./format and RoundMarker from ./types",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-dividers.ac2",
-            "title": "MessagesTimeline.tsx no longer contains those divider/indicator components inline and imports them from ./messagesTimeline/dividers",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-dividers.ac3",
-            "title": "The round-marker injection tests still pass; npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "extract-row-renderer",
-        "title": "Extract the per-row dispatcher to messagesTimeline/TimelineRowRenderer.tsx",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2155",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Create chat/messagesTimeline/TimelineRowRenderer.tsx containing the RowProps interface and the memo'd TimelineRowRenderer (currently MessagesTimeline.tsx:854-901). It imports the row components from ./messageRows and ./workLogRows, the divider/indicator components from ./dividers, PlanCard from ../PlanCard, and the MessagesTimelineRow type from ../MessagesTimeline.logic. Export TimelineRowRenderer. Remove the inline definition from MessagesTimeline.tsx and import it back. Depends on extract-message-rows, extract-worklog-rows, extract-dividers, extract-types being done first."
-        },
-        "items": [
-          {
-            "id": "extract-row-renderer.ac1",
-            "title": "messagesTimeline/TimelineRowRenderer.tsx contains and exportsTimelineRowRenderer, importing the row, work-log, and divider components from their new sibling modules",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-row-renderer.ac2",
-            "title": "MessagesTimeline.tsx no longer contains TimelineRowRenderer/RowProps inline and imports TimelineRowRenderer from ./messagesTimeline/TimelineRowRenderer",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "extract-row-renderer.ac3",
-            "title": "npm run typecheck, npm run lint, and npx vitest run --configLoader runner each exits 0 with 0 tests failed",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "barrelize-entry",
-        "title": "Move the MessagesTimeline component out and collapse the entry to a thin barrel",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T15:44:42.000Z",
+        "priority": "high",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-2155",
@@ -432,41 +98,91 @@
           "inspectionDepth": "fast",
           "traces": [
             "FR-2",
-            "FR-3",
-            "NFR-1"
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
           ]
         },
         "narrative": {
-          "Action": "Move the MessagesTimeline component (currently MessagesTimeline.tsx:227-851) into chat/messagesTimeline/MessagesTimeline.tsx, importing constants from ./constants, search-highlight helpers from ./searchHighlight, types from ./types, and TimelineRowRenderer from ./TimelineRowRenderer (and the logic/markdown/etc. modules at their relocated relative paths). Then rewrite chat/MessagesTimeline.tsx as a thin barrel: re-export MessagesTimeline (value) from ./messagesTimeline/MessagesTimeline and re-export RoundMarker and MessagesTimelineProps (types) from ./messagesTimeline/types. No call-site changes anywhere."
+          "Action": "Create messagesTimeline/messageRows.tsx and move isSummaryForkMessage (:905-908), isReviewerContextMessage (:910-915), parseSlashCommandMessage (:917-920), UserMessageRow (:922-958), ContextMessageBlock (:960-986), ReviewerContextBlock (:988-1013), and AssistantMessageRow (:1015-1100); it imports formatTimestamp/formatElapsed from './helpers' and ChatMarkdown/ChangedFilesTree/DiffStatLabel/summarizeTurnDiffStats with repathed relatives. Create messagesTimeline/workLogRows.tsx and move WorkLogGroup (:1101-1160), TERMINAL_TOOLS (:1161), WORK_LOG_DETAIL_MAX (:1162), asString (:1164-1166), firstLine (:1168-1171), getWorkLogDisplayDetail (:1173-1183), ToolUseExpanded (:1185-1363), and SimpleWorkEntryRow (:1364-1449); it imports MAX_VISIBLE_WORK_LOG_ENTRIES from './helpers'. Create messagesTimeline/dividers.tsx and move WorkingIndicator (:1450-1482), ROUND_VERDICT_COLOR/LABEL (:1483-1496), RoundDivider (:1497-1551), SessionPermissionsRow (:1552-1570), SlashCommandDivider (:1571-1588), CompactBoundaryDivider (:1589-1612), and CompactingIndicator (:1613-1620); it imports formatTimestamp from './helpers', RoundMarker from './types', and the command-deck styles module with a repathed relative. Update chat/MessagesTimeline.tsx so TimelineRowRenderer (still in chat/MessagesTimeline.tsx at this point) and the main component import these components from the three new modules. Pure move — no logic edits, no renamed exports."
         },
         "items": [
           {
-            "id": "barrelize-entry.ac1",
-            "title": "chat/messagesTimeline/MessagesTimeline.tsx contains the component and is under 1,000 lines",
+            "id": "wi2-extract-leaf-rows-and-dividers.ac1",
+            "title": "Given the three new module files, when `npx tsc --noEmit` runs from src/dashboard/frontend/ and `npm run typecheck && npx vitest run --configLoader runner` runs at root, then all pass with 0 failures (no import cycle, all relative paths resolve).",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "barrelize-entry.ac2",
-            "title": "chat/MessagesTimeline.tsx is reduced to a thin re-export barrel exposing MessagesTimeline, RoundMarker, and MessagesTimelineProps; all five existing importers (TerminalPanel, ConversationPanel, SessionPanel, deriveRoundMarkers, the test) resolve unchanged, which preserves every existing import path with no edits to their import lines",
+            "id": "wi2-extract-leaf-rows-and-dividers.ac2",
+            "title": "Given the moved renderers, when `npm --prefix src/dashboard/frontend run test` runs, then MessagesTimeline.test.tsx (search highlighting, round-marker injection, Pi harness tool entries) and ConversationPanel.test.tsx pass with 0 failures, proving rendered output is unchanged.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "barrelize-entry.ac3",
-            "title": "Every file under chat/messagesTimeline/ contains fewer than 1,000 lines and no source file in the changeset exceeds the file-size guard",
+            "id": "wi2-extract-leaf-rows-and-dividers.ac3",
+            "title": "Given messageRows.tsx, workLogRows.tsx, and dividers.tsx, when `npm run lint` runs, then it exits 0 and the file-size guard reports each new file under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-extract-component-and-barrelize",
+        "title": "WI-3: Move TimelineRowRenderer + the MessagesTimeline component into messagesTimeline/ and reduce chat/MessagesTimeline.tsx to a thin barrel",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2155",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create messagesTimeline/TimelineRowRenderer.tsx and move RowProps (:854-866) and TimelineRowRenderer (:867-903); it imports messageRows/workLogRows/dividers from './...', types from './types', and PlanCard with a repathed relative. Create messagesTimeline/MessagesTimeline.tsx and move the MessagesTimeline component (:227-852, including the ALWAYS_UNVIRTUALIZED_TAIL_ROWS/AUTO_SCROLL_THRESHOLD_PX usages which import from './helpers'); it imports helpers, types, TimelineRowRenderer, RoundDivider from './dividers', ChatMarkdownSettingsProvider/ChatMarkdown, useVirtualizer, and the MessagesTimeline.logic helpers from '../MessagesTimeline.logic'. Reduce chat/MessagesTimeline.tsx to a thin barrel containing only a top file comment, `export { MessagesTimeline } from './messagesTimeline/MessagesTimeline'`, and `export type { RoundMarker, MessagesTimelineProps } from './messagesTimeline/types'`. Do NOT edit scripts/file-size-baseline.txt (the shrunk barrel passes against its 1620 baseline) and do NOT touch MessagesTimeline.logic.ts."
+        },
+        "items": [
+          {
+            "id": "wi3-extract-component-and-barrelize.ac1",
+            "title": "Given the thin barrel, when the 5 importers (TerminalPanel.tsx, ConversationPanel.tsx, CommandDeck/SessionView/SessionPanel.tsx, lib/deriveRoundMarkers.ts, __tests__/MessagesTimeline.test.tsx) are typechecked, then each resolves MessagesTimeline / RoundMarker / MessagesTimelineProps unchanged with no importer edit.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "barrelize-entry.ac4",
-            "title": "npm run typecheck, npm run lint, and the full npx vitest run --configLoader runner each exits 0 with 0 tests failed",
+            "id": "wi3-extract-component-and-barrelize.ac2",
+            "title": "Given the completed refactor, when `wc -l` runs on chat/MessagesTimeline.tsx and on every file under chat/messagesTimeline/, then the barrel is materially smaller than 1620 (a few lines) and each new module is under 1000 lines, and `npm run lint:file-size` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-extract-component-and-barrelize.ac3",
+            "title": "Given the full gate set, when `npm run lint`, `npx tsc --noEmit` (in src/dashboard/frontend), `npm --prefix src/dashboard/frontend run test`, and `npm run typecheck && npx vitest run --configLoader runner` all run, then every gate passes with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-extract-component-and-barrelize.ac4",
+            "title": "Given the cumulative diff, when reviewed, then it is pure relocation: no logic edits, no renamed or removed exports, MessagesTimeline.logic.ts untouched, scripts/file-size-baseline.txt untouched, and eslint-any-allowlist.json untouched.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -477,69 +193,16 @@
     ],
     "edges": [
       {
-        "from": "extract-format",
-        "to": "extract-message-rows",
+        "from": "wi1-extract-types-and-helpers",
+        "to": "wi2-extract-leaf-rows-and-dividers",
         "type": "blocks"
       },
       {
-        "from": "extract-format",
-        "to": "extract-dividers",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-constants",
-        "to": "extract-worklog-rows",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-constants",
-        "to": "barrelize-entry",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-search-highlight",
-        "to": "barrelize-entry",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-types",
-        "to": "extract-dividers",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-types",
-        "to": "extract-row-renderer",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-types",
-        "to": "barrelize-entry",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-message-rows",
-        "to": "extract-row-renderer",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-worklog-rows",
-        "to": "extract-row-renderer",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-dividers",
-        "to": "extract-row-renderer",
-        "type": "blocks"
-      },
-      {
-        "from": "extract-row-renderer",
-        "to": "barrelize-entry",
+        "from": "wi2-extract-leaf-rows-and-dividers",
+        "to": "wi3-extract-component-and-barrelize",
         "type": "blocks"
       }
-    ],
-    "metadata": {
-      "canonicalFilename": "2026-06-29-PAN-2155-decompose-messagestimeline-tsx-1620-lines-into-focused-modules.vbrief.json"
-    }
+    ]
   },
   "status": "proposed"
 }
