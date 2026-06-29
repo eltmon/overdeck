@@ -1,0 +1,450 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T04:30:00.000Z",
+    "author": "agent:claude-opus-4-8",
+    "description": "Plan for PAN-2150: Decompose SettingsPage.tsx (2043 lines) into focused submodules — behavior-preserving.",
+    "updated": "2026-06-29T04:22:06.194Z"
+  },
+  "plan": {
+    "id": "pan-2150",
+    "title": "Decompose src/dashboard/frontend/src/components/Settings/SettingsPage.tsx into focused modules",
+    "status": "proposed",
+    "uid": "pan2150-de00-4c00-9a00-000000002150",
+    "author": "agent:claude-opus-4-8",
+    "created": "2026-06-29T04:30:00.000Z",
+    "updated": "2026-06-29T04:22:06.194Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2150",
+        "label": "PAN-2150",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/codebase-health/REMAINING-BACKLOG.md",
+        "label": "codebase-health backlog",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "frontend",
+      "settings",
+      "file-size",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx is 2043 lines — a god file flagged by the A3 file-size campaign (baselined at 4200 in scripts/file-size-baseline.txt). The component renders all ~17 settings sections stacked as inline <section id=\"…\"> anchors in one 1180-line return, alongside ~40 handlers and module-level interfaces/constants. The page already uses a partial decomposition: five sections are extracted under sections/*Section.tsx (VoiceSettingsSection, ConversationSettingsSection, ProviderManagementSection, TtsConfigurationSection, ConversationSearchSection) plus WorkhorsePanel/RolesPanel/DesktopSettingsSection — but the remaining inline sections keep the file oversized.",
+      "Proposal": "Finish the established decomposition: extract every remaining inline <section> block (except the already-thin model-routing wrapper) into its own sections/<Name>Section.tsx component receiving the state/handlers it needs as props — mirroring VoiceSettingsSection verbatim. Move module-level shared code (the four local interfaces, the tracker/nav/cost constants, the voice defaults/helpers, and buildMiniMaxFormData) into co-located modules, re-exporting buildMiniMaxFormData from SettingsPage.tsx so the existing test import keeps resolving. A handler used by exactly one section moves into that section; a handler used by multiple sections stays in SettingsPage and is passed as a prop. SettingsPage.tsx remains the import entry (export function SettingsPage unchanged) and shrinks to a thin composition (target ≤ ~900 lines); every new file lands under the 1000-line ceiling. Pure relocation — no logic edits, no renamed exports, no markup changes beyond mechanical prop substitution. Each seam (one work item) ends with typecheck + lint + the FULL vitest suite green.",
+      "NonGoals": "- No logic changes, no renamed/removed exports, no behavior change of any kind. - No pulling state into custom hooks (state ownership stays in SettingsPage; only handler bodies and JSX relocate). - No extraction of the model-routing section (already a ~24-line wrapper around extracted panels). - No edit to scripts/file-size-baseline.txt (a shrunk baselined file already passes the guard; touching it is out of scope). - No fix of pre-existing any usages — moved any is allowlisted, not retyped. - No changes to the scroll-spy nav model (SETTINGS_NAV_ITEMS, scrollToSection) or section ids/order."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extraction pattern = mirror the existing sections/*Section.tsx prop-driven components (VoiceSettingsSection etc.). Each inline <section id=x> becomes sections/<Name>Section.tsx with a typed Props interface; the <section>…</section> JSX moves verbatim and closed-over identifiers become props.",
+        "rationale": "The repo already decomposed five sections this exact way; following precedent keeps the change behavior-preserving and reviewable. Reuses existing prop types from ./types and ./modelCatalog where present."
+      },
+      {
+        "summary": "Handler ownership rule: a handler referenced by exactly one section moves into that section component (relocated verbatim, closing over props like formData + applySettings); a handler referenced by 2+ sections stays in SettingsPage and is passed down. State (useState/useEffect/useMemo) stays entirely in SettingsPage.",
+        "rationale": "Deterministic, executor-applicable rule that shrinks SettingsPage on both JSX and handler axes while keeping state ownership unchanged (lowest behavior-change risk). typecheck enforces every closed-over identifier is wired."
+      },
+      {
+        "summary": "buildMiniMaxFormData moves to a co-located helper module and is re-exported from SettingsPage.tsx (export { buildMiniMaxFormData } from './miniMaxFormData'). The four local interfaces, the constants (TrackerType/TRACKERS/BG_FEATURE_COST_SOURCE/SETTINGS_NAV_ITEMS), and the voice defaults/helpers move to co-located modules and are imported back.",
+        "rationale": "Keeps the existing test import (__tests__/SettingsPage.test.ts imports buildMiniMaxFormData from '../SettingsPage') resolving with zero test edits (FR-1)."
+      },
+      {
+        "summary": "Files receiving moved `any` are added to eslint-any-allowlist.json in the same commit: settingsPageConstants.ts (TRACKERS icon:any), MaintenanceSection.tsx and ExperimentalSection.tsx (catch (err: any)).",
+        "rationale": "A1 ratchet — no new explicit any; moved any is allowlisted, never retyped (out of scope per NonGoals)."
+      },
+      {
+        "summary": "All work items run sequentially (linear DAG WI-1→WI-2→…→WI-8) because each item edits SettingsPage.tsx (imports + return) = shared mutation of one file.",
+        "rationale": "Edge semantics: shared mutation requires serialization. This is the only reason for the chain — the sections are otherwise independent. The executor must not fan these out in parallel; they would conflict on SettingsPage.tsx."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-extract-module-level-shared",
+        "title": "WI-1: Extract module-level interfaces, constants, voice helpers, and buildMiniMaxFormData into co-located modules",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/: (1) Create SettingsPage.types.ts and move the four SettingsPage-local interfaces verbatim — OpenRouterModelCatalog (currently SettingsPage.tsx:56), OpenRouterCatalogResponse (:67), SaveSettingsResponse (:89), CloisterConfig (:95). NOTE: this local CloisterConfig is distinct from src/lib/cloister/config.ts's backend type — do not merge them. (2) Create settingsPageConstants.ts and move TrackerType (:292), TRACKERS (:293), BG_FEATURE_COST_SOURCE (:301), SETTINGS_NAV_ITEMS (:312). (3) Create voiceSettingsDefaults.ts and move DEFAULT_VOICE_SETTINGS (:206), DEFAULT_VOICE_HARDWARE_SETTINGS (:218), VOICE_HARDWARE_STORAGE_KEY (:224), loadVoiceHardwareSettings (:226), normalizeVoiceSettings (:241). (4) Create miniMaxFormData.ts and move buildMiniMaxFormData (:268). In SettingsPage.tsx, import all moved symbols back, and add `export { buildMiniMaxFormData } from './miniMaxFormData';` so the test import (__tests__/SettingsPage.test.ts:5 `from '../SettingsPage'`) keeps resolving. Add settingsPageConstants.ts to eslint-any-allowlist.json (TRACKERS has icon: any). Match imports each new file needs (lucide icons for TRACKERS/SETTINGS_NAV_ITEMS, types from ./types).",
+          "Why": "Removes ~180 lines of module-level code from SettingsPage.tsx and establishes the co-located module layout the section extractions build on. The buildMiniMaxFormData re-export preserves the public surface (FR-1) so no importer/test changes."
+        },
+        "items": [
+          {
+            "id": "wi1-extract-module-level-shared.ac1",
+            "title": "Given the moved interfaces/constants/helpers, when npm run typecheck runs, then SettingsPage.tsx compiles importing them from the new modules with no type errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-extract-module-level-shared.ac2",
+            "title": "Given the test file unchanged, when npx vitest run src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts runs, then buildMiniMaxFormData still imports from '../SettingsPage' and all its cases pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-extract-module-level-shared.ac3",
+            "title": "Given settingsPageConstants.ts now holds TRACKERS (icon: any), when npm run lint runs, then the any-ratchet passes because the file is listed in eslint-any-allowlist.json.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-extract-permissions",
+        "title": "WI-2: Extract the permissions section into sections/PermissionsSection.tsx",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Locate the <section id=\"permissions\"> … </section> block (currently ~SettingsPage.tsx:937–1089; re-find by the id anchor since WI-1 shifted lines). Create sections/PermissionsSection.tsx exporting function PermissionsSection(props: PermissionsSectionProps). Move the JSX verbatim. Every identifier the block closes over that is not an import/module-global becomes a typed prop (reuse SettingsConfig and other types from ./types). Apply the handler-ownership rule: handlers used only by this section (e.g. handlePermissionModeChange, handleCodexPermissionModeChange) move into PermissionsSection closing over props; handlers shared with other sections stay in SettingsPage and pass as props. In SettingsPage.tsx replace the block with <PermissionsSection …props… /> at the same position and add the import.",
+          "Why": "permissions is the largest non-diff/-memory inline section (~152 lines); extracting it is a big step toward the <900-line target and exercises the section-extraction recipe."
+        },
+        "items": [
+          {
+            "id": "wi2-extract-permissions.ac1",
+            "title": "Given PermissionsSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-extract-permissions.ac2",
+            "title": "Given the refactor, when the diff is reviewed, then the permissions JSX is byte-for-byte the same except closed-over identifiers now come from props, and no export was renamed/removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-extract-permissions.ac3",
+            "title": "Given PermissionsSection.tsx, when wc -l runs on it, then it is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-extract-cloister-remote",
+        "title": "WI-3: Extract the cloister and remote sections into sections/CloisterSection.tsx and sections/RemoteSection.tsx",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-find <section id=\"cloister\"> (~1090–1143) and <section id=\"remote\"> (~1144–1188) by their id anchors. Create sections/CloisterSection.tsx and sections/RemoteSection.tsx following the WI-2 recipe. Section-only handlers move in (cloister: saveCloisterSnapshot, updateCloisterConcurrency; remote: handleTmuxConfigModeChange, handleRemoteResiliencyTierChange, handleRemoteMaxConcurrentAgentsChange); shared handlers pass as props. The cloister section consumes the local CloisterConfig type now in SettingsPage.types.ts. Replace both blocks with <CloisterSection …/> and <RemoteSection …/> at the same positions and add imports.",
+          "Why": "Two cohesive mid-sized sections; continues the shrink and keeps each new file well under the ceiling."
+        },
+        "items": [
+          {
+            "id": "wi3-extract-cloister-remote.ac1",
+            "title": "Given CloisterSection.tsx and RemoteSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-extract-cloister-remote.ac2",
+            "title": "Given the refactor, when the rendered Settings page is inspected, then the cloister and remote sections appear in the same order/position with identical controls.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-extract-memory",
+        "title": "WI-4: Extract the memory section into sections/MemorySection.tsx",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-find <section id=\"memory\"> (~1233–1402) by its id anchor. Create sections/MemorySection.tsx per the WI-2 recipe. Section-only handlers move in (updateMemorySettings, handleMemoryNumberChange); shared handlers/state pass as props. Replace the block with <MemorySection …/> at the same position and add the import.",
+          "Why": "memory is one of the three largest inline sections (~170 lines)."
+        },
+        "items": [
+          {
+            "id": "wi4-extract-memory.ac1",
+            "title": "Given MemorySection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-extract-memory.ac2",
+            "title": "Given MemorySection.tsx, when wc -l runs on it, then it is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-extract-backgroundai-terminal-trackerkeys",
+        "title": "WI-5: Extract background-ai, terminal, and tracker-keys sections",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-find <section id=\"background-ai\"> (~1403–1501), <section id=\"terminal\"> (~1502–1533), <section id=\"tracker-keys\"> (~1534–1590) by id anchors. Create sections/BackgroundAiSection.tsx, sections/TerminalSection.tsx, sections/TrackerKeysSection.tsx per the WI-2 recipe. Section-only handlers move in (background-ai: updateBackgroundAi, applyBackgroundModelPatch, backgroundModelControl; tracker-keys: handleTrackerKeyChange and the showTrackerKey toggle state — keep showTrackerKey state in SettingsPage and pass setter, OR move it into TrackerKeysSection if used only there). background-ai consumes BG_FEATURE_COST_SOURCE from settingsPageConstants.ts; tracker-keys consumes TRACKERS/TrackerType from there. Replace all three blocks with their components at the same positions and add imports.",
+          "Why": "Three cohesive sections that share the moved constants; batching them keeps the seam coherent."
+        },
+        "items": [
+          {
+            "id": "wi5-extract-backgroundai-terminal-trackerkeys.ac1",
+            "title": "Given the three new section files, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-extract-backgroundai-terminal-trackerkeys.ac2",
+            "title": "Given the new section files, when wc -l runs on each, then each is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-extract-appearance-diff",
+        "title": "WI-6: Extract the appearance and diff sections into sections/AppearanceSection.tsx and sections/DiffSection.tsx",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-find <section id=\"appearance\"> (~1591–1621) and <section id=\"diff\"> (~1622–1818) by id anchors. Create sections/AppearanceSection.tsx and sections/DiffSection.tsx per the WI-2 recipe. The diff section likely consumes useDiffPreferences and useUIPreferences hook values — pass the values/handlers it closes over as props (do not move the hook calls out of SettingsPage). Replace both blocks at the same positions and add imports.",
+          "Why": "diff is the single largest inline section (~196 lines); extracting it is the biggest single shrink."
+        },
+        "items": [
+          {
+            "id": "wi6-extract-appearance-diff.ac1",
+            "title": "Given AppearanceSection.tsx and DiffSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-extract-appearance-diff.ac2",
+            "title": "Given DiffSection.tsx, when wc -l runs on it, then it is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-extract-maintenance-experimental",
+        "title": "WI-7: Extract the maintenance and experimental sections (both carry catch (err: any))",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-find <section id=\"maintenance\"> (~1819–1853) and the experimental <section id=\"experimental\"> (~1860–2042) by id anchors. Create sections/MaintenanceSection.tsx and sections/ExperimentalSection.tsx per the WI-2 recipe. Section-only handlers move in (experimental: handleClaudeCodeChannelsToggle, handleExperimentalFeaturesToggle, handleStreamdownToggle, handleHarnessModelPermutationsToggle, handleRtkToggle, handleTldrToggle; maintenance: the clearingCache/reloadingTldr handlers). Both blocks contain `catch (err: any)` (maintenance ~:1837, experimental ~:1942) — add BOTH new files to eslint-any-allowlist.json in this commit. Preserve all data-testid attributes verbatim (experimental-section, experimental-features-toggle, experimental-rtk-toggle, experimental-tldr-toggle, experimental-claude-code-channels-toggle, experimental-streamdown-toggle, legacy-import-open-button) so existing tests still target them. Replace both blocks at the same positions and add imports.",
+          "Why": "Final two inline sections; the experimental section is large (~182 lines) and test-targeted via data-testid, so verbatim preservation matters."
+        },
+        "items": [
+          {
+            "id": "wi7-extract-maintenance-experimental.ac1",
+            "title": "Given MaintenanceSection.tsx and ExperimentalSection.tsx, when typecheck + lint + the full vitest suite run, then all pass with 0 failures and the any-ratchet passes (both files allowlisted).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-extract-maintenance-experimental.ac2",
+            "title": "Given the experimental section, when its data-testid attributes are diffed, then every testid (experimental-section, experimental-features-toggle, experimental-rtk-toggle, experimental-tldr-toggle, experimental-claude-code-channels-toggle, experimental-streamdown-toggle) is preserved unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-final-verification",
+        "title": "WI-8: Final verification — SettingsPage thin entry, all files under ceiling, gates green, pure-move diff",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "easy",
+          "issueLabel": "pan-2150",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Confirm wc -l SettingsPage.tsx ≤ ~900 and every new sections/*.tsx + co-located module < 1000. Run scripts/lint-file-size.sh (exit 0), npm run typecheck, npm run lint, and npx vitest run --configLoader runner (0 failed). Verify FR-1: git grep \"from './SettingsPage'\" and the App/AppRoutes.tsx import still resolve; buildMiniMaxFormData re-export present. Review the cumulative diff to confirm pure relocation — no handler body changed except its closed-over identifier source, no export renamed/removed, no markup edits. Do NOT edit scripts/file-size-baseline.txt. If SettingsPage.tsx is still over ~900, extract one more section (e.g. fold model-routing or split a section file) rather than leaving it bloated.",
+          "Why": "Single gate that proves the decomposition met its size + behavior-preservation goals before review."
+        },
+        "items": [
+          {
+            "id": "wi8-final-verification.ac1",
+            "title": "Given the completed refactor, when scripts/lint-file-size.sh runs, then it exits 0 (SettingsPage.tsx ≤ its 4200 baseline and materially smaller than 2043; no new file > 1000).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-final-verification.ac2",
+            "title": "Given the completed refactor, when npm run typecheck && npm run lint && npx vitest run --configLoader runner run, then all pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-final-verification.ac3",
+            "title": "Given the cumulative diff, when reviewed, then it is pure relocation: no logic edits, no renamed/removed exports, importers unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-extract-module-level-shared",
+        "to": "wi2-extract-permissions",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-extract-permissions",
+        "to": "wi3-extract-cloister-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-extract-cloister-remote",
+        "to": "wi4-extract-memory",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-extract-memory",
+        "to": "wi5-extract-backgroundai-terminal-trackerkeys",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-extract-backgroundai-terminal-trackerkeys",
+        "to": "wi6-extract-appearance-diff",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-extract-appearance-diff",
+        "to": "wi7-extract-maintenance-experimental",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-extract-maintenance-experimental",
+        "to": "wi8-final-verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2150-decompose-src-dashboard-frontend-src-components-settings-settingspage-tsx-into-focused-modules.vbrief.json"
+    },
+    "sequence": 1
+  },
+  "status": "proposed"
+}
