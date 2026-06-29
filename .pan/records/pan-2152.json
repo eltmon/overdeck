@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2152",
   "schemaVersion": 2,
-  "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-06-29T04:13:18.509Z",
-  "pipeline": {
-    "issueId": "PAN-2152",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T04:13:04.890Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-2152: Decompose src/cli/commands/workspace.ts (1791 lines) into focused modules",
       "timestamp": "2026-06-29T04:13:18.509Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T04:13:04.890Z",
+  "updated": "2026-06-29T04:34:31.786Z",
+  "pipeline": {
+    "issueId": "PAN-2152",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T04:34:31.768Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7316,
+            "output": 346,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 31985,
+            "output": 86978,
+            "cacheRead": 8879020,
+            "cacheWrite": 320996
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7316,
+          "output": 346,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 31985,
+          "output": 86978,
+          "cacheRead": 8879020,
+          "cacheWrite": 320996
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 8.780116,
+        "pricingAsOf": "2026-06-29T04:34:31.785Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
