@@ -28,16 +28,17 @@
   ],
   "feedback": [],
   "created": "2026-06-27T02:46:24.299Z",
-  "updated": "2026-06-29T03:11:41.806Z",
+  "updated": "2026-06-29T03:11:48.701Z",
   "pipeline": {
     "issueId": "PAN-2081",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T03:11:41.774Z",
+    "updatedAt": "2026-06-29T03:11:48.680Z",
+    "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "Bead workspace-46l48 (Thread epic data through both backlog read endpoints) INSPECTION PASSED. computeEpicGroups + EpicGroups added at src/lib/backlog/pickup.ts:259; getBacklogSequenceForRoot surfaces isEpic via Map with isEpic:false fallback in md-absent path; routes/backlog.ts forecast returns epics (titleByIssue uppercase lookup) + contains. No SCHEMA_VERSION bump, no new DB column, no direct store access. Tests cover both AC (#2075 epic fixture, getBacklogSequenceForRoot epic-enrichment with temp sequence.md).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2096",
     "reviewRequestedAt": "2026-06-27T07:45:33.424Z"
@@ -92,7 +93,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.324373,
-        "pricingAsOf": "2026-06-29T03:11:41.806Z"
+        "pricingAsOf": "2026-06-29T03:11:48.701Z"
       }
     },
     "merges": [
