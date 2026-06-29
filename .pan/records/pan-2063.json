@@ -16,32 +16,43 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T13:21:55.100Z"
+    },
+    {
+      "timestamp": "2026-06-29T13:23:33.751Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:23:34.480Z"
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-haiku-4-5",
   "pipeline": {
     "issueId": "PAN-2063",
-    "reviewStatus": "passed",
-    "testStatus": "pending",
-    "verificationStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "testing",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:23:17.883Z",
+    "updatedAt": "2026-06-29T13:24:03.005Z",
     "reviewNotes": "No blocking findings; extracted UAT panel collapse meets requirements and non-goals.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "testNotes": "Verification gates passed: npm run typecheck (TypeScript strict mode), npm run lint (ESLint + all sub-linters), npm test (root + frontend suites). Root suite: 7496 tests passed, 52 skipped. Frontend suite: 32 tests passed. Implementation verified: FeatureItem.tsx line 938 initializes uatExpanded=false; lines 1287-1309 render collapse/expand button with proper aria-expanded, aria-label, and chevron indicators; button toggles uatExpanded state; UatStackStatus rendered conditionally on uatExpanded. CSS button reset applied at command-deck.module.css .uatStackTreeHeader with appearance/background/border/cursor/font resets. Test updated at FeatureItem.test.tsx:626 to assert collapsed-by-default (header/badge visible, service rows absent on mount), then click-to-expand assertion (postgres/api rows appear), then collapse-again assertion. All acceptance criteria met: AC1 (collapsed by default), AC2 (click header toggles), AC3 (button with proper aria + chevrons), AC4 (test + quality gates).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
     "reviewedAtCommit": "569242f66c1fa067ecd1625e5da9f9821e7bdd50",
-    "lastVerifiedCommit": "fadde2df83f8c574392b735b36ac642c9a665c41"
+    "lastVerifiedCommit": "fadde2df83f8c574392b735b36ac642c9a665c41",
+    "reviewRequestedAt": "2026-06-29T13:23:33.767Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 40329,
-            "output": 5150,
+            "input": 41331,
+            "output": 5402,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -56,10 +67,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 79,
-            "output": 7431,
-            "cacheRead": 4152720,
-            "cacheWrite": 285462
+            "input": 95,
+            "output": 7941,
+            "cacheRead": 4190504,
+            "cacheWrite": 396539
           }
         },
         "work": {
@@ -73,8 +84,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 40329,
-          "output": 5150,
+          "input": 41331,
+          "output": 5402,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -85,10 +96,10 @@
           "cacheWrite": 281556
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 79,
-          "output": 7431,
-          "cacheRead": 4152720,
-          "cacheWrite": 285462
+          "input": 95,
+          "output": 7941,
+          "cacheRead": 4190504,
+          "cacheWrite": 396539
         },
         "custom/glm-5.2": {
           "input": 237548,
@@ -98,8 +109,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 9.655044,
-        "pricingAsOf": "2026-06-29T13:23:17.914Z"
+        "usd": 9.800234,
+        "pricingAsOf": "2026-06-29T13:24:03.059Z"
       }
     },
     "merges": [
@@ -108,7 +119,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-06-29T13:23:17.914Z",
+  "updated": "2026-06-29T13:24:03.060Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
