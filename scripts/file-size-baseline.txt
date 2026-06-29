@@ -1,5 +1,5 @@
 1447 src/cli/commands/start.ts
-1791 src/cli/commands/workspace.ts
+151 src/cli/commands/workspace.ts
 1463 src/cli/index.ts
 1927 src/dashboard/frontend/src/App.tsx
 1016 src/dashboard/frontend/src/components/AwaitingMergePage.tsx

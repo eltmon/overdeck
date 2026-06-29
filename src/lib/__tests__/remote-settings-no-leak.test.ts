@@ -24,7 +24,7 @@ const REPO_ROOT = join(__dirname, '..', '..', '..');
 
 const REMOTE_PROVISIONERS = [
   'src/lib/remote/fly-provider.ts',
-  'src/cli/commands/workspace.ts',
+  'src/cli/commands/workspace-remote.ts',
 ];
 
 describe('Remote VM provisioning — settings.json must NEVER hardcode bypassPermissions', () => {

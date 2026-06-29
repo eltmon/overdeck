@@ -4,17 +4,17 @@
     "created": "2026-06-21T00:04:11.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1982: Revive convoy review as a configurable opt-in — global/project/per-issue (quick stays default)",
-    "updated": "2026-06-21T00:09:10.139Z"
+    "updated": "2026-06-28T04:25:06.471Z"
   },
   "plan": {
     "id": "pan-1982",
     "title": "Revive convoy review as a configurable opt-in — global/project/per-issue (quick stays default)",
-    "status": "proposed",
+    "status": "running",
     "uid": "0cc4c622-8158-4f08-88d6-721ca98e4cf8",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-21T00:04:11.000Z",
-    "updated": "2026-06-21T00:09:10.139Z",
+    "updated": "2026-06-28T04:25:06.471Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1982",
@@ -416,5 +416,5 @@
       "canonicalFilename": "2026-06-21-PAN-1982-revive-convoy-review-as-a-configurable-opt-in-global-project-per-issue-quick-stays-default.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

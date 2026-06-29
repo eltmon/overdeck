@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-27T16:42:33.430Z",
-    "updated": "2026-06-27T16:43:44.792Z",
+    "updated": "2026-06-29T03:05:16.693Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1084: Work agent must not auto-approve permission prompts in subagent sessions",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-1084",
     "title": "Work agent must not auto-approve permission prompts in subagent sessions",
-    "status": "running",
+    "status": "completed",
     "uid": "f67461d5-cc4a-45ac-b0a4-eba5da0101d6",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-06-27T16:42:33.430Z",
-    "updated": "2026-06-27T16:43:44.792Z",
+    "updated": "2026-06-29T03:05:16.693Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1084",
@@ -82,5 +82,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }
