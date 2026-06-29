@@ -231,7 +231,13 @@ export async function isAutoMergeEligible(
       return { eligible: false, reason: 'review status PR URL is missing or invalid' };
     }
 
-    const prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+    let prState: GitHubPullRequestState;
+    try {
+      prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      return { eligible: false, reason: `GitHub PR state lookup failed: ${message}` };
+    }
 
     // Reviewer P1: tighten to positive "green and mergeable" instead of "not known
     // failed". The previous predicate accepted pending checks, draft PRs,

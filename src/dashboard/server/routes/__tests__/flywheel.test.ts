@@ -542,6 +542,12 @@ describe('flywheel auto-merge routes', () => {
     }))).resolves.toEqual({ status: 422, body: { error: 'CI checks failing on PR HEAD deadbeef' } });
   });
 
+  it('returns 422 when auto-merge eligibility reports a GitHub PR-state read failure', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isEligible: async () => ({ eligible: false, reason: 'GitHub PR state lookup failed: gh auth required' }),
+    }))).resolves.toEqual({ status: 422, body: { error: 'GitHub PR state lookup failed: gh auth required' } });
+  });
+
   it('returns active pending auto-merges sorted by scheduled merge time', async () => {
     seedIssue('PAN-1');
     seedIssue('PAN-2');

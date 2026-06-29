@@ -139,6 +139,16 @@ describe('auto-merge eligibility', () => {
       .resolves.toEqual({ eligible: true });
   });
 
+  it('returns ineligible when the GitHub PR state lookup throws', async () => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus());
+    const getPullRequestState = vi.fn(async () => { throw new Error('gh auth required'); });
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
+      .resolves.toEqual({ eligible: false, reason: 'GitHub PR state lookup failed: gh auth required' });
+    expect(getIssueLabels).not.toHaveBeenCalled();
+  });
+
   it('uses gh to read GitHub PR state when the GitHub App is not configured', async () => {
     githubAppMocks.isGitHubAppConfigured.mockReturnValue(false);
     childProcessMocks.execFile.mockResolvedValue({
