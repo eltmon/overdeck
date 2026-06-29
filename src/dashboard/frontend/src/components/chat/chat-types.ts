@@ -12,6 +12,7 @@ export interface ChatMessage {
   completedAt?: string;
   streaming?: boolean;
   sequence?: number;
+  acknowledged?: boolean;
 }
 
 /** A user message whose send POST failed — held in the retry outbox. */

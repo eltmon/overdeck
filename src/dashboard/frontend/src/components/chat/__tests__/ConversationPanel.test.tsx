@@ -184,6 +184,51 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.getByRole('button', { name: 'Show tool calls' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('shows a pi Stop button during a running turn and posts abort', async () => {
+    let resolveAbort: ((response: Response) => void) | null = null;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/abort')) {
+        return new Promise<Response>((resolve) => {
+          resolveAbort = resolve;
+        });
+      }
+      return Promise.resolve(new Response(JSON.stringify({ summaries: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPanel(
+      {
+        ...mockConversation,
+        harness: 'pi',
+        sessionAlive: true,
+        status: 'active',
+      },
+      {},
+      {
+        messages: [{
+          id: 'u1',
+          role: 'user',
+          text: 'please keep working',
+          createdAt: new Date().toISOString(),
+        }],
+        workLog: [],
+        streaming: true,
+      },
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop current turn' }));
+
+    await waitFor(() => expect(screen.getByText('Stopping…')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/test-conv/abort', expect.objectContaining({ method: 'POST' }));
+
+    resolveAbort?.(new Response('{}', { status: 200 }));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeInTheDocument());
+  });
+
   it('closes the About drawer when switching conversations', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

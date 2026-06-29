@@ -48,6 +48,10 @@ const SETTINGS_PAGE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../SettingsPage.tsx'),
   'utf8',
 );
+const SETTINGS_PAGE_CONSTANTS_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../settingsPageConstants.ts'),
+  'utf8',
+);
 const AUTOSAVE_PIPELINE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../hooks/useAutosavePipeline.ts'),
   'utf8',
@@ -68,6 +72,22 @@ const TTS_CONFIGURATION_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/TtsConfigurationSection.tsx'),
   'utf8',
 );
+const REMOTE_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/RemoteSection.tsx'),
+  'utf8',
+);
+const MEMORY_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/MemorySection.tsx'),
+  'utf8',
+);
+const BACKGROUND_AI_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/BackgroundAiSection.tsx'),
+  'utf8',
+);
+const EXPERIMENTAL_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/ExperimentalSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -81,7 +101,7 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('includes the TTS sidebar item and settings section controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
+    expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('id="tts"');
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ enabled:');
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ volume:');
@@ -120,7 +140,7 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('const applySettings = (next: SettingsConfig');
     expect(SETTINGS_PAGE_SOURCE).toContain('const applyVoiceSettings = (next: VoiceSettings');
     // Text-input handlers debounce; click handlers save immediately.
-    expect(SETTINGS_PAGE_SOURCE).toContain("}, { debounce: true });");
+    expect(BACKGROUND_AI_SECTION_SOURCE).toContain('{ debounce: true }');
     // Deprecated-model migration kept its own explicit action.
     expect(SETTINGS_PAGE_SOURCE).toContain('Migrate now');
   });
@@ -135,12 +155,12 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces remote work-agent provisioning controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'remote', label: 'Remote'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('id="remote"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Resiliency tier');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteResiliencyTierChange');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Max concurrent remote agents');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteMaxConcurrentAgentsChange');
+    expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'remote', label: 'Remote'");
+    expect(REMOTE_SECTION_SOURCE).toContain('id="remote"');
+    expect(REMOTE_SECTION_SOURCE).toContain('Resiliency tier');
+    expect(REMOTE_SECTION_SOURCE).toContain('handleRemoteResiliencyTierChange');
+    expect(REMOTE_SECTION_SOURCE).toContain('Max concurrent remote agents');
+    expect(REMOTE_SECTION_SOURCE).toContain('handleRemoteMaxConcurrentAgentsChange');
   });
 
   it('surfaces conversation search controls', () => {
@@ -159,16 +179,16 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Extraction provider');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Fallback provider');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Daily cost cap');
-    expect(SETTINGS_PAGE_SOURCE).toContain('0 disables the cap');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Disable memory observations"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle prompt-time memory injection"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Rollup threshold');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Sidebar refresh interval');
+    expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
+    expect(MEMORY_SECTION_SOURCE).toContain('OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values');
+    expect(MEMORY_SECTION_SOURCE).toContain('Extraction provider');
+    expect(MEMORY_SECTION_SOURCE).toContain('Fallback provider');
+    expect(MEMORY_SECTION_SOURCE).toContain('Daily cost cap');
+    expect(MEMORY_SECTION_SOURCE).toContain('0 disables the cap');
+    expect(MEMORY_SECTION_SOURCE).toContain('aria-label="Disable memory observations"');
+    expect(MEMORY_SECTION_SOURCE).toContain('aria-label="Toggle prompt-time memory injection"');
+    expect(MEMORY_SECTION_SOURCE).toContain('Rollup threshold');
+    expect(MEMORY_SECTION_SOURCE).toContain('Sidebar refresh interval');
   });
 
   it('renders provider harness selects as clearable built-in defaults', () => {
@@ -192,18 +212,18 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces the RTK Bash compression toggle in experimental settings', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('RTK Bash compression');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Enable RTK Bash compression"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-rtk-toggle"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleRtkToggle(!formData.agents?.rtk?.enabled)');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('RTK Bash compression');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('aria-label="Enable RTK Bash compression"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('data-testid="experimental-rtk-toggle"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('handleRtkToggle(!formData.agents?.rtk?.enabled)');
   });
 
   it('surfaces the Streamdown renderer toggle in experimental settings', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('Streamdown renderer');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Render chat markdown with Streamdown — research preview');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Render chat markdown with Streamdown"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-streamdown-toggle"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleStreamdownToggle(!formData.experimental?.streamdownRenderer)');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('Streamdown renderer');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('Render chat markdown with Streamdown — research preview');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('aria-label="Render chat markdown with Streamdown"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('data-testid="experimental-streamdown-toggle"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('handleStreamdownToggle(!formData.experimental?.streamdownRenderer)');
   });
 
   it('surfaces the harness/model permutations toggle in provider settings', () => {

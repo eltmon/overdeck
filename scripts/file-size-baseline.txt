@@ -1,5 +1,5 @@
 1447 src/cli/commands/start.ts
-1791 src/cli/commands/workspace.ts
+151 src/cli/commands/workspace.ts
 1463 src/cli/index.ts
 1927 src/dashboard/frontend/src/App.tsx
 1016 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
@@ -10,11 +10,11 @@
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 4200 src/dashboard/frontend/src/components/Settings/SettingsPage.tsx
 1174 src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx
-1448 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
+1488 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
 1620 src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx
 4071 src/dashboard/server/routes/agents.ts
 1413 src/dashboard/server/routes/command-deck.ts
-4898 src/dashboard/server/routes/conversations.ts
+5293 src/dashboard/server/routes/conversations.ts
 1028 src/dashboard/server/routes/flywheel.ts
 4065 src/dashboard/server/routes/issues.ts
 1835 src/dashboard/server/routes/misc.ts
@@ -35,12 +35,12 @@
 1650 src/lib/database/schema.ts
 1270 src/lib/model-capabilities.ts
 1075 src/lib/overdeck/agents.ts
-1522 src/lib/overdeck/conversations.ts
+1526 src/lib/overdeck/conversations.ts
 1050 src/lib/overdeck/memory.ts
 1001 src/lib/overdeck/merge.ts
 1062 src/lib/review-status.ts
 1488 src/lib/settings-api.ts
 1205 src/lib/sync.ts
-1247 src/lib/tmux.ts
+1258 src/lib/tmux.ts
 1095 src/lib/vbrief/dag.ts
 1736 src/lib/workspace-manager.ts

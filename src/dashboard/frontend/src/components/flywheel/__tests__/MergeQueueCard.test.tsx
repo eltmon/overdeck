@@ -97,6 +97,38 @@ describe('empty state', () => {
     renderCard();
     expect(await screen.findByText(/No features are ready to merge/)).toBeTruthy();
   });
+
+  it('warns when the merge backend is unavailable', async () => {
+    mockFetch({
+      'uat-generations': [],
+      'merge-queue': [],
+      'merge-backend': {
+        available: false,
+        mode: 'none',
+        detail: 'No GitHub App credentials or gh CLI authentication found',
+      },
+    });
+    renderCard();
+
+    expect(await screen.findByText(/Merge backend unavailable/)).toBeTruthy();
+    expect(screen.getByText(/autonomous merge disabled/)).toBeTruthy();
+  });
+
+  it('does not warn when the merge backend is available', async () => {
+    mockFetch({
+      'uat-generations': [],
+      'merge-queue': [],
+      'merge-backend': {
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      },
+    });
+    renderCard();
+
+    expect(await screen.findByText(/No features are ready to merge/)).toBeTruthy();
+    expect(screen.queryByText(/Merge backend unavailable/)).toBeNull();
+  });
 });
 
 describe('steady state', () => {

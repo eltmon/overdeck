@@ -33,6 +33,7 @@ import {
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -443,7 +444,10 @@ export async function flywheelStatusCommand(options: StatusOptions): Promise<voi
       return;
     }
 
-    console.log(options.json ? JSON.stringify(status, null, 2) : formatFlywheelStatus(status));
+    const mergeBackend = await loadMergeBackendStatusForCli();
+    console.log(options.json
+      ? JSON.stringify({ ...status, mergeBackend }, null, 2)
+      : `${formatFlywheelStatus(status)}\n${formatMergeBackendStatus(mergeBackend)}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
