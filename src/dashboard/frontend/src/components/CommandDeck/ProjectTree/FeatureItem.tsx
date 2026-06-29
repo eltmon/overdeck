@@ -11,7 +11,8 @@ import type { Harness } from '../../shared/ModelPicker';
 import { SessionNode } from './SessionNode';
 import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
-import { UatStackStatus, getUatStackSummary } from '../UatStackStatus';
+import { getUatStackSummary } from '../UatStackStatus';
+import { UatStackTreeGroup } from './UatStackTreeGroup';
 import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import {
   ContextMenuRoot,
@@ -933,9 +934,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   });
 
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
-  // UAT environment panel collapses by default to reduce clutter; the health
-  // summary stays visible in the header while collapsed (PAN-2063).
-  const [uatExpanded, setUatExpanded] = useState(false);
 
   useEffect(() => {
     if (!expanded) return;
@@ -1283,30 +1281,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {shouldShowUatStack && uatStackSummary && (
-        <div className={styles.uatStackTreeGroup}>
-          <button
-            type="button"
-            className={styles.uatStackTreeHeader}
-            onClick={() => setUatExpanded(v => !v)}
-            aria-expanded={uatExpanded}
-            aria-label="Toggle UAT environment details"
-            title="Toggle UAT environment details"
-          >
-            {uatExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            <span>UAT environment</span>
-            <span className={styles.uatStackTreeSummary}>{uatStackSummary.label.replace(/^UAT stack\s*/i, '')}</span>
-          </button>
-          {uatExpanded && (
-            <UatStackStatus
-              containers={workspace?.containers}
-              stackHealth={workspace?.stackHealth}
-              frontendUrl={workspace?.frontendUrl}
-              apiUrl={workspace?.apiUrl}
-              pending={stackPending}
-              density="compact"
-            />
-          )}
-        </div>
+        <UatStackTreeGroup summary={uatStackSummary} workspace={workspace} pending={Boolean(stackPending)} />
       )}
 
       {expanded && hasResources && detailIdentifiers && (

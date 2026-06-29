@@ -190,9 +190,7 @@ describe('FlywheelConversationPane', () => {
     renderPane(onOpenSettings);
 
     expect(await screen.findByText('RUN-2')).toBeInTheDocument();
-    // Harness field renders the live orchestrator harness (status?.orchestrator.harness)
-    // when a run is active, falling back to config.harness — see FlywheelConversationPane:460.
-    expect(screen.getByText('claude-code')).toBeInTheDocument();
+    expect(screen.getByText('ohmypi')).toBeInTheDocument();
     expect(screen.getByText('claude-sonnet-4-6')).toBeInTheDocument();
     expect(screen.getByText('All tracked projects')).toBeInTheDocument();
 
