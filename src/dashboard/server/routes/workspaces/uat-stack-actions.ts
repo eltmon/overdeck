@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { teardownWorkspace } from '../../../../lib/lifecycle/teardown-workspace.js';
@@ -13,6 +13,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/pro
 import { DEVCONTAINER_DIRNAME } from '../../../../lib/workspace/devcontainer-renderer.js';
 import { composeProjectNameForWorkspace } from '../../../../lib/workspace/rebuild-stack.js';
 import { jsonResponse } from '../../http-helpers.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
 import {
   appendActivityOutput,
@@ -201,6 +202,10 @@ const postWorkspaceStackActionRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/stack/:action',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const action = params['action'] ?? '';
@@ -239,6 +244,10 @@ const getWorkspaceStackLogsRoute = HttpRouter.add(
   'GET',
   '/api/workspaces/:issueId/stack-logs',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const context = resolveWorkspaceStackContext(issueId);
@@ -284,6 +293,10 @@ const getWorkspaceStateDirRoute = HttpRouter.add(
   'GET',
   '/api/workspaces/:issueId/state-dir',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const context = resolveWorkspaceStackContext(issueId);
@@ -303,6 +316,10 @@ const postWorkspaceReapRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/reap',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const context = resolveWorkspaceStackContext(issueId);

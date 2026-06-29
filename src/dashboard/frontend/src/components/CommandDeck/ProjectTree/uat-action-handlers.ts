@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import type { WorkspaceData } from '../ZoneCOverviewTabs/queries';
 import type { UatAction } from '../uat-actions';
 
@@ -16,8 +17,23 @@ function inferUatStackName(issueId: string, containers?: Record<string, unknown>
   return match?.[1] ?? `overdeck-feature-${issueId.toLowerCase()}`;
 }
 
+function headersToRecord(headers?: HeadersInit): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return headers;
+}
+
 async function fetchUatAction(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
-  const response = await fetch(url, init);
+  const method = init?.method?.toUpperCase();
+  const isMutation = !!method && method !== 'GET' && method !== 'HEAD';
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      ...(isMutation ? await dashboardMutationJsonHeaders() : {}),
+      ...headersToRecord(init?.headers),
+    },
+  });
   const data = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (!response.ok) {
     throw new Error(typeof data.error === 'string' ? data.error : `Request failed: ${response.status}`);

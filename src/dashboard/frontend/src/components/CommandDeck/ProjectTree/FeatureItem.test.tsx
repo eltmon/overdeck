@@ -55,6 +55,13 @@ vi.mock('../../../lib/refresh-dashboard-state', () => ({
   refreshDashboardState: vi.fn(),
 }));
 
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf-token',
+  })),
+}));
+
 vi.mock('./SessionNode', () => ({
   SessionNode: ({ session, isSelected, onClick }: {
     session: SessionNodeType;
@@ -904,7 +911,13 @@ describe('FeatureItem', () => {
     fireEvent.click(await screen.findByTestId('uat-inline-action-reap'));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-821/reap', { method: 'POST' });
+      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-821/reap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
+      });
     });
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     const calledUrls = fetchMock.mock.calls.map(call => String(call[0]));

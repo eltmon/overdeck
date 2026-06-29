@@ -12,22 +12,64 @@
       "timestamp": "2026-06-29T17:21:16.068Z",
       "reason": "end",
       "note": "Implemented all PAN-1894 beads and pushed feature/pan-1894. Gates: typecheck, lint, build, full frontend test, focused UAT tests, escalated root npm test."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T17:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T17:22:45.594Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T17:22Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T17:22:53.439Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T17:23:25.039Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T17:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T17:24:02.098Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T17:24Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T17:24:03.539Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T17:24:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1894\n\nNew UAT stack routes run Docker and teardown operations without dashboard auth/CSRF gates\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1894 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T17:24:03Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1894\n\nNew UAT stack routes run Docker and teardown operations without dashboard auth/CSRF gates\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1894 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T14:58:24.745Z",
-  "updated": "2026-06-29T17:21:24.514Z",
+  "updated": "2026-06-29T17:24:03.540Z",
   "pipeline": {
     "issueId": "PAN-1894",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T17:21:24.477Z",
+    "updatedAt": "2026-06-29T17:24:02.061Z",
+    "reviewNotes": "New UAT stack routes run Docker and teardown operations without dashboard auth/CSRF gates",
     "inspectNotes": "Spec fidelity and constraint compliance passed for bead workspace-hfuig. resolveUatActions covers the documented UAT states/lifecycles, inline actions render visibly in the UAT tree row, and no PRD/CLAUDE constraints were violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2177",
+    "lastVerifiedCommit": "08df42a850e3100f402a959ebdf34e9f856ff9ed",
     "reviewRequestedAt": "2026-06-29T17:21:16.076Z"
   },
   "closeOut": {
@@ -80,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.438832,
-        "pricingAsOf": "2026-06-29T17:21:24.513Z"
+        "pricingAsOf": "2026-06-29T17:24:02.090Z"
       }
     },
     "merges": [
