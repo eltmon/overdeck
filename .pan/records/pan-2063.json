@@ -26,20 +26,33 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T13:23:34.480Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T13:24Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T13:24:59.894Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T13:24:59Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2063\n\nReview manifest head changed during review; re-run against current branch head.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2063 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "pipeline": {
     "issueId": "PAN-2063",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "testing",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:24:03.005Z",
-    "reviewNotes": "No blocking findings; extracted UAT panel collapse meets requirements and non-goals.",
+    "updatedAt": "2026-06-29T13:24:56.870Z",
+    "reviewNotes": "Review manifest head changed during review; re-run against current branch head.",
     "testNotes": "Verification gates passed: npm run typecheck (TypeScript strict mode), npm run lint (ESLint + all sub-linters), npm test (root + frontend suites). Root suite: 7496 tests passed, 52 skipped. Frontend suite: 32 tests passed. Implementation verified: FeatureItem.tsx line 938 initializes uatExpanded=false; lines 1287-1309 render collapse/expand button with proper aria-expanded, aria-label, and chevron indicators; button toggles uatExpanded state; UatStackStatus rendered conditionally on uatExpanded. CSS button reset applied at command-deck.module.css .uatStackTreeHeader with appearance/background/border/cursor/font resets. Test updated at FeatureItem.test.tsx:626 to assert collapsed-by-default (header/badge visible, service rows absent on mount), then click-to-expand assertion (postgres/api rows appear), then collapse-again assertion. All acceptance criteria met: AC1 (collapsed by default), AC2 (click header toggles), AC3 (button with proper aria + chevrons), AC4 (test + quality gates).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
     "reviewedAtCommit": "569242f66c1fa067ecd1625e5da9f9821e7bdd50",
@@ -67,10 +80,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 95,
-            "output": 7941,
-            "cacheRead": 4190504,
-            "cacheWrite": 396539
+            "input": 108,
+            "output": 8240,
+            "cacheRead": 4343935,
+            "cacheWrite": 401373
           }
         },
         "work": {
@@ -96,10 +109,10 @@
           "cacheWrite": 281556
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 95,
-          "output": 7941,
-          "cacheRead": 4190504,
-          "cacheWrite": 396539
+          "input": 108,
+          "output": 8240,
+          "cacheRead": 4343935,
+          "cacheWrite": 401373
         },
         "custom/glm-5.2": {
           "input": 237548,
@@ -109,8 +122,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 9.800234,
-        "pricingAsOf": "2026-06-29T13:24:03.059Z"
+        "usd": 9.823127,
+        "pricingAsOf": "2026-06-29T13:24:56.913Z"
       }
     },
     "merges": [
@@ -119,7 +132,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-06-29T13:24:03.060Z",
+  "updated": "2026-06-29T13:24:59.894Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
