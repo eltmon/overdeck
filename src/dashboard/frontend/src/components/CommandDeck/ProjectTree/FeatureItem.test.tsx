@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { DialogProvider } from '../../DialogProvider';
 import { FeatureItem, pickBestSession } from './FeatureItem';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
+import { resolveUatActions } from '../uat-actions';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -42,8 +43,23 @@ vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [] }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 vi.mock('../../../lib/refresh-dashboard-state', () => ({
   refreshDashboardState: vi.fn(),
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf-token',
+  })),
 }));
 
 vi.mock('./SessionNode', () => ({
@@ -161,6 +177,52 @@ function renderFeature(ui: ReactElement) {
   );
 }
 
+function stubWorkspace(workspace: Record<string, unknown>) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url === '/api/workspaces/PAN-821') {
+      return {
+        ok: true,
+        json: async () => workspace,
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    };
+  }));
+}
+
+function renderReadyForMergeFeature() {
+  return renderFeature(
+    <FeatureItem
+      feature={makeFeature({
+        stateLabel: 'In Review',
+        readyForMerge: true,
+        resourceSources: ['workspace'],
+        resourceDetails: {
+          hasWorkspace: true,
+          localBranchCount: 0,
+          remoteBranchCount: 0,
+          tmuxSessionCount: 0,
+          prs: [],
+          hasVbrief: false,
+          hasBeads: false,
+          dockerContainerCount: 2,
+        },
+      })}
+      isSelected={false}
+      onSelect={() => {}}
+    />,
+  );
+}
+
 // ─── pickBestSession ──────────────────────────────────────────────────────────
 
 describe('pickBestSession', () => {
@@ -228,7 +290,7 @@ describe('FeatureItem', () => {
 
   it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
     const onUnpauseSession = vi.fn();
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           sessions: [makeSession({
@@ -252,7 +314,7 @@ describe('FeatureItem', () => {
   });
 
   it('does not show paused badge for unpaused sessions', () => {
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()] })}
         isSelected={false}
@@ -264,7 +326,7 @@ describe('FeatureItem', () => {
   });
 
   it('renders feature info without caret when no sessions', () => {
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature()}
         isSelected={false}
@@ -578,7 +640,7 @@ describe('FeatureItem', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
@@ -663,7 +725,7 @@ describe('FeatureItem', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           stateLabel: 'In Review',
@@ -695,17 +757,171 @@ describe('FeatureItem', () => {
     expect(screen.queryByText('UAT stack 1/2 healthy')).toBeNull();
     expect(screen.queryByText('postgres')).toBeNull();
     expect(screen.queryByText('api')).toBeNull();
+    let toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
+    expect(within(toggle).getByTestId('chevron-right')).toBeTruthy();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
 
-    // Clicking the header expands and renders the per-service detail list.
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
+    // Clicking the header expands and renders the per-service tree rows.
+    fireEvent.click(toggle);
     expect(await screen.findByText('postgres')).toBeTruthy();
     expect(screen.getByText('api')).toBeTruthy();
-    expect(screen.getByText('UAT stack 1/2 healthy')).toBeTruthy();
+    expect(screen.getByText('Up 2m')).toBeTruthy();
+    expect(screen.getByText('Up 42s')).toBeTruthy();
+    const logsAction = screen.getByTestId('uat-inline-action-logs');
+    expect(logsAction).toBeTruthy();
+    expect(logsAction.className).not.toMatch(/opacity|hover/);
+    toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
+    expect(within(toggle).getByTestId('chevron-down')).toBeTruthy();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBe('true');
+
+    view.unmount();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'In Review',
+          readyForMerge: true,
+          resourceSources: ['workspace'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 2,
+          },
+          sessions: [
+            makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(await screen.findByText('postgres')).toBeTruthy();
 
     // Clicking again collapses and removes the service rows.
     fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
     expect(screen.queryByText('postgres')).toBeNull();
     expect(screen.queryByText('api')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
+  });
+
+  it('opens the UAT context menu with resolver actions for an unhealthy stack', async () => {
+    stubWorkspace({
+      exists: true,
+      issueId: 'PAN-821',
+      frontendUrl: 'https://feature-pan-821.pan.localhost',
+      stackHealth: {
+        healthy: false,
+        reasons: ['api unhealthy: connection refused'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: true, uptime: '2m', status: 'running', health: 'healthy', ports: [5432] },
+        api: { running: true, uptime: '42s', status: 'running', health: 'unhealthy', ports: [8080] },
+      },
+    });
+
+    renderReadyForMergeFeature();
+
+    fireEvent.contextMenu(await screen.findByTestId('uat-stack-tree-header'));
+    const items = await screen.findAllByRole('menuitem');
+    const labels = items.map(item => item.textContent);
+    const expected = resolveUatActions('unhealthy').menu.map(action => action.label);
+
+    expect(labels).toEqual(expected);
+    expect(labels.at(-1)).toBe('Reap');
+    expect(items.at(-1)?.className).toContain('text-destructive');
+  });
+
+  it('opens the UAT context menu with resolver actions for a stopped stack', async () => {
+    stubWorkspace({
+      exists: true,
+      issueId: 'PAN-821',
+      stackHealth: {
+        healthy: false,
+        reasons: ['api exited', 'postgres exited'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: false, uptime: '', status: 'exited', health: 'none', ports: [5432] },
+        api: { running: false, uptime: '', status: 'exited', health: 'none', ports: [8080] },
+      },
+    });
+
+    renderReadyForMergeFeature();
+
+    fireEvent.contextMenu(await screen.findByTestId('uat-stack-tree-header'));
+    const items = await screen.findAllByRole('menuitem');
+    const labels = items.map(item => item.textContent);
+    const expected = resolveUatActions('stopped').menu.map(action => action.label);
+
+    expect(labels).toEqual(expected);
+    expect(labels.at(-1)).toBe('Reap');
+    expect(items.at(-1)?.className).toContain('text-destructive');
+  });
+
+  it('confirms UAT reap through the workspace reap route and never calls deep-wipe', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/workspaces/PAN-821') {
+        return {
+          ok: true,
+          json: async () => ({
+            exists: true,
+            issueId: 'PAN-821',
+            stackHealth: {
+              healthy: false,
+              reasons: ['api exited', 'postgres exited'],
+              lastObserved: '2026-06-14T19:02:00.000Z',
+            },
+            containers: {
+              postgres: { running: false, uptime: '', status: 'exited', health: 'none', ports: [5432] },
+              api: { running: false, uptime: '', status: 'exited', health: 'none', ports: [8080] },
+            },
+          }),
+        };
+      }
+      if (url === '/api/workspaces/PAN-821/reap' && init?.method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, activityId: 'activity-1' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          workspacePaths: [],
+          localBranchNames: [],
+          remoteBranchNames: [],
+          tmuxSessionNames: [],
+          prs: [],
+          dockerContainerNames: [],
+        } satisfies ProjectFeatureResourceIdentifiers),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderReadyForMergeFeature();
+
+    fireEvent.click(await screen.findByTestId('uat-inline-action-reap'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-821/reap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
+      });
+    });
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map(call => String(call[0]));
+    expect(calledUrls.some(url => url.includes('deep-wipe'))).toBe(false);
   });
 
   it('shows cleanup affordances for orphaned resources', () => {
