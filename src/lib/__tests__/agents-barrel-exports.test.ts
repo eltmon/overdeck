@@ -23,6 +23,7 @@ const EXPECTED_EXPORTS = Object.freeze([
   'decideSupervisorForWorkAgent',
   'deliverAgentMessage',
   'deliverAgentPermissionDecision',
+  'deliverInitialPromptWithRetry',
   'deliverResumeMessageWithTranscriptConfirmation',
   'describeOhmypiSpawnFailure',
   'detectCrashedAgents',
