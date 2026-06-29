@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const appSettingsMocks = vi.hoisted(() => ({
+  getBootReconciliationState: vi.fn(() => ({
+    decision: null,
+    perAgent: {},
+    decidedAt: null,
+    bootId: null,
+    graceDeadline: null,
+  })),
+  setBootReconciliationDecision: vi.fn(),
+  stampBootReconciliation: vi.fn(),
+}));
+
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
   return {
@@ -89,6 +101,9 @@ vi.mock('../../overdeck/review-status-sync.js', () => ({
 
 vi.mock('../../overdeck/control-settings.js', () => ({
   isDeaconGloballyPaused: vi.fn(() => false),
+  getBootReconciliationState: appSettingsMocks.getBootReconciliationState,
+  setBootReconciliationDecision: appSettingsMocks.setBootReconciliationDecision,
+  stampBootReconciliation: appSettingsMocks.stampBootReconciliation,
 }));
 
 vi.mock('os', async (importOriginal) => {
@@ -300,6 +315,13 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockResumeAgent.mockResolvedValue({ success: true } as any);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
     mockExistsSync.mockImplementation(noCompletedMarkers);
+    appSettingsMocks.getBootReconciliationState.mockReturnValue({
+      decision: null,
+      perAgent: {},
+      decidedAt: null,
+      bootId: null,
+      graceDeadline: null,
+    });
   });
 
   afterEach(() => {
@@ -369,6 +391,21 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
 
     expect(resumed).toEqual(['agent-pan-871']);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
+  });
+
+  it('does not auto-resume a stopped work agent while boot reconciliation is pending', async () => {
+    appSettingsMocks.getBootReconciliationState.mockReturnValue({
+      decision: 'pending',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:00.000Z',
+      bootId: 'boot-pan-2076',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual([]);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 
   it('does not nudge an idle work agent when the issue is closed', async () => {

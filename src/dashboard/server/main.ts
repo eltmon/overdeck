@@ -53,6 +53,7 @@ import { startConversationSearchWatcher, stopConversationSearchWatcher } from '.
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
+import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Layer } from 'effect';
@@ -601,6 +602,7 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
+  startBootReconciliation();
   resetPatrolHeartbeatForStartup();
   getCloisterService().start().catch((err) => {
     console.error('[overdeck] Cloister auto-start failed:', err);

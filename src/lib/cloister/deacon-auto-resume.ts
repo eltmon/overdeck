@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
+import { getBootReconciliationPendingHoldSet } from './boot-reconciliation.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
@@ -797,10 +798,15 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
   }
 
   // PAN-1908: authoritative registry is the agents table; no directory scan.
+  const bootReconciliationHoldSet = getBootReconciliationPendingHoldSet();
   const candidates = listAllAgents()
     .filter((agent) => agent.status === 'stopped' && agent.role === 'work')
+    .filter((agent) => !bootReconciliationHoldSet.has(agent.id))
     .map((agent) => agent.id);
 
+  if (bootReconciliationHoldSet.size > 0) {
+    logDeaconEventSync(`autoResumeStoppedWorkAgents: boot reconciliation pending — holding ${bootReconciliationHoldSet.size} candidate(s)`);
+  }
   logDeaconEventSync(`autoResumeStoppedWorkAgents started: ${candidates.length} candidate(s) from agents table`);
 
   for (const agentId of candidates) {
