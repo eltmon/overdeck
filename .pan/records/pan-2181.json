@@ -67,19 +67,29 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T23:34:31.015Z"
+    },
+    {
+      "timestamp": "2026-06-29T23:34:57.283Z",
+      "reason": "end",
+      "note": "Anomalies: bd sync is unavailable in this workspace's bd CLI (unknown command), so that step could not run; the first npm test attempt failed under sandbox EPERM on git/socket/local-server tests, then the same npm test command passed with escalation. Review follow-ups fixed: countdown now formats 120 seconds as 2:00, rendered modal e2e coverage was removed from styleguide conformance, and the Date.now spy is restored after each modal test. Deviations: no implementation deviations from the plan. Hazards: none discovered. Delivered: default boot reconciliation grace is 120 seconds with override coverage; BootReconciliationModal uses semantic theme tokens; GraceCountdown remains tokenized; styleguide conformance covers static token guard; review and tests passed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T23:34:57.563Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:34:31.022Z",
+  "updated": "2026-06-29T23:35:03.123Z",
   "pipeline": {
     "issueId": "PAN-2181",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:34:30.903Z",
+    "updatedAt": "2026-06-29T23:35:03.078Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -88,7 +98,8 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "lastVerifiedCommit": "e3358d23d5856ca05c64c2031449e2b22a0369d4"
+    "lastVerifiedCommit": "e3358d23d5856ca05c64c2031449e2b22a0369d4",
+    "reviewRequestedAt": "2026-06-29T23:34:57.285Z"
   },
   "closeOut": {
     "usage": {
@@ -148,7 +159,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.282759,
-        "pricingAsOf": "2026-06-29T23:34:30.949Z"
+        "pricingAsOf": "2026-06-29T23:35:03.122Z"
       }
     },
     "merges": [
