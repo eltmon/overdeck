@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-27T17:14:04.911Z",
-    "updated": "2026-06-27T17:15:26.498Z",
+    "updated": "2026-06-29T03:49:32.381Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1884: chore(rules): migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-1884",
     "title": "chore(rules): migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer",
-    "status": "running",
+    "status": "completed",
     "uid": "ef41a758-3fc0-430a-b99e-4ef77e759f95",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-06-27T17:14:04.911Z",
-    "updated": "2026-06-27T17:15:26.498Z",
+    "updated": "2026-06-29T03:49:32.381Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1884",
@@ -91,5 +91,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }
