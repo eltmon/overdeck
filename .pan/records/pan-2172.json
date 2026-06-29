@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2172",
   "schemaVersion": 2,
-  "created": "2026-06-29T20:37:01.251Z",
-  "updated": "2026-06-29T20:37:18.221Z",
-  "pipeline": {
-    "issueId": "PAN-2172",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T20:37:01.251Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,77 @@
       "note": "Planning session started for PAN-2172: bug(agents): host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0",
       "timestamp": "2026-06-29T20:37:18.220Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T20:37:01.251Z",
+  "updated": "2026-06-29T21:36:08.703Z",
+  "pipeline": {
+    "issueId": "PAN-2172",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T21:36:08.656Z",
+    "inspectNotes": "Spec fidelity: delivery.ts snapshots the transcript confirmation target immediately before each deliver attempt, then waits for a new user record before returning success. Constraint compliance: no prohibited patterns or architecture violations in the scoped diff."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 738765,
+            "output": 22527,
+            "cacheRead": 8988160,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 25908,
+            "output": 1565,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 32099,
+            "output": 88862,
+            "cacheRead": 11218047,
+            "cacheWrite": 660969
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 738765,
+          "output": 22527,
+          "cacheRead": 8988160,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 25908,
+          "output": 1565,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 32099,
+          "output": 88862,
+          "cacheRead": 11218047,
+          "cacheWrite": 660969
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 20.985846,
+        "pricingAsOf": "2026-06-29T21:36:08.691Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.5"
 }
