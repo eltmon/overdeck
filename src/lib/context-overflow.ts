@@ -6,6 +6,7 @@
 export const CONTEXT_OVERFLOW_PATTERNS = [
   'input exceeds the context window',
   'exceeds the context window of this model',
+  'exceeded model token limit',
 ];
 
 export const CONTEXT_OVERFLOW_TAIL_LINES = 40;
