@@ -13,12 +13,13 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { createSign } from 'crypto';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const APP_DIR = join(homedir(), '.overdeck', 'github-app');
 
@@ -84,6 +85,17 @@ export interface GitHubCiCheckRunsState {
   failedRuns: GitHubCiCheckRunSummary[];
 }
 
+export type MergeBackendStatus = {
+  available: boolean;
+  mode: 'app' | 'gh-cli' | 'none';
+  detail: string;
+};
+
+export interface MergeBackendStatusDeps {
+  isConfigured?: () => boolean;
+  checkGhAuth?: () => Promise<boolean>;
+}
+
 type GitHubCheckRunApiResponse = {
   check_runs?: Array<{
     id?: number;
@@ -103,6 +115,41 @@ export function isGitHubAppConfigured(): boolean {
     existsSync(join(APP_DIR, 'private-key.pem')) &&
     existsSync(join(APP_DIR, 'installation-id'))
   );
+}
+
+async function defaultCheckGhAuth(): Promise<boolean> {
+  try {
+    await execFileAsync('gh', ['auth', 'status'], { timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getMergeBackendStatus(deps: MergeBackendStatusDeps = {}): Promise<MergeBackendStatus> {
+  const isConfigured = deps.isConfigured ?? isGitHubAppConfigured;
+  if (isConfigured()) {
+    return {
+      available: true,
+      mode: 'app',
+      detail: 'GitHub App credentials are configured',
+    };
+  }
+
+  const checkGhAuth = deps.checkGhAuth ?? defaultCheckGhAuth;
+  if (await checkGhAuth()) {
+    return {
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    };
+  }
+
+  return {
+    available: false,
+    mode: 'none',
+    detail: 'No GitHub App credentials or gh CLI authentication found',
+  };
 }
 
 /**

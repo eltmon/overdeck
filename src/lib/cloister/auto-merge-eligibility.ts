@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { getPullRequestState as getPullRequestStateEffect, type GitHubPullRequestState } from '../github-app.js';
+import { getPullRequestState as getPullRequestStateEffect, isGitHubAppConfigured, type GitHubPullRequestState } from '../github-app.js';
 import { parseArtifactRef } from '../forge.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -23,6 +23,24 @@ interface GitLabMrState {
 
 type GitLabMrLookup = (projectPath: string, iid: number) => Promise<GitLabMrState>;
 
+interface GhPullRequestView {
+  state?: string | null;
+  mergeable?: string | null;
+  mergeStateStatus?: string | null;
+  isDraft?: boolean | null;
+  headRefOid?: string | null;
+  baseRefName?: string | null;
+  url?: string | null;
+  statusCheckRollup?: GhStatusRollupItem[] | null;
+}
+
+interface GhStatusRollupItem {
+  __typename?: string;
+  status?: string | null;
+  conclusion?: string | null;
+  state?: string | null;
+}
+
 export interface AutoMergeEligibilityDeps {
   getReviewStatus?: (issueId: string) => ReviewStatus | null;
   getPullRequestState?: PullRequestLookup;
@@ -37,7 +55,78 @@ function parsePullRequestUrl(prUrl: string | undefined): { owner: string; repo: 
 }
 
 async function defaultGetPullRequestState(owner: string, repo: string, number: number): Promise<GitHubPullRequestState> {
+  if (!isGitHubAppConfigured()) {
+    return getPullRequestStateViaGh(owner, repo, number);
+  }
   return Effect.runPromise(getPullRequestStateEffect(owner, repo, number));
+}
+
+function normalizeGhValue(value: string | null | undefined): string {
+  return (value ?? '').toUpperCase();
+}
+
+function getGhStatusRollupState(statusCheckRollup: GhStatusRollupItem[] | null | undefined): { pending: boolean; failed: boolean } {
+  let pending = false;
+  let failed = false;
+
+  for (const check of statusCheckRollup ?? []) {
+    const status = normalizeGhValue(check.status);
+    const conclusion = normalizeGhValue(check.conclusion);
+    const state = normalizeGhValue(check.state);
+
+    if (status && status !== 'COMPLETED') {
+      pending = true;
+    }
+    if (status === 'COMPLETED' && conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(conclusion)) {
+      failed = true;
+    }
+
+    if (state === 'PENDING') {
+      pending = true;
+    }
+    if (state === 'FAILURE' || state === 'ERROR') {
+      failed = true;
+    }
+  }
+
+  return { pending, failed };
+}
+
+export async function getPullRequestStateViaGh(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<GitHubPullRequestState> {
+  const { stdout } = await execFileAsync('gh', [
+    'pr',
+    'view',
+    String(number),
+    '--repo',
+    `${owner}/${repo}`,
+    '--json',
+    'state,mergeable,mergeStateStatus,isDraft,headRefOid,baseRefName,url,statusCheckRollup',
+  ], { encoding: 'utf-8' });
+
+  const pr = JSON.parse(stdout) as GhPullRequestView;
+  const state = normalizeGhValue(pr.state);
+  const mergeable = normalizeGhValue(pr.mergeable);
+  const checkState = getGhStatusRollupState(pr.statusCheckRollup);
+
+  return {
+    owner,
+    repo,
+    number,
+    url: pr.url ?? undefined,
+    state: state === 'OPEN' ? 'OPEN' : 'CLOSED',
+    merged: state === 'MERGED',
+    mergeable: mergeable === 'MERGEABLE' ? true : mergeable === 'CONFLICTING' ? false : null,
+    mergeableState: pr.mergeStateStatus?.toLowerCase() ?? null,
+    draft: pr.isDraft === true,
+    headSha: pr.headRefOid ?? '',
+    baseBranch: pr.baseRefName ?? 'main',
+    checksPending: checkState.pending,
+    checksFailed: checkState.failed,
+  };
 }
 
 async function defaultGetGitLabMrState(projectPath: string, iid: number): Promise<GitLabMrState> {
@@ -142,7 +231,13 @@ export async function isAutoMergeEligible(
       return { eligible: false, reason: 'review status PR URL is missing or invalid' };
     }
 
-    const prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+    let prState: GitHubPullRequestState;
+    try {
+      prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      return { eligible: false, reason: `GitHub PR state lookup failed: ${message}` };
+    }
 
     // Reviewer P1: tighten to positive "green and mergeable" instead of "not known
     // failed". The previous predicate accepted pending checks, draft PRs,
