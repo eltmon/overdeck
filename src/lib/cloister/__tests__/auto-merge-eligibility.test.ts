@@ -1,7 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import type { GitHubPullRequestState } from '../../github-app.js';
 import type { ReviewStatus } from '../../review-status.js';
-import { BLOCKER_LABELS, isAutoMergeEligible } from '../auto-merge-eligibility.js';
+import { BLOCKER_LABELS, getPullRequestStateViaGh, isAutoMergeEligible } from '../auto-merge-eligibility.js';
+
+const githubAppMocks = vi.hoisted(() => ({
+  getPullRequestState: vi.fn(),
+  isGitHubAppConfigured: vi.fn(() => true),
+}));
+
+const childProcessMocks = vi.hoisted(() => ({
+  execFile: vi.fn(),
+}));
+
+vi.mock('../../github-app.js', () => githubAppMocks);
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  const execFile = childProcessMocks.execFile;
+  Object.assign(execFile, {
+    [Symbol.for('nodejs.util.promisify.custom')]: vi.fn((command: string, args: string[], options: unknown) =>
+      Promise.resolve(execFile(command, args, options))),
+  });
+  return { ...actual, execFile };
+});
 
 function makeReviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return {
@@ -36,6 +58,12 @@ function makePrState(overrides: Partial<GitHubPullRequestState> = {}): GitHubPul
 }
 
 describe('auto-merge eligibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(true);
+    githubAppMocks.getPullRequestState.mockReturnValue(Effect.succeed(makePrState()));
+  });
+
   it('exports blocker labels as a readonly tuple', () => {
     expect(BLOCKER_LABELS).toEqual(['needs-design', 'needs-discussion', 'do-not-merge']);
   });
@@ -109,6 +137,127 @@ describe('auto-merge eligibility', () => {
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
       .resolves.toEqual({ eligible: true });
+  });
+
+  it('uses gh to read GitHub PR state when the GitHub App is not configured', async () => {
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(false);
+    childProcessMocks.execFile.mockResolvedValue({
+      stdout: JSON.stringify({
+        state: 'OPEN',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        isDraft: false,
+        headRefOid: 'abc1234',
+        baseRefName: 'main',
+        url: 'https://github.com/eltmon/overdeck/pull/1486',
+        statusCheckRollup: [
+          { __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'SUCCESS' },
+          { __typename: 'StatusContext', state: 'SUCCESS' },
+        ],
+      }),
+      stderr: '',
+    });
+    const getReviewStatus = vi.fn(() => makeReviewStatus());
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getIssueLabels }))
+      .resolves.toEqual({ eligible: true });
+
+    expect(childProcessMocks.execFile).toHaveBeenCalledWith('gh', [
+      'pr',
+      'view',
+      '1486',
+      '--repo',
+      'eltmon/overdeck',
+      '--json',
+      'state,mergeable,mergeStateStatus,isDraft,headRefOid,baseRefName,url,statusCheckRollup',
+    ], { encoding: 'utf-8' });
+    expect(githubAppMocks.getPullRequestState).not.toHaveBeenCalled();
+  });
+
+  it('keeps the GitHub App reader when the App is configured', async () => {
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(true);
+    githubAppMocks.getPullRequestState.mockReturnValue(Effect.succeed(makePrState()));
+    const getReviewStatus = vi.fn(() => makeReviewStatus());
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getIssueLabels }))
+      .resolves.toEqual({ eligible: true });
+
+    expect(githubAppMocks.getPullRequestState).toHaveBeenCalledWith('eltmon', 'overdeck', 1486);
+    expect(childProcessMocks.execFile).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      gh: { state: 'OPEN', mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' },
+      expected: {
+        state: 'OPEN',
+        merged: false,
+        mergeable: false,
+        mergeableState: 'dirty',
+      },
+    },
+    {
+      gh: { state: 'MERGED', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' },
+      expected: {
+        state: 'CLOSED',
+        merged: true,
+        mergeable: true,
+        mergeableState: 'clean',
+      },
+    },
+    {
+      gh: { state: 'CLOSED', mergeable: 'UNKNOWN', mergeStateStatus: null },
+      expected: {
+        state: 'CLOSED',
+        merged: false,
+        mergeable: null,
+        mergeableState: null,
+      },
+    },
+  ])('maps gh PR state into GitHubPullRequestState: %j', async ({ gh, expected }) => {
+    childProcessMocks.execFile.mockResolvedValue({
+      stdout: JSON.stringify({
+        ...gh,
+        isDraft: false,
+        headRefOid: 'abc1234',
+        baseRefName: 'main',
+        url: 'https://github.com/eltmon/overdeck/pull/1486',
+        statusCheckRollup: [],
+      }),
+      stderr: '',
+    });
+
+    await expect(getPullRequestStateViaGh('eltmon', 'overdeck', 1486))
+      .resolves.toMatchObject(expected);
+  });
+
+  it('maps gh statusCheckRollup pending and failed states like the GitHub App reader', async () => {
+    childProcessMocks.execFile.mockResolvedValue({
+      stdout: JSON.stringify({
+        state: 'OPEN',
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        isDraft: false,
+        headRefOid: 'abc1234',
+        baseRefName: 'main',
+        url: 'https://github.com/eltmon/overdeck/pull/1486',
+        statusCheckRollup: [
+          { __typename: 'CheckRun', status: 'IN_PROGRESS', conclusion: null },
+          { __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' },
+          { __typename: 'StatusContext', state: 'PENDING' },
+          { __typename: 'StatusContext', state: 'ERROR' },
+        ],
+      }),
+      stderr: '',
+    });
+
+    await expect(getPullRequestStateViaGh('eltmon', 'overdeck', 1486))
+      .resolves.toMatchObject({
+        checksPending: true,
+        checksFailed: true,
+      });
   });
 
   it('returns eligible for a mergeable GitLab MR', async () => {
