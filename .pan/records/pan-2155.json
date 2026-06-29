@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T15:41:56.572Z",
-  "updated": "2026-06-29T16:19:58.693Z",
+  "updated": "2026-06-29T16:53:40.216Z",
   "pipeline": {
     "issueId": "PAN-2155",
     "reviewStatus": "pending",
@@ -64,5 +64,21 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "wi1-extract-types-and-helpers": "completed",
+    "wi1-extract-types-and-helpers.ac1": "completed",
+    "wi1-extract-types-and-helpers.ac2": "completed",
+    "wi1-extract-types-and-helpers.ac3": "completed",
+    "wi1-extract-types-and-helpers.ac4": "completed",
+    "wi2-extract-leaf-rows-and-dividers": "completed",
+    "wi2-extract-leaf-rows-and-dividers.ac1": "completed",
+    "wi2-extract-leaf-rows-and-dividers.ac2": "completed",
+    "wi2-extract-leaf-rows-and-dividers.ac3": "completed",
+    "wi3-extract-component-and-barrelize": "completed",
+    "wi3-extract-component-and-barrelize.ac1": "completed",
+    "wi3-extract-component-and-barrelize.ac2": "completed",
+    "wi3-extract-component-and-barrelize.ac3": "completed",
+    "wi3-extract-component-and-barrelize.ac4": "completed"
+  }
 }
