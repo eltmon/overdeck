@@ -2,6 +2,17 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
+## RUN-33 tick 2 (2026-06-29 ~03:30Z) — operator merged the ready PRs; PAN-2157 fix in flight; PAN-1982 done; +1 plan launched
+
+- **Operator acted on tick-1 suggestions: merged PR #2109 (PAN-1884) + #2097 (PAN-2088)** at 03:24Z. Both now verifying-on-main. **Main CI went `in_progress`** on merge commit `5bfa88d` — NOT yet confirmed green, so I deferred their close-out to next tick (verify CI conclusion first; both were CLEAN/test-passed so green expected).
+- **PAN-1982 finished → Ready for Merge** (PR #2112, review=passed test=passed). Cohort member complete; now in the same merge-blocked queue (dead mechanism + CI in_progress). agent-pan-1982 is idle.
+- **PAN-2157 (merge-mechanism fix) auto-promoted plan→work.** planning-pan-2157 wrote the vBRIEF (+443/-2) and `agent-pan-2157-plan` is the live work agent (Opus, in feature-pan-2157), implementing the fix. This is the key unblocker — let it run to review.
+- **Launched `pan plan PAN-1506 --auto` → planning-pan-1506** as the 2nd producer (minAgents=2). PAN-1506 = "strike agents missing from frontend store" (critical substrate, eltmon-authored, root of PAN-1510). Chose to launch this tick because the gate is no longer jammed (operator merging + PAN-2157 fixing autonomy), so adding a producer no longer churns a stuck gate.
+- **PAN-2086 STILL wedged** (100% ctx, kimi token limit). Deacon's stuck-detector fired the 20-min nudge but the agent can't act at 100% ctx. 17 commits safe, no PR. Confirmed: the only recovery is a dashboard restart WITHOUT `--no-resume` (or operator-driven), which the flywheel cannot do.
+- **`pan review pending` is noisy** — it lists every workspace with a pending-review status incl. stopped --no-resume sessions (PAN-1817/1781/2044/2045 strikes/plans from prior runs). Don't mistake these for live stalled convoys; none had live reviewers this tick, none needed `pan review restart`.
+- Cohort tally: 9 terminal + PAN-1884 merged (verifying). Remaining active: PAN-1982 (ready-merge), 2054/1718/2063 (in-review), 2086 (wedged), 806/1864 (held).
+- Next tick: (1) **verify main CI conclusion** on 5bfa88d — if red, P0; if green, close out PAN-1884/2088 and push PAN-1982/MIN merges; (2) watch agent-pan-2157-plan → review (it bootstraps autonomous merge); (3) watch planning-pan-1506 → work.
+
 ## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
 
 - **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
