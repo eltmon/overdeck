@@ -2,6 +2,18 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
+## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
+
+- **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
+- **THE BIG SHIFT — the RUN-31 rebase bottleneck CLEARED for PAN-1884/2088.** PR #2109 (PAN-1884) and #2097 (PAN-2088) are now `mergeable=MERGEABLE mergeStateStatus=CLEAN`, review=passed test=passed. They got rebased since RUN-31 (work agents or operator). So the "merge-ready-after-rebase" jam is gone for these two.
+- **NEW blocker exposed — auto-merge mechanism is non-functional. Filed PAN-2157 (bug/critical/substrate).** `POST /api/flywheel/auto-merge/schedule {issueId}` (with `Origin: http://localhost:3011`) now returns `{"error":"GitHub App not configured. Run: node scripts/create-github-app.mjs"}` for the ready items. **Why we never saw this before:** the endpoint checks `readyForMerge` BEFORE the GitHub-App merge step; in RUN-32 every probe failed at `not readyForMerge` first, so we never reached the app-config failure. PAN-1884/2088 are the first genuinely readyForMerge items, exposing that the GitHub App has effectively never been configured (consistent with the old `GitHub App credential path is dead code` note). **Net: with `require_uat_before_merge=false`, the Flywheel's sanctioned merge action silently funnels every clean ready PR back to the operator's manual merge — defeating the autonomy toggle.**
+- **ACTION: launched `pan plan PAN-2157 --auto` → planning-pan-2157.** This is the root-cause fix and the highest-value unblocker (fixes ALL future autonomous merges). Default fix direction: switch the auto-merge backend to the already-authenticated `gh`/installation token instead of requiring a separately-provisioned GitHub App. Now 2 producers: agent-pan-1982 (work, gpt-5.5, healthy) + planning-pan-2157.
+- **Did NOT `gh pr merge` the clean ready PRs** — forbidden from the workflow path. Surfaced PAN-1884/2088 + MIN-831/MIN-846 as `merge` suggestions (operator override = `gh pr merge --admin`, main green) and as openQuestions. Drain of the ready items waits on operator merge OR PAN-2157 landing.
+- **PAN-2063 `released` label is STALE/LYING** — `pan close` verify-merged gate refused with "12 unmerged commits on feature/pan-2063". The label says released but the branch is NOT merged. Do not trust `released`/`merged` labels for close-out; the verify-merged gate is the truth.
+- **PAN-2086 still WEDGED** (kimi 100% ctx, token limit 262144 exceeded; 17 commits safe, no PR because `pan done` never ran). The `--no-resume` boot disables overflow-respawn + deacon recovery, so the flywheel has NO autonomous lever to recover it. Surfaced: restart dashboard without `--no-resume` to re-enable recovery.
+- Operator-held (skip): PAN-1864 (parked+objection), PAN-806 (objection, large epic, not Definition-of-Ready).
+- Next tick: (1) if operator merges PAN-1884/2088/MIN-831/MIN-846 (or PAN-2157 lands), drain + close out; (2) watch planning-pan-2157 → work → review (it bootstraps autonomous merge); (3) watch PAN-1982 → review; (4) PAN-2086 recoverable only on a non--no-resume restart.
+
 ## Substrate fixes
 
 ### Autonomous planning auto-promote (commit 861cf8baa, 2026-05-20, RUN-1)
