@@ -200,3 +200,16 @@ live in **Substrate fixes** above; RUN-32/34/35 are kept verbatim below.)
 ## Recent runs (RUN-29 onward)
 
 Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file holds only cross-run **durable** memory; per-tick logs were redundant with the run reports and were compacted out on 2026-06-29 (was 373KB / 3253 lines).
+
+## RUN-39 tick 2 (2026-06-29) — PAN-2155 drained; kickoff-delivery bugs gate the rest
+
+- **PAN-2155 MERGED** (commit 9bebbf24, auto-merge fired 20:14Z) → `pan close --force` → terminal. Cohort now 13/15 terminal.
+- **Remaining cohort (PAN-2086, PAN-1718, PAN-2146) all hit agent kickoff/relaunch bugs:**
+  - **agent-pan-1718** — my tick-1 `pan start --fresh` produced a ZOMBIE: ctx 0% / out 0 / cost $0, `status=running` but `lastActivity=None`, `failures=1` (kickoff delivery failed). Known bug **PAN-2172** (host/fresh respawn never delivers kickoff). Plus its PR #2103 is still CONFLICTING.
+  - **agent-pan-2086** — byte-identical metrics across ticks (out 198 / $0.4306) = stalled; the RUN-37 `--fresh --host` respawn that PAN-2172 describes.
+  - **agent-pan-2146** — flipped to `stopped+troubled` with **0 failures** (spurious gate, RUN-37 pattern) despite a stale "Working" pane frame. `pan untroubled pan-2146` → deacon resumed it cleanly (back to running).
+- **Action:** launched `pan plan pan-2172 --auto` (kickoff-delivery fix is a named pipeline-flow blocker = agent spawning). Chose full pipeline over strike — RUN-37 showed lifecycle/delivery-path strikes can red-main; review/test gates protect it. planning-pan-2172 confirmed alive (Opus, ctx 11%, advancing) — **normal fresh planning spawns deliver kickoff fine; only `--fresh`/`--host` respawns + relaunches are broken.**
+- **PAN-2179** (relaunch zombie — session alive, kickoff never delivered, liveness fooled) likely shares PAN-2172's root cause; flagged for the planner to dedupe/collapse rather than launching a second racing fix on the same delivery code.
+- These three stuck agents drain only after PAN-2172 (+PAN-2179) lands AND the operator `pan reload`s (deacon runs compiled dist). Carry to next run.
+
+**Reusable:** distinguish a productive vs zombie fresh-spawn by `ctx%`/`out` advancing across ticks AND `state.json.lastActivity != None`. A `running` status with `lastActivity=None` + `failures=1` = kickoff never landed (PAN-2172/2179), not a live agent.
