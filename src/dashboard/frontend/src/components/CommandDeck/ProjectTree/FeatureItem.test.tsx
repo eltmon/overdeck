@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -228,7 +228,7 @@ describe('FeatureItem', () => {
 
   it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
     const onUnpauseSession = vi.fn();
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           sessions: [makeSession({
@@ -252,7 +252,7 @@ describe('FeatureItem', () => {
   });
 
   it('does not show paused badge for unpaused sessions', () => {
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()] })}
         isSelected={false}
@@ -264,7 +264,7 @@ describe('FeatureItem', () => {
   });
 
   it('renders feature info without caret when no sessions', () => {
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature()}
         isSelected={false}
@@ -578,7 +578,7 @@ describe('FeatureItem', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
@@ -663,7 +663,7 @@ describe('FeatureItem', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           stateLabel: 'In Review',
@@ -695,18 +695,54 @@ describe('FeatureItem', () => {
     expect(screen.queryByText('UAT stack 1/2 healthy')).toBeNull();
     expect(screen.queryByText('postgres')).toBeNull();
     expect(screen.queryByText('api')).toBeNull();
+    let toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
+    expect(within(toggle).getByTestId('chevron-right')).toBeTruthy();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
 
     // Clicking the header expands and renders the per-service tree rows.
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
+    fireEvent.click(toggle);
     expect(await screen.findByText('postgres')).toBeTruthy();
     expect(screen.getByText('api')).toBeTruthy();
     expect(screen.getByText('Up 2m')).toBeTruthy();
     expect(screen.getByText('Up 42s')).toBeTruthy();
+    toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
+    expect(within(toggle).getByTestId('chevron-down')).toBeTruthy();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBe('true');
+
+    view.unmount();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'In Review',
+          readyForMerge: true,
+          resourceSources: ['workspace'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 2,
+          },
+          sessions: [
+            makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(await screen.findByText('postgres')).toBeTruthy();
 
     // Clicking again collapses and removes the service rows.
     fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
     expect(screen.queryByText('postgres')).toBeNull();
     expect(screen.queryByText('api')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
   });
 
   it('shows cleanup affordances for orphaned resources', () => {

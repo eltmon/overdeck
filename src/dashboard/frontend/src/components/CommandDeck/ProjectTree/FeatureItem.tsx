@@ -1281,7 +1281,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {shouldShowUatStack && uatStackSummary && (
-        <UatStackTreeGroup summary={uatStackSummary} workspace={workspace} pending={Boolean(stackPending)} />
+        <UatStackTreeGroup
+          summary={uatStackSummary}
+          workspace={workspace}
+          pending={Boolean(stackPending)}
+          storageKey={`${getExpandedKey(feature.issueId)}:uat`}
+        />
       )}
 
       {expanded && hasResources && detailIdentifiers && (
