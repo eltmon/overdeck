@@ -2,6 +2,9 @@ import { Check, Circle, ExternalLink, Loader2, X } from 'lucide-react';
 import type { WorkspaceContainerStatus, WorkspaceStackHealth } from './ZoneCOverviewTabs/queries';
 
 type Density = 'compact' | 'full';
+export type UatContainerState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'unknown';
+export type UatStackState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'stale';
+export type UatStackLifecycle = 'active' | 'merged' | 'idle';
 
 interface UatStackStatusProps {
   containers?: Record<string, WorkspaceContainerStatus> | null;
@@ -9,16 +12,29 @@ interface UatStackStatusProps {
   frontendUrl?: string;
   apiUrl?: string;
   pending?: boolean;
+  lifecycle?: UatStackLifecycle;
   density?: Density;
   className?: string;
 }
 
-function normalizeStatus(status: WorkspaceContainerStatus): 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'unknown' {
+export interface UatStackSummary {
+  label: string;
+  healthyCount: number;
+  totalCount: number;
+  active: boolean;
+  state: UatStackState;
+}
+
+export function normalizeStatus(status: WorkspaceContainerStatus): UatContainerState {
+  if (!status.running && status.status?.toLowerCase().includes('exited')) {
+    return status.lastFailureReason ? 'unhealthy' : 'stopped';
+  }
   if (status.health === 'healthy') return 'healthy';
   if (status.health === 'starting') return 'starting';
   if (status.health === 'unhealthy') return 'unhealthy';
   if (!status.running) {
-    return status.status?.startsWith('exited') ? 'unhealthy' : 'stopped';
+    if (status.lastFailureReason) return 'unhealthy';
+    return 'stopped';
   }
   if (status.health === 'unknown') return 'unknown';
   return 'healthy';
@@ -76,33 +92,95 @@ function formatLastProbe(value?: string): string | null {
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.round(minutes / 60)}h ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function formatStoppedAge(entries: Array<[string, WorkspaceContainerStatus]>): string | null {
+  const newestProbe = entries
+    .map(([, status]) => status.lastProbeAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const formatted = formatLastProbe(newestProbe);
+  return formatted ? formatted.replace(/\s+ago$/, '') : null;
+}
+
+export function resolveUatStackState({
+  containers,
+  stackHealth,
+  pending,
+  lifecycle = 'active',
+}: Pick<UatStackStatusProps, 'containers' | 'stackHealth' | 'pending' | 'lifecycle'>): UatStackState | null {
+  if (lifecycle === 'merged' || lifecycle === 'idle') return 'stale';
+
+  const entries = Object.entries(containers ?? {});
+  if (entries.length === 0 && stackHealth?.healthy === undefined && !pending) return null;
+  if (pending) return 'starting';
+
+  const states = entries.map(([, status]) => normalizeStatus(status));
+  if (states.includes('unhealthy') || stackHealth?.healthy === false) return 'unhealthy';
+  if (states.includes('starting')) return 'starting';
+  if (entries.length > 0 && states.every(state => state === 'stopped')) return 'stopped';
+  if (stackHealth?.healthy === true || (entries.length > 0 && states.every(state => state === 'healthy'))) return 'healthy';
+  if (states.includes('stopped')) return 'stopped';
+  return 'healthy';
 }
 
 export function getUatStackSummary({
   containers,
   stackHealth,
   pending,
-}: Pick<UatStackStatusProps, 'containers' | 'stackHealth' | 'pending'>): { label: string; healthyCount: number; totalCount: number; active: boolean } | null {
+  lifecycle,
+}: Pick<UatStackStatusProps, 'containers' | 'stackHealth' | 'pending' | 'lifecycle'>): UatStackSummary | null {
   const entries = Object.entries(containers ?? {});
   const totalCount = entries.length;
   const healthyCount = entries.filter(([, status]) => normalizeStatus(status) === 'healthy').length;
-  const active = Boolean(pending || stackHealth?.healthy === false || entries.some(([, status]) => ['starting', 'stopped', 'unhealthy'].includes(normalizeStatus(status))));
+  const state = resolveUatStackState({ containers, stackHealth, pending, lifecycle });
+  if (!state) return null;
 
-  if (totalCount === 0 && stackHealth?.healthy === undefined && !pending) return null;
-  if (stackHealth?.healthy === true && totalCount === 0) {
-    return { label: 'UAT stack healthy', healthyCount: 0, totalCount: 0, active: false };
+  const active = state === 'starting' || state === 'unhealthy';
+  if (state === 'stale') {
+    return { label: 'UAT stack merged · idle', healthyCount, totalCount, active: false, state };
   }
-  if (pending) {
-    return { label: totalCount > 0 ? `UAT stack ${healthyCount}/${totalCount} healthy` : 'UAT stack rebuilding', healthyCount, totalCount, active: true };
+  if (state === 'healthy') {
+    return { label: totalCount > 0 ? `UAT stack ${healthyCount}/${totalCount} healthy` : 'UAT stack healthy', healthyCount, totalCount, active, state };
   }
-  if (stackHealth?.healthy === false) {
-    return { label: totalCount > 0 ? `UAT stack ${healthyCount}/${totalCount} healthy` : 'UAT stack unhealthy', healthyCount, totalCount, active: true };
+  if (state === 'starting') {
+    return { label: totalCount > 0 ? `UAT stack ${healthyCount}/${totalCount} healthy` : 'UAT stack rebuilding', healthyCount, totalCount, active, state };
   }
-  if (totalCount > 0) {
-    return { label: `UAT stack ${healthyCount}/${totalCount} healthy`, healthyCount, totalCount, active };
+  if (state === 'unhealthy') {
+    return { label: totalCount > 0 ? `UAT stack ${healthyCount}/${totalCount} unhealthy` : 'UAT stack unhealthy', healthyCount, totalCount, active, state };
   }
-  return null;
+  const stoppedAge = formatStoppedAge(entries);
+  return {
+    label: stoppedAge ? `UAT stack stopped ${stoppedAge}` : 'UAT stack stopped',
+    healthyCount,
+    totalCount,
+    active,
+    state,
+  };
+}
+
+function SummaryIcon({ summary }: { summary: UatStackSummary }) {
+  if (summary.state === 'starting') return <Loader2 className="h-3.5 w-3.5 animate-spin text-warning" />;
+  if (summary.state === 'healthy') return <Check className="h-3.5 w-3.5 text-success" />;
+  if (summary.state === 'unhealthy') return <X className="h-3.5 w-3.5 text-destructive" />;
+  return <Circle className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+function summaryTone(summary: UatStackSummary): string {
+  switch (summary.state) {
+    case 'healthy':
+      return 'text-success';
+    case 'starting':
+      return 'text-warning';
+    case 'unhealthy':
+      return 'text-destructive';
+    default:
+      return 'text-muted-foreground';
+  }
 }
 
 export function UatStackStatus({
@@ -111,15 +189,16 @@ export function UatStackStatus({
   frontendUrl,
   apiUrl,
   pending,
+  lifecycle = 'active',
   density = 'full',
   className = '',
 }: UatStackStatusProps) {
   const entries = Object.entries(containers ?? {}).sort((a, b) => containerSortKey(a).localeCompare(containerSortKey(b)));
-  const summary = getUatStackSummary({ containers, stackHealth, pending });
+  const summary = getUatStackSummary({ containers, stackHealth, pending, lifecycle });
   if (!summary) return null;
 
-  const reason = stackHealth?.healthy === false ? stackHealth.reasons?.[0] : undefined;
-  const showDetails = density === 'full' || pending || stackHealth?.healthy === false;
+  const reason = summary.state === 'unhealthy' ? stackHealth?.reasons?.[0] : undefined;
+  const showDetails = density === 'full' || pending || summary.state === 'unhealthy';
   const lastProbe = entries
     .map(([, status]) => formatLastProbe(status.lastProbeAt))
     .find(Boolean);
@@ -127,8 +206,8 @@ export function UatStackStatus({
   return (
     <div className={`rounded-md border border-border bg-muted/20 p-2.5 text-xs ${className}`} data-testid="uat-stack-status">
       <div className="flex flex-wrap items-center gap-2">
-        {pending || summary.active ? <Loader2 className="h-3.5 w-3.5 animate-spin text-warning" /> : <Check className="h-3.5 w-3.5 text-success" />}
-        <span className="font-semibold text-foreground">{summary.label}</span>
+        <SummaryIcon summary={summary} />
+        <span className={`font-semibold ${summaryTone(summary)}`}>{summary.label}</span>
         {lastProbe && <span className="text-[11px] text-muted-foreground">last probe {lastProbe}</span>}
         {frontendUrl && stackHealth?.healthy === true && (
           <a href={frontendUrl} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-[11px] text-info-foreground hover:underline">
