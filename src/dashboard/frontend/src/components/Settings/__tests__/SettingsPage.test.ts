@@ -76,6 +76,10 @@ const REMOTE_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/RemoteSection.tsx'),
   'utf8',
 );
+const MEMORY_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/MemorySection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -168,15 +172,15 @@ describe('SettingsPage role model routing panels', () => {
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
     expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Extraction provider');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Fallback provider');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Daily cost cap');
-    expect(SETTINGS_PAGE_SOURCE).toContain('0 disables the cap');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Disable memory observations"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle prompt-time memory injection"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Rollup threshold');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Sidebar refresh interval');
+    expect(MEMORY_SECTION_SOURCE).toContain('OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values');
+    expect(MEMORY_SECTION_SOURCE).toContain('Extraction provider');
+    expect(MEMORY_SECTION_SOURCE).toContain('Fallback provider');
+    expect(MEMORY_SECTION_SOURCE).toContain('Daily cost cap');
+    expect(MEMORY_SECTION_SOURCE).toContain('0 disables the cap');
+    expect(MEMORY_SECTION_SOURCE).toContain('aria-label="Disable memory observations"');
+    expect(MEMORY_SECTION_SOURCE).toContain('aria-label="Toggle prompt-time memory injection"');
+    expect(MEMORY_SECTION_SOURCE).toContain('Rollup threshold');
+    expect(MEMORY_SECTION_SOURCE).toContain('Sidebar refresh interval');
   });
 
   it('renders provider harness selects as clearable built-in defaults', () => {
