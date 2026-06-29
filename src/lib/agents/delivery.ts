@@ -428,7 +428,6 @@ export async function deliverInitialPromptWithRetry(
     // Non-fatal: fall back to delivering the full prompt inline.
   }
 
-  const confirmationTarget = await resolveTranscriptConfirmationTarget(state);
   let lastFailure = 'not-attempted';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     let harness: RuntimeName | undefined;
@@ -454,6 +453,7 @@ export async function deliverInitialPromptWithRetry(
       await new Promise<void>((resolve) => setTimeout(resolve, settleDelayMs));
     }
     try {
+      const confirmationTarget = await resolveTranscriptConfirmationTarget(state);
       const result = await deliver(agentId, deliveredPrompt, caller, deliveryMethod);
       if (result.ok) {
         if (!confirmationTarget) return result;
