@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T20:37:01.251Z",
-  "updated": "2026-06-29T21:36:08.703Z",
+  "updated": "2026-06-29T21:55:03.629Z",
   "pipeline": {
     "issueId": "PAN-2172",
     "reviewStatus": "pending",
@@ -80,5 +80,22 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "confirm-kickoff-landing": "completed",
+    "confirm-kickoff-landing.ac1": "completed",
+    "confirm-kickoff-landing.ac2": "completed",
+    "confirm-kickoff-landing.ac3": "completed",
+    "confirm-kickoff-landing.ac4": "completed",
+    "start-fails-loud-on-undelivered-kickoff": "completed",
+    "start-fails-loud-on-undelivered-kickoff.ac1": "completed",
+    "start-fails-loud-on-undelivered-kickoff.ac2": "completed",
+    "start-fails-loud-on-undelivered-kickoff.ac3": "completed",
+    "start-fails-loud-on-undelivered-kickoff.ac4": "completed",
+    "deacon-redeliver-undelivered-kickoff": "completed",
+    "deacon-redeliver-undelivered-kickoff.ac1": "completed",
+    "deacon-redeliver-undelivered-kickoff.ac2": "completed",
+    "deacon-redeliver-undelivered-kickoff.ac3": "completed",
+    "deacon-redeliver-undelivered-kickoff.ac4": "completed"
+  }
 }
