@@ -222,3 +222,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **agent-pan-2086 is the lone persistent zombie** (status=running, lastActivity=None, failures=1, unchanged across 3 ticks). Operator-started (flywheelRunId=None) -> exempt from reaping; flywheel has no tell/resume/wake lever. Drains only on PAN-2172 fix + operator `pan reload`.
 - PAN-2172 planning healthy (Opus, ctx 22%, advancing). Flagged PAN-2179 dedupe.
 - Accurate cohort count: 12 terminal (10 closed + 2 parked) + 3 in-flight (PAN-2146 in-review healthy, PAN-1718 active healthy, PAN-2086 zombie). Two of three in-flight are moving to merge under their own steam.
+
+## RUN-39 tick 4 (2026-06-29) — PAN-2146 to merge gate, PAN-2172 work started
+
+- Main green (3 consecutive CI successes: 12c4fa7ce8 / e8c3e13919 / e2b74a5516).
+- **PAN-2146 reached ready-for-merge** (review+test passed, PR #2180). Scheduled auto-merge (id 7, fires 21:22:31Z). Origin header required as always.
+- **PAN-1718 re-entered review** (agent-pan-1718-review) on its now-MERGEABLE PR #2103 (conflict resolved tick-3). Healthy.
+- **PAN-2172 planning completed** (issue went to `planned`, vBRIEF + 3 beads). BUT `pan plan --auto` did NOT auto-chain into work; the planning agent sat idle 14m at `planned`. Started work manually with `pan start pan-2172` (codex/gpt-5.5) -> got kickoff, implementing. OBSERVATION: flywheel-launched `pan plan --auto` stops at `planned` rather than auto-starting work, despite the brief calling it "planning + work in one chain." Watch whether this is consistent; may be a handoff gap worth filing if it recurs.
+- agent-pan-2086 unchanged (lone zombie, gated on PAN-2172 merge + reload).
+- Confirms again: NORMAL `pan start`/`pan plan` spawns deliver kickoff fine; only `--fresh`/`--host` respawns + relaunches are broken (PAN-2172/2179).
