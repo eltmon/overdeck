@@ -14,6 +14,7 @@ import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
 import { UatStackTreeGroup } from './UatStackTreeGroup';
 import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
+import { createUatActionHandler } from './uat-action-handlers';
 import {
   ContextMenuRoot,
   ContextMenuTrigger,
@@ -25,7 +26,7 @@ import {
 } from '../../shared/ContextMenu';
 import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import styles from '../styles/command-deck.module.css';
 
@@ -922,6 +923,7 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 };
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
+  const queryClient = useQueryClient();
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1034,14 +1036,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const stackPending = workspace?.pendingOperation?.status === 'running' && (
     workspace.pendingOperation.type === 'containerize' ||
     workspace.pendingOperation.type === 'start' ||
-    workspace.pendingOperation.type === 'rebuild-stack'
+    workspace.pendingOperation.type === 'rebuild-stack' ||
+    workspace.pendingOperation.type === 'start-stack' ||
+    workspace.pendingOperation.type === 'stop-stack' ||
+    workspace.pendingOperation.type === 'restart-stack' ||
+    workspace.pendingOperation.type === 'reap-workspace'
   );
   const uatStackSummary = getUatStackSummary({
     containers: workspace?.containers,
     stackHealth: workspace?.stackHealth,
     pending: stackPending,
   });
-
   // Live flash when dominant status or visible session count changes (blocker-8)
   const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
@@ -1286,6 +1291,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           workspace={workspace}
           pending={Boolean(stackPending)}
           storageKey={`${getExpandedKey(feature.issueId)}:uat`}
+          onActionSelect={createUatActionHandler({ issueId: feature.issueId, workspace, queryClient })}
         />
       )}
 

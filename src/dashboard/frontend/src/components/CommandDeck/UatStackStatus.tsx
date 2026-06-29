@@ -144,8 +144,8 @@ export function resolveUatStackState({
 
   const states = entries.map(([, status]) => normalizeStatus(status));
   if (entries.length > 0 && states.every(state => state === 'stopped')) return 'stopped';
-  if (states.includes('unhealthy') || stackHealth?.healthy === false) return 'unhealthy';
   if (states.includes('starting')) return 'starting';
+  if (states.includes('unhealthy') || stackHealth?.healthy === false) return 'unhealthy';
   if (stackHealth?.healthy === true || (entries.length > 0 && states.every(state => state === 'healthy'))) return 'healthy';
   if (states.includes('stopped')) return 'stopped';
   return 'healthy';
@@ -220,8 +220,8 @@ export function UatStackStatus({
   const summary = getUatStackSummary({ containers, stackHealth, pending, lifecycle });
   if (!summary) return null;
 
-  const reason = summary.state === 'unhealthy' ? stackHealth?.reasons?.[0] : undefined;
-  const showDetails = density === 'full' || pending || summary.state === 'unhealthy';
+  const reason = summary.state === 'unhealthy' || summary.state === 'starting' ? stackHealth?.reasons?.[0] : undefined;
+  const showDetails = density === 'full' || pending || summary.state === 'unhealthy' || summary.state === 'starting';
   const lastProbe = entries
     .map(([, status]) => formatLastProbe(status.lastProbeAt))
     .find(Boolean);

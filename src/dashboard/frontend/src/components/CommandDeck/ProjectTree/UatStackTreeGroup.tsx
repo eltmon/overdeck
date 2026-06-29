@@ -22,6 +22,7 @@ interface UatStackTreeGroupProps {
   pending: boolean;
   storageKey: string;
   issueLifecycle?: UatIssueLifecycle;
+  onActionSelect?: (action: UatAction) => void;
 }
 
 function readExpanded(storageKey: string): boolean {
@@ -53,12 +54,12 @@ function actionClassName(action: UatAction): string {
   return `${styles.uatStackActionButton} ${toneClass}`;
 }
 
-export function UatStackTreeGroup({ summary, workspace, pending, storageKey, issueLifecycle = 'active' }: UatStackTreeGroupProps) {
+export function UatStackTreeGroup({ summary, workspace, pending, storageKey, issueLifecycle = 'active', onActionSelect }: UatStackTreeGroupProps) {
   const [expanded, setExpanded] = useState(() => readExpanded(storageKey));
   const actions = resolveUatActions(summary.state, issueLifecycle);
-  const handleActionSelect = useCallback((_action: UatAction) => {
-    // WI-6 wires these action ids to the workspace-stack endpoints.
-  }, []);
+  const handleActionSelect = useCallback((action: UatAction) => {
+    onActionSelect?.(action);
+  }, [onActionSelect]);
   const handleToggle = useCallback(() => {
     setExpanded(current => {
       const next = !current;

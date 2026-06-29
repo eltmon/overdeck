@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -41,6 +41,14 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 
 vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [] }),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+  },
 }));
 
 vi.mock('../../../lib/refresh-dashboard-state', () => ({
@@ -848,6 +856,59 @@ describe('FeatureItem', () => {
     expect(labels).toEqual(expected);
     expect(labels.at(-1)).toBe('Reap');
     expect(items.at(-1)?.className).toContain('text-destructive');
+  });
+
+  it('confirms UAT reap through the workspace reap route and never calls deep-wipe', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/workspaces/PAN-821') {
+        return {
+          ok: true,
+          json: async () => ({
+            exists: true,
+            issueId: 'PAN-821',
+            stackHealth: {
+              healthy: false,
+              reasons: ['api exited', 'postgres exited'],
+              lastObserved: '2026-06-14T19:02:00.000Z',
+            },
+            containers: {
+              postgres: { running: false, uptime: '', status: 'exited', health: 'none', ports: [5432] },
+              api: { running: false, uptime: '', status: 'exited', health: 'none', ports: [8080] },
+            },
+          }),
+        };
+      }
+      if (url === '/api/workspaces/PAN-821/reap' && init?.method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, activityId: 'activity-1' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          workspacePaths: [],
+          localBranchNames: [],
+          remoteBranchNames: [],
+          tmuxSessionNames: [],
+          prs: [],
+          dockerContainerNames: [],
+        } satisfies ProjectFeatureResourceIdentifiers),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderReadyForMergeFeature();
+
+    fireEvent.click(await screen.findByTestId('uat-inline-action-reap'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-821/reap', { method: 'POST' });
+    });
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map(call => String(call[0]));
+    expect(calledUrls.some(url => url.includes('deep-wipe'))).toBe(false);
   });
 
   it('shows cleanup affordances for orphaned resources', () => {
