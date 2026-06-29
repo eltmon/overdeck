@@ -28,22 +28,16 @@
     "auto-start.ac4": "completed"
   },
   "created": "2026-06-26T03:32:56.369Z",
-  "updated": "2026-06-29T00:41:10.985Z",
+  "updated": "2026-06-29T08:17:22.969Z",
   "pipeline": {
     "issueId": "PAN-1884",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T00:41:10.964Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-06-29T00:41:10.964Z"
-      }
-    ],
+    "updatedAt": "2026-06-29T08:17:22.909Z",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2109",
     "reviewedAtCommit": "66d3c01292b8fc594110ac31f62f9568bee99b1b",
     "lastVerifiedCommit": "66d3c01292b8fc594110ac31f62f9568bee99b1b"
@@ -51,10 +45,18 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 258,
+            "output": 12623,
+            "cacheRead": 1472490,
+            "cacheWrite": 16429
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 34907,
-            "output": 5426,
+            "input": 38853,
+            "output": 6580,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -67,6 +69,14 @@
             "cacheWrite": 204001
           }
         },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 48,
+            "output": 3236,
+            "cacheRead": 1718554,
+            "cacheWrite": 157593
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
             "input": 534609,
@@ -77,17 +87,23 @@
         }
       },
       "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 28026,
+          "output": 31678,
+          "cacheRead": 2862016,
+          "cacheWrite": 220430
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 34907,
-          "output": 5426,
+          "input": 38853,
+          "output": 6580,
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "anthropic/claude-opus-4-8": {
-          "input": 27768,
-          "output": 19055,
-          "cacheRead": 1389526,
-          "cacheWrite": 204001
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 48,
+          "output": 3236,
+          "cacheRead": 1718554,
+          "cacheWrite": 157593
         },
         "custom/kimi-k2.7-code": {
           "input": 534609,
@@ -97,8 +113,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.653463,
-        "pricingAsOf": "2026-06-29T00:41:10.983Z"
+        "usd": 13.194331,
+        "pricingAsOf": "2026-06-29T08:17:22.969Z"
       }
     },
     "merges": [
