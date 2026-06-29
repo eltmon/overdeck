@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-1894",
   "schemaVersion": 2,
-  "created": "2026-06-29T14:58:24.745Z",
-  "updated": "2026-06-29T14:58:35.903Z",
-  "pipeline": {
-    "issueId": "PAN-1894",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T14:58:24.745Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,77 @@
       "note": "Planning session started for PAN-1894: Show UAT stack startup state in issue tree and issue slide-out",
       "timestamp": "2026-06-29T14:58:35.903Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T14:58:24.745Z",
+  "updated": "2026-06-29T16:45:04.227Z",
+  "pipeline": {
+    "issueId": "PAN-1894",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T16:45:04.081Z",
+    "inspectNotes": "Spec fidelity and constraint compliance passed for bead workspace-hfuig. resolveUatActions covers the documented UAT states/lifecycles, inline actions render visibly in the UAT tree row, and no PRD/CLAUDE constraints were violated."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 982076,
+            "output": 65337,
+            "cacheRead": 7849984,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 35052,
+            "output": 3971,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 28991,
+            "output": 54732,
+            "cacheRead": 4694536,
+            "cacheWrite": 272551
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 982076,
+          "output": 65337,
+          "cacheRead": 7849984,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 35052,
+          "output": 3971,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 28991,
+          "output": 54732,
+          "cacheRead": 4694536,
+          "cacheWrite": 272551
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 16.359454,
+        "pricingAsOf": "2026-06-29T16:45:04.225Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.5"
 }
