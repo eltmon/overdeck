@@ -216,6 +216,24 @@ export function selectUnblockTargets(
     .slice(0, cap);
 }
 
+/**
+ * Planning floor targets: ready issues that still need a plan, capped in rank
+ * order. Planning stops at the Release gate; this selector surfaces the backlog
+ * the flywheel should keep planning even while a current work cohort drains.
+ */
+export function selectNeedsPlanning(
+  nodes: readonly SequenceNode[],
+  lk: ClassifyLookups,
+  opts: { cap?: number } = {},
+): ForecastNode[] {
+  const cap = Math.max(1, opts.cap ?? 2);
+  return nodes
+    .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
+    .filter((n) => n.state.ready && !n.state.planned && !n.state.parked && !n.state.vetoed && !n.state.objection && !n.state.inPipeline)
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, cap);
+}
+
 export interface ForecastStats {
   total: number;
   inFlight: number;

@@ -200,3 +200,34 @@ live in **Substrate fixes** above; RUN-32/34/35 are kept verbatim below.)
 ## Recent runs (RUN-29 onward)
 
 Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file holds only cross-run **durable** memory; per-tick logs were redundant with the run reports and were compacted out on 2026-06-29 (was 373KB / 3253 lines).
+
+## RUN-39 tick 2 (2026-06-29) — PAN-2155 drained; kickoff-delivery bugs gate the rest
+
+- **PAN-2155 MERGED** (commit 9bebbf24, auto-merge fired 20:14Z) → `pan close --force` → terminal. Cohort now 13/15 terminal.
+- **Remaining cohort (PAN-2086, PAN-1718, PAN-2146) all hit agent kickoff/relaunch bugs:**
+  - **agent-pan-1718** — my tick-1 `pan start --fresh` produced a ZOMBIE: ctx 0% / out 0 / cost $0, `status=running` but `lastActivity=None`, `failures=1` (kickoff delivery failed). Known bug **PAN-2172** (host/fresh respawn never delivers kickoff). Plus its PR #2103 is still CONFLICTING.
+  - **agent-pan-2086** — byte-identical metrics across ticks (out 198 / $0.4306) = stalled; the RUN-37 `--fresh --host` respawn that PAN-2172 describes.
+  - **agent-pan-2146** — flipped to `stopped+troubled` with **0 failures** (spurious gate, RUN-37 pattern) despite a stale "Working" pane frame. `pan untroubled pan-2146` → deacon resumed it cleanly (back to running).
+- **Action:** launched `pan plan pan-2172 --auto` (kickoff-delivery fix is a named pipeline-flow blocker = agent spawning). Chose full pipeline over strike — RUN-37 showed lifecycle/delivery-path strikes can red-main; review/test gates protect it. planning-pan-2172 confirmed alive (Opus, ctx 11%, advancing) — **normal fresh planning spawns deliver kickoff fine; only `--fresh`/`--host` respawns + relaunches are broken.**
+- **PAN-2179** (relaunch zombie — session alive, kickoff never delivered, liveness fooled) likely shares PAN-2172's root cause; flagged for the planner to dedupe/collapse rather than launching a second racing fix on the same delivery code.
+- These three stuck agents drain only after PAN-2172 (+PAN-2179) lands AND the operator `pan reload`s (deacon runs compiled dist). Carry to next run.
+
+**Reusable:** distinguish a productive vs zombie fresh-spawn by `ctx%`/`out` advancing across ticks AND `state.json.lastActivity != None`. A `running` status with `lastActivity=None` + `failures=1` = kickoff never landed (PAN-2172/2179), not a live agent.
+
+## RUN-39 tick 3 (2026-06-29) — zombies can self-recover; cohort drains cleanly
+
+- Main green (e2b74a5516 + 0469f6d038 both CI success).
+- **agent-pan-1718 SELF-RECOVERED.** Tick-2 it was a zombie (status=running, lastActivity=None, failures=1). Tick-3: failures=0, lastActivity recent, ctx 72%, actively running git merge-base. The deacon's nudge/re-engage delivered the kickoff after all, AND the agent resolved its conflict: **PR #2103 went CONFLICTING/DIRTY -> MERGEABLE/UNSTABLE.** It's now addressing review feedback (.pan/feedback/001-review-agent-changes-requested.md). Lesson: do NOT prematurely write off a `lastActivity=None`/`failures=1` zombie as dead — the deacon re-delivery sometimes lands a tick later. Re-check before escalating.
+- **PAN-2146 advanced to in-review** (work done) with a healthy convoy (agent-pan-2146-review wrote review.md, not wedged).
+- **agent-pan-2086 is the lone persistent zombie** (status=running, lastActivity=None, failures=1, unchanged across 3 ticks). Operator-started (flywheelRunId=None) -> exempt from reaping; flywheel has no tell/resume/wake lever. Drains only on PAN-2172 fix + operator `pan reload`.
+- PAN-2172 planning healthy (Opus, ctx 22%, advancing). Flagged PAN-2179 dedupe.
+- Accurate cohort count: 12 terminal (10 closed + 2 parked) + 3 in-flight (PAN-2146 in-review healthy, PAN-1718 active healthy, PAN-2086 zombie). Two of three in-flight are moving to merge under their own steam.
+
+## RUN-39 tick 4 (2026-06-29) — PAN-2146 to merge gate, PAN-2172 work started
+
+- Main green (3 consecutive CI successes: 12c4fa7ce8 / e8c3e13919 / e2b74a5516).
+- **PAN-2146 reached ready-for-merge** (review+test passed, PR #2180). Scheduled auto-merge (id 7, fires 21:22:31Z). Origin header required as always.
+- **PAN-1718 re-entered review** (agent-pan-1718-review) on its now-MERGEABLE PR #2103 (conflict resolved tick-3). Healthy.
+- **PAN-2172 planning completed** (issue went to `planned`, vBRIEF + 3 beads). BUT `pan plan --auto` did NOT auto-chain into work; the planning agent sat idle 14m at `planned`. Started work manually with `pan start pan-2172` (codex/gpt-5.5) -> got kickoff, implementing. OBSERVATION: flywheel-launched `pan plan --auto` stops at `planned` rather than auto-starting work, despite the brief calling it "planning + work in one chain." Watch whether this is consistent; may be a handoff gap worth filing if it recurs.
+- agent-pan-2086 unchanged (lone zombie, gated on PAN-2172 merge + reload).
+- Confirms again: NORMAL `pan start`/`pan plan` spawns deliver kickoff fine; only `--fresh`/`--host` respawns + relaunches are broken (PAN-2172/2179).
