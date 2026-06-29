@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-06-29T04:34:31.786Z",
+  "updated": "2026-06-29T05:25:24.033Z",
   "pipeline": {
     "issueId": "PAN-2152",
     "reviewStatus": "pending",
@@ -64,5 +64,37 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "extract-beads": "completed",
+    "extract-beads.extract-beads.ac1": "completed",
+    "extract-beads.extract-beads.ac2": "completed",
+    "extract-beads.extract-beads.ac3": "completed",
+    "extract-beads.extract-beads.ac4": "completed",
+    "extract-remote": "completed",
+    "extract-remote.extract-remote.ac1": "completed",
+    "extract-remote.extract-remote.ac2": "completed",
+    "extract-remote.extract-remote.ac3": "completed",
+    "extract-remote.extract-remote.ac4": "completed",
+    "extract-create": "completed",
+    "extract-create.extract-create.ac1": "completed",
+    "extract-create.extract-create.ac2": "completed",
+    "extract-create.extract-create.ac3": "completed",
+    "extract-create.extract-create.ac4": "completed",
+    "extract-list": "completed",
+    "extract-list.extract-list.ac1": "completed",
+    "extract-list.extract-list.ac2": "completed",
+    "extract-list.extract-list.ac3": "completed",
+    "extract-list.extract-list.ac4": "completed",
+    "extract-maintenance": "completed",
+    "extract-maintenance.extract-maintenance.ac1": "completed",
+    "extract-maintenance.extract-maintenance.ac2": "completed",
+    "extract-maintenance.extract-maintenance.ac3": "completed",
+    "extract-maintenance.extract-maintenance.ac4": "completed",
+    "ratchet-guard": "completed",
+    "ratchet-guard.ratchet-guard.ac1": "completed",
+    "ratchet-guard.ratchet-guard.ac2": "completed",
+    "ratchet-guard.ratchet-guard.ac3": "completed",
+    "ratchet-guard.ratchet-guard.ac4": "completed"
+  }
 }
