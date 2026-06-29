@@ -66,6 +66,18 @@ export function getBootReconciliationPendingHoldSet(): Set<string> {
   return new Set(listBootReconciliationCandidateIds());
 }
 
+export function getBootReconciliationHeldResumeSet(): Set<string> {
+  const state = getBootReconciliationState();
+  if (state.decision !== 'pending' && state.decision !== 'hold_all' && state.decision !== 'per_agent') {
+    return new Set();
+  }
+
+  const heldCandidates = listBootReconciliationCandidates()
+    .filter((agent) => state.decision !== 'per_agent' || state.perAgent[agent.issueId] !== 'resume')
+    .map((agent) => agent.id);
+  return new Set(heldCandidates);
+}
+
 export function clearBootReconciliationGraceTimer(): void {
   if (!graceTimer) return;
   clearTimeout(graceTimer);

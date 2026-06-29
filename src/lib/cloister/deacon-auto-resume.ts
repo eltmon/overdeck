@@ -8,6 +8,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import {
+  getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
   listBootReconciliationCandidates,
 } from './boot-reconciliation.js';
@@ -575,6 +576,11 @@ export async function handleAgentStoppedEvent(
   }
   if (state.role !== 'work') {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not work)`);
+    return null;
+  }
+
+  if (getBootReconciliationHeldResumeSet().has(agentId)) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — held by boot reconciliation decision`);
     return null;
   }
 
