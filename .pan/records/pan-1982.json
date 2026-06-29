@@ -88,37 +88,33 @@
       "reason": "feedback",
       "note": "[2026-06-29T13:12Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T13:12:25.842Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T13:12:18Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1982\n\nWorkspace detached at b14f5100 with unresolved scripts/file-size-baseline.txt conflict; requested head 4cd21d1d not reviewable\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1982 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T13:12:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1982\n\nWorkspace detached at b14f5100 with unresolved scripts/file-size-baseline.txt conflict; requested head 4cd21d1d not reviewable\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1982 -m \"Fixed review issues\"`"
+      "timestamp": "2026-06-29T13:19:25.187Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:19:25.467Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1982",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:12:18.285Z",
+    "updatedAt": "2026-06-29T13:19:37.097Z",
     "reviewNotes": "Workspace detached at b14f5100 with unresolved scripts/file-size-baseline.txt conflict; requested head 4cd21d1d not reviewable",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2112"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2112",
+    "reviewRequestedAt": "2026-06-29T13:19:25.189Z"
   },
   "closeOut": {
     "usage": {
@@ -141,8 +137,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 45957,
-            "output": 8040,
+            "input": 46694,
+            "output": 8356,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -178,8 +174,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 45957,
-          "output": 8040,
+          "input": 46694,
+          "output": 8356,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -192,7 +188,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.709705,
-        "pricingAsOf": "2026-06-29T13:12:18.324Z"
+        "pricingAsOf": "2026-06-29T13:19:37.670Z"
       }
     },
     "merges": [
@@ -201,7 +197,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T13:12:18.327Z",
-  "updated": "2026-06-29T13:18:00.647Z",
+  "updated": "2026-06-29T13:19:38.379Z",
   "statusOverrides": {
     "reverify-parked-convoy-bugs": "completed",
     "reverify-parked-convoy-bugs.ac1": "completed",
