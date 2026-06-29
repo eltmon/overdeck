@@ -106,17 +106,17 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T20:54:57.057Z",
-    "reviewNotes": "PAN-2172 planning artifact is included in the PAN-1718 review diff",
+    "updatedAt": "2026-06-29T21:06:29.874Z",
+    "reviewNotes": "Agent re-review request (2/25): Removed PAN-2172 planning artifact from PR diff",
     "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "lastVerifiedCommit": "0020a201f162e6dc6d8bffe3b815e6cdb2d1681d",
+    "lastVerifiedCommit": "b2ebbd99f9e5e7f6fed9c77b30fe50ca5ed90fb5",
     "reviewRequestedAt": "2026-06-29T20:48:38.506Z"
   },
   "closeOut": {
@@ -132,8 +132,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 169090,
-            "output": 15763,
+            "input": 170889,
+            "output": 15892,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -156,9 +156,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2004154,
-            "output": 198806,
-            "cacheRead": 91088128,
+            "input": 2072214,
+            "output": 235988,
+            "cacheRead": 106914560,
             "cacheWrite": 0
           }
         }
@@ -171,8 +171,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 169090,
-          "output": 15763,
+          "input": 170889,
+          "output": 15892,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -189,15 +189,15 @@
           "cacheWrite": 184046
         },
         "custom/kimi-k2.7-code": {
-          "input": 2004154,
-          "output": 198806,
-          "cacheRead": 91088128,
+          "input": 2072214,
+          "output": 235988,
+          "cacheRead": 106914560,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 28.331404,
-        "pricingAsOf": "2026-06-29T20:54:57.086Z"
+        "usd": 31.551808,
+        "pricingAsOf": "2026-06-29T21:06:29.892Z"
       }
     },
     "merges": [
@@ -206,7 +206,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T20:54:57.882Z",
+  "updated": "2026-06-29T21:06:29.914Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
