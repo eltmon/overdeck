@@ -32,26 +32,50 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T21:02:44.262Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T21:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T21:25:03.903Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T21:25Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T21:25:14.762Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T21:25:03Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2146\n\nWorkspace is detached and has unresolved conflict in .pan/records/pan-2146.json\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2146 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T21:25:14Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2146\n\nWorkspace is detached and has unresolved conflict in .pan/records/pan-2146.json\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2146 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-06-29T21:22:38.973Z",
+  "updated": "2026-06-29T21:25:14.762Z",
   "pipeline": {
     "issueId": "PAN-2146",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:22:38.936Z",
-    "reviewNotes": "No blocking findings in current refactor review",
+    "updatedAt": "2026-06-29T21:25:03.861Z",
+    "reviewNotes": "Workspace is detached and has unresolved conflict in .pan/records/pan-2146.json",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead workspace-ic7qo (commit bb0c18c7ce): 2-line surgical fix removing modelSpawnKey + flywheelRunId from cleanAgentState preservation. Both fields are ephemeral spawn-time inputs (computed/provided in src/lib/agents.ts spawn paths), not persistent runtime state. Their persistence through the disk-read cleaner was a leak that would have re-introduced stale values across restarts. Fields remain in AgentState interface and are still set correctly at spawn sites. Foundation-only edit, no barrel back-import, file-size guard satisfied. PASS.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2180",
-    "reviewedAtCommit": "60bd1bb83f0dfe14bb52caf123e8dc5039201cb7",
     "lastVerifiedCommit": "60bd1bb83f0dfe14bb52caf123e8dc5039201cb7",
     "reviewRequestedAt": "2026-06-29T21:00:07.851Z"
   },
@@ -119,7 +143,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.986153,
-        "pricingAsOf": "2026-06-29T21:22:38.960Z"
+        "pricingAsOf": "2026-06-29T21:25:03.893Z"
       }
     },
     "merges": [
