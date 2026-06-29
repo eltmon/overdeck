@@ -84,6 +84,10 @@ const BACKGROUND_AI_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/BackgroundAiSection.tsx'),
   'utf8',
 );
+const EXPERIMENTAL_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/ExperimentalSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -208,18 +212,18 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces the RTK Bash compression toggle in experimental settings', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('RTK Bash compression');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Enable RTK Bash compression"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-rtk-toggle"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleRtkToggle(!formData.agents?.rtk?.enabled)');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('RTK Bash compression');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('aria-label="Enable RTK Bash compression"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('data-testid="experimental-rtk-toggle"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('handleRtkToggle(!formData.agents?.rtk?.enabled)');
   });
 
   it('surfaces the Streamdown renderer toggle in experimental settings', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('Streamdown renderer');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Render chat markdown with Streamdown — research preview');
-    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Render chat markdown with Streamdown"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-streamdown-toggle"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleStreamdownToggle(!formData.experimental?.streamdownRenderer)');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('Streamdown renderer');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('Render chat markdown with Streamdown — research preview');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('aria-label="Render chat markdown with Streamdown"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('data-testid="experimental-streamdown-toggle"');
+    expect(EXPERIMENTAL_SECTION_SOURCE).toContain('handleStreamdownToggle(!formData.experimental?.streamdownRenderer)');
   });
 
   it('surfaces the harness/model permutations toggle in provider settings', () => {
