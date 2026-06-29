@@ -1,40 +1,54 @@
-import { appendFile, mkdir, readFile, rename, rmdir, stat, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 
 const MAX_JOURNAL_ENTRIES = 200;
 const LOCK_POLL_MS = 10;
-const LOCK_MAX_WAIT_MS = 5000;
-const STALE_LOCK_MS = 30000;
 
 function restartEventsLockPath(): string {
   return `${restartEventsPath()}.lock`;
 }
 
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function removeStaleRestartEventsLock(lockPath: string): Promise<boolean> {
+  const pidFile = join(lockPath, 'pid');
+  try {
+    const pid = parseInt(await readFile(pidFile, 'utf8'), 10);
+    if (Number.isFinite(pid) && isProcessAlive(pid)) return false;
+  } catch {
+    // Malformed or missing PID file means the lock is not valid.
+  }
+  try {
+    await rm(lockPath, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function acquireRestartEventsLock(): Promise<boolean> {
   const lockPath = restartEventsLockPath();
-  const start = Date.now();
   while (true) {
     try {
       await mkdir(lockPath);
+      await writeFile(join(lockPath, 'pid'), String(process.pid), 'utf8');
       return true;
     } catch (error) {
       if (!isErrnoException(error) || error.code !== 'EEXIST') {
         // Unexpected lock failure; proceed without locking.
         return false;
       }
-      try {
-        const lockStat = await stat(lockPath);
-        if (Date.now() - lockStat.mtimeMs > STALE_LOCK_MS) {
-          await rmdir(lockPath);
-          continue;
-        }
-      } catch {
-        // Lock disappeared or became inaccessible; retry immediately.
-        continue;
-      }
-      if (Date.now() - start > LOCK_MAX_WAIT_MS) return false;
+      // Lock is held. If it is stale (owner dead or malformed), remove it.
+      if (await removeStaleRestartEventsLock(lockPath)) continue;
       await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS));
     }
   }
@@ -42,7 +56,7 @@ async function acquireRestartEventsLock(): Promise<boolean> {
 
 async function releaseRestartEventsLock(): Promise<void> {
   try {
-    await rmdir(restartEventsLockPath());
+    await rm(restartEventsLockPath(), { recursive: true, force: true });
   } catch {
     // ignore
   }
@@ -124,6 +138,7 @@ function parseRestartEventLine(line: string): RestartStatus | null {
 
 async function appendRestartEvent(entry: RestartStatus): Promise<void> {
   const locked = await acquireRestartEventsLock();
+  if (!locked) return; // Could not acquire lock; skip best-effort journal append.
   try {
     const path = restartEventsPath();
     await mkdir(dirname(path), { recursive: true });
@@ -131,7 +146,7 @@ async function appendRestartEvent(entry: RestartStatus): Promise<void> {
   } catch {
     // Journal append is best-effort and must never fail the primary status write.
   } finally {
-    if (locked) await releaseRestartEventsLock();
+    await releaseRestartEventsLock();
   }
 }
 
