@@ -3086,3 +3086,23 @@ Main GREEN unchanged at origin/main `2d0fb0d36`. RAM 14/64 GB.
 - Conflicting trio unchanged (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). No flywheel lever. Main green.
 
 - Next tick: (1) strike-pan-2166 — landed on main + verified? grep `exceeded model token limit` on origin/main; if merged → `pan close PAN-2166` AND recommend close PAN-1865 as superseded. (2) Once pattern on main, does deacon AUTO-RECOVER agent-pan-2086 (tail now matches isContextOverflowTail)? watch ~/.overdeck/logs/deacon.log for a recovery respawn. (3) trio unchanged unless operator rebases. (4) emit status. (5) PAN-1865 cleanup is operator's (pan kill).
+
+## RUN-36 tick 5 (2026-06-29 ~09:53Z) — KIMI-OVERFLOW FIX LANDED (PAN-2166 merged+closed); but live recovery gated on a dashboard restart (stale dist)
+
+Main GREEN, advanced to origin/main `fde45b7e3` (CI success 09:40Z).
+
+- **WIN: PAN-2166 MERGED + closed-out.** strike-pan-2166 (gpt-5.5, clean worktree) added `'exceeded model token limit'` to CONTEXT_OVERFLOW_PATTERNS + 8 regression tests, passed lint/typecheck/full suite (7584 root + 32 frontend), `pan done --strike` ff-merged to main. Verified the pattern is on origin/main:src/lib/context-overflow.ts:9. `pan close PAN-2166 --force` clean (verify-merged ✓, terminal ✓; the PAN-2165 label-abort tripped again, non-fatal/expected). The re-route from the wedged PAN-1865 strike → fresh PAN-2166 strike WORKED — the kimi-native overflow detection gap is fixed on green main.
+
+- **Closed PAN-1865 as superseded/completed** (gh issue close; its residual is fixed on main via PAN-2166). Two operator cleanups noted on the issue: `pan kill pan-1865` (debris) + `pan reload` (deploy).
+
+- **CRITICAL FINDING (verified, not assumed) — the fix is on main but NOT live; agent-pan-2086 is still wedged.** I expected the deacon to auto-recover agent-pan-2086 once the pattern landed. It did NOT. Deacon log shows only troubled-inspect skips + `nudgeIdleWorkAgentsWithOpenBeads: agent-pan-2086 bd ready failed` — no overflow recovery. Root cause, ground-truthed: **the running dashboard/deacon executes STALE compiled dist.** `dist/dashboard/server.js` was built 08:14Z (BEFORE the fix landed 09:40Z); `grep 'exceeded model token limit' dist/dashboard/server.js` = 0 (ABSENT); server PIDs 42807/44707 started Jun 28 22:46. So the live `isContextOverflowTail` is pre-fix code and still misses kimi's string. **The detection fix cannot recover the live wedge (or any future kimi overflow) until `pan reload` (rebuild + restart).**
+
+- **DECISION: did NOT restart the dashboard.** Per feedback_confirm_before_going_live + feedback_no_live_boot_hotpatch + the brief's allowed-actions list, a rebuild+restart/go-live is the OPERATOR's call, not a flywheel action (it kills PTYs, the deacon, and all agent streams). Surfaced as an URGENT operator suggestion + openQuestion with the verified facts. This is the honest boundary: flywheel landed + verified the fix on main; deploying it to the live process is the operator's switch.
+
+- **DURABLE LESSON — a merged substrate fix to dashboard/deacon code is NOT live until `pan reload`.** Source-on-main ≠ running-process. Any flywheel fix that changes server/deacon behavior (recovery, gates, nudges) only takes effect after a rebuild+restart the flywheel cannot perform. When a fix targets live-process behavior, the tick must explicitly check dist build-time + server PID start-time vs the merge time, and surface the deploy step — do NOT report the live symptom as fixed just because main is green.
+
+- Conflicting trio unchanged (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). Operator/PAN-2108.
+
+- **Cohort drain status:** cohort (12) now: 1884/2088/1084/2054/2150/2152 closed-out + 806/1864 parked + (mid-run) 1510/1506/2157/2166/1865 closed = strong drain. Remaining cohort blockers: 1982/1718/2063 (operator rebase) + 2086 (now fixable via pan reload, then deacon auto-recovers). NONE flywheel-actionable further this run.
+
+- Next tick: (1) did the operator `pan reload`? if dist now contains the pattern + server restarted AFTER 09:40Z → watch deacon auto-recover agent-pan-2086. (2) operator rebase of trio → if any CLEAN+green, schedule auto-merge. (3) `pan kill pan-1865` debris cleared? (4) if cohort fully wound down + nothing flywheel-actionable → RETROSPECTIVE + `pan flywheel report`.
