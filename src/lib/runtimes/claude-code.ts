@@ -15,6 +15,7 @@ import type {
   AgentRuntime,
   AgentRuntimeSync,
   AgentRuntimeError,
+  HarnessBehavior,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -23,6 +24,7 @@ import type {
   Agent,
   ActivitySource,
 } from './types.js';
+import { CLAUDE_CODE_BEHAVIOR } from './behavior.js';
 import { getAgentStateSync, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentStateSync, saveAgentRuntimeState, determineModel } from '../agents.js';
 import { sessionExistsSync, killSessionSync, sendKeys, getAgentSessionsSync } from '../tmux.js';
 import { parseClaudeSessionSync, getSessionFilesSync, getProjectDirsSync } from '../cost-parsers/jsonl-parser.js';
@@ -45,6 +47,10 @@ interface SessionIndexEntry {
  */
 export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
   readonly name = 'claude-code' as const;
+
+  getHarnessBehavior(): HarnessBehavior {
+    return CLAUDE_CODE_BEHAVIOR;
+  }
 
   /**
    * Get the project directory for a workspace
@@ -459,6 +465,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
 
   getSessionPath(agentId: string): string | null {
     return this.inner.getSessionPath(agentId);
+  }
+  getHarnessBehavior(): HarnessBehavior {
+    return this.inner.getHarnessBehavior();
   }
   getLastActivity(agentId: string): Date | null {
     return this.inner.getLastActivity(agentId);

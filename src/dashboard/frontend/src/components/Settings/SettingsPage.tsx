@@ -1,15 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Loader2,
-  X,
-  ChevronDown,
   Code,
   Beaker,
   Eye,
-  Zap,
-  CheckCircle,
   Terminal,
   Brain,
   SplitSquareVertical,
@@ -21,7 +17,6 @@ import {
   GitBranch,
   Flag,
   RefreshCw,
-  Trash2,
   Palette,
   Wrench,
   Monitor,
@@ -31,37 +26,31 @@ import {
   Gauge,
   Globe,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, ModelId, type BackgroundAiConfig, type BackgroundAiFeature, type VoiceHardwareSettings, type VoiceSettings, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
-import { setReauthSession } from '../../lib/pending-codex-spawn';
-import { OpenRouterPage } from './OpenRouterPage';
-import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
 import { RolesPanel } from './RolesPanel';
-import { SavedVoicesTab } from './SavedVoicesTab';
-import { VoiceDesignTab } from './VoiceDesignTab';
-import { VoicePresetsTab } from './VoicePresetsTab';
-import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
+import { VoiceSettingsSection } from './sections/VoiceSettingsSection';
+import { ConversationSearchSection } from './sections/ConversationSearchSection';
+import { ConversationSettingsSection } from './sections/ConversationSettingsSection';
+import { ProviderManagementSection } from './sections/ProviderManagementSection';
+import { TtsConfigurationSection } from './sections/TtsConfigurationSection';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
-import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 import { LegacyImportDialog } from './LegacyImportDialog';
-// PAN-1055: drop the cached available-models response when Settings is saved
-// so subsequent picker renders see the new provider/keys mix immediately.
-import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
-import { HarnessLogo, ProviderLogo } from '../shared/branding';
 import {
   SettingsLayout,
   SettingsHeader,
   SettingsSidebarNav,
-  SettingsSection,
-  SettingsRow,
   type NavItem,
 } from './primitives';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
+import { AUTOSAVE_DEBOUNCE_MS, useAutosavePipeline } from './hooks/useAutosavePipeline';
+import { useConversationSearch } from './hooks/useConversationSearch';
+import { EMBEDDING_MODELS_BY_PROVIDER } from './embeddingModels';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -80,16 +69,6 @@ interface OpenRouterCatalogResponse {
   favorites: string[];
 }
 
-const HARNESS_LABELS: Record<Harness, string> = {
-  'claude-code': 'Claude Code',
-  ohmypi: 'oh-my-pi',
-  codex: 'Codex',
-};
-
-function harnessLabel(harness: Harness): string {
-  return HARNESS_LABELS[harness];
-}
-
 async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | null> {
   try {
     const res = await fetch('/api/settings/openrouter/models');
@@ -104,114 +83,6 @@ async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | nul
 async function fetchSettings(): Promise<SettingsConfig> {
   const res = await fetch('/api/settings');
   if (!res.ok) throw new Error('Failed to fetch settings');
-  return res.json();
-}
-
-interface ConversationSearchStatusResponse {
-  enabled: boolean;
-  available: boolean;
-  unavailableReason?: string;
-  dbPath: string;
-  chunkCount: number;
-  indexedFileCount: number;
-  lastIndexedAt: string | null;
-}
-
-async function fetchConversationSearchStatus(): Promise<ConversationSearchStatusResponse> {
-  const res = await fetch('/api/settings/conversation-search/status', { credentials: 'include' });
-  if (!res.ok) throw new Error('Failed to fetch conversation search status');
-  return res.json();
-}
-
-interface ConversationSearchCostEstimate {
-  provider: 'openai';
-  model: string;
-  tokenCount: number;
-  pricePerMillionTokens: number;
-  estimatedUsd: number;
-  filesScanned: number;
-  chunksEstimated: number;
-  disabled: boolean;
-  unavailableReason?: string;
-  confirmationNonce?: string;
-}
-
-async function estimateConversationSearchReindex(model?: string): Promise<ConversationSearchCostEstimate> {
-  // Pass ?model= to price a prospective model switch before it's saved.
-  const qs = model ? `?model=${encodeURIComponent(model)}` : '';
-  const res = await fetch(`/api/settings/conversation-search/reindex-estimate${qs}`, { credentials: 'include' });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to estimate reindex cost (${res.status})`);
-  }
-  return res.json();
-}
-
-async function reindexConversationSearch(confirmationNonce?: string): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
-  const res = await fetch('/api/settings/conversation-search/reindex', {
-    method: 'POST',
-    credentials: 'include',
-    headers: await dashboardMutationJsonHeaders(),
-    body: JSON.stringify({ confirmationNonce }),
-  });
-  if (!res.ok) throw new Error('Failed to reindex conversations');
-  return res.json();
-}
-
-interface TtsHealthResponse {
-  ok: boolean;
-  running: boolean;
-  pid: number | null;
-  daemonHost: string;
-  daemonPort: number;
-  phase?: 'stopped' | 'starting' | 'healthy' | 'unhealthy';
-  initializing?: boolean;
-  queueDepth?: number;
-  model?: unknown;
-  uptimeSeconds?: number;
-  gpuMemoryUsedMb?: number;
-  error?: string;
-}
-
-interface TtsVoiceListItem {
-  id: string;
-  name: string;
-  kind: 'preset' | 'design' | 'clone';
-  presetName?: string;
-  description?: string;
-  instruct?: string;
-}
-
-async function fetchTtsHealth(): Promise<TtsHealthResponse> {
-  const res = await fetch('/api/tts/health');
-  if (!res.ok) throw new Error('Failed to fetch TTS health');
-  return res.json();
-}
-
-async function startTtsDaemonRequest(): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch('/api/tts/start', { method: 'POST' });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.ok !== true) throw new Error(body.error ?? body.status?.error ?? 'Failed to start TTS daemon');
-  return body;
-}
-
-function formatTtsUptime(seconds: number | undefined): string | undefined {
-  if (seconds === undefined) return undefined;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
-  return `${remainingSeconds}s`;
-}
-
-function formatTtsGpuMemory(mb: number | undefined): string | undefined {
-  if (mb === undefined) return undefined;
-  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB VRAM` : `${mb}MB VRAM`;
-}
-
-async function fetchTtsVoices(): Promise<TtsVoiceListItem[]> {
-  const res = await fetch('/api/tts/voices');
-  if (!res.ok) throw new Error('Failed to fetch TTS voices');
   return res.json();
 }
 
@@ -332,18 +203,6 @@ async function saveCloisterConfig(config: CloisterConfig): Promise<void> {
   }
 }
 
-interface VoiceSettings {
-  stt: {
-    provider: 'moonshine' | 'google-cloud';
-    moonshine: { model: string };
-    googleCloud: { apiKey: string; model: string };
-  };
-  autopreso: {
-    provider: 'openai' | 'codex' | 'ollama';
-    model: string;
-  };
-}
-
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   stt: {
     provider: 'moonshine',
@@ -355,12 +214,6 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
     model: 'gpt-4.1-mini',
   },
 };
-
-interface VoiceHardwareSettings {
-  inputDevice: string;
-  outputDevice: string;
-  volume: number;
-}
 
 const DEFAULT_VOICE_HARDWARE_SETTINGS: VoiceHardwareSettings = {
   inputDevice: '',
@@ -435,87 +288,6 @@ export function buildMiniMaxFormData(
   };
 }
 
-interface TestApiKeyResult {
-  success: boolean;
-  error: string | null;
-  response: string | null;
-  latencyMs: number;
-  model?: string;
-}
-
-async function testApiKey(provider: string, apiKey: string, model?: string): Promise<TestApiKeyResult> {
-  const res = await fetch('/api/settings/test-api-key', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, apiKey, model }),
-  });
-  if (!res.ok) throw new Error('Failed to test API key');
-  return res.json();
-}
-
-function formatCodexExpiry(expiresAt?: string): string | null {
-  if (!expiresAt) return null;
-  const date = new Date(expiresAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return `Expires ${date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
-}
-
-// Provider definitions
-const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
-  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
-  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
-  { id: 'google', name: 'Google', placeholder: 'AIza...' },
-  { id: 'kimi', name: 'Kimi (Moonshot)', placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', placeholder: 'sk-zai-...' },
-  { id: 'minimax', name: 'MiniMax', placeholder: 'eyJ...' },
-  { id: 'mimo', name: 'Xiaomi MiMo', placeholder: 'sk-... or tp-...' },
-  { id: 'nous', name: 'Nous Portal', placeholder: 'ns-...' },
-  { id: 'dashscope', name: 'Alibaba DashScope', placeholder: 'sk-...' },
-];
-
-const TTS_EVENT_KEYS = [
-  'reviewStatus.passed',
-  'reviewStatus.failed',
-  'reviewStatus.blocked',
-  'testStatus.testing',
-  'testStatus.passed',
-  'testStatus.failed',
-  'testStatus.skipped',
-  'testStatus.dispatch_failed',
-  'verificationStatus.passed',
-  'verificationStatus.failed',
-  'verificationStatus.skipped',
-  'mergeStatus.queued',
-  'mergeStatus.merging',
-  'mergeStatus.verifying',
-  'mergeStatus.merged',
-  'mergeStatus.failed',
-  'readyForMerge',
-] as const;
-
-/**
- * Debounce window for autosaves driven by high-frequency inputs (text fields,
- * sliders). Click-style controls (toggles, selects, radios) save immediately.
- */
-const AUTOSAVE_DEBOUNCE_MS = 600;
-
-/** One pending autosave: the full settings + voice payload, latest-wins. */
-interface AutosavePayload {
-  settings: SettingsConfig;
-  voiceSettings: VoiceSettings;
-}
-
-const ACTIVITY_SOURCE_OPTIONS = [
-  'merge-agent',
-  'review-specialist',
-  'test-specialist',
-  'cloister',
-  'work-agent',
-  'planning-agent',
-  'dashboard',
-  'deploy-script',
-] as const;
-
 // Tracker definitions
 type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
 const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; placeholder: string }[] = [
@@ -535,29 +307,6 @@ const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
   sessionEmbeddings: 'background:sessionEmbeddings',
   summaryFork: 'background:summaryFork',
   ttsSummarizer: 'background:ttsSummarizer',
-};
-
-/** Known embedding models per provider for the embeddings picker (PAN-1589). */
-interface EmbeddingModelOption {
-  id: string;
-  label: string;
-  description: string;
-}
-
-const EMBEDDING_MODELS_BY_PROVIDER: Record<string, EmbeddingModelOption[]> = {
-  openai: [
-    { id: 'text-embedding-3-small', label: 'text-embedding-3-small', description: 'Recommended · 1536-dim · $0.02 / 1M tokens — cheap & fast' },
-    { id: 'text-embedding-3-large', label: 'text-embedding-3-large', description: 'Higher quality · 3072-dim · $0.13 / 1M tokens' },
-    { id: 'text-embedding-ada-002', label: 'text-embedding-ada-002', description: 'Legacy · 1536-dim — prefer 3-small' },
-  ],
-  voyage: [
-    { id: 'voyage-code-3', label: 'voyage-code-3', description: 'Code-optimized · $0.18 / 1M tokens' },
-    { id: 'voyage-3', label: 'voyage-3', description: 'General-purpose semantic embeddings' },
-  ],
-  ollama: [
-    { id: 'nomic-embed-text', label: 'nomic-embed-text', description: 'Local via Ollama · free · nothing leaves your machine' },
-    { id: 'mxbai-embed-large', label: 'mxbai-embed-large', description: 'Local via Ollama · free · larger, higher quality' },
-  ],
 };
 
 const SETTINGS_NAV_ITEMS: NavItem[] = [
@@ -589,16 +338,6 @@ export function SettingsPage() {
     queryKey: ['settings'],
     queryFn: fetchSettings,
   });
-  const { data: ttsHealth } = useQuery({
-    queryKey: ['tts-health'],
-    queryFn: fetchTtsHealth,
-    refetchInterval: 10_000,
-  });
-  const { data: conversationSearchStatus } = useQuery({
-    queryKey: ['conversation-search-status'],
-    queryFn: fetchConversationSearchStatus,
-    refetchInterval: 30_000,
-  });
   const {
     data: cloisterConfig,
     error: cloisterConfigError,
@@ -616,12 +355,6 @@ export function SettingsPage() {
     },
     refetchInterval: 60_000,
   });
-  const ttsVoicesQuery = useQuery({
-    queryKey: ['tts-voices'],
-    queryFn: fetchTtsVoices,
-    staleTime: 60_000,
-  });
-  const ttsVoices = ttsVoicesQuery.data ?? [];
   const {
     data: voiceSettings,
     isLoading: voiceSettingsLoading,
@@ -635,14 +368,7 @@ export function SettingsPage() {
   const [cloisterFormData, setCloisterFormData] = useState<CloisterConfig | null>(null);
   const [voiceFormData, setVoiceFormData] = useState<VoiceSettings | null>(null);
   const [voiceHardwareSettings, setVoiceHardwareSettings] = useState<VoiceHardwareSettings>(loadVoiceHardwareSettings);
-  const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
-  const [showVoiceApiKey, setShowVoiceApiKey] = useState(false);
   const [showTrackerKey, setShowTrackerKey] = useState<Record<string, boolean>>({});
-  const [testingProvider, setTestingProvider] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
-  const [modelsModalProvider, setModelsModalProvider] = useState<Provider | null>(null);
-  const [testingModel, setTestingModel] = useState<string | null>(null);
-  const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   const [reloadingTldr, setReloadingTldr] = useState(false);
@@ -656,19 +382,55 @@ export function SettingsPage() {
     hasAnthropicApiKey: boolean;
   } | null>(null);
   const [activeSection, setActiveSection] = useState('model-routing');
-  const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
-  const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
-  // ── Autosave pipeline ───────────────────────────────────────────────────────
-  // Every control persists on change through one serialized latest-wins queue:
-  // rapid edits collapse into the newest snapshot, saves never overlap, and
-  // text inputs debounce so half-typed values don't hit the server.
-  const pendingSaveRef = useRef<AutosavePayload | null>(null);
-  const saveInFlightRef = useRef<Promise<void> | null>(null);
-  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cloisterSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSaveOkRef = useRef(true);
-  const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const {
+    cloisterSaveDebounceRef,
+    flushAutosave,
+    markSaveError,
+    markSaved,
+    saveStatus,
+    scheduleAutosave,
+    setSaveStatus,
+  } = useAutosavePipeline({
+    queryClient,
+    saveSettings,
+    saveVoiceSettings,
+  });
+  const {
+    cancelReindexConfirm,
+    confirmReindex,
+    conversationSearch,
+    conversationSearchEnabled,
+    conversationSearchEstimate,
+    conversationSearchModel,
+    conversationSearchReindexPending,
+    conversationSearchStatus,
+    convConfig,
+    convConfigDirty,
+    convConfigError,
+    convConfigLoading,
+    convConfigSaving,
+    embeddingTestResult,
+    estimatingConversationSearch,
+    handleConvConfigChange,
+    handleConversationSearchChange,
+    handleConversationSearchReindex,
+    handleEmbeddingModelChange,
+    handleSaveConvConfig,
+    handleTestEmbeddingConnection,
+    legacyImportOpen,
+    loadConvConfig,
+    reindexConfirm,
+    reindexConfirmBusy,
+    reindexProgress,
+    setLegacyImportOpen,
+    testingEmbedding,
+  } = useConversationSearch({
+    formData,
+    voiceFormData,
+    setFormData,
+    scheduleAutosave,
+    flushAutosave,
+  });
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
@@ -711,36 +473,6 @@ export function SettingsPage() {
     return () => window.removeEventListener(SETTINGS_SECTION_EVENT, handler);
   }, [scrollToSection]);
 
-  // ── Conversations & Search (embedding) config ──────────────────────────────
-  const [convConfig, setConvConfig] = useState<{
-    embeddings: boolean;
-    embeddingProvider: string;
-    embeddingModel: string;
-    embeddingAutoOnDeep: boolean;
-  } | null>(null);
-  const [convConfigDirty, setConvConfigDirty] = useState(false);
-  const [convConfigSaving, setConvConfigSaving] = useState(false);
-  const [convConfigLoading, setConvConfigLoading] = useState(true);
-  const [convConfigError, setConvConfigError] = useState<string | null>(null);
-  const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
-  const [testingEmbedding, setTestingEmbedding] = useState(false);
-  const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
-  const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
-  const [legacyImportOpen, setLegacyImportOpen] = useState(false);
-  const [reindexConfirm, setReindexConfirm] = useState<{
-    kind: 'manual' | 'model';
-    newModel?: string;
-    estimate: ConversationSearchCostEstimate | null;
-  } | null>(null);
-  const [reindexConfirmBusy, setReindexConfirmBusy] = useState(false);
-  const [reindexProgress, setReindexProgress] = useState<{
-    active: boolean;
-    filesScanned: number;
-    filesIndexed: number;
-    chunksIndexed: number;
-    currentFile?: string;
-  } | null>(null);
-
   const fetchClaudeAuth = async () => {
     try {
       const res = await fetch('/api/settings/claude-auth');
@@ -749,86 +481,6 @@ export function SettingsPage() {
   };
 
   useEffect(() => { void fetchClaudeAuth(); }, []);
-
-  const loadConvConfig = useCallback(() => {
-    setConvConfigLoading(true);
-    setConvConfigError(null);
-    ensureDashboardSession()
-      .then(() => fetch('/api/discovered-sessions/config', { credentials: 'include' }))
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`Failed to load embedding settings (HTTP ${r.status})`);
-        return r.json();
-      })
-      .then((d) => setConvConfig(d))
-      .catch((e) => setConvConfigError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setConvConfigLoading(false));
-  }, []);
-
-  useEffect(() => { loadConvConfig(); }, [loadConvConfig]);
-
-  const handleConvConfigChange = (patch: Partial<typeof convConfig>) => {
-    setConvConfig((prev) => prev ? { ...prev, ...patch } : null);
-    setConvConfigDirty(true);
-    setEmbeddingTestResult(null);
-  };
-
-  const handleSaveConvConfig = async () => {
-    if (!convConfig) return;
-    setConvConfigSaving(true);
-    try {
-      await ensureDashboardSession();
-      const res = await fetch('/api/discovered-sessions/config', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(convConfig),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null) as { error?: string } | null;
-        throw new Error(body?.error ?? `HTTP ${res.status}`);
-      }
-      setFormData((prev) => prev ? {
-        ...prev,
-        conversations: {
-          ...prev.conversations,
-          embeddings: convConfig.embeddings,
-          embedding_provider: convConfig.embeddingProvider as 'openai' | 'voyage' | 'ollama',
-          embedding_model: convConfig.embeddingModel,
-          embedding_auto_on_deep: convConfig.embeddingAutoOnDeep,
-        },
-      } : prev);
-      setConvConfigDirty(false);
-      toast.success('Embedding settings saved');
-    } catch (err) {
-      toast.error(`Failed to save embedding settings: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setConvConfigSaving(false);
-    }
-  };
-
-  const handleTestEmbeddingConnection = async () => {
-    if (!convConfig) return;
-    setTestingEmbedding(true);
-    setEmbeddingTestResult(null);
-    try {
-      await ensureDashboardSession();
-      const res = await fetch('/api/discovered-sessions/test-connection', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: convConfig.embeddingProvider,
-          model: convConfig.embeddingModel,
-        }),
-      });
-      const result = await res.json();
-      setEmbeddingTestResult(result);
-    } catch (err) {
-      setEmbeddingTestResult({ ok: false, error: String(err) });
-    } finally {
-      setTestingEmbedding(false);
-    }
-  };
 
   useEffect(() => {
     fetchOpenRouterCatalog().then(setOrCatalog);
@@ -879,193 +531,6 @@ export function SettingsPage() {
     window.localStorage.setItem(VOICE_HARDWARE_STORAGE_KEY, JSON.stringify(voiceHardwareSettings));
   }, [voiceHardwareSettings]);
 
-  // Drain the autosave queue: one save in flight at a time, always taking the
-  // newest pending snapshot. Returns the in-flight drain so callers can await
-  // a flush (e.g. before triggering a paid reindex).
-  const drainSaveQueue = useCallback((): Promise<void> => {
-    if (saveInFlightRef.current) return saveInFlightRef.current;
-    const run = (async () => {
-      while (pendingSaveRef.current) {
-        const snapshot = pendingSaveRef.current;
-        pendingSaveRef.current = null;
-        setSaveStatus('saving');
-        try {
-          const [response, savedVoiceSettings] = await Promise.all([
-            saveSettings(snapshot.settings),
-            saveVoiceSettings(snapshot.voiceSettings),
-          ]);
-          lastSaveOkRef.current = true;
-          invalidateAvailableModelsCache();
-          queryClient.invalidateQueries({ queryKey: ['settings'] });
-          queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
-          queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
-          queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
-          if (response.warnings && response.warnings.length > 0) {
-            response.warnings.forEach((warning) => {
-              toast.warning(warning, { duration: 8000 });
-            });
-          }
-          setSaveStatus('saved');
-          if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
-          savedStatusResetRef.current = setTimeout(() => {
-            savedStatusResetRef.current = null;
-            setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
-          }, 2500);
-        } catch (error) {
-          lastSaveOkRef.current = false;
-          setSaveStatus('error');
-          toast.error(`Failed to save settings: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-    })();
-    saveInFlightRef.current = run.finally(() => {
-      saveInFlightRef.current = null;
-    });
-    return saveInFlightRef.current;
-  }, [queryClient]);
-
-  // Schedule an autosave of the given snapshot. Click-style controls save
-  // immediately; text inputs and sliders pass debounce to wait for typing to
-  // pause. A newer schedule always supersedes the pending snapshot.
-  const scheduleAutosave = useCallback((payload: AutosavePayload, opts: { debounce?: boolean } = {}) => {
-    pendingSaveRef.current = payload;
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current);
-      saveDebounceRef.current = null;
-    }
-    if (opts.debounce) {
-      saveDebounceRef.current = setTimeout(() => {
-        saveDebounceRef.current = null;
-        void drainSaveQueue();
-      }, AUTOSAVE_DEBOUNCE_MS);
-    } else {
-      void drainSaveQueue();
-    }
-  }, [drainSaveQueue]);
-
-  // Force any pending (possibly debounced) save through and report whether the
-  // final save succeeded. Used by flows that must persist before acting.
-  const flushAutosave = useCallback(async (): Promise<boolean> => {
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current);
-      saveDebounceRef.current = null;
-    }
-    await drainSaveQueue();
-    return lastSaveOkRef.current;
-  }, [drainSaveQueue]);
-
-  const conversationSearchReindexMutation = useMutation({
-    mutationFn: reindexConversationSearch,
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
-      if (result.disabled) {
-        toast.warning(result.unavailableReason ?? 'Conversation search is disabled');
-      } else {
-        toast.success(`Reindexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} from ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}`);
-      }
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to reindex conversations: ${error.message}`);
-    },
-  });
-
-  // Poll live reindex progress while a reindex is running so the UI can show a real bar.
-  const conversationSearchReindexPending = conversationSearchReindexMutation.isPending;
-  useEffect(() => {
-    if (!conversationSearchReindexPending) {
-      setReindexProgress(null);
-      return;
-    }
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/settings/conversation-search/reindex-progress', { credentials: 'include' });
-        if (res.ok && !cancelled) setReindexProgress(await res.json());
-      } catch { /* ignore transient poll errors */ }
-    };
-    void poll();
-    const id = setInterval(poll, 1000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [conversationSearchReindexPending]);
-
-  // Open the confirm modal immediately, then fill in the cost estimate (scanning every
-  // transcript can take a few seconds). `model` prices a prospective switch.
-  const openReindexConfirm = async (kind: 'manual' | 'model', newModel?: string) => {
-    setReindexConfirm({ kind, newModel, estimate: null });
-    setEstimatingConversationSearch(true);
-    try {
-      const estimate = await estimateConversationSearchReindex(newModel);
-      setConversationSearchEstimate(estimate);
-      setReindexConfirm((prev) => (prev && prev.kind === kind && prev.newModel === newModel ? { ...prev, estimate } : prev));
-    } catch (error) {
-      toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
-      setReindexConfirm(null);
-    } finally {
-      setEstimatingConversationSearch(false);
-    }
-  };
-
-  const handleConversationSearchReindex = () => { void openReindexConfirm('manual'); };
-
-  // Switching the embedding model invalidates every cached vector (they're model-specific)
-  // and forces a paid full reindex, so confirm before applying.
-  const handleEmbeddingModelChange = (newModel: string) => {
-    if (newModel === conversationSearchModel) return;
-    void openReindexConfirm('model', newModel);
-  };
-
-  const cancelReindexConfirm = () => { if (!reindexConfirmBusy) setReindexConfirm(null); };
-
-  const confirmReindex = async () => {
-    if (!reindexConfirm || !reindexConfirm.estimate || reindexConfirm.estimate.disabled) return;
-    const { kind, newModel, estimate } = reindexConfirm;
-    if (kind === 'model' && newModel) {
-      if (!formData || !voiceFormData) return;
-      setReindexConfirmBusy(true);
-      const next: SettingsConfig = {
-        ...formData,
-        conversationSearch: { ...(formData.conversationSearch ?? {}), model: newModel },
-      };
-      setFormData(next);
-      scheduleAutosave({ settings: next, voiceSettings: voiceFormData });
-      const saved = await flushAutosave();
-      if (!saved) {
-        // The autosave pipeline surfaces its own error toast; leave the modal open to retry.
-        setReindexConfirmBusy(false);
-        return;
-      }
-      conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
-      setReindexConfirmBusy(false);
-      setReindexConfirm(null);
-      return;
-    }
-    conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
-    setReindexConfirm(null);
-  };
-
-  const ttsStartMutation = useMutation({
-    mutationFn: startTtsDaemonRequest,
-    onSuccess: () => {
-      toast.success('TTS daemon started');
-      queryClient.invalidateQueries({ queryKey: ['tts-health'] });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to start TTS daemon: ${error.message}`);
-      queryClient.invalidateQueries({ queryKey: ['tts-health'] });
-    },
-  });
-
-  // On unmount, flush any debounced edit immediately so navigating away
-  // doesn't drop the last change (the fetch survives SPA navigation).
-  useEffect(() => () => {
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current);
-      saveDebounceRef.current = null;
-      void drainSaveQueue();
-    }
-    if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
-  }, [drainSaveQueue]);
-
   // Shared chat-model <option> list (same catalog as the Conversations selects).
   // MUST be declared before the early returns below — it's a hook (PAN-1597 fix:
   // a misplaced useMemo here caused React error #310 / hooks-order violation that
@@ -1099,10 +564,6 @@ export function SettingsPage() {
     );
   }
 
-  const conversationSearch = formData.conversationSearch ?? {};
-  const conversationSearchEnabled = conversationSearch.enabled ?? false;
-  const conversationSearchModel = conversationSearch.model ?? 'text-embedding-3-small';
-
   // Apply a settings patch and autosave it. Pass debounce for text inputs and
   // sliders; click-style controls save immediately.
   const applySettings = (next: SettingsConfig, opts: { debounce?: boolean } = {}) => {
@@ -1113,47 +574,6 @@ export function SettingsPage() {
   const applyVoiceSettings = (next: VoiceSettings, opts: { debounce?: boolean } = {}) => {
     setVoiceFormData(next);
     scheduleAutosave({ settings: formData, voiceSettings: next }, opts);
-  };
-
-  const handleProviderToggle = (provider: Provider) => {
-    applySettings({
-      ...formData,
-      models: {
-        ...formData.models,
-        providers: {
-          ...formData.models.providers,
-          [provider]: !formData.models.providers[provider],
-        },
-      },
-    });
-  };
-
-  const handleApiKeyChange = (provider: Provider, key: string) => {
-    if (provider === 'anthropic') return;
-    applySettings({
-      ...formData,
-      api_keys: {
-        ...formData.api_keys,
-        [provider]: key || undefined,
-      },
-    }, { debounce: true });
-  };
-
-  const handleProviderHarnessChange = (provider: Provider, harness: HarnessOverride) => {
-    const nextProviderHarnesses = { ...formData.models.provider_harnesses };
-    if (harness === '') {
-      delete nextProviderHarnesses[provider];
-    } else {
-      nextProviderHarnesses[provider] = harness;
-    }
-
-    applySettings({
-      ...formData,
-      models: {
-        ...formData.models,
-        provider_harnesses: nextProviderHarnesses,
-      },
-    });
   };
 
   const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
@@ -1197,192 +617,6 @@ export function SettingsPage() {
     }, { debounce: true });
   };
 
-  const handleTtsConfigChange = (patch: Partial<TtsConfig>, options: { debounce?: boolean } = {}) => {
-    const nextTts = {
-      ...formData.tts,
-      ...patch,
-    };
-    applySettings({
-      ...formData,
-      tts: nextTts,
-    }, { debounce: options.debounce === true });
-  };
-
-  const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {
-    const nextVoiceMap = { ...(ttsConfig.voiceMap ?? {}) };
-    if (voiceId) nextVoiceMap[eventKey] = voiceId;
-    else delete nextVoiceMap[eventKey];
-    handleTtsConfigChange({ voiceMap: nextVoiceMap });
-  };
-
-  const handleTtsMutedSourceChange = (source: string, muted: boolean) => {
-    const current = ttsConfig.mutedSources ?? [];
-    const nextMutedSources = muted
-      ? Array.from(new Set([...current, source]))
-      : current.filter((value) => value !== source);
-    handleTtsConfigChange({ mutedSources: nextMutedSources });
-  };
-
-  const handleTtsTemplateChange = (eventKey: string, text: string) => {
-    handleTtsConfigChange({
-      utteranceTemplates: {
-        ...(ttsConfig.utteranceTemplates ?? {}),
-        [eventKey]: text,
-      },
-    });
-  };
-
-  const handleTtsTemplateKeyChange = (oldKey: string, newKey: string) => {
-    const nextTemplates = { ...(ttsConfig.utteranceTemplates ?? {}) };
-    const text = nextTemplates[oldKey] ?? '';
-    delete nextTemplates[oldKey];
-    nextTemplates[newKey] = text;
-    handleTtsConfigChange({ utteranceTemplates: nextTemplates });
-  };
-
-  const handleRemoveTtsTemplate = (eventKey: string) => {
-    const nextTemplates = { ...(ttsConfig.utteranceTemplates ?? {}) };
-    delete nextTemplates[eventKey];
-    handleTtsConfigChange({ utteranceTemplates: nextTemplates });
-  };
-
-  const handleAddTtsTemplate = () => {
-    const templates = ttsConfig.utteranceTemplates ?? {};
-    const eventKey = TTS_EVENT_KEYS.find((key) => templates[key] === undefined);
-    if (!eventKey) return;
-    handleTtsConfigChange({
-      utteranceTemplates: {
-        ...templates,
-        [eventKey]: '',
-      },
-    });
-  };
-
-  const handleVoiceProviderChange = (provider: VoiceSettings['stt']['provider']) => {
-    applyVoiceSettings({
-      ...voiceFormData,
-      stt: {
-        ...voiceFormData.stt,
-        provider,
-      },
-    });
-  };
-
-  const handleMoonshineModelChange = (model: string) => {
-    applyVoiceSettings({
-      ...voiceFormData,
-      stt: {
-        ...voiceFormData.stt,
-        moonshine: { model },
-      },
-    });
-  };
-
-  const handleGoogleCloudApiKeyChange = (apiKey: string) => {
-    applyVoiceSettings({
-      ...voiceFormData,
-      stt: {
-        ...voiceFormData.stt,
-        googleCloud: {
-          ...voiceFormData.stt.googleCloud,
-          apiKey,
-        },
-      },
-    }, { debounce: true });
-  };
-
-  const handleGoogleCloudModelChange = (model: string) => {
-    applyVoiceSettings({
-      ...voiceFormData,
-      stt: {
-        ...voiceFormData.stt,
-        googleCloud: {
-          ...voiceFormData.stt.googleCloud,
-          model,
-        },
-      },
-    });
-  };
-
-  const handleAutoPresoProviderChange = (provider: VoiceSettings['autopreso']['provider']) => {
-    applyVoiceSettings({
-      ...voiceFormData,
-      autopreso: {
-        ...voiceFormData.autopreso,
-        provider,
-      },
-    });
-  };
-
-  const handleAutoPresoModelChange = (model: string) => {
-    applyVoiceSettings({
-      ...voiceFormData,
-      autopreso: {
-        ...voiceFormData.autopreso,
-        model,
-      },
-    }, { debounce: true });
-  };
-
-  const handleVoiceHardwareChange = <K extends keyof VoiceHardwareSettings>(
-    key: K,
-    value: VoiceHardwareSettings[K],
-  ) => {
-    setVoiceHardwareSettings({
-      ...voiceHardwareSettings,
-      [key]: value,
-    });
-  };
-  const handleCompactionModelChange = (modelId: ModelId) => {
-    applySettings({
-      ...formData,
-      conversations: {
-        ...formData.conversations,
-        compaction_model: modelId,
-      },
-    });
-  };
-
-  const handleTitleModelChange = (modelId: ModelId) => {
-    applySettings({
-      ...formData,
-      conversations: {
-        ...formData.conversations,
-        title_model: modelId,
-      },
-    });
-  };
-
-  const handleManualCompactModeChange = (mode: 'claude-code' | 'overdeck-native') => {
-    applySettings({
-      ...formData,
-      conversations: {
-        ...formData.conversations,
-        manual_compact_mode: mode,
-      },
-    });
-  };
-
-  const handleRichCompactionChange = (enabled: boolean) => {
-    applySettings({
-      ...formData,
-      conversations: {
-        ...formData.conversations,
-        rich_compaction: enabled,
-      },
-    });
-  };
-
-  const handleConversationSearchChange = (patch: Partial<ConversationSearchConfig>) => {
-    applySettings({
-      ...formData,
-      conversationSearch: {
-        ...(formData.conversationSearch ?? {}),
-        ...patch,
-      },
-    });
-  };
-
   const updateMemorySettings = (memory: NonNullable<SettingsConfig['memory']>, opts: { debounce?: boolean } = {}) => {
     applySettings({
       ...formData,
@@ -1404,18 +638,11 @@ export function SettingsPage() {
     setSaveStatus('saving');
     try {
       await saveCloisterConfig(snapshot);
-      lastSaveOkRef.current = true;
       queryClient.setQueryData(['cloister-config'], snapshot);
       queryClient.invalidateQueries({ queryKey: ['cloister-config'] });
-      setSaveStatus('saved');
-      if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
-      savedStatusResetRef.current = setTimeout(() => {
-        savedStatusResetRef.current = null;
-        setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
-      }, 2500);
+      markSaved();
     } catch (error) {
-      lastSaveOkRef.current = false;
-      setSaveStatus('error');
+      markSaveError();
       toast.error(`Failed to save Cloister settings: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -1634,67 +861,6 @@ export function SettingsPage() {
   };
 
 
-  const handleTestApiKey = async (provider: Provider) => {
-    const apiKey = formData?.api_keys[provider as keyof typeof formData.api_keys];
-    if (!apiKey) return;
-
-    setTestingProvider(provider);
-    setTestResults({ ...testResults, [provider]: null });
-
-    try {
-      const result = await testApiKey(provider, apiKey);
-      setTestResults({ ...testResults, [provider]: result });
-    } catch (error) {
-      setTestResults({
-        ...testResults,
-        [provider]: { success: false, error: 'Test failed', response: null, latencyMs: 0 },
-      });
-    } finally {
-      setTestingProvider(null);
-    }
-  };
-
-  const handleTestModel = async (provider: Provider, modelId: string) => {
-    const apiKey = formData?.api_keys[provider as keyof typeof formData.api_keys];
-    if (!apiKey) return;
-
-    const testKey = `${provider}:${modelId}`;
-    setTestingModel(testKey);
-    setModelTestResults({ ...modelTestResults, [testKey]: null });
-
-    try {
-      const result = await testApiKey(provider, apiKey, modelId);
-      setModelTestResults({ ...modelTestResults, [testKey]: result });
-    } catch (error) {
-      setModelTestResults({
-        ...modelTestResults,
-        [testKey]: { success: false, error: 'Test failed', response: null, latencyMs: 0 },
-      });
-    } finally {
-      setTestingModel(null);
-    }
-  };
-
-  const ttsConfig = formData.tts ?? {};
-  const ttsVolume = ttsConfig.volume ?? 1;
-  const ttsRate = ttsConfig.rate ?? 1;
-  const ttsMaxChars = ttsConfig.maxChars ?? 140;
-  const ttsDaemonOnline = ttsHealth?.ok === true;
-  const ttsDaemonStarting = ttsHealth?.phase === 'starting' || ttsHealth?.initializing === true;
-  const ttsDaemonStatus = ttsHealth === undefined ? 'checking' : ttsDaemonOnline ? 'online' : ttsDaemonStarting ? 'starting' : ttsHealth.running ? 'unhealthy' : 'offline';
-  const ttsDaemonModel = typeof ttsHealth?.model === 'string' ? ttsHealth.model : undefined;
-  const ttsDaemonUptime = formatTtsUptime(ttsHealth?.uptimeSeconds);
-  const ttsDaemonGpuMemory = formatTtsGpuMemory(ttsHealth?.gpuMemoryUsedMb);
-  const ttsDaemonDetails = [
-    ttsHealth ? `${ttsHealth.daemonHost}:${ttsHealth.daemonPort}` : undefined,
-    ttsHealth?.pid ? `pid ${ttsHealth.pid}` : undefined,
-    ttsHealth?.queueDepth !== undefined ? `queue ${ttsHealth.queueDepth}` : undefined,
-    ttsDaemonGpuMemory,
-    ttsDaemonUptime ? `uptime ${ttsDaemonUptime}` : undefined,
-  ].filter(Boolean).join(' | ');
-  const ttsTemplateEntries = Object.entries(ttsConfig.utteranceTemplates ?? {});
-  const canAddTtsTemplate = ttsTemplateEntries.length < TTS_EVENT_KEYS.length;
-
   return (
     <SettingsLayout
       header={
@@ -1753,376 +919,19 @@ export function SettingsPage() {
         <RolesPanel />
       </section>
 
-      {/* Providers */}
-      <section id="providers" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
-          Providers
-        </h2>
-        <div className="mb-3 flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-border/70 bg-card/40">
-          <div className="min-w-0">
-            <span className="text-sm font-medium text-foreground">Show all harness/model permutations</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Off by default. When off, model pickers use each provider&apos;s default harness and hide explicit Claude Code, Pi, and Codex combinations.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={Boolean(formData.experimental?.showHarnessModelPermutations)}
-            aria-label="Show all harness/model permutations"
-            data-testid="show-harness-model-permutations-toggle"
-            onClick={() => handleHarnessModelPermutationsToggle(!formData.experimental?.showHarnessModelPermutations)}
-            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-              formData.experimental?.showHarnessModelPermutations ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              formData.experimental?.showHarnessModelPermutations ? 'translate-x-[18px]' : 'translate-x-[3px]'
-            }`} />
-          </button>
-        </div>
-        <div className="space-y-1">
-          {PROVIDERS.map((provider) => {
-            const isDefault = provider.id === 'anthropic';
-            const isEnabled = formData.models.providers[provider.id];
-            const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
-            const isExpanded = expandedProviders[provider.id] || false;
-            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? '';
-            const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
-
-            const getAuthSummary = () => {
-              if (isDefault) {
-                if (claudeAuth?.loggedIn) return { text: claudeAuth.subscriptionType ? `${claudeAuth.subscriptionType} plan` : 'Subscription', variant: 'success' as const };
-                if (claudeAuth?.hasAnthropicApiKey) return { text: 'API key', variant: 'neutral' as const };
-                return { text: 'Not authenticated', variant: 'warning' as const };
-              }
-              if (provider.id === 'openai') {
-                if (codexAuth?.status === 'valid') return { text: 'OAuth', variant: 'success' as const };
-                if (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') return { text: codexAuth.status, variant: 'warning' as const };
-              }
-              if (apiKey && !apiKey.startsWith('$')) return { text: 'Key configured', variant: 'success' as const };
-              if (apiKey?.startsWith('$')) return { text: `via ${apiKey}`, variant: 'neutral' as const };
-              return { text: 'No key', variant: 'neutral' as const };
-            };
-
-            const authSummary = getAuthSummary();
-
-            return (
-              <div key={provider.id} className="border border-transparent rounded-lg hover:border-border transition-colors">
-                {/* Summary row */}
-                <div className="flex items-center gap-3 px-3 py-2.5">
-                  <ProviderLogo provider={provider.id} label={provider.name} className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium text-foreground flex-1 min-w-0">{provider.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      authSummary.variant === 'success' ? 'text-success bg-success/10' :
-                      authSummary.variant === 'warning' ? 'text-warning bg-warning/10' :
-                      'text-muted-foreground bg-muted/50'
-                    }`}>
-                      {authSummary.text}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleProviderToggle(provider.id)}
-                      role="switch"
-                      aria-checked={isEnabled}
-                      aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${provider.name}`}
-                      className={`w-8 h-4.5 rounded-full relative transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                        isEnabled ? 'bg-primary' : 'bg-muted'
-                      }`}
-                    >
-                      <span className={`absolute top-0.5 size-3.5 bg-white rounded-full transition-all ${
-                        isEnabled ? 'right-0.5' : 'left-0.5'
-                      }`} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedProviders(prev => ({ ...prev, [provider.id]: !prev[provider.id] }))}
-                      className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
-                      aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${provider.name} details`}
-                    >
-                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expanded details */}
-                {isExpanded && (
-                  <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
-                    {isDefault ? (
-                      <div className="space-y-2">
-                        {claudeAuth?.loggedIn ? (
-                          <div className="flex items-center gap-2 text-xs">
-                            <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                            <span className="text-muted-foreground">
-                              Subscription{claudeAuth.subscriptionType ? ` — ${claudeAuth.subscriptionType.toUpperCase()}` : ''}
-                              {claudeAuth.rateLimitTier ? ` · ${claudeAuth.rateLimitTier}` : ''}
-                            </span>
-                          </div>
-                        ) : claudeAuth?.hasAnthropicApiKey ? (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Key className="w-3 h-3" />
-                            <span>Using ANTHROPIC_API_KEY from environment</span>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-warning">
-                            Not authenticated. Run <code className="font-mono bg-muted px-1 rounded">claude</code> and use <code className="font-mono bg-muted px-1 rounded">/login</code>.
-                          </p>
-                        )}
-                        {claudeAuth?.hasAnthropicApiKey && claudeAuth.loggedIn && (
-                          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3 text-warning" />
-                            ANTHROPIC_API_KEY overrides subscription for direct API calls
-                          </p>
-                        )}
-                      </div>
-                    ) : provider.id === 'openai' ? (
-                      <div className="space-y-2">
-                        {codexAuth?.status === 'valid' ? (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                            <span>Subscription OAuth active</span>
-                            {codexAuth.email && (
-                              <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
-                            )}
-                            {formatCodexExpiry(codexAuth.expiresAt) && (
-                              <span className="text-[10px] text-muted-foreground">{formatCodexExpiry(codexAuth.expiresAt)}</span>
-                            )}
-                          </div>
-                        ) : (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-warning capitalize">{codexAuth.status}</span>
-                            {codexAuth.email && (
-                              <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
-                            )}
-                            {formatCodexExpiry(codexAuth.expiresAt) && (
-                              <span className="text-[10px] text-muted-foreground">{formatCodexExpiry(codexAuth.expiresAt)}</span>
-                            )}
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch('/api/settings/codex-reauth', { method: 'POST' });
-                                  if (!res.ok) {
-                                    const body = await res.json().catch(() => ({}));
-                                    throw new Error(body.error || `Failed (${res.status})`);
-                                  }
-                                  const { sessionName, statusToken } = await res.json() as { sessionName: string; statusToken: string };
-                                  setReauthSession(sessionName, statusToken);
-                                  window.location.href = `/terminal/${sessionName}`;
-                                } catch (err) {
-                                  toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
-                                }
-                              }}
-                              className="text-[10px] text-warning hover:text-warning/80 underline"
-                            >
-                              Re-authenticate
-                            </button>
-                          </div>
-                        ) : null}
-                        {/* API key input for OpenAI */}
-                        <div className="relative">
-                          <input
-                            type={showApiKey[provider.id] ? 'text' : 'password'}
-                            value={apiKey}
-                            onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                            placeholder={provider.placeholder}
-                            autoComplete="off"
-                            className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground pr-14"
-                          />
-                          {apiKey && (
-                            <>
-                              <button
-                                onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                                className="absolute right-7 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                title={showApiKey[provider.id] ? 'Hide' : 'Show'}
-                                aria-label={showApiKey[provider.id] ? 'Hide key' : 'Show key'}
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleApiKeyChange(provider.id, '')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
-                                title="Remove key"
-                                aria-label="Remove API key"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {apiKey.startsWith('$') ? (
-                          <div className="text-xs">
-                            <span className="text-muted-foreground">Env: </span>
-                            <code className="font-mono text-muted-foreground">{apiKey}</code>
-                            <input
-                              type="text"
-                              placeholder={provider.placeholder}
-                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                              autoComplete="off"
-                              className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs font-mono mt-1.5 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
-                            />
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <input
-                              type={showApiKey[provider.id] ? 'text' : 'password'}
-                              value={apiKey}
-                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                              placeholder={provider.placeholder}
-                              autoComplete="off"
-                              className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground pr-14"
-                            />
-                            {apiKey && (
-                              <>
-                                <button
-                                  onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                                  className="absolute right-7 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                  title={showApiKey[provider.id] ? 'Hide' : 'Show'}
-                                  aria-label={showApiKey[provider.id] ? 'Hide key' : 'Show key'}
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleApiKeyChange(provider.id, '')}
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
-                                  title="Remove key"
-                                  aria-label="Remove API key"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-foreground">Default harness</span>
-                      <div className="flex items-center gap-2">
-                        <HarnessLogo harness={(providerHarness || builtInHarness) as Harness} className="w-4 h-4 shrink-0" />
-                        <select
-                          value={providerHarness}
-                          onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as HarnessOverride)}
-                          className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                        >
-                          <option value="">Default ({harnessLabel(builtInHarness)})</option>
-                          <option value="claude-code">Claude Code</option>
-                          <option value="pi">Pi</option>
-                          <option value="codex">Codex</option>
-                        </select>
-                      </div>
-                    </label>
-                    {/* Action buttons for non-default providers */}
-                    {!isDefault && apiKey && !apiKey.startsWith('$') && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setModelsModalProvider(provider.id)}
-                          className="text-xs text-primary hover:text-primary/80 font-medium"
-                        >
-                          View models
-                        </button>
-                        <span className="text-border">·</span>
-                        <button
-                          onClick={() => handleTestApiKey(provider.id)}
-                          disabled={testingProvider === provider.id}
-                          className="text-xs text-muted-foreground hover:text-foreground font-medium disabled:opacity-50 flex items-center gap-1"
-                        >
-                          {testingProvider === provider.id && <Loader2 className="w-3 h-3 animate-spin" />}
-                          Test
-                        </button>
-                        {testResults[provider.id] && (
-                          <span className={`text-[10px] ${testResults[provider.id]?.success ? 'text-success' : 'text-destructive'}`}>
-                            {testResults[provider.id]?.success
-                              ? `${testResults[provider.id]?.latencyMs}ms`
-                              : testResults[provider.id]?.error?.slice(0, 20)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* OpenRouter as part of providers */}
-          <div className="border border-transparent rounded-lg hover:border-border transition-colors">
-            <div className="flex items-center gap-3 px-3 py-2.5">
-              <ProviderLogo provider="openrouter" label="OpenRouter" className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-foreground flex-1">OpenRouter</span>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                  formData.api_keys.openrouter ? 'text-success bg-success/10' : 'text-muted-foreground bg-muted/50'
-                }`}>
-                  {formData.api_keys.openrouter ? 'Configured' : 'No key'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleProviderToggle('openrouter')}
-                  role="switch"
-                  aria-checked={!!formData.models.providers.openrouter}
-                  aria-label={`${formData.models.providers.openrouter ? 'Disable' : 'Enable'} OpenRouter`}
-                  className={`w-8 h-4.5 rounded-full relative transition-colors ${
-                    formData.models.providers.openrouter ? 'bg-primary' : 'bg-muted'
-                  }`}
-                >
-                  <span className={`absolute top-0.5 size-3.5 bg-white rounded-full transition-all ${
-                    formData.models.providers.openrouter ? 'right-0.5' : 'left-0.5'
-                  }`} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExpandedProviders(prev => ({ ...prev, openrouter: !prev.openrouter }))}
-                  className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
-                  aria-expanded={expandedProviders.openrouter || false}
-                  aria-label={`${expandedProviders.openrouter ? 'Collapse' : 'Expand'} OpenRouter details`}
-                >
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expandedProviders.openrouter ? '' : '-rotate-90'}`} />
-                </button>
-              </div>
-            </div>
-            {expandedProviders.openrouter && (
-              <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Default harness</span>
-                  <div className="flex items-center gap-2">
-                    <HarnessLogo
-                      harness={(formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter || 'claude-code') as Harness}
-                      className="w-4 h-4 shrink-0"
-                    />
-                    <select
-                      value={formData.models.provider_harnesses?.openrouter ?? ''}
-                      onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as HarnessOverride)}
-                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                    >
-                      <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
-                      <option value="claude-code">Claude Code</option>
-                      <option value="pi">Pi</option>
-                      <option value="codex">Codex</option>
-                    </select>
-                  </div>
-                </label>
-                <OpenRouterPage
-                  apiKey={formData.api_keys.openrouter}
-                  enabled={!!formData.models.providers.openrouter}
-                  onApiKeyChange={(key) => handleApiKeyChange('openrouter', key)}
-                  onToggleEnabled={() => handleProviderToggle('openrouter')}
-                  onApiKeySaved={(savedKey) => {
-                    setFormData(prev => prev ? {
-                      ...prev,
-                      api_keys: { ...prev.api_keys, openrouter: savedKey },
-                    } : prev);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      <ProviderManagementSection
+        claudeAuth={claudeAuth}
+        codexAuth={codexAuth}
+        formData={formData}
+        onHarnessModelPermutationsToggle={handleHarnessModelPermutationsToggle}
+        onOpenRouterApiKeySaved={(savedKey) => {
+          setFormData(prev => prev ? {
+            ...prev,
+            api_keys: { ...prev.api_keys, openrouter: savedKey },
+          } : prev);
+        }}
+        onSettingsChange={applySettings}
+      />
 
       {/* Permissions — controls what flags get passed to spawned agents */}
       <section id="permissions" className="py-6 scroll-mt-4">
@@ -2377,576 +1186,48 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Voice */}
-      <section id="voice" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
-          <Mic className="w-4 h-4 text-muted-foreground" />
-          Voice
-        </h2>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">STT provider</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Speech-to-text backend used by the voice widget and AutoPreso
-              </p>
-            </div>
-            <select
-              value={voiceFormData.stt.provider}
-              onChange={(e) => handleVoiceProviderChange(e.target.value as VoiceSettings['stt']['provider'])}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-            >
-              <option value="moonshine">Moonshine</option>
-              <option value="google-cloud">Google Cloud STT</option>
-            </select>
-          </div>
+      <VoiceSettingsSection
+        voiceFormData={voiceFormData}
+        voiceHardwareSettings={voiceHardwareSettings}
+        onVoiceSettingsChange={applyVoiceSettings}
+        onVoiceHardwareSettingsChange={setVoiceHardwareSettings}
+      />
 
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">AutoPreso provider</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Whiteboard agent backend used for live diagram updates
-              </p>
-            </div>
-            <select
-              value={voiceFormData.autopreso.provider}
-              onChange={(e) => handleAutoPresoProviderChange(e.target.value as VoiceSettings['autopreso']['provider'])}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-            >
-              <option value="openai">OpenAI</option>
-              <option value="codex">Codex</option>
-              <option value="ollama">Ollama</option>
-            </select>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">AutoPreso model</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Model passed to the whiteboard agent
-              </p>
-            </div>
-            <input
-              type="text"
-              value={voiceFormData.autopreso.model}
-              onChange={(e) => handleAutoPresoModelChange(e.target.value)}
-              placeholder="gpt-4.1-mini"
-              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          {voiceFormData.stt.provider === 'moonshine' ? (
-            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-foreground">Moonshine model</span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Tiny is faster; base is more accurate
-                </p>
-              </div>
-              <select
-                value={voiceFormData.stt.moonshine.model}
-                onChange={(e) => handleMoonshineModelChange(e.target.value)}
-                className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-              >
-                <option value="tiny">Tiny</option>
-                <option value="base">Base</option>
-              </select>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">Google Cloud API key</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Used only when Google Cloud STT is selected
-                  </p>
-                </div>
-                <div className="relative w-[260px] shrink-0">
-                  <input
-                    type={showVoiceApiKey ? 'text' : 'password'}
-                    value={voiceFormData.stt.googleCloud.apiKey}
-                    onChange={(e) => handleGoogleCloudApiKeyChange(e.target.value)}
-                    placeholder="Google Cloud API key"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    data-form-type="other"
-                    className="w-full bg-background border border-border rounded-md px-2.5 py-1.5 pr-8 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
-                  />
-                  {voiceFormData.stt.googleCloud.apiKey && (
-                    <button
-                      type="button"
-                      onClick={() => setShowVoiceApiKey(!showVoiceApiKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label={showVoiceApiKey ? 'Hide Google Cloud API key' : 'Show Google Cloud API key'}
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">Google Cloud model</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Recognition model passed to Google Cloud STT
-                  </p>
-                </div>
-                <select
-                  value={voiceFormData.stt.googleCloud.model}
-                  onChange={(e) => handleGoogleCloudModelChange(e.target.value)}
-                  className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  <option value="latest_long">Latest long</option>
-                  <option value="latest_short">Latest short</option>
-                  <option value="command_and_search">Command and search</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Input device</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Browser microphone device ID stored on this machine
-              </p>
-            </div>
-            <input
-              type="text"
-              value={voiceHardwareSettings.inputDevice}
-              onChange={(e) => handleVoiceHardwareChange('inputDevice', e.target.value)}
-              placeholder="Default microphone"
-              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Output device</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Browser speaker device ID stored on this machine
-              </p>
-            </div>
-            <input
-              type="text"
-              value={voiceHardwareSettings.outputDevice}
-              onChange={(e) => handleVoiceHardwareChange('outputDevice', e.target.value)}
-              placeholder="Default speaker"
-              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Voice volume</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Playback volume stored on this machine
-              </p>
-            </div>
-            <div className="flex items-center gap-3 w-[260px] shrink-0">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={voiceHardwareSettings.volume}
-                onChange={(e) => handleVoiceHardwareChange('volume', Number(e.target.value))}
-                aria-label="Voice volume"
-                className="flex-1 accent-primary"
-              />
-              <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">
-                {Math.round(voiceHardwareSettings.volume * 100)}%
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Conversations */}
-      <section id="conversations" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
-          Conversations
-        </h2>
-        <div className="space-y-1">
-          {/* Compaction model */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Compaction model</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Used for native compaction and fork summaries</p>
-            </div>
-            <select
-              value={formData.conversations?.compaction_model || 'claude-haiku-4-5'}
-              onChange={(e) => handleCompactionModelChange(e.target.value as ModelId)}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
-                providerDef.models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {providerDef.name} — {model.name}
-                  </option>
-                ))
-              )}
-              {openRouterFavoriteModels.map((model) => (
-                <option key={model.id} value={model.id}>
-                  OpenRouter — {model.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Title model */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Title generation model</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Generates conversation titles from first message</p>
-            </div>
-            <select
-              value={formData.conversations?.title_model || 'claude-haiku-4-5'}
-              onChange={(e) => handleTitleModelChange(e.target.value as ModelId)}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
-                providerDef.models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {providerDef.name} — {model.name}
-                  </option>
-                ))
-              )}
-              {openRouterFavoriteModels.map((model) => (
-                <option key={model.id} value={model.id}>
-                  OpenRouter — {model.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* /compact handling */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">/compact handling</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {(formData.conversations?.manual_compact_mode || 'claude-code') === 'claude-code'
-                  ? 'Pass through to Claude Code'
-                  : 'Overdeck-native compaction'}
-              </p>
-            </div>
-            <select
-              value={formData.conversations?.manual_compact_mode || 'claude-code'}
-              onChange={(e) => handleManualCompactModeChange(e.target.value as 'claude-code' | 'overdeck-native')}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-            >
-              <option value="claude-code">Pass through</option>
-              <option value="overdeck-native">Native compaction</option>
-            </select>
-          </div>
-
-          {/* Rich compaction */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Rich summaries</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                9-section verbose format (higher token usage)
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!!formData.conversations?.rich_compaction}
-              aria-label="Toggle rich compaction summaries"
-              onClick={() => handleRichCompactionChange(!formData.conversations?.rich_compaction)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                formData.conversations?.rich_compaction ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                formData.conversations?.rich_compaction ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-
-          <div className="border-t border-border my-2" />
-
-          <div className="px-4 py-3 rounded-lg bg-muted/15 border border-border/50">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <span className="text-sm font-medium text-foreground">Conversation Search</span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Index Claude JSONL transcripts for Ctrl+K semantic search. Disabled by default; enabling sends transcript chunks to the configured embedding provider.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={conversationSearchEnabled}
-                aria-label="Toggle conversation search"
-                onClick={() => handleConversationSearchChange({ enabled: !conversationSearchEnabled })}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  conversationSearchEnabled ? 'bg-primary' : 'bg-muted'
-                }`}
-              >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  conversationSearchEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                }`} />
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <label className="text-xs text-muted-foreground">
-                Provider
-                <select
-                  value={conversationSearch.provider ?? 'openai'}
-                  onChange={(e) => handleConversationSearchChange({ provider: e.target.value as 'openai' })}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  <option value="openai">OpenAI</option>
-                </select>
-              </label>
-              <label className="text-xs text-muted-foreground">
-                Model
-                <select
-                  value={conversationSearchModel}
-                  onChange={(e) => handleEmbeddingModelChange(e.target.value)}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
-                    <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
-                  ))}
-                </select>
-                {(() => {
-                  const desc = (EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? [])
-                    .find((m) => m.id === conversationSearchModel)?.description;
-                  return desc ? <span className="mt-1 block text-[11px] leading-snug text-muted-foreground/80">{desc}</span> : null;
-                })()}
-              </label>
-              <div className="flex items-end text-xs">
-                {formData?.api_keys?.openai ? (
-                  <span className="text-success">✓ Using OpenAI key from API Keys section</span>
-                ) : (
-                  <span className="text-warning">No OpenAI key set — configure in API Keys above</span>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-              <div>
-                <span>Last indexed: </span>
-                <span className="text-foreground">
-                  {conversationSearchStatus?.lastIndexedAt
-                    ? conversationSearchStatus.lastIndexedAt.slice(0, 19).replace('T', ' ')
-                    : 'Never'}
-                </span>
-                {conversationSearchStatus && (
-                  <span className="ml-2">
-                    ({conversationSearchStatus.chunkCount} chunks · {conversationSearchStatus.indexedFileCount} files)
-                  </span>
-                )}
-                {conversationSearchStatus && !conversationSearchStatus.available && (
-                  <span className="ml-2 text-destructive">{conversationSearchStatus.unavailableReason}</span>
-                )}
-                {conversationSearchEstimate && !conversationSearchEstimate.disabled && (
-                  <span className="block mt-1">
-                    Estimated reindex cost: <span className="text-foreground">${conversationSearchEstimate.estimatedUsd.toFixed(4)}</span>
-                    {' '}({conversationSearchEstimate.tokenCount.toLocaleString()} tokens · {conversationSearchEstimate.chunksEstimated} chunks)
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleConversationSearchReindex()}
-                disabled={!conversationSearchEnabled || estimatingConversationSearch || conversationSearchReindexMutation.isPending}
-                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
-              >
-                {estimatingConversationSearch || conversationSearchReindexMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                Estimate & reindex all conversations
-              </button>
-            </div>
-
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
-              <span className="text-foreground">Estimate &amp; reindex</span> rebuilds the entire semantic-search index from your conversation transcripts: it shows the one-time embedding-API cost, asks you to confirm, then re-embeds every conversation. Run it after switching the model, or to pick up transcripts created before search was enabled.
-            </p>
-
-            {conversationSearchReindexMutation.isPending && reindexProgress && (
-              <div className="mt-2">
-                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-1">
-                  <span className="truncate">
-                    {reindexProgress.currentFile ? `Indexing ${reindexProgress.currentFile}…` : 'Finishing up…'}
-                  </span>
-                  <span className="text-foreground tabular-nums shrink-0">
-                    {reindexProgress.filesIndexed}/{reindexProgress.filesScanned || '—'} files · {reindexProgress.chunksIndexed.toLocaleString()} chunks
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-500"
-                    style={{ width: `${reindexProgress.filesScanned > 0 ? Math.min(100, Math.round((reindexProgress.filesIndexed / reindexProgress.filesScanned) * 100)) : 5}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="border-t border-border my-2" />
-
-          {convConfigLoading ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Loading embedding settings…
-            </div>
-          ) : convConfigError ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-xs text-warning">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-muted-foreground">{convConfigError}</span>
-              <button
-                type="button"
-                onClick={loadConvConfig}
-                className="ml-1 inline-flex items-center gap-1 text-foreground hover:underline"
-              >
-                <RefreshCw className="w-3 h-3" /> Retry
-              </button>
-            </div>
-          ) : convConfig ? (
-            <>
-              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">Semantic embeddings</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Store vector embeddings for semantic conversation search. Non-local providers receive session-derived summaries, tags, workspace paths, and tool names.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={convConfig.embeddings}
-                  aria-label="Toggle semantic embeddings"
-                  onClick={() => handleConvConfigChange({ embeddings: !convConfig.embeddings })}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                    convConfig.embeddings ? 'bg-primary' : 'bg-muted'
-                  }`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                    convConfig.embeddings ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`} />
-                </button>
-              </div>
-
-              {convConfig.embeddings && (
-                <>
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-foreground">Embedding provider</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Which API generates embeddings</p>
-                    </div>
-                    <select
-                      value={convConfig.embeddingProvider}
-                      onChange={(e) => {
-                        const provider = e.target.value;
-                        const defaultModel = provider === 'openai'
-                          ? 'text-embedding-3-small'
-                          : provider === 'voyage'
-                            ? 'voyage-code-3'
-                            : 'nomic-embed-text';
-                        handleConvConfigChange({ embeddingProvider: provider, embeddingModel: defaultModel });
-                      }}
-                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="openai">OpenAI</option>
-                      <option value="voyage">Voyage AI</option>
-                      <option value="ollama">Ollama (local)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-foreground">Embedding model</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Model name for the selected provider</p>
-                    </div>
-                    <input
-                      type="text"
-                      value={convConfig.embeddingModel}
-                      onChange={(e) => handleConvConfigChange({ embeddingModel: e.target.value })}
-                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary w-[220px]"
-                      placeholder="text-embedding-3-small"
-                    />
-                  </div>
-
-                  {convConfig.embeddingProvider !== 'ollama' && (
-                    <div className="px-4 py-3 rounded-lg bg-muted/20">
-                      <p className="text-xs text-muted-foreground">
-                        API key is read from{' '}
-                        <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">
-                          {convConfig.embeddingProvider === 'openai' ? 'OPENAI_API_KEY' : 'VOYAGE_API_KEY'}
-                        </code>{' '}
-                        or <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">~/.overdeck.env</code>.
-                        Session-derived summaries, tags, workspace paths, and tool names are sent to this provider.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-foreground">Auto-embed after deep enrichment</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Generate embeddings when a session is enriched at tier 2 or 3
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={convConfig.embeddingAutoOnDeep}
-                      aria-label="Toggle auto-embed after deep enrichment"
-                      onClick={() => handleConvConfigChange({ embeddingAutoOnDeep: !convConfig.embeddingAutoOnDeep })}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                        convConfig.embeddingAutoOnDeep ? 'bg-primary' : 'bg-muted'
-                      }`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                        convConfig.embeddingAutoOnDeep ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                      }`} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleTestEmbeddingConnection}
-                        disabled={testingEmbedding}
-                        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
-                      >
-                        {testingEmbedding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                        Test connection
-                      </button>
-                      {embeddingTestResult && (
-                        <span className={`text-xs flex items-center gap-1 ${embeddingTestResult.ok ? 'text-success' : 'text-destructive'}`}>
-                          {embeddingTestResult.ok
-                            ? <><CheckCircle className="w-3.5 h-3.5" /> Connected ({embeddingTestResult.latencyMs}ms)</>
-                            : <><AlertTriangle className="w-3.5 h-3.5" /> {embeddingTestResult.error}</>}
-                        </span>
-                      )}
-                    </div>
-                    {convConfigDirty && (
-                      <button
-                        type="button"
-                        onClick={() => void handleSaveConvConfig()}
-                        disabled={convConfigSaving}
-                        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                      >
-                        {convConfigSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                        Save embeddings
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </>
-          ) : null}
-        </div>
-      </section>
+      <ConversationSettingsSection
+        formData={formData}
+        onSettingsChange={applySettings}
+        openRouterFavoriteModels={openRouterFavoriteModels}
+      >
+        <ConversationSearchSection
+          conversationSearch={conversationSearch}
+          conversationSearchEnabled={conversationSearchEnabled}
+          conversationSearchEstimate={conversationSearchEstimate}
+          conversationSearchModel={conversationSearchModel}
+          conversationSearchReindexPending={conversationSearchReindexPending}
+          conversationSearchStatus={conversationSearchStatus}
+          convConfig={convConfig}
+          convConfigDirty={convConfigDirty}
+          convConfigError={convConfigError}
+          convConfigLoading={convConfigLoading}
+          convConfigSaving={convConfigSaving}
+          embeddingTestResult={embeddingTestResult}
+          estimatingConversationSearch={estimatingConversationSearch}
+          hasOpenAiKey={Boolean(formData.api_keys.openai)}
+          loadConvConfig={loadConvConfig}
+          reindexConfirm={reindexConfirm}
+          reindexConfirmBusy={reindexConfirmBusy}
+          reindexProgress={reindexProgress}
+          testingEmbedding={testingEmbedding}
+          onCancelReindexConfirm={cancelReindexConfirm}
+          onConfirmReindex={confirmReindex}
+          onConversationSearchChange={handleConversationSearchChange}
+          onConversationSearchReindex={handleConversationSearchReindex}
+          onConvConfigChange={handleConvConfigChange}
+          onEmbeddingModelChange={handleEmbeddingModelChange}
+          onSaveConvConfig={handleSaveConvConfig}
+          onTestEmbeddingConnection={handleTestEmbeddingConnection}
+        />
+      </ConversationSettingsSection>
 
       {/* Memory */}
       <section id="memory" className="py-6 scroll-mt-4">
@@ -3244,287 +1525,10 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <SettingsSection
-        id="tts"
-        title="TTS"
-        description="Built-in voice playback"
-        actions={
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs ${
-            ttsHealth === undefined
-              ? 'bg-muted/50 text-muted-foreground'
-              : ttsDaemonOnline
-                ? 'bg-success/10 text-success'
-                : ttsDaemonStarting
-                  ? 'bg-warning/10 text-warning'
-                  : 'bg-destructive/10 text-destructive'
-          }`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${ttsDaemonOnline ? 'bg-success' : 'bg-current'}`} />
-            Daemon status: {ttsDaemonStatus}
-          </span>
-        }
-      >
-        <SettingsRow
-          label="Enable TTS"
-          description="Speak activity events through the local Qwen3-TTS daemon"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={!!ttsConfig.enabled}
-            aria-label="Toggle TTS"
-            onClick={() => handleTtsConfigChange({ enabled: !ttsConfig.enabled })}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-              ttsConfig.enabled ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              ttsConfig.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-            }`} />
-          </button>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Daemon"
-          description={ttsDaemonDetails || ttsHealth?.error || 'Live Qwen TTS daemon status'}
-        >
-          <div className="flex flex-col items-end gap-1.5 text-right">
-            <span className={`text-sm font-medium ${ttsDaemonOnline ? 'text-success' : ttsDaemonStarting ? 'text-warning' : 'text-muted-foreground'}`}>
-              {ttsDaemonOnline ? 'running' : ttsDaemonStatus}
-            </span>
-            {ttsDaemonModel && (
-              <span className="max-w-xs truncate text-xs text-muted-foreground">{ttsDaemonModel}</span>
-            )}
-            {!ttsDaemonOnline && !ttsDaemonStarting && (
-              <button
-                type="button"
-                onClick={() => ttsStartMutation.mutate()}
-                disabled={ttsStartMutation.isPending}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-              >
-                {ttsStartMutation.isPending ? 'Starting…' : 'Start daemon'}
-              </button>
-            )}
-          </div>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Volume"
-          description={`${Math.round(ttsVolume * 100)}% output volume`}
-        >
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={ttsVolume}
-            onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })}
-            className="w-40 accent-primary disabled:opacity-50"
-          />
-          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
-            {Math.round(ttsVolume * 100)}%
-          </span>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Rate"
-          description="Speech speed multiplier"
-        >
-          <input
-            type="number"
-            min={0.1}
-            step={0.1}
-            value={ttsRate}
-            onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })}
-            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-          />
-        </SettingsRow>
-
-        <SettingsRow
-          label="Max chars"
-          description="Maximum text length per spoken utterance"
-        >
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={ttsMaxChars}
-            onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })}
-            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-          />
-        </SettingsRow>
-
-        <SettingsRow
-          label="Drop info when queue full"
-          description="Skip low-priority speech when the daemon queue is saturated"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={ttsConfig.dropInfoWhenFull ?? true}
-            aria-label="Toggle dropping low-priority TTS when queue is full"
-            onClick={() => handleTtsConfigChange({ dropInfoWhenFull: !(ttsConfig.dropInfoWhenFull ?? true) })}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-              (ttsConfig.dropInfoWhenFull ?? true) ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              (ttsConfig.dropInfoWhenFull ?? true) ? 'translate-x-[18px]' : 'translate-x-[3px]'
-            }`} />
-          </button>
-        </SettingsRow>
-
-        <TtsSystemVoicePicker
-          voices={ttsVoices}
-          isLoading={ttsVoicesQuery.isLoading}
-          systemVoiceId={ttsConfig.voice}
-          statusVoiceId={ttsConfig.statusVoice}
-          onSetSystemVoice={(voiceId) => handleTtsConfigChange({ voice: voiceId })}
-          onSetStatusVoice={(voiceId) => handleTtsConfigChange({ statusVoice: voiceId })}
-        />
-
-        <div className="mt-6" data-testid="tts-voice-library-tabs">
-          <div className="rounded-t-xl border border-border/70 bg-card/40 p-2">
-            <div className="inline-flex rounded-lg bg-background/60 p-1">
-              {([
-                ['presets', 'CustomVoice Presets'],
-                ['design', 'VoiceDesign'],
-              ] as const).map(([tabId, label]) => (
-                <button
-                  key={tabId}
-                  type="button"
-                  onClick={() => setActiveTtsVoiceTab(tabId)}
-                  aria-pressed={activeTtsVoiceTab === tabId}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    activeTtsVoiceTab === tabId
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-popover'
-                  }`}
-                  data-testid={`tts-voice-library-tab-${tabId}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {activeTtsVoiceTab === 'presets' ? <VoicePresetsTab /> : <VoiceDesignTab />}
-        </div>
-
-        <SavedVoicesTab />
-
-        <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-advanced-settings">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Route event types to specific voices, silence noisy activity sources, and override spoken text.
-            </p>
-          </div>
-
-          <div className="space-y-5">
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Voice Map</h4>
-                  <p className="text-xs text-muted-foreground mt-1">Use default falls back to the configured TTS voice.</p>
-                </div>
-                <span className="text-[10px] text-muted-foreground">{ttsVoices.length} saved voices</span>
-              </div>
-              <div className="overflow-hidden rounded-lg border border-border">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] bg-muted/30 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  <span>Event key</span>
-                  <span>Voice</span>
-                </div>
-                {TTS_EVENT_KEYS.map((eventKey) => (
-                  <div key={eventKey} className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] items-center gap-3 border-t border-border px-3 py-2">
-                    <code className="truncate text-xs text-foreground">{eventKey}</code>
-                    <select
-                      value={ttsConfig.voiceMap?.[eventKey] ?? ''}
-                      onChange={(e) => handleTtsVoiceMapChange(eventKey, e.target.value)}
-                      aria-label={`Voice for ${eventKey}`}
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-                    >
-                      <option value="">Use default</option>
-                      {ttsVoices.map((voice) => (
-                        <option key={voice.id} value={voice.id}>{voice.name} ({voice.kind})</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Muted Sources</h4>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {ACTIVITY_SOURCE_OPTIONS.map((source) => (
-                  <label key={source} className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={ttsConfig.mutedSources?.includes(source) ?? false}
-                      onChange={(e) => handleTtsMutedSourceChange(source, e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
-                    />
-                    <span>{source}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Utterance Templates</h4>
-                  <p className="text-xs text-muted-foreground mt-1">Templates may include {'{issueId}'}.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddTtsTemplate}
-                  disabled={!canAddTtsTemplate}
-                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-popover disabled:opacity-50"
-                >
-                  Add template
-                </button>
-              </div>
-              <div className="space-y-2">
-                {ttsTemplateEntries.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                    No utterance templates configured.
-                  </p>
-                )}
-                {ttsTemplateEntries.map(([eventKey, template]) => (
-                  <div key={eventKey} className="grid gap-2 rounded-lg border border-border bg-background/60 p-2 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto]">
-                    <select
-                      value={eventKey}
-                      onChange={(e) => handleTtsTemplateKeyChange(eventKey, e.target.value)}
-                      aria-label="Template event key"
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-                    >
-                      {TTS_EVENT_KEYS.map((key) => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      value={template}
-                      onChange={(e) => handleTtsTemplateChange(eventKey, e.target.value)}
-                      placeholder="e.g. {issueId} passed review"
-                      aria-label={`Template text for ${eventKey}`}
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTtsTemplate(eventKey)}
-                      className="inline-flex items-center justify-center rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                      aria-label={`Remove template for ${eventKey}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </SettingsSection>
+      <TtsConfigurationSection
+        formData={formData}
+        onSettingsChange={applySettings}
+      />
 
       {/* Tracker Keys */}
       <section id="tracker-keys" className="py-6 scroll-mt-4">
@@ -3851,147 +1855,6 @@ export function SettingsPage() {
         <DesktopSettingsSection />
       </div>
 
-      {/* Provider Models Modal */}
-      {modelsModalProvider && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <ProviderLogo
-                  provider={modelsModalProvider}
-                  label={PROVIDERS.find(p => p.id === modelsModalProvider)?.name}
-                  className="w-5 h-5 shrink-0"
-                />
-                <h3 className="text-foreground text-lg font-bold">
-                  {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
-                </h3>
-              </div>
-              <button
-                onClick={() => setModelsModalProvider(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {(() => {
-                const providerApiKey = formData?.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
-                const isEnvVarRef = providerApiKey.startsWith('$');
-
-                if (!providerApiKey) {
-                  return (
-                    <div className="text-center py-8">
-                      <Key className="w-10 h-10 text-muted-foreground mb-2 mx-auto" />
-                      <p className="text-muted-foreground">Enter an API key to test models</p>
-                    </div>
-                  );
-                }
-
-                if (isEnvVarRef) {
-                  return (
-                    <div className="text-center py-8">
-                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
-                      <p className="text-warning">API key configured via environment variable</p>
-                      <p className="text-muted-foreground text-sm mt-1">
-                        <code className="font-mono bg-popover px-1 rounded">{providerApiKey}</code> is not set
-                      </p>
-                      <p className="text-muted-foreground text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-3">
-                  {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
-                    const testKey = `${modelsModalProvider}:${model.id}`;
-                    const testResult = modelTestResults[testKey];
-                    const isTesting = testingModel === testKey;
-
-                    return (
-                      <div
-                        key={model.id}
-                        className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              {/* Model icons are strings (Material Symbols names) - render as text fallback */}
-                              <div className="w-4 h-4 flex items-center justify-center text-muted-foreground text-[10px]">
-                                {typeof model.icon === 'string' ? model.icon[0] : '◆'}
-                              </div>
-                              <h4 className="text-foreground font-semibold">{model.name}</h4>
-                              {model.tier && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
-                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
-                                  'badge-bg-success text-success-foreground'
-                                }`}>
-                                  {model.tier}
-                                </span>
-                              )}
-                            </div>
-                            {model.description && (
-                              <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
-                            )}
-                            <div className="flex flex-wrap gap-1">
-                              {model.capabilities.map((cap) => (
-                                <span
-                                  key={cap}
-                                  className="text-[9px] px-1.5 py-0.5 bg-card text-muted-foreground rounded border border-border"
-                                >
-                                  {cap}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <button
-                              onClick={() => handleTestModel(modelsModalProvider, model.id)}
-                              disabled={isTesting}
-                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
-                            >
-                              {isTesting ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Zap className="w-3.5 h-3.5" />
-                              )}
-                              Test 2+3
-                            </button>
-                            {testResult && (
-                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
-                                {testResult.success ? (
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                ) : (
-                                  <AlertTriangle className="w-3.5 h-3.5" />
-                                )}
-                                {testResult.success
-                                  ? `${testResult.latencyMs}ms`
-                                  : (testResult.error?.slice(0, 30) || 'Failed')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-border bg-card">
-              <p className="text-xs text-muted-foreground text-center">
-                Test verifies API key and model availability by asking "What is 2+3?"
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Experimental — research-preview features, must remain the LAST section on the page */}
       <section
         id="experimental"
@@ -4174,26 +2037,6 @@ export function SettingsPage() {
       </section>
 
       <LegacyImportDialog open={legacyImportOpen} onClose={() => setLegacyImportOpen(false)} />
-
-      <ReindexConfirmDialog
-        open={reindexConfirm !== null}
-        title={reindexConfirm?.kind === 'model' ? 'Switch embedding model?' : 'Reindex all conversations?'}
-        intro={reindexConfirm?.kind === 'model' ? (
-          <>
-            Switching to <span className="text-foreground font-medium">{reindexConfirm?.newModel}</span> invalidates
-            every cached embedding — vectors can&apos;t be reused across models — and runs a full reindex with the new
-            model. This is a one-time embedding-API cost:
-          </>
-        ) : (
-          <>This re-embeds every conversation transcript from scratch and replaces the existing index, calling the OpenAI embeddings API once for your whole history:</>
-        )}
-        estimate={reindexConfirm?.estimate ?? null}
-        estimating={estimatingConversationSearch && !reindexConfirm?.estimate}
-        confirmLabel={reindexConfirm?.kind === 'model' ? 'Switch & reindex' : 'Reindex now'}
-        busy={reindexConfirmBusy}
-        onConfirm={() => void confirmReindex()}
-        onCancel={cancelReindexConfirm}
-      />
 
     </SettingsLayout>
   );

@@ -33,6 +33,8 @@ import {
 import { listSessionNames, isHarnessProcessAlive, listPaneValues } from '../../../lib/tmux.js';
 import { isRespawnPending } from './pending-respawn.js';
 import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
+import type { HarnessName } from '../../../lib/runtimes/types.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
@@ -51,6 +53,10 @@ const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship']);
 // Tmux session prefixes that are NOT specialist agents and must be left alone
 // by the backfill pass even if they happen to be missing a row.
 const NON_AGENT_PREFIXES = ['conv-', 'inspect-', 'planning-'];
+
+function behaviorForHarness(harness: string | null | undefined) {
+  return getHarnessBehavior(harness as HarnessName | null | undefined);
+}
 
 /**
  * PAN-2099: read the last `maxBytes` of a file without loading the whole thing.
@@ -274,13 +280,13 @@ async function backfillOrphanedSpecialistConversations(aliveSessions: string[]):
  */
 async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Promise<void> {
   // Group by cwd so we readdir each project dir at most once per tick.
-  // Pi conversations don't use ~/.claude/projects; harness === 'pi' is filtered out.
-  // Legacy rows with harness === null predate the harness column and were all claude-code.
+  // Non-Claude conversations don't use ~/.claude/projects.
+  // Legacy rows with a null harness predate the harness column and were all claude-code.
   const cwdGroups = new Map<string, Conversation[]>();
   for (const conv of activeConvs) {
     if (!conv.cwd) continue;
     if (!conv.claudeSessionId) continue;
-    if (conv.harness === 'ohmypi' || conv.harness === 'codex') continue;
+    if (behaviorForHarness(conv.harness).transcriptKind !== 'claude-jsonl') continue;
     const list = cwdGroups.get(conv.cwd) ?? [];
     list.push(conv);
     cwdGroups.set(conv.cwd, list);

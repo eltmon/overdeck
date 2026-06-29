@@ -19,6 +19,8 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
+          command: "$HOME/.overdeck/bin/tmux-send-keys-guard"
+        - type: command
           command: "$HOME/.overdeck/bin/gh-issue-trailer-hook"
         - type: command
           command: "$HOME/.overdeck/bin/rtk-bash-filter"

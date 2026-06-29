@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
   readStuckRemediationState: vi.fn(),
   writeStuckRemediationState: vi.fn(),
   pauseFlywheel: vi.fn(),
+  resumeFlywheel: vi.fn(),
+  listPaneValuesSync: vi.fn(),
+  killSessionSync: vi.fn(),
+  getNoResumeMode: vi.fn(),
+  getFlywheelActiveRunId: vi.fn(),
+  describeAgentDeath: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -42,6 +48,8 @@ vi.mock('../../review-status.js', () => ({
 
 vi.mock('../../tmux.js', () => ({
   sessionExistsSync: mocks.sessionExistsSync,
+  listPaneValuesSync: mocks.listPaneValuesSync,
+  killSessionSync: mocks.killSessionSync,
 }));
 
 vi.mock('../config.js', () => ({
@@ -68,7 +76,20 @@ vi.mock('../stuck-remediation-state.js', () => ({
 
 vi.mock('../flywheel.js', () => ({
   pauseFlywheel: mocks.pauseFlywheel,
+  resumeFlywheel: mocks.resumeFlywheel,
   FLYWHEEL_ORCHESTRATOR_AGENT_ID: 'flywheel-orchestrator',
+}));
+
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: mocks.getNoResumeMode,
+}));
+
+vi.mock('../../overdeck/control-settings.js', () => ({
+  getFlywheelActiveRunId: mocks.getFlywheelActiveRunId,
+}));
+
+vi.mock('../agent-death.js', () => ({
+  describeAgentDeath: mocks.describeAgentDeath,
 }));
 
 import { checkStuckAgentRemediation } from '../stuck-remediation.js';
@@ -146,6 +167,11 @@ describe('checkStuckAgentRemediation', () => {
     mocks.readStuckRemediationState.mockReturnValue(null);
     mocks.messageAgent.mockResolvedValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: true });
+    mocks.listPaneValuesSync.mockReturnValue([]);
+    mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
+    mocks.getFlywheelActiveRunId.mockReturnValue('RUN-8');
+    mocks.resumeFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
+    mocks.describeAgentDeath.mockReturnValue('exit=1 at 2026-05-23T11:59:00Z');
     mockReadyBeads();
   });
 
@@ -218,8 +244,9 @@ describe('checkStuckAgentRemediation', () => {
     expect(actions).toEqual([]);
     expect(mocks.resumeAgent).toHaveBeenCalledOnce();
     expect(mocks.writeStuckRemediationState).not.toHaveBeenCalled();
+    // PAN-2108: resume-failed now carries the death reason (exit code + tail).
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
-      '[deacon] stuck-remediation stage=2 issue=PAN-1415 idleMin=50 action=resume-failed',
+      '[deacon] stuck-remediation stage=2 issue=PAN-1415 idleMin=50 action=resume-failed — death: exit=1 at 2026-05-23T11:59:00Z',
     );
   });
 
@@ -396,6 +423,12 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     mocks.readStuckRemediationState.mockReturnValue(null);
     mocks.messageAgent.mockResolvedValue(undefined);
     mocks.pauseFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
+    // PAN-2108 defaults: orchestrator alive (no dead pane), run active, resume OK.
+    mocks.listPaneValuesSync.mockReturnValue([]);
+    mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
+    mocks.getFlywheelActiveRunId.mockReturnValue('RUN-8');
+    mocks.resumeFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
+    mocks.describeAgentDeath.mockReturnValue('exit=1 at 2026-05-23T11:59:00Z');
   });
 
   afterEach(() => {
@@ -457,13 +490,73 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(mocks.messageAgent).not.toHaveBeenCalled();
   });
 
-  it('skips when the orchestrator tmux session is already gone', async () => {
+  // PAN-2108: a DEAD orchestrator process (not idle) must self-heal — kill the
+  // zombie session and fresh-launch the run — so the pipeline's last stand
+  // survives a silent omp death like RUN-30.
+  it('fresh-launches the orchestrator when its omp pane is dead', async () => {
+    mocks.sessionExistsSync.mockReturnValue(true);
+    mocks.listPaneValuesSync.mockReturnValue(['1']); // #{pane_dead} = 1
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.killSessionSync).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(mocks.writeStuckRemediationState).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.objectContaining({ respawnCount: 1 }),
+    );
+    expect(actions[0]).toContain('fresh-launched (relaunch 1/3)');
+  });
+
+  it('fresh-launches the orchestrator when its session has fully vanished', async () => {
     mocks.sessionExistsSync.mockReturnValue(false);
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(95));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(actions).toEqual([]);
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(actions[0]).toContain('fresh-launched');
+  });
+
+  it('does not auto-relaunch a dead orchestrator under OVERDECK_NO_RESUME', async () => {
+    mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.getNoResumeMode.mockReturnValue({ active: true, since: 'x' });
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(actions[0]).toContain('OVERDECK_NO_RESUME=1, not auto-relaunching');
+  });
+
+  it('does not resurrect when there is no active flywheel run (operator stopped it)', async () => {
+    mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.getFlywheelActiveRunId.mockReturnValue(null);
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
+  });
+
+  it('escalates to pause+troubled after exceeding the relaunch cap (crash loop)', async () => {
+    mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.readStuckRemediationState.mockReturnValue({
+      lastStage: 0,
+      lastStageAt: new Date(NOW - 60_000).toISOString(),
+      firstStuckAt: new Date(NOW - 60_000).toISOString(),
+      respawnCount: 3,
+      lastRespawnAt: new Date(NOW - 60_000).toISOString(),
+    } as StuckRemediationState);
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(mocks.pauseFlywheel).toHaveBeenCalledOnce();
+    expect(mocks.markAgentTroubled).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(actions[0]).toContain('exceeded 3 relaunches');
   });
 });

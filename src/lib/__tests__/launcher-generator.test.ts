@@ -637,7 +637,10 @@ describe('generateLauncherScript', () => {
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
     });
-    expect(piScript).toContain('exec omp --mode rpc');
+    // PAN-2108: rpc path runs omp without `exec` so the launcher bash survives
+    // to record omp's exit; the supervisor is still skipped for ohmypi.
+    expect(piScript).toContain('omp --mode rpc');
+    expect(piScript).not.toContain('exec omp');
     expect(piScript).not.toContain('pty-supervisor.js');
 
     const reviewScript = generateLauncherScriptSync({
@@ -784,8 +787,10 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       piSessionDir: '/home/u/.overdeck/agents/agent-pan-1989/sessions',
       promptFile: '/tmp/prompt.txt',
     });
-    // Binary is omp, not pi.
-    expect(script).toMatch(/exec omp --mode rpc/);
+    // Binary is omp, not pi. PAN-2108: the rpc path no longer uses `exec` so the
+    // launcher bash outlives omp and can record its exit (silent-death trace).
+    expect(script).toMatch(/\bomp --mode rpc/);
+    expect(script).not.toMatch(/exec omp/);
     expect(script).not.toMatch(/exec pi --mode/);
     // --no-context-files REMOVED in omp (docs/ohmypi-contract.md).
     expect(script).not.toMatch(/--no-context-files/);
@@ -795,6 +800,11 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     // FIFO redirection is `<>` (non-blocking), same as pi.
     expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/rpc\.in'/);
     expect(script).toMatch(/>> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/output\.log' 2>&1/);
+    // PAN-2108: omp's exit code + timestamp recorded to exit-status on death, and
+    // the launcher exits with omp's code so `#{pane_exit_status}` reflects it too.
+    expect(script).toMatch(/__omp_exit=\$\?/);
+    expect(script).toMatch(/> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/exit-status'/);
+    expect(script).toMatch(/exit \$__omp_exit/);
   });
 
   it('ohmypi: uses --resume (not --session) for resumeSessionId (AC1, contract)', () => {
@@ -824,7 +834,8 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
     });
-    expect(script).toMatch(/exec omp --mode rpc/);
+    expect(script).toMatch(/\bomp --mode rpc/);
+    expect(script).not.toMatch(/exec omp/);
     expect(script).not.toContain('pty-supervisor.js');
   });
 
