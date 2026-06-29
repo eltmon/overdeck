@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-06-29T23:07Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T23:07:02.184Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T23:11:02.913Z"
     }
   ],
   "feedback": [
@@ -76,23 +81,31 @@
     }
   ],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:07:02.184Z",
+  "updated": "2026-06-29T23:11:06.873Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:07:01.245Z",
-    "reviewNotes": "New countdown test leaks a mocked Date.now into later tests",
+    "updatedAt": "2026-06-29T23:11:06.806Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "lastVerifiedCommit": "de5b985233d2aeb8bc8b9b4fd20ec37ae2f52465",
+    "lastVerifiedCommit": "e3358d23d5856ca05c64c2031449e2b22a0369d4",
     "reviewRequestedAt": "2026-06-29T22:56:43.964Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 141,
+            "output": 4934,
+            "cacheRead": 2984569,
+            "cacheWrite": 8380
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
             "input": 33488,
@@ -111,22 +124,22 @@
         }
       },
       "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 33499,
+          "output": 65020,
+          "cacheRead": 11526350,
+          "cacheWrite": 384496
+        },
         "cliproxy/gpt-5.4-mini": {
           "input": 33488,
           "output": 1472,
           "cacheRead": 0,
           "cacheWrite": 0
-        },
-        "anthropic/claude-opus-4-8": {
-          "input": 33358,
-          "output": 60086,
-          "cacheRead": 8541781,
-          "cacheWrite": 376116
         }
       },
       "costAtCloseOut": {
-        "usd": 8.290561,
-        "pricingAsOf": "2026-06-29T23:07:01.290Z"
+        "usd": 9.959276,
+        "pricingAsOf": "2026-06-29T23:11:06.864Z"
       }
     },
     "merges": [
