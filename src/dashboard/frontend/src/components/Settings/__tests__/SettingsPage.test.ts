@@ -80,6 +80,10 @@ const MEMORY_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/MemorySection.tsx'),
   'utf8',
 );
+const BACKGROUND_AI_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/BackgroundAiSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -132,7 +136,7 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('const applySettings = (next: SettingsConfig');
     expect(SETTINGS_PAGE_SOURCE).toContain('const applyVoiceSettings = (next: VoiceSettings');
     // Text-input handlers debounce; click handlers save immediately.
-    expect(SETTINGS_PAGE_SOURCE).toContain("}, { debounce: true });");
+    expect(BACKGROUND_AI_SECTION_SOURCE).toContain('{ debounce: true }');
     // Deprecated-model migration kept its own explicit action.
     expect(SETTINGS_PAGE_SOURCE).toContain('Migrate now');
   });
