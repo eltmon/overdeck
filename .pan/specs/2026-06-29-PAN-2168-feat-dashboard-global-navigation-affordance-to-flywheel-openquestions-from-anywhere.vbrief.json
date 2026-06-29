@@ -1,20 +1,19 @@
 {
   "vBRIEFInfo": {
     "version": "0.6",
-    "created": "2026-06-29T13:03:04.000Z",
+    "created": "2026-06-29T13:08:04Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2168: feat(dashboard): global navigation affordance to Flywheel openQuestions from anywhere",
-    "updated": "2026-06-29T13:07:14.513Z"
+    "description": "Plan for PAN-2168: Global navigation affordance to Flywheel openQuestions from anywhere",
+    "updated": "2026-06-29T13:11:36.101Z"
   },
   "plan": {
     "id": "pan-2168",
-    "title": "feat(dashboard): global navigation affordance to Flywheel openQuestions from anywhere",
+    "title": "Global navigation affordance to Flywheel openQuestions from anywhere",
     "status": "proposed",
-    "uid": "20dd8b2f-76fe-4522-966d-9248d16c8bbf",
+    "uid": "a2191679-9394-4039-bf60-fc85d3cd5cc8",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
-    "created": "2026-06-29T13:03:04.000Z",
-    "updated": "2026-06-29T13:07:14.513Z",
+    "created": "2026-06-29T13:08:04Z",
+    "updated": "2026-06-29T13:11:36.101Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2168",
@@ -26,86 +25,127 @@
       "dashboard",
       "frontend",
       "flywheel",
-      "navigation"
+      "ux"
     ],
     "narratives": {
-      "Problem": "FlywheelStatus.openQuestions[] (packages/contracts/src/flywheel.ts:224) are only visible on the Flywheel status surface. The operator has no way to jump to them from anywhere in the dashboard, so time-sensitive decisions (e.g. releasing MIN merges blocked on the per-project UAT gate) sit unseen until they happen to open the Flywheel page.",
-      "Proposal": "Add a persistent indicator to the app bar's right-side status group (App/AppChrome.tsx:190-226), rendered on every route. It shows the open-question count when >0 (hidden at 0), updates live over /ws/rpc, and on click navigates to the Flywheel tab and reveals the existing 'Open Questions for the Next Tick' section (FlywheelStatusDetails.tsx:271-279) with full question text. A small shared signal module (lib/flywheelReveal.ts) decouples the indicator from the Flywheel page. Presentation-only: reuses subscribeFlywheelStatus (lib/wsTransport.ts:283) and GET /api/flywheel/current; no new server data path.",
-      "NonGoals": "- No change to how openQuestions are produced or emitted (server/orchestrator untouched).\n- No new dedicated openQuestions drawer or route — reuse the Flywheel status tab.\n- No badge in the left Sidebar — the indicator goes in the top app bar.\n- No mark-as-read, dismissal, or per-question persistence.\n- No change to the existing flywheel-live sidebar nav badge.\n- No restyle of the pre-existing (non-conformant) running-agent pill in AppChrome."
+      "Problem": "FlywheelStatus.openQuestions[] (packages/contracts/src/flywheel.ts:224) is emitted every Flywheel tick but is only visible on the /flywheel page's status tab (FlywheelStatusDetails.tsx:271-279). The operator cannot see or jump to open questions from other routes, so time-sensitive non-blocking decisions (e.g. releasing MIN merges blocked on the MYN per-project UAT gate) sit unseen until they happen to open the Flywheel page.",
+      "Proposal": "Add a persistent, global count-badge indicator to the app bar's right-side status group (AppChrome.tsx:190-226), styled per pan-style-guide as an operator-attention (--warning/amber) badge: hidden at 0 open questions, showing the count when >0, updating live by seeding /api/flywheel/current then applying subscribeFlywheelStatus pushes with a 5s refetch (the same pattern FlywheelPage uses, FlywheelPage.tsx:372-395). Clicking it navigates to the Flywheel tab (setActiveTab('flywheel')) and reveals the openQuestions list — forcing the status tab and scrolling a newly-anchored section (id='flywheel-open-questions') into view. Indicator and page are decoupled by a tiny signal module (lib/flywheelReveal.ts) so neither imports the other. Presentation/navigation only — no new server endpoint, RPC method, domain event, or FlywheelStatus contract field.",
+      "NonGoals": "- No change to how openQuestions are produced or emitted (server/orchestrator untouched).\n- No new dedicated openQuestions drawer or route — reuse the Flywheel status tab.\n- No badge in the left Sidebar (the issue asks for the top app bar); the existing flywheel-live sidebar badge (Sidebar.tsx:82,300) is untouched.\n- No new server data path, RPC method, domain event, or contract field.\n- No mark-as-read / dismissal / persistence of individual questions.\n- No global flywheel-status store/refactor."
     },
     "autoDecisions": [
       {
-        "summary": "Placement = app bar right-side status group (App/AppChrome.tsx:190-226).",
-        "rationale": "Matches the issue's suggested placement and is where every other global system indicator already lives; AppChrome renders on every route, satisfying 'from anywhere'."
+        "summary": "Color signal = --warning (amber), not --destructive (red).",
+        "rationale": "openQuestions are explicitly non-blocking ('weigh in'), which the pan-style-guide signal table maps to 'a human must act' = amber (--warning). Red is reserved for broken/stuck/urgent. The issue's 'operator-attention / needs-you' maps to amber."
       },
       {
-        "summary": "Color-signal = --warning (amber), non-pill badge with 8% bg / 32% border tint.",
-        "rationale": "pan-style-guide maps 'a human must act / awaiting approval' to amber; an open question is operator-attention. Honors NFR-1 (no rounded-full pill, no bold)."
+        "summary": "0 open questions => indicator hidden (render null), not a muted badge.",
+        "rationale": "The issue allows 'hidden or muted'; hidden gives zero footprint when there is nothing to action and avoids a persistent dead chip in the app bar."
       },
       {
-        "summary": "Reveal target = existing 'Open Questions for the Next Tick' section, not a new drawer.",
-        "rationale": "Smallest change that shows each question's full text (AC2); reuses the surface that already renders it."
+        "summary": "Indicator owns its own live status (seed /api/flywheel/current + subscribeFlywheelStatus + 5s refetch), mirroring FlywheelPage, rather than introducing a shared flywheel store.",
+        "rationale": "There is no shared flywheel-status store today; FlywheelPage subscribes locally (FlywheelPage.tsx:372-395). The /ws/rpc transport is a multiplexed singleton, so a second subscriber is cheap. The refetch makes a restart/replay unable to strand a stale count. A new global store is more machinery than one badge warrants."
       },
       {
-        "summary": "Live data reuses the FlywheelPage subscription pattern; no run-lifecycle query in the indicator.",
-        "rationale": "Keeps it minimal and avoids a new data path (NFR-2). /api/flywheel/current returns null when paused, zeroing the count on refetch (hazard H1)."
+        "summary": "Reveal via a decoupled signal module (lib/flywheelReveal.ts), not prop-drilling through App -> AppRoutes -> FlywheelPage.",
+        "rationale": "A sticky-pending + listener module handles both the cold-navigation case (consumePendingReveal on FlywheelPage mount) and the warm case (subscribe while mounted), keeps AppChrome and FlywheelPage from importing each other, touches no AppRoutes threading, and is unit-testable. URL-hash deep-linking was rejected because the dashboard uses a custom pushState router and hash parsing would be fragile for an in-app affordance."
       },
       {
-        "summary": "Decouple via lib/flywheelReveal.ts shared signal module rather than an inline window CustomEvent.",
-        "rationale": "Avoids duplicating an event-name string across two components and makes the reveal contract unit-testable."
+        "summary": "Placement = app bar right-side status group, between SystemHealthPill and SystemMenu.",
+        "rationale": "Matches the issue's suggested placement ('next to existing system indicators') and is where every other global system indicator already lives (AppChrome.tsx:190-226)."
+      },
+      {
+        "summary": "Reveal target = existing 'Open Questions for the Next Tick' section in the Flywheel status tab (anchored with a new id), not a new drawer or route.",
+        "rationale": "That section already renders each question's full text. Reusing it is the smallest change that satisfies AC2; a dedicated drawer would duplicate rendering for no added value (a NonGoal)."
+      },
+      {
+        "summary": "Icon = lucide MessageCircleQuestion, fallback HelpCircle.",
+        "rationale": "Both are already imported elsewhere in the frontend, so both exist in the installed lucide-react. MessageCircleQuestion reads as 'open questions'; HelpCircle is the safe fallback if the version lacks the former."
       }
     ],
     "items": [
       {
-        "id": "reveal-signal",
-        "title": "Add lib/flywheelReveal.ts reveal-signal contract module",
+        "id": "reveal-signal-module",
+        "title": "Add flywheelReveal.ts signal module (request/consume/subscribe)",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-29T13:03:04.000Z",
+        "created": "2026-06-29T13:08:04Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-2168",
-          "requiresInspection": true,
+          "requiresInspection": false,
           "inspectionDepth": "fast",
-          "foundationFor": [
-            "open-questions-indicator",
-            "flywheel-reveal-handler"
-          ],
           "traces": [
             "FR-2"
           ]
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/lib/flywheelReveal.ts: a tiny module that is the contract between the global indicator and the Flywheel page so neither imports the other. Export `requestRevealOpenQuestions(): void` (sets a module-level sticky-pending boolean to true, then notifies all current listeners), `consumePendingReveal(): boolean` (returns the pending flag and resets it to false), and `subscribeRevealOpenQuestions(cb: () => void): () => void` (adds cb to a module-level Set and returns an unsubscribe that deletes it). No window/global-event usage, no React. This bead ships a new, unused module plus its test — tree stays working."
+          "Action": "Create src/dashboard/frontend/src/lib/flywheelReveal.ts exporting three functions that decouple the app-bar indicator from FlywheelPage so neither imports the other: `requestRevealOpenQuestions(): void` (sets a sticky-pending boolean AND notifies current listeners), `consumePendingReveal(): boolean` (returns the pending flag and clears it — used by FlywheelPage on mount for the cold-navigation case), and `subscribeRevealOpenQuestions(cb: () => void): () => void` (adds cb to a listener Set, returns an unsubscribe — used by FlywheelPage while mounted for the warm/already-on-page case). Module-level `let pending = false` and `const listeners = new Set<() => void>()`. No window/CustomEvent magic strings. Pure additive new file; no consumers yet."
         },
         "items": [
           {
-            "id": "reveal-signal.ac1",
-            "title": "Given no prior request, consumePendingReveal() returns false; after requestRevealOpenQuestions(), the next consumePendingReveal() returns true and a subsequent call returns false (one-shot).",
+            "id": "reveal-signal-module.ac1",
+            "title": "src/dashboard/frontend/src/lib/flywheelReveal.ts exists and exports requestRevealOpenQuestions, consumePendingReveal, subscribeRevealOpenQuestions; `npm run typecheck` exits 0",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "reveal-signal.ac2",
-            "title": "Given a callback registered via subscribeRevealOpenQuestions(), when requestRevealOpenQuestions() runs then the callback receives the call synchronously.",
+            "id": "reveal-signal-module.ac2",
+            "title": "Unit test src/dashboard/frontend/src/lib/__tests__/flywheelReveal.test.ts proves: requestReveal sets pending so a later consumePendingReveal returns true once then false; requestReveal fires all subscribed listeners; unsubscribe stops further calls",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "reveal-signal.ac3",
-            "title": "Given the unsubscribe returned by subscribeRevealOpenQuestions() has run, when requestRevealOpenQuestions() runs then the removed callback receives nothing.",
+            "id": "reveal-signal-module.ac3",
+            "title": "`npm run lint` exits 0 (no unused exports flagged, no explicit any)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-questions-anchor",
+        "title": "Add id anchor to the Open Questions section in FlywheelStatusDetails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T13:08:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx, extend the local `Section` helper (line ~113) to accept an optional `id`: change the signature to `function Section({ title, children, id }: { title: string; children: ReactNode; id?: string })` and add `id={id}` to its `<section>` element. Then pass `id=\"flywheel-open-questions\"` to the Open Questions section (line ~271: `<Section title=\"Open Questions for the Next Tick\" id=\"flywheel-open-questions\">`). Pure additive — no other Section call sites change behavior (id is optional/undefined for them)."
+        },
+        "items": [
+          {
+            "id": "open-questions-anchor.ac1",
+            "title": "The Open Questions section renders a DOM element with id=\"flywheel-open-questions\" containing each question's full text",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "reveal-signal.ac4",
-            "title": "A new test file src/dashboard/frontend/src/lib/__tests__/flywheelReveal.test.ts exercises ac1-ac3 and passes under npm test.",
+            "id": "open-questions-anchor.ac2",
+            "title": "A test (create src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx if absent) renders FlywheelStatusDetails with a status carrying >=1 openQuestions and asserts container.querySelector('#flywheel-open-questions') exists and includes the question text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-questions-anchor.ac3",
+            "title": "`npm run typecheck` exits 0 and `npm run lint` exits 0",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -115,10 +155,10 @@
       },
       {
         "id": "open-questions-indicator",
-        "title": "Add OpenQuestionsIndicator component (live count + style-guide badge)",
+        "title": "Build the OpenQuestionsIndicator app-bar component",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-29T13:03:04.000Z",
+        "created": "2026-06-29T13:08:04Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-2168",
@@ -132,12 +172,12 @@
           ]
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/OpenQuestionsIndicator.tsx. Props: { onActivate: () => void }. Internally track the latest FlywheelStatus: seed once from GET /api/flywheel/current, then apply live pushes via subscribeFlywheelStatus from lib/wsTransport.ts (mirror FlywheelPage.tsx:373-395 — including a ~5s setInterval refetch of /api/flywheel/current and full cleanup: clear the interval and call the unsubscribe in the effect cleanup, hazard H4). Derive count = status?.openQuestions.length ?? 0. When count === 0, render nothing (null) — AC1 hidden state. When count > 0, render a button styled per pan-style-guide: NOT a pill (use rounded-sm, h-5, font-medium, never font-bold/font-semibold/rounded-full), color-signal --warning with the 8%/32% tint (bg-warning/8 border-warning/32 text-warning-foreground or the nearest existing warning badge class in the repo), a short label/icon plus the count, with title/aria-label like `${count} open question(s) for the Flywheel`. onClick calls requestRevealOpenQuestions() from lib/flywheelReveal.ts then props.onActivate(). Do NOT copy the existing emerald rounded-full running-agent pill (hazard H3)."
+          "Action": "Create src/dashboard/frontend/src/components/OpenQuestionsIndicator.tsx. Props: `{ onActivate: () => void }`. Hold `status: FlywheelStatus | null` in useState. In a useEffect (mirror FlywheelPage.tsx:372-395): seed once from GET /api/flywheel/current (define a local fetchCurrentFlywheelStatus like FlywheelPage.tsx:59-62), set a 5000ms refetch interval, and subscribe via subscribeFlywheelStatus (lib/wsTransport.ts:283); clean up interval + unsubscribe on unmount. `const count = status?.openQuestions.length ?? 0;` — if count === 0 return null (hidden). Otherwise render `<button type=\"button\" onClick={() => { requestRevealOpenQuestions(); onActivate(); }}>` (import requestRevealOpenQuestions from lib/flywheelReveal) with classes `inline-flex items-center gap-1.5 rounded-sm h-5 border px-1.5 text-[10px] font-medium badge-bg-warning badge-border-warning text-warning-foreground tabular-nums`, a `<MessageCircleQuestion className=\"h-3.5 w-3.5\" aria-hidden=\"true\" />` icon (lucide-react; fall back to HelpCircle only if MessageCircleQuestion is unavailable in the installed version) then `{count}`, and title + aria-label `${count} open Flywheel question${count===1?'':'s'} — click to view`. Style per pan-style-guide: rounded-sm (NOT rounded-full), font-medium (no bold), --warning operator-attention tint."
         },
         "items": [
           {
             "id": "open-questions-indicator.ac1",
-            "title": "Given a FlywheelStatus with openQuestions.length === 0 (or /api/flywheel/current resolving null and no pushes), the component renders nothing (no badge in the DOM).",
+            "title": "With a snapshot of N>0 openQuestions the component renders a button showing N; with 0 openQuestions, or status null, it renders nothing (returns null)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -145,7 +185,7 @@
           },
           {
             "id": "open-questions-indicator.ac2",
-            "title": "Given openQuestions.length === 2, the component renders a visible badge showing the count 2.",
+            "title": "Test src/dashboard/frontend/src/components/__tests__/OpenQuestionsIndicator.test.tsx (mock ../../lib/wsTransport with a captured listener per FlywheelPage.test.tsx:8-21; mock fetch for /api/flywheel/current): renders null at 0; renders the count at >0; pushing a new snapshot through the captured listener updates the count live (FR-3); clicking calls onActivate AND requestRevealOpenQuestions",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -153,7 +193,7 @@
           },
           {
             "id": "open-questions-indicator.ac3",
-            "title": "When a new snapshot arrives via the subscribeFlywheelStatus listener (count 0 -> 3), the rendered count updates to 3 with no remount/reload (FR-3); the test drives this by invoking the captured listener from a mocked subscribeFlywheelStatus.",
+            "title": "The button renders with classes rounded-sm and text-warning-foreground, and renders neither rounded-full nor font-bold/font-semibold (NFR-1: no pill, no bold)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -161,15 +201,7 @@
           },
           {
             "id": "open-questions-indicator.ac4",
-            "title": "When the badge is clicked, the component sends requestRevealOpenQuestions() and the onActivate prop exactly once each.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "open-questions-indicator.ac5",
-            "title": "The rendered badge markup contains no `rounded-full`, `font-bold`, or `font-semibold` class and uses a --warning signal token (NFR-1); asserted in the test by inspecting className.",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and the OpenQuestionsIndicator test suite passes",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -178,11 +210,64 @@
         ]
       },
       {
-        "id": "wire-into-appbar",
-        "title": "Render the indicator in the app bar and thread navigate-to-Flywheel",
+        "id": "flywheel-page-consume-reveal",
+        "title": "FlywheelPage consumes the reveal signal (force status tab + scroll)",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-29T13:03:04.000Z",
+        "created": "2026-06-29T13:08:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2168",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/FlywheelPage.tsx, add a useEffect (after the existing status-subscription effect) that wires the reveal signal. Define a local `revealOpenQuestions()` that calls the existing `setActiveTab('status')` (the FlywheelLeftTab setter, FlywheelPage.tsx:294) and, inside requestAnimationFrame, `document.getElementById('flywheel-open-questions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })`. On mount: `if (consumePendingReveal()) revealOpenQuestions();` (cold navigation from another route). While mounted: `const unsub = subscribeRevealOpenQuestions(revealOpenQuestions); return unsub;` (warm — already on the Flywheel tab when the indicator is clicked). Import consumePendingReveal + subscribeRevealOpenQuestions from ../lib/flywheelReveal. No props/threading changes (decoupled via the signal module)."
+        },
+        "items": [
+          {
+            "id": "flywheel-page-consume-reveal.ac1",
+            "title": "Given a pending reveal, navigating to the Flywheel tab shows the 'status' left tab and scrolls #flywheel-open-questions into view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-page-consume-reveal.ac2",
+            "title": "When requestRevealOpenQuestions() fires while FlywheelPage is mounted, the page shows the 'status' tab and scrolls the openQuestions section into view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-page-consume-reveal.ac3",
+            "title": "Test (extend src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx) spies Element.prototype.scrollIntoView and asserts it is called for the pending-reveal-on-mount case; the FlywheelStatusDetails mock renders a <div id=\"flywheel-open-questions\">",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-page-consume-reveal.ac4",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and the FlywheelPage test suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-indicator-into-appchrome",
+        "title": "Render OpenQuestionsIndicator in the app bar and wire navigation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T13:08:04Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-2168",
@@ -194,81 +279,28 @@
           ]
         },
         "narrative": {
-          "Action": "Wire the indicator into the global chrome. In src/dashboard/frontend/src/App/AppChrome.tsx: import OpenQuestionsIndicator, add `onNavigateFlywheel: () => void` to AppChromeProps, and render <OpenQuestionsIndicator onActivate={onNavigateFlywheel} /> inside the right-side status group (the `flex shrink-0 items-center gap-2` div at AppChrome.tsx:190-226, e.g. just before <SystemMenu />). In src/dashboard/frontend/src/App.tsx, pass `onNavigateFlywheel={() => setActiveTab('flywheel')}` to <AppChrome /> (the render block at App.tsx:672-691; setActiveTab is defined at App.tsx:358). Because AppChrome renders on every route, this delivers the 'from anywhere' guarantee (FR-1) and the navigation half of FR-2."
+          "Action": "In src/dashboard/frontend/src/App/AppChrome.tsx: import OpenQuestionsIndicator; add `onNavigateOpenQuestions: () => void` to AppChromeProps (interface ~line 19) and destructure it; render `<OpenQuestionsIndicator onActivate={onNavigateOpenQuestions} />` in the right-side status group between `<SystemHealthPill />` and `<SystemMenu … />` (AppChrome.tsx ~210-211). In src/dashboard/frontend/src/App.tsx: pass `onNavigateOpenQuestions={() => setActiveTab('flywheel')}` to the `<AppChrome … />` render (App.tsx:672) — setActiveTab already exists (App.tsx:358) and uses the pushState router to navigate to /flywheel. No AppRoutes changes (reveal is handled by the signal module, not prop-drilling)."
         },
         "items": [
           {
-            "id": "wire-into-appbar.ac1",
-            "title": "AppChrome renders <OpenQuestionsIndicator> within its right-side status group; verified by a test that renders AppChrome (mocking child data sources / subscribeFlywheelStatus to supply openQuestions) and finds the indicator badge when count > 0.",
+            "id": "wire-indicator-into-appchrome.ac1",
+            "title": "The app bar renders the OpenQuestionsIndicator on every route (it self-hides when count is 0)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wire-into-appbar.ac2",
-            "title": "When the indicator is activated, AppChrome sends the onNavigateFlywheel prop (App.tsx routes it to setActiveTab('flywheel')); the test asserts onNavigateFlywheel fires on click.",
+            "id": "wire-indicator-into-appchrome.ac2",
+            "title": "Clicking the indicator navigates to /flywheel and then shows the 'status' tab with the openQuestions section scrolled into view",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wire-into-appbar.ac3",
-            "title": "npm run typecheck passes with the new required AppChromeProps.onNavigateFlywheel supplied from App.tsx (no missing-prop or unused-prop errors).",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "flywheel-reveal-handler",
-        "title": "Reveal the openQuestions section on the Flywheel page when activated",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-29T13:03:04.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2168",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "traces": [
-            "FR-2"
-          ]
-        },
-        "narrative": {
-          "Action": "Make the Flywheel page act on the reveal signal. In src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx, give the Section helper (FlywheelStatusDetails.tsx:113) an optional `id?: string` prop applied to its <section>, and pass id=\"flywheel-open-questions\" to the 'Open Questions for the Next Tick' Section (FlywheelStatusDetails.tsx:271). In src/dashboard/frontend/src/pages/FlywheelPage.tsx add a useEffect that: (a) on mount, if consumePendingReveal() from lib/flywheelReveal.ts is true, performs reveal; and (b) registers subscribeRevealOpenQuestions(reveal) and returns its unsubscribe (warm case). `reveal` = setActiveTab('status') then requestAnimationFrame(() => document.getElementById('flywheel-open-questions')?.scrollIntoView({ block: 'nearest' })) (hazard H2 — scroll after the status tab renders). Cold navigation already shows the status tab by default (FlywheelPage.tsx:294); this adds the forced-status-tab + scroll for completeness and the warm case."
-        },
-        "items": [
-          {
-            "id": "flywheel-reveal-handler.ac1",
-            "title": "The 'Open Questions for the Next Tick' section renders with id=\"flywheel-open-questions\"; asserted in FlywheelStatusDetails.test.tsx.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "flywheel-reveal-handler.ac2",
-            "title": "Given a pending reveal (consumePendingReveal() true at mount), FlywheelPage sets its left tab to 'status' so the openQuestions list is rendered; asserted by a FlywheelPage test that primes the signal then mounts the page.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "flywheel-reveal-handler.ac3",
-            "title": "Given FlywheelPage is mounted on a non-status left tab, when requestRevealOpenQuestions() runs then the page shows the 'status' left tab and renders the openQuestions list.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "flywheel-reveal-handler.ac4",
-            "title": "When FlywheelPage unmounts it runs the unsubscribe returned from the effect, so a later requestRevealOpenQuestions() throws nothing and updates no unmounted state.",
+            "id": "wire-indicator-into-appchrome.ac3",
+            "title": "`npm test` (root + frontend) passes with no new failures; `npm run typecheck` exits 0 and `npm run lint` exits 0",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -279,24 +311,30 @@
     ],
     "edges": [
       {
-        "from": "reveal-signal",
+        "from": "reveal-signal-module",
         "to": "open-questions-indicator",
         "type": "blocks"
       },
       {
-        "from": "reveal-signal",
-        "to": "flywheel-reveal-handler",
+        "from": "reveal-signal-module",
+        "to": "flywheel-page-consume-reveal",
+        "type": "blocks"
+      },
+      {
+        "from": "open-questions-anchor",
+        "to": "flywheel-page-consume-reveal",
         "type": "blocks"
       },
       {
         "from": "open-questions-indicator",
-        "to": "wire-into-appbar",
+        "to": "wire-indicator-into-appchrome",
         "type": "blocks"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-29-PAN-2168-feat-dashboard-global-navigation-affordance-to-flywheel-openquestions-from-anywhere.vbrief.json"
-    }
+      "canonicalFilename": "2026-06-29-PAN-2168-global-navigation-affordance-to-flywheel-openquestions-from-anywhere.vbrief.json"
+    },
+    "sequence": 1
   },
   "status": "proposed"
 }
