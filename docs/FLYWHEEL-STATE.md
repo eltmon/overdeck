@@ -3149,3 +3149,93 @@ Main GREEN unchanged `fde45b7e3`. No operator action since tick 5.
 - Parked: PAN-806, PAN-1864.
 
 **Two operator actions unblock everything remaining:** (1) `pan reload`; (2) rebase the trio (or land PAN-2108).
+
+## RUN-37 (2026-06-29) — wedge-recovery recipe + findings
+
+**Recurring wedge pattern + recovery recipe (reusable).** PAN-1982 was wedged
+across three coupled failures at once: (1) review convoy `2-active/0-done` that
+never synthesizes (PAN-1861/PAN-1864 class), (2) a *troubled* `inspect-pan-1982-workspace`
+agent (3 consecutive failures) that the deacon was *skipping* (`handleAgentStoppedEvent: ... skipped — troubled`),
+and (3) the work agent itself flagged troubled with **0 failures** (spurious, inherited
+from the wedge). The recovery that worked without any forbidden command:
+1. `pan review reset <id>` — clears the wedged convoy + troubled inspect sub-agent.
+2. `pan untroubled <id>` — clears the *spurious* troubled gate (0 failures) on the
+   work agent so the deacon stops skipping it and can resume/nudge it.
+3. The work agent (still alive in tmux, just idle) then gets re-engaged by the
+   deacon patrol. `pan start` refuses ("already running") — do NOT try to force it;
+   clearing the troubled gate is the actual unblock.
+Note: `pan review request <id>` will still abort on a dirty worktree — see PAN-2167.
+
+**PAN-2167 filed** — pipeline-written `.pan/records/<id>.json` + `.pan/test/result.json`
+sit dirty in the workspace and trip `pan review request`'s clean-tree gate, so an
+otherwise-ready issue can't re-enter review. The review-request check should ignore
+pipeline-owned paths (or the writers should commit atomically). Discovered on PAN-1982,
+which was also in a `chore: checkpoint conflict state` rebase loop on PR #2112.
+
+**PAN-2086 kimi 100%-ctx deadlock not auto-recovered.** Work agent (kimi-k2.7-code)
+stuck at 100% ctx for 9h, deacon nudge fired but no respawn — despite PAN-1865
+(kimi context-overflow detection → deacon auto-recovery) being CLOSED. Strong
+suspicion the running dashboard server is on **stale dist** (pre-PAN-1865). Flywheel
+can't restart the server; surfaced as openQuestion + investigate. If this recurs,
+check whether `dist/` predates the PAN-1865 merge and a `pan reload` is needed.
+
+**MIN per-project UAT gate overrides the global flywheel toggle.** Even with
+`require_uat_before_merge=false` globally, `POST /api/flywheel/auto-merge/schedule`
+for MIN-831/MIN-846 returns `"UAT is still required before merge"`. MYN keeps its
+own UAT requirement; those merges genuinely await operator UAT, not a flywheel bug.
+
+**Planning agents self-close already-fixed issues.** planning-pan-1506 and
+planning-pan-1510 concluded their bugs were already fixed and the issues are now
+CLOSED — but the planning tmux sessions linger (deacon not reaping). Harmless;
+drop from cohort.
+
+### RUN-37 PAN-2086 kill+respawn (operator-authorized) — chain of findings
+
+Operator authorized kill+respawn of the frozen kimi agent. The respawn surfaced a
+cascade worth remembering:
+1. `pan kill pan-2086` cleared the agent + its troubled inspect sub-agents + Docker stack.
+2. `pan start pan-2086` → troubled "kickoff delivery failed" (1 failure) immediately
+   after kill — `pan untroubled` + retry cleared it (transient post-kill timing).
+3. Retry → "resumable Claude session" guard. For a context-overflow respawn you MUST
+   use `pan start <id> --fresh` (a plain resume reloads the 100%-ctx session and
+   re-wedges instantly). `pan resume` is the wrong tool here (and forbidden for flywheel).
+4. `--fresh` (Docker path) failed: workspace **init container lacks Python**, so
+   node-gyp can't rebuild `better-sqlite3@11.10.0` → init exits 1 → stack unhealthy.
+   Filed **PAN-2170**. Workaround: `pan start <id> --fresh --host --yes` runs on the
+   host worktree, bypassing the broken container. Agent came up clean (ctx 0%, 9 beads).
+
+**Reusable recipe for a context-frozen agent:** `pan kill <id>` → (if troubled)
+`pan untroubled <id>` → `pan start <id> --fresh` → if Docker init fails on node-gyp/Python,
+add `--host --yes`. Never `pan resume` an overflow-frozen session.
+
+**Stale-dist confirmation method (reusable):** compare the running server PID's start
+time (`ps -o lstart`) against the fix commit date (`git log -1 --format=%ci <sha>`) and
+the dist build mtime, and grep the actual bundle the code lands in (deacon logic is in
+`dist/dashboard/agents-*.js`, NOT `server.js`). Beware container peers (cgroup: docker,
+OVERDECK_DISABLE_DEACON=1) — `pgrep | head` can grab one and mislead. Confirm the host
+server via `ss -ltnp | grep :3011` + `/proc/<pid>/cgroup`.
+
+### RUN-37 tick 4 — RED MAIN from PAN-2160 (meta: a flywheel-system fix broke main)
+
+main CI `test` job went red on `75e1c4f9` = PAN-2160 ("orchestrator must auto-relaunch
+on death regardless of OVERDECK_NO_RESUME"). The **source change is correct and
+intended** (`src/lib/cloister/stuck-remediation.ts:180,225` — NO_RESUME deliberately not
+consulted for the orchestrator; it gates work-agents only), but PAN-2160 left **2 stale
+tests** in `src/lib/cloister/__tests__/stuck-remediation.test.ts`:
+- `:524 does not auto-relaunch ... under OVERDECK_NO_RESUME` — now backwards (must assert
+  it DOES relaunch under NO_RESUME).
+- `:472 pauses and marks troubled at stage 3 (95 min idle)` — action string drifted.
+Filed **PAN-2171** (blocks-main, critical) and **struck** it (test-only fix, source is the
+contract). Lesson: red-main triage must diff the failing test's expectation against the
+*intended* behavior of the merged change before "fixing" — here the fix is to the TESTS,
+not the source. PAN-2160 should have updated its own tests (a review/verification gap:
+the verification gate let a PR merge that red-mains on a test file the PR's own change
+invalidated).
+
+**Sequencing rule reinforced:** while main is RED, do NOT churn feature reviews/tests
+(PAN-2063's restarted review failed this tick) — they inherit the red-main `test` failure.
+Land the red-main fix first; the gate is empty until then regardless.
+
+**Other tick-4 state:** PAN-1982 work agent re-engaged (last tick's review reset +
+untroubled worked) and is actively resolving PR #2112's merge conflict. PAN-2086 fresh
+--host respawn alive but ctx 0%/out 0 — watch for host-mode kickoff-delivery failure.
