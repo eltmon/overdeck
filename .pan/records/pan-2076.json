@@ -22,26 +22,21 @@
       "reason": "feedback",
       "note": "[2026-06-29T16:33Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T16:33:49.419Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T16:33:39Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2076\n\nBoot hold/per-agent decisions are bypassed by liveness reconciliation\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2076 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T16:33:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2076\n\nBoot hold/per-agent decisions are bypassed by liveness reconciliation\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2076 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T16:39:25.195Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T16:40:06.366Z"
     }
   ],
+  "feedback": [],
   "created": "2026-06-29T14:57:37.612Z",
-  "updated": "2026-06-29T16:33:54.599Z",
+  "updated": "2026-06-29T16:40:10.628Z",
   "pipeline": {
     "issueId": "PAN-2076",
     "reviewStatus": "reviewing",
@@ -49,10 +44,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T16:33:54.539Z",
-    "reviewNotes": "Boot hold/per-agent decisions are bypassed by liveness reconciliation",
+    "updatedAt": "2026-06-29T16:40:10.585Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2175",
-    "lastVerifiedCommit": "8776b61da156fc122396e41b758b1ad1a44c6870"
+    "lastVerifiedCommit": "24afe063e482e4ecc4ff8c222862c91568788a02"
   },
   "closeOut": {
     "usage": {
@@ -90,7 +85,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.435896,
-        "pricingAsOf": "2026-06-29T16:33:54.586Z"
+        "pricingAsOf": "2026-06-29T16:40:10.627Z"
       }
     },
     "merges": [
