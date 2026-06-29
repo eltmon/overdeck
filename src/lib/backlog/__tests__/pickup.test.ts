@@ -10,6 +10,7 @@ import {
   computeCohort,
   computeStats,
   pickableQueue,
+  selectNeedsPlanning,
   selectUnblockTargets,
   effortOf,
   type ClassifyLookups,
@@ -194,6 +195,57 @@ describe('selectUnblockTargets', () => {
     const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 }), node({ issue: 'C', rank: 3 })];
     const lk = lookups({ A: { labels: ['blocks-main'] }, B: { labels: ['blocks-main'] }, C: { labels: ['blocks-main'] } });
     expect(selectUnblockTargets(nodes, lk, { cap: 1 }).map((t) => t.issue)).toEqual(['A']);
+  });
+});
+
+describe('selectNeedsPlanning', () => {
+  it('returns ready-but-unplanned issues in rank order', () => {
+    const nodes = [
+      node({ issue: 'LOW', rank: 5 }),
+      node({ issue: 'HIGH', rank: 2 }),
+      node({ issue: 'PLANNED', rank: 1 }),
+    ];
+    const lk = lookups({
+      LOW: { labels: ['ready'], planned: false },
+      HIGH: { labels: ['ready'], planned: false },
+      PLANNED: { labels: ['ready'], planned: true },
+    });
+
+    expect(selectNeedsPlanning(nodes, lk).map((t) => t.issue)).toEqual(['HIGH', 'LOW']);
+  });
+
+  it('excludes planned, parked, vetoed, objected, and in-pipeline issues', () => {
+    const nodes = [
+      node({ issue: 'PLANNED', rank: 1 }),
+      node({ issue: 'PARKED', rank: 2 }),
+      node({ issue: 'VETOED', rank: 3 }),
+      node({ issue: 'OBJECTED', rank: 4 }),
+      node({ issue: 'FLIGHT', rank: 5 }),
+    ];
+    const lk = lookups({
+      PLANNED: { labels: ['ready'], planned: true },
+      PARKED: { labels: ['ready', 'parked'] },
+      VETOED: { labels: ['ready', 'vetoed'] },
+      OBJECTED: { labels: ['ready', 'objection'] },
+      FLIGHT: { labels: ['ready'], inPipeline: true },
+    });
+
+    expect(selectNeedsPlanning(nodes, lk)).toEqual([]);
+  });
+
+  it('respects the cap and defaults to two items', () => {
+    const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 }), node({ issue: 'C', rank: 3 })];
+    const lk = lookups({ A: { labels: ['ready'] }, B: { labels: ['ready'] }, C: { labels: ['ready'] } });
+
+    expect(selectNeedsPlanning(nodes, lk).map((t) => t.issue)).toEqual(['A', 'B']);
+    expect(selectNeedsPlanning(nodes, lk, { cap: 1 }).map((t) => t.issue)).toEqual(['A']);
+  });
+
+  it('returns an empty array when no issue needs planning', () => {
+    const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 })];
+    const lk = lookups({ A: { labels: ['ready'], planned: true }, B: { labels: [] } });
+
+    expect(selectNeedsPlanning(nodes, lk)).toEqual([]);
   });
 });
 
