@@ -61,16 +61,16 @@
     }
   ],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-06-29T21:25:14.762Z",
+  "updated": "2026-06-29T21:26:41.702Z",
   "pipeline": {
     "issueId": "PAN-2146",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "verifying",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:25:03.861Z",
+    "updatedAt": "2026-06-29T21:26:41.588Z",
     "reviewNotes": "Workspace is detached and has unresolved conflict in .pan/records/pan-2146.json",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -143,7 +143,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.986153,
-        "pricingAsOf": "2026-06-29T21:25:03.893Z"
+        "pricingAsOf": "2026-06-29T21:26:41.685Z"
       }
     },
     "merges": [
