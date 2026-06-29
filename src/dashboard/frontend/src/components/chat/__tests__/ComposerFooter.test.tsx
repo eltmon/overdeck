@@ -57,7 +57,9 @@ vi.mock('../defaultConversationModel', () => ({
 }));
 
 vi.mock('../EffortPicker', () => ({
-  EffortPicker: ({ value }: { value: string }) => <div data-testid="effort-picker">{value}</div>,
+  EffortPicker: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
+    <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{value}</button>
+  ),
   loadStoredEffort: () => 'medium',
 }));
 
@@ -71,6 +73,8 @@ vi.mock('../VoiceWidget', () => ({
 vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
+    success: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
@@ -479,6 +483,87 @@ describe('ComposerFooter image attachments', () => {
     resolveSend?.();
     await waitFor(() => {
       expect(screen.getByTestId('composer-editor')).not.toBeDisabled();
+    });
+  });
+
+  it('includes the selected pi delivery mode in message sends', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+    const piConversation = { ...conversation, harness: 'pi' as const };
+
+    render(<ComposerFooter conversation={piConversation} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+
+    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'hello pi', deliverAs: 'follow_up' }),
+      }),
+    );
+  });
+
+  it('omits pi delivery mode for idle sends so the server uses prompt delivery', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+    const piConversation = { ...conversation, harness: 'pi' as const };
+
+    render(<ComposerFooter conversation={piConversation} onSendAcknowledged={onSendAcknowledged} />);
+
+    expect(screen.getByLabelText('Pi delivery mode')).toHaveValue('auto');
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello pi' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('hello pi'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'hello pi' }),
+      }),
+    );
+  });
+
+  it('posts live thinking-level changes for pi conversations', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const piConversation = { ...conversation, harness: 'ohmypi' as const };
+
+    render(<ComposerFooter conversation={piConversation} />);
+
+    fireEvent.click(screen.getByTestId('effort-picker'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/thinking-level',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ level: 'high' }),
+        }),
+      );
+    });
+  });
+
+  it('posts compact requests for pi conversations', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const piConversation = { ...conversation, harness: 'pi' as const };
+
+    render(<ComposerFooter conversation={piConversation} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compact context' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/compact',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
   });
 

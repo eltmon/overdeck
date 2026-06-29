@@ -54,6 +54,12 @@ interface UatGenerationPayload {
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
+interface MergeBackendStatus {
+  available: boolean;
+  mode: 'app' | 'gh-cli' | 'none';
+  detail: string;
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
@@ -95,9 +101,15 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
     queryFn: () => fetchJson<MergeQueueItem[]>('/api/flywheel/merge-queue'),
     refetchInterval: active ? 15000 : false,
   });
+  const mergeBackendQuery = useQuery({
+    queryKey: ['flywheel-merge-backend'],
+    queryFn: () => fetchJson<MergeBackendStatus>('/api/flywheel/merge-backend'),
+    refetchInterval: active ? 15000 : false,
+  });
 
   const generations = Array.isArray(generationsQuery.data) ? generationsQuery.data : [];
   const mergeQueue = Array.isArray(mergeQueueQuery.data) ? mergeQueueQuery.data : [];
+  const mergeBackendUnavailable = mergeBackendQuery.data?.available === false;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['flywheel-uat-generations'] });
@@ -237,6 +249,11 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
       ariaLabel="UAT batches"
       count={featureCount > 0 ? `${featureCount} feature${featureCount === 1 ? '' : 's'}${batchCount > 0 ? ` · ${batchCount} batch${batchCount === 1 ? '' : 'es'}` : ''}` : undefined}
     >
+      {mergeBackendUnavailable && (
+        <div className="mb-2 rounded border border-border bg-muted/40 px-2 py-1.5 text-[11px] leading-snug text-muted-foreground">
+          <span className="font-semibold text-foreground">Merge backend unavailable</span> — autonomous merge disabled until GitHub App credentials or gh CLI authentication are configured.
+        </div>
+      )}
       {empty ? (
         <p className="px-1 py-1.5 text-xs text-muted-foreground">
           No features are ready to merge. When work passes review and tests, it lines up here and a test batch assembles automatically.

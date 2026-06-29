@@ -129,7 +129,7 @@ vi.mock('../../../../../src/lib/review-status.js', () => ({
 }));
 
 import { clearReviewStatus, getReviewStatusSync, setReviewStatusSync } from '../../../../../src/lib/review-status.js';
-import { reconcileGitHubMergeStatus } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { reconcileGitHubMergeStatus } from '../../../../../src/dashboard/server/routes/workspaces/merge-ops.js';
 
 describe('reconcileGitHubMergeStatus', () => {
   beforeEach(() => {

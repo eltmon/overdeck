@@ -57,6 +57,7 @@ import {
   type ScheduleAutoMergeInput,
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
+import { getMergeBackendRoute } from './flywheel-merge-backend.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -348,7 +349,6 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
   return { status: 200, body: result.entry };
 }
-
 export function getPendingAutoMergePayload(): PendingAutoMerge[] {
   return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
 }
@@ -629,7 +629,7 @@ async function defaultGetOrderedIssueIds(): Promise<string[]> {
 }
 
 async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const { triggerMerge } = await import('./workspaces.js');
+  const { triggerMerge } = await import('./workspaces/merge-ops.js');
   const r = await triggerMerge(issueId);
   return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
 }
@@ -649,7 +649,6 @@ export async function postFlywheelMergeNextPayload(payload: unknown, deps: Merge
   const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
   return { status: 200, body: { outcomes } };
 }
-
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',
@@ -1004,6 +1003,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getPendingAutoMergeRoute,
   getAutoMergeProblemsRoute,
   getMergeBlockersRoute,
+  getMergeBackendRoute,
   postAutoMergeScheduleRoute,
   postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,

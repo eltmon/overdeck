@@ -7,7 +7,7 @@ import { rm, mkdir, writeFile } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildRichPRBody } from '../workspaces.js';
+import { buildRichPRBody } from '../workspaces/merge-ops.js';
 
 vi.mock('../../../../lib/beads-query.js', () => ({
   queryBeadsForIssue: vi.fn(() => Effect.succeed({ beads: [] })),

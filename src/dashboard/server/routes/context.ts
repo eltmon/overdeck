@@ -34,6 +34,7 @@ import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context
 import { CLAUDE_DIR, getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { jsonResponse } from '../http-helpers.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
@@ -389,7 +390,7 @@ function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyM
 }
 
 async function previewForHarness(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): Promise<string> {
-  const title = harness === 'claude-code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : 'Pi';
+  const title = getHarnessBehavior(harness).displayName;
   return [
     `# Overdeck injected context preview (${title})`,
     renderLayerSections(layers, drafts, harness),

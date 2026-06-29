@@ -1,568 +1,575 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-27T02:54:51Z · model: zai/glm-5.2 · open: 552_
+_Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 
 
-| rank | issue | size | importance | condition | depends-on | why |
-|------|-------|------|------------|-----------|------------|-----|
-| 3 | PAN-1919 | M | medium | ok |  | Keystone: collapse per-issue resume/progress state into ONE git-tracked record; retire dual continue/progress. |
-| 6 | PAN-1982 | M | medium | ok |  | Revive full convoy review as configurable opt-in (quick stays default). Ready. |
-| 7 | PAN-806 | XL | critical | ok | PAN-804 | Epic B: work agents must use pan primitives (sync-main/done) for history ops — never raw git rebase/reset/stash. |
-| 8 | PAN-1864 | S | critical | ok | PAN-1861 | Review nudge fires but never synthesizes — deacon must derive synthesis DETERMINISTICALLY from on-disk reports. |
-| 11 | PAN-1510 | M | critical | ok |  | Issues filed mid-session never appear in the frontend store tree/kanban (cache not invalidated). |
-| 12 | PAN-1506 | M | critical | ok |  | Strike agents appear in /api/agents but never on the dashboard Agents page/store. |
-| 13 | PAN-1508 | M | critical | ok | PAN-1027, PAN-863 | workspaces/feature-*/ debris consumes 220GB (~⅓ of host storage); post-merge cleanup never fully runs. |
-| 16 | PAN-1456 | L | critical | ok |  | Pass-3 behavior audit handoff incomplete — fresh-context agent must finish verifying recent closes. |
-| 17 | PAN-1861 | S | critical | ok |  | Review convoy parent still wedges waiting for sub-specialist signals after PAN-1818 — blocks merge cascade. |
-| 18 | PAN-1865 | S | critical | ok |  | Kimi on claude-code harness hangs at 100% ctx ($22/agent) — CLIProxy advertises a false ~200k window. |
-| 19 | PAN-804 | XL | critical | needs-refinement |  | Epic D: archaeological audit + pre-1.0 cleanup — must execute FIRST, before Epics A/B/C, on known-good ground. |
-| 20 | PAN-1520 | L | high | ok |  | Unify 'agent awaiting input': finish AskUserQuestion + generic hooks; feed the dashboard INPUT badge. |
-| 21 | PAN-807 | XL | critical | ok | PAN-804 | Epic C: stop spawn flow destroying local state — pre-flight checks guarantee a safe workspace before start. |
-| 22 | PAN-1213 | L | high | ok |  | Synthesis→review-status bridge broken: passed PRs never reach the Awaiting-Merge page. |
-| 23 | PAN-1214 | L | high | ok |  | Dashboard crashes on UnhandledPromiseRejection when deacon pokes a not-running agent. |
-| 24 | PAN-1560 | L | high | ok |  | Re-review after a PR head moves (sync-main/rebase) doesn't re-post the required review status. |
-| 25 | PAN-1499 | M | high | ok | PAN-1454 | Substrate pattern-2: block pan done when close-out honestly defers work ('will do X') with no follow-up. |
-| 26 | PAN-1084 | M | high | ok |  | Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops. |
-| 27 | PAN-2086 | M | high | ok |  | Startup speedup: incremental pan sync (skip-when-unchanged) + traefik precheck + listen-before-merge. |
-| 28 | PAN-1557 | L | medium | ok |  | Run convoy reviewers as interactive, attachable sessions with hook-owned completion (not headless --print). |
-| 29 | PAN-955 | M | high | ok |  | Devcontainer template has no versioning — template changes never re-render existing workspaces. |
-| 30 | PAN-1193 | L | high | ok |  | Swarm slots branch independently with no file-overlap arbitration — two slots can clobber the same file. |
-| 31 | PAN-1198 | L | high | ok |  | Workspace init container's bun install doesn't populate container-node-modules; init/frontend fail. |
-| 32 | PAN-1207 | L | high | ok |  | Review sub-specialists exit cleanly but state.json stays 'running' — deacon orphans healthy reviewers. |
-| 33 | PAN-1209 | M | high | ok |  | Dashboard bead projection (40 open/0 closed) disagrees with workspace bd (opposite) after resume. |
-| 34 | PAN-1435 | M | high | needs-refinement |  | Provider API keys stored plaintext in ~/.panopticon/config.yaml — at-rest exposure. |
-| 35 | PAN-1498 | M | high | ok | PAN-1454 | Substrate pattern-1: require a live-code-path trace in review so code doesn't land in the wrong file. |
-| 36 | PAN-1618 | M | high | ok |  | Work-spawn docker-health gate has no autonomous recovery — a sick container blocks all spawns until manual fix. |
-| 37 | PAN-1698 | M | high | ok |  | main CI RED: model-count + schema-version + substrate-smoke tests failing on HEAD. |
-| 38 | PAN-2085 | L | high | needs-refinement |  | Auto-isolate project conversations in a disposable git worktree (Conductor/Cursor pattern) — stop polluting shared main. |
-| 39 | PAN-1766 | M | high | ok |  | Work agents hang on Claude Code settings-file protection prompts (class-2 scope split from PAN-1616). |
-| 40 | PAN-1770 | M | high | ok |  | pan-dir auto-commit rebase races live .pan/continues during convoy bursts — rebase-failed storms. |
-| 41 | PAN-1783 | M | high | ok | PAN-1698 | main CI RED after Command Deck redesign: resource-strip Playwright fixture failing. |
-| 42 | PAN-1915 | M | high | ok |  | API-key at-rest hardening: startup perm check + OS keychain + deprecate plaintext storage. |
-| 43 | PAN-605 | S | high | stale |  | Reconcile CLAUDE.md prompt assembly across all agent types — dead code + inconsistent composition. |
-| 44 | PAN-1226 | M | high | ok |  | [META] unified-dashboard redesign: 32 gaps vs PRD and mockups — full audit tracker. |
-| 45 | PAN-1263 | S | high | ok |  | Swarm UX: pipeline rows/IssueDrawer don't surface per-slot identity or progress. |
-| 46 | PAN-1433 | S | high | ok |  | Conversation agents can leave the host main repo stranded in an abandoned git rebase. |
-| 47 | PAN-1444 | S | high | ok | PAN-1416 | Follow-up to PAN-1416: add dashboard port lockfile + pan doctor multi-instance detection. |
-| 48 | PAN-1461 | M | high | ok |  | Conversation transcript Ctrl+F only finds currently-rendered DOM text, not the full transcript. |
-| 49 | PAN-1491 | M | medium | needs-refinement |  | Flywheel metric-aware prioritization: weight substrate-bug suggestions by which v1.0 blockers they fix (v1.0-required). |
-| 50 | PAN-1556 | S | high | ok |  | Session/activity feed drowns in review-spawn noise (~11 entries/cycle), burying conversations. |
-| 51 | PAN-262 | L | medium | stale |  | Post-merge lifecycle is fragmented across 3+ duplicated, inconsistent code paths. |
-| 52 | PAN-578 | L | high | needs-refinement |  | Security: comment mediation layer to stop prompt injection via tracker comments. |
-| 53 | PAN-1767 | M | medium | ok |  | No first-class surface for the merged-but-not-closed-out (verifying-on-main) queue — reached 21 deep. |
-| 54 | PAN-1452 | L | medium | ok |  | Sub-reviewer (correctness/security/perf) has no Restart context-menu action (only parents got it). |
-| 55 | PAN-1454 | XL | medium | ok |  | [META] Substrate audit: 31 of 80 recent closes needed action — root-cause the shipped-but-broken class. |
-| 56 | PAN-1650 | L | medium | ok |  | readyForMerge is one boolean doing two jobs — merge-gate reject vs. operator-ready, causing pain. |
-| 57 | PAN-538 | S | high | stale |  | Root Vite build occasionally doesn't regenerate the bundle on source change (stale hash). |
-| 58 | PAN-1142 | L | medium | needs-refinement |  | Extend per-role/per-conversation config to accept a reasoning-effort level (low→max). |
-| 59 | PAN-1232 | S | high | ok | PAN-1226 | IssueDrawer surface: largest bucket of PAN-1148 PRD gaps (width, scrim, animation). |
-| 60 | PAN-1234 | S | high | ok | PAN-1226 | Cross-cutting app-shell gaps from the PAN-1148 audit (6 issues across surfaces). |
-| 61 | PAN-1313 | L | medium | needs-refinement |  | Finish the src/lib Effect migration — additive bridge shipped, but the old imperative paths remain. |
-| 62 | PAN-1416 | S | high | ok |  | Canonical-path guard + remaining multi-instance/dashboard-binding safety (parent of PAN-1444). |
-| 63 | PAN-1504 | M | medium | needs-refinement |  | Codify the ad-hoc merge/commit/push hygiene check into a reusable dev skill. |
-| 64 | PAN-1681 | S | high | ok |  | In-review PRs strand at test=pending though tests pass — blocks ship→ready_for_merge. |
-| 65 | PAN-1824 | S | high | ok |  | Main CI flaky: ~5s timeouts on suites that pass locally (94/94 in 2.5s). |
-| 66 | PAN-1913 | S | medium | ok |  | Add project 'description' field + bundle config niceties (project list polish). |
-| 67 | PAN-2054 | S | high | ok |  | Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model. |
-| 68 | PAN-2065 | L | high | needs-refinement |  | Unified provider usage & headroom panel — 2026-06-26 fleet stalled 10h on a silently-exhausted z.ai plan limit. |
-| 69 | PAN-2059 | XL | high | needs-refinement |  | Epic: operator Plan→Release pickup gate + AI Objection (5th state) + Flywheel relevance-vetting. Mockups committed. |
-| 70 | PAN-1436 | L | high | ok |  | Header 'stopped' count still mis-includes some running agents (follow-up to PAN-1419). |
-| 71 | PAN-1711 | L | high | ok |  | Supervisor watchdog force-restarts the dashboard repeatedly within 45 min on health-probe noise. |
-| 72 | PAN-1769 | L | high | ok |  | Conversation message eaten by submit-time compaction after resume; retry storm risk. |
-| 73 | PAN-630 | L | medium | needs-refinement |  | Multi-tenant mode: shared instance with workspace ownership, ACLs, audit logging. |
-| 74 | PAN-1195 | L | medium | needs-refinement |  | Swarm parent is paused (stoppedByUser) while swarm runs — confusing lifecycle state. |
-| 75 | PAN-1196 | L | medium | needs-refinement |  | Every bead runs on one model regardless of complexity — no per-bead model selection. |
-| 76 | PAN-1217 | M | medium | needs-refinement |  | Requirements reviewer treats the whole AC list as in-scope for every PR — coverage-matrix blowup. |
-| 77 | PAN-1218 | M | medium | needs-refinement | PAN-1124 | Bead inspection adds ~3-5 min/bead (30% blow past 10 min) — throughput tax. |
-| 78 | PAN-1219 | M | medium | needs-refinement |  | Synthesis prior-cycle SHA derivation is brittle (reads 2nd-newest review file). |
-| 79 | PAN-1246 | L | medium | needs-refinement |  | Optimize VCS diff loading (t3code pattern) — up to 98% faster diff fetch. |
-| 80 | PAN-1253 | L | medium | needs-refinement |  | Flywheel issue picker ignores dependency/graph signal — rework selection to respect edges. |
-| 81 | PAN-1254 | L | medium | needs-refinement |  | Ship: Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
-| 82 | PAN-1311 | L | medium | needs-refinement |  | Ship: Swarm: fast-track tier — skip slot dispatch for trivial mechanical items |
-| 83 | PAN-1357 | L | medium | needs-refinement |  | Ship: Template conversations: load curated skill bundles into a single conversation |
-| 84 | PAN-1424 | L | medium | needs-refinement | PAN-1122 | Ship: Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 85 | PAN-1497 | M | medium | needs-refinement |  | Ship: emit TTS announcements on lifecycle events (start, pause, resume, report) |
-| 86 | PAN-1525 | L | medium | ok |  | Ship: Composer autocomplete: expose all CLI args for every pan command |
-| 87 | PAN-1538 | L | medium | ok |  | Ship: Unblock Pi source forks — remove API guard, verify transcript parsers |
-| 88 | PAN-1558 | L | medium | ok |  | Ship: Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 89 | PAN-1561 | L | medium | ok |  | Ship: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 90 | PAN-1578 | L | medium | ok |  | Ship: GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 91 | PAN-1588 | L | medium | ok |  | Ship: PAN-800 Phase 5: eliminate parseThinkingDuration / capture-pane stuck detection |
-| 92 | PAN-1594 | L | medium | ok |  | Ship: Hook-driven agent readiness (kill prompt-polling + permission-mode coupling) |
-| 93 | PAN-1889 | M | medium | ok |  | Ship: retention/compaction policy for docs/FLYWHEEL-STATE.md — it grows unbounded and is read whole every run |
-| 94 | PAN-2027 | L | medium | ok |  | Ship: ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
-| 95 | PAN-49 | S | high | stale |  | Fix: Fix CloisterService tests that require real runtime |
-| 96 | PAN-113 | S | high | stale |  | Fix: Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 97 | PAN-244 | S | high | stale |  | Fix: Deep-wipe leaves local branch and worktree metadata behind |
-| 98 | PAN-245 | S | high | stale |  | Fix: Ctrl+C aborts planning dialog instead of copying text |
-| 99 | PAN-247 | S | high | stale |  | Fix: Deacon has no backoff or escalation for repeated specialist startup failures |
-| 100 | PAN-304 | S | high | stale |  | Fix: closeLinearDirect returns stepOk even when state update never happens |
-| 101 | PAN-321 | S | high | stale |  | Fix: Ephemeral merge specialist fails silently for polyrepo MYN projects |
-| 102 | PAN-324 | S | high | stale |  | Fix: Agent detail pane missing Merge/Approve button |
-| 103 | PAN-334 | S | high | stale |  | Fix: Dashboard server has no duplicate-process protection — zombie instances cause 502 |
-| 104 | PAN-673 | S | high | stale |  | Fix: virtualizer inline ref causes blank conversation page on large message lists |
-| 105 | PAN-681 | S | high | stale |  | Fix: Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 106 | PAN-886 | S | high | ok |  | Fix: pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 107 | PAN-890 | S | high | ok |  | Fix: Conflict-resolver agent merges stale main snapshot and never pushes |
-| 108 | PAN-899 | S | high | ok |  | Fix: Agent CLI commands fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE |
-| 109 | PAN-900 | S | high | ok |  | Fix: Trust devroot for conversations + atomic .claude.json writes |
-| 110 | PAN-928 | S | high | ok |  | Fix: verification-runner: polyrepo workspaces fail at sync-target-branch |
-| 111 | PAN-929 | S | high | ok |  | Fix: review-run: polyrepo workspaces detect overlay repo instead of code repos |
-| 112 | PAN-932 | S | high | ok |  | Fix: pan done: polyrepo uncommitted changes check + existing MR handling |
-| 113 | PAN-933 | S | high | ok |  | Fix: Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 114 | PAN-1027 | S | high | ok |  | Fix: Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
-| 115 | PAN-1038 | S | high | ok |  | Fix: Conversation diff panel always empty: conv.claudeSessionId is null for all conversations |
-| 116 | PAN-1042 | S | high | ok |  | Fix: cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 117 | PAN-1068 | M | high | ok |  | Fix: PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 118 | PAN-1113 | S | high | ok |  | Fix: Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 119 | PAN-1128 | M | high | ok |  | Fix: Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 120 | PAN-1129 | S | high | ok |  | Fix: Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 121 | PAN-1130 | M | high | ok |  | Fix: Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 122 | PAN-1131 | M | high | ok |  | Fix: Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle') |
-| 123 | PAN-1149 | S | high | ok |  | Fix: v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 124 | PAN-1150 | M | high | ok |  | Fix: Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 125 | PAN-1173 | S | high | ok |  | Fix: pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 126 | PAN-1227 | S | high | ok |  | Fix: Substrate: bead can be closed without delivering the work — add per-bead delivery check in pan done |
-| 127 | PAN-1240 | S | high | ok |  | Fix: Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
-| 128 | PAN-1243 | S | high | ok |  | Fix: pan admin hooks install: resolver fails outside repo CWD (auto-config breaks flywheel resume) |
-| 129 | PAN-1247 | S | high | ok |  | Fix: Substrate: deacon orphan-test recovery loops dispatch_failed forever on an unhealthy workspace docker stack |
-| 130 | PAN-1258 | S | high | ok |  | Fix: Swarm slot spawn hangs silently before writeLauncherScriptAtomic when model=kimi-k2.6 |
-| 131 | PAN-1330 | S | high | ok |  | Fix: CLI cannot address planning-*/specialist-* sessions — pan tell/pan kill hard-code 'agent-' prefix; no 'pan plan abort' |
-| 132 | PAN-1336 | S | high | ok |  | Fix: Swarm: pan swarm --auto-advance cannot advance — no slot-PR merger, slots never self-terminate |
-| 133 | PAN-1386 | S | high | ok |  | Fix: Flywheel orchestrator never emits status snapshots — dashboard 'flywheel' pane stays blank during an active run |
-| 134 | PAN-1392 | S | high | ok |  | Fix: pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
-| 135 | PAN-1434 | S | high | ok |  | Fix: conv-find.py reports session_file: N/A for newer conversation records (wrong column) |
-| 136 | PAN-1438 | S | high | ok |  | Fix: pan flywheel start launcher process orphans when orchestrator dies externally |
-| 137 | PAN-1439 | S | high | ok |  | Fix: Recover conv-2084's in-progress PANOPTICON_PROJECT_ROOT env var work |
-| 138 | PAN-1440 | S | high | ok |  | Fix: Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
-| 139 | PAN-1445 | S | high | ok |  | Fix: PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 140 | PAN-1446 | S | high | ok |  | Fix: PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 141 | PAN-1447 | S | high | ok |  | Fix: PAN-1194 follow-up: restore failed-merge slot UI deleted by sibling PAN-1148 merge |
-| 142 | PAN-1449 | S | high | ok |  | Fix: PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
-| 143 | PAN-1472 | S | high | ok |  | Fix: Swarm inspect agents emit pan tell to parent agent ID — fails when only slot agents exist |
-| 144 | PAN-1530 | S | high | ok |  | Fix: Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 145 | PAN-1559 | S | high | ok |  | Fix: Orphaned inspect sessions: live tmux panes with no state.json escape all reapers |
-| 146 | PAN-1564 | S | high | ok |  | Fix: Pi extension path + dashboard server spawn both depend on launch cwd (fix: resolve against packageRoot + pin spawn cwd) |
-| 147 | PAN-1565 | S | high | ok |  | Fix: Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 148 | PAN-1570 | S | high | ok |  | Fix: Cost recorder silently dropped ALL cost events since 2026-05-21 (Effect-migration regression) |
-| 149 | PAN-1571 | S | high | ok |  | Fix: Large multi-line pastes (handoff docs) land unsubmitted — paste/submit verification is blind to Claude's collapsed "[Pasted text +N... |
-| 150 | PAN-1582 | S | high | ok |  | Fix: Handoff fork falls back to summary: external authoring session stalls on Write permission |
-| 151 | PAN-1624 | M | high | ok |  | Fix: pan handoff --author external: authored doc is socket_write-ten but never submitted — successor sits at empty welcome screen |
-| 152 | PAN-1637 | S | high | ok |  | Fix: Conversation resume reattaches to a keep-alive corpse (no harness-liveness probe) |
-| 153 | PAN-1638 | S | high | ok |  | Fix: Conversation DB status stays 'active' after the harness process dies |
-| 154 | PAN-1652 | S | high | ok |  | Fix: Conversation title regeneration 500s on large transcripts — claude title invocation times out at 30s |
-| 155 | PAN-1673 | S | high | ok |  | Fix: Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 156 | PAN-1674 | S | high | ok |  | Fix: TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC |
-| 157 | PAN-1775 | M | medium | ok |  | remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
-| 158 | PAN-2075 | XL | high | needs-refinement |  | [EPIC] Boot Reconciliation + Operator Inbox: informed per-agent boot decisions + durable notification spine (local+remote). |
-| 159 | PAN-2079 | L | high | needs-refinement |  | Operator Inbox: durable server-side queue + in-dashboard surface — the notification spine every producer posts to. |
-| 160 | PAN-1718 | S | high | ok |  | Fix: Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes |
-| 161 | PAN-1722 | S | high | ok |  | Fix: Awareness rail activity entries don't survive page load — snapshot doesn't seed recentActivity, only live events accumulate |
-| 162 | PAN-1781 | S | high | ok |  | Fix: Context-overflow recovery: claude --resume bypasses panopticon-native compact boundaries (~50% of the time) — compaction is a silent... |
-| 163 | PAN-2077 | L | high | needs-refinement | PAN-1775 | One substrate-complete reconciliation inventory (local tmux + remote Fly) the dashboard and CLI both consume. |
-| 164 | PAN-2076 | L | medium | needs-refinement | PAN-2077, PAN-2079 | Boot Reconciliation dashboard surface: informed per-agent Resume/Freeze/Kill replacing the all-or-nothing banner. |
-| 165 | PAN-1793 | M | high | ok |  | Fix: pan handoff kickoff message is not delivered to pi-harness conversations |
-| 166 | PAN-1795 | S | high | ok |  | Fix: Codebase map bootstrapped in planning worktree is never promoted to main (PAN-1788 WI-6 wiring gap) |
-| 167 | PAN-1816 | S | high | ok |  | Fix: Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag +... |
-| 168 | PAN-1817 | S | high | ok |  | Fix: Linear API quota exhausted by IssueDataService polling (2500/hr ceiling hit, 84+ poll errors) — regression of the pre-safeguard trac... |
-| 169 | PAN-2080 | M | medium | needs-refinement | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) for offline reach; fast-follow to the inbox spine. |
-| 170 | PAN-1828 | S | high | ok |  | Fix: Conversation fork/handoff harness defaults ignore source conversation harness — silent claude-code coercion |
-| 171 | PAN-1830 | M | high | ok |  | Fix: Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
-| 172 | PAN-2078 | M | medium | needs-refinement | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all/--select/--freeze/--kill-remote. |
-| 173 | PAN-2084 | L | medium | needs-refinement | PAN-2085 | Auto-create lightweight conversation worktrees (conv/<slug> branch, fetch-first, bun install only). |
-| 174 | PAN-1897 | M | high | ok |  | Fix: pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error) |
-| 175 | PAN-1900 | S | high | ok |  | Fix: UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle (3 for 0614) |
-| 176 | PAN-1912 | S | high | ok |  | Fix: Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 177 | PAN-1776 | M | medium | ok |  | Ship: hot-updatable delivery path — version-stamped supervisors, rolling refresh, and dumb-shim primitives with server-side delivery logic |
-| 178 | PAN-1791 | M | medium | ok |  | Ship: Tiered execution: difficulty-routed bead dispatch + event-driven supervisor review (standing tier agents with plan-filtered commit... |
-| 179 | PAN-1852 | M | medium | ok |  | Ship: Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 180 | PAN-1862 | M | medium | ok |  | Ship: cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review |
-| 181 | PAN-608 | M | medium | stale |  | Ship: Integrate Destructive Command Guard (dcg) with configurable settings |
-| 182 | PAN-783 | M | medium | needs-refinement |  | Ship: Agents Page Redesign — Unified Multi-View Experience |
-| 183 | PAN-947 | M | medium | needs-refinement |  | Ship: project management actions in unified sidebar |
-| 184 | PAN-1102 | M | medium | needs-refinement |  | Ship: real-time notification + interactive prompts when agent awaits user input |
-| 185 | PAN-1164 | M | medium | needs-refinement |  | Ship: Push diff summary updates over /ws/rpc instead of 5s polling |
-| 186 | PAN-1488 | M | medium | needs-refinement |  | Ship: add required_pull_request_reviews to main branch protection |
-| 187 | PAN-1577 | M | medium | ok |  | Ship: Move a conversation to a different project (CLI + drag/drop + menu action) |
-| 188 | PAN-1610 | M | medium | ok |  | Ship: Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer) |
-| 189 | PAN-813 | M | medium | ok |  | Add regression test for /api/review/:issueId/reset preserving work-agent resolution |
-| 190 | PAN-1451 | M | medium | ok |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 191 | PAN-1544 | L | medium | ok |  | Architect: Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 192 | PAN-399 | L | medium | needs-refinement |  | Ship: Release specialist — coordinated post-merge rollout and release safety |
-| 193 | PAN-532 | L | medium | needs-refinement |  | Ship: Per-project and per-issue model overrides for workflow agent model selection |
-| 194 | PAN-817 | L | medium | needs-refinement |  | Ship: Improve planning dialog layout and content fit |
-| 195 | PAN-924 | L | medium | needs-refinement |  | Ship: Spike: evaluate GitNexus for Panopticon integration |
-| 196 | PAN-1040 | L | medium | needs-refinement |  | Ship: event-driven dispatch for inspect-agent (requiresInspection=true beads) |
-| 197 | PAN-1041 | L | medium | needs-refinement |  | Ship: Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 198 | PAN-1103 | L | medium | needs-refinement |  | Ship: surface AskUserQuestion choice options in conversation view |
-| 199 | PAN-1469 | S | medium | needs-refinement |  | Doc: End-to-end review and consolidation of all project documentation |
-| 200 | PAN-1494 | S | medium | needs-refinement |  | Doc: register docs/FLYWHEEL-VISION on panopticon-cli.com (Mintlify) — needed for public sharing |
-| 201 | PAN-1684 | S | medium | ok |  | Doc: build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 202 | PAN-2037 | L | medium | needs-refinement |  | Ship: UI: prominent 'Start work agent' CTA on all issue surfaces when agent is stopped |
-| 203 | PAN-37 | M | medium | stale |  | Ship: Support external PR selection for merge-agent |
-| 204 | PAN-38 | M | medium | stale |  | Ship: Support multiple merge agents per repository |
-| 205 | PAN-77 | M | medium | stale |  | Ship: Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 206 | PAN-111 | M | medium | stale |  | Ship: Support cross-machine planning state sync without cross-contamination |
-| 207 | PAN-243 | M | medium | stale |  | Ship: Audit dashboard actions: ensure all are available via CLI |
-| 208 | PAN-252 | M | medium | stale |  | Ship: Disable Sync with Main button when workspace is up to date |
-| 209 | PAN-255 | M | medium | stale |  | Ship: Agents lack awareness of MCP tools — sync MCP config and inject into prompts |
-| 210 | PAN-258 | M | medium | stale |  | Ship: Kanban board: fit all columns without horizontal scrolling |
-| 211 | PAN-277 | M | medium | stale |  | Ship: Session reasoning capture & collaborative PRD refinement |
-| 212 | PAN-293 | M | medium | stale |  | Ship: Project Living Memory — per-project semantic memory for agents |
-| 213 | PAN-294 | M | medium | stale |  | Ship: Surface module initialization errors as system-level, not per-issue |
-| 214 | PAN-450 | M | medium | stale |  | Ship: Adopt remaining Effect patterns — Schema, Platform, Streams, Logging, Testing |
-| 215 | PAN-452 | M | medium | stale |  | Ship: Conversation input bar — mode/permissions/workspace selectors |
-| 216 | PAN-2081 | M | medium | needs-refinement |  | Make the sequencer epic-aware: epics are containers (not auto-pickable), children stay grouped in waves/DAG. |
-| 217 | PAN-456 | M | medium | stale |  | Ship: Store Claude Code session IDs for agent resume after crash/restart |
-| 218 | PAN-463 | M | medium | stale |  | Ship: Add Qwen 3.6+ model support |
-| 219 | PAN-465 | M | medium | stale |  | Ship: Add OpenRouter as a model provider |
-| 220 | PAN-466 | M | medium | stale |  | Ship: Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 221 | PAN-531 | M | medium | stale |  | Ship: PAN: Windows Electron support (WSL2 required) |
-| 222 | PAN-546 | M | medium | stale |  | Ship: Remove claude-code-router — all providers use direct env var injection |
-| 223 | PAN-548 | M | medium | stale |  | Ship: Command Deck: preserve state across navigation including URL routing for tabs |
-| 224 | PAN-606 | M | medium | stale |  | Ship: Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 225 | PAN-607 | M | medium | stale |  | Ship: Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 226 | PAN-613 | M | medium | stale |  | Ship: Investigate thinking effort levels for agents — reduce signature corruption frequency |
-| 227 | PAN-629 | M | medium | needs-refinement |  | Ship: Workspace quotas and resource governance |
-| 228 | PAN-637 | M | medium | needs-refinement |  | Ship: Direct issue kickoff (skip planning) from dashboard UI |
-| 229 | PAN-649 | M | medium | needs-refinement |  | Ship: Render Excalidraw drawings inline in Claude Code conversations |
-| 230 | PAN-654 | M | medium | needs-refinement |  | Ship: Project Setup Wizard — Dashboard UI |
-| 231 | PAN-675 | M | medium | needs-refinement |  | Ship: Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 232 | PAN-678 | M | medium | needs-refinement |  | Ship: pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 233 | PAN-687 | M | medium | needs-refinement |  | Ship: Support OpenCode as alternative coding agent |
-| 234 | PAN-818 | M | medium | needs-refinement |  | Ship: Make summary optional when forking conversations |
-| 235 | PAN-901 | M | medium | needs-refinement |  | Ship: Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 236 | PAN-902 | M | medium | needs-refinement |  | Ship: Settings: add 'Run pan sync' button to configuration menu |
-| 237 | PAN-903 | M | medium | needs-refinement |  | Ship: Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 238 | PAN-938 | M | medium | needs-refinement |  | Ship: Fizzy visual pipeline — Kanban mirror for specialist pipeline |
-| 239 | PAN-949 | M | medium | needs-refinement |  | Ship: add conversation for project from sidebar |
-| 240 | PAN-958 | M | medium | needs-refinement |  | Ship: Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 241 | PAN-1037 | M | medium | needs-refinement |  | Ship: Retire 'planning-' tmux prefix — fold into agent-PAN-N keyed by phase |
-| 242 | PAN-1060 | M | medium | needs-refinement |  | Ship: Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 243 | PAN-1151 | M | medium | needs-refinement |  | Ship: Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 244 | PAN-1165 | M | medium | needs-refinement |  | Ship: Lightweight review path for small/trivial PRs |
-| 245 | PAN-1202 | M | medium | needs-refinement |  | Ship: Swarm: prune merged/completed slot state directories after wave converges |
-| 246 | PAN-1223 | M | medium | needs-refinement |  | Ship: Auto-update for users in the field (npm + desktop binaries) |
-| 247 | PAN-1432 | M | medium | needs-refinement |  | Ship: Merge agent leaves packages/contracts/dist stale — typecheck breaks on every fresh checkout |
-| 248 | PAN-1437 | M | medium | needs-refinement |  | Ship: pan flywheel report semantics: split read-only snapshot from run finalization |
-| 249 | PAN-1442 | M | medium | needs-refinement |  | Ship: Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 250 | PAN-1443 | M | medium | needs-refinement |  | Ship: Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
-| 251 | PAN-1453 | M | medium | needs-refinement |  | Ship: Audit: 3 cheap verifications that should ride along with merges (PAN-1170, PAN-1316, PAN-457 CLI parity) |
-| 252 | PAN-1473 | M | medium | needs-refinement |  | Ship: Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 253 | PAN-1485 | M | medium | needs-refinement |  | Ship: Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 254 | PAN-1489 | M | medium | needs-refinement |  | Ship: task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
-| 255 | PAN-1490 | M | medium | needs-refinement |  | Ship: show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 256 | PAN-1524 | M | medium | ok |  | Ship: Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 257 | PAN-1542 | M | medium | ok |  | Ship: Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 258 | PAN-1545 | M | medium | ok |  | Ship: New Terminal button — spawn ad-hoc bash sessions from sidebar / conversation / drawer / palette |
-| 259 | PAN-1623 | M | medium | ok |  | Ship: Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 260 | PAN-1653 | M | medium | ok |  | Ship: perf(docs-rag): batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 261 | PAN-1654 | M | medium | ok |  | Ship: perf(build): run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 262 | PAN-1655 | M | medium | ok |  | Ship: Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 263 | PAN-1656 | M | medium | ok |  | Ship: Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 264 | PAN-1657 | M | medium | ok |  | Ship: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 265 | PAN-1666 | XL | medium | ok |  | Ship: [EPIC] Pipeline Throughput Hardening — run many work agents safely, on-demand specialists, slot manager, fly.io scale-out |
-| 266 | PAN-1671 | M | medium | ok |  | Ship: surface pending ExitPlanMode plan as a popup modal (reuse PlanCard + /plan-action) |
-| 267 | PAN-1672 | M | medium | ok |  | Ship: GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 268 | PAN-1676 | M | medium | ok |  | Ship: harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 269 | PAN-1685 | M | medium | ok |  | Ship: Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 270 | PAN-1837 | M | medium | ok |  | Ship: Support Kimi Code as a first-class harness (Moonshot's own coding CLI) |
-| 271 | PAN-1838 | M | medium | ok |  | Ship: [research] Grok Build (xAI) coding harness — research and specify support |
-| 272 | PAN-1839 | M | medium | ok |  | Ship: Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 273 | PAN-1840 | M | medium | ok |  | Ship: Add 'pan switch <id>' — change a running agent's model/harness in one command (kill + fresh-start + re-onboard) |
-| 274 | PAN-1844 | M | medium | ok |  | Ship: Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 275 | PAN-1853 | M | medium | ok |  | Ship: Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 276 | PAN-1854 | M | medium | ok |  | Ship: Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 277 | PAN-1916 | M | medium | ok |  | Ship: configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 278 | PAN-1955 | M | medium | ok |  | Ship: Issue cockpit: move beads from a tab into a persistent right rail with a 'working now' highlight |
-| 279 | PAN-1965 | M | medium | ok |  | Ship: Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 280 | PAN-1966 | M | medium | ok |  | Ship: Single authoritative pipeline-membership resolver — one function for "what's in the pipeline" (collapse the 5 divergent views) |
-| 281 | PAN-1967 | M | medium | ok |  | Ship: Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 282 | PAN-1968 | M | medium | ok |  | Ship: Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 283 | PAN-1985 | M | medium | ok |  | Ship: Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 284 | PAN-1991 | M | medium | ok |  | Ship: Issue cockpit redesign — incremental rollout (tracking) |
-| 285 | PAN-1995 | M | medium | ok |  | Ship: infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 286 | PAN-2004 | M | medium | ok |  | Ship: Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 287 | PAN-2082 | S | medium | ok |  | Composer: a single send failure clears ALL in-flight optimistic bubbles, reopening a data-loss window. |
-| 288 | PAN-2083 | S | medium | ok |  | Composer: a failed first send leaves text in BOTH composer and retry outbox — double-send hazard. |
-| 289 | PAN-2024 | M | medium | ok |  | Ship: ohmypi: frontend Tools-toggle for conversation view |
-| 290 | PAN-2025 | M | medium | ok |  | Ship: ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 291 | PAN-2026 | M | medium | ok |  | Ship: ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 292 | PAN-2028 | M | medium | ok |  | Ship: ohmypi: per-provider cost grouping in cost dashboard |
-| 293 | PAN-2029 | M | medium | ok |  | Ship: ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
-| 294 | PAN-2030 | M | medium | ok |  | Ship: ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
-| 295 | PAN-2031 | M | medium | ok |  | Ship: ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 296 | PAN-2032 | M | medium | ok |  | Ship: ohmypi: local Ollama model as zero-cost preliminary review role |
-| 297 | PAN-2033 | M | medium | ok |  | Ship: ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
-| 298 | PAN-2034 | M | medium | ok |  | Ship: ohmypi: end-to-end test that tool-call steps render in Conversation panel |
-| 299 | PAN-2035 | M | medium | ok |  | Ship: ohmypi: GitHub Copilot subscription provider routing via omp |
-| 300 | PAN-2053 | M | medium | ok |  | Ship: Dashboard: read-only "why this model" (resolved + weighted distribution + hash) at the top of the agent Start/Restart submenu (foll... |
-| 301 | PAN-1533 | M | medium | ok |  | Fork-into-worktree from conversation branch chip |
-| 302 | PAN-1696 | M | medium | ok |  | decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view |
-| 303 | PAN-1592 | M | medium | ok |  | Composer: persist pending images + unsent/failed text across reload (draft-text parity). |
-| 304 | PAN-2005 | M | medium | ok |  | Backlog Sequencer: Pickup Forecast — visualize Flywheel pickup order (waves, lanes, planning bottleneck) |
-| 305 | PAN-2006 | M | medium | ok |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 306 | PAN-1101 | M | medium | ok |  | Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire |
-| 307 | PAN-1122 | M | medium | ok |  | Trim OpenAI model catalog to 5 supported models |
-| 308 | PAN-1547 | M | medium | ok |  | @panctl/cli npm install warns on Node <22 (engine mismatch + deprecated deps) |
-| 309 | PAN-1705 | M | medium | ok |  | conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse |
-| 310 | PAN-1706 | M | medium | ok |  | orphaned playwright-mcp headless Chromiums keep full dashboard pages open — each multiplies dashboard poll load |
-| 311 | PAN-1868 | M | medium | ok |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 312 | PAN-1896 | M | medium | ok |  | Reduce approval friction for GitHub CLI operations in managed sessions |
-| 313 | PAN-1951 | M | medium | ok |  | Inspector agent should resume a warm session instead of cold-spawning a new one per bead |
-| 314 | PAN-537 | L | medium | needs-refinement |  | show changed files diff summary after each agent response in activity view |
-| 315 | PAN-592 | L | medium | needs-refinement |  | Audit: Planning agent CLAUDE.md and STATE.md contents vs expectations |
-| 316 | PAN-633 | S | low | ok |  | Doc: Update Cloister PRD and docs index — stale relative to implementation |
-| 317 | PAN-634 | S | low | ok |  | Doc: Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 318 | PAN-646 | L | medium | needs-refinement |  | Canceled issues: add guided Recover workflow |
-| 319 | PAN-674 | S | low | ok |  | Doc: add glossary of Panopticon domain terms |
-| 320 | PAN-700 | L | medium | needs-refinement |  | Detachable terminal for conversation view — popout into OS window |
-| 321 | PAN-713 | L | medium | needs-refinement |  | test: add unit tests for doneCommand and approveCommand |
-| 322 | PAN-802 | L | medium | needs-refinement |  | Resume on conversation session forks instead of resuming |
-| 323 | PAN-826 | L | medium | needs-refinement |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
-| 324 | PAN-863 | L | medium | needs-refinement |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
-| 325 | PAN-1474 | S | low | ok |  | Doc: Add ACKNOWLEDGEMENTS doc — credit borrowed code from open-source projects (MIT/Apache 2.0) |
-| 326 | PAN-1555 | S | low | ok |  | Doc: remove/update stale swarm-runtime references after PAN-1517 |
-| 327 | PAN-1683 | S | low | ok |  | Doc: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) — strike keeps falling out... |
-| 328 | PAN-43 | M | medium | ok |  | Add Slack and email notifications for agent events |
-| 329 | PAN-44 | M | medium | ok |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 330 | PAN-47 | M | medium | ok |  | PRD files should be committed to feature branch, moved to completed/ on merge |
-| 331 | PAN-51 | M | medium | ok |  | Documentation: Clarify issue tracker options beyond Linear |
-| 332 | PAN-52 | M | medium | ok |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 333 | PAN-54 | M | medium | ok |  | Add pan test:e2e command for full workflow integration test |
-| 334 | PAN-55 | M | medium | ok |  | Track specialist costs with time period filtering |
-| 335 | PAN-104 | M | medium | ok |  | Cost alerts/notifications when spending exceeds thresholds |
-| 336 | PAN-106 | M | medium | ok |  | Cost prediction/estimation for in-progress work |
-| 337 | PAN-146 | M | medium | ok |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 338 | PAN-155 | M | medium | ok |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 339 | PAN-175 | M | medium | ok |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 340 | PAN-176 | M | medium | ok |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 341 | PAN-177 | M | medium | ok |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 342 | PAN-178 | M | medium | ok |  | PAN-178: Crash recovery with granular task checkpointing |
-| 343 | PAN-180 | M | medium | ok |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 344 | PAN-190 | M | medium | ok |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 345 | PAN-198 | M | medium | ok |  | Structured audit trail for agent actions |
-| 346 | PAN-227 | M | medium | ok |  | Phase gate validation — mid-implementation acceptance checks |
-| 347 | PAN-228 | M | medium | ok |  | Shift-left post-edit diagnostics — type check after every edit |
-| 348 | PAN-241 | M | medium | ok |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
-| 349 | PAN-249 | M | medium | ok |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 350 | PAN-265 | M | medium | ok |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 351 | PAN-271 | M | medium | ok |  | Auto-assign Linear project from project config when creating issues |
-| 352 | PAN-283 | M | medium | ok |  | Reset should sync workspace feature branch with latest main |
-| 353 | PAN-297 | M | medium | ok |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 354 | PAN-298 | M | medium | ok |  | Auto-detect package manager and runtime in workspace setup |
-| 355 | PAN-299 | M | medium | ok |  | Granular session state persistence across context compaction |
-| 356 | PAN-306 | M | medium | ok |  | merge-agent polyrepo false failures — stale refs, wrong error field, short timeout |
-| 357 | PAN-371 | M | medium | ok |  | Agents tab only shows global specialists, not per-project ephemeral ones |
-| 358 | PAN-407 | M | medium | ok |  | Run Panopticon from a main workspace for development isolation |
-| 359 | PAN-438 | M | medium | ok |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 360 | PAN-459 | M | medium | ok |  | Planning setup screen with SSE progress streaming |
-| 361 | PAN-461 | M | medium | ok |  | Deep-wipe multi-step progress dialog |
-| 362 | PAN-468 | M | medium | ok |  | Agent test conversations pollute production database — need test isolation |
-| 363 | PAN-471 | M | medium | ok |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 364 | PAN-472 | M | medium | ok |  | GET /api/costs/by-issue takes 10s — N+1 query on 353K rows × 184 issues |
-| 365 | PAN-476 | M | medium | ok |  | Agent resume with Haiku session summary instead of claude --resume |
-| 366 | PAN-480 | M | medium | ok |  | Pass --effort flag when spawning planning agents via Cloister |
-| 367 | PAN-483 | M | medium | ok |  | Unify Resume Agent UX — all entry points should show message input |
-| 368 | PAN-487 | M | medium | ok |  | VBRIEF not archived to docs/prds/completed/ after merge |
-| 369 | PAN-543 | M | medium | ok |  | Add confirmation dialog before applying Optimal Defaults |
-| 370 | PAN-552 | M | medium | ok |  | Claude Code terminals should respect app light/dark mode scheme |
-| 371 | PAN-554 | M | medium | ok |  | Add kanban board deeplinks for issue URLs |
-| 372 | PAN-564 | M | medium | ok |  | Slash menu positioned incorrectly — cut off / off-screen |
-| 373 | PAN-565 | M | medium | ok |  | Handle CTRL-Z to undo accidental conversation archival |
-| 374 | PAN-568 | M | medium | ok |  | Kanban: Show workspace and tmux session counts in stats |
-| 375 | PAN-570 | M | medium | ok |  | Show PLAN badge on costs when under a subscription/plan |
-| 376 | PAN-571 | M | medium | ok |  | Add OpenRouter credits/plan status endpoint and UI |
-| 377 | PAN-576 | M | medium | ok |  | Global / search should include conversations in addition to workspace features |
-| 378 | PAN-589 | M | medium | ok |  | Review and update commands-skills.md with all available Panopticon skills |
-| 379 | PAN-591 | M | medium | ok |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 380 | PAN-603 | M | medium | ok |  | Plan review loop with configurable reviewer model |
-| 381 | PAN-604 | M | medium | ok |  | Hide planning agent from workspace detail pane |
-| 382 | PAN-622 | M | medium | ok |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 383 | PAN-623 | M | medium | ok |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 384 | PAN-624 | M | medium | ok |  | Loop nodes: iterative agent execution with conditional termination |
-| 385 | PAN-656 | M | medium | ok |  | Docs site scroll broken: dashboard CSS leaks onto panopticon-cli.com |
-| 386 | PAN-658 | M | medium | ok |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
-| 387 | PAN-660 | M | medium | ok |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 388 | PAN-663 | M | medium | ok |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 389 | PAN-683 | M | medium | ok |  | shadow-state getPendingSyncCount test is environment-dependent |
-| 390 | PAN-701 | M | medium | ok |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 391 | PAN-702 | M | medium | ok |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 392 | PAN-709 | M | medium | ok |  | self-improving flywheel — retro agent, skill-change pipeline, audience-scoped skills, Q&A detection, autonomous daemon |
-| 393 | PAN-727 | M | medium | ok |  | Fix orphaned work-agent start handoff after planning |
-| 394 | PAN-730 | M | medium | ok |  | Add provider account telemetry for credits, balances, and usage |
-| 395 | PAN-735 | M | medium | ok |  | Settings page: review and configure overridden subagent model files |
-| 396 | PAN-736 | M | medium | ok |  | wire per-subagent model overrides from settings to Claude Code spawn env |
-| 397 | PAN-738 | M | medium | ok |  | Add right-click fork option to conversation list |
-| 398 | PAN-743 | M | medium | ok |  | Add consistent new conversation icon actions in Command Deck |
-| 399 | PAN-747 | M | medium | ok |  | Conversation list items lack accessible labels in accessibility tree |
-| 400 | PAN-749 | M | medium | ok |  | Research and borrow best features from gstack |
-| 401 | PAN-750 | M | medium | ok |  | PAN-XXX: Complete Metrics Page Redesign — Real Data, Charts, Time Filtering, and TLDR Analytics |
-| 402 | PAN-751 | M | medium | ok |  | PAN-XXX: Historical Metrics Data Persistence — Beyond the 30-Day JSONL Window |
-| 403 | PAN-752 | M | medium | ok |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 404 | PAN-762 | M | medium | ok |  | Settings: warn when model overrides target disabled providers |
-| 405 | PAN-764 | M | medium | ok |  | Add quota/usage inspector for routed model providers |
-| 406 | PAN-765 | M | medium | ok |  | Preserve trailing zeros in cost displays |
-| 407 | PAN-769 | M | medium | ok |  | Track verification/review/test phase churn over time |
-| 408 | PAN-771 | M | medium | ok |  | Investigate Vercel Sandbox execution backend support |
-| 409 | PAN-772 | M | medium | ok |  | Unify terminal stack behavior across tmux sessions |
-| 410 | PAN-773 | M | medium | ok |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 411 | PAN-774 | M | medium | ok |  | Unify launch UX and release pipeline for 1.0 — npx panctl, lazy prereqs, cross-platform desktop builds |
-| 412 | PAN-775 | M | medium | ok |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 413 | PAN-777 | M | medium | ok |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 414 | PAN-778 | M | medium | ok |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 415 | PAN-780 | M | medium | ok |  | Agent stuck in feedback loop when old feedback files exist but review has passed |
-| 416 | PAN-786 | M | medium | ok |  | Post planning Q\&A answers as issue comment |
-| 417 | PAN-790 | M | medium | ok |  | PAN-789: Eliminate remaining TanStack Query polling — complete push-first migration |
-| 418 | PAN-791 | M | medium | ok |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
-| 419 | PAN-793 | M | medium | ok |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
-| 420 | PAN-797 | M | medium | ok |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 421 | PAN-810 | M | medium | ok |  | Inspector: diagnostic UI when pipeline phase is unknown |
-| 422 | PAN-832 | M | medium | ok |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 423 | PAN-833 | M | medium | ok |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 424 | PAN-834 | M | medium | ok |  | Cleanup: legacy ~/.panopticon/heartbeats/ directory has not been written since 2026-04-22 |
-| 425 | PAN-835 | M | medium | ok |  | Workspace creation removes stale .planning/ from previous issue but doesn't commit deletion → PR diff includes 982 unrelated lines |
-| 426 | PAN-838 | M | medium | ok |  | synthesis.json contains hallucinated timestamp + sparse structure (only counts, no findings arrays) |
-| 427 | PAN-853 | M | medium | ok |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 428 | PAN-898 | M | medium | ok |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 429 | PAN-904 | M | medium | ok |  | Make AI title generation model configurable |
-| 430 | PAN-908 | M | medium | ok |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 431 | PAN-927 | M | medium | ok |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 432 | PAN-943 | M | medium | ok |  | Add memory file review and management command |
-| 433 | PAN-944 | M | medium | ok |  | Make vBRIEF the durable task graph source of truth |
-| 434 | PAN-948 | M | medium | ok |  | Implement pan scope lifecycle commands |
-| 435 | PAN-961 | M | medium | ok |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 436 | PAN-962 | M | medium | ok |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 437 | PAN-984 | M | medium | ok |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 438 | PAN-1049 | M | medium | ok |  | Spike: evaluate Tauri v2 desktop shell |
-| 439 | PAN-1051 | M | medium | ok |  | Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 440 | PAN-1063 | M | medium | ok |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 441 | PAN-1064 | M | medium | ok |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 442 | PAN-1065 | M | medium | ok |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 443 | PAN-1066 | M | medium | ok |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 444 | PAN-1115 | M | medium | ok |  | Inject observation context into agent prompts |
-| 445 | PAN-1116 | M | medium | ok |  | Memory: cross-project search mode |
-| 446 | PAN-1117 | M | medium | ok |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 447 | PAN-1121 | M | medium | ok |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 448 | PAN-1123 | M | medium | ok |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 449 | PAN-1124 | M | medium | ok |  | Decouple specs and PRDs from workspaces — write directly to main |
-| 450 | PAN-1126 | M | medium | ok |  | Integrate TLDR summaries into review context manifest |
-| 451 | PAN-1133 | M | medium | ok |  | TLDR: deacon supervision + pan doctor check + GC |
-| 452 | PAN-1135 | M | medium | ok |  | Document the hook system in docs/HOOKS.md |
-| 453 | PAN-1136 | M | medium | ok |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
-| 454 | PAN-1147 | M | medium | ok |  | Work-agent done flow stalls at 'push and re-request review' after addressing review feedback |
-| 455 | PAN-1152 | M | medium | ok |  | Remove PANOPTICON_DEV env-var persistence — derive Traefik mode from the running command |
-| 456 | PAN-1153 | M | medium | ok |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' — breaks pan dev proxy |
-| 457 | PAN-1154 | M | medium | ok |  | pan up does not kill existing port holders — startup races against orphan dashboard servers |
-| 458 | PAN-1166 | M | medium | ok |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
-| 459 | PAN-1208 | M | medium | ok |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 460 | PAN-1222 | M | medium | ok |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 461 | PAN-1238 | M | medium | ok |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
-| 462 | PAN-1242 | M | medium | ok |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
-| 463 | PAN-1244 | M | medium | ok |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 464 | PAN-1245 | M | medium | ok |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
-| 465 | PAN-1325 | M | medium | ok |  | Artifact storage model is unsafe for polyrepo projects — define a canonical "orchestration repo" |
-| 466 | PAN-1356 | M | medium | ok |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 467 | PAN-1479 | M | medium | ok |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 468 | PAN-1480 | M | medium | ok |  | TLDR: 93% bypass rate — daemon/hook integration broken |
-| 469 | PAN-1481 | M | medium | ok |  | Add cost-event telemetry for Caveman token savings |
-| 470 | PAN-1482 | M | medium | ok |  | Token spend report should aggregate data from repo, not just local machine |
-| 471 | PAN-1483 | M | medium | ok |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 472 | PAN-1493 | M | medium | ok |  | TEST: write hello.txt — probe for PAN-1200 Universal Context System verification |
-| 473 | PAN-1548 | M | medium | ok |  | npx @panctl/cli shows stale placeholder message referencing v0.8.0 |
-| 474 | PAN-1550 | M | medium | ok |  | FilesPane + BrowserPane — file browser and embedded web view implementation details |
-| 475 | PAN-1552 | M | medium | ok |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 476 | PAN-1553 | M | medium | ok |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 477 | PAN-1572 | M | medium | ok |  | Settings permission-mode can desync from resolved config — agents silently use --dangerously-skip-permissions despite 'Auto' |
-| 478 | PAN-1573 | M | medium | ok |  | Consideration for reintroducing ability to --dangerously-skip-permissions, DO NOT act on this issue |
-| 479 | PAN-1581 | M | medium | ok |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 480 | PAN-2069 | M | medium | ok |  | Caveman follow-up gaps: review-agent mode never set at spawn, no hook-execution test, missing Settings toggle. |
-| 481 | PAN-1619 | M | medium | ok |  | Bridge host Codex auth into workspace containers + honest gpt-5.5 lock reason |
-| 482 | PAN-1620 | M | medium | ok |  | Awaiting-Merge button is clickable on a conflicting/CI-failing PR (stale blockerReasons) |
-| 483 | PAN-1621 | M | medium | ok |  | pan close human-only gate over-blocks operator conv-* sessions |
-| 484 | PAN-1622 | M | medium | ok |  | pan dev restart leaves orphan dashboard servers (stale serving + multi-Deacon risk) |
-| 485 | PAN-1627 | M | medium | ok |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-approv... |
-| 486 | PAN-1640 | M | medium | ok |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 487 | PAN-1641 | M | medium | ok |  | Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness |
-| 488 | PAN-1643 | M | medium | ok |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 489 | PAN-1644 | M | medium | ok |  | Hook-driven progressive conversation titling |
-| 490 | PAN-1646 | M | medium | ok |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 491 | PAN-1667 | M | medium | ok |  | unify Agents + Resources into one issue-centric holistic view |
-| 492 | PAN-1668 | M | medium | ok |  | right-click 'restart with <model>' carries model only, never harness — can't move a review off Kimi |
-| 493 | PAN-1669 | M | medium | ok |  | restart-with-model doesn't emit a live event — issue tree shows stale model until manual refresh |
-| 494 | PAN-1670 | M | medium | ok |  | pan dev hot-reload wedges tabs on 'Reconnecting to the dashboard…' — PAN-1580 boot watchdog never fires under Vite |
-| 495 | PAN-1691 | M | medium | ok |  | conflict-aware merge train + on-demand UAT candidate — stop the rebase-cascade that strands ready PRs |
-| 496 | PAN-1708 | M | medium | ok |  | pan start CLI never flips spec plan.status proposed→approved — all 8 in-flight specs stuck at proposed, triggering reconciler misfires |
-| 497 | PAN-1710 | M | medium | ok |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 — server boots, h... |
-| 498 | PAN-1720 | M | medium | ok |  | cloister auto-resume tests fail under full parallel run, pass in isolation — test pollution reddening main |
-| 499 | PAN-1726 | M | medium | ok |  | postMergeLifecycle did not pause the merged issue's work agent — idle agent holds a work slot and throttles all pipeline dispatch (PAN-16... |
-| 500 | PAN-1728 | M | medium | ok |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch |
-| 501 | PAN-1729 | M | medium | ok |  | test(beads): beads-scoping work.md "-l {{ISSUE_ID_LOWER}}" label-filter assertion fails on main |
-| 502 | PAN-1730 | M | medium | ok |  | idle awaiting-test work sessions count against the PAN-1665 ceiling — pipeline livelocks when work pool alone exceeds total (work=7/9 obs... |
-| 503 | PAN-1734 | M | medium | ok |  | request-review-nudge remote workspace HEAD test fails on main |
-| 504 | PAN-1735 | M | medium | ok |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
-| 505 | PAN-1739 | M | medium | ok |  | Command Deck issue TREE still hides strike agents — frontend FeatureItem session-type allowlist omits 'strike' (4th allowlist miss); dead... |
-| 506 | PAN-1740 | M | medium | ok |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
-| 507 | PAN-1748 | M | medium | ok |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 508 | PAN-1750 | M | medium | ok |  | UAT assembly/conflict agent — observability surfaces + configurable harness/model (default gpt-5.5 via Codex) |
-| 509 | PAN-1751 | M | medium | ok |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 510 | PAN-1754 | M | medium | ok |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 511 | PAN-1755 | M | medium | ok |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 512 | PAN-1758 | M | medium | ok |  | ship lane cannot converge on a continuously-moving main — 37 re-dispatches for one issue; readyForMerge only ever flips via the startup r... |
-| 513 | PAN-1761 | M | medium | ok |  | conversations endpoints fetched via relative /api path — 403 inside workspace/UAT containers (session cookie is on the api-* origin) |
-| 514 | PAN-1762 | M | medium | ok |  | Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B) |
-| 515 | PAN-1773 | M | medium | ok |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 516 | PAN-1774 | M | medium | ok |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 517 | PAN-1782 | M | medium | ok |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout — decouple precompaction from the handoff author model |
-| 518 | PAN-1846 | M | medium | ok |  | unbounded log growth — deacon.log 687MB / dashboard.log 91MB, no rotation; per-agent skip line logged every 60s patrol |
-| 519 | PAN-1874 | M | medium | ok |  | per-issue override for review mode / re-review scope (extends PAN-1862 project-scope config) |
-| 520 | PAN-1878 | M | medium | ok |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 521 | PAN-1894 | M | medium | ok |  | Show UAT stack startup state in issue tree and issue slide-out |
-| 522 | PAN-1895 | M | medium | ok |  | Spawn work agents from issue workspace slide-out |
-| 523 | PAN-1906 | M | medium | ok |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 524 | PAN-1907 | M | medium | ok |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate everywh... |
-| 525 | PAN-1910 | M | medium | ok |  | fast-follow(PAN-1908): collapse issue status to ONE canonical field — labels become a derived projection, not the source of truth |
-| 526 | PAN-1914 | M | medium | ok |  | Follow-up: move /api/health/agents off agent-directory scans |
-| 527 | PAN-1917 | M | medium | ok |  | /sessions page redesign: unify with conversation view |
-| 528 | PAN-1918 | M | medium | ok |  | full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang stalls the onl... |
-| 529 | PAN-1926 | M | medium | ok |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 530 | PAN-1935 | M | medium | ok |  | pi/kimi work-agent cost not recorded in cost_events → runaway spend is invisible (no cost-based safety possible) |
-| 531 | PAN-1936 | M | medium | ok |  | Single source-of-truth reads — one canonical resolver per domain (consolidate the 280+ scattered read endpoints) |
-| 532 | PAN-1937 | M | medium | ok |  | data export — portable bundle (conversations + favorites core; decoupled optional cost ledger) + user-facing Export my data |
-| 533 | PAN-1949 | M | medium | ok |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all bead verdicts |
-| 534 | PAN-1953 | M | medium | ok |  | Design: beads rail mockup |
-| 535 | PAN-1954 | M | medium | ok |  | Beads rail: move beads to right sidebar, highlight active work |
-| 536 | PAN-1958 | M | medium | ok |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 537 | PAN-1963 | M | medium | ok |  | Default to no-resume on dashboard boot; add 'Resume all' to the stopped-agents banner |
-| 538 | PAN-1980 | M | medium | ok |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
-| 539 | PAN-1983 | M | medium | ok |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 540 | PAN-1984 | M | medium | ok |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 541 | PAN-1986 | M | medium | ok |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 542 | PAN-1987 | M | medium | ok |  | Allow renaming a registered project (display name is locked at registration) |
-| 543 | PAN-1988 | M | medium | ok |  | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
-| 544 | PAN-1990 | M | medium | ok |  | First-class workspaces and projects with per-workspace memory |
-| 545 | PAN-1999 | M | medium | ok |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 546 | PAN-2002 | M | medium | ok |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 547 | PAN-2008 | M | medium | ok |  | store-access guard — fail the build on direct store reads outside a domain resolver (PAN-1936 slice) |
-| 548 | PAN-2045 | M | medium | ok |  | perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool |
-| 549 | PAN-2046 | M | medium | ok |  | Conversation view does not surface terminal command responses |
-| 550 | PAN-1884 | M | medium | ok |  | Migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer; complete on main. |
-| 551 | PAN-2063 | XS | low | ok |  | UAT stack health panel should display collapsed by default to reduce clutter during active work. |
-| 552 | PAN-2066 | L | low | ok |  | OKF knowledge skill — deferred v2 capabilities (hybrid search, viz, lease writes, MCP, semantic auditor). |
-| 553 | PAN-2074 | S | low | needs-refinement |  | Research: evaluate ponytail (prompt compression) and decide build-vs-integrate vs Caveman/TLDR/RTK. |
-| 554 | PAN-2073 | S | low | ok |  | Docs: add user-facing page for the Desktop App (install, tray, embedded server, updates). |
-| 555 | PAN-2072 | S | low | ok |  | Docs: add user-facing page for Beads (task tracking) — lifecycle, bd CLI, dashboard view, enforcement gate. |
-| 556 | PAN-2071 | S | low | ok |  | Docs: add user-facing page for the Hooks system (lifecycle events, registration, built-ins, contract). |
-| 557 | PAN-2070 | S | low | ok |  | Docs: add user-facing page for the Flywheel orchestrator (start/stop, prioritization, health, config). |
-| 558 | PAN-2068 | S | low | ok |  | Docs: add user-facing page for Caveman (agent output compression) — modes, config, A/B, savings. |
-| 559 | PAN-2067 | S | low | ok |  | Docs: add user-facing page for RTK (Bash output compression) — toggle, config, savings, caveats. |
-| 560 | PAN-454 | M | low | needs-refinement |  | Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| rank | issue | size | importance | condition | epic | depends-on | why |
+|------|-------|------|------------|-----------|------|------------|-----|
+| 3 | PAN-2143 | S | critical | ok |  |  | Linchpin for 24/7 throughput: deacon patrol must re-evaluate stale merge-blockers so resolved-conflict PRs actually merge. |
+| 6 | PAN-1982 | M | medium | ok |  |  | Revive full convoy review as configurable opt-in (quick stays default). Ready. |
+| 7 | PAN-806 | XL | critical | ok |  | PAN-804 | Epic B: work agents must use pan primitives (sync-main/done) for history ops — never raw git rebase/reset/stash. |
+| 8 | PAN-1864 | S | critical | ok |  | PAN-1861 | Review nudge fires but never synthesizes — deacon must derive synthesis DETERMINISTICALLY from on-disk reports. |
+| 11 | PAN-1510 | M | critical | ok |  |  | Issues filed mid-session never appear in the frontend store tree/kanban (cache not invalidated). |
+| 12 | PAN-1506 | M | critical | ok |  |  | Strike agents appear in /api/agents but never on the dashboard Agents page/store. |
+| 13 | PAN-1508 | M | critical | ok |  | PAN-1027, PAN-863 | workspaces/feature-*/ debris consumes 220GB (~⅓ of host storage); post-merge cleanup never fully runs. |
+| 16 | PAN-1456 | L | critical | ok |  |  | Pass-3 behavior audit handoff incomplete — fresh-context agent must finish verifying recent closes. |
+| 17 | PAN-1861 | S | critical | ok |  |  | Review convoy parent still wedges waiting for sub-specialist signals after PAN-1818 — blocks merge cascade. |
+| 18 | PAN-1865 | S | critical | ok |  |  | Kimi on claude-code harness hangs at 100% ctx ($22/agent) — CLIProxy advertises a false ~200k window. |
+| 19 | PAN-804 | XL | critical | needs-refinement |  |  | Epic D: archaeological audit + pre-1.0 cleanup — must execute FIRST, before Epics A/B/C, on known-good ground. |
+| 20 | PAN-1520 | L | high | ok |  |  | Unify 'agent awaiting input': finish AskUserQuestion + generic hooks; feed the dashboard INPUT badge. |
+| 21 | PAN-807 | XL | critical | ok |  | PAN-804 | Epic C: stop spawn flow destroying local state — pre-flight checks guarantee a safe workspace before start. |
+| 22 | PAN-1213 | L | high | ok |  |  | Synthesis→review-status bridge broken: passed PRs never reach the Awaiting-Merge page. |
+| 23 | PAN-1214 | L | high | ok |  |  | Dashboard crashes on UnhandledPromiseRejection when deacon pokes a not-running agent. |
+| 24 | PAN-1560 | L | high | ok |  |  | Re-review after a PR head moves (sync-main/rebase) doesn't re-post the required review status. |
+| 25 | PAN-1499 | M | high | ok |  | PAN-1454 | Substrate pattern-2: block pan done when close-out honestly defers work ('will do X') with no follow-up. |
+| 26 | PAN-1084 | M | high | ok |  |  | Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops. |
+| 27 | PAN-2086 | M | high | ok |  |  | Startup speedup: incremental pan sync (skip-when-unchanged) + traefik precheck + listen-before-merge. |
+| 28 | PAN-1557 | L | medium | ok |  |  | Run convoy reviewers as interactive, attachable sessions with hook-owned completion (not headless --print). |
+| 29 | PAN-955 | M | high | ok |  |  | Devcontainer template has no versioning — template changes never re-render existing workspaces. |
+| 30 | PAN-1193 | L | high | ok |  |  | Swarm slots branch independently with no file-overlap arbitration — two slots can clobber the same file. |
+| 31 | PAN-1198 | L | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules; init/frontend fail. |
+| 32 | PAN-1207 | L | high | ok |  |  | Review sub-specialists exit cleanly but state.json stays 'running' — deacon orphans healthy reviewers. |
+| 33 | PAN-1209 | M | high | ok |  |  | Dashboard bead projection (40 open/0 closed) disagrees with workspace bd (opposite) after resume. |
+| 34 | PAN-1435 | M | high | needs-refinement |  |  | Provider API keys stored plaintext in ~/.panopticon/config.yaml — at-rest exposure. |
+| 35 | PAN-1498 | M | high | ok |  | PAN-1454 | Substrate pattern-1: require a live-code-path trace in review so code doesn't land in the wrong file. |
+| 36 | PAN-1618 | M | high | ok |  |  | Work-spawn docker-health gate has no autonomous recovery — a sick container blocks all spawns until manual fix. |
+| 37 | PAN-1698 | M | high | ok |  |  | main CI RED: model-count + schema-version + substrate-smoke tests failing on HEAD. |
+| 38 | PAN-2085 | L | high | needs-refinement |  |  | Auto-isolate project conversations in a disposable git worktree (Conductor/Cursor pattern) — stop polluting shared main. |
+| 39 | PAN-1766 | M | high | ok |  |  | Work agents hang on Claude Code settings-file protection prompts (class-2 scope split from PAN-1616). |
+| 40 | PAN-1770 | M | high | ok |  |  | pan-dir auto-commit rebase races live .pan/continues during convoy bursts — rebase-failed storms. |
+| 41 | PAN-1783 | M | high | ok |  | PAN-1698 | main CI RED after Command Deck redesign: resource-strip Playwright fixture failing. |
+| 42 | PAN-1915 | M | high | ok |  |  | API-key at-rest hardening: startup perm check + OS keychain + deprecate plaintext storage. |
+| 43 | PAN-605 | S | high | stale |  |  | Reconcile CLAUDE.md prompt assembly across all agent types — dead code + inconsistent composition. |
+| 44 | PAN-1226 | M | high | ok |  |  | [META] unified-dashboard redesign: 32 gaps vs PRD and mockups — full audit tracker. |
+| 45 | PAN-1263 | S | high | ok |  |  | Swarm UX: pipeline rows/IssueDrawer don't surface per-slot identity or progress. |
+| 46 | PAN-1433 | S | high | ok |  |  | Conversation agents can leave the host main repo stranded in an abandoned git rebase. |
+| 47 | PAN-1444 | S | high | ok |  | PAN-1416 | Follow-up to PAN-1416: add dashboard port lockfile + pan doctor multi-instance detection. |
+| 48 | PAN-1461 | M | high | ok |  |  | Conversation transcript Ctrl+F only finds currently-rendered DOM text, not the full transcript. |
+| 49 | PAN-1491 | M | medium | needs-refinement |  |  | Flywheel metric-aware prioritization: weight substrate-bug suggestions by which v1.0 blockers they fix (v1.0-required). |
+| 50 | PAN-1556 | S | high | ok |  |  | Session/activity feed drowns in review-spawn noise (~11 entries/cycle), burying conversations. |
+| 51 | PAN-262 | L | medium | stale |  |  | Post-merge lifecycle is fragmented across 3+ duplicated, inconsistent code paths. |
+| 52 | PAN-578 | L | high | needs-refinement |  |  | Security: comment mediation layer to stop prompt injection via tracker comments. |
+| 53 | PAN-1767 | M | medium | ok |  |  | No first-class surface for the merged-but-not-closed-out (verifying-on-main) queue — reached 21 deep. |
+| 54 | PAN-1452 | L | medium | ok |  |  | Sub-reviewer (correctness/security/perf) has no Restart context-menu action (only parents got it). |
+| 55 | PAN-1454 | XL | medium | ok |  |  | [META] Substrate audit: 31 of 80 recent closes needed action — root-cause the shipped-but-broken class. |
+| 56 | PAN-1650 | L | medium | ok |  |  | readyForMerge is one boolean doing two jobs — merge-gate reject vs. operator-ready, causing pain. |
+| 57 | PAN-538 | S | high | stale |  |  | Root Vite build occasionally doesn't regenerate the bundle on source change (stale hash). |
+| 58 | PAN-1142 | L | medium | needs-refinement |  |  | Extend per-role/per-conversation config to accept a reasoning-effort level (low→max). |
+| 59 | PAN-1232 | S | high | ok |  | PAN-1226 | IssueDrawer surface: largest bucket of PAN-1148 PRD gaps (width, scrim, animation). |
+| 60 | PAN-1234 | S | high | ok |  | PAN-1226 | Cross-cutting app-shell gaps from the PAN-1148 audit (6 issues across surfaces). |
+| 61 | PAN-1313 | L | medium | needs-refinement |  |  | Finish the src/lib Effect migration — additive bridge shipped, but the old imperative paths remain. |
+| 62 | PAN-1416 | S | high | ok |  |  | Canonical-path guard + remaining multi-instance/dashboard-binding safety (parent of PAN-1444). |
+| 63 | PAN-1504 | M | medium | needs-refinement |  |  | Codify the ad-hoc merge/commit/push hygiene check into a reusable dev skill. |
+| 64 | PAN-1681 | S | high | ok |  |  | In-review PRs strand at test=pending though tests pass — blocks ship→ready_for_merge. |
+| 65 | PAN-1824 | S | high | ok |  |  | Main CI flaky: ~5s timeouts on suites that pass locally (94/94 in 2.5s). |
+| 66 | PAN-1913 | S | medium | ok |  |  | Add project 'description' field + bundle config niceties (project list polish). |
+| 67 | PAN-2054 | S | high | ok |  |  | Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model. |
+| 68 | PAN-2065 | L | high | needs-refinement |  |  | Unified provider usage & headroom panel — 2026-06-26 fleet stalled 10h on a silently-exhausted z.ai plan limit. |
+| 69 | PAN-2059 | XL | high | needs-refinement |  |  | Epic: operator Plan→Release pickup gate + AI Objection (5th state) + Flywheel relevance-vetting. Mockups committed. |
+| 70 | PAN-1436 | L | high | ok |  |  | Header 'stopped' count still mis-includes some running agents (follow-up to PAN-1419). |
+| 71 | PAN-1711 | L | high | ok |  |  | Supervisor watchdog force-restarts the dashboard repeatedly within 45 min on health-probe noise. |
+| 72 | PAN-1769 | L | high | ok |  |  | Conversation message eaten by submit-time compaction after resume; retry storm risk. |
+| 73 | PAN-630 | L | medium | needs-refinement |  |  | Multi-tenant mode: shared instance with workspace ownership, ACLs, audit logging. |
+| 74 | PAN-1195 | L | medium | needs-refinement |  |  | Swarm parent is paused (stoppedByUser) while swarm runs — confusing lifecycle state. |
+| 75 | PAN-1196 | L | medium | needs-refinement |  |  | Every bead runs on one model regardless of complexity — no per-bead model selection. |
+| 76 | PAN-1217 | M | medium | needs-refinement |  |  | Requirements reviewer treats the whole AC list as in-scope for every PR — coverage-matrix blowup. |
+| 77 | PAN-1218 | M | medium | needs-refinement |  | PAN-1124 | Bead inspection adds ~3-5 min/bead (30% blow past 10 min) — throughput tax. |
+| 78 | PAN-1219 | M | medium | needs-refinement |  |  | Synthesis prior-cycle SHA derivation is brittle (reads 2nd-newest review file). |
+| 79 | PAN-1246 | L | medium | needs-refinement |  |  | Optimize VCS diff loading (t3code pattern) — up to 98% faster diff fetch. |
+| 80 | PAN-1253 | L | medium | needs-refinement |  |  | Flywheel issue picker ignores dependency/graph signal — rework selection to respect edges. |
+| 81 | PAN-1254 | L | medium | needs-refinement |  |  | Ship: Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
+| 82 | PAN-1311 | L | medium | needs-refinement |  |  | Ship: Swarm: fast-track tier — skip slot dispatch for trivial mechanical items |
+| 83 | PAN-1357 | L | medium | needs-refinement |  |  | Ship: Template conversations: load curated skill bundles into a single conversation |
+| 84 | PAN-1424 | L | medium | needs-refinement |  | PAN-1122 | Ship: Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 85 | PAN-1497 | M | medium | needs-refinement |  |  | Ship: emit TTS announcements on lifecycle events (start, pause, resume, report) |
+| 86 | PAN-1525 | L | medium | ok |  |  | Ship: Composer autocomplete: expose all CLI args for every pan command |
+| 87 | PAN-1538 | L | medium | ok |  |  | Ship: Unblock Pi source forks — remove API guard, verify transcript parsers |
+| 88 | PAN-1558 | L | medium | ok |  |  | Ship: Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 89 | PAN-1561 | L | medium | ok |  |  | Ship: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 90 | PAN-1578 | L | medium | ok |  |  | Ship: GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 91 | PAN-1588 | L | medium | ok |  |  | Ship: PAN-800 Phase 5: eliminate parseThinkingDuration / capture-pane stuck detection |
+| 92 | PAN-1594 | L | medium | ok |  |  | Ship: Hook-driven agent readiness (kill prompt-polling + permission-mode coupling) |
+| 93 | PAN-1889 | M | medium | ok |  |  | Ship: retention/compaction policy for docs/FLYWHEEL-STATE.md — it grows unbounded and is read whole every run |
+| 94 | PAN-2027 | L | medium | ok |  |  | Ship: ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
+| 95 | PAN-49 | S | high | stale |  |  | Fix: Fix CloisterService tests that require real runtime |
+| 96 | PAN-113 | S | high | stale |  |  | Fix: Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 97 | PAN-244 | S | high | stale |  |  | Fix: Deep-wipe leaves local branch and worktree metadata behind |
+| 98 | PAN-245 | S | high | stale |  |  | Fix: Ctrl+C aborts planning dialog instead of copying text |
+| 99 | PAN-247 | S | high | stale |  |  | Fix: Deacon has no backoff or escalation for repeated specialist startup failures |
+| 100 | PAN-304 | S | high | stale |  |  | Fix: closeLinearDirect returns stepOk even when state update never happens |
+| 101 | PAN-321 | S | high | stale |  |  | Fix: Ephemeral merge specialist fails silently for polyrepo MYN projects |
+| 102 | PAN-324 | S | high | stale |  |  | Fix: Agent detail pane missing Merge/Approve button |
+| 103 | PAN-334 | S | high | stale |  |  | Fix: Dashboard server has no duplicate-process protection — zombie instances cause 502 |
+| 104 | PAN-673 | S | high | stale |  |  | Fix: virtualizer inline ref causes blank conversation page on large message lists |
+| 105 | PAN-681 | S | high | stale |  |  | Fix: Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 106 | PAN-886 | S | high | ok |  |  | Fix: pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 107 | PAN-890 | S | high | ok |  |  | Fix: Conflict-resolver agent merges stale main snapshot and never pushes |
+| 108 | PAN-899 | S | high | ok |  |  | Fix: Agent CLI commands fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE |
+| 109 | PAN-900 | S | high | ok |  |  | Fix: Trust devroot for conversations + atomic .claude.json writes |
+| 110 | PAN-928 | S | high | ok |  |  | Fix: verification-runner: polyrepo workspaces fail at sync-target-branch |
+| 111 | PAN-929 | S | high | ok |  |  | Fix: review-run: polyrepo workspaces detect overlay repo instead of code repos |
+| 112 | PAN-932 | S | high | ok |  |  | Fix: pan done: polyrepo uncommitted changes check + existing MR handling |
+| 113 | PAN-933 | S | high | ok |  |  | Fix: Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 114 | PAN-1027 | S | high | ok |  |  | Fix: Merge-status drift: deacon auto-detect paths set mergeStatus=merged without postMergeLifecycle, never reset on revert |
+| 115 | PAN-1038 | S | high | ok |  |  | Fix: Conversation diff panel always empty: conv.claudeSessionId is null for all conversations |
+| 116 | PAN-1042 | S | high | ok |  |  | Fix: cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 117 | PAN-1068 | M | high | ok |  |  | Fix: PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 118 | PAN-1113 | S | high | ok |  |  | Fix: Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 119 | PAN-1128 | M | high | ok |  |  | Fix: Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 120 | PAN-1129 | S | high | ok |  |  | Fix: Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 121 | PAN-1130 | M | high | ok |  |  | Fix: Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 122 | PAN-1131 | M | high | ok |  |  | Fix: Stale idle synthesis session blocks review re-dispatch (idempotency guard can't tell 'reviewing' from 'finished-idle') |
+| 123 | PAN-1149 | S | high | ok |  |  | Fix: v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 124 | PAN-1150 | M | high | ok |  |  | Fix: Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 125 | PAN-1173 | S | high | ok |  |  | Fix: pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 126 | PAN-1227 | S | high | ok |  |  | Fix: Substrate: bead can be closed without delivering the work — add per-bead delivery check in pan done |
+| 127 | PAN-1240 | S | high | ok |  |  | Fix: Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
+| 128 | PAN-1243 | S | high | ok |  |  | Fix: pan admin hooks install: resolver fails outside repo CWD (auto-config breaks flywheel resume) |
+| 129 | PAN-1247 | S | high | ok |  |  | Fix: Substrate: deacon orphan-test recovery loops dispatch_failed forever on an unhealthy workspace docker stack |
+| 130 | PAN-1258 | S | high | ok |  |  | Fix: Swarm slot spawn hangs silently before writeLauncherScriptAtomic when model=kimi-k2.6 |
+| 131 | PAN-1330 | S | high | ok |  |  | Fix: CLI cannot address planning-*/specialist-* sessions — pan tell/pan kill hard-code 'agent-' prefix; no 'pan plan abort' |
+| 132 | PAN-1336 | S | high | ok |  |  | Fix: Swarm: pan swarm --auto-advance cannot advance — no slot-PR merger, slots never self-terminate |
+| 133 | PAN-1386 | S | high | ok |  |  | Fix: Flywheel orchestrator never emits status snapshots — dashboard 'flywheel' pane stays blank during an active run |
+| 134 | PAN-1392 | S | high | ok |  |  | Fix: pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
+| 135 | PAN-1434 | S | high | ok |  |  | Fix: conv-find.py reports session_file: N/A for newer conversation records (wrong column) |
+| 136 | PAN-1438 | S | high | ok |  |  | Fix: pan flywheel start launcher process orphans when orchestrator dies externally |
+| 137 | PAN-1439 | S | high | ok |  |  | Fix: Recover conv-2084's in-progress PANOPTICON_PROJECT_ROOT env var work |
+| 138 | PAN-1440 | S | high | ok |  |  | Fix: Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
+| 139 | PAN-1445 | S | high | ok |  |  | Fix: PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 140 | PAN-1446 | S | high | ok |  |  | Fix: PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 141 | PAN-1447 | S | high | ok |  |  | Fix: PAN-1194 follow-up: restore failed-merge slot UI deleted by sibling PAN-1148 merge |
+| 142 | PAN-1449 | S | high | ok |  |  | Fix: PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
+| 143 | PAN-1472 | S | high | ok |  |  | Fix: Swarm inspect agents emit pan tell to parent agent ID — fails when only slot agents exist |
+| 144 | PAN-1530 | S | high | ok |  |  | Fix: Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 145 | PAN-2108 | M | high | ok |  |  | Flywheel can't recover context-exhausted/troubled work agents — RUN-30 root throughput blocker; needs a flywheel-safe recovery surface. |
+| 146 | PAN-1564 | S | high | ok |  |  | Fix: Pi extension path + dashboard server spawn both depend on launch cwd (fix: resolve against packageRoot + pin spawn cwd) |
+| 147 | PAN-1565 | S | high | ok |  |  | Fix: Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 148 | PAN-1570 | S | high | ok |  |  | Fix: Cost recorder silently dropped ALL cost events since 2026-05-21 (Effect-migration regression) |
+| 149 | PAN-1571 | S | high | ok |  |  | Fix: Large multi-line pastes (handoff docs) land unsubmitted — paste/submit verification is blind to Claude's collapsed "[Pasted text +N... |
+| 150 | PAN-1582 | S | high | ok |  |  | Fix: Handoff fork falls back to summary: external authoring session stalls on Write permission |
+| 151 | PAN-1624 | M | high | ok |  |  | Fix: pan handoff --author external: authored doc is socket_write-ten but never submitted — successor sits at empty welcome screen |
+| 152 | PAN-2095 | M | high | ok |  |  | pan reload builds the divergent primary worktree, not origin/main — landed CI-green fixes never actually go live. |
+| 153 | PAN-2106 | M | medium | ok |  |  | pan strike git-lock race leaves a broken partial workspace yet reports 'spawned' — false success blocks red-main reverts. |
+| 154 | PAN-2088 | L | high | ok |  | PAN-1958 | Replace fragile tmux paste with pi extension control channel: steer/follow_up, effort, model, compact, quick-abort. In-review. |
+| 155 | PAN-1673 | S | high | ok |  |  | Fix: Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 156 | PAN-1674 | S | high | ok |  |  | Fix: TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC |
+| 157 | PAN-1775 | M | medium | ok |  |  | remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
+| 158 | PAN-2075 | XL | high | needs-refinement | ✓ |  | [EPIC] Boot Reconciliation + Operator Inbox: informed per-agent boot decisions + durable notification spine (local+remote). |
+| 159 | PAN-2079 | L | high | needs-refinement |  |  | Operator Inbox: durable server-side queue + in-dashboard surface — the notification spine every producer posts to. |
+| 160 | PAN-1718 | S | high | ok |  |  | Fix: Duplicate successful 'pan reload' restart-status writes from two unidentified concurrent processes |
+| 161 | PAN-2091 | S | low | ok |  |  | Pure dead-code deletion: remove superseded IssueCockpitBody subtree (8 files); data-loss audit confirms nothing lost. |
+| 162 | PAN-2145 | XL | medium | ok |  |  | Codebase-health: decompose routes/conversations.ts (4898 lines) into <1000-line modules behind a re-export barrel. |
+| 163 | PAN-2077 | L | high | needs-refinement |  | PAN-1775 | One substrate-complete reconciliation inventory (local tmux + remote Fly) the dashboard and CLI both consume. |
+| 164 | PAN-2076 | L | medium | needs-refinement |  | PAN-2077, PAN-2079 | Boot Reconciliation dashboard surface: informed per-agent Resume/Freeze/Kill replacing the all-or-nothing banner. |
+| 165 | PAN-2146 | XL | medium | ok |  |  | Codebase-health: decompose src/lib/agents.ts (4572 lines) into <1000-line modules behind a re-export barrel. |
+| 166 | PAN-1795 | S | high | ok |  |  | Fix: Codebase map bootstrapped in planning worktree is never promoted to main (PAN-1788 WI-6 wiring gap) |
+| 167 | PAN-1816 | S | high | ok |  |  | Fix: Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag +... |
+| 168 | PAN-2147 | XL | medium | ok |  |  | Codebase-health: decompose routes/agents.ts (4071 lines) into <1000-line modules behind a re-export barrel. |
+| 169 | PAN-2080 | M | medium | needs-refinement |  | PAN-2079 | Operator Inbox external transports (email/Slack/push/TTS) for offline reach; fast-follow to the inbox spine. |
+| 170 | PAN-1828 | S | high | ok |  |  | Fix: Conversation fork/handoff harness defaults ignore source conversation harness — silent claude-code coercion |
+| 171 | PAN-1830 | M | high | ok |  |  | Fix: Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY — synthesis waits forever despite report written (PAN-1696) |
+| 172 | PAN-2078 | M | medium | needs-refinement |  | PAN-2077 | CLI parity for boot reconciliation: pan boot status + pan resume --all/--select/--freeze/--kill-remote. |
+| 173 | PAN-2084 | L | medium | needs-refinement |  | PAN-2085 | Auto-create lightweight conversation worktrees (conv/<slug> branch, fetch-first, bun install only). |
+| 174 | PAN-1897 | M | high | ok |  |  | Fix: pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error) |
+| 175 | PAN-2148 | XL | medium | ok |  |  | Codebase-health: decompose routes/issues.ts (4065 lines) into <1000-line modules behind a re-export barrel. |
+| 176 | PAN-1912 | S | high | ok |  |  | Fix: Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 177 | PAN-1776 | M | medium | ok |  |  | Ship: hot-updatable delivery path — version-stamped supervisors, rolling refresh, and dumb-shim primitives with server-side delivery logic |
+| 178 | PAN-1791 | M | medium | ok |  |  | Ship: Tiered execution: difficulty-routed bead dispatch + event-driven supervisor review (standing tier agents with plan-filtered commit... |
+| 179 | PAN-1852 | M | medium | ok |  |  | Ship: Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 180 | PAN-1862 | M | medium | ok |  |  | Ship: cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review |
+| 181 | PAN-608 | M | medium | stale |  |  | Ship: Integrate Destructive Command Guard (dcg) with configurable settings |
+| 182 | PAN-783 | M | medium | needs-refinement |  |  | Ship: Agents Page Redesign — Unified Multi-View Experience |
+| 183 | PAN-947 | M | medium | needs-refinement |  |  | Ship: project management actions in unified sidebar |
+| 184 | PAN-1102 | M | medium | needs-refinement |  |  | Ship: real-time notification + interactive prompts when agent awaits user input |
+| 185 | PAN-1164 | M | medium | needs-refinement |  |  | Ship: Push diff summary updates over /ws/rpc instead of 5s polling |
+| 186 | PAN-1488 | M | medium | needs-refinement |  |  | Ship: add required_pull_request_reviews to main branch protection |
+| 187 | PAN-1577 | M | medium | ok |  |  | Ship: Move a conversation to a different project (CLI + drag/drop + menu action) |
+| 188 | PAN-1610 | M | medium | ok |  |  | Ship: Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer) |
+| 189 | PAN-813 | M | medium | ok |  |  | Add regression test for /api/review/:issueId/reset preserving work-agent resolution |
+| 190 | PAN-1451 | M | medium | ok |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 191 | PAN-1544 | L | medium | ok |  |  | Architect: Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 192 | PAN-399 | L | medium | needs-refinement |  |  | Ship: Release specialist — coordinated post-merge rollout and release safety |
+| 193 | PAN-532 | L | medium | needs-refinement |  |  | Ship: Per-project and per-issue model overrides for workflow agent model selection |
+| 194 | PAN-817 | L | medium | needs-refinement |  |  | Ship: Improve planning dialog layout and content fit |
+| 195 | PAN-924 | L | medium | needs-refinement |  |  | Ship: Spike: evaluate GitNexus for Panopticon integration |
+| 196 | PAN-1040 | L | medium | needs-refinement |  |  | Ship: event-driven dispatch for inspect-agent (requiresInspection=true beads) |
+| 197 | PAN-1041 | L | medium | needs-refinement |  |  | Ship: Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 198 | PAN-1103 | L | medium | needs-refinement |  |  | Ship: surface AskUserQuestion choice options in conversation view |
+| 199 | PAN-1469 | S | medium | needs-refinement |  |  | Doc: End-to-end review and consolidation of all project documentation |
+| 200 | PAN-1494 | S | medium | needs-refinement |  |  | Doc: register docs/FLYWHEEL-VISION on panopticon-cli.com (Mintlify) — needed for public sharing |
+| 201 | PAN-1684 | S | medium | ok |  |  | Doc: build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 202 | PAN-2037 | L | medium | needs-refinement |  |  | Ship: UI: prominent 'Start work agent' CTA on all issue surfaces when agent is stopped |
+| 203 | PAN-37 | M | medium | stale |  |  | Ship: Support external PR selection for merge-agent |
+| 204 | PAN-38 | M | medium | stale |  |  | Ship: Support multiple merge agents per repository |
+| 205 | PAN-77 | M | medium | stale |  |  | Ship: Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 206 | PAN-111 | M | medium | stale |  |  | Ship: Support cross-machine planning state sync without cross-contamination |
+| 207 | PAN-243 | M | medium | stale |  |  | Ship: Audit dashboard actions: ensure all are available via CLI |
+| 208 | PAN-252 | M | medium | stale |  |  | Ship: Disable Sync with Main button when workspace is up to date |
+| 209 | PAN-255 | M | medium | stale |  |  | Ship: Agents lack awareness of MCP tools — sync MCP config and inject into prompts |
+| 210 | PAN-258 | M | medium | stale |  |  | Ship: Kanban board: fit all columns without horizontal scrolling |
+| 211 | PAN-277 | M | medium | stale |  |  | Ship: Session reasoning capture & collaborative PRD refinement |
+| 212 | PAN-293 | M | medium | stale |  |  | Ship: Project Living Memory — per-project semantic memory for agents |
+| 213 | PAN-294 | M | medium | stale |  |  | Ship: Surface module initialization errors as system-level, not per-issue |
+| 214 | PAN-450 | M | medium | stale |  |  | Ship: Adopt remaining Effect patterns — Schema, Platform, Streams, Logging, Testing |
+| 215 | PAN-452 | M | medium | stale |  |  | Ship: Conversation input bar — mode/permissions/workspace selectors |
+| 216 | PAN-2149 | L | medium | ok |  |  | Codebase-health: decompose lib/cloister/service.ts (2039 lines) into <1000-line modules behind a re-export barrel. |
+| 217 | PAN-456 | M | medium | stale |  |  | Ship: Store Claude Code session IDs for agent resume after crash/restart |
+| 218 | PAN-463 | M | medium | stale |  |  | Ship: Add Qwen 3.6+ model support |
+| 219 | PAN-465 | M | medium | stale |  |  | Ship: Add OpenRouter as a model provider |
+| 220 | PAN-466 | M | medium | stale |  |  | Ship: Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 221 | PAN-531 | M | medium | stale |  |  | Ship: PAN: Windows Electron support (WSL2 required) |
+| 222 | PAN-546 | M | medium | stale |  |  | Ship: Remove claude-code-router — all providers use direct env var injection |
+| 223 | PAN-548 | M | medium | stale |  |  | Ship: Command Deck: preserve state across navigation including URL routing for tabs |
+| 224 | PAN-606 | M | medium | stale |  |  | Ship: Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 225 | PAN-607 | M | medium | stale |  |  | Ship: Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 226 | PAN-613 | M | medium | stale |  |  | Ship: Investigate thinking effort levels for agents — reduce signature corruption frequency |
+| 227 | PAN-629 | M | medium | needs-refinement |  |  | Ship: Workspace quotas and resource governance |
+| 228 | PAN-637 | M | medium | needs-refinement |  |  | Ship: Direct issue kickoff (skip planning) from dashboard UI |
+| 229 | PAN-649 | M | medium | needs-refinement |  |  | Ship: Render Excalidraw drawings inline in Claude Code conversations |
+| 230 | PAN-654 | M | medium | needs-refinement |  |  | Ship: Project Setup Wizard — Dashboard UI |
+| 231 | PAN-675 | M | medium | needs-refinement |  |  | Ship: Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 232 | PAN-678 | M | medium | needs-refinement |  |  | Ship: pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 233 | PAN-687 | M | medium | needs-refinement |  |  | Ship: Support OpenCode as alternative coding agent |
+| 234 | PAN-818 | M | medium | needs-refinement |  |  | Ship: Make summary optional when forking conversations |
+| 235 | PAN-901 | M | medium | needs-refinement |  |  | Ship: Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 236 | PAN-902 | M | medium | needs-refinement |  |  | Ship: Settings: add 'Run pan sync' button to configuration menu |
+| 237 | PAN-903 | M | medium | needs-refinement |  |  | Ship: Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 238 | PAN-938 | M | medium | needs-refinement |  |  | Ship: Fizzy visual pipeline — Kanban mirror for specialist pipeline |
+| 239 | PAN-949 | M | medium | needs-refinement |  |  | Ship: add conversation for project from sidebar |
+| 240 | PAN-958 | M | medium | needs-refinement |  |  | Ship: Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 241 | PAN-1037 | M | medium | needs-refinement |  |  | Ship: Retire 'planning-' tmux prefix — fold into agent-PAN-N keyed by phase |
+| 242 | PAN-1060 | M | medium | needs-refinement |  |  | Ship: Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 243 | PAN-1151 | M | medium | needs-refinement |  |  | Ship: Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 244 | PAN-1165 | M | medium | needs-refinement |  |  | Ship: Lightweight review path for small/trivial PRs |
+| 245 | PAN-1202 | M | medium | needs-refinement |  |  | Ship: Swarm: prune merged/completed slot state directories after wave converges |
+| 246 | PAN-1223 | M | medium | needs-refinement |  |  | Ship: Auto-update for users in the field (npm + desktop binaries) |
+| 247 | PAN-1432 | M | medium | needs-refinement |  |  | Ship: Merge agent leaves packages/contracts/dist stale — typecheck breaks on every fresh checkout |
+| 248 | PAN-1437 | M | medium | needs-refinement |  |  | Ship: pan flywheel report semantics: split read-only snapshot from run finalization |
+| 249 | PAN-1442 | M | medium | needs-refinement |  |  | Ship: Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 250 | PAN-1443 | M | medium | needs-refinement |  |  | Ship: Follow-up to PAN-487: migrate 10 stale .vbrief.json files from docs/prds/active/ to completed/ |
+| 251 | PAN-1453 | M | medium | needs-refinement |  |  | Ship: Audit: 3 cheap verifications that should ride along with merges (PAN-1170, PAN-1316, PAN-457 CLI parity) |
+| 252 | PAN-1473 | M | medium | needs-refinement |  |  | Ship: Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 253 | PAN-1485 | M | medium | needs-refinement |  |  | Ship: Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 254 | PAN-1489 | M | medium | needs-refinement |  |  | Ship: task(flywheel): tune v1.0 readiness criteria after 30 days of telemetry |
+| 255 | PAN-1490 | M | medium | needs-refinement |  |  | Ship: show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 256 | PAN-1524 | M | medium | ok |  |  | Ship: Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 257 | PAN-1542 | M | medium | ok |  |  | Ship: Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 258 | PAN-1545 | M | medium | ok |  |  | Ship: New Terminal button — spawn ad-hoc bash sessions from sidebar / conversation / drawer / palette |
+| 259 | PAN-1623 | M | medium | ok |  |  | Ship: Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 260 | PAN-1653 | M | medium | ok |  |  | Ship: perf(docs-rag): batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 261 | PAN-1654 | M | medium | ok |  |  | Ship: perf(build): run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 262 | PAN-1655 | M | medium | ok |  |  | Ship: Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 263 | PAN-1656 | M | medium | ok |  |  | Ship: Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 264 | PAN-1657 | M | medium | ok |  |  | Ship: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 265 | PAN-1666 | XL | medium | ok |  |  | Ship: [EPIC] Pipeline Throughput Hardening — run many work agents safely, on-demand specialists, slot manager, fly.io scale-out |
+| 266 | PAN-1671 | M | medium | ok |  |  | Ship: surface pending ExitPlanMode plan as a popup modal (reuse PlanCard + /plan-action) |
+| 267 | PAN-1672 | M | medium | ok |  |  | Ship: GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 268 | PAN-1676 | M | medium | ok |  |  | Ship: harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 269 | PAN-1685 | M | medium | ok |  |  | Ship: Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 270 | PAN-1837 | M | medium | ok |  |  | Ship: Support Kimi Code as a first-class harness (Moonshot's own coding CLI) |
+| 271 | PAN-1838 | M | medium | ok |  |  | Ship: [research] Grok Build (xAI) coding harness — research and specify support |
+| 272 | PAN-1839 | M | medium | ok |  |  | Ship: Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 273 | PAN-1840 | M | medium | ok |  |  | Ship: Add 'pan switch <id>' — change a running agent's model/harness in one command (kill + fresh-start + re-onboard) |
+| 274 | PAN-1844 | M | medium | ok |  |  | Ship: Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 275 | PAN-1853 | M | medium | ok |  |  | Ship: Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 276 | PAN-1854 | M | medium | ok |  |  | Ship: Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 277 | PAN-1916 | M | medium | ok |  |  | Ship: configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 278 | PAN-1955 | M | medium | ok |  |  | Ship: Issue cockpit: move beads from a tab into a persistent right rail with a 'working now' highlight |
+| 279 | PAN-1965 | M | medium | ok |  |  | Ship: Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 280 | PAN-1966 | M | medium | ok |  |  | Ship: Single authoritative pipeline-membership resolver — one function for "what's in the pipeline" (collapse the 5 divergent views) |
+| 281 | PAN-1967 | M | medium | ok |  |  | Ship: Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 282 | PAN-1968 | M | medium | ok |  |  | Ship: Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 283 | PAN-1985 | M | medium | ok |  |  | Ship: Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 284 | PAN-1991 | M | medium | ok |  |  | Ship: Issue cockpit redesign — incremental rollout (tracking) |
+| 285 | PAN-1995 | M | medium | ok |  |  | Ship: infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 286 | PAN-2004 | M | medium | ok |  |  | Ship: Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 287 | PAN-2082 | S | medium | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles, reopening a data-loss window. |
+| 288 | PAN-2083 | S | medium | ok |  |  | Composer: a failed first send leaves text in BOTH composer and retry outbox — double-send hazard. |
+| 289 | PAN-2024 | M | medium | ok |  |  | Ship: ohmypi: frontend Tools-toggle for conversation view |
+| 290 | PAN-2025 | M | medium | ok |  |  | Ship: ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 291 | PAN-2026 | M | medium | ok |  |  | Ship: ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 292 | PAN-2028 | M | medium | ok |  |  | Ship: ohmypi: per-provider cost grouping in cost dashboard |
+| 293 | PAN-2029 | M | medium | ok |  |  | Ship: ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
+| 294 | PAN-2030 | M | medium | ok |  |  | Ship: ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
+| 295 | PAN-2031 | M | medium | ok |  |  | Ship: ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 296 | PAN-2032 | M | medium | ok |  |  | Ship: ohmypi: local Ollama model as zero-cost preliminary review role |
+| 297 | PAN-2033 | M | medium | ok |  |  | Ship: ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
+| 298 | PAN-2034 | M | medium | ok |  |  | Ship: ohmypi: end-to-end test that tool-call steps render in Conversation panel |
+| 299 | PAN-2035 | M | medium | ok |  |  | Ship: ohmypi: GitHub Copilot subscription provider routing via omp |
+| 300 | PAN-2053 | M | medium | ok |  |  | Ship: Dashboard: read-only "why this model" (resolved + weighted distribution + hash) at the top of the agent Start/Restart submenu (foll... |
+| 301 | PAN-1533 | M | medium | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 302 | PAN-1696 | M | medium | ok |  |  | decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view |
+| 303 | PAN-1592 | M | medium | ok |  |  | Composer: persist pending images + unsent/failed text across reload (draft-text parity). |
+| 304 | PAN-2005 | M | medium | ok |  |  | Backlog Sequencer: Pickup Forecast — visualize Flywheel pickup order (waves, lanes, planning bottleneck) |
+| 305 | PAN-2006 | M | medium | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 306 | PAN-1101 | M | medium | ok |  |  | Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire |
+| 307 | PAN-1122 | M | medium | ok |  |  | Trim OpenAI model catalog to 5 supported models |
+| 308 | PAN-1547 | M | medium | ok |  |  | @panctl/cli npm install warns on Node <22 (engine mismatch + deprecated deps) |
+| 309 | PAN-1705 | M | medium | ok |  |  | conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse |
+| 310 | PAN-1706 | M | medium | ok |  |  | orphaned playwright-mcp headless Chromiums keep full dashboard pages open — each multiplies dashboard poll load |
+| 311 | PAN-1868 | M | medium | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 312 | PAN-1896 | M | medium | ok |  |  | Reduce approval friction for GitHub CLI operations in managed sessions |
+| 313 | PAN-1951 | M | medium | ok |  |  | Inspector agent should resume a warm session instead of cold-spawning a new one per bead |
+| 314 | PAN-537 | L | medium | needs-refinement |  |  | show changed files diff summary after each agent response in activity view |
+| 315 | PAN-592 | L | medium | needs-refinement |  |  | Audit: Planning agent CLAUDE.md and STATE.md contents vs expectations |
+| 316 | PAN-633 | S | low | ok |  |  | Doc: Update Cloister PRD and docs index — stale relative to implementation |
+| 317 | PAN-634 | S | low | ok |  |  | Doc: Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 318 | PAN-646 | L | medium | needs-refinement |  |  | Canceled issues: add guided Recover workflow |
+| 319 | PAN-674 | S | low | ok |  |  | Doc: add glossary of Panopticon domain terms |
+| 320 | PAN-700 | L | medium | needs-refinement |  |  | Detachable terminal for conversation view — popout into OS window |
+| 321 | PAN-713 | L | medium | needs-refinement |  |  | test: add unit tests for doneCommand and approveCommand |
+| 322 | PAN-802 | L | medium | needs-refinement |  |  | Resume on conversation session forks instead of resuming |
+| 323 | PAN-826 | L | medium | needs-refinement |  |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
+| 324 | PAN-863 | L | medium | needs-refinement |  |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
+| 325 | PAN-1474 | S | low | ok |  |  | Doc: Add ACKNOWLEDGEMENTS doc — credit borrowed code from open-source projects (MIT/Apache 2.0) |
+| 326 | PAN-1555 | S | low | ok |  |  | Doc: remove/update stale swarm-runtime references after PAN-1517 |
+| 327 | PAN-1683 | S | low | ok |  |  | Doc: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) — strike keeps falling out... |
+| 328 | PAN-43 | M | medium | ok |  |  | Add Slack and email notifications for agent events |
+| 329 | PAN-44 | M | medium | ok |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 330 | PAN-47 | M | medium | ok |  |  | PRD files should be committed to feature branch, moved to completed/ on merge |
+| 331 | PAN-51 | M | medium | ok |  |  | Documentation: Clarify issue tracker options beyond Linear |
+| 332 | PAN-52 | M | medium | ok |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 333 | PAN-54 | M | medium | ok |  |  | Add pan test:e2e command for full workflow integration test |
+| 334 | PAN-55 | M | medium | ok |  |  | Track specialist costs with time period filtering |
+| 335 | PAN-104 | M | medium | ok |  |  | Cost alerts/notifications when spending exceeds thresholds |
+| 336 | PAN-106 | M | medium | ok |  |  | Cost prediction/estimation for in-progress work |
+| 337 | PAN-146 | M | medium | ok |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 338 | PAN-155 | M | medium | ok |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 339 | PAN-175 | M | medium | ok |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 340 | PAN-176 | M | medium | ok |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 341 | PAN-177 | M | medium | ok |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 342 | PAN-178 | M | medium | ok |  |  | PAN-178: Crash recovery with granular task checkpointing |
+| 343 | PAN-180 | M | medium | ok |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 344 | PAN-190 | M | medium | ok |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 345 | PAN-198 | M | medium | ok |  |  | Structured audit trail for agent actions |
+| 346 | PAN-227 | M | medium | ok |  |  | Phase gate validation — mid-implementation acceptance checks |
+| 347 | PAN-228 | M | medium | ok |  |  | Shift-left post-edit diagnostics — type check after every edit |
+| 348 | PAN-241 | M | medium | ok |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
+| 349 | PAN-249 | M | medium | ok |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 350 | PAN-265 | M | medium | ok |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 351 | PAN-271 | M | medium | ok |  |  | Auto-assign Linear project from project config when creating issues |
+| 352 | PAN-283 | M | medium | ok |  |  | Reset should sync workspace feature branch with latest main |
+| 353 | PAN-297 | M | medium | ok |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 354 | PAN-298 | M | medium | ok |  |  | Auto-detect package manager and runtime in workspace setup |
+| 355 | PAN-299 | M | medium | ok |  |  | Granular session state persistence across context compaction |
+| 356 | PAN-306 | M | medium | ok |  |  | merge-agent polyrepo false failures — stale refs, wrong error field, short timeout |
+| 357 | PAN-371 | M | medium | ok |  |  | Agents tab only shows global specialists, not per-project ephemeral ones |
+| 358 | PAN-407 | M | medium | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 359 | PAN-438 | M | medium | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 360 | PAN-459 | M | medium | ok |  |  | Planning setup screen with SSE progress streaming |
+| 361 | PAN-461 | M | medium | ok |  |  | Deep-wipe multi-step progress dialog |
+| 362 | PAN-468 | M | medium | ok |  |  | Agent test conversations pollute production database — need test isolation |
+| 363 | PAN-471 | M | medium | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 364 | PAN-472 | M | medium | ok |  |  | GET /api/costs/by-issue takes 10s — N+1 query on 353K rows × 184 issues |
+| 365 | PAN-476 | M | medium | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 366 | PAN-480 | M | medium | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
+| 367 | PAN-483 | M | medium | ok |  |  | Unify Resume Agent UX — all entry points should show message input |
+| 368 | PAN-487 | M | medium | ok |  |  | VBRIEF not archived to docs/prds/completed/ after merge |
+| 369 | PAN-543 | M | medium | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 370 | PAN-552 | M | medium | ok |  |  | Claude Code terminals should respect app light/dark mode scheme |
+| 371 | PAN-554 | M | medium | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 372 | PAN-564 | M | medium | ok |  |  | Slash menu positioned incorrectly — cut off / off-screen |
+| 373 | PAN-565 | M | medium | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 374 | PAN-568 | M | medium | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 375 | PAN-570 | M | medium | ok |  |  | Show PLAN badge on costs when under a subscription/plan |
+| 376 | PAN-571 | M | medium | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 377 | PAN-576 | M | medium | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 378 | PAN-589 | M | medium | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 379 | PAN-591 | M | medium | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 380 | PAN-603 | M | medium | ok |  |  | Plan review loop with configurable reviewer model |
+| 381 | PAN-604 | M | medium | ok |  |  | Hide planning agent from workspace detail pane |
+| 382 | PAN-622 | M | medium | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 383 | PAN-623 | M | medium | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 384 | PAN-624 | M | medium | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 385 | PAN-656 | M | medium | ok |  |  | Docs site scroll broken: dashboard CSS leaks onto panopticon-cli.com |
+| 386 | PAN-658 | M | medium | ok |  |  | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 387 | PAN-660 | M | medium | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 388 | PAN-663 | M | medium | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 389 | PAN-683 | M | medium | ok |  |  | shadow-state getPendingSyncCount test is environment-dependent |
+| 390 | PAN-701 | M | medium | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 391 | PAN-702 | M | medium | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 392 | PAN-709 | M | medium | ok |  |  | self-improving flywheel — retro agent, skill-change pipeline, audience-scoped skills, Q&A detection, autonomous daemon |
+| 393 | PAN-727 | M | medium | ok |  |  | Fix orphaned work-agent start handoff after planning |
+| 394 | PAN-730 | M | medium | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 395 | PAN-735 | M | medium | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 396 | PAN-736 | M | medium | ok |  |  | wire per-subagent model overrides from settings to Claude Code spawn env |
+| 397 | PAN-738 | M | medium | ok |  |  | Add right-click fork option to conversation list |
+| 398 | PAN-743 | M | medium | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 399 | PAN-747 | M | medium | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 400 | PAN-749 | M | medium | ok |  |  | Research and borrow best features from gstack |
+| 401 | PAN-750 | M | medium | ok |  |  | PAN-XXX: Complete Metrics Page Redesign — Real Data, Charts, Time Filtering, and TLDR Analytics |
+| 402 | PAN-751 | M | medium | ok |  |  | PAN-XXX: Historical Metrics Data Persistence — Beyond the 30-Day JSONL Window |
+| 403 | PAN-752 | M | medium | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 404 | PAN-762 | M | medium | ok |  |  | Settings: warn when model overrides target disabled providers |
+| 405 | PAN-764 | M | medium | ok |  |  | Add quota/usage inspector for routed model providers |
+| 406 | PAN-765 | M | medium | ok |  |  | Preserve trailing zeros in cost displays |
+| 407 | PAN-769 | M | medium | ok |  |  | Track verification/review/test phase churn over time |
+| 408 | PAN-771 | M | medium | ok |  |  | Investigate Vercel Sandbox execution backend support |
+| 409 | PAN-772 | M | medium | ok |  |  | Unify terminal stack behavior across tmux sessions |
+| 410 | PAN-773 | M | medium | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 411 | PAN-774 | M | medium | ok |  |  | Unify launch UX and release pipeline for 1.0 — npx panctl, lazy prereqs, cross-platform desktop builds |
+| 412 | PAN-775 | M | medium | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 413 | PAN-777 | M | medium | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 414 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 415 | PAN-780 | M | medium | ok |  |  | Agent stuck in feedback loop when old feedback files exist but review has passed |
+| 416 | PAN-786 | M | medium | ok |  |  | Post planning Q\&A answers as issue comment |
+| 417 | PAN-790 | M | medium | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling — complete push-first migration |
+| 418 | PAN-791 | M | medium | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
+| 419 | PAN-793 | M | medium | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
+| 420 | PAN-797 | M | medium | ok |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 421 | PAN-810 | M | medium | ok |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
+| 422 | PAN-832 | M | medium | ok |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 423 | PAN-833 | M | medium | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 424 | PAN-834 | M | medium | ok |  |  | Cleanup: legacy ~/.panopticon/heartbeats/ directory has not been written since 2026-04-22 |
+| 425 | PAN-835 | M | medium | ok |  |  | Workspace creation removes stale .planning/ from previous issue but doesn't commit deletion → PR diff includes 982 unrelated lines |
+| 426 | PAN-838 | M | medium | ok |  |  | synthesis.json contains hallucinated timestamp + sparse structure (only counts, no findings arrays) |
+| 427 | PAN-853 | M | medium | ok |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 428 | PAN-898 | M | medium | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 429 | PAN-904 | M | medium | ok |  |  | Make AI title generation model configurable |
+| 430 | PAN-908 | M | medium | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 431 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 432 | PAN-943 | M | medium | ok |  |  | Add memory file review and management command |
+| 433 | PAN-944 | M | medium | ok |  |  | Make vBRIEF the durable task graph source of truth |
+| 434 | PAN-948 | M | medium | ok |  |  | Implement pan scope lifecycle commands |
+| 435 | PAN-961 | M | medium | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 436 | PAN-962 | M | medium | ok |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 437 | PAN-984 | M | medium | ok |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 438 | PAN-1049 | M | medium | ok |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 439 | PAN-1051 | M | medium | ok |  |  | Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 440 | PAN-1063 | M | medium | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 441 | PAN-1064 | M | medium | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 442 | PAN-1065 | M | medium | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 443 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 444 | PAN-1115 | M | medium | ok |  |  | Inject observation context into agent prompts |
+| 445 | PAN-1116 | M | medium | ok |  |  | Memory: cross-project search mode |
+| 446 | PAN-1117 | M | medium | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 447 | PAN-1121 | M | medium | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 448 | PAN-1123 | M | medium | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 449 | PAN-1124 | M | medium | ok |  |  | Decouple specs and PRDs from workspaces — write directly to main |
+| 450 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 451 | PAN-1133 | M | medium | ok |  |  | TLDR: deacon supervision + pan doctor check + GC |
+| 452 | PAN-1135 | M | medium | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 453 | PAN-1136 | M | medium | ok |  |  | Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency |
+| 454 | PAN-1147 | M | medium | ok |  |  | Work-agent done flow stalls at 'push and re-request review' after addressing review feedback |
+| 455 | PAN-1152 | M | medium | ok |  |  | Remove PANOPTICON_DEV env-var persistence — derive Traefik mode from the running command |
+| 456 | PAN-1153 | M | medium | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' — breaks pan dev proxy |
+| 457 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders — startup races against orphan dashboard servers |
+| 458 | PAN-1166 | M | medium | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 459 | PAN-1208 | M | medium | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 460 | PAN-1222 | M | medium | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 461 | PAN-1238 | M | medium | ok |  |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
+| 462 | PAN-1242 | M | medium | ok |  |  | Board view follow-up — + New issue column footer button (deferred from PAN-1229) |
+| 463 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
+| 464 | PAN-1245 | M | medium | ok |  |  | Flywheel gate gets stuck after orchestrator dies (reboot, crash, partial report) |
+| 465 | PAN-1325 | M | medium | ok |  |  | Artifact storage model is unsafe for polyrepo projects — define a canonical "orchestration repo" |
+| 466 | PAN-1356 | M | medium | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 467 | PAN-1479 | M | medium | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 468 | PAN-1480 | M | medium | ok |  |  | TLDR: 93% bypass rate — daemon/hook integration broken |
+| 469 | PAN-1481 | M | medium | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 470 | PAN-1482 | M | medium | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 471 | PAN-1483 | M | medium | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 472 | PAN-1493 | M | medium | ok |  |  | TEST: write hello.txt — probe for PAN-1200 Universal Context System verification |
+| 473 | PAN-1548 | M | medium | ok |  |  | npx @panctl/cli shows stale placeholder message referencing v0.8.0 |
+| 474 | PAN-1550 | M | medium | ok |  |  | FilesPane + BrowserPane — file browser and embedded web view implementation details |
+| 475 | PAN-1552 | M | medium | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 476 | PAN-1553 | M | medium | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 477 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config — agents silently use --dangerously-skip-permissions despite 'Auto' |
+| 478 | PAN-1573 | M | medium | ok |  |  | Consideration for reintroducing ability to --dangerously-skip-permissions, DO NOT act on this issue |
+| 479 | PAN-1581 | M | medium | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 480 | PAN-2069 | M | medium | ok |  |  | Caveman follow-up gaps: review-agent mode never set at spawn, no hook-execution test, missing Settings toggle. |
+| 481 | PAN-1619 | M | medium | ok |  |  | Bridge host Codex auth into workspace containers + honest gpt-5.5 lock reason |
+| 482 | PAN-1620 | M | medium | ok |  |  | Awaiting-Merge button is clickable on a conflicting/CI-failing PR (stale blockerReasons) |
+| 483 | PAN-1621 | M | medium | ok |  |  | pan close human-only gate over-blocks operator conv-* sessions |
+| 484 | PAN-1622 | M | medium | ok |  |  | pan dev restart leaves orphan dashboard servers (stale serving + multi-Deacon risk) |
+| 485 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-approv... |
+| 486 | PAN-1640 | M | medium | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 487 | PAN-1641 | M | medium | ok |  |  | Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness |
+| 488 | PAN-1643 | M | medium | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 489 | PAN-1644 | M | medium | ok |  |  | Hook-driven progressive conversation titling |
+| 490 | PAN-1646 | M | medium | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 491 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 492 | PAN-1668 | M | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness — can't move a review off Kimi |
+| 493 | PAN-1669 | M | medium | ok |  |  | restart-with-model doesn't emit a live event — issue tree shows stale model until manual refresh |
+| 494 | PAN-1670 | M | medium | ok |  |  | pan dev hot-reload wedges tabs on 'Reconnecting to the dashboard…' — PAN-1580 boot watchdog never fires under Vite |
+| 495 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate — stop the rebase-cascade that strands ready PRs |
+| 496 | PAN-1708 | M | medium | ok |  |  | pan start CLI never flips spec plan.status proposed→approved — all 8 in-flight specs stuck at proposed, triggering reconciler misfires |
+| 497 | PAN-1710 | M | medium | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 — server boots, h... |
+| 498 | PAN-1720 | M | medium | ok |  |  | cloister auto-resume tests fail under full parallel run, pass in isolation — test pollution reddening main |
+| 499 | PAN-1726 | M | medium | ok |  |  | postMergeLifecycle did not pause the merged issue's work agent — idle agent holds a work slot and throttles all pipeline dispatch (PAN-16... |
+| 500 | PAN-1728 | M | medium | ok |  |  | PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch |
+| 501 | PAN-1729 | M | medium | ok |  |  | test(beads): beads-scoping work.md "-l {{ISSUE_ID_LOWER}}" label-filter assertion fails on main |
+| 502 | PAN-1730 | M | medium | ok |  |  | idle awaiting-test work sessions count against the PAN-1665 ceiling — pipeline livelocks when work pool alone exceeds total (work=7/9 obs... |
+| 503 | PAN-1734 | M | medium | ok |  |  | request-review-nudge remote workspace HEAD test fails on main |
+| 504 | PAN-1735 | M | medium | ok |  |  | adopt externally-completed readyForMerge issues into the pipeline/merge queue |
+| 505 | PAN-1739 | M | medium | ok |  |  | Command Deck issue TREE still hides strike agents — frontend FeatureItem session-type allowlist omits 'strike' (4th allowlist miss); dead... |
+| 506 | PAN-1740 | M | medium | ok |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
+| 507 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 508 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent — observability surfaces + configurable harness/model (default gpt-5.5 via Codex) |
+| 509 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 510 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 511 | PAN-1755 | M | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 512 | PAN-1758 | M | medium | ok |  |  | ship lane cannot converge on a continuously-moving main — 37 re-dispatches for one issue; readyForMerge only ever flips via the startup r... |
+| 513 | PAN-1761 | M | medium | ok |  |  | conversations endpoints fetched via relative /api path — 403 inside workspace/UAT containers (session cookie is on the api-* origin) |
+| 514 | PAN-1762 | M | medium | ok |  |  | Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B) |
+| 515 | PAN-1773 | M | medium | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 516 | PAN-1774 | M | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 517 | PAN-1782 | M | medium | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout — decouple precompaction from the handoff author model |
+| 518 | PAN-1846 | M | medium | ok |  |  | unbounded log growth — deacon.log 687MB / dashboard.log 91MB, no rotation; per-agent skip line logged every 60s patrol |
+| 519 | PAN-1874 | M | medium | ok |  |  | per-issue override for review mode / re-review scope (extends PAN-1862 project-scope config) |
+| 520 | PAN-1878 | M | medium | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 521 | PAN-1894 | M | medium | ok |  |  | Show UAT stack startup state in issue tree and issue slide-out |
+| 522 | PAN-1895 | M | medium | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 523 | PAN-1906 | M | medium | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 524 | PAN-1907 | M | medium | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate everywh... |
+| 525 | PAN-1910 | M | medium | ok |  |  | fast-follow(PAN-1908): collapse issue status to ONE canonical field — labels become a derived projection, not the source of truth |
+| 526 | PAN-1914 | M | medium | ok |  |  | Follow-up: move /api/health/agents off agent-directory scans |
+| 527 | PAN-1917 | M | medium | ok |  |  | /sessions page redesign: unify with conversation view |
+| 528 | PAN-1918 | M | medium | ok |  |  | full frontend vitest suite runs in no CI path — npm test limited to 3 files; IssueMissionControl.test.tsx open-handle hang stalls the onl... |
+| 529 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 530 | PAN-1935 | M | medium | ok |  |  | pi/kimi work-agent cost not recorded in cost_events → runaway spend is invisible (no cost-based safety possible) |
+| 531 | PAN-1936 | M | medium | ok |  |  | Single source-of-truth reads — one canonical resolver per domain (consolidate the 280+ scattered read endpoints) |
+| 532 | PAN-1937 | M | medium | ok |  |  | data export — portable bundle (conversations + favorites core; decoupled optional cost ledger) + user-facing Export my data |
+| 533 | PAN-1949 | M | medium | ok |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all bead verdicts |
+| 534 | PAN-1953 | M | medium | ok |  |  | Design: beads rail mockup |
+| 535 | PAN-1954 | M | medium | ok |  |  | Beads rail: move beads to right sidebar, highlight active work |
+| 536 | PAN-1958 | M | medium | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 537 | PAN-1963 | M | medium | ok |  |  | Default to no-resume on dashboard boot; add 'Resume all' to the stopped-agents banner |
+| 538 | PAN-1980 | M | medium | ok |  |  | Stop session rotation on resume (behind a constant); one pipeline-membership view from all lenses |
+| 539 | PAN-1983 | M | medium | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 540 | PAN-1984 | M | medium | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 541 | PAN-1986 | M | medium | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 542 | PAN-1987 | M | medium | ok |  |  | Allow renaming a registered project (display name is locked at registration) |
+| 543 | PAN-1988 | M | medium | ok |  |  | Verdict signaling: one host-owned write door; agents journal, host owns the DB cache |
+| 544 | PAN-1990 | M | medium | ok |  |  | First-class workspaces and projects with per-workspace memory |
+| 545 | PAN-1999 | M | medium | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 546 | PAN-2002 | M | medium | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 547 | PAN-2008 | M | medium | ok |  |  | store-access guard — fail the build on direct store reads outside a domain resolver (PAN-1936 slice) |
+| 548 | PAN-2045 | M | medium | ok |  |  | perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool |
+| 549 | PAN-2046 | M | medium | ok |  |  | Conversation view does not surface terminal command responses |
+| 550 | PAN-1884 | M | medium | ok |  |  | Migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer; complete on main. |
+| 551 | PAN-2063 | XS | low | ok |  |  | UAT stack health panel should display collapsed by default to reduce clutter during active work. |
+| 552 | PAN-2066 | L | low | ok |  |  | OKF knowledge skill — deferred v2 capabilities (hybrid search, viz, lease writes, MCP, semantic auditor). |
+| 553 | PAN-2074 | S | low | needs-refinement |  |  | Research: evaluate ponytail (prompt compression) and decide build-vs-integrate vs Caveman/TLDR/RTK. |
+| 554 | PAN-2073 | S | low | ok |  |  | Docs: add user-facing page for the Desktop App (install, tray, embedded server, updates). |
+| 555 | PAN-2072 | S | low | ok |  |  | Docs: add user-facing page for Beads (task tracking) — lifecycle, bd CLI, dashboard view, enforcement gate. |
+| 556 | PAN-2071 | S | low | ok |  |  | Docs: add user-facing page for the Hooks system (lifecycle events, registration, built-ins, contract). |
+| 557 | PAN-2070 | S | low | ok |  |  | Docs: add user-facing page for the Flywheel orchestrator (start/stop, prioritization, health, config). |
+| 558 | PAN-2068 | S | low | ok |  |  | Docs: add user-facing page for Caveman (agent output compression) — modes, config, A/B, savings. |
+| 559 | PAN-2067 | S | low | ok |  |  | Docs: add user-facing page for RTK (Bash output compression) — toggle, config, savings, caveats. |
+| 560 | PAN-454 | M | low | needs-refinement |  |  | Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
+| 561 | PAN-2150 | L | medium | ok |  |  | Codebase-health: decompose Settings/SettingsPage.tsx (2043 lines) into <1000-line modules behind a re-export barrel. |
+| 562 | PAN-2151 | L | medium | ok |  |  | Codebase-health: decompose routes/misc.ts (1835 lines) into <1000-line modules behind a re-export barrel. |
+| 563 | PAN-2152 | L | medium | ok |  |  | Codebase-health: decompose cli/commands/workspace.ts (1791 lines) into <1000-line modules behind a re-export barrel. |
+| 564 | PAN-2153 | L | medium | ok |  |  | Codebase-health: decompose routes/specialists.ts (1753 lines) into <1000-line modules behind a re-export barrel. |
+| 565 | PAN-2154 | L | medium | ok |  |  | Codebase-health: decompose lib/workspace-manager.ts (1736 lines) into <1000-line modules behind a re-export barrel. |
+| 566 | PAN-2155 | M | medium | ok |  |  | Codebase-health: decompose chat/MessagesTimeline.tsx (1620 lines) into <1000-line modules behind a re-export barrel. |
+| 567 | PAN-2156 | M | medium | ok |  |  | Codebase-health: decompose services/conversation-service.ts (1609 lines) into <1000-line modules behind a re-export barrel. |
 
 ## Rationale detail
 
-### PAN-1919 (rank 3)
+### PAN-2143 (rank 3)
 
-This is the keystone of the state-model simplification (local DB is a disposable cache rebuilt from git+GitHub). The dual continue.json/progress.json representation is the root of repeated drift and recovery failures; consolidating into one git-tracked record is structural, not cosmetic. In-review; landing it unblocks the whole single-source-of-truth tenet.
+New top node, replacing the closed keystone PAN-1919. resolveConflictGate only runs on-demand from review-dispatch routes, so any PR that picked up a merge_conflict blocker and then fell out of the active review flow is never re-evaluated — the blocker persists forever and the merge train never picks it up, even after the conflict is resolved by a rebase. Confirmed live on PAN-1884/PAN-2088/PAN-1718 (review+test passed, mergeable again, yet readyForMerge=0). The fix is a small, well-understood deacon patrol (reconcileStaleMergeBlockers with a 2-min per-issue cooldown), so it is high impact, small, and clear — the ideal top-of-backlog pick and the single biggest unblocker for autonomous merge-train throughput.
 
 ### PAN-1982 (rank 6)
 
@@ -855,24 +862,11 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-27T02:54:51Z",
-  "model": "zai/glm-5.2",
+  "generatedAt": "2026-06-29T03:03:24Z",
+  "model": "claude-opus-4-8",
   "pass": "incremental",
-  "openCount": 552,
+  "openCount": 559,
   "nodes": [
-    {
-      "issue": "PAN-1919",
-      "rank": 3,
-      "size": "M",
-      "importance": "medium",
-      "score": 26,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Keystone: collapse per-issue resume/progress state into ONE git-tracked record; retire dual continue/progress.",
-      "rationale": "This is the keystone of the state-model simplification (local DB is a disposable cache rebuilt from git+GitHub). The dual continue.json/progress.json representation is the root of repeated drift and recovery failures; consolidating into one git-tracked record is structural, not cosmetic. In-review; landing it unblocks the whole single-source-of-truth tenet.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-1982",
       "rank": 6,
@@ -2592,18 +2586,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1559",
-      "rank": 145,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Orphaned inspect sessions: live tmux panes with no state.json escape all reapers",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1564",
       "rank": 146,
       "size": "S",
@@ -2672,42 +2654,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Fix: pan handoff --author external: authored doc is socket_write-ten but never submitted — successor sits at empty welcome screen",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1637",
-      "rank": 152,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Conversation resume reattaches to a keep-alive corpse (no harness-liveness probe)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1638",
-      "rank": 153,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Conversation DB status stays 'active' after the harness process dies",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1652",
-      "rank": 154,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Conversation title regeneration 500s on large transcripts — claude title invocation times out at 30s",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2789,30 +2735,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1722",
-      "rank": 161,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Awareness rail activity entries don't survive page load — snapshot doesn't seed recentActivity, only live events accumulate",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1781",
-      "rank": 162,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Context-overflow recovery: claude --resume bypasses panopticon-native compact boundaries (~50% of the time) — compaction is a silent...",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2077",
       "rank": 163,
       "size": "L",
@@ -2846,18 +2768,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "isEpic": false
     },
     {
-      "issue": "PAN-1793",
-      "rank": 165,
-      "size": "M",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: pan handoff kickoff message is not delivered to pi-harness conversations",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1795",
       "rank": 166,
       "size": "S",
@@ -2878,18 +2788,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Fix: Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag +...",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1817",
-      "rank": 168,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Linear API quota exhausted by IssueDataService polling (2500/hr ceiling hit, 84+ poll errors) — regression of the pre-safeguard trac...",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2974,18 +2872,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Fix: pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1900",
-      "rank": 175,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle (3 for 0614)",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3468,20 +3354,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "why": "Ship: Conversation input bar — mode/permissions/workspace selectors",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-2081",
-      "rank": 216,
-      "size": "M",
-      "importance": "medium",
-      "score": 24,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Make the sequencer epic-aware: epics are containers (not auto-pickable), children stay grouped in waves/DAG.",
-      "rationale": "Meta: make this sequencer epic-aware so containers like #2075 aren't auto-pickable and children stay grouped.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": false
     },
     {
       "issue": "PAN-456",
@@ -7328,6 +7200,7 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source)",
+      "rationale": "PAN-2088 (now in-review) builds directly on this delivery/source-attribution foundation; rank held at 536 because 2088 is shipping the generalization, leaving 1958 a low-priority scoped piece.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7637,6 +7510,242 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "rationale": "Demoted: superseded by PAN-2076 — the Boot Reconciliation epic absorbs this crash-recovery UI work as its dashboard surface.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-2143",
+      "rank": 3,
+      "size": "S",
+      "importance": "critical",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Linchpin for 24/7 throughput: deacon patrol must re-evaluate stale merge-blockers so resolved-conflict PRs actually merge.",
+      "rationale": "New top node, replacing the closed keystone PAN-1919. resolveConflictGate only runs on-demand from review-dispatch routes, so any PR that picked up a merge_conflict blocker and then fell out of the active review flow is never re-evaluated — the blocker persists forever and the merge train never picks it up, even after the conflict is resolved by a rebase. Confirmed live on PAN-1884/PAN-2088/PAN-1718 (review+test passed, mergeable again, yet readyForMerge=0). The fix is a small, well-understood deacon patrol (reconcileStaleMergeBlockers with a 2-min per-issue cooldown), so it is high impact, small, and clear — the ideal top-of-backlog pick and the single biggest unblocker for autonomous merge-train throughput.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2108",
+      "rank": 145,
+      "size": "M",
+      "importance": "high",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel can't recover context-exhausted/troubled work agents — RUN-30 root throughput blocker; needs a flywheel-safe recovery surface.",
+      "rationale": "RUN-30 root blocker: committed work strands on branches because the only recovery command (pan resume --compact) is flywheel-forbidden and deacon auto-resume exempts user-stopped/troubled agents.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2095",
+      "rank": 152,
+      "size": "M",
+      "importance": "high",
+      "score": 32,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan reload builds the divergent primary worktree, not origin/main — landed CI-green fixes never actually go live.",
+      "rationale": "New substrate deploy bug: primary HEAD diverges (61 state-sync commits ahead, behind on landed fixes) so pan reload compiles stale source; freshly-landed strike fixes silently fail to deploy.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2106",
+      "rank": 153,
+      "size": "M",
+      "importance": "medium",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan strike git-lock race leaves a broken partial workspace yet reports 'spawned' — false success blocks red-main reverts.",
+      "rationale": "New substrate bug: concurrent git ops on the shared primary repo race the worktree create, leaving a workspace with no source tree and no branch while strike reports success.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2088",
+      "rank": 154,
+      "size": "L",
+      "importance": "high",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-1958"
+      ],
+      "why": "Replace fragile tmux paste with pi extension control channel: steer/follow_up, effort, model, compact, quick-abort. In-review.",
+      "rationale": "New in-pipeline node (in-review); pinned. Generalizes PAN-1958's delivery foundation into the full pi/oh-my-pi conversation control surface plus dashboard affordances.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2091",
+      "rank": 161,
+      "size": "S",
+      "importance": "low",
+      "score": 16,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pure dead-code deletion: remove superseded IssueCockpitBody subtree (8 files); data-loss audit confirms nothing lost.",
+      "rationale": "New low-risk cleanup: IssueCockpitBody and its 7 orphaned cards are unreachable since IssueMissionControl superseded them; behavior-preserving deletion with a completed no-loss audit.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2145",
+      "rank": 162,
+      "size": "XL",
+      "importance": "medium",
+      "score": 24,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose routes/conversations.ts (4898 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: worst god-file (4898 lines); behavior-preserving decomposition improves AI-navigability and satisfies the file-size guard.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2146",
+      "rank": 165,
+      "size": "XL",
+      "importance": "medium",
+      "score": 23,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose src/lib/agents.ts (4572 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: agents.ts is one of the most-imported god-files (4572 lines); behavior-preserving split, no call-site changes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2147",
+      "rank": 168,
+      "size": "XL",
+      "importance": "medium",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose routes/agents.ts (4071 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: routes/agents.ts (4071 lines); behavior-preserving relocation behind a barrel.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2148",
+      "rank": 175,
+      "size": "XL",
+      "importance": "medium",
+      "score": 21,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose routes/issues.ts (4065 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: routes/issues.ts (4065 lines); behavior-preserving relocation behind a barrel.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2149",
+      "rank": 216,
+      "size": "L",
+      "importance": "medium",
+      "score": 18,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose lib/cloister/service.ts (2039 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: cloister/service.ts (2039 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2150",
+      "rank": 561,
+      "size": "L",
+      "importance": "medium",
+      "score": 13,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose Settings/SettingsPage.tsx (2043 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: SettingsPage.tsx (2043 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2151",
+      "rank": 562,
+      "size": "L",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose routes/misc.ts (1835 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: routes/misc.ts (1835 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2152",
+      "rank": 563,
+      "size": "L",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose cli/commands/workspace.ts (1791 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: cli workspace.ts (1791 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2153",
+      "rank": 564,
+      "size": "L",
+      "importance": "medium",
+      "score": 11,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose routes/specialists.ts (1753 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: routes/specialists.ts (1753 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2154",
+      "rank": 565,
+      "size": "L",
+      "importance": "medium",
+      "score": 11,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose lib/workspace-manager.ts (1736 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: workspace-manager.ts (1736 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2155",
+      "rank": 566,
+      "size": "M",
+      "importance": "medium",
+      "score": 10,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose chat/MessagesTimeline.tsx (1620 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: MessagesTimeline.tsx (1620 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2156",
+      "rank": 567,
+      "size": "M",
+      "importance": "medium",
+      "score": 10,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Codebase-health: decompose services/conversation-service.ts (1609 lines) into <1000-line modules behind a re-export barrel.",
+      "rationale": "New codebase-health cohort: conversation-service.ts (1609 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -7807,6 +7916,13 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-1958",
+      "to": "PAN-2088",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }

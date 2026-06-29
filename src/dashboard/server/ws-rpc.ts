@@ -38,6 +38,7 @@ import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
+import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -307,6 +308,46 @@ export function streamResolvedFullParseSnapshots(
       (handle) => Effect.sync(() => handle.stop()),
     ),
   );
+}
+
+type FullParseSnapshotStream = Stream.Stream<ConversationEvent, PanRpcError>;
+
+function ohmypiSnapshotParser(harness: unknown): (file: string) => Promise<ParseResult> {
+  switch (harness) {
+    case 'pi':
+      return parsePiConversationMessages;
+    default:
+      return parseOhmypiConversationMessages;
+  }
+}
+
+function streamHarnessFullParseSnapshots(
+  sessionName: string,
+  harness: unknown,
+  model: string | null,
+  unresolvedMeansEmpty = false,
+): FullParseSnapshotStream | null {
+  const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
+
+  if (behavior.transcriptKind === 'ohmypi-jsonl') {
+    return streamResolvedFullParseSnapshots(
+      () => resolvePiSessionPath(sessionName),
+      ohmypiSnapshotParser(harness),
+      model,
+      unresolvedMeansEmpty,
+    );
+  }
+
+  if (behavior.transcriptKind === 'codex-rollout-jsonl') {
+    return streamResolvedFullParseSnapshots(
+      () => resolveCodexRolloutPath(sessionName),
+      parseCodexConversationMessages,
+      model,
+      unresolvedMeansEmpty,
+    );
+  }
+
+  return null;
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
@@ -857,27 +898,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // streaming for pi/codex here.
             if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              if (harness === 'ohmypi') {
-                return streamResolvedFullParseSnapshots(
-                  () => resolvePiSessionPath(input.conversationName),
-                  parseOhmypiConversationMessages,
-                  null,
-                );
-              }
-              if (harness === 'pi') {
-                return streamResolvedFullParseSnapshots(
-                  () => resolvePiSessionPath(input.conversationName),
-                  parsePiConversationMessages,
-                  null,
-                );
-              }
-              if (harness === 'codex') {
-                return streamResolvedFullParseSnapshots(
-                  () => resolveCodexRolloutPath(input.conversationName),
-                  parseCodexConversationMessages,
-                  null,
-                );
-              }
+              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null);
+              if (stream) return stream;
               return conversationDiscoveringStream();
             }
 
@@ -885,34 +907,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            if (conv.harness === 'ohmypi') {
-              return streamResolvedFullParseSnapshots(
-                () => resolvePiSessionPath(conv.tmuxSession),
-                parseOhmypiConversationMessages,
-                conv.model ?? null,
-                true,
-              );
-            }
+            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true);
+            if (stream) return stream;
 
-            if (conv.harness === 'pi') {
-              return streamResolvedFullParseSnapshots(
-                () => resolvePiSessionPath(conv.tmuxSession),
-                parsePiConversationMessages,
-                conv.model ?? null,
-                true,
-              );
-            }
-
-            if (conv.harness === 'codex') {
-              return streamResolvedFullParseSnapshots(
-                () => resolveCodexRolloutPath(conv.tmuxSession),
-                parseCodexConversationMessages,
-                conv.model ?? null,
-                true,
-              );
-            }
-
-            if (conv.harness !== 'claude-code' && conv.harness != null) {
+            if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {
               return conversationDiscoveringStream();
             }
 

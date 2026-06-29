@@ -34,6 +34,7 @@ import type {
   AgentRuntime,
   AgentRuntimeSync,
   AgentRuntimeError,
+  HarnessBehavior,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -41,6 +42,7 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
+import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
@@ -146,6 +148,10 @@ export function resolveLatestOhmypiSessionId(agentId: string): string | null {
 
 export class OhmypiRuntimeSync implements AgentRuntimeSync {
   readonly name = 'ohmypi' as const
+
+  getHarnessBehavior(): HarnessBehavior {
+    return OHMYPI_BEHAVIOR
+  }
 
   getSessionPath(agentId: string): string | null {
     const root = ohmypiSessionDirFor(agentId)
@@ -424,6 +430,9 @@ export class OhmypiRuntime implements AgentRuntime {
 
   getSessionPath(agentId: string): string | null {
     return this.inner.getSessionPath(agentId)
+  }
+  getHarnessBehavior(): HarnessBehavior {
+    return this.inner.getHarnessBehavior()
   }
   getLastActivity(agentId: string): Date | null {
     return this.inner.getLastActivity(agentId)

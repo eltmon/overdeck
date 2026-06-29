@@ -87,7 +87,7 @@ afterEach(() => {
 
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
-import { processResetReviewPipeline } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { processResetReviewPipeline } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
 import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────

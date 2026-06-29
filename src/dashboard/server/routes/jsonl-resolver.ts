@@ -30,6 +30,8 @@ import { Effect } from 'effect';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir, getOverdeckHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
+import type { HarnessName } from '../../../lib/runtimes/types.js';
 
 export interface ResolveJsonlPathOptions {
   /** Override the ~/.overdeck/agents directory (test hook). */
@@ -46,6 +48,10 @@ async function pathExists(p: string): Promise<boolean> {
 
 async function readOptional(p: string): Promise<string | null> {
   return readFile(p, 'utf-8').catch(() => null);
+}
+
+function behaviorForHarness(harness: string | null | undefined) {
+  return getHarnessBehavior(harness as HarnessName | null | undefined);
 }
 
 /**
@@ -345,10 +351,11 @@ export async function resolveJsonlPath(
   // Dispatch on the recorded harness so a stale session.id from an earlier
   // claude-code run of the same agent id can't shadow the codex transcript.
   const harness = await resolveAgentHarness(agentId, opts);
-  if (harness === 'codex') {
+  const behavior = behaviorForHarness(harness);
+  if (behavior.transcriptKind === 'codex-rollout-jsonl') {
     return resolveCodexRolloutPath(agentId, opts);
   }
-  if (harness === 'pi' || harness === 'ohmypi') {
+  if (behavior.transcriptKind === 'ohmypi-jsonl') {
     return resolvePiSessionPath(agentId, opts);
   }
 

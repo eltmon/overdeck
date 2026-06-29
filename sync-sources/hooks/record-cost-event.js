@@ -25452,6 +25452,1970 @@ function readIssueRecordSync(project, issueId) {
 	}
 }
 //#endregion
+//#region ../../src/lib/config-yaml/schema.ts
+const COMPLIANCE_MODES = [
+	"off",
+	"advisory",
+	"enforcing"
+];
+const PARENT_MODEL_REF = "parent";
+/**
+* Canonical workhorse slot list. Anything outside this set is rejected by
+* config-load validation (PAN-1048 review feedback 003 / REQ-18).
+*/
+const WORKHORSE_SLOTS = [
+	"expensive",
+	"mid",
+	"cheap"
+];
+const ROLE_EFFORTS = [
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max"
+];
+//#endregion
+//#region ../../src/lib/model-capabilities.ts
+/**
+* Model ID deprecation mapping
+*
+* Maps deprecated model IDs to their current replacements.
+* When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
+* add the mapping here to enable automatic migration.
+*
+* Strategy: Single-hop only. Only add models here when the provider has
+* actually retired them — not just because a newer version exists.
+*/
+const MODEL_DEPRECATIONS = {
+	"claude-opus-4-5": "claude-opus-4-7",
+	"claude-sonnet-4-5": "claude-sonnet-4-6",
+	"gpt-5.2-codex": "gpt-5.3-codex",
+	"gpt-5.5-mini": "gpt-5.4-mini",
+	"gpt-5.5-nano": "gpt-5.4-mini",
+	"gpt-5.4-nano": "gpt-5.4-mini",
+	"gpt-5.5-pro": "gpt-5.5",
+	"gpt-5.4-pro": "gpt-5.4",
+	"o3": "gpt-5.4",
+	"o3-deep-research": "gpt-5.4",
+	"o4-mini": "gpt-5.4-mini",
+	"gpt-4o": "gpt-5.4",
+	"gpt-4o-mini": "gpt-5.4-mini",
+	"gemini-3-pro-preview": "gemini-3.1-pro-preview",
+	"gemini-3-flash": "gemini-3-flash-preview",
+	"gemini-2.5-pro": "gemini-3.1-pro-preview",
+	"gemini-2.5-flash": "gemini-3-flash-preview",
+	"kimi-k2": "kimi-k2.5",
+	"glm-4.7": "glm-5.1",
+	"glm-4.7-flash": "glm-5.1"
+};
+/**
+* Resolve a model ID to its current version
+*
+* If the model ID is deprecated, returns the replacement.
+* Otherwise, returns the model ID unchanged.
+*
+* @param modelId - Model ID to resolve (may be deprecated)
+* @returns Current model ID
+*/
+function resolveModelIdSync(modelId) {
+	return MODEL_DEPRECATIONS[modelId] || modelId;
+}
+/**
+* Master capability database
+*
+* Scores are based on:
+* - Public benchmarks (HumanEval, SWE-bench, MBPP)
+* - Community consensus
+* - Practical experience
+*
+* These are baseline scores - run Kimi 2.5 research to refine.
+*/
+const MODEL_CAPABILITIES = {
+	"claude-fable-5": {
+		model: "claude-fable-5",
+		provider: "anthropic",
+		displayName: "Claude Fable 5",
+		costPer1MTokens: 90,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 99,
+			"code-review": 99,
+			debugging: 99,
+			planning: 99,
+			documentation: 97,
+			testing: 96,
+			security: 99,
+			performance: 95,
+			synthesis: 99,
+			speed: 42,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding."
+	},
+	"claude-opus-4-8": {
+		model: "claude-opus-4-8",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.8",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 98,
+			"code-review": 99,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 95,
+			security: 99,
+			performance: 93,
+			synthesis: 99,
+			speed: 40,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks."
+	},
+	"claude-opus-4-7": {
+		model: "claude-opus-4-7",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.7",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 98,
+			"code-review": 99,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 94,
+			security: 99,
+			performance: 92,
+			synthesis: 99,
+			speed: 38,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks."
+	},
+	"claude-opus-4-6": {
+		model: "claude-opus-4-6",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.6",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 96,
+			"code-review": 98,
+			debugging: 97,
+			planning: 99,
+			documentation: 95,
+			testing: 92,
+			security: 98,
+			performance: 90,
+			synthesis: 98,
+			speed: 40,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"max"
+		],
+		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
+	},
+	"claude-sonnet-4-6": {
+		model: "claude-sonnet-4-6",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 4.6",
+		costPer1MTokens: 9,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 94,
+			"code-review": 94,
+			debugging: 92,
+			planning: 90,
+			documentation: 92,
+			testing: 92,
+			security: 88,
+			performance: 88,
+			synthesis: 90,
+			speed: 70,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high"
+		],
+		notes: "Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning."
+	},
+	"claude-sonnet-4-5": {
+		model: "claude-sonnet-4-5",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 4.5",
+		costPer1MTokens: 9,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 92,
+			"code-review": 92,
+			debugging: 90,
+			planning: 88,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 85,
+			synthesis: 88,
+			speed: 70,
+			"context-length": 95
+		},
+		notes: "Best value: 77.2% SWE-bench at 1/5th Opus cost. Beats GPT-5 Codex."
+	},
+	"claude-haiku-4-5": {
+		model: "claude-haiku-4-5",
+		provider: "anthropic",
+		displayName: "Claude Haiku 4.5",
+		costPer1MTokens: 4,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 75,
+			"code-review": 72,
+			debugging: 70,
+			planning: 65,
+			documentation: 75,
+			testing: 70,
+			security: 60,
+			performance: 65,
+			synthesis: 68,
+			speed: 95,
+			"context-length": 95
+		},
+		notes: "Fast and cheap, good for simple tasks and exploration"
+	},
+	"gpt-5.4": {
+		model: "gpt-5.4",
+		provider: "openai",
+		displayName: "GPT-5.4",
+		costPer1MTokens: 8.75,
+		contextWindow: 105e4,
+		minTier: "plus",
+		skills: {
+			"code-generation": 96,
+			"code-review": 92,
+			debugging: 94,
+			planning: 92,
+			documentation: 90,
+			testing: 92,
+			security: 88,
+			performance: 90,
+			synthesis: 92,
+			speed: 60,
+			"context-length": 100
+		},
+		notes: "OpenAI flagship (March 2026). 1.05M context, 128K max output. Strong coding and reasoning."
+	},
+	"gpt-5.4-mini": {
+		model: "gpt-5.4-mini",
+		provider: "openai",
+		displayName: "GPT-5.4 Mini",
+		costPer1MTokens: 1,
+		contextWindow: 4e5,
+		minTier: "free",
+		skills: {
+			"code-generation": 82,
+			"code-review": 78,
+			debugging: 76,
+			planning: 72,
+			documentation: 80,
+			testing: 76,
+			security: 68,
+			performance: 72,
+			synthesis: 75,
+			speed: 90,
+			"context-length": 90
+		},
+		notes: "Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers."
+	},
+	"o3": {
+		model: "o3",
+		provider: "openai",
+		displayName: "O3",
+		costPer1MTokens: 5,
+		contextWindow: 2e5,
+		minTier: "plus",
+		skills: {
+			"code-generation": 90,
+			"code-review": 95,
+			debugging: 98,
+			planning: 95,
+			documentation: 88,
+			testing: 88,
+			security: 92,
+			performance: 92,
+			synthesis: 95,
+			speed: 25,
+			"context-length": 95
+		},
+		notes: "Deep reasoning model. Excels at complex debugging, math, scientific reasoning."
+	},
+	"o4-mini": {
+		model: "o4-mini",
+		provider: "openai",
+		displayName: "O4 Mini",
+		costPer1MTokens: 2.75,
+		contextWindow: 2e5,
+		minTier: "plus",
+		skills: {
+			"code-generation": 85,
+			"code-review": 90,
+			debugging: 94,
+			planning: 88,
+			documentation: 84,
+			testing: 85,
+			security: 86,
+			performance: 88,
+			synthesis: 88,
+			speed: 70,
+			"context-length": 90
+		},
+		notes: "Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable."
+	},
+	"gpt-5.4-pro": {
+		model: "gpt-5.4-pro",
+		provider: "openai",
+		displayName: "GPT-5.4 Pro",
+		costPer1MTokens: 105,
+		contextWindow: 105e4,
+		minTier: "pro",
+		skills: {
+			"code-generation": 98,
+			"code-review": 98,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 96,
+			security: 96,
+			performance: 95,
+			synthesis: 99,
+			speed: 45,
+			"context-length": 100
+		},
+		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
+	},
+	"gpt-5.5": {
+		model: "gpt-5.5",
+		provider: "openai",
+		displayName: "GPT-5.5",
+		costPer1MTokens: 10.5,
+		contextWindow: 15e4,
+		minTier: "plus",
+		skills: {
+			"code-generation": 97,
+			"code-review": 94,
+			debugging: 96,
+			planning: 95,
+			documentation: 92,
+			testing: 94,
+			security: 91,
+			performance: 92,
+			synthesis: 94,
+			speed: 65,
+			"context-length": 95
+		},
+		notes: "OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 128K max output."
+	},
+	"gpt-5.5-pro": {
+		model: "gpt-5.5-pro",
+		provider: "openai",
+		displayName: "GPT-5.5 Pro",
+		costPer1MTokens: 119,
+		contextWindow: 105e4,
+		minTier: "pro",
+		skills: {
+			"code-generation": 99,
+			"code-review": 99,
+			debugging: 99,
+			planning: 99,
+			documentation: 97,
+			testing: 97,
+			security: 97,
+			performance: 96,
+			synthesis: 99,
+			speed: 50,
+			"context-length": 100
+		},
+		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only."
+	},
+	"gpt-5.3-codex": {
+		model: "gpt-5.3-codex",
+		provider: "openai",
+		displayName: "GPT-5.3 Codex",
+		costPer1MTokens: 7.875,
+		contextWindow: 4e5,
+		skills: {
+			"code-generation": 96,
+			"code-review": 95,
+			debugging: 94,
+			planning: 90,
+			documentation: 88,
+			testing: 90,
+			security: 86,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 90
+		},
+		notes: "Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API."
+	},
+	"gpt-5.2": {
+		model: "gpt-5.2",
+		provider: "openai",
+		displayName: "GPT-5.2",
+		costPer1MTokens: 5.625,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 84,
+			planning: 82,
+			documentation: 84,
+			testing: 82,
+			security: 78,
+			performance: 80,
+			synthesis: 84,
+			speed: 70,
+			"context-length": 85
+		},
+		notes: "Previous-generation general-purpose model (Oct 2025). Positioned by OpenAI for long-running agent workloads — strong candidate for orchestrator/flywheel roles."
+	},
+	"gpt-5.3-codex-spark": {
+		model: "gpt-5.3-codex-spark",
+		provider: "openai",
+		displayName: "GPT-5.3 Codex Spark",
+		costPer1MTokens: 7.875,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 86,
+			debugging: 84,
+			planning: 78,
+			documentation: 82,
+			testing: 88,
+			security: 76,
+			performance: 82,
+			synthesis: 84,
+			speed: 98,
+			"context-length": 72
+		},
+		notes: "Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available."
+	},
+	"o3-deep-research": {
+		model: "o3-deep-research",
+		provider: "openai",
+		displayName: "O3 Deep Research (deprecated)",
+		costPer1MTokens: 5,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 95,
+			debugging: 98,
+			planning: 95,
+			documentation: 88,
+			testing: 88,
+			security: 92,
+			performance: 92,
+			synthesis: 95,
+			speed: 25,
+			"context-length": 95
+		}
+	},
+	"gpt-4o": {
+		model: "gpt-4o",
+		provider: "openai",
+		displayName: "GPT-4o",
+		costPer1MTokens: 7.5,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 78,
+			planning: 76,
+			documentation: 80,
+			testing: 76,
+			security: 74,
+			performance: 74,
+			synthesis: 80,
+			speed: 75,
+			"context-length": 75
+		}
+	},
+	"gpt-4o-mini": {
+		model: "gpt-4o-mini",
+		provider: "openai",
+		displayName: "GPT-4o Mini",
+		costPer1MTokens: .6,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 68,
+			"code-review": 64,
+			debugging: 60,
+			planning: 56,
+			documentation: 66,
+			testing: 60,
+			security: 52,
+			performance: 56,
+			synthesis: 62,
+			speed: 92,
+			"context-length": 75
+		}
+	},
+	"gemini-3.1-pro-preview": {
+		model: "gemini-3.1-pro-preview",
+		provider: "google",
+		displayName: "Gemini 3.1 Pro",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 88,
+			planning: 88,
+			documentation: 90,
+			testing: 88,
+			security: 82,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 100
+		},
+		notes: "Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities."
+	},
+	"gemini-3-flash-preview": {
+		model: "gemini-3-flash-preview",
+		provider: "google",
+		displayName: "Gemini 3 Flash Preview",
+		costPer1MTokens: .4,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 80,
+			"code-review": 75,
+			debugging: 72,
+			planning: 68,
+			documentation: 76,
+			testing: 72,
+			security: 60,
+			performance: 70,
+			synthesis: 75,
+			speed: 96,
+			"context-length": 100
+		},
+		notes: "Fast and cheap with 1M context. Strong reasoning and agentic capabilities."
+	},
+	"gemini-3.1-flash-lite-preview": {
+		model: "gemini-3.1-flash-lite-preview",
+		provider: "google",
+		displayName: "Gemini 3.1 Flash Lite",
+		costPer1MTokens: .9,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 72,
+			"code-review": 68,
+			debugging: 65,
+			planning: 60,
+			documentation: 70,
+			testing: 65,
+			security: 52,
+			performance: 62,
+			synthesis: 68,
+			speed: 98,
+			"context-length": 100
+		},
+		notes: "Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads."
+	},
+	"gemini-3-pro-preview": {
+		model: "gemini-3-pro-preview",
+		provider: "google",
+		displayName: "Gemini 3 Pro (deprecated)",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 88,
+			planning: 88,
+			documentation: 90,
+			testing: 88,
+			security: 82,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 100
+		}
+	},
+	"gemini-2.5-pro": {
+		model: "gemini-2.5-pro",
+		provider: "google",
+		displayName: "Gemini 2.5 Pro (deprecated)",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 86,
+			planning: 86,
+			documentation: 88,
+			testing: 86,
+			security: 80,
+			performance: 86,
+			synthesis: 90,
+			speed: 70,
+			"context-length": 100
+		}
+	},
+	"gemini-2.5-flash": {
+		model: "gemini-2.5-flash",
+		provider: "google",
+		displayName: "Gemini 2.5 Flash (deprecated)",
+		costPer1MTokens: .4,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 78,
+			"code-review": 74,
+			debugging: 70,
+			planning: 66,
+			documentation: 74,
+			testing: 70,
+			security: 58,
+			performance: 68,
+			synthesis: 74,
+			speed: 94,
+			"context-length": 100
+		}
+	},
+	"kimi-k2.7-code": {
+		model: "kimi-k2.7-code",
+		provider: "kimi",
+		displayName: "Kimi K2.7 Code",
+		costPer1MTokens: 2.5,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 95,
+			"code-review": 93,
+			debugging: 93,
+			planning: 90,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 88,
+			synthesis: 94,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Moonshot/Kimi's coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat"
+	},
+	"kimi-k2.6": {
+		model: "kimi-k2.6",
+		provider: "kimi",
+		displayName: "Kimi K2.6",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 94,
+			"code-review": 92,
+			debugging: 92,
+			planning: 90,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 88,
+			synthesis: 94,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Kimi's smartest model (April 2026). Native multimodal, superior agentic coding, and autonomous agent execution. Replaces K2.6-code-preview."
+	},
+	"kimi-k2.5": {
+		model: "kimi-k2.5",
+		provider: "kimi",
+		displayName: "Kimi K2.5",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration."
+	},
+	"K2.6-code-preview": {
+		model: "K2.6-code-preview",
+		provider: "kimi",
+		displayName: "K2.6-code-preview",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Kimi coding preview model."
+	},
+	"kimi-k2": {
+		model: "kimi-k2",
+		provider: "kimi",
+		displayName: "Kimi K2 (deprecated)",
+		costPer1MTokens: 1.6,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 78,
+			performance: 80,
+			synthesis: 88,
+			speed: 72,
+			"context-length": 80
+		},
+		notes: "65.8% SWE-bench. Superseded by Kimi K2.5."
+	},
+	"minimax-m2.7": {
+		model: "minimax-m2.7",
+		provider: "minimax",
+		displayName: "MiniMax M2.7",
+		costPer1MTokens: 1.5,
+		contextWindow: 204800,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 85,
+			documentation: 85,
+			testing: 86,
+			security: 80,
+			performance: 82,
+			synthesis: 90,
+			speed: 80,
+			"context-length": 92
+		},
+		notes: "10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache."
+	},
+	"minimax-m2.7-highspeed": {
+		model: "minimax-m2.7-highspeed",
+		provider: "minimax",
+		displayName: "MiniMax M2.7 Highspeed",
+		costPer1MTokens: 1.5,
+		contextWindow: 204800,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 85,
+			documentation: 85,
+			testing: 86,
+			security: 80,
+			performance: 82,
+			synthesis: 90,
+			speed: 92,
+			"context-length": 92
+		},
+		notes: "Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work."
+	},
+	"MiniMax-M3": {
+		model: "MiniMax-M3",
+		provider: "minimax",
+		displayName: "MiniMax M3",
+		costPer1MTokens: 1.5,
+		contextWindow: 1024e3,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 80,
+			"context-length": 100
+		},
+		notes: "MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7."
+	},
+	"glm-5.2": {
+		model: "glm-5.2",
+		provider: "zai",
+		displayName: "GLM-5.2",
+		costPer1MTokens: 2.9,
+		contextWindow: 1e6,
+		effortLevels: ["high", "max"],
+		supportsImages: false,
+		skills: {
+			"code-generation": 85,
+			"code-review": 83,
+			debugging: 83,
+			planning: 81,
+			documentation: 80,
+			testing: 80,
+			security: 77,
+			performance: 77,
+			synthesis: 82,
+			speed: 84,
+			"context-length": 75
+		},
+		notes: "Z.AI GLM-5.2 flagship via Anthropic-compatible API. Supports only high and max effort levels. Scores provisional — verify against benchmarks."
+	},
+	"glm-5.1": {
+		model: "glm-5.1",
+		provider: "zai",
+		displayName: "GLM-5.1",
+		costPer1MTokens: 2.9,
+		contextWindow: 2e5,
+		supportsImages: false,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 80,
+			planning: 78,
+			documentation: 78,
+			testing: 78,
+			security: 75,
+			performance: 75,
+			synthesis: 80,
+			speed: 85,
+			"context-length": 75
+		},
+		notes: "Z.AI GLM-5.1 model via Anthropic-compatible API. Previous flagship; retained alongside GLM-5.2."
+	},
+	"glm-4.7": {
+		model: "glm-4.7",
+		provider: "zai",
+		displayName: "GLM-4.7 (deprecated)",
+		costPer1MTokens: 1.5,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 85,
+			debugging: 84,
+			planning: 82,
+			documentation: 80,
+			testing: 82,
+			security: 78,
+			performance: 80,
+			synthesis: 84,
+			speed: 80,
+			"context-length": 92
+		},
+		notes: "Top open-source model for agentic coding. 73.8% SWE-bench, 200K context."
+	},
+	"glm-4.7-flash": {
+		model: "glm-4.7-flash",
+		provider: "zai",
+		displayName: "GLM-4.7 Flash (deprecated)",
+		costPer1MTokens: .3,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 78,
+			"code-review": 74,
+			debugging: 72,
+			planning: 70,
+			documentation: 72,
+			testing: 72,
+			security: 68,
+			performance: 70,
+			synthesis: 74,
+			speed: 95,
+			"context-length": 92
+		},
+		notes: "Fast and affordable GLM model for quick iterations. 200K context."
+	},
+	"mimo-v2.5-pro": {
+		model: "mimo-v2.5-pro",
+		provider: "mimo",
+		displayName: "MiMo V2.5 Pro",
+		costPer1MTokens: 2,
+		contextWindow: 1048576,
+		supportsImages: false,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 80,
+			performance: 82,
+			synthesis: 88,
+			speed: 78,
+			"context-length": 100
+		},
+		notes: "Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window."
+	},
+	"mimo-v2.5": {
+		model: "mimo-v2.5",
+		provider: "mimo",
+		displayName: "MiMo V2.5",
+		costPer1MTokens: 1,
+		contextWindow: 262144,
+		supportsImages: true,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 80,
+			planning: 78,
+			documentation: 78,
+			testing: 78,
+			security: 74,
+			performance: 76,
+			synthesis: 82,
+			speed: 85,
+			"context-length": 96
+		},
+		notes: "Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities."
+	},
+	"qwen/qwen3.6-plus": {
+		model: "qwen/qwen3.6-plus",
+		provider: "nous",
+		displayName: "Qwen 3.6 Plus (Nous Portal)",
+		costPer1MTokens: 0,
+		contextWindow: 1048576,
+		skills: {
+			"code-generation": 94,
+			"code-review": 92,
+			debugging: 92,
+			planning: 92,
+			documentation: 90,
+			testing: 90,
+			security: 88,
+			performance: 88,
+			synthesis: 92,
+			speed: 74,
+			"context-length": 100
+		},
+		notes: "Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material."
+	},
+	"qwen3-max": {
+		model: "qwen3-max",
+		provider: "dashscope",
+		displayName: "Qwen3 Max (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 95,
+			"code-review": 93,
+			debugging: 93,
+			planning: 94,
+			documentation: 91,
+			testing: 91,
+			security: 89,
+			performance: 89,
+			synthesis: 94,
+			speed: 72,
+			"context-length": 98
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3-coder-plus": {
+		model: "qwen3-coder-plus",
+		provider: "dashscope",
+		displayName: "Qwen3 Coder Plus (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 96,
+			"code-review": 94,
+			debugging: 94,
+			planning: 91,
+			documentation: 90,
+			testing: 92,
+			security: 89,
+			performance: 90,
+			synthesis: 92,
+			speed: 74,
+			"context-length": 98
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3-plus": {
+		model: "qwen3-plus",
+		provider: "dashscope",
+		displayName: "Qwen3 Plus (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 131072,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 80,
+			performance: 82,
+			synthesis: 88,
+			speed: 82,
+			"context-length": 96
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3.7-max": {
+		model: "qwen3.7-max",
+		provider: "dashscope",
+		displayName: "Qwen3.7 Max (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 96,
+			"code-review": 94,
+			debugging: 94,
+			planning: 95,
+			documentation: 92,
+			testing: 92,
+			security: 90,
+			performance: 90,
+			synthesis: 95,
+			speed: 70,
+			"context-length": 98
+		},
+		notes: "Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"grok-build-0.1": {
+		model: "grok-build-0.1",
+		provider: "xai",
+		displayName: "Grok Build 0.1",
+		costPer1MTokens: 1.5,
+		contextWindow: 256e3,
+		supportsImages: true,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 87,
+			documentation: 85,
+			testing: 86,
+			security: 82,
+			performance: 84,
+			synthesis: 88,
+			speed: 82,
+			"context-length": 97
+		},
+		notes: "xAI's agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli."
+	}
+};
+/**
+* Effort levels a model accepts, or `undefined` when not enumerated for that
+* model (treat undefined as "no model-specific restriction"). Resolves
+* deprecated IDs first so callers can pass raw config refs.
+*/
+function getModelEffortLevelsSync(model) {
+	return MODEL_CAPABILITIES[resolveModelIdSync(String(model))]?.effortLevels;
+}
+//#endregion
+//#region ../../src/lib/config-yaml/roles.ts
+const DEFAULT_WORKHORSES = {
+	expensive: "claude-opus-4-8",
+	mid: "claude-sonnet-4-6",
+	cheap: "claude-haiku-4-5"
+};
+const DEFAULT_ROLES = {
+	plan: { model: "workhorse:expensive" },
+	work: {
+		model: "workhorse:mid",
+		sub: {
+			inspect: { model: "workhorse:cheap" },
+			"inspect-deep": { model: "workhorse:mid" }
+		}
+	},
+	review: {
+		model: "workhorse:expensive",
+		sub: {
+			security: { model: "workhorse:expensive" },
+			correctness: { model: "workhorse:mid" },
+			performance: { model: "workhorse:mid" },
+			requirements: { model: "workhorse:mid" },
+			synthesis: { model: "workhorse:expensive" }
+		}
+	},
+	test: { model: "workhorse:mid" },
+	ship: { model: "workhorse:mid" },
+	strike: { model: "workhorse:expensive" },
+	sequencer: { model: "workhorse:expensive" },
+	flywheel: {
+		model: "claude-opus-4-8",
+		effort: "high",
+		minAgents: 20,
+		maxAgents: 30,
+		scope: "pan-only"
+	}
+};
+function cloneRoles(roles) {
+	const cloned = {};
+	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
+		...roleConfig,
+		model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
+		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
+	};
+	return cloned;
+}
+function isWorkhorseRef(ref) {
+	return ref.startsWith("workhorse:");
+}
+function workhorseSlotFromRef(ref) {
+	return ref.slice(10);
+}
+function derefWorkhorse(ref, config, fieldPath = "model") {
+	if (ref === "parent") throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
+	if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref);
+	const slot = workhorseSlotFromRef(ref);
+	const resolved = config.workhorses?.[slot];
+	if (!resolved) throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
+	if (isWorkhorseRef(resolved)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+	return resolveModelIdSync(resolved);
+}
+function mergeRoleConfig(result, config) {
+	if (!config?.workhorses && !config?.roles) return;
+	if (config.workhorses) {
+		const unknownSlots = Object.keys(config.workhorses).filter((slot) => !WORKHORSE_SLOTS.includes(slot));
+		if (unknownSlots.length > 0) throw new Error(`config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? "s" : ""} ` + unknownSlots.map((s) => `workhorses.${s}`).join(", ") + `. Valid slots: ${WORKHORSE_SLOTS.join(", ")}.`);
+		result.workhorses = {
+			...result.workhorses ?? {},
+			...config.workhorses
+		};
+	}
+	if (config.roles) {
+		result.roles = { ...result.roles ?? {} };
+		for (const [role, roleConfig] of Object.entries(config.roles)) {
+			const existing = result.roles[role];
+			const sub = {
+				...existing?.sub ?? {},
+				...roleConfig.sub ?? {}
+			};
+			const mergedRoleConfig = {
+				...existing,
+				...roleConfig,
+				sub: Object.keys(sub).length > 0 ? sub : void 0
+			};
+			if (roleConfig.maxAgents !== void 0 && roleConfig.minAgents === void 0 && mergedRoleConfig.minAgents !== void 0 && mergedRoleConfig.minAgents > roleConfig.maxAgents) mergedRoleConfig.minAgents = roleConfig.maxAgents;
+			result.roles[role] = mergedRoleConfig;
+		}
+	}
+}
+function validateRoleFields(role, roleConfig) {
+	if (Array.isArray(roleConfig.model)) {
+		if (roleConfig.model.length === 0) throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
+		for (let i = 0; i < roleConfig.model.length; i++) {
+			const entry = roleConfig.model[i];
+			if (!entry.model || typeof entry.model !== "string") throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
+			if (!Number.isInteger(entry.weight) || entry.weight <= 0) throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
+		}
+	}
+	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
+	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
+	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
+	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
+	if (roleConfig.minAgents !== void 0 && roleConfig.maxAgents !== void 0 && roleConfig.minAgents > roleConfig.maxAgents) throw new Error(`config.yaml: roles.${role}.minAgents (${roleConfig.minAgents}) cannot exceed maxAgents (${roleConfig.maxAgents})`);
+	if (roleConfig.scope !== void 0 && roleConfig.scope !== "pan-only" && roleConfig.scope !== "all-tracked-projects") throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
+}
+function validateRoleModelRefs(config) {
+	for (const [slot, ref] of Object.entries(config.workhorses ?? {})) {
+		if (ref === "parent") throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
+		if (isWorkhorseRef(ref)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+		resolveModelIdSync(ref);
+	}
+	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
+		validateRoleFields(role, roleConfig);
+		if (Array.isArray(roleConfig.model)) for (let i = 0; i < roleConfig.model.length; i++) derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
+		else if (roleConfig.model) {
+			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+			if (roleConfig.effort !== void 0) {
+				const supported = getModelEffortLevelsSync(resolvedModel);
+				if (supported !== void 0 && !supported.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(", ")})`);
+			}
+		}
+		for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) if (subConfig.model && subConfig.model !== "parent") derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
+	}
+}
+//#endregion
+//#region ../../src/lib/background-ai/registry.ts
+/**
+* Background AI feature registry — pure data, no dependencies (PAN-1583).
+*
+* Kept dependency-free so `config-yaml.ts` can import the feature list and
+* defaults without creating an import cycle with the enablement gate in
+* `features.ts` (which imports `config-yaml`).
+*/
+/** Every background AI feature Overdeck can run automatically. */
+const BACKGROUND_AI_FEATURES = [
+	"conversationTitles",
+	"titleRefinement",
+	"memoryExtraction",
+	"memoryQueryExpansion",
+	"conversationEnrichment",
+	"sessionEmbeddings",
+	"summaryFork",
+	"ttsSummarizer"
+];
+/**
+* Feature metadata. The `defaultEnabled` values mirror the historical
+* behavior of each subsystem so introducing the registry changes nothing
+* until the user flips a toggle:
+*   - sessionEmbeddings defaults OFF  (conversations.embeddings default false)
+*   - ttsSummarizer defaults OFF      (ttsSummarizer.enabled default false)
+*   - everything else defaults ON.
+*/
+const BACKGROUND_AI_FEATURE_META = [
+	{
+		key: "conversationTitles",
+		label: "Conversation titles",
+		description: "Generate a title for a new conversation from its first message.",
+		defaultEnabled: true
+	},
+	{
+		key: "titleRefinement",
+		label: "Title refinement",
+		description: "Refine a conversation title once the first assistant reply arrives.",
+		defaultEnabled: true
+	},
+	{
+		key: "memoryExtraction",
+		label: "Memory extraction",
+		description: "Extract structured observations from running agent transcripts.",
+		defaultEnabled: true
+	},
+	{
+		key: "memoryQueryExpansion",
+		label: "Memory query expansion",
+		description: "Expand memory search queries into related terms for better recall.",
+		defaultEnabled: true
+	},
+	{
+		key: "conversationEnrichment",
+		label: "Conversation enrichment",
+		description: "Summarize and tag discovered sessions for search and display.",
+		defaultEnabled: true
+	},
+	{
+		key: "sessionEmbeddings",
+		label: "Session embeddings",
+		description: "Build embedding vectors for semantic conversation search.",
+		defaultEnabled: false
+	},
+	{
+		key: "summaryFork",
+		label: "Summary fork / compaction",
+		description: "Summarize a transcript on compaction or handoff fallback.",
+		defaultEnabled: true
+	},
+	{
+		key: "ttsSummarizer",
+		label: "TTS activity narration",
+		description: "Summarize recent activity into spoken narration utterances.",
+		defaultEnabled: false
+	}
+];
+/** The default per-feature enablement map (used by config normalization). */
+function defaultBackgroundAiFeatures() {
+	const out = {};
+	for (const meta of BACKGROUND_AI_FEATURE_META) out[meta.key] = meta.defaultEnabled;
+	return out;
+}
+//#endregion
+//#region ../../src/lib/config-yaml/defaults.ts
+const DEFAULT_DOCS_TRIGGER_REGEXES = [
+	"pan",
+	"overdeck",
+	"cloister",
+	"deacon",
+	"workspace",
+	"specialist",
+	"harness",
+	"bd",
+	"beads",
+	"vbrief",
+	"workhorse"
+];
+const DEFAULT_CONFIG = {
+	tmux: { configMode: "managed" },
+	enabledProviders: new Set(["anthropic"]),
+	apiKeys: {},
+	providerAuth: {},
+	providerPlan: {},
+	providerHarnesses: {},
+	openrouterFavorites: [],
+	workhorses: { ...DEFAULT_WORKHORSES },
+	roles: cloneRoles(DEFAULT_ROLES),
+	overrides: {},
+	geminiThinkingLevel: 3,
+	trackerKeys: {},
+	conversations: {
+		compactionModel: "claude-haiku-4-5",
+		manualCompactMode: "claude-code",
+		richCompaction: true,
+		titleModel: "claude-haiku-4-5",
+		watchDirs: ["~/Projects"],
+		scanMaxParallel: null,
+		embeddings: false,
+		embeddingProvider: "openai",
+		embeddingModel: "text-embedding-3-small",
+		embeddingAutoOnDeep: true,
+		enrichment: {
+			quickModel: null,
+			deepModel: null,
+			maxParallel: 4,
+			costConfirmThreshold: 1
+		}
+	},
+	docs: {
+		enabled: true,
+		promptInjectionEnabled: true,
+		cliEnabled: true,
+		trigger: {
+			regexes: DEFAULT_DOCS_TRIGGER_REGEXES,
+			caseSensitive: false
+		},
+		corpus: {
+			docs: true,
+			skills: true,
+			rules: true,
+			claudeMd: true,
+			prds: false,
+			prdStatuses: ["active", "planned"],
+			maxChunkTokens: 500
+		},
+		budget: {
+			injectionRate: 1,
+			turnWindow: 10,
+			maxTokensPerInjection: 3e3,
+			maxChunksPerInjection: 5,
+			bypassClassifierThreshold: .85
+		},
+		embedding: {
+			provider: "local",
+			model: "gte-small",
+			dimensions: 384
+		},
+		classifier: {
+			enabled: false,
+			provider: "anthropic",
+			model: "claude-haiku-4-5",
+			threshold: .85,
+			timeoutMs: 1500
+		}
+	},
+	conversationSearch: {
+		enabled: false,
+		provider: "openai",
+		model: "text-embedding-3-small",
+		apiKeyRef: void 0,
+		dbPath: join(homedir(), ".overdeck", "conversations", "embeddings.db")
+	},
+	memory: {
+		extraction: { fallbackChain: [] },
+		observationsEnabled: true,
+		promptTimeInjectionEnabled: true,
+		rollupPendingThreshold: 4,
+		sidebarRefreshIntervalMs: 1e4,
+		workerConcurrency: 4
+	},
+	backgroundAi: {
+		cheapMode: true,
+		features: defaultBackgroundAiFeatures()
+	},
+	compliance: { mode: "advisory" },
+	registry: { classification: {
+		enabled: true,
+		provider: "cliproxy",
+		model: "gpt-4.1-nano",
+		perDayCostCapUsd: 1
+	} },
+	shadow: {
+		enabled: false,
+		trackers: {
+			linear: false,
+			github: false,
+			gitlab: false,
+			rally: false
+		}
+	},
+	caveman: {
+		enabled: false,
+		abTest: false,
+		modes: {
+			work: "full",
+			review: "review",
+			test: "full",
+			merge: "full"
+		}
+	},
+	rtk: { enabled: false },
+	tldr: { enabled: true },
+	tts: {
+		enabled: false,
+		lifecycle: true,
+		voice: "",
+		volume: 1,
+		rate: 1,
+		maxChars: 140,
+		dropInfoWhenFull: true,
+		daemonPort: 8787,
+		daemonHost: "127.0.0.1",
+		daemonAutoStart: false,
+		voiceMap: {},
+		mutedSources: [],
+		utteranceTemplates: {},
+		mutedIssues: []
+	},
+	ttsSummarizer: {
+		enabled: false,
+		model: "gpt-5.4-mini",
+		batchWindowSeconds: 15
+	},
+	resources: {
+		memoryWarnGb: 4,
+		memoryBlockGb: 2,
+		agentWarnCount: 8,
+		agentBlockCount: 10
+	},
+	experimental: {
+		experimentalFeatures: false,
+		claudeCodeChannels: false,
+		claudeCodeChannelsMcp: false,
+		streamdownRenderer: false,
+		showHarnessModelPermutations: false
+	},
+	claude: { permissionMode: "auto" },
+	codex: { permissionMode: "auto-review" }
+};
+/**
+* Path to global config file
+*/
+const GLOBAL_CONFIG_PATH = join(homedir(), ".overdeck", "config.yaml");
+//#endregion
+//#region ../../src/lib/config-yaml/domain-mergers.ts
+function isComplianceMode(value) {
+	return typeof value === "string" && COMPLIANCE_MODES.includes(value);
+}
+function isFeatureRegistryClassificationProvider(value) {
+	return value === "anthropic" || value === "cliproxy";
+}
+const VALID_RESILIENCY_TIERS = ["ephemeral", "durable"];
+function isResiliencyTier(value) {
+	return typeof value === "string" && VALID_RESILIENCY_TIERS.includes(value);
+}
+/**
+* Merge remote work-agent provisioning settings from a single config source.
+*/
+function mergeRemoteConfig(result, config) {
+	const remote = config?.remote;
+	if (!remote) return;
+	if (remote.resiliency_tier !== void 0) {
+		if (!isResiliencyTier(remote.resiliency_tier)) throw new Error(`config.yaml: remote.resiliency_tier must be one of ${VALID_RESILIENCY_TIERS.join(", ")}`);
+		result.remote = {
+			...result.remote ?? { maxConcurrentAgents: 0 },
+			resiliencyTier: remote.resiliency_tier
+		};
+	}
+	if (remote.max_concurrent_agents !== void 0) {
+		if (typeof remote.max_concurrent_agents !== "number" || !Number.isInteger(remote.max_concurrent_agents) || remote.max_concurrent_agents < 0) throw new Error("config.yaml: remote.max_concurrent_agents must be a non-negative integer");
+		result.remote = {
+			...result.remote ?? { resiliencyTier: "ephemeral" },
+			maxConcurrentAgents: remote.max_concurrent_agents
+		};
+	}
+}
+/**
+* Merge shadow configuration from multiple sources
+*/
+function mergeShadowConfig(result, config) {
+	if (!config?.shadow) return;
+	if (config.shadow.enabled !== void 0) result.enabled = config.shadow.enabled;
+	if (config.shadow.trackers) {
+		if (config.shadow.trackers.linear !== void 0) result.trackers.linear = config.shadow.trackers.linear;
+		if (config.shadow.trackers.github !== void 0) result.trackers.github = config.shadow.trackers.github;
+		if (config.shadow.trackers.gitlab !== void 0) result.trackers.gitlab = config.shadow.trackers.gitlab;
+		if (config.shadow.trackers.rally !== void 0) result.trackers.rally = config.shadow.trackers.rally;
+	}
+}
+/**
+* Merge caveman configuration from a single config source into the result.
+*/
+function mergeCavemanConfig(result, config) {
+	const caveman = config?.agents?.caveman;
+	if (!caveman) return;
+	if (caveman.enabled !== void 0) result.enabled = caveman.enabled;
+	if (caveman.ab_test !== void 0) result.abTest = caveman.ab_test;
+	if (caveman.work !== void 0) result.modes.work = caveman.work;
+	if (caveman.review !== void 0) result.modes.review = caveman.review;
+	if (caveman.test !== void 0) result.modes.test = caveman.test;
+	if (caveman.merge !== void 0) result.modes.merge = caveman.merge;
+}
+function mergeRtkConfig(result, config) {
+	const rtk = config?.agents?.rtk;
+	if (!rtk) return;
+	if (rtk.enabled !== void 0) result.enabled = rtk.enabled;
+}
+function mergeTldrConfig(result, config) {
+	const tldr = config?.agents?.tldr;
+	if (!tldr) return;
+	if (tldr.enabled !== void 0) result.enabled = tldr.enabled;
+}
+function cloneDocsConfig(config) {
+	return {
+		enabled: config.enabled,
+		promptInjectionEnabled: config.promptInjectionEnabled,
+		cliEnabled: config.cliEnabled,
+		trigger: {
+			regexes: [...config.trigger.regexes],
+			caseSensitive: config.trigger.caseSensitive
+		},
+		corpus: {
+			docs: config.corpus.docs,
+			skills: config.corpus.skills,
+			rules: config.corpus.rules,
+			claudeMd: config.corpus.claudeMd,
+			prds: config.corpus.prds,
+			prdStatuses: [...config.corpus.prdStatuses],
+			maxChunkTokens: config.corpus.maxChunkTokens
+		},
+		budget: { ...config.budget },
+		embedding: { ...config.embedding },
+		classifier: { ...config.classifier }
+	};
+}
+function mergeDocsConfig(result, config) {
+	const docs = config?.docs;
+	if (!docs) return;
+	if (docs.enabled !== void 0) result.enabled = docs.enabled;
+	if (docs.prompt_injection !== void 0) result.promptInjectionEnabled = docs.prompt_injection;
+	if (docs.cli !== void 0) result.cliEnabled = docs.cli;
+	if (docs.trigger) {
+		if (docs.trigger.regexes !== void 0) result.trigger.regexes = [...docs.trigger.regexes];
+		if (docs.trigger.case_sensitive !== void 0) result.trigger.caseSensitive = docs.trigger.case_sensitive;
+	}
+	if (docs.corpus) {
+		if (docs.corpus.docs !== void 0) result.corpus.docs = docs.corpus.docs;
+		if (docs.corpus.skills !== void 0) result.corpus.skills = docs.corpus.skills;
+		if (docs.corpus.rules !== void 0) result.corpus.rules = docs.corpus.rules;
+		if (docs.corpus.claude_md !== void 0) result.corpus.claudeMd = docs.corpus.claude_md;
+		if (docs.corpus.prds !== void 0) result.corpus.prds = docs.corpus.prds;
+		if (docs.corpus.prd_statuses !== void 0) result.corpus.prdStatuses = [...docs.corpus.prd_statuses];
+		if (docs.corpus.max_chunk_tokens !== void 0) result.corpus.maxChunkTokens = docs.corpus.max_chunk_tokens;
+	}
+	if (docs.budget) {
+		if (docs.budget.injection_rate !== void 0) result.budget.injectionRate = docs.budget.injection_rate;
+		if (docs.budget.turn_window !== void 0) result.budget.turnWindow = docs.budget.turn_window;
+		if (docs.budget.max_tokens_per_injection !== void 0) result.budget.maxTokensPerInjection = docs.budget.max_tokens_per_injection;
+		if (docs.budget.max_chunks_per_injection !== void 0) result.budget.maxChunksPerInjection = docs.budget.max_chunks_per_injection;
+		if (docs.budget.bypass_classifier_threshold !== void 0) result.budget.bypassClassifierThreshold = docs.budget.bypass_classifier_threshold;
+	}
+	if (docs.embedding) {
+		if (docs.embedding.provider !== void 0) result.embedding.provider = docs.embedding.provider;
+		if (docs.embedding.model !== void 0) result.embedding.model = docs.embedding.model;
+		if (docs.embedding.dimensions !== void 0) result.embedding.dimensions = docs.embedding.dimensions;
+	}
+	if (docs.classifier) {
+		if (docs.classifier.enabled !== void 0) result.classifier.enabled = docs.classifier.enabled;
+		if (docs.classifier.provider !== void 0) result.classifier.provider = docs.classifier.provider;
+		if (docs.classifier.model !== void 0) result.classifier.model = docs.classifier.model;
+		if (docs.classifier.threshold !== void 0) result.classifier.threshold = docs.classifier.threshold;
+		if (docs.classifier.timeout_ms !== void 0) result.classifier.timeoutMs = docs.classifier.timeout_ms;
+	}
+}
+function mergeTtsConfig(result, config) {
+	const tts = config?.tts;
+	if (!tts) return;
+	if (tts.enabled !== void 0) result.enabled = tts.enabled;
+	if (tts.lifecycle !== void 0) result.lifecycle = tts.lifecycle;
+	if (tts.voice !== void 0) result.voice = tts.voice;
+	if (tts.statusVoice !== void 0) result.statusVoice = tts.statusVoice;
+	if (tts.volume !== void 0) result.volume = tts.volume;
+	if (tts.rate !== void 0) result.rate = tts.rate;
+	if (tts.maxChars !== void 0) result.maxChars = tts.maxChars;
+	if (tts.dropInfoWhenFull !== void 0) result.dropInfoWhenFull = tts.dropInfoWhenFull;
+	if (tts.daemonPort !== void 0) result.daemonPort = tts.daemonPort;
+	if (tts.daemonHost !== void 0) result.daemonHost = tts.daemonHost;
+	if (tts.daemon?.autoStart !== void 0) result.daemonAutoStart = tts.daemon.autoStart;
+	if (tts.voiceMap !== void 0) result.voiceMap = { ...tts.voiceMap };
+	if (tts.mutedSources !== void 0) result.mutedSources = [...tts.mutedSources];
+	if (tts.utteranceTemplates !== void 0) result.utteranceTemplates = { ...tts.utteranceTemplates };
+	if (tts.mutedIssues !== void 0) result.mutedIssues = [...tts.mutedIssues];
+}
+//#endregion
+//#region ../../src/lib/config-yaml/merge.ts
+/**
+* Normalize a provider config (handle both boolean and object forms)
+*/
+function normalizeProviderConfig(providerConfig, fallbackKey) {
+	if (providerConfig === void 0) return { enabled: false };
+	if (typeof providerConfig === "boolean") return {
+		enabled: providerConfig,
+		api_key: fallbackKey
+	};
+	return {
+		enabled: providerConfig.enabled,
+		api_key: providerConfig.api_key || fallbackKey,
+		harness: providerConfig.harness,
+		auth: providerConfig.auth,
+		plan: providerConfig.plan
+	};
+}
+function validateProviderHarness(provider, harness) {
+	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
+}
+function applyProviderHarness(result, provider, harness) {
+	validateProviderHarness(provider, harness);
+	if (harness !== void 0) result.providerHarnesses[provider] = harness;
+}
+/**
+* Resolve environment variables in config values.
+* If the env var is not set, returns the original reference (e.g., "$OPENAI_API_KEY")
+* so the UI can show that it's configured via env var but not resolved.
+*/
+function resolveEnvVar(value) {
+	if (!value) return void 0;
+	return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (match, varName) => {
+		const envValue = process.env[varName];
+		return envValue !== void 0 ? envValue : match;
+	});
+}
+/**
+* Merge multiple configs with precedence: project > global > defaults
+*/
+function mergeConfigs(...configs) {
+	const result = {
+		...DEFAULT_CONFIG,
+		tmux: { ...DEFAULT_CONFIG.tmux },
+		enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
+		workhorses: { ...DEFAULT_WORKHORSES },
+		roles: cloneRoles(DEFAULT_ROLES),
+		memory: {
+			extraction: {
+				...DEFAULT_CONFIG.memory.extraction,
+				fallbackChain: [...DEFAULT_CONFIG.memory.extraction.fallbackChain]
+			},
+			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
+			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
+			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
+			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
+		},
+		backgroundAi: {
+			cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
+			features: { ...DEFAULT_CONFIG.backgroundAi.features }
+		},
+		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
+		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
+		shadow: {
+			enabled: DEFAULT_CONFIG.shadow.enabled,
+			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
+		},
+		caveman: {
+			enabled: DEFAULT_CONFIG.caveman.enabled,
+			abTest: DEFAULT_CONFIG.caveman.abTest,
+			modes: { ...DEFAULT_CONFIG.caveman.modes }
+		},
+		rtk: { enabled: DEFAULT_CONFIG.rtk.enabled },
+		docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
+		conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
+		tts: {
+			enabled: DEFAULT_CONFIG.tts.enabled,
+			lifecycle: DEFAULT_CONFIG.tts.lifecycle,
+			voice: DEFAULT_CONFIG.tts.voice,
+			volume: DEFAULT_CONFIG.tts.volume,
+			rate: DEFAULT_CONFIG.tts.rate,
+			maxChars: DEFAULT_CONFIG.tts.maxChars,
+			dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+			daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+			daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+			daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
+			voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+			mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+			utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+			mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues]
+		},
+		ttsSummarizer: {
+			enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
+			model: DEFAULT_CONFIG.ttsSummarizer.model,
+			batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds
+		},
+		resources: {
+			memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
+			memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
+			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
+			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
+		},
+		experimental: {
+			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
+			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
+			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
+			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
+		},
+		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
+		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
+	};
+	const explicitlyDisabled = /* @__PURE__ */ new Set();
+	const validConfigs = configs.filter((c) => c !== null);
+	for (const config of validConfigs.reverse()) {
+		if (config.models?.providers) {
+			const providers = config.models.providers;
+			const legacyKeys = config.api_keys || {};
+			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
+			applyProviderHarness(result, "anthropic", anthropic.harness);
+			if (anthropic.enabled) result.enabledProviders.add("anthropic");
+			else if (providers.anthropic !== void 0) {
+				explicitlyDisabled.add("anthropic");
+				result.enabledProviders.delete("anthropic");
+			}
+			const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
+			applyProviderHarness(result, "openai", openai.harness);
+			if (openai.enabled) {
+				result.enabledProviders.add("openai");
+				if (openai.api_key) result.apiKeys.openai = resolveEnvVar(openai.api_key);
+				if (openai.auth) result.providerAuth.openai = openai.auth;
+				if (openai.plan) result.providerPlan.openai = openai.plan;
+			} else if (providers.openai !== void 0) explicitlyDisabled.add("openai");
+			const google = normalizeProviderConfig(providers.google, legacyKeys.google);
+			applyProviderHarness(result, "google", google.harness);
+			if (google.enabled) {
+				result.enabledProviders.add("google");
+				if (google.api_key) result.apiKeys.google = resolveEnvVar(google.api_key);
+				if (google.auth) result.providerAuth.google = google.auth;
+				if (google.plan) result.providerPlan.google = google.plan;
+			} else if (providers.google !== void 0) explicitlyDisabled.add("google");
+			const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
+			applyProviderHarness(result, "minimax", minimax.harness);
+			if (minimax.enabled) {
+				result.enabledProviders.add("minimax");
+				if (minimax.api_key) result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
+			} else if (providers.minimax !== void 0) explicitlyDisabled.add("minimax");
+			const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+			applyProviderHarness(result, "zai", zai.harness);
+			if (zai.enabled) {
+				result.enabledProviders.add("zai");
+				if (zai.api_key) result.apiKeys.zai = resolveEnvVar(zai.api_key);
+			} else if (providers.zai !== void 0) explicitlyDisabled.add("zai");
+			const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
+			applyProviderHarness(result, "kimi", kimi.harness);
+			if (kimi.enabled) {
+				result.enabledProviders.add("kimi");
+				if (kimi.api_key) result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
+			} else if (providers.kimi !== void 0) explicitlyDisabled.add("kimi");
+			const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
+			applyProviderHarness(result, "openrouter", openrouter.harness);
+			if (openrouter.enabled) {
+				result.enabledProviders.add("openrouter");
+				if (openrouter.api_key) result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
+			} else if (providers.openrouter !== void 0) explicitlyDisabled.add("openrouter");
+			const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+			applyProviderHarness(result, "mimo", mimo.harness);
+			if (mimo.enabled) {
+				result.enabledProviders.add("mimo");
+				if (mimo.api_key) result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
+			} else if (providers.mimo !== void 0) explicitlyDisabled.add("mimo");
+			const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
+			applyProviderHarness(result, "nous", nous.harness);
+			if (nous.enabled) {
+				result.enabledProviders.add("nous");
+				if (nous.api_key) result.apiKeys.nous = resolveEnvVar(nous.api_key);
+			} else if (providers.nous !== void 0) explicitlyDisabled.add("nous");
+			const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
+			applyProviderHarness(result, "dashscope", dashscope.harness);
+			if (dashscope.enabled) {
+				result.enabledProviders.add("dashscope");
+				if (dashscope.api_key) result.apiKeys.dashscope = resolveEnvVar(dashscope.api_key);
+			} else if (providers.dashscope !== void 0) explicitlyDisabled.add("dashscope");
+		}
+		if (config.tmux?.config_mode) result.tmux.configMode = config.tmux.config_mode;
+		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
+		if (config.conversations?.manual_compact_mode) result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
+		if (config.conversations?.rich_compaction !== void 0) result.conversations.richCompaction = config.conversations.rich_compaction;
+		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+		if (config.conversations?.watch_dirs) result.conversations.watchDirs = config.conversations.watch_dirs;
+		if (config.conversations?.scan_max_parallel !== void 0) result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
+		if (config.conversations?.embeddings !== void 0) result.conversations.embeddings = config.conversations.embeddings;
+		if (config.conversations?.embedding_provider) {
+			result.conversations.embeddingProvider = config.conversations.embedding_provider;
+			if (config.conversations.embedding_provider === "ollama" && !config.conversations.embedding_model) result.conversations.embeddingModel = "nomic-embed-text";
+		}
+		if (config.conversations?.embedding_model) result.conversations.embeddingModel = config.conversations.embedding_model;
+		if (config.conversations?.embedding_auto_on_deep !== void 0) result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
+		if (config.conversations?.enrichment?.quick_model !== void 0) result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
+		if (config.conversations?.enrichment?.deep_model !== void 0) result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
+		if (config.conversations?.enrichment?.max_parallel !== void 0) result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
+		if (config.conversations?.enrichment?.cost_confirm_threshold !== void 0) result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
+		if (config.memory) {
+			if (config.memory.extraction) result.memory.extraction = {
+				...result.memory.extraction,
+				...config.memory.extraction.provider !== void 0 ? { provider: config.memory.extraction.provider } : {},
+				...config.memory.extraction.model !== void 0 ? { model: config.memory.extraction.model } : {},
+				...config.memory.extraction.per_day_cost_cap_usd !== void 0 ? { perDayCostCapUsd: config.memory.extraction.per_day_cost_cap_usd } : {},
+				...config.memory.extraction.fallback_chain !== void 0 ? { fallbackChain: config.memory.extraction.fallback_chain } : {}
+			};
+			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
+			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
+			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
+			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
+		}
+		if (config.compliance?.mode !== void 0) {
+			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
+			result.compliance.mode = config.compliance.mode;
+		}
+		if (config.registry?.classification) {
+			const classification = config.registry.classification;
+			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
+			if (classification.provider !== void 0) {
+				if (!isFeatureRegistryClassificationProvider(classification.provider)) throw new Error("config.yaml: registry.classification.provider must be anthropic or cliproxy");
+				result.registry.classification.provider = classification.provider;
+			}
+			if (classification.model !== void 0) result.registry.classification.model = classification.model;
+			if (classification.per_day_cost_cap_usd !== void 0) {
+				if (typeof classification.per_day_cost_cap_usd !== "number" || classification.per_day_cost_cap_usd < 0) throw new Error("config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number");
+				result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
+			}
+		}
+		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
+		mergeRoleConfig(result, config);
+		if (config.api_keys) {
+			if (config.api_keys.openai) {
+				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
+				if (!explicitlyDisabled.has("openai")) result.enabledProviders.add("openai");
+			}
+			if (config.api_keys.voyage) result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
+			if (config.api_keys.google) {
+				result.apiKeys.google = resolveEnvVar(config.api_keys.google);
+				if (!explicitlyDisabled.has("google")) result.enabledProviders.add("google");
+			}
+			if (config.api_keys.minimax) {
+				result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
+				if (!explicitlyDisabled.has("minimax")) result.enabledProviders.add("minimax");
+			}
+			if (config.api_keys.zai) {
+				result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
+				if (!explicitlyDisabled.has("zai")) result.enabledProviders.add("zai");
+			}
+			if (config.api_keys.kimi) {
+				result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
+				if (!explicitlyDisabled.has("kimi")) result.enabledProviders.add("kimi");
+			}
+			if (config.api_keys.openrouter) {
+				result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
+				if (!explicitlyDisabled.has("openrouter")) result.enabledProviders.add("openrouter");
+			}
+			if (config.api_keys.mimo) {
+				result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
+				if (!explicitlyDisabled.has("mimo")) result.enabledProviders.add("mimo");
+			}
+			if (config.api_keys.nous) {
+				result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
+				if (!explicitlyDisabled.has("nous")) result.enabledProviders.add("nous");
+			}
+			if (config.api_keys.dashscope) {
+				result.apiKeys.dashscope = resolveEnvVar(config.api_keys.dashscope);
+				if (!explicitlyDisabled.has("dashscope")) result.enabledProviders.add("dashscope");
+			}
+		}
+		if (config.models?.overrides) result.overrides = {
+			...result.overrides,
+			...config.models.overrides
+		};
+		if (config.models?.gemini_thinking_level) result.geminiThinkingLevel = config.models.gemini_thinking_level;
+		if (config.models?.default_conversation_model) result.defaultConversationModel = config.models.default_conversation_model;
+		if (config.tracker_keys) {
+			if (config.tracker_keys.linear) result.trackerKeys.linear = resolveEnvVar(config.tracker_keys.linear);
+			if (config.tracker_keys.github) result.trackerKeys.github = resolveEnvVar(config.tracker_keys.github);
+			if (config.tracker_keys.gitlab) result.trackerKeys.gitlab = resolveEnvVar(config.tracker_keys.gitlab);
+			if (config.tracker_keys.rally) result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
+		}
+		mergeShadowConfig(result.shadow, config);
+		mergeCavemanConfig(result.caveman, config);
+		mergeRtkConfig(result.rtk, config);
+		mergeTldrConfig(result.tldr, config);
+		mergeDocsConfig(result.docs, config);
+		mergeTtsConfig(result.tts, config);
+		if (config.tts?.summarizer) {
+			const s = config.tts.summarizer;
+			if (s.enabled !== void 0) result.ttsSummarizer.enabled = s.enabled;
+			if (s.model) result.ttsSummarizer.model = resolveModelIdSync(s.model);
+			if (s.batch_window_seconds !== void 0) result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
+		}
+		if (config.background_ai) {
+			if (typeof config.background_ai.cheap_mode === "boolean") result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
+			if (config.background_ai.features) for (const feature of BACKGROUND_AI_FEATURES) {
+				const value = config.background_ai.features[feature];
+				if (typeof value === "boolean") result.backgroundAi.features[feature] = value;
+			}
+		}
+		if (config.resources) {
+			if (typeof config.resources.memory_warn_gb === "number") result.resources.memoryWarnGb = config.resources.memory_warn_gb;
+			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
+			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
+			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
+		}
+		if (config.experimental) {
+			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
+			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
+			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
+			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+			if (typeof config.experimental.showHarnessModelPermutations === "boolean") result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
+		}
+		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
+		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;
+		mergeRemoteConfig(result, config);
+		if (config.conversationSearch) {
+			const cs = config.conversationSearch;
+			if (typeof cs.enabled === "boolean") result.conversationSearch.enabled = cs.enabled;
+			if (cs.provider !== void 0) result.conversationSearch.provider = cs.provider;
+			if (cs.model !== void 0) result.conversationSearch.model = cs.model;
+			if (cs.apiKeyRef !== void 0) result.conversationSearch.apiKeyRef = cs.apiKeyRef;
+			if (cs.dbPath !== void 0) result.conversationSearch.dbPath = cs.dbPath;
+		}
+	}
+	validateRoleModelRefs(result);
+	return {
+		config: result,
+		explicitlyDisabled
+	};
+}
+//#endregion
 //#region ../../node_modules/.bun/js-yaml@4.1.1/node_modules/js-yaml/dist/js-yaml.mjs
 /*! js-yaml 4.1.1 https://github.com/nodeca/js-yaml @license MIT */
 function isNothing(subject) {
@@ -27482,1477 +29446,7 @@ var jsYaml = {
 	safeDump: renamed("safeDump", "dump")
 };
 //#endregion
-//#region ../../src/lib/model-capabilities.ts
-/**
-* Model ID deprecation mapping
-*
-* Maps deprecated model IDs to their current replacements.
-* When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
-* add the mapping here to enable automatic migration.
-*
-* Strategy: Single-hop only. Only add models here when the provider has
-* actually retired them — not just because a newer version exists.
-*/
-const MODEL_DEPRECATIONS = {
-	"claude-opus-4-5": "claude-opus-4-7",
-	"claude-sonnet-4-5": "claude-sonnet-4-6",
-	"gpt-5.2-codex": "gpt-5.3-codex",
-	"gpt-5.5-mini": "gpt-5.4-mini",
-	"gpt-5.5-nano": "gpt-5.4-mini",
-	"gpt-5.4-nano": "gpt-5.4-mini",
-	"gpt-5.5-pro": "gpt-5.5",
-	"gpt-5.4-pro": "gpt-5.4",
-	"o3": "gpt-5.4",
-	"o3-deep-research": "gpt-5.4",
-	"o4-mini": "gpt-5.4-mini",
-	"gpt-4o": "gpt-5.4",
-	"gpt-4o-mini": "gpt-5.4-mini",
-	"gemini-3-pro-preview": "gemini-3.1-pro-preview",
-	"gemini-3-flash": "gemini-3-flash-preview",
-	"gemini-2.5-pro": "gemini-3.1-pro-preview",
-	"gemini-2.5-flash": "gemini-3-flash-preview",
-	"kimi-k2": "kimi-k2.5",
-	"glm-4.7": "glm-5.1",
-	"glm-4.7-flash": "glm-5.1"
-};
-/**
-* Resolve a model ID to its current version
-*
-* If the model ID is deprecated, returns the replacement.
-* Otherwise, returns the model ID unchanged.
-*
-* @param modelId - Model ID to resolve (may be deprecated)
-* @returns Current model ID
-*/
-function resolveModelIdSync(modelId) {
-	return MODEL_DEPRECATIONS[modelId] || modelId;
-}
-/**
-* Master capability database
-*
-* Scores are based on:
-* - Public benchmarks (HumanEval, SWE-bench, MBPP)
-* - Community consensus
-* - Practical experience
-*
-* These are baseline scores - run Kimi 2.5 research to refine.
-*/
-const MODEL_CAPABILITIES = {
-	"claude-fable-5": {
-		model: "claude-fable-5",
-		provider: "anthropic",
-		displayName: "Claude Fable 5",
-		costPer1MTokens: 90,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 99,
-			"code-review": 99,
-			debugging: 99,
-			planning: 99,
-			documentation: 97,
-			testing: 96,
-			security: 99,
-			performance: 95,
-			synthesis: 99,
-			speed: 42,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max"
-		],
-		notes: "Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding."
-	},
-	"claude-opus-4-8": {
-		model: "claude-opus-4-8",
-		provider: "anthropic",
-		displayName: "Claude Opus 4.8",
-		costPer1MTokens: 45,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 98,
-			"code-review": 99,
-			debugging: 98,
-			planning: 99,
-			documentation: 96,
-			testing: 95,
-			security: 99,
-			performance: 93,
-			synthesis: 99,
-			speed: 40,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max"
-		],
-		notes: "Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks."
-	},
-	"claude-opus-4-7": {
-		model: "claude-opus-4-7",
-		provider: "anthropic",
-		displayName: "Claude Opus 4.7",
-		costPer1MTokens: 45,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 98,
-			"code-review": 99,
-			debugging: 98,
-			planning: 99,
-			documentation: 96,
-			testing: 94,
-			security: 99,
-			performance: 92,
-			synthesis: 99,
-			speed: 38,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max"
-		],
-		notes: "Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks."
-	},
-	"claude-opus-4-6": {
-		model: "claude-opus-4-6",
-		provider: "anthropic",
-		displayName: "Claude Opus 4.6",
-		costPer1MTokens: 45,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 96,
-			"code-review": 98,
-			debugging: 97,
-			planning: 99,
-			documentation: 95,
-			testing: 92,
-			security: 98,
-			performance: 90,
-			synthesis: 98,
-			speed: 40,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"max"
-		],
-		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
-	},
-	"claude-sonnet-4-6": {
-		model: "claude-sonnet-4-6",
-		provider: "anthropic",
-		displayName: "Claude Sonnet 4.6",
-		costPer1MTokens: 9,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 94,
-			"code-review": 94,
-			debugging: 92,
-			planning: 90,
-			documentation: 92,
-			testing: 92,
-			security: 88,
-			performance: 88,
-			synthesis: 90,
-			speed: 70,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high"
-		],
-		notes: "Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning."
-	},
-	"claude-sonnet-4-5": {
-		model: "claude-sonnet-4-5",
-		provider: "anthropic",
-		displayName: "Claude Sonnet 4.5",
-		costPer1MTokens: 9,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 92,
-			"code-review": 92,
-			debugging: 90,
-			planning: 88,
-			documentation: 90,
-			testing: 90,
-			security: 85,
-			performance: 85,
-			synthesis: 88,
-			speed: 70,
-			"context-length": 95
-		},
-		notes: "Best value: 77.2% SWE-bench at 1/5th Opus cost. Beats GPT-5 Codex."
-	},
-	"claude-haiku-4-5": {
-		model: "claude-haiku-4-5",
-		provider: "anthropic",
-		displayName: "Claude Haiku 4.5",
-		costPer1MTokens: 4,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 75,
-			"code-review": 72,
-			debugging: 70,
-			planning: 65,
-			documentation: 75,
-			testing: 70,
-			security: 60,
-			performance: 65,
-			synthesis: 68,
-			speed: 95,
-			"context-length": 95
-		},
-		notes: "Fast and cheap, good for simple tasks and exploration"
-	},
-	"gpt-5.4": {
-		model: "gpt-5.4",
-		provider: "openai",
-		displayName: "GPT-5.4",
-		costPer1MTokens: 8.75,
-		contextWindow: 105e4,
-		minTier: "plus",
-		skills: {
-			"code-generation": 96,
-			"code-review": 92,
-			debugging: 94,
-			planning: 92,
-			documentation: 90,
-			testing: 92,
-			security: 88,
-			performance: 90,
-			synthesis: 92,
-			speed: 60,
-			"context-length": 100
-		},
-		notes: "OpenAI flagship (March 2026). 1.05M context, 128K max output. Strong coding and reasoning."
-	},
-	"gpt-5.4-mini": {
-		model: "gpt-5.4-mini",
-		provider: "openai",
-		displayName: "GPT-5.4 Mini",
-		costPer1MTokens: 1,
-		contextWindow: 4e5,
-		minTier: "free",
-		skills: {
-			"code-generation": 82,
-			"code-review": 78,
-			debugging: 76,
-			planning: 72,
-			documentation: 80,
-			testing: 76,
-			security: 68,
-			performance: 72,
-			synthesis: 75,
-			speed: 90,
-			"context-length": 90
-		},
-		notes: "Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers."
-	},
-	"o3": {
-		model: "o3",
-		provider: "openai",
-		displayName: "O3",
-		costPer1MTokens: 5,
-		contextWindow: 2e5,
-		minTier: "plus",
-		skills: {
-			"code-generation": 90,
-			"code-review": 95,
-			debugging: 98,
-			planning: 95,
-			documentation: 88,
-			testing: 88,
-			security: 92,
-			performance: 92,
-			synthesis: 95,
-			speed: 25,
-			"context-length": 95
-		},
-		notes: "Deep reasoning model. Excels at complex debugging, math, scientific reasoning."
-	},
-	"o4-mini": {
-		model: "o4-mini",
-		provider: "openai",
-		displayName: "O4 Mini",
-		costPer1MTokens: 2.75,
-		contextWindow: 2e5,
-		minTier: "plus",
-		skills: {
-			"code-generation": 85,
-			"code-review": 90,
-			debugging: 94,
-			planning: 88,
-			documentation: 84,
-			testing: 85,
-			security: 86,
-			performance: 88,
-			synthesis: 88,
-			speed: 70,
-			"context-length": 90
-		},
-		notes: "Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable."
-	},
-	"gpt-5.4-pro": {
-		model: "gpt-5.4-pro",
-		provider: "openai",
-		displayName: "GPT-5.4 Pro",
-		costPer1MTokens: 105,
-		contextWindow: 105e4,
-		minTier: "pro",
-		skills: {
-			"code-generation": 98,
-			"code-review": 98,
-			debugging: 98,
-			planning: 99,
-			documentation: 96,
-			testing: 96,
-			security: 96,
-			performance: 95,
-			synthesis: 99,
-			speed: 45,
-			"context-length": 100
-		},
-		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
-	},
-	"gpt-5.5": {
-		model: "gpt-5.5",
-		provider: "openai",
-		displayName: "GPT-5.5",
-		costPer1MTokens: 10.5,
-		contextWindow: 15e4,
-		minTier: "plus",
-		skills: {
-			"code-generation": 97,
-			"code-review": 94,
-			debugging: 96,
-			planning: 95,
-			documentation: 92,
-			testing: 94,
-			security: 91,
-			performance: 92,
-			synthesis: 94,
-			speed: 65,
-			"context-length": 95
-		},
-		notes: "OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 128K max output."
-	},
-	"gpt-5.5-pro": {
-		model: "gpt-5.5-pro",
-		provider: "openai",
-		displayName: "GPT-5.5 Pro",
-		costPer1MTokens: 119,
-		contextWindow: 105e4,
-		minTier: "pro",
-		skills: {
-			"code-generation": 99,
-			"code-review": 99,
-			debugging: 99,
-			planning: 99,
-			documentation: 97,
-			testing: 97,
-			security: 97,
-			performance: 96,
-			synthesis: 99,
-			speed: 50,
-			"context-length": 100
-		},
-		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only."
-	},
-	"gpt-5.3-codex": {
-		model: "gpt-5.3-codex",
-		provider: "openai",
-		displayName: "GPT-5.3 Codex",
-		costPer1MTokens: 7.875,
-		contextWindow: 4e5,
-		skills: {
-			"code-generation": 96,
-			"code-review": 95,
-			debugging: 94,
-			planning: 90,
-			documentation: 88,
-			testing: 90,
-			security: 86,
-			performance: 88,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 90
-		},
-		notes: "Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API."
-	},
-	"gpt-5.2": {
-		model: "gpt-5.2",
-		provider: "openai",
-		displayName: "GPT-5.2",
-		costPer1MTokens: 5.625,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 84,
-			planning: 82,
-			documentation: 84,
-			testing: 82,
-			security: 78,
-			performance: 80,
-			synthesis: 84,
-			speed: 70,
-			"context-length": 85
-		},
-		notes: "Previous-generation general-purpose model (Oct 2025). Positioned by OpenAI for long-running agent workloads — strong candidate for orchestrator/flywheel roles."
-	},
-	"gpt-5.3-codex-spark": {
-		model: "gpt-5.3-codex-spark",
-		provider: "openai",
-		displayName: "GPT-5.3 Codex Spark",
-		costPer1MTokens: 7.875,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 92,
-			"code-review": 86,
-			debugging: 84,
-			planning: 78,
-			documentation: 82,
-			testing: 88,
-			security: 76,
-			performance: 82,
-			synthesis: 84,
-			speed: 98,
-			"context-length": 72
-		},
-		notes: "Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available."
-	},
-	"o3-deep-research": {
-		model: "o3-deep-research",
-		provider: "openai",
-		displayName: "O3 Deep Research (deprecated)",
-		costPer1MTokens: 5,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 88,
-			"code-review": 95,
-			debugging: 98,
-			planning: 95,
-			documentation: 88,
-			testing: 88,
-			security: 92,
-			performance: 92,
-			synthesis: 95,
-			speed: 25,
-			"context-length": 95
-		}
-	},
-	"gpt-4o": {
-		model: "gpt-4o",
-		provider: "openai",
-		displayName: "GPT-4o",
-		costPer1MTokens: 7.5,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 82,
-			"code-review": 80,
-			debugging: 78,
-			planning: 76,
-			documentation: 80,
-			testing: 76,
-			security: 74,
-			performance: 74,
-			synthesis: 80,
-			speed: 75,
-			"context-length": 75
-		}
-	},
-	"gpt-4o-mini": {
-		model: "gpt-4o-mini",
-		provider: "openai",
-		displayName: "GPT-4o Mini",
-		costPer1MTokens: .6,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 68,
-			"code-review": 64,
-			debugging: 60,
-			planning: 56,
-			documentation: 66,
-			testing: 60,
-			security: 52,
-			performance: 56,
-			synthesis: 62,
-			speed: 92,
-			"context-length": 75
-		}
-	},
-	"gemini-3.1-pro-preview": {
-		model: "gemini-3.1-pro-preview",
-		provider: "google",
-		displayName: "Gemini 3.1 Pro",
-		costPer1MTokens: 7,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 93,
-			"code-review": 90,
-			debugging: 88,
-			planning: 88,
-			documentation: 90,
-			testing: 88,
-			security: 82,
-			performance: 88,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 100
-		},
-		notes: "Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities."
-	},
-	"gemini-3-flash-preview": {
-		model: "gemini-3-flash-preview",
-		provider: "google",
-		displayName: "Gemini 3 Flash Preview",
-		costPer1MTokens: .4,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 80,
-			"code-review": 75,
-			debugging: 72,
-			planning: 68,
-			documentation: 76,
-			testing: 72,
-			security: 60,
-			performance: 70,
-			synthesis: 75,
-			speed: 96,
-			"context-length": 100
-		},
-		notes: "Fast and cheap with 1M context. Strong reasoning and agentic capabilities."
-	},
-	"gemini-3.1-flash-lite-preview": {
-		model: "gemini-3.1-flash-lite-preview",
-		provider: "google",
-		displayName: "Gemini 3.1 Flash Lite",
-		costPer1MTokens: .9,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 72,
-			"code-review": 68,
-			debugging: 65,
-			planning: 60,
-			documentation: 70,
-			testing: 65,
-			security: 52,
-			performance: 62,
-			synthesis: 68,
-			speed: 98,
-			"context-length": 100
-		},
-		notes: "Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads."
-	},
-	"gemini-3-pro-preview": {
-		model: "gemini-3-pro-preview",
-		provider: "google",
-		displayName: "Gemini 3 Pro (deprecated)",
-		costPer1MTokens: 7,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 93,
-			"code-review": 90,
-			debugging: 88,
-			planning: 88,
-			documentation: 90,
-			testing: 88,
-			security: 82,
-			performance: 88,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 100
-		}
-	},
-	"gemini-2.5-pro": {
-		model: "gemini-2.5-pro",
-		provider: "google",
-		displayName: "Gemini 2.5 Pro (deprecated)",
-		costPer1MTokens: 7,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 86,
-			planning: 86,
-			documentation: 88,
-			testing: 86,
-			security: 80,
-			performance: 86,
-			synthesis: 90,
-			speed: 70,
-			"context-length": 100
-		}
-	},
-	"gemini-2.5-flash": {
-		model: "gemini-2.5-flash",
-		provider: "google",
-		displayName: "Gemini 2.5 Flash (deprecated)",
-		costPer1MTokens: .4,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 78,
-			"code-review": 74,
-			debugging: 70,
-			planning: 66,
-			documentation: 74,
-			testing: 70,
-			security: 58,
-			performance: 68,
-			synthesis: 74,
-			speed: 94,
-			"context-length": 100
-		}
-	},
-	"kimi-k2.7-code": {
-		model: "kimi-k2.7-code",
-		provider: "kimi",
-		displayName: "Kimi K2.7 Code",
-		costPer1MTokens: 2.5,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 95,
-			"code-review": 93,
-			debugging: 93,
-			planning: 90,
-			documentation: 90,
-			testing: 90,
-			security: 85,
-			performance: 88,
-			synthesis: 94,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Moonshot/Kimi's coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat"
-	},
-	"kimi-k2.6": {
-		model: "kimi-k2.6",
-		provider: "kimi",
-		displayName: "Kimi K2.6",
-		costPer1MTokens: 1.6,
-		contextWindow: 256e3,
-		skills: {
-			"code-generation": 94,
-			"code-review": 92,
-			debugging: 92,
-			planning: 90,
-			documentation: 90,
-			testing: 90,
-			security: 85,
-			performance: 88,
-			synthesis: 94,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Kimi's smartest model (April 2026). Native multimodal, superior agentic coding, and autonomous agent execution. Replaces K2.6-code-preview."
-	},
-	"kimi-k2.5": {
-		model: "kimi-k2.5",
-		provider: "kimi",
-		displayName: "Kimi K2.5",
-		costPer1MTokens: 1.6,
-		contextWindow: 256e3,
-		skills: {
-			"code-generation": 92,
-			"code-review": 90,
-			debugging: 90,
-			planning: 88,
-			documentation: 88,
-			testing: 88,
-			security: 82,
-			performance: 85,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration."
-	},
-	"K2.6-code-preview": {
-		model: "K2.6-code-preview",
-		provider: "kimi",
-		displayName: "K2.6-code-preview",
-		costPer1MTokens: 1.6,
-		contextWindow: 256e3,
-		skills: {
-			"code-generation": 92,
-			"code-review": 90,
-			debugging: 90,
-			planning: 88,
-			documentation: 88,
-			testing: 88,
-			security: 82,
-			performance: 85,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Kimi coding preview model."
-	},
-	"kimi-k2": {
-		model: "kimi-k2",
-		provider: "kimi",
-		displayName: "Kimi K2 (deprecated)",
-		costPer1MTokens: 1.6,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 86,
-			planning: 84,
-			documentation: 84,
-			testing: 84,
-			security: 78,
-			performance: 80,
-			synthesis: 88,
-			speed: 72,
-			"context-length": 80
-		},
-		notes: "65.8% SWE-bench. Superseded by Kimi K2.5."
-	},
-	"minimax-m2.7": {
-		model: "minimax-m2.7",
-		provider: "minimax",
-		displayName: "MiniMax M2.7",
-		costPer1MTokens: 1.5,
-		contextWindow: 204800,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 88,
-			planning: 85,
-			documentation: 85,
-			testing: 86,
-			security: 80,
-			performance: 82,
-			synthesis: 90,
-			speed: 80,
-			"context-length": 92
-		},
-		notes: "10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache."
-	},
-	"minimax-m2.7-highspeed": {
-		model: "minimax-m2.7-highspeed",
-		provider: "minimax",
-		displayName: "MiniMax M2.7 Highspeed",
-		costPer1MTokens: 1.5,
-		contextWindow: 204800,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 88,
-			planning: 85,
-			documentation: 85,
-			testing: 86,
-			security: 80,
-			performance: 82,
-			synthesis: 90,
-			speed: 92,
-			"context-length": 92
-		},
-		notes: "Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work."
-	},
-	"MiniMax-M3": {
-		model: "MiniMax-M3",
-		provider: "minimax",
-		displayName: "MiniMax M3",
-		costPer1MTokens: 1.5,
-		contextWindow: 1024e3,
-		skills: {
-			"code-generation": 93,
-			"code-review": 90,
-			debugging: 90,
-			planning: 88,
-			documentation: 88,
-			testing: 88,
-			security: 82,
-			performance: 85,
-			synthesis: 92,
-			speed: 80,
-			"context-length": 100
-		},
-		notes: "MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7."
-	},
-	"glm-5.2": {
-		model: "glm-5.2",
-		provider: "zai",
-		displayName: "GLM-5.2",
-		costPer1MTokens: 2.9,
-		contextWindow: 1e6,
-		effortLevels: ["high", "max"],
-		supportsImages: false,
-		skills: {
-			"code-generation": 85,
-			"code-review": 83,
-			debugging: 83,
-			planning: 81,
-			documentation: 80,
-			testing: 80,
-			security: 77,
-			performance: 77,
-			synthesis: 82,
-			speed: 84,
-			"context-length": 75
-		},
-		notes: "Z.AI GLM-5.2 flagship via Anthropic-compatible API. Supports only high and max effort levels. Scores provisional — verify against benchmarks."
-	},
-	"glm-5.1": {
-		model: "glm-5.1",
-		provider: "zai",
-		displayName: "GLM-5.1",
-		costPer1MTokens: 2.9,
-		contextWindow: 2e5,
-		supportsImages: false,
-		skills: {
-			"code-generation": 82,
-			"code-review": 80,
-			debugging: 80,
-			planning: 78,
-			documentation: 78,
-			testing: 78,
-			security: 75,
-			performance: 75,
-			synthesis: 80,
-			speed: 85,
-			"context-length": 75
-		},
-		notes: "Z.AI GLM-5.1 model via Anthropic-compatible API. Previous flagship; retained alongside GLM-5.2."
-	},
-	"glm-4.7": {
-		model: "glm-4.7",
-		provider: "zai",
-		displayName: "GLM-4.7 (deprecated)",
-		costPer1MTokens: 1.5,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 88,
-			"code-review": 85,
-			debugging: 84,
-			planning: 82,
-			documentation: 80,
-			testing: 82,
-			security: 78,
-			performance: 80,
-			synthesis: 84,
-			speed: 80,
-			"context-length": 92
-		},
-		notes: "Top open-source model for agentic coding. 73.8% SWE-bench, 200K context."
-	},
-	"glm-4.7-flash": {
-		model: "glm-4.7-flash",
-		provider: "zai",
-		displayName: "GLM-4.7 Flash (deprecated)",
-		costPer1MTokens: .3,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 78,
-			"code-review": 74,
-			debugging: 72,
-			planning: 70,
-			documentation: 72,
-			testing: 72,
-			security: 68,
-			performance: 70,
-			synthesis: 74,
-			speed: 95,
-			"context-length": 92
-		},
-		notes: "Fast and affordable GLM model for quick iterations. 200K context."
-	},
-	"mimo-v2.5-pro": {
-		model: "mimo-v2.5-pro",
-		provider: "mimo",
-		displayName: "MiMo V2.5 Pro",
-		costPer1MTokens: 2,
-		contextWindow: 1048576,
-		supportsImages: false,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 86,
-			planning: 84,
-			documentation: 84,
-			testing: 84,
-			security: 80,
-			performance: 82,
-			synthesis: 88,
-			speed: 78,
-			"context-length": 100
-		},
-		notes: "Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window."
-	},
-	"mimo-v2.5": {
-		model: "mimo-v2.5",
-		provider: "mimo",
-		displayName: "MiMo V2.5",
-		costPer1MTokens: 1,
-		contextWindow: 262144,
-		supportsImages: true,
-		skills: {
-			"code-generation": 82,
-			"code-review": 80,
-			debugging: 80,
-			planning: 78,
-			documentation: 78,
-			testing: 78,
-			security: 74,
-			performance: 76,
-			synthesis: 82,
-			speed: 85,
-			"context-length": 96
-		},
-		notes: "Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities."
-	},
-	"qwen/qwen3.6-plus": {
-		model: "qwen/qwen3.6-plus",
-		provider: "nous",
-		displayName: "Qwen 3.6 Plus (Nous Portal)",
-		costPer1MTokens: 0,
-		contextWindow: 1048576,
-		skills: {
-			"code-generation": 94,
-			"code-review": 92,
-			debugging: 92,
-			planning: 92,
-			documentation: 90,
-			testing: 90,
-			security: 88,
-			performance: 88,
-			synthesis: 92,
-			speed: 74,
-			"context-length": 100
-		},
-		notes: "Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material."
-	},
-	"qwen3-max": {
-		model: "qwen3-max",
-		provider: "dashscope",
-		displayName: "Qwen3 Max (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 95,
-			"code-review": 93,
-			debugging: 93,
-			planning: 94,
-			documentation: 91,
-			testing: 91,
-			security: 89,
-			performance: 89,
-			synthesis: 94,
-			speed: 72,
-			"context-length": 98
-		},
-		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"qwen3-coder-plus": {
-		model: "qwen3-coder-plus",
-		provider: "dashscope",
-		displayName: "Qwen3 Coder Plus (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 96,
-			"code-review": 94,
-			debugging: 94,
-			planning: 91,
-			documentation: 90,
-			testing: 92,
-			security: 89,
-			performance: 90,
-			synthesis: 92,
-			speed: 74,
-			"context-length": 98
-		},
-		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"qwen3-plus": {
-		model: "qwen3-plus",
-		provider: "dashscope",
-		displayName: "Qwen3 Plus (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 131072,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 86,
-			planning: 84,
-			documentation: 84,
-			testing: 84,
-			security: 80,
-			performance: 82,
-			synthesis: 88,
-			speed: 82,
-			"context-length": 96
-		},
-		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"qwen3.7-max": {
-		model: "qwen3.7-max",
-		provider: "dashscope",
-		displayName: "Qwen3.7 Max (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 96,
-			"code-review": 94,
-			debugging: 94,
-			planning: 95,
-			documentation: 92,
-			testing: 92,
-			security: 90,
-			performance: 90,
-			synthesis: 95,
-			speed: 70,
-			"context-length": 98
-		},
-		notes: "Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"grok-build-0.1": {
-		model: "grok-build-0.1",
-		provider: "xai",
-		displayName: "Grok Build 0.1",
-		costPer1MTokens: 1.5,
-		contextWindow: 256e3,
-		supportsImages: true,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 88,
-			planning: 87,
-			documentation: 85,
-			testing: 86,
-			security: 82,
-			performance: 84,
-			synthesis: 88,
-			speed: 82,
-			"context-length": 97
-		},
-		notes: "xAI's agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli."
-	}
-};
-/**
-* Effort levels a model accepts, or `undefined` when not enumerated for that
-* model (treat undefined as "no model-specific restriction"). Resolves
-* deprecated IDs first so callers can pass raw config refs.
-*/
-function getModelEffortLevelsSync(model) {
-	return MODEL_CAPABILITIES[resolveModelIdSync(String(model))]?.effortLevels;
-}
-//#endregion
-//#region ../../src/lib/background-ai/registry.ts
-/**
-* Background AI feature registry — pure data, no dependencies (PAN-1583).
-*
-* Kept dependency-free so `config-yaml.ts` can import the feature list and
-* defaults without creating an import cycle with the enablement gate in
-* `features.ts` (which imports `config-yaml`).
-*/
-/** Every background AI feature Overdeck can run automatically. */
-const BACKGROUND_AI_FEATURES = [
-	"conversationTitles",
-	"titleRefinement",
-	"memoryExtraction",
-	"memoryQueryExpansion",
-	"conversationEnrichment",
-	"sessionEmbeddings",
-	"summaryFork",
-	"ttsSummarizer"
-];
-/**
-* Feature metadata. The `defaultEnabled` values mirror the historical
-* behavior of each subsystem so introducing the registry changes nothing
-* until the user flips a toggle:
-*   - sessionEmbeddings defaults OFF  (conversations.embeddings default false)
-*   - ttsSummarizer defaults OFF      (ttsSummarizer.enabled default false)
-*   - everything else defaults ON.
-*/
-const BACKGROUND_AI_FEATURE_META = [
-	{
-		key: "conversationTitles",
-		label: "Conversation titles",
-		description: "Generate a title for a new conversation from its first message.",
-		defaultEnabled: true
-	},
-	{
-		key: "titleRefinement",
-		label: "Title refinement",
-		description: "Refine a conversation title once the first assistant reply arrives.",
-		defaultEnabled: true
-	},
-	{
-		key: "memoryExtraction",
-		label: "Memory extraction",
-		description: "Extract structured observations from running agent transcripts.",
-		defaultEnabled: true
-	},
-	{
-		key: "memoryQueryExpansion",
-		label: "Memory query expansion",
-		description: "Expand memory search queries into related terms for better recall.",
-		defaultEnabled: true
-	},
-	{
-		key: "conversationEnrichment",
-		label: "Conversation enrichment",
-		description: "Summarize and tag discovered sessions for search and display.",
-		defaultEnabled: true
-	},
-	{
-		key: "sessionEmbeddings",
-		label: "Session embeddings",
-		description: "Build embedding vectors for semantic conversation search.",
-		defaultEnabled: false
-	},
-	{
-		key: "summaryFork",
-		label: "Summary fork / compaction",
-		description: "Summarize a transcript on compaction or handoff fallback.",
-		defaultEnabled: true
-	},
-	{
-		key: "ttsSummarizer",
-		label: "TTS activity narration",
-		description: "Summarize recent activity into spoken narration utterances.",
-		defaultEnabled: false
-	}
-];
-/** The default per-feature enablement map (used by config normalization). */
-function defaultBackgroundAiFeatures() {
-	const out = {};
-	for (const meta of BACKGROUND_AI_FEATURE_META) out[meta.key] = meta.defaultEnabled;
-	return out;
-}
-//#endregion
-//#region ../../src/lib/config-yaml.ts
-/**
-* YAML Configuration Loader
-*
-* Loads and merges configuration from:
-* 1. Global config: ~/.overdeck/config.yaml
-* 2. Per-project config: .pan.yaml (project root, falls back to .overdeck.yaml with deprecation warning)
-*
-* Uses smart (capability-based) model selection - no legacy presets.
-*/
-const COMPLIANCE_MODES = [
-	"off",
-	"advisory",
-	"enforcing"
-];
-function isComplianceMode(value) {
-	return typeof value === "string" && COMPLIANCE_MODES.includes(value);
-}
-function isFeatureRegistryClassificationProvider(value) {
-	return value === "anthropic" || value === "cliproxy";
-}
-const VALID_RESILIENCY_TIERS = ["ephemeral", "durable"];
-function isResiliencyTier(value) {
-	return typeof value === "string" && VALID_RESILIENCY_TIERS.includes(value);
-}
-/**
-* Merge remote work-agent provisioning settings from a single config source.
-*/
-function mergeRemoteConfig(result, config) {
-	const remote = config?.remote;
-	if (!remote) return;
-	if (remote.resiliency_tier !== void 0) {
-		if (!isResiliencyTier(remote.resiliency_tier)) throw new Error(`config.yaml: remote.resiliency_tier must be one of ${VALID_RESILIENCY_TIERS.join(", ")}`);
-		result.remote = {
-			...result.remote ?? { maxConcurrentAgents: 0 },
-			resiliencyTier: remote.resiliency_tier
-		};
-	}
-	if (remote.max_concurrent_agents !== void 0) {
-		if (typeof remote.max_concurrent_agents !== "number" || !Number.isInteger(remote.max_concurrent_agents) || remote.max_concurrent_agents < 0) throw new Error("config.yaml: remote.max_concurrent_agents must be a non-negative integer");
-		result.remote = {
-			...result.remote ?? { resiliencyTier: "ephemeral" },
-			maxConcurrentAgents: remote.max_concurrent_agents
-		};
-	}
-}
-const PARENT_MODEL_REF = "parent";
-/**
-* Canonical workhorse slot list. Anything outside this set is rejected by
-* config-load validation (PAN-1048 review feedback 003 / REQ-18).
-*/
-const WORKHORSE_SLOTS = [
-	"expensive",
-	"mid",
-	"cheap"
-];
-const ROLE_EFFORTS = [
-	"low",
-	"medium",
-	"high",
-	"xhigh",
-	"max"
-];
-const DEFAULT_WORKHORSES = {
-	expensive: "claude-opus-4-8",
-	mid: "claude-sonnet-4-6",
-	cheap: "claude-haiku-4-5"
-};
-const DEFAULT_ROLES = {
-	plan: { model: "workhorse:expensive" },
-	work: {
-		model: "workhorse:mid",
-		sub: {
-			inspect: { model: "workhorse:cheap" },
-			"inspect-deep": { model: "workhorse:mid" }
-		}
-	},
-	review: {
-		model: "workhorse:expensive",
-		sub: {
-			security: { model: "workhorse:expensive" },
-			correctness: { model: "workhorse:mid" },
-			performance: { model: "workhorse:mid" },
-			requirements: { model: "workhorse:mid" },
-			synthesis: { model: "workhorse:expensive" }
-		}
-	},
-	test: { model: "workhorse:mid" },
-	ship: { model: "workhorse:mid" },
-	strike: { model: "workhorse:expensive" },
-	sequencer: { model: "workhorse:expensive" },
-	flywheel: {
-		model: "claude-opus-4-8",
-		effort: "high",
-		minAgents: 20,
-		maxAgents: 30,
-		scope: "pan-only"
-	}
-};
-function cloneRoles(roles) {
-	const cloned = {};
-	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
-		...roleConfig,
-		model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
-		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
-	};
-	return cloned;
-}
-/**
-* Default configuration (used when no config files exist)
-*/
-const DEFAULT_DOCS_TRIGGER_REGEXES = [
-	"pan",
-	"overdeck",
-	"cloister",
-	"deacon",
-	"workspace",
-	"specialist",
-	"harness",
-	"bd",
-	"beads",
-	"vbrief",
-	"workhorse"
-];
-const DEFAULT_CONFIG = {
-	tmux: { configMode: "managed" },
-	enabledProviders: new Set(["anthropic"]),
-	apiKeys: {},
-	providerAuth: {},
-	providerPlan: {},
-	providerHarnesses: {},
-	openrouterFavorites: [],
-	workhorses: { ...DEFAULT_WORKHORSES },
-	roles: cloneRoles(DEFAULT_ROLES),
-	overrides: {},
-	geminiThinkingLevel: 3,
-	trackerKeys: {},
-	conversations: {
-		compactionModel: "claude-haiku-4-5",
-		manualCompactMode: "claude-code",
-		richCompaction: true,
-		titleModel: "claude-haiku-4-5",
-		watchDirs: ["~/Projects"],
-		scanMaxParallel: null,
-		embeddings: false,
-		embeddingProvider: "openai",
-		embeddingModel: "text-embedding-3-small",
-		embeddingAutoOnDeep: true,
-		enrichment: {
-			quickModel: null,
-			deepModel: null,
-			maxParallel: 4,
-			costConfirmThreshold: 1
-		}
-	},
-	docs: {
-		enabled: true,
-		promptInjectionEnabled: true,
-		cliEnabled: true,
-		trigger: {
-			regexes: DEFAULT_DOCS_TRIGGER_REGEXES,
-			caseSensitive: false
-		},
-		corpus: {
-			docs: true,
-			skills: true,
-			rules: true,
-			claudeMd: true,
-			prds: false,
-			prdStatuses: ["active", "planned"],
-			maxChunkTokens: 500
-		},
-		budget: {
-			injectionRate: 1,
-			turnWindow: 10,
-			maxTokensPerInjection: 3e3,
-			maxChunksPerInjection: 5,
-			bypassClassifierThreshold: .85
-		},
-		embedding: {
-			provider: "local",
-			model: "gte-small",
-			dimensions: 384
-		},
-		classifier: {
-			enabled: false,
-			provider: "anthropic",
-			model: "claude-haiku-4-5",
-			threshold: .85,
-			timeoutMs: 1500
-		}
-	},
-	conversationSearch: {
-		enabled: false,
-		provider: "openai",
-		model: "text-embedding-3-small",
-		apiKeyRef: void 0,
-		dbPath: join(homedir(), ".overdeck", "conversations", "embeddings.db")
-	},
-	memory: {
-		extraction: { fallbackChain: [] },
-		observationsEnabled: true,
-		promptTimeInjectionEnabled: true,
-		rollupPendingThreshold: 4,
-		sidebarRefreshIntervalMs: 1e4,
-		workerConcurrency: 4
-	},
-	backgroundAi: {
-		cheapMode: true,
-		features: defaultBackgroundAiFeatures()
-	},
-	compliance: { mode: "advisory" },
-	registry: { classification: {
-		enabled: true,
-		provider: "cliproxy",
-		model: "gpt-4.1-nano",
-		perDayCostCapUsd: 1
-	} },
-	shadow: {
-		enabled: false,
-		trackers: {
-			linear: false,
-			github: false,
-			gitlab: false,
-			rally: false
-		}
-	},
-	caveman: {
-		enabled: false,
-		abTest: false,
-		modes: {
-			work: "full",
-			review: "review",
-			test: "full",
-			merge: "full"
-		}
-	},
-	rtk: { enabled: false },
-	tldr: { enabled: true },
-	tts: {
-		enabled: false,
-		lifecycle: true,
-		voice: "",
-		volume: 1,
-		rate: 1,
-		maxChars: 140,
-		dropInfoWhenFull: true,
-		daemonPort: 8787,
-		daemonHost: "127.0.0.1",
-		daemonAutoStart: false,
-		voiceMap: {},
-		mutedSources: [],
-		utteranceTemplates: {},
-		mutedIssues: []
-	},
-	ttsSummarizer: {
-		enabled: false,
-		model: "gpt-5.4-mini",
-		batchWindowSeconds: 15
-	},
-	resources: {
-		memoryWarnGb: 4,
-		memoryBlockGb: 2,
-		agentWarnCount: 8,
-		agentBlockCount: 10
-	},
-	experimental: {
-		experimentalFeatures: false,
-		claudeCodeChannels: false,
-		claudeCodeChannelsMcp: false,
-		streamdownRenderer: false,
-		showHarnessModelPermutations: false
-	},
-	claude: { permissionMode: "auto" },
-	codex: { permissionMode: "auto-review" }
-};
-/**
-* Path to global config file
-*/
-const GLOBAL_CONFIG_PATH = join(homedir(), ".overdeck", "config.yaml");
-/**
-* Normalize a provider config (handle both boolean and object forms)
-*/
-function normalizeProviderConfig(providerConfig, fallbackKey) {
-	if (providerConfig === void 0) return { enabled: false };
-	if (typeof providerConfig === "boolean") return {
-		enabled: providerConfig,
-		api_key: fallbackKey
-	};
-	return {
-		enabled: providerConfig.enabled,
-		api_key: providerConfig.api_key || fallbackKey,
-		harness: providerConfig.harness,
-		auth: providerConfig.auth,
-		plan: providerConfig.plan
-	};
-}
-function validateProviderHarness(provider, harness) {
-	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
-}
-function applyProviderHarness(result, provider, harness) {
-	validateProviderHarness(provider, harness);
-	if (harness !== void 0) result.providerHarnesses[provider] = harness;
-}
-/**
-* Resolve environment variables in config values.
-* If the env var is not set, returns the original reference (e.g., "$OPENAI_API_KEY")
-* so the UI can show that it's configured via env var but not resolved.
-*/
-function resolveEnvVar(value) {
-	if (!value) return void 0;
-	return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (match, varName) => {
-		const envValue = process.env[varName];
-		return envValue !== void 0 ? envValue : match;
-	});
-}
+//#region ../../src/lib/config-yaml/load.ts
 /**
 * Load and parse a YAML config file
 */
@@ -29006,502 +29500,6 @@ function loadProjectConfig() {
 */
 function loadGlobalConfig() {
 	return loadYamlFile(GLOBAL_CONFIG_PATH);
-}
-/**
-* Merge shadow configuration from multiple sources
-*/
-function mergeShadowConfig(result, config) {
-	if (!config?.shadow) return;
-	if (config.shadow.enabled !== void 0) result.enabled = config.shadow.enabled;
-	if (config.shadow.trackers) {
-		if (config.shadow.trackers.linear !== void 0) result.trackers.linear = config.shadow.trackers.linear;
-		if (config.shadow.trackers.github !== void 0) result.trackers.github = config.shadow.trackers.github;
-		if (config.shadow.trackers.gitlab !== void 0) result.trackers.gitlab = config.shadow.trackers.gitlab;
-		if (config.shadow.trackers.rally !== void 0) result.trackers.rally = config.shadow.trackers.rally;
-	}
-}
-/**
-* Merge caveman configuration from a single config source into the result.
-*/
-function mergeCavemanConfig(result, config) {
-	const caveman = config?.agents?.caveman;
-	if (!caveman) return;
-	if (caveman.enabled !== void 0) result.enabled = caveman.enabled;
-	if (caveman.ab_test !== void 0) result.abTest = caveman.ab_test;
-	if (caveman.work !== void 0) result.modes.work = caveman.work;
-	if (caveman.review !== void 0) result.modes.review = caveman.review;
-	if (caveman.test !== void 0) result.modes.test = caveman.test;
-	if (caveman.merge !== void 0) result.modes.merge = caveman.merge;
-}
-function mergeRtkConfig(result, config) {
-	const rtk = config?.agents?.rtk;
-	if (!rtk) return;
-	if (rtk.enabled !== void 0) result.enabled = rtk.enabled;
-}
-function mergeTldrConfig(result, config) {
-	const tldr = config?.agents?.tldr;
-	if (!tldr) return;
-	if (tldr.enabled !== void 0) result.enabled = tldr.enabled;
-}
-function cloneDocsConfig(config) {
-	return {
-		enabled: config.enabled,
-		promptInjectionEnabled: config.promptInjectionEnabled,
-		cliEnabled: config.cliEnabled,
-		trigger: {
-			regexes: [...config.trigger.regexes],
-			caseSensitive: config.trigger.caseSensitive
-		},
-		corpus: {
-			docs: config.corpus.docs,
-			skills: config.corpus.skills,
-			rules: config.corpus.rules,
-			claudeMd: config.corpus.claudeMd,
-			prds: config.corpus.prds,
-			prdStatuses: [...config.corpus.prdStatuses],
-			maxChunkTokens: config.corpus.maxChunkTokens
-		},
-		budget: { ...config.budget },
-		embedding: { ...config.embedding },
-		classifier: { ...config.classifier }
-	};
-}
-function mergeDocsConfig(result, config) {
-	const docs = config?.docs;
-	if (!docs) return;
-	if (docs.enabled !== void 0) result.enabled = docs.enabled;
-	if (docs.prompt_injection !== void 0) result.promptInjectionEnabled = docs.prompt_injection;
-	if (docs.cli !== void 0) result.cliEnabled = docs.cli;
-	if (docs.trigger) {
-		if (docs.trigger.regexes !== void 0) result.trigger.regexes = [...docs.trigger.regexes];
-		if (docs.trigger.case_sensitive !== void 0) result.trigger.caseSensitive = docs.trigger.case_sensitive;
-	}
-	if (docs.corpus) {
-		if (docs.corpus.docs !== void 0) result.corpus.docs = docs.corpus.docs;
-		if (docs.corpus.skills !== void 0) result.corpus.skills = docs.corpus.skills;
-		if (docs.corpus.rules !== void 0) result.corpus.rules = docs.corpus.rules;
-		if (docs.corpus.claude_md !== void 0) result.corpus.claudeMd = docs.corpus.claude_md;
-		if (docs.corpus.prds !== void 0) result.corpus.prds = docs.corpus.prds;
-		if (docs.corpus.prd_statuses !== void 0) result.corpus.prdStatuses = [...docs.corpus.prd_statuses];
-		if (docs.corpus.max_chunk_tokens !== void 0) result.corpus.maxChunkTokens = docs.corpus.max_chunk_tokens;
-	}
-	if (docs.budget) {
-		if (docs.budget.injection_rate !== void 0) result.budget.injectionRate = docs.budget.injection_rate;
-		if (docs.budget.turn_window !== void 0) result.budget.turnWindow = docs.budget.turn_window;
-		if (docs.budget.max_tokens_per_injection !== void 0) result.budget.maxTokensPerInjection = docs.budget.max_tokens_per_injection;
-		if (docs.budget.max_chunks_per_injection !== void 0) result.budget.maxChunksPerInjection = docs.budget.max_chunks_per_injection;
-		if (docs.budget.bypass_classifier_threshold !== void 0) result.budget.bypassClassifierThreshold = docs.budget.bypass_classifier_threshold;
-	}
-	if (docs.embedding) {
-		if (docs.embedding.provider !== void 0) result.embedding.provider = docs.embedding.provider;
-		if (docs.embedding.model !== void 0) result.embedding.model = docs.embedding.model;
-		if (docs.embedding.dimensions !== void 0) result.embedding.dimensions = docs.embedding.dimensions;
-	}
-	if (docs.classifier) {
-		if (docs.classifier.enabled !== void 0) result.classifier.enabled = docs.classifier.enabled;
-		if (docs.classifier.provider !== void 0) result.classifier.provider = docs.classifier.provider;
-		if (docs.classifier.model !== void 0) result.classifier.model = docs.classifier.model;
-		if (docs.classifier.threshold !== void 0) result.classifier.threshold = docs.classifier.threshold;
-		if (docs.classifier.timeout_ms !== void 0) result.classifier.timeoutMs = docs.classifier.timeout_ms;
-	}
-}
-function mergeTtsConfig(result, config) {
-	const tts = config?.tts;
-	if (!tts) return;
-	if (tts.enabled !== void 0) result.enabled = tts.enabled;
-	if (tts.lifecycle !== void 0) result.lifecycle = tts.lifecycle;
-	if (tts.voice !== void 0) result.voice = tts.voice;
-	if (tts.statusVoice !== void 0) result.statusVoice = tts.statusVoice;
-	if (tts.volume !== void 0) result.volume = tts.volume;
-	if (tts.rate !== void 0) result.rate = tts.rate;
-	if (tts.maxChars !== void 0) result.maxChars = tts.maxChars;
-	if (tts.dropInfoWhenFull !== void 0) result.dropInfoWhenFull = tts.dropInfoWhenFull;
-	if (tts.daemonPort !== void 0) result.daemonPort = tts.daemonPort;
-	if (tts.daemonHost !== void 0) result.daemonHost = tts.daemonHost;
-	if (tts.daemon?.autoStart !== void 0) result.daemonAutoStart = tts.daemon.autoStart;
-	if (tts.voiceMap !== void 0) result.voiceMap = { ...tts.voiceMap };
-	if (tts.mutedSources !== void 0) result.mutedSources = [...tts.mutedSources];
-	if (tts.utteranceTemplates !== void 0) result.utteranceTemplates = { ...tts.utteranceTemplates };
-	if (tts.mutedIssues !== void 0) result.mutedIssues = [...tts.mutedIssues];
-}
-function isWorkhorseRef(ref) {
-	return ref.startsWith("workhorse:");
-}
-function workhorseSlotFromRef(ref) {
-	return ref.slice(10);
-}
-function derefWorkhorse(ref, config, fieldPath = "model") {
-	if (ref === "parent") throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
-	if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref);
-	const slot = workhorseSlotFromRef(ref);
-	const resolved = config.workhorses?.[slot];
-	if (!resolved) throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
-	if (isWorkhorseRef(resolved)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
-	return resolveModelIdSync(resolved);
-}
-function mergeRoleConfig(result, config) {
-	if (!config?.workhorses && !config?.roles) return;
-	if (config.workhorses) {
-		const unknownSlots = Object.keys(config.workhorses).filter((slot) => !WORKHORSE_SLOTS.includes(slot));
-		if (unknownSlots.length > 0) throw new Error(`config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? "s" : ""} ` + unknownSlots.map((s) => `workhorses.${s}`).join(", ") + `. Valid slots: ${WORKHORSE_SLOTS.join(", ")}.`);
-		result.workhorses = {
-			...result.workhorses ?? {},
-			...config.workhorses
-		};
-	}
-	if (config.roles) {
-		result.roles = { ...result.roles ?? {} };
-		for (const [role, roleConfig] of Object.entries(config.roles)) {
-			const existing = result.roles[role];
-			const sub = {
-				...existing?.sub ?? {},
-				...roleConfig.sub ?? {}
-			};
-			const mergedRoleConfig = {
-				...existing,
-				...roleConfig,
-				sub: Object.keys(sub).length > 0 ? sub : void 0
-			};
-			if (roleConfig.maxAgents !== void 0 && roleConfig.minAgents === void 0 && mergedRoleConfig.minAgents !== void 0 && mergedRoleConfig.minAgents > roleConfig.maxAgents) mergedRoleConfig.minAgents = roleConfig.maxAgents;
-			result.roles[role] = mergedRoleConfig;
-		}
-	}
-}
-function validateRoleFields(role, roleConfig) {
-	if (Array.isArray(roleConfig.model)) {
-		if (roleConfig.model.length === 0) throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
-		for (let i = 0; i < roleConfig.model.length; i++) {
-			const entry = roleConfig.model[i];
-			if (!entry.model || typeof entry.model !== "string") throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
-			if (!Number.isInteger(entry.weight) || entry.weight <= 0) throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
-		}
-	}
-	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
-	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
-	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
-	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
-	if (roleConfig.minAgents !== void 0 && roleConfig.maxAgents !== void 0 && roleConfig.minAgents > roleConfig.maxAgents) throw new Error(`config.yaml: roles.${role}.minAgents (${roleConfig.minAgents}) cannot exceed maxAgents (${roleConfig.maxAgents})`);
-	if (roleConfig.scope !== void 0 && roleConfig.scope !== "pan-only" && roleConfig.scope !== "all-tracked-projects") throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
-}
-function validateRoleModelRefs(config) {
-	for (const [slot, ref] of Object.entries(config.workhorses ?? {})) {
-		if (ref === "parent") throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
-		if (isWorkhorseRef(ref)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
-		resolveModelIdSync(ref);
-	}
-	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
-		validateRoleFields(role, roleConfig);
-		if (Array.isArray(roleConfig.model)) for (let i = 0; i < roleConfig.model.length; i++) derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
-		else if (roleConfig.model) {
-			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
-			if (roleConfig.effort !== void 0) {
-				const supported = getModelEffortLevelsSync(resolvedModel);
-				if (supported !== void 0 && !supported.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(", ")})`);
-			}
-		}
-		for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) if (subConfig.model && subConfig.model !== "parent") derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
-	}
-}
-/**
-* Merge multiple configs with precedence: project > global > defaults
-*/
-function mergeConfigs(...configs) {
-	const result = {
-		...DEFAULT_CONFIG,
-		tmux: { ...DEFAULT_CONFIG.tmux },
-		enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
-		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
-		workhorses: { ...DEFAULT_WORKHORSES },
-		roles: cloneRoles(DEFAULT_ROLES),
-		memory: {
-			extraction: {
-				...DEFAULT_CONFIG.memory.extraction,
-				fallbackChain: [...DEFAULT_CONFIG.memory.extraction.fallbackChain]
-			},
-			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
-			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
-			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
-			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
-			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
-		},
-		backgroundAi: {
-			cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
-			features: { ...DEFAULT_CONFIG.backgroundAi.features }
-		},
-		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
-		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
-		shadow: {
-			enabled: DEFAULT_CONFIG.shadow.enabled,
-			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
-		},
-		caveman: {
-			enabled: DEFAULT_CONFIG.caveman.enabled,
-			abTest: DEFAULT_CONFIG.caveman.abTest,
-			modes: { ...DEFAULT_CONFIG.caveman.modes }
-		},
-		rtk: { enabled: DEFAULT_CONFIG.rtk.enabled },
-		docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
-		conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
-		tts: {
-			enabled: DEFAULT_CONFIG.tts.enabled,
-			lifecycle: DEFAULT_CONFIG.tts.lifecycle,
-			voice: DEFAULT_CONFIG.tts.voice,
-			volume: DEFAULT_CONFIG.tts.volume,
-			rate: DEFAULT_CONFIG.tts.rate,
-			maxChars: DEFAULT_CONFIG.tts.maxChars,
-			dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
-			daemonPort: DEFAULT_CONFIG.tts.daemonPort,
-			daemonHost: DEFAULT_CONFIG.tts.daemonHost,
-			daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
-			voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
-			mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
-			utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
-			mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues]
-		},
-		ttsSummarizer: {
-			enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
-			model: DEFAULT_CONFIG.ttsSummarizer.model,
-			batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds
-		},
-		resources: {
-			memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
-			memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
-			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
-			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
-		},
-		experimental: {
-			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
-			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
-			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
-			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
-			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
-		},
-		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
-		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
-	};
-	const explicitlyDisabled = /* @__PURE__ */ new Set();
-	const validConfigs = configs.filter((c) => c !== null);
-	for (const config of validConfigs.reverse()) {
-		if (config.models?.providers) {
-			const providers = config.models.providers;
-			const legacyKeys = config.api_keys || {};
-			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
-			applyProviderHarness(result, "anthropic", anthropic.harness);
-			if (anthropic.enabled) result.enabledProviders.add("anthropic");
-			else if (providers.anthropic !== void 0) {
-				explicitlyDisabled.add("anthropic");
-				result.enabledProviders.delete("anthropic");
-			}
-			const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
-			applyProviderHarness(result, "openai", openai.harness);
-			if (openai.enabled) {
-				result.enabledProviders.add("openai");
-				if (openai.api_key) result.apiKeys.openai = resolveEnvVar(openai.api_key);
-				if (openai.auth) result.providerAuth.openai = openai.auth;
-				if (openai.plan) result.providerPlan.openai = openai.plan;
-			} else if (providers.openai !== void 0) explicitlyDisabled.add("openai");
-			const google = normalizeProviderConfig(providers.google, legacyKeys.google);
-			applyProviderHarness(result, "google", google.harness);
-			if (google.enabled) {
-				result.enabledProviders.add("google");
-				if (google.api_key) result.apiKeys.google = resolveEnvVar(google.api_key);
-				if (google.auth) result.providerAuth.google = google.auth;
-				if (google.plan) result.providerPlan.google = google.plan;
-			} else if (providers.google !== void 0) explicitlyDisabled.add("google");
-			const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
-			applyProviderHarness(result, "minimax", minimax.harness);
-			if (minimax.enabled) {
-				result.enabledProviders.add("minimax");
-				if (minimax.api_key) result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
-			} else if (providers.minimax !== void 0) explicitlyDisabled.add("minimax");
-			const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
-			applyProviderHarness(result, "zai", zai.harness);
-			if (zai.enabled) {
-				result.enabledProviders.add("zai");
-				if (zai.api_key) result.apiKeys.zai = resolveEnvVar(zai.api_key);
-			} else if (providers.zai !== void 0) explicitlyDisabled.add("zai");
-			const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
-			applyProviderHarness(result, "kimi", kimi.harness);
-			if (kimi.enabled) {
-				result.enabledProviders.add("kimi");
-				if (kimi.api_key) result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
-			} else if (providers.kimi !== void 0) explicitlyDisabled.add("kimi");
-			const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
-			applyProviderHarness(result, "openrouter", openrouter.harness);
-			if (openrouter.enabled) {
-				result.enabledProviders.add("openrouter");
-				if (openrouter.api_key) result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
-			} else if (providers.openrouter !== void 0) explicitlyDisabled.add("openrouter");
-			const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
-			applyProviderHarness(result, "mimo", mimo.harness);
-			if (mimo.enabled) {
-				result.enabledProviders.add("mimo");
-				if (mimo.api_key) result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
-			} else if (providers.mimo !== void 0) explicitlyDisabled.add("mimo");
-			const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
-			applyProviderHarness(result, "nous", nous.harness);
-			if (nous.enabled) {
-				result.enabledProviders.add("nous");
-				if (nous.api_key) result.apiKeys.nous = resolveEnvVar(nous.api_key);
-			} else if (providers.nous !== void 0) explicitlyDisabled.add("nous");
-			const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
-			applyProviderHarness(result, "dashscope", dashscope.harness);
-			if (dashscope.enabled) {
-				result.enabledProviders.add("dashscope");
-				if (dashscope.api_key) result.apiKeys.dashscope = resolveEnvVar(dashscope.api_key);
-			} else if (providers.dashscope !== void 0) explicitlyDisabled.add("dashscope");
-		}
-		if (config.tmux?.config_mode) result.tmux.configMode = config.tmux.config_mode;
-		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
-		if (config.conversations?.manual_compact_mode) result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
-		if (config.conversations?.rich_compaction !== void 0) result.conversations.richCompaction = config.conversations.rich_compaction;
-		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
-		if (config.conversations?.watch_dirs) result.conversations.watchDirs = config.conversations.watch_dirs;
-		if (config.conversations?.scan_max_parallel !== void 0) result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
-		if (config.conversations?.embeddings !== void 0) result.conversations.embeddings = config.conversations.embeddings;
-		if (config.conversations?.embedding_provider) {
-			result.conversations.embeddingProvider = config.conversations.embedding_provider;
-			if (config.conversations.embedding_provider === "ollama" && !config.conversations.embedding_model) result.conversations.embeddingModel = "nomic-embed-text";
-		}
-		if (config.conversations?.embedding_model) result.conversations.embeddingModel = config.conversations.embedding_model;
-		if (config.conversations?.embedding_auto_on_deep !== void 0) result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
-		if (config.conversations?.enrichment?.quick_model !== void 0) result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
-		if (config.conversations?.enrichment?.deep_model !== void 0) result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
-		if (config.conversations?.enrichment?.max_parallel !== void 0) result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
-		if (config.conversations?.enrichment?.cost_confirm_threshold !== void 0) result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
-		if (config.memory) {
-			if (config.memory.extraction) result.memory.extraction = {
-				...result.memory.extraction,
-				...config.memory.extraction.provider !== void 0 ? { provider: config.memory.extraction.provider } : {},
-				...config.memory.extraction.model !== void 0 ? { model: config.memory.extraction.model } : {},
-				...config.memory.extraction.per_day_cost_cap_usd !== void 0 ? { perDayCostCapUsd: config.memory.extraction.per_day_cost_cap_usd } : {},
-				...config.memory.extraction.fallback_chain !== void 0 ? { fallbackChain: config.memory.extraction.fallback_chain } : {}
-			};
-			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
-			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
-			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
-			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
-			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
-		}
-		if (config.compliance?.mode !== void 0) {
-			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
-			result.compliance.mode = config.compliance.mode;
-		}
-		if (config.registry?.classification) {
-			const classification = config.registry.classification;
-			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
-			if (classification.provider !== void 0) {
-				if (!isFeatureRegistryClassificationProvider(classification.provider)) throw new Error("config.yaml: registry.classification.provider must be anthropic or cliproxy");
-				result.registry.classification.provider = classification.provider;
-			}
-			if (classification.model !== void 0) result.registry.classification.model = classification.model;
-			if (classification.per_day_cost_cap_usd !== void 0) {
-				if (typeof classification.per_day_cost_cap_usd !== "number" || classification.per_day_cost_cap_usd < 0) throw new Error("config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number");
-				result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
-			}
-		}
-		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
-		mergeRoleConfig(result, config);
-		if (config.api_keys) {
-			if (config.api_keys.openai) {
-				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
-				if (!explicitlyDisabled.has("openai")) result.enabledProviders.add("openai");
-			}
-			if (config.api_keys.voyage) result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
-			if (config.api_keys.google) {
-				result.apiKeys.google = resolveEnvVar(config.api_keys.google);
-				if (!explicitlyDisabled.has("google")) result.enabledProviders.add("google");
-			}
-			if (config.api_keys.minimax) {
-				result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
-				if (!explicitlyDisabled.has("minimax")) result.enabledProviders.add("minimax");
-			}
-			if (config.api_keys.zai) {
-				result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
-				if (!explicitlyDisabled.has("zai")) result.enabledProviders.add("zai");
-			}
-			if (config.api_keys.kimi) {
-				result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
-				if (!explicitlyDisabled.has("kimi")) result.enabledProviders.add("kimi");
-			}
-			if (config.api_keys.openrouter) {
-				result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
-				if (!explicitlyDisabled.has("openrouter")) result.enabledProviders.add("openrouter");
-			}
-			if (config.api_keys.mimo) {
-				result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
-				if (!explicitlyDisabled.has("mimo")) result.enabledProviders.add("mimo");
-			}
-			if (config.api_keys.nous) {
-				result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
-				if (!explicitlyDisabled.has("nous")) result.enabledProviders.add("nous");
-			}
-			if (config.api_keys.dashscope) {
-				result.apiKeys.dashscope = resolveEnvVar(config.api_keys.dashscope);
-				if (!explicitlyDisabled.has("dashscope")) result.enabledProviders.add("dashscope");
-			}
-		}
-		if (config.models?.overrides) result.overrides = {
-			...result.overrides,
-			...config.models.overrides
-		};
-		if (config.models?.gemini_thinking_level) result.geminiThinkingLevel = config.models.gemini_thinking_level;
-		if (config.models?.default_conversation_model) result.defaultConversationModel = config.models.default_conversation_model;
-		if (config.tracker_keys) {
-			if (config.tracker_keys.linear) result.trackerKeys.linear = resolveEnvVar(config.tracker_keys.linear);
-			if (config.tracker_keys.github) result.trackerKeys.github = resolveEnvVar(config.tracker_keys.github);
-			if (config.tracker_keys.gitlab) result.trackerKeys.gitlab = resolveEnvVar(config.tracker_keys.gitlab);
-			if (config.tracker_keys.rally) result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
-		}
-		mergeShadowConfig(result.shadow, config);
-		mergeCavemanConfig(result.caveman, config);
-		mergeRtkConfig(result.rtk, config);
-		mergeTldrConfig(result.tldr, config);
-		mergeDocsConfig(result.docs, config);
-		mergeTtsConfig(result.tts, config);
-		if (config.tts?.summarizer) {
-			const s = config.tts.summarizer;
-			if (s.enabled !== void 0) result.ttsSummarizer.enabled = s.enabled;
-			if (s.model) result.ttsSummarizer.model = resolveModelIdSync(s.model);
-			if (s.batch_window_seconds !== void 0) result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
-		}
-		if (config.background_ai) {
-			if (typeof config.background_ai.cheap_mode === "boolean") result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
-			if (config.background_ai.features) for (const feature of BACKGROUND_AI_FEATURES) {
-				const value = config.background_ai.features[feature];
-				if (typeof value === "boolean") result.backgroundAi.features[feature] = value;
-			}
-		}
-		if (config.resources) {
-			if (typeof config.resources.memory_warn_gb === "number") result.resources.memoryWarnGb = config.resources.memory_warn_gb;
-			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
-			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
-			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
-		}
-		if (config.experimental) {
-			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
-			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
-			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
-			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
-			if (typeof config.experimental.showHarnessModelPermutations === "boolean") result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
-		}
-		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
-		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;
-		mergeRemoteConfig(result, config);
-		if (config.conversationSearch) {
-			const cs = config.conversationSearch;
-			if (typeof cs.enabled === "boolean") result.conversationSearch.enabled = cs.enabled;
-			if (cs.provider !== void 0) result.conversationSearch.provider = cs.provider;
-			if (cs.model !== void 0) result.conversationSearch.model = cs.model;
-			if (cs.apiKeyRef !== void 0) result.conversationSearch.apiKeyRef = cs.apiKeyRef;
-			if (cs.dbPath !== void 0) result.conversationSearch.dbPath = cs.dbPath;
-		}
-	}
-	validateRoleModelRefs(result);
-	return {
-		config: result,
-		explicitlyDisabled
-	};
 }
 /**
 * Detect deprecated model IDs in config overrides

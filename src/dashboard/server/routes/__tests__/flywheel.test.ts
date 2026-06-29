@@ -24,6 +24,7 @@ import {
   postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
+import { getMergeBackendPayload } from '../flywheel-merge-backend.js';
 import { initEventStore } from '../../event-store.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
@@ -358,6 +359,33 @@ describe('flywheel config routes', () => {
   });
 });
 
+describe('flywheel merge backend route', () => {
+  it('returns the merge backend helper result', async () => {
+    await expect(getMergeBackendPayload({
+      getStatus: async () => ({
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      }),
+    })).resolves.toEqual({
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    });
+  });
+
+  it('accepts GET requests without an Origin header', async () => {
+    const result = await requestFlywheelRoute('/api/flywheel/merge-backend');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      available: expect.any(Boolean),
+      mode: expect.stringMatching(/^(app|gh-cli|none)$/),
+      detail: expect.any(String),
+    });
+  });
+});
+
 describe('flywheel auto-merge routes', () => {
   let overdeckHome: string;
 
@@ -540,6 +568,12 @@ describe('flywheel auto-merge routes', () => {
     await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }),
     }))).resolves.toEqual({ status: 422, body: { error: 'CI checks failing on PR HEAD deadbeef' } });
+  });
+
+  it('returns 422 when auto-merge eligibility reports a GitHub PR-state read failure', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isEligible: async () => ({ eligible: false, reason: 'GitHub PR state lookup failed: gh auth required' }),
+    }))).resolves.toEqual({ status: 422, body: { error: 'GitHub PR state lookup failed: gh auth required' } });
   });
 
   it('returns active pending auto-merges sorted by scheduled merge time', async () => {
@@ -800,9 +834,11 @@ describe('flywheel run payload helpers', () => {
     await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
     await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { overdeckHome });
 
+    // PAN-2108: with no active run set, both are orphaned (no terminal marker,
+    // not the active run) → aborted. This test asserts sort order, not status.
     await expect(getFlywheelRunsPayload({ overdeckHome })).resolves.toEqual([
-      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
-      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'aborted' },
+      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'aborted' },
     ]);
   });
 
@@ -812,7 +848,7 @@ describe('flywheel run payload helpers', () => {
     await mkdir(join(overdeckHome, 'flywheel', 'runs', 'not-a-run'), { recursive: true });
 
     await expect(getFlywheelRunsPayload({ overdeckHome, limit: 1 })).resolves.toEqual([
-      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'aborted' },
     ]);
   });
 

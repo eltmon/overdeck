@@ -394,6 +394,21 @@ export function ConversationPanel({
     },
   });
 
+  const abortMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/abort`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Failed to stop turn (${res.status})${body ? `: ${body}` : ''}`);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
+    },
+  });
+
   const renameMutation = useMutation({
     mutationFn: (title: string) => updateConversationTitle(conversation.name, title),
     onSuccess: () => {
@@ -605,6 +620,7 @@ export function ConversationPanel({
     ? 'var(--info)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   return (
     <div className={styles.conversationTerminal}>
       {/* Header — hidden in embedded mode (ZoneB already shows session info).
@@ -703,6 +719,19 @@ export function ConversationPanel({
                 <Wrench size={14} />
                 <span>Tools</span>
               </button>
+
+              {showPiAbort && (
+                <button
+                  className={`${styles.conversationAboutToggle} ${abortMutation.isPending ? styles.conversationAboutToggleActive : ''}`}
+                  onClick={() => abortMutation.mutate()}
+                  disabled={abortMutation.isPending}
+                  title="Stop current turn"
+                  aria-label="Stop current turn"
+                >
+                  {abortMutation.isPending ? <Loader2 size={14} className={styles.spinnerIcon} /> : <Square size={14} />}
+                  <span>{abortMutation.isPending ? 'Stopping…' : 'Stop'}</span>
+                </button>
+              )}
 
               {/* Copy link */}
               <button
@@ -979,6 +1008,7 @@ export function ConversationPanel({
               agentId={agentId}
               hideToolCalls={hideToolCalls}
               workingPhase={isWorking ? workingPhase : undefined}
+              agentBusy={isWorking}
               streamMessagesEnabled={streamMessagesEnabled}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
@@ -1159,6 +1189,8 @@ interface ConversationViewProps {
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */
   workingPhase?: WorkingPhase;
+  /** True when the agent is currently mid-turn. */
+  agentBusy?: boolean;
   /** True when the shared conversation-messages cache is fed by the WS stream. */
   streamMessagesEnabled?: boolean;
   messagesData?: MessagesResponse;
@@ -1171,7 +1203,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1183,6 +1215,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
   const failedMessages = useConversationFailed(conversation.name);
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
+  const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
   const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
   const failSend = useComposerStore((s) => s.failSend);
   const removeFailed = useComposerStore((s) => s.removeFailed);
@@ -1230,6 +1263,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const handleMessageSent = useCallback((text: string) => {
     addOptimistic(conversation.name, text, serverMessages.length);
   }, [addOptimistic, conversation.name, serverMessages.length]);
+
+  const handleMessageAcknowledged = useCallback((text: string) => {
+    if (conversation.harness !== 'ohmypi' && conversation.harness !== 'pi') return;
+    acknowledgeOptimistic(conversation.name, text);
+  }, [acknowledgeOptimistic, conversation.harness, conversation.name]);
 
   // Called by ComposerFooter when POST fails — move optimistic to failed outbox.
   const handleSendFailed = useCallback((text: string) => {
@@ -1438,9 +1476,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
         <ComposerFooter
           conversation={conversation}
           onSend={handleMessageSent}
+          onSendAcknowledged={handleMessageAcknowledged}
           onSendFailed={handleSendFailed}
           agentId={agentId}
           contextWindowUsage={contextWindowUsage}
+          agentBusy={agentBusy}
         />
       )}
     </div>

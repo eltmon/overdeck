@@ -8,6 +8,14 @@ export interface StuckRemediationState {
   lastStage: StuckRemediationStage;
   lastStageAt: string;
   firstStuckAt: string;
+  /**
+   * PAN-2108: flywheel-orchestrator death-recovery guard. Counts auto-relaunches
+   * within a rolling window so a crash-looping orchestrator escalates to
+   * paused+troubled instead of respawning forever. Optional — only set on the
+   * flywheel-orchestrator agent.
+   */
+  respawnCount?: number;
+  lastRespawnAt?: string;
 }
 
 function agentStateDir(agentId: string): string {

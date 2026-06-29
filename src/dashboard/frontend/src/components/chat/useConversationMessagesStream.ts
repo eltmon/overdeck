@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
-import { WS_METHODS } from '@overdeck/contracts';
+import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ProposedPlan, WorkLogEntry } from './chat-types';
@@ -122,10 +122,9 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   // streams — polling those every 2s is visibly stale during fast turns.
   if (conversation.id !== undefined && conversation.id >= 0) {
     if (conversation.endedAt) return false;
-    return conversation.harness === 'claude-code' ||
-      conversation.harness === 'ohmypi' ||
-      conversation.harness === 'codex' ||
-      conversation.harness == null;
+    if (conversation.harness == null) return true;
+    const behavior = getHarnessBehavior(conversation.harness);
+    return behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
   }
   // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels)
   // have no conversations-table row and only stream while their session is live.
@@ -135,7 +134,7 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   if (!conversation.sessionAlive) return false;
   const name = conversation.name ?? '';
   const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
-  const streamable = conversation.harness === 'ohmypi' || conversation.harness === 'codex';
+  const streamable = getHarnessBehavior(conversation.harness).supportsConversationStreaming;
   return isAgentSession && streamable;
 }
 

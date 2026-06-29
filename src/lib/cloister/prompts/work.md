@@ -117,6 +117,21 @@ If neither exists, check the issue tracker for requirements.
 - If a permission prompt appears in your own session, wait for the harness/user to handle it; if it appears in another agent, treat that as a system bug and fix the permissions path, not the prompt.
 - Do not ask an inspector, reviewer, test agent, or any subagent to approve a prompt. Permission decisions belong to the harness/user path only.
 
+### Subagent permission prompts — never self-approve
+
+If you observe that any subagent (the inspector spawned by `pan inspect`, or any other Claude Code subagent in a tmux session you can see) appears stuck waiting on a permission prompt, do **NOT** send keystrokes via `tmux send-keys` to approve, decline, or otherwise interact with the prompt.
+
+Permission prompts indicate a permissions configuration issue that must be raised to the user. Self-approving via `tmux send-keys` can silently authorize destructive operations (file deletion, force-pushes, outbound network calls) that the user did not intend to allow.
+
+Instead, when you detect a stuck subagent that appears to be waiting on a prompt:
+
+1. Capture the tmux pane content to document what was waiting (`tmux -L overdeck capture-pane -t <session> -p -S -50`).
+2. Stop polling the subagent. Do not retry.
+3. Signal back to the user via `pan tell {{ISSUE_ID}}` with a summary: which subagent, what bead it was inspecting, and the captured pane content excerpt.
+4. Halt your own bead loop. The user must address the permissions configuration before work can resume.
+
+The only acceptable interaction with a subagent's tmux session from inside the work agent is read-only inspection (`capture-pane`, `list-sessions`). Writing keystrokes is forbidden.
+
 {{#TLDR_AVAILABLE}}
 ## TLDR: Token-Efficient Code Analysis
 

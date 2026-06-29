@@ -6,6 +6,7 @@
  */
 
 export * from './types.js';
+export * from './behavior.js';
 export {
   ClaudeCodeRuntimeSync,
   ClaudeCodeRuntime,

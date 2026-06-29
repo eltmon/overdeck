@@ -48,6 +48,7 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
+import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
@@ -84,6 +85,7 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
 
+void warnIfAutonomousMergeBackendUnavailable();
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and

@@ -4,17 +4,17 @@
     "created": "2026-06-27T03:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2088: Full programmatic control surface for pi/oh-my-pi conversations via the extension API",
-    "updated": "2026-06-27T07:09:53.361Z"
+    "updated": "2026-06-29T03:49:38.493Z"
   },
   "plan": {
     "id": "pan-2088",
     "title": "Full programmatic control surface for pi/oh-my-pi conversations via the extension API",
-    "status": "running",
+    "status": "completed",
     "uid": "b2f88e10-2088-4c44-9a31-0c9f7d4e8a21",
     "author": "agent:claude-opus-4-8",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-06-27T03:40:00.000Z",
-    "updated": "2026-06-27T07:09:53.361Z",
+    "updated": "2026-06-29T03:49:38.493Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2088",
@@ -533,5 +533,5 @@
       "canonicalFilename": "2026-06-27-PAN-2088-full-programmatic-control-surface-for-pi-oh-my-pi-conversations-via-the-extension-api.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

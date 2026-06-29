@@ -8,19 +8,22 @@ import {
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
 
-let odb: OverdeckTestDb;
+let odb: OverdeckTestDb | undefined;
 
 function resetDb() {
-  teardownOverdeckTestDb(odb);
+  if (odb) teardownOverdeckTestDb(odb);
   odb = setupOverdeckTestDb();
 }
 
-beforeEach(() => {
-  odb = setupOverdeckTestDb();
-});
+function ensureDb() {
+  if (!odb) odb = setupOverdeckTestDb();
+}
 
 afterEach(() => {
-  teardownOverdeckTestDb(odb);
+  if (odb) {
+    teardownOverdeckTestDb(odb);
+    odb = undefined;
+  }
 });
 
 // ─── parseRelativeTime ────────────────────────────────────────────────────────
@@ -114,6 +117,7 @@ describe('cosineSimilarity', () => {
 // ─── searchSessions (integration) ────────────────────────────────────────────
 
 function seedSession(opts: { id: number; workspace: string; tags?: string[]; cost?: number; ts?: string }) {
+  ensureDb();
   upsertDiscoveredSession({
     jsonlPath: `/fake/${opts.id}.jsonl`,
     workspacePath: opts.workspace,
@@ -224,6 +228,7 @@ describe('searchSessions', () => {
 
 describe('FTS total is not derived from the capped candidate slice', () => {
   beforeEach(async () => {
+    ensureDb();
     // Seed 5 sessions all with the same distinctive keyword in their summaries
     for (let i = 1; i <= 5; i++) {
       const s = upsertDiscoveredSession({
@@ -281,6 +286,7 @@ describe('FTS total is not derived from the capped candidate slice', () => {
 
 describe('FTS pagination with non-zero offset', () => {
   beforeEach(async () => {
+    ensureDb();
     // Seed 8 sessions with the same keyword so FTS matches all of them
     for (let i = 1; i <= 8; i++) {
       const s = upsertDiscoveredSession({
@@ -376,6 +382,7 @@ describe('similar-session search paginates after excluding the reference session
   }
 
   beforeEach(async () => {
+    ensureDb();
     const vectors = [
       [1, 0],
       [0.99, 0.01],
@@ -449,6 +456,7 @@ describe('semantic+FTS search respects filter constraints', () => {
   const MODEL = 'text-embedding-3-small';
 
   beforeEach(async () => {
+    ensureDb();
     // Seed 4 sessions: 2 in workspace-A, 2 in workspace-B
     // All share a distinctive keyword in summaries
     for (let i = 1; i <= 4; i++) {

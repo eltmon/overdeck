@@ -23,6 +23,7 @@ import type {
   AgentRuntime,
   AgentRuntimeSync,
   AgentRuntimeError,
+  HarnessBehavior,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -30,6 +31,7 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
+import { CODEX_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, listSessionsSync, createSession } from '../tmux.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
@@ -376,6 +378,10 @@ export function findLatestRollout(codexHomeDir: string): string | null {
 export class CodexRuntimeSync implements AgentRuntimeSync {
   readonly name = 'codex' as const
 
+  getHarnessBehavior(): HarnessBehavior {
+    return CODEX_BEHAVIOR
+  }
+
   getSessionPath(agentId: string): string | null {
     const threadId = readThreadId(agentId)
     if (!threadId) return null
@@ -661,6 +667,9 @@ export class CodexRuntime implements AgentRuntime {
 
   getSessionPath(agentId: string): string | null {
     return this.inner.getSessionPath(agentId)
+  }
+  getHarnessBehavior(): HarnessBehavior {
+    return this.inner.getHarnessBehavior()
   }
   getLastActivity(agentId: string): Date | null {
     return this.inner.getLastActivity(agentId)

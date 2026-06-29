@@ -2,6 +2,78 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
+## RUN-33 tick 2 (2026-06-29 ~03:30Z) — operator merged the ready PRs; PAN-2157 fix in flight; PAN-1982 done; +1 plan launched
+
+- **Operator acted on tick-1 suggestions: merged PR #2109 (PAN-1884) + #2097 (PAN-2088)** at 03:24Z. Both now verifying-on-main. **Main CI went `in_progress`** on merge commit `5bfa88d` — NOT yet confirmed green, so I deferred their close-out to next tick (verify CI conclusion first; both were CLEAN/test-passed so green expected).
+- **PAN-1982 finished → Ready for Merge** (PR #2112, review=passed test=passed). Cohort member complete; now in the same merge-blocked queue (dead mechanism + CI in_progress). agent-pan-1982 is idle.
+- **PAN-2157 (merge-mechanism fix) auto-promoted plan→work.** planning-pan-2157 wrote the vBRIEF (+443/-2) and `agent-pan-2157-plan` is the live work agent (Opus, in feature-pan-2157), implementing the fix. This is the key unblocker — let it run to review.
+- **Launched `pan plan PAN-1506 --auto` → planning-pan-1506** as the 2nd producer (minAgents=2). PAN-1506 = "strike agents missing from frontend store" (critical substrate, eltmon-authored, root of PAN-1510). Chose to launch this tick because the gate is no longer jammed (operator merging + PAN-2157 fixing autonomy), so adding a producer no longer churns a stuck gate.
+- **PAN-2086 STILL wedged** (100% ctx, kimi token limit). Deacon's stuck-detector fired the 20-min nudge but the agent can't act at 100% ctx. 17 commits safe, no PR. Confirmed: the only recovery is a dashboard restart WITHOUT `--no-resume` (or operator-driven), which the flywheel cannot do.
+- **`pan review pending` is noisy** — it lists every workspace with a pending-review status incl. stopped --no-resume sessions (PAN-1817/1781/2044/2045 strikes/plans from prior runs). Don't mistake these for live stalled convoys; none had live reviewers this tick, none needed `pan review restart`.
+- Cohort tally: 9 terminal + PAN-1884 merged (verifying). Remaining active: PAN-1982 (ready-merge), 2054/1718/2063 (in-review), 2086 (wedged), 806/1864 (held).
+- Next tick: (1) **verify main CI conclusion** on 5bfa88d — if red, P0; if green, close out PAN-1884/2088 and push PAN-1982/MIN merges; (2) watch agent-pan-2157-plan → review (it bootstraps autonomous merge); (3) watch planning-pan-1506 → work.
+
+### RUN-33 tick-2 addendum (~03:37Z) — PAN-1506 already-fixed → CLOSED; producer re-pointed at PAN-1510
+
+- **planning-pan-1506 came back "already resolved, no vBRIEF" — and it was RIGHT.** PAN-1506 (strike agents missing from frontend store) was already fixed by PAN-1908/1938/1979 (role-guard now includes `strike`, `/api/agents` + WS snapshot both read unified overdeck.db, projection-cache fast-bootstrap removed). **Verified before closing:** ran `src/dashboard/server/__tests__/read-model-agent-source.test.ts` → 4/4 passing; `VALID_ROLES` (read-model.ts:226) includes `strike`; documented at docs/ROLES.md + resource-discovery.ts (PAN-1682). **Closed PAN-1506 as completed** with evidence comment. LESSON: treat a plan agent's "already-fixed, recommend close" as data → verify the strongest claim (run the named regression test) → close. Don't spawn a work agent on a non-bug.
+- **Re-pointed the 2nd producer: launched `pan plan PAN-1510 --auto` → planning-pan-1510** (parallel "newly-filed issues missing from store" bug). Unlike 1506, PAN-1510 has NO obvious regression test and a distinct code path (issue-data-service cache invalidation, not agent source), so it's genuinely unverified — worth planning (will fix or report already-resolved). Kept the existing tick-2 wakeup; did not reschedule.
+
+### RUN-33 tick-2 addendum 2 (~03:42Z) — PAN-1510 ALSO already-fixed → CLOSED; producer → PAN-1508; backlog top is stale
+
+- **planning-pan-1510 ALSO came back "already fixed" — verified and CLOSED.** Fix commit `7e0dcf2081` ("fix(read-model): merge issueService snapshot with projection cache at bootstrap", Refs PAN-1510) confirmed in origin/main; adds discoverNewIssues + mergeIssuesByIdentifier in both getSnapshot and bootstrap (mirrors PAN-1506). Ran `tests/dashboard/read-model-new-issues.test.ts` → 13/13 green. Closed as completed with evidence.
+- **PATTERN — the top of the backlog is STALE: two consecutive "already-fixed" closes (PAN-1506, PAN-1510).** New triage rule adopted: **before launching a plan on a backlog bug, `git log origin/main --grep "PAN-<n>"` for an existing fix commit.** If a real fix commit exists → verify (run its named test) + close instead of planning. This avoids spawning plan agents that just report "already fixed." (Backlog scan this tick: PAN-1456 has only a spec/proposed commit; PAN-1861 has a partial fix `df2c2d8a1`; PAN-1865's only commit is a docs/dev-rule, real bug still open; PAN-1508 has NO fix commit.)
+- **Re-pointed producer → `pan plan PAN-1508 --auto` → planning-pan-1508** (immediate cleanup of safe post-merge feature-*/ workspaces; eltmon, critical, substrate; NO existing fix commit = genuinely unfixed work). Disk currently fine (81%, workspaces 42G) so it's not urgent, but it's real plannable work and keeps minAgents=2.
+- Net cohort/backlog drain this run so far: closed-out PAN-1084, PAN-2081; closed-as-already-fixed PAN-1506, PAN-1510; operator merged PAN-1884, PAN-2088. Producers: agent-pan-2157-plan (work, the merge unblocker) + planning-pan-1508.
+
+### RUN-33 tick-2 addendum 3 (~03:46Z) — PAN-1508 obsolete (3rd stale close); STOPPED speculative launching; closed merged-stranded PAN-2054; consolidated --no-resume finding
+
+- **PAN-1508 self-aborted → CLOSED as obsolete (3rd consecutive stale backlog item).** It was a one-time RUN-11 disk emergency (220GB) that's gone (disk 140G free, 83%). Verified: reaper exists (`src/lib/cloister/strike-workspace-reaper.ts`, `src/lib/lifecycle/teardown-workspace.ts`), PAN-925 CLOSED, broader hygiene in **PAN-863 (OPEN)**. Closed as not-planned, pointing to PAN-863. The plan agent's safety warning is correct: auto-sweeping workspaces is unsafe (most have live tmux sessions).
+- **DECISION — stopped speculative plan launching.** 3-for-3 already-fixed/obsolete (1506/1510/1508) is conclusive: the top of the ranked backlog is STALE. Spawning more auto-plans that self-abort in 2 min is churn, not "agents working." The genuine producers are agent-pan-2157-plan (merge unblocker, real work) + agent-pan-1982-review (PAN-1982 review convoy spawned ~23:44). New rule: when N≥3 consecutive backlog picks come back already-resolved, treat the backlog as stale → switch from launch-mode to drain/hygiene-mode and surface the re-rank need, rather than forcing minAgents with phantom plans.
+- **Closed out PAN-2054 — it was MERGED 2 days ago (PR #2092, 2026-06-27) but stranded OPEN/in-review** because the --no-resume boot never ran its post-merge close-out. `git merge-base --is-ancestor` confirmed fully merged; `pan close --force` verify-merged gate passed. (branch ahead-by-0 vs main = the tell.)
+- **PAN-1718 (ahead 24/behind 49) and PAN-2063 (ahead 12/behind 210) need a REBASE before merge** — flywheel-forbidden, and their work agents were intentionally stopped 2 days ago by --no-resume. Review-restart won't help (stale-base CI). They're blocked on the same operator action as PAN-2086.
+- **CONSOLIDATED HIGHEST-VALUE OPERATOR ACTION: restart dashboard WITHOUT --no-resume.** One action recovers PAN-2086 (overflow-respawn re-enabled) AND lets PAN-1718/PAN-2063 work agents resume to self-rebase AND prevents future merged-but-stranded issues (the PAN-2054 class). The flywheel cannot restart or rebase itself.
+- Run drain total: 6 closed/closed-out (1084, 2081, 1506, 1510, 1508, 2054) + 2 operator-merged (1884, 2088) + PAN-2157 filed & in-progress.
+- Next tick (tick-2 wakeup still pending, NOT rescheduled): verify main CI on 5bfa88d; if green close out PAN-1884/2088; watch agent-pan-2157-plan + agent-pan-1982-review.
+
+## RUN-33 tick 3 (2026-06-29 ~03:52Z) — main GREEN, PAN-1884/2088 closed out; merge-unblocker STALLED on a question; run is operator-gated
+
+- **Main CI GREEN on 5bfa88d** (success). Closed out **PAN-1884 + PAN-2088** (merged + main green). Cohort now ~11/17 terminal.
+- **PAN-1982 review convoy COMPLETED** (session gone, review=passed test=passed). It + MIN-831 + MIN-846 are ready-for-merge, main green — but auto-merge is dead (PAN-2157), so they need operator merge (gh pr merge --admin).
+- **CRITICAL: the PAN-2157 merge-unblocker agent STALLED asking the operator a question.** `pan plan PAN-2157 --auto` analyzed all 3 fix options, strongly recommended option 2 (gh/installation token), then ended with *\"Which way do you want me to go?\"* and went idle — `--auto` escalated to interactive on a decision the PRD already defaulted. The flywheel CANNOT unblock it (pan tell forbidden). So the single most important producer is stranded on a trivially-answerable question.
+  - **Filed PAN-2158** (bug/critical/substrate): `pan plan --auto` must auto-decide from PRD-documented options + default (record in plan.autoDecisions) instead of escalating; secondary: flywheel/deacon needs a path to advance a stalled-on-question agent.
+  - **Recorded the decision on PAN-2157** (comment): proceed with option 2 (gh-token). To unblock now, operator answers the agent 'go with option 2'.
+- **0 active producers this tick — and that is the honest state.** agent-pan-2157-plan stalled; agent-pan-1982/test idle (done); agent-2086 wedged; planning-pan-1506/1510/2157 are idle zombies (their work done). Backlog top verified-stale (3-for-3). The run is now **OPERATOR-GATED** on: (1) merge PAN-1982/MIN-831/MIN-846; (2) unblock PAN-2157 (answer 'option 2' or land PAN-2158); (3) restart WITHOUT --no-resume (recovers PAN-2086 + lets PAN-1718/2063 rebase). Did NOT force speculative launches — churn, not work.
+- Run drain total: 8 closed/closed-out (1084, 2081, 1506, 1510, 1508, 2054, 1884, 2088) + 2 operator-merged + 3 substrate bugs filed (2157, 2158, and earlier). Excellent drain; remaining blockers are all human-gated.
+
+## RUN-33 tick 4 (2026-06-29 ~04:13Z) — CORRECTED the "no eligible work" call: found the ready decomposition pool; launched 2 genuine producers
+
+- Main still GREEN (5bfa88d). **No operator action on any of the 3 gates since tick 3** (PAN-1982 #2112 unmerged; PAN-2157 agent still stalled at identical ctx/out/cost; no --no-resume restart).
+- **IMPORTANT CORRECTION to tick 3's "0 producers / operator-gated" conclusion.** `gh issue list --label ready` revealed a fresh, NON-stale auto-pickup pool: **PAN-2145..2156 — 12 god-file decomposition tasks**, all operator-marked `ready` + `substrate-improvement`. Verified PAN-2146/2147/2148 are OPEN, no spec, no workspace, no fix commit = genuinely unplanned+unstarted (the `released` co-label is misleading here, same as PAN-2063 — ignore it). **LESSON: when the ranked-backlog top is stale, don't conclude 'no eligible work' — query `--label ready` directly for the real auto-pickup pool.** This is the legitimate way to honor minAgents, not speculative plans on stale bugs.
+- **Launched `pan plan --auto` on PAN-2150 (frontend Settings) + PAN-2152 (cli/commands/workspace.ts)** → planning-pan-2150, planning-pan-2152. Chose independent, low-blast-radius files; deliberately AVOIDED the central src/lib/agents.ts decomp (PAN-2146) which would conflict with everything when the gated agents (PAN-2086/1718/2063/2157) resume. 10 ready decompositions remain for future capacity (launch a couple per tick).
+- Producers now genuinely 2 (PAN-2150 + PAN-2152 plans). PAN-2157 still stalled (operator-gated), PAN-2086 wedged.
+- Consolidated operator actions UNCHANGED and still pending: (1) answer PAN-2157 'option 2'; (2) restart without --no-resume; (3) merge PAN-1982/MIN-831/MIN-846.
+
+## RUN-33 tick 5 (2026-06-29 ~04:35Z) — decomposition plans completed → STARTED 2 work agents; filed 3rd plan-machinery bug
+
+- Main GREEN. **Operator gates STILL unactioned across ticks 3→5** (PAN-1982 #2112 unmerged; PAN-2157 agent stalled at identical ctx; PAN-2158 open; no --no-resume restart).
+- **CRITICAL LESSON — `pan plan --auto` does PLANNING ONLY; it does NOT auto-start the work agent.** Both PAN-2150 and PAN-2152 planning agents finished and explicitly said: *\"Issue is in Planned... no work agent was spawned — it waits for `pan start`\"*. So after `pan plan --auto`, the orchestrator MUST run `pan start <id>` to get a work producer. (My tick-4 assumption that they'd auto-promote was wrong.) Did so this tick: **`pan start PAN-2150` + `pan start PAN-2152`** → agent-pan-2150 + agent-pan-2152 live work agents (genuine decomposition producers).
+- **Filed PAN-2159** (bug/substrate): a single `pan plan <id> --auto` leaves BOTH a `planning-pan-<id>` and an `agent-pan-<id>-plan` session; for PAN-2152 the two raced on `pan plan finalize` → bd process-lock thrashing (the plan agent flagged it; plan landed cleanly but it's a real race). Fix: one planning path per invocation + idempotency guard on finalize.
+- **Three substrate bugs filed this run on the plan/merge automation** — PAN-2157 (merge backend dead), PAN-2158 (auto-plan interactive stall), PAN-2159 (duplicate planning spawn). The auto-plan/auto-merge machinery has compounding gaps; surfaced as a 'focused fix pass' openQuestion.
+- Producers: agent-pan-2150 + agent-pan-2152 (working). 10 ready decompositions remain (PAN-2146/2147/2148/2149/2151/2153/2154/2155/2156) for future capacity — launch a couple per tick, plan THEN start, avoid central agents.ts while gated agents may resume.
+- Run drain total: 8 closed/closed-out + 2 operator-merged + 4 substrate bugs filed (2157/2158/2159 + the earlier store-bug verifications) + 2 decomposition work agents started.
+
+## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
+
+- **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
+- **THE BIG SHIFT — the RUN-31 rebase bottleneck CLEARED for PAN-1884/2088.** PR #2109 (PAN-1884) and #2097 (PAN-2088) are now `mergeable=MERGEABLE mergeStateStatus=CLEAN`, review=passed test=passed. They got rebased since RUN-31 (work agents or operator). So the "merge-ready-after-rebase" jam is gone for these two.
+- **NEW blocker exposed — auto-merge mechanism is non-functional. Filed PAN-2157 (bug/critical/substrate).** `POST /api/flywheel/auto-merge/schedule {issueId}` (with `Origin: http://localhost:3011`) now returns `{"error":"GitHub App not configured. Run: node scripts/create-github-app.mjs"}` for the ready items. **Why we never saw this before:** the endpoint checks `readyForMerge` BEFORE the GitHub-App merge step; in RUN-32 every probe failed at `not readyForMerge` first, so we never reached the app-config failure. PAN-1884/2088 are the first genuinely readyForMerge items, exposing that the GitHub App has effectively never been configured (consistent with the old `GitHub App credential path is dead code` note). **Net: with `require_uat_before_merge=false`, the Flywheel's sanctioned merge action silently funnels every clean ready PR back to the operator's manual merge — defeating the autonomy toggle.**
+- **ACTION: launched `pan plan PAN-2157 --auto` → planning-pan-2157.** This is the root-cause fix and the highest-value unblocker (fixes ALL future autonomous merges). Default fix direction: switch the auto-merge backend to the already-authenticated `gh`/installation token instead of requiring a separately-provisioned GitHub App. Now 2 producers: agent-pan-1982 (work, gpt-5.5, healthy) + planning-pan-2157.
+- **Did NOT `gh pr merge` the clean ready PRs** — forbidden from the workflow path. Surfaced PAN-1884/2088 + MIN-831/MIN-846 as `merge` suggestions (operator override = `gh pr merge --admin`, main green) and as openQuestions. Drain of the ready items waits on operator merge OR PAN-2157 landing.
+- **PAN-2063 `released` label is STALE/LYING** — `pan close` verify-merged gate refused with "12 unmerged commits on feature/pan-2063". The label says released but the branch is NOT merged. Do not trust `released`/`merged` labels for close-out; the verify-merged gate is the truth.
+- **PAN-2086 still WEDGED** (kimi 100% ctx, token limit 262144 exceeded; 17 commits safe, no PR because `pan done` never ran). The `--no-resume` boot disables overflow-respawn + deacon recovery, so the flywheel has NO autonomous lever to recover it. Surfaced: restart dashboard without `--no-resume` to re-enable recovery.
+- Operator-held (skip): PAN-1864 (parked+objection), PAN-806 (objection, large epic, not Definition-of-Ready).
+- Next tick: (1) if operator merges PAN-1884/2088/MIN-831/MIN-846 (or PAN-2157 lands), drain + close out; (2) watch planning-pan-2157 → work → review (it bootstraps autonomous merge); (3) watch PAN-1982 → review; (4) PAN-2086 recoverable only on a non--no-resume restart.
+
 ## Substrate fixes
 
 ### Autonomous planning auto-promote (commit 861cf8baa, 2026-05-20, RUN-1)
@@ -2663,3 +2735,417 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-pro
   tail (re-trigger vs operator force-close); (4) once gate unjams, `pan start` the stack-broken ready+
   planned cohort members (1084/1884/2063) — kimi spawns are now safe. MIN-831/846 still operator
   UAT/merge-gated.
+
+## RUN-30 tick 2 (2026-06-27 ~16:48Z) — PAN-1084 recovering via idle-nudge (PAN-2102 LIVE); strike-2104 FIX CORRECT but bundled scope-creep 36523347b RE-REDDENED main → struck revert (PAN-2105)
+
+- **DURABLE LESSON — verify a strike's commit list contains ONLY the requested change; a strike can
+  bundle unrelated scope-creep that lands "green in its own gate" yet re-reddens main via a test the
+  strike never ran.** strike-pan-2104 correctly fixed the 4 kimi→ohmypi assertions (`794e04361`,
+  confirmed: on that commit only 1 unrelated test fails) BUT also landed `36523347b fix(terminal):
+  create empty session and configure survival before sending command` — unrelated to the red-main
+  brief. That terminal fix destabilized `tests/playwright/conversation-supervisor-uat.test.ts`
+  (BOTH sub-tests PASSED on green e93897caf pre-fix; one FAILS on each terminal-fix-bearing commit
+  — "resumes Codex conversations" on 36523347b, "delivers through real conversation routes" on
+  794e04361). Main stayed red, just via a different test. LESSON: after a strike "lands green," (a)
+  list `git log --oneline strike/<id>` and confirm every commit traces to the brief; (b) check main
+  CI on the NEW head, not the strike's self-reported gate; (c) if an extra commit appears, treat it
+  as suspect for any residual red.
+
+- **DURABLE LESSON — PAN-2102 idle-nudge->on-disk-brief recovery is LIVE and WORKS.** `pan start
+  PAN-1084` kickoff delivery FAILED twice ("input echo confirmation failed after 2 attempts x2500ms"
+  — the large-brief PTY echo-confirm gap PAN-2102 names), but the deacon's idle-nudge fired and
+  pointed the agent at its open bead + workflow; agent-pan-1084 proceeded to read roles/work.md and
+  start implementing. **A failed kickoff delivery is NOT a dead agent** — the deacon recovers it
+  within a patrol cycle. Do not treat "Kickoff delivery attempt N/N failed" + "Agent spawned" as a
+  spawn failure; verify via the pane (agent thinking/reading files) before concluding it stalled.
+  (Reinforces PAN-2102's whole premise; first clean prod observation this run.)
+
+- **Follow-through on the scope-creep re-red: filed PAN-2105 + struck the revert in the SAME tick.**
+  `pan strike PAN-2105 --harness codex` -> `strike-pan-2105` (`git revert 36523347b`). Revert keeps
+  the correct kimi test fix (794e04361) and removes the Playwright regression; zero runtime effect
+  (terminal fix landed 16:35Z, server started 15:14Z, so it was never in the deployed binary). If
+  the terminal improvement is real, re-land it correctly via the normal pipeline as a separate issue.
+
+- **PAN-2104 at `verifying-on-main` (labels merged/verifying-on-main/blocks-main).** Its test fix is
+  correct; close it once strike-pan-2105's revert lands green. Do NOT close before main is green.
+
+- **Net RUN-30 cohort-drain position: still 8/17 terminal-or-parked.** Active 9 unchanged. Productive
+  agents now: agent-pan-1084 (NEW, recovering), agent-pan-1718, agent-pan-2086 (both kimi->claude-code
+  flowing), strike-pan-2105 (revert in flight). The merge gate remains jammed until strike-2105 lands
+  green; operator UAT/merge (MIN-831/846) + close-out tail (2054/2081/2088) + broken stacks
+  (1884/2063/1982/806) are the other holds.
+
+- Next tick: (1) verify strike-pan-2105 revert lands -> main CI GREEN -> close PAN-2104 AND PAN-2105;
+  (2) with green main, re-check PAN-1718/1919 gate (1919 merge_conflict still needs operator rebase);
+  (3) confirm agent-pan-1084 is making real progress (commits); (4) consider `pan start` on the next
+  ready+planned stack-broken cohort member (1884 or 2063) now that kimi->claude-code + stack self-heal
+  are both proven live this run.
+
+## RUN-30 tick 3 (2026-06-27 ~17:03Z) — MAIN GREEN; PAN-2104/2105 CLOSED; PAN-1084 implemented+PR#2107 (full idle-nudge->work->review arc validated)
+
+- **RED MAIN RESOLVED.** strike-pan-2105's revert `a28cdd974` landed on origin/main → CI `completed
+  success`. strike verified: kimi tests pass (test fix 794e04361 intact), typecheck pass, npm test
+  736 files / 7496 tests pass — the conversation-supervisor Playwright UAT is GREEN again (terminal
+  regression gone). Closed PAN-2104 + PAN-2105 via `pan close --force` (both merged + verifying-on-main;
+  verify-merged gate passed; the non-fatal label step is the known missing-`in-planning` quirk). Net:
+  the original kimi red-main (filed+struck tick 1) + the scope-creep re-red (filed+struck tick 2) are
+  both drained. PAN-2106 (pan strike workspace-setup substrate bug) filed and pending normal pipeline.
+
+- **DURABLE LESSON — PAN-1084 proved the FULL recovered-spawn arc end-to-end this run.** `pan start
+  PAN-1084` kickoff delivery FAILED (echo-confirm) -> deacon idle-nudge recovered it -> agent
+  IMPLEMENTED the security fix (`51d19ae39 fix(specialists): block work agents from self-approving
+  subagent prompts via tmux`, + a tmux-send-keys-guard PreToolUse hook + tests) -> pushed -> PR #2107
+  -> review & test auto-running. A kimi-k2.7-code work agent that lost its kickoff prompt still
+  delivered a real security fix and entered review, all via the PAN-2102 on-disk-brief recovery path.
+  This is the strongest evidence yet that kimi->claude-code + idle-nudge recovery = reliable work
+  execution. (NOTE the agent hit ctx 91% / 701k by bead-close; PAN-1675 compact brake is the net for
+  multi-bead kimi work.)
+
+- **Merge gate after green main:** PAN-1718 (PR #2103) STILL `failing_checks` despite green main —
+  likely a STALE PR check evaluated against the old red base; GitHub did not auto-rerun on base update.
+  Next tick try `pan review request PAN-1718` to refresh the check, or the operator can retrigger.
+  PAN-1919 (PR #1950) merge_conflict+checks (conflict is independent — needs operator rebase).
+  PAN-2088 (PR #2097) merge_conflict. MIN-831/846 still operator UAT/merge-gated.
+
+- **Strike workspace-setup substrate bug confirmed transient + filed (PAN-2106).** The first
+  strike-pan-2105 spawn left a broken partial workspace (no worktree/branch/source, false "spawned"
+  success); a clean re-strike ~5 min later (after strike-2104's push finished) set up correctly.
+  Root cause = git-lock race (concurrent worktree-add vs push on the shared primary). PAN-2106 tracks
+  the verify-after-add + serialize-against-push fix.
+
+- **Cohort-drain position: 8/17 terminal-or-parked + PAN-1084 now advancing (review).** Productive:
+  agent-pan-1718, agent-pan-2086 (kimi->claude-code flowing), agent-pan-1084 (PR #2107 in review).
+  Holds: operator UAT/merge (MIN-831/846), close-out tail (2054/2081/2088), stale/conflict gate
+  (1718/1919/2088), broken stacks (1884/2063/1982/806). Did NOT start 1884/2063 yet — gate already
+  holds 4-5 items + 1084 incoming; capacity is not the bottleneck, the gate is.
+
+- Next tick: (1) refresh PAN-1718 stale check (pan review request or operator); (2) watch PAN-1084
+  PR #2107 review/test; (3) reassess close-out tail (2054/2081/2088) now that main is green + close-out
+  fix deployed; (4) once the gate drains, `pan start` 1884/2063 (kimi+stack-self-heal both proven).
+
+## RUN-30 ticks 4-6 (2026-06-27 ~17:16-17:27Z) — PAN-1084 PR#2107 MERGE-READY; 3 of 4 producers WEDGED (unrecoverable by flywheel); filed PAN-2106 + PAN-2108
+
+- **PAN-1084 is fully merge-ready (operator gate).** PR #2107 CLEAN/MERGEABLE, ALL checks pass incl.
+  test. The security fix (block work agents self-approving subagent prompts) is verified. With
+  require_uat_before_merge=true this is an operator merge — the single highest-leverage action.
+
+- **DURABLE LESSON — the flywheel has NO recovery path for context-exhausted/user-stopped/troubled
+  work agents, and 3 of 4 producers wedged into exactly that unrecoverable state.** Mechanism (from
+  deacon.log + pty-supervisor logs):
+  - **agent-pan-2086** (17 commits, no PR): kimi, hit `API 400 token limit 262144`; was
+    `deliberately stopped by user` (~15:02Z) then fed ~138KB `pan-tell` pastes that fail PTY
+    echo-confirm and inflate ctx to 209k. User-stopped → exempt from deacon auto-recovery.
+  - **agent-pan-1718** (19 commits, PR #2103 conflicts main, review=CHANGES REQUESTED): deacon
+    `bd ready -l pan-1718` FAILS (the `.pan/records` sync conflict breaks bd) → idle-nudge can't
+    fire → `stuck-remediation stage=3 → marked-troubled` (17:25Z). Troubled → exempt from auto-resume.
+  - **agent-pan-2063** (glm-5.2/ohmypi): stalled at startup, only the sync auto-commit, NO
+    idle-nudge recovery (the glm-5.2/ohmypi path did NOT get the kimi idle-nudge recovery).
+  - The ONE recovery command (`pan resume --compact`, PAN-1675) is **flywheel-forbidden**; and
+    user-stopped/troubled gates exempt the agent from the deacon compact brake. So once an agent
+    lands user-stopped-OR-troubled AND context-exhausted (the common end-state), it wedges
+    permanently until a human intervenes. Committed work is SAFE on the branches (re-PR-able).
+  Filed as **PAN-2108** (flywheel-safe recovery surface / compact-brake-for-context-overflow).
+
+- **DURABLE LESSON — glm-5.2/ohmypi work spawns do NOT self-recover from a failed kickoff, but
+  kimi/claude-code ones DO.** PAN-1084 + PAN-1884 (kimi) both recovered via the deacon idle-nudge
+  after their ~50KB kickoff echo-confirm failed. PAN-2063 (glm-5.2/ohmypi) stalled with no recovery.
+  Prefer kimi-routed (claude-code) work spawns; ohmypi/glm work spawns are not yet reliable. (Filed
+  context in PAN-2108.)
+
+- **DURABLE LESSON — `.pan/records/<issue>.json` sync-main conflicts abort the spawn's main sync AND
+  break `bd ready -l <issue>` (which breaks the idle-nudge).** Seen on PAN-1884, PAN-2063 (spawn),
+  PAN-1718 (bd ready failed). The record file is auto-generated state; sync should take origin's side
+  or re-merge rather than abort. (In PAN-2108.)
+
+- **Filed PAN-2106** (pan strike workspace-setup git-lock race: broken partial workspace + false
+  "spawned" success — confirmed transient; clean re-strike worked).
+
+- **Cohort-drain position: 8/17 terminal/parked; 1 merge-ready (PAN-1084); 1 healthy producer
+  (PAN-1884); 3 wedged (2086/1718/2063); gate-bound (1919/2088 conflicts, 2054/2081/2088 close-out
+  tail).** The remaining drain is operator-gated: merges (PAN-1084, MIN-846), rebases (1718/1919/2088),
+  force-close close-out tail (2054/2081/2088), and recovery of the 2 wedged kimi agents (2086/1718).
+
+- Next tick: (1) watch PAN-1884 (only healthy producer) → review; (2) if operator merges PAN-1084 /
+  recovers 2086/1718, reassess; (3) keep snapshots current. **The flywheel's autonomous levers are
+  exhausted for this cohort state — further drain needs operator gate/recovery actions.**
+
+## RUN-31 tick 1 (2026-06-28 ~04:25Z) — fresh baseline; MAIN GREEN; closed verifying-on-main tail (2100/2101); cohort gate-bound on rebases the flywheel cannot perform
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. **Orchestrator routed to ohmypi/glm-5.2
+despite config requesting harness=claude-code** (Cloister provider-default routing; surfaced as openQuestion).
+
+- **Main GREEN** at `274b1873693e` (CI `success`, 2026-06-28T03:37Z). RAM 34.9/64.1 GB, swap 4.7/8.2 GB (cold-page eviction, not pressure). No P0.
+
+- **Cohort (17): 6 terminal** (PAN-1559/1638/1652/1722/1793/1900 CLOSED closed-out). **2 operator-held** (PAN-806 objection; PAN-1864 parked+objection — skip). **9 open**, almost all gate-bound.
+
+- **Closed the verifying-on-main tail (NON-cohort, hygiene):** `pan close PAN-2100 --force` + `pan close PAN-2101 --force` both succeeded (verify-merged gate passed; the missing-`in-planning` label step is the known non-fatal quirk). These were RUN-30 strikes already merged; frees the tail.
+
+- **DURABLE LESSON — PR #2103 (PAN-1718) "test FAILURE" is a STALE-BASE artifact, confirmed.** The 4 failing tests are ALL `expected 'claude-code' to be 'ohmypi'` provider-default assertions (`tests/unit/lib/harness-resolve.test.ts`, `tests/unit/lib/providers.test.ts`) — the branch is behind main's provider-default cutover. The kimi work agent received "Tests: passed" from Overdeck's `overdeck/test` role (the OTHER test signal) and declared done; GitHub CI's `test` check failed on the stale base. **Work agent is context-exhausted (256k) so it cannot self-rebase.** A rebase onto green main almost certainly clears it. This is the two-test-signals lesson + the stale-base lesson combined.
+
+- **DURABLE LESSON — the cohort's merge gate is jammed on REBASES the flywheel is structurally forbidden to perform.** PAN-1718/1884/2088 PRs are all CONFLICTING/behind main; their tests PASS once rebased (1884/2088 test=SUCCESS already; 1718 is stale-base). But `pan sync-main` is flywheel-forbidden and editing feature branches is barred, so the work agents must rebase — and all three work agents are context-exhausted (100%) or paused. **Net: three merge-ready-after-rebase items sit blocked behind an operator-only rebase step.** This is the real drain bottleneck for this cohort state, not capacity. Candidate substrate fix: a flywheel-safe rebase surface (overlaps PAN-2108's recovery-surface scope).
+
+- **PAN-2086 work agent WEDGED** (kimi `API 400 token limit 262144`, requested 272397) — confirmed unrecoverable (PAN-2108 family); 17 commits safe on branch. agent-pan-1084/1718/1884 all idle-at-prompt at ctx 100% (done or work-complete). The only genuinely PRODUCTIVE producers are the two Opus plan agents: agent-pan-2054-plan (close-out fix, in-review) and planning-pan-1781 (kimi/CLIProxy root-cause). minAgents=2 satisfied by those two.
+
+- **Did NOT launch new agents** — no eligible unstarted ready+planned+unblocked work exists (PAN-1982 stack-broken; PAN-806/1864 operator-held). Launching would churn an already-jammed gate. "0 producers (beyond the 2 plan engines) is a valid finding — repair > launch" held.
+
+- Next tick: (1) if operator merges PAN-1084 / rebases 1718/1884/2088, reassess + close out; (2) watch 2054-plan → if it lands, it may retroactively advance the close-out tail (2054/2081); (3) keep snapshots current. **Autonomous levers remain exhausted for the gate-bound items — the cohort drains on operator rebases + the PAN-1084 merge.**
+
+## RUN-31 tick 2 (2026-06-28 ~04:36Z) — operator has not acted on tick-1 levers; PAN-1982 producing; 7/17 terminal; gate still operator-blocked
+
+- **Operator took NO gate action between ticks** (PAN-1084 still unmerged; 1718/1884/2088 still conflicting). Merge blockers byte-identical to tick 1. Main still GREEN (274b1873693e). This confirms the drain is hard-blocked on operator rebases + the PAN-1084 merge.
+
+- **PAN-1781 is CLOSED (terminal) — 7/17 cohort terminal now** (`closed:true`; fix on main `74bb453dd fix(cli): default Kimi to claude-code`). planning-pan-1781 is a STALE idle session on the closed issue (received "close as already-fixed", already executed). agent-pan-2054-plan pane is DEAD — stale plan session; its close-out fix is already deployed/in-review.
+
+- **PAN-1982 (launched tick 1) is the SOLE active producer.** Validated the launch: clean main sync, committed `5ae65b029 feat: add review mode config` (bead 1/7), typecheck green, advancing. The broken stack self-healed on spawn (PAN-1618 recovery confirmed live AGAIN this run). gpt-5.5/codex routed by provider default.
+
+- **Scanned all open bugs for a clean pipeline-unblocker to strike as a 2nd producer — NONE qualify.** The gate is blocked on operator rebases, not a strikable substrate bug; auto_pickup_backlog=false bars ordinary backlog pickup; PAN-2106/2108 are filed-but-not-strikable (not active unblockers; 2108 architectural). Honest conclusion: minAgents=2 cannot be sustained autonomously here — repair>launch, not a stall. PAN-1982 is the one producer.
+
+- Next tick: (1) watch PAN-1982 → review; (2) if operator finally merges PAN-1084 / rebases 1718/1884/2088, drain + close out; (3) keep snapshots current. **The autonomous levers are genuinely exhausted; the cohort drains only on operator gate action. The operator-prompted "are you stuck" check is answered: not stuck — producing via 1982, and waiting on the operator-only rebases+merge.**
+
+## RUN-35 tick 1 (2026-06-29 ~05:00Z) — MAIN GREEN; 2 healthy producers; THREE green-but-conflicting items jam the gate; auto_pickup=true but top sequence exhausted
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `harness=claude-code`, `scope=all-tracked-projects`, **`auto_pickup_backlog=true`**, **`require_uat_before_merge=false`**. Producers routed to gpt-5.5/codex via provider-default (surfaced as openQuestion).
+
+- **Main GREEN** at `5bfa88d14` (CI success, 03:25Z). PRs #2109 (PAN-1884) + #2097 (PAN-2088) merged just before/at run start. RAM 16.7/64 GB used, swap 0. No P0. No OOM risk.
+
+- **Cohort (12): 4 terminal** — PAN-1884, PAN-2088, PAN-1084, PAN-2054 (all CLOSED + closed-out + verifying-on-main). **2 parked-out** — PAN-806 (objection/critical/architecture), PAN-1864 (parked+objection). 6/12 terminal-or-parked.
+
+- **minAgents=2 GENUINELY satisfied this run** (unlike RUN-30/31): agent-pan-2150 (decompose Settings) + agent-pan-2152 (decompose workspace.ts) are BOTH actively working gpt-5.5 producers — broken stacks self-healed on spawn (PAN-1618 recovery live again). Plus review/test/plan activity on 1506/1510/1508/2157.
+
+- **DURABLE LESSON — the green-but-conflicting jam has spread from 1 item (RUN-31) to THREE (RUN-35).** PAN-1982 (#2112, ALL 8 checks SUCCESS), PAN-1718 (#2103), PAN-2063 (#2110) are ALL `CONFLICTING/DIRTY` with main — merge-ready-after-rebase, but the flywheel is structurally forbidden to rebase (pan sync-main forbidden, feature-branch edits barred) and their work agents are idle (1982: gpt-5.5 idle-at-prompt, NOT ctx-exhausted, so deacon idle-nudge *should* drive it) or dead (1718/2063 sessions gone). `pan review restart` does NOT fix a merge conflict, so even the allowed review-recovery lever is useless here. **This is now the dominant drain bottleneck — 3 merge-ready items stranded behind an operator-only/PAN-2108 rebase step.** PAN-2108 (flywheel-safe rebase/recovery surface) is the tracking fix; its absence is now blocking 3 items at once.
+
+- **PAN-2086 wedged** (kimi 100% ctx, token-limit 262144) — flywheel-unrecoverable (resume --compact forbidden; agent gate-exempt). 17+ commits safe on branch. PAN-2108 family.
+
+- **Did NOT launch new agents despite auto_pickup=true + maxAgents=20.** The ranked sequencer reported "no eligible issue in sequence — fall back to normal priority": top items are all in-flight (1982/2150/2152), objection (806), parked (1864), or already in planning/review (1506/1510/1508/2157). minAgents floor met by 2150/2152; pipeline is busy (~8 active sessions); the bottleneck is the rebase gate, not capacity — piling more PRs behind the same conflict wall doesn't drain it. Repair > launch holds, but THIS time the floor is met by real producers, not plan engines.
+
+- **MIN-831/846 ready-for-merge** (review+test passed, GitLab). require_uat=false would permit auto-merge, but the flywheel auto-merge endpoint's GitLab support is unproven and MIN is outside the PAN cohort — surfaced as operator `merge` suggestions rather than risk a wrong-tracker auto-merge POST.
+
+- Next tick: (1) watch PAN-2150/2152 → review/PR (will they ALSO land conflicting? watch the rebase-on-done step); (2) if operator/PAN-2108 rebases 1982/1718/2063, they merge immediately (all green); (3) confirm deacon idle-nudge picks up idle agent-pan-1982 for self-rebase; (4) keep snapshots current.
+
+## RUN-35 ticks 2-4 (2026-06-29 ~05:17-05:58Z) — steady gate-blocked holding pattern; wakeup drift = symptom of PAN-2160
+
+- **Steady state across 3 ticks, no operator/deacon gate action:** main GREEN `5bfa88d14` (unchanged); PAN-2150 + PAN-2152 still the 2 healthy gpt-5.5 producers (2150 hit 1h+ on its decomposition bead — long but actively in-turn, not wedged; watch it); the 3 green-but-conflicting PRs (PAN-1982 #2112, PAN-1718 #2103, PAN-2063 #2110) ALL still CONFLICTING — no rebase. PAN-2086 still wedged. No flywheel lever for any of them; minAgents=2 stays met by 2150/2152.
+
+- **DURABLE LESSON — the flywheel's "appears stuck / wakeup drift" is a SYMPTOM of PAN-2160, not orchestrator failure.** Every scheduled `ScheduleWakeup(1000s)` drifted to ~30-44 min actual re-invocation, each time via the deacon STUCK-WATCHDOG, never the scheduled wakeup. Root cause is PAN-2160 (already filed, eltmon, ready/released): the dashboard reverts to `OVERDECK_NO_RESUME=1` on watchdog/health restart, which (wrongly) gates the FLYWHEEL orchestrator's own self-heal — so the deacon stops nudging the idle orchestrator (no backup to ScheduleWakeup) and the only thing that re-invokes it is stuck-remediation. Net for future runs: do NOT re-file wakeup-drift bugs; it's PAN-2160. The loop still functions (watchdog drives it ~every 30-44min, each wake emits a current snapshot), just at a coarser cadence than the 20-min target until PAN-2160's NO_RESUME-exemption fix is confirmed live.
+
+- **PAN-1901 #2042 ready-listing was STALE** — already merged + closed-out. MIN-831/846 ready-for-merge left as operator merge (GitLab MRs, outside the flywheel auto-merge endpoint's proven GitHub scope).
+
+- Honest position: the flywheel's autonomous drain levers are exhausted for this cohort state. Remaining drain = operator rebases of the 3 conflicting PRs (or PAN-2108 fix) + the 2 producers reaching clean PRs. Each watchdog wake: re-verify main green, check producers + conflicting PRs, emit snapshot, watch for a clean PR to merge (require_uat=false → schedulable via /api/flywheel/auto-merge/schedule for GitHub PAN PRs).
+
+## RUN-35 tick 5 (2026-06-29 ~06:12Z) — PAN-2152 MERGED (#2161); GitHub GraphQL rate limit EXCEEDED; close-out deferred
+
+- **DRAIN PROGRESS: PAN-2152 PR #2161 merged to main** (main `5bfa88d14`→`2a41e2ecb`). One of the 2 producers (the workspace.ts decomposition) reached a CLEAN PR and merged — proving 2150/2152 do NOT all land conflicting (the rebase-on-done worked for 2152). agent-pan-2152 now idle/done. agent-pan-2150 advanced to a new bead (working ~10m). prsMerged=3 this run window.
+
+- **GITHUB GRAPHQL RATE LIMIT EXCEEDED (user 678719).** All `gh pr view` / `gh issue view` (GraphQL) calls fail with "API rate limit already exceeded"; REST core still shows ~4993/5000 (separate bucket). 5,000/hr is shared across ALL tools+agents — the busy pipeline (review/test convoys) plus the flywheel's own per-tick gh-pr polling of the 3 conflicting PRs exhausted it. **Deferred PAN-2152 close-out** — `pan close` step 6 (close tracker issue) needs GraphQL and would leave a half-closed state; the interactive prompt was NOT confirmed (process exited at default N). Retry close-out next tick after reset.
+
+- **DURABLE LESSON — the flywheel's per-tick gh-pr polling is itself a GraphQL-rate-limit contributor.** Re-running `gh pr view <pr>` for each of the 3 conflicting PRs every wake (×5 ticks) burns GraphQL against a shared 5k/hr budget already loaded by review/test convoys. Future ticks: check `gh api rate_limit --jq .resources.graphql` FIRST; if low/exhausted, emit local-data-only snapshots (pan review pending / git log work without GraphQL) and back off gh-pr polling. Candidate substrate fix: cache PR mergeable-state per tick + 403-backoff. (File once gh is usable again if it recurs.)
+
+- Next tick (gh permitting): (1) retry `pan close PAN-2152` (merged, verify-merged gate is the net) — use --force to skip the interactive prompt if rate-limit clear; (2) check PAN-2150 → did it reach PR / merge?; (3) re-check 3 conflicting PRs ONLY if GraphQL budget allows; (4) keep snapshots current. Cohort now ~7/12 terminal-or-parked (added PAN-2152).
+
+## RUN-35 tick 6 (2026-06-29 ~06:24Z) — GraphQL recovered; PAN-2150 #2162 CI-green-in-review; PAN-2152 close-out BLOCKED (branch diverged); 0 active work producers
+
+- **GraphQL recovered** (4404/5000). Retried PAN-2152 close-out → **BLOCKED by verify-merged gate: "60 unmerged commit(s) on feature/pan-2152."** PR #2161's *changes* are on main (head 2a41e2ecb) but the feature branch advanced 60 commits past the merge point, so the ancestry check correctly refuses. Close-out tail stuck behind branch/main reconciliation the flywheel can't do (no sync-main/branch-edit lever). NOT forced. Likely substrate gap: post-merge commits on a merged branch defeat close-out's ancestry gate — worth an issue if it recurs, but did not file yet (verify it's not a one-off of this specific PR first).
+
+- **PAN-2150 PR #2162 is CLEAN/MERGEABLE, ALL 8 CI checks SUCCESS, but Overdeck review not yet review=passed** (not in `pan review pending --ready`; agent-pan-2150-review spawned 01:39, idle at placeholder prompt). The work agent finished cleanly and handed to review — healthy, NOT a crash (earlier 'agent-pan-2150 gone' was the work→review handoff). Decision: did NOT `pan review restart` — review is recent + CI green; restart risks discarding in-progress synthesis. If still idle next tick → restart to drive review=passed → auto-merge (require_uat=false, main green → schedulable via /api/flywheel/auto-merge/schedule).
+
+- **Both cohort producers now finished** (2152 merged, 2150→review) → 0 active WORK producers. minAgents=2 floor unmet, BUT: remaining cohort gate-blocked (3 conflicting PRs operator-rebase-bound, PAN-2086 wedged, 806/1864 parked) and sequencer found no eligible ready+planned+unblocked backlog item. This is genuine cohort-drain wind-down, not neglected idle capacity. Held launches.
+
+- **The operator's repeated "Stage 2 idle Nmin / emit-or-pause" alerts are the PAN-2160 wakeup-drift symptom**, NOT a hang — the orchestrator is functioning (drained PAN-2152, advanced PAN-2150 this run) and emits a current snapshot on every watchdog wake. Until PAN-2160's NO_RESUME-exemption fix lands, the loop runs at the watchdog's ~30-66min cadence, not the 20-min ScheduleWakeup target.
+
+- Cohort drain: 6/12 hard-terminal (1884/2088/1084/2054 closed-out + 806/1864 parked) + PAN-2152 merged-pending-closeout + PAN-2150 in-review-to-merge = ~8/12 effectively resolved or near. Remaining true blockers: 1982/1718/2063 (operator rebase) + 2086 (wedged).
+
+## RUN-35 tick 7 (2026-06-29 ~06:41Z) — diagnosed + drove through PAN-2150 (NOT a stalled review; a needs-you-paused blocked verdict); PAN-2152 close-out still gate-blocked
+
+- **PAN-2150 was NOT a stalled review — the review COMPLETED and correctly BLOCKED it.** agent-pan-2150-review wrote a blocked verdict: 2 PR-scoped TS6133 unused-var errors fail `npm run build` (frontend) — SettingsPage.tsx:43 `buildMiniMaxFormData`, ExperimentalSection.tsx:56 `handleHarnessModelPermutationsToggle`. (The PR's CI `build` check passed but the frontend typecheck-in-build caught these — two-test-signals mismatch.) The verdict recorded locally but the **PR-comment post FAILED on network**, and the work session was already torn down → feedback had no live target.
+
+- **`pan start PAN-2150` revealed the real state: PAUSED at needs-you 'verification stuck after 3/3 attempts (vbrief-ac)'.** The work agent had already failed the AC gate 3x on these same trivial errors. **Decision: `pan start PAN-2150 --force`** (act-and-correct, drive-through-pushback) — re-dispatched the work agent (gpt-5.5/codex, 8 beads) now that the review pinpointed the exact 2 lines. This restores a producer AND drives 2150 toward merge. **If it re-pauses next tick = confirmed needs-you blocker + a real substrate gap (blocked-review feedback can't reach a torn-down work session when PR-comment delivery also fails) → FILE it then.**
+
+- **DURABLE LESSON — a needs-you 'verification stuck 3/3' pause + a network-failed review-comment = an issue silently stuck with NO automated path forward.** The review verdict is correct and on-disk, but nothing delivers it to a work agent (session gone; PR comment failed; flywheel can't pan tell). The force-restart is the only flywheel-allowed drive-through; whether the resumed agent actually picks up the on-disk review.md is the open question for next tick.
+
+- **PAN-2152 close-out STILL blocked** (60 unmerged commits on feature/pan-2152 even with --force) across ticks 5-7. Changes are on main; ancestry broken (likely post-merge rebase rewrote SHAs). Functionally delivered; ceremony stuck. Watch whether postMergeLifecycle/close-out ever reconciles; candidate substrate bug (relates to PAN-2054).
+
+- 3 conflicting PRs (1982/1718/2063) STILL CONFLICTING (operator-rebase-bound). GraphQL recovered to 3013/5000. Fixed a self-inflicted status.json JSON-escape break by rewriting the file clean (lesson: large multi-Edit on a JSON string field risks structural breakage — validate with python json.load before emit).
+
+- Next tick: (1) PAN-2150 — did the re-dispatched work agent fix the 2 errors + re-submit PR 2162? If review=passed → schedule auto-merge. If re-paused at needs-you → file the feedback-delivery gap + leave for operator. (2) retry PAN-2152 close-out; (3) conflicting PRs; (4) if cohort drains → retrospective + report.
+
+## RUN-35 tick 8 (2026-06-29 ~06:58Z) — PAN-2150 fix VERIFIED + review re-requested; the force-restart paid off
+
+- **PAN-2150 force-restart (tick 7) WORKED.** The re-dispatched work agent removed the 2 unused symbols (commit `fce202554 fix(dashboard): remove unused Settings extraction symbols`): `buildMiniMaxFormData` is now re-exported+test-used, `handleHarnessModelPermutationsToggle` is now wired to onHarnessModelPermutationsToggle. **Verified independently in-workspace: `npm run build` (frontend) passes clean — 5790 modules, 3.04s, zero TS6133.** Pushed to PR #2162.
+
+- **DURABLE LESSON — a fixed work agent may NOT auto-re-request review; the flywheel must `pan review request <id>`.** agent-pan-2150 pushed the fix then sat idle: "I did not re-request review because the latest verification feedback explicitly said not to re-request review automatically." That conservative behavior would have stranded a green fix forever. `pan review request PAN-2150` succeeded (1/25 auto-requeues) → fresh review convoy now running → on review=passed, auto-merge. This is the canonical flywheel drive-through for a post-fix work agent that holds at idle: verify the fix in-workspace, then `pan review request`.
+
+- **The act-and-correct call on tick 7 (force past needs-you 3/3) was correct** — the fix was trivial+diagnosed, and one forced retry with the review's exact line-pointers cleared a gate that had stuck the work agent 3x. Validates the brief's drive-through-pushback / never-block-on-operator stance over leaving it at needs-you.
+
+- **PAN-2152 close-out STILL blocked (ticks 5-8, 60 unmerged commits).** Stopping per-tick close-out retries — it will not change without branch/main reconciliation. Decision: do NOT file yet (may self-resolve via postMergeLifecycle; conserve GraphQL which dropped to 1330/5000); re-evaluate next tick — if still blocked, file the close-out verify-merged-vs-rebased-branch substrate gap.
+
+- **GraphQL budget management is now a live constraint** (1330/5000). Did NOT re-poll the 3 conflicting PRs (unchanged 7 ticks, operator-rebase-bound). Per-tick discipline: check graphql budget first; skip stable-state gh-pr polling; spend the budget on the items actually moving (PAN-2150 review).
+
+- Cohort drain ~8-9/12 resolved-or-near: 6 hard-terminal/parked + PAN-2152 merged (closeout-blocked) + PAN-2150 fix-verified-in-review. Remaining true blockers: 1982/1718/2063 (operator rebase) + 2086 (wedged).
+
+## RUN-35 tick 9 (2026-06-29 ~07:15Z) — PAN-2150 MERGED (#2162); filed PAN-2163 (close-out false-positive); run approaching end-of-run quiescence
+
+- **PAN-2150 MERGED to main** (#2162, `ac60a693f`; review=passed test=passed). The full arc — tick-7 force-restart through needs-you 3/3 → fix `fce202554` verified in-workspace → tick-8 `pan review request` → review passed → merged — is the run's headline win. A work agent stuck at needs-you (3 failed verifications + undelivered review feedback) was driven all the way to merge by the flywheel without operator action. Close-out pending main CI green (main CI re-running post-merge); will `pan close PAN-2150` next tick once green.
+
+- **Filed PAN-2163** — close-out verify-merged FALSE-POSITIVE. PAN-2152 PR #2161 is 100pct merged (`git rev-list origin/main..origin/feature/pan-2152` = 0) yet `pan close --force` reports "60 unmerged commits." The gate checks stale local/worktree refs instead of `origin/main` vs `origin/feature/<id>`. Strands merged issues in the close-out tail. Routed to normal pipeline (not flywheel-fixable). This is the root cause of PAN-2152's stuck close-out and likely recurs for any merged-then-locally-rebased branch.
+
+- **DURABLE LESSON — use `git rev-list --count origin/main..origin/feature/<id>` to ground-truth merged-ness**, NOT the close-out gate's word. The gate's local-ref check lied; origin showed 0 unmerged. Always confirm against origin before believing a verify-merged failure.
+
+- **Run state: cohort ~8/12 effectively drained; eligible flywheel work nearly exhausted.** After PAN-2150 close-out (next tick), remaining cohort = 1982/1718/2063 (operator rebase, no flywheel lever), 2086 (wedged, no lever), 2152 (close-out blocked by PAN-2163, no lever). NONE are flywheel-actionable. Per brief, once PAN-2150 closes and no eligible work remains → do the retrospective + `pan flywheel report`. The 4 stuck items carry to the next run (or operator action).
+
+- Substrate bugs filed/surfaced this run: PAN-2163 (close-out false-positive, NEW). Referenced existing: PAN-2160 (wakeup drift / orchestrator self-heal), PAN-2108 (flywheel-safe rebase/recovery), PAN-2054 (close-out-not-terminal).
+
+- Next tick: (1) main CI green? → `pan close PAN-2150`; (2) if cohort eligible-work exhausted → RETROSPECTIVE + `pan flywheel report`; (3) keep snapshot current.
+
+## RUN-35 RETROSPECTIVE (tick 10, 2026-06-29 ~07:30Z) — END OF RUN
+
+**Outcome.** Started gate-blocked (most of the 12-item cohort behind operator rebases). Over 10 ticks the flywheel drove **2 producers all the way to merge** (PAN-2150 #2162, PAN-2152 #2161 — both gpt-5.5/codex decomposition tasks), filed **1 new substrate bug** (PAN-2163), and confirmed/surfaced 3 existing ones (PAN-2160, PAN-2108, PAN-2054). Final cohort: 4 closed-out-terminal (1884/2088/1084/2054) + 2 parked (806/1864) + 2 merged-but-close-out-blocked (2150/2152, by PAN-2163) + 3 operator-rebase-bound (1982/1718/2063) + 1 wedged (2086). **No eligible flywheel work remained** → reporting.
+
+**Headline win.** PAN-2150 was stranded at a `needs-you` gate (3 failed verifications on 2 trivial TS6133 unused-var errors) with its review-blocked feedback undelivered (PR-comment post failed on network + work session torn down). The flywheel recovered it end-to-end with ZERO operator action: force-restart through the gate → fix landed → **verified the build in-workspace** → `pan review request` → review passed → merged. This is the strongest evidence this run that the flywheel can drive a wedged work agent to merge.
+
+**Recurring stalls + the guardrails that worked:**
+1. **needs-you + undelivered review feedback = silent permanent stall.** A blocked-review verdict cannot reach a work agent whose tmux session was torn down (and PR-comment delivery failed). Drive-through recipe that worked: `pan start <id> --force` (clear needs-you) → confirm fix in-workspace (`npm run build` / grep the flagged symbols) → `pan review request <id>`. Candidate substrate fix: deliver blocked-review feedback durably (on-disk brief the resumed agent reads) instead of only via the (fragile) PR comment + live tmux.
+2. **close-out verify-merged FALSE-POSITIVE (PAN-2163).** Reports "N unmerged commits" on branches that are 100pct merged at origin (checks local/worktree refs, not `origin/main..origin/feature/<id>`). Confirmed on BOTH PAN-2150 and PAN-2152 — it strands the entire close-out tail. Highest-leverage substrate fix for flywheel throughput right now.
+3. **wakeup drift (PAN-2160).** ScheduleWakeup(1000s) drifted to ~30-66min actual; the deacon stuck-watchdog (not the scheduled wakeup) drove the loop because NO_RESUME gates the orchestrator's own self-heal. The loop still functioned (every wake emitted a current snapshot) but at coarse cadence and tripping stage-2 stuck-remediation repeatedly.
+4. **green-but-conflicting PRs (PAN-2108).** 1982/1718/2063 stayed all-checks-green-but-CONFLICTING for the whole run; the flywheel is structurally forbidden to rebase and the work agents were idle/dead. No flywheel lever — pure operator-rebase backlog.
+5. **GraphQL 5k/hr shared budget is a live constraint.** Dropped to ~1330 mid-run from review/test convoys + the flywheel's own per-tick gh-pr polling. Discipline adopted: check `gh api rate_limit --jq .resources.graphql` first; skip re-polling stable-state items (the 3 conflicting PRs unchanged 7+ ticks); spend budget on items actually moving.
+
+**Process lessons for future runs:**
+- **Ground-truth merged-ness with `git rev-list --count origin/main..origin/feature/<id>`** — do NOT trust the close-out gate's "unmerged commits" (PAN-2163 lies via local refs).
+- **VALIDATE status.json with `python3 -c "import json;json.load(open(...))"` before every emit** — a multi-Edit on a JSON string field broke the file at tick 7 (and a background emit silently no-op'd at tick 2). Emit in FOREGROUND and verify `latest.json` ticks incremented.
+- **A fixed work agent often will NOT auto-re-request review** — the flywheel must `pan review request <id>` after verifying the fix; otherwise green fixes sit idle forever.
+- **The operator's "Stage 2 idle Nmin" alerts during this run were PAN-2160 drift, not hangs** — the flywheel was productive throughout. Until PAN-2160 lands, expect watchdog-cadence ticks.
+
+**Carries to next run (not flywheel-actionable now):** PAN-2150 + PAN-2152 close-outs (need PAN-2163 fix), PAN-1982/1718/2063 (operator rebase or PAN-2108), PAN-2086 (wedged; operator recovery).
+## RUN-36 tick 1 (2026-06-29 ~08:30Z) — DRAINED the merged close-out tail (2150/2152/2157); filed PAN-2165; conflicting trio still operator-bound
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `harness=claude-code`, `scope=all-tracked-projects`, **`auto_pickup_backlog=true`**, **`require_uat_before_merge=false`**. Main GREEN at origin/main `2d0fb0d36` (CI success 08:12Z). RAM 15/64 GB, swap 0 — abundant headroom; eligible work, not capacity, is the binding constraint.
+
+- **HEADLINE WIN — closed out the entire merged tail that RUN-35 left stuck (PAN-2163).** PAN-2150 (#2162), PAN-2152 (#2161), PAN-2157 (#2164) were all `state:MERGED` at GitHub + 0 commits ahead of origin/main, but stuck OPEN/in-review because RUN-35's close-outs hit the PAN-2163 false-positive. This tick all three `pan close --force` SUCCEEDED. **Why it worked now and not in RUN-35:** I ran `git fetch origin` FIRST, then verified `git rev-list --count origin/main..origin/feature/pan-<id>` == 0 at BOTH origin and local before closing. RUN-35's "60 unmerged commits" was stale local refs; after fetch the local refs also showed 0 ahead, so the verify-merged gate passed. **DURABLE RECIPE: before believing a close-out is blocked, `git fetch origin` then confirm `origin/main..origin/feature/<id>` == 0; if 0, `pan close --force` will pass.** Cohort: 8/12 now terminal-or-parked.
+
+- **Filed PAN-2165 — close-out `close-issue` phase robustness bug (two failures).** Bug A (DETERMINISTIC): `close-issue:label` runs one `gh issue edit --add-label closed-out --remove-label <9 labels>`; gh aborts the WHOLE edit on the first absent label (`'in-planning' not found`), so `closed-out` is never added and stale `in-review`/`ready`/`released` persist on all three. Bug B (INTERMITTENT): on PAN-2157 `close-issue:transition` printed "✓ Closed" + "Close-out complete" but the issue stayed OPEN (verified twice ~6s apart) — a SECOND `pan close --force` then closed it. The no-vBRIEF close path looks more prone to B. Fix: idempotent label set (only remove present labels / REST SET) + verify-and-retry the transition. Route through normal pipeline.
+
+- **DURABLE — the conflicting trio (1982/1718/2063) has NO automated lever, flywheel OR deacon.** Verified in deacon.log: `nudgeIdleWorkAgentsWithOpenBeads` only nudges agents with OPEN beads. agent-pan-1982 (gpt-5.5, idle "Stopped, worked 12m") finished its work — PR #2112 exists, all 8 checks green, but CONFLICTING (12 ahead) — it has no open bead, so the idle-nudge NEVER fires to make it self-rebase. 1718 (24 ahead)/2063 (12 ahead) work agents are dead. So nothing drives the rebase. This is exactly the PAN-2108 gap (flywheel-safe rebase surface). The trio drains ONLY on operator rebase or PAN-2108. merge-blockers API confirms only PAN-1982 listed (merge_conflict).
+
+- **PAN-2086 still wedged** (kimi-k2.7, ctx 100% = 248k/200k, "stuck 20min"). resume --compact flywheel-forbidden, agent gate-exempt. Operator-only. PAN-1865/2108 family.
+
+- **PAN-2160 escalated: deacon stuck-remediation `stage=3 issue=FLYWHEEL idleMin=205 action=paused-and-troubled` at 08:18Z**, then the orchestrator was re-invoked at 08:23 (this tick). The orchestrator self-heal is NO_RESUME-gated AND now troubled, so the loop runs on watchdog cadence, not ScheduleWakeup. Known — do NOT re-file; PAN-2160.
+
+- **Held launches — correct, not neglect.** `pan review pending --ready` showed 3 stale entries (the merged trio) + MIN-831/846 (GitLab, out-of-cohort). The ready+planned auto-start pool is EMPTY (`gh issue list --label ready --label planned --state open` → nothing). minAgents=2 is MET by 2 LIVE planning producers (planning-pan-1510 + planning-pan-1506, both Opus 4.8, auto-mode, progressing). Next-tier criticals (1456 behavior-audit/meta, 1861 convoy-wedge overlapping parked 1864, 1865 kimi-ctx architectural) are NON-ready and fraught — auto-planning them risks operator-triage waste. PAN-1508 (disk debris) is CLOSED + disk only 47G/82% — stale sequence entry. Genuine cohort wind-down with floor met by real producers.
+
+- Next tick: (1) did planning-1510/1506 finish → vBRIEF → startable? if so `pan start`; (2) any operator rebase of 1982/1718/2063 → if a PR goes CLEAN+green, schedule auto-merge (require_uat=false → /api/flywheel/auto-merge/schedule); (3) re-confirm main green; (4) if cohort fully winds down (only the 4 non-actionable remain) → retrospective + `pan flywheel report`.
+
+## RUN-36 tick 2 (2026-06-29 ~08:57Z) — CORRECTED tick-1 misread; drained 2 stale backlog items; restored producer floor 0→1
+
+Main GREEN unchanged at origin/main `2d0fb0d36` (no new merges since tick 1). GraphQL reset to 4869. RAM 13.7/64 GB, swap 0.
+
+- **CORRECTION to tick 1 — the "2 live planning producers" were a MISREAD.** planning-pan-1510 + planning-pan-1506 showed BYTE-IDENTICAL panes across both ticks (same ctx 13%/16%, same cost $1.9645/$3.6283, same diff +43/+108) and were created ~9h ago — i.e. ZERO progress, not "live." Both are `status=stopped`, `flywheelRunId=None` (OPERATOR-started). They had each COMPLETED a thorough analysis and STOPPED awaiting a close confirmation (operator had even typed "yes close it" / "close the issue" but it never submitted). **So tick 1's "minAgents met by 2 live planning agents" was WRONG — there were 0 progressing producers.** DURABLE LESSON: never judge agent liveness from a single pane showing "auto mode on"; compare cost/ctx/diff ACROSS ticks (byte-identical = stalled) AND read state.json `status`. A frozen TUI looks identical to a working one in one frame.
+
+- **Drained 2 stale backlog items (already-resolved).** planning-pan-1510 concluded PAN-1510 (new-issue cache-invalidation race) was already fixed on main by `7e0dcf208` (git log main..HEAD empty, vitest 13/13 pass). planning-pan-1506 concluded PAN-1506 (strike-agent snapshot visibility) was already fixed by `61814fe26` (all 4 ACs met). Verified both commits on origin/main, both with no remote feature branch (direct-to-main fixes that used `Refs:` not `Closes:`, so never auto-closed). Both were ALREADY CLOSED by the time I went to close them (the operator's typed confirmations apparently landed) — I posted evidence-trail comments citing the fix commits + planning analyses. 2 backlog items off the list (sequence #11/#12).
+
+- **agent-pan-1982 is `running` but TROUBLED (troubled=True) + operator-started (flywheelRunId=None).** Its PR #2112 is still all-green-but-CONFLICTING (12 ahead). Troubled gate blocks auto-resume; the work is bead-complete so the deacon idle-nudge (open-beads-only) never fires to drive a rebase. Still no flywheel lever — operator rebase / PAN-2108. (1718=24 ahead, 2063=12 ahead, both dead, same boat. merge-blockers API still lists only PAN-1982.)
+
+- **Restored producer floor 0→1: launched `pan plan PAN-1865 --auto`** (planning-pan-1865, Opus, ctx climbing, cost $0.72 — live). PAN-1865 = the critical recurring kimi/CLIProxy false-200k-window deadlock ($22/agent). Picked it over the alternatives because floor was UNMET (0 producers), auto_pickup=true, and the saturation mandate; 1456 (meta behavior-audit) and 1861 (overlaps parked 1864) are poor auto-plan targets and the ready+planned pool is empty. WATCH next tick: the auto-plan must respect PAN-1865's own constraint that a hard `resolveHarness` refusal must NOT be the fix (the orchestrator-knowledge rule is deliberately un-enforced in code) — if the plan proposes a hard refusal it contradicts the issue intent. Did NOT pad the 2nd floor slot with a junk candidate.
+
+- **NOTE — `pan plan --auto` launched by the flywheel does not stamp `flywheelRunId`** on planning-pan-1865's state.json (shows None), so the governor treats it as operator-started / reaping-exempt. Minor; flagged as openQuestion; file only if attribution matters and it recurs.
+
+- Next tick: (1) planning-pan-1865 → vBRIEF+beads? if finalized → `pan start PAN-1865 --auto` (or it auto-chains); watch it doesn't stall like 1510/1506 did. (2) main still green + any operator rebase of the trio → if a PR goes CLEAN+green schedule auto-merge. (3) PAN-2086 still wedged = operator-only. (4) Compare 1865 cost/ctx across ticks to confirm real progress (tick-1 lesson). (5) If no producer survives and no eligible work → retrospective + report.
+
+## RUN-36 tick 3 (2026-06-29 ~09:07Z) — operator-driven: PAN-1865 re-scoped (OBE premise → narrow fix) + STRUCK; root-caused the live PAN-2086 wedge
+
+Operator surfaced that PAN-1865's original premise is OBE and asked: CLOSE as OBE, or re-scope to a narrow detection-hardening check. I verified and DECIDED: **re-scope + strike** (not close as OBE).
+
+- **Premise OBE — verified.** PAN-2102 (CLOSED) moved kimi-k2.7 to claude-code's native Anthropic endpoint (api.kimi.com/coding), no CLIProxy. PAN-1781 (CLOSED, test-locked) landed work-agent context-overflow auto-recovery (summarize+respawn) in deacon-api-recovery.ts + context-overflow.ts. Both of PAN-1865's named gaps are closed on main.
+
+- **The residual is REAL and LIVE — and it root-causes PAN-2086.** I captured agent-pan-2086's actual error: `API Error: 400 Invalid request: Your request exceeded model token limit: 262144 (requested: 336148)`. Then read src/lib/context-overflow.ts:6-9 — `CONTEXT_OVERFLOW_PATTERNS` = ['input exceeds the context window', 'exceeds the context window of this model'] (+ 'prompt is too long','blocking_limit' in isContextOverflowError). **NONE match 'exceeded model token limit'.** So `isContextOverflowTail()` returns false for kimi-native overflow → the PAN-1781 deacon recovery NEVER FIRES → kimi-native overflow wedges forever. **This is the confirmed cause of agent-pan-2086's unrecovered wedge** (and every future kimi-native overflow). Closing PAN-1865 as OBE would have left this live bug unfixed.
+
+- **DECISION + ACTION: re-scoped PAN-1865 body to the narrow fix** (add 'exceeded model token limit' to CONTEXT_OVERFLOW_PATTERNS + unit test; exact file/lines/AC in the issue body), retitled it (the old title said "no strike" for the old architectural scope — the narrow fix IS a clean scoped strike), and **`pan strike PAN-1865`** → strike-pan-1865 (gpt-5.5/codex, branch strike/pan-1865) live and working. Per the brief, an urgent scoped pipeline-unblocker defaults to strike; this directly unblocks the wedged producer + all future kimi overflow.
+
+- **DURABLE LESSON — when an operator says "OBE", verify whether a RESIDUAL is live before closing.** PAN-1865's headline premise was dead, but its residual detection-gap was the active root cause of a wedged agent. The string-match recovery (isContextOverflowTail) is only as good as its pattern list; a new provider/endpoint with a new 400 phrasing silently defeats it. Future: any new harness/endpoint needs its overflow phrasing added to CONTEXT_OVERFLOW_PATTERNS, with a test.
+
+- **Two agents now on PAN-1865:** strike-pan-1865 (authoritative, implements+lands+verifies) and the redundant planning-pan-1865 (launched tick 2 on the stale premise, now producing a MOOT vBRIEF). Planners write no implementation code, so no git conflict; the strike wins. Could NOT pan kill the redundant planner (flywheel-forbidden) — flagged as openQuestion (should re-scoped/superseded plan agents be cancellable?). Minor wasted planning tokens.
+
+- Cohort/floor: minAgents=2 now met by real producers (strike-pan-1865 + planning-pan-1865). Main still GREEN 2d0fb0d36.
+
+- Next tick: (1) strike-pan-1865 — did it land the pattern+test on main + verify? if merged → `pan close PAN-1865`. (2) once landed, does the deacon AUTO-RECOVER agent-pan-2086 (its tail now matches)? watch for the recovery respawn. (3) conflicting trio unchanged (operator/PAN-2108). (4) main green + any rebase → auto-merge. (5) emit status.
+
+## RUN-36 tick 4 (2026-06-29 ~09:32Z) — PAN-1865 strike WEDGED on PAN-2106; re-routed the fix to PAN-2166 (struck clean) — follow-through held
+
+Main GREEN unchanged at origin/main `2d0fb0d36`. RAM 14/64 GB.
+
+- **The tick-3 strike (strike-pan-1865) WEDGED on PAN-2106.** `pan strike PAN-1865` printed `✔ spawned` (Workspace feature-pan-1865-strike, Branch strike/pan-1865) but the worktree + branch were NEVER created — only an orphan dir at `workspaces/feature-pan-1865-strike` that resolves up to the primary repo. The strike agent (gpt-5.5) correctly SELF-HALTED on worktree discipline before editing (the only thing that stopped strike work landing on main). **PAN-2106 is exactly this bug** ("pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race)") — strengthened it with a fresh repro comment. Likely trigger: the concurrently-running planning-pan-1865 held `feature/pan-1865`, and the strike's `git worktree add` raced its git ops and lost the lock.
+
+- **The redundant planner (planning-pan-1865) finished with a WRONG-SCOPE vBRIEF.** It planned "investigate a launch-time window knob, explicitly NO deacon-side recovery (H3)" — it never identified the actual residual (the missing CONTEXT_OVERFLOW_PATTERNS string), so the normal work chain off it would NOT add the pattern. Confirms tick-3's worry: striking over a live planner was a mistake (PAN-2106 trigger), and the planner alone wouldn't have landed the fix either.
+
+- **FOLLOW-THROUGH (brief: "file a tighter issue + re-strike"): split the verified fix to PAN-2166 and struck it CLEAN.** New issue PAN-2166 carries only the one-line pattern add + test (exact spec). `pan strike PAN-2166` → strike-pan-2166 (gpt-5.5) with a VERIFIED worktree (`feature-pan-2166-strike` registered on `strike/pan-2166` @ 2d0fb0d36) — agent actively running the strike flow. A FRESH issue has no pre-existing worktree, so it dodged the PAN-2106 same-issue git-lock collision. This lands the fix on main + verifies → unblocks the live PAN-2086 wedge. DURABLE LESSON: do NOT `pan strike` an issue that already has a live agent/worktree (planner or work) — it triggers PAN-2106; either wait for the agent to clear or route the fix through a fresh issue.
+
+- **PAN-1865 annotated superseded-by-PAN-2166** + operator cleanup recommended (`pan kill pan-1865` clears the stranded strike-pan-1865 + idle planning-pan-1865 + orphan worktree). Flywheel cannot pan kill — surfaced, not blocked. Close PAN-1865 once PAN-2166 lands.
+
+- **Two flywheel-control gaps compounded** (both surfaced as openQuestions, not re-filed): (1) flywheel can't pan kill a redundant/superseded agent it launched; (2) pan strike vs an issue with a live worktree hits PAN-2106. Net effect: the tiny kimi-overflow fix took a re-route (PAN-1865 strike → wedge → PAN-2166 strike) rather than landing directly — but it IS now in flight, not stalled.
+
+- Conflicting trio unchanged (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). No flywheel lever. Main green.
+
+- Next tick: (1) strike-pan-2166 — landed on main + verified? grep `exceeded model token limit` on origin/main; if merged → `pan close PAN-2166` AND recommend close PAN-1865 as superseded. (2) Once pattern on main, does deacon AUTO-RECOVER agent-pan-2086 (tail now matches isContextOverflowTail)? watch ~/.overdeck/logs/deacon.log for a recovery respawn. (3) trio unchanged unless operator rebases. (4) emit status. (5) PAN-1865 cleanup is operator's (pan kill).
+
+## RUN-36 tick 5 (2026-06-29 ~09:53Z) — KIMI-OVERFLOW FIX LANDED (PAN-2166 merged+closed); but live recovery gated on a dashboard restart (stale dist)
+
+Main GREEN, advanced to origin/main `fde45b7e3` (CI success 09:40Z).
+
+- **WIN: PAN-2166 MERGED + closed-out.** strike-pan-2166 (gpt-5.5, clean worktree) added `'exceeded model token limit'` to CONTEXT_OVERFLOW_PATTERNS + 8 regression tests, passed lint/typecheck/full suite (7584 root + 32 frontend), `pan done --strike` ff-merged to main. Verified the pattern is on origin/main:src/lib/context-overflow.ts:9. `pan close PAN-2166 --force` clean (verify-merged ✓, terminal ✓; the PAN-2165 label-abort tripped again, non-fatal/expected). The re-route from the wedged PAN-1865 strike → fresh PAN-2166 strike WORKED — the kimi-native overflow detection gap is fixed on green main.
+
+- **Closed PAN-1865 as superseded/completed** (gh issue close; its residual is fixed on main via PAN-2166). Two operator cleanups noted on the issue: `pan kill pan-1865` (debris) + `pan reload` (deploy).
+
+- **CRITICAL FINDING (verified, not assumed) — the fix is on main but NOT live; agent-pan-2086 is still wedged.** I expected the deacon to auto-recover agent-pan-2086 once the pattern landed. It did NOT. Deacon log shows only troubled-inspect skips + `nudgeIdleWorkAgentsWithOpenBeads: agent-pan-2086 bd ready failed` — no overflow recovery. Root cause, ground-truthed: **the running dashboard/deacon executes STALE compiled dist.** `dist/dashboard/server.js` was built 08:14Z (BEFORE the fix landed 09:40Z); `grep 'exceeded model token limit' dist/dashboard/server.js` = 0 (ABSENT); server PIDs 42807/44707 started Jun 28 22:46. So the live `isContextOverflowTail` is pre-fix code and still misses kimi's string. **The detection fix cannot recover the live wedge (or any future kimi overflow) until `pan reload` (rebuild + restart).**
+
+- **DECISION: did NOT restart the dashboard.** Per feedback_confirm_before_going_live + feedback_no_live_boot_hotpatch + the brief's allowed-actions list, a rebuild+restart/go-live is the OPERATOR's call, not a flywheel action (it kills PTYs, the deacon, and all agent streams). Surfaced as an URGENT operator suggestion + openQuestion with the verified facts. This is the honest boundary: flywheel landed + verified the fix on main; deploying it to the live process is the operator's switch.
+
+- **DURABLE LESSON — a merged substrate fix to dashboard/deacon code is NOT live until `pan reload`.** Source-on-main ≠ running-process. Any flywheel fix that changes server/deacon behavior (recovery, gates, nudges) only takes effect after a rebuild+restart the flywheel cannot perform. When a fix targets live-process behavior, the tick must explicitly check dist build-time + server PID start-time vs the merge time, and surface the deploy step — do NOT report the live symptom as fixed just because main is green.
+
+- Conflicting trio unchanged (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). Operator/PAN-2108.
+
+- **Cohort drain status:** cohort (12) now: 1884/2088/1084/2054/2150/2152 closed-out + 806/1864 parked + (mid-run) 1510/1506/2157/2166/1865 closed = strong drain. Remaining cohort blockers: 1982/1718/2063 (operator rebase) + 2086 (now fixable via pan reload, then deacon auto-recovers). NONE flywheel-actionable further this run.
+
+- Next tick: (1) did the operator `pan reload`? if dist now contains the pattern + server restarted AFTER 09:40Z → watch deacon auto-recover agent-pan-2086. (2) operator rebase of trio → if any CLEAN+green, schedule auto-merge. (3) `pan kill pan-1865` debris cleared? (4) if cohort fully wound down + nothing flywheel-actionable → RETROSPECTIVE + `pan flywheel report`.
+
+## RUN-36 tick 6 (2026-06-29 ~10:12Z) — steady state; no operator gate-action; loop kept alive to drain on reload/rebase
+
+Main GREEN unchanged `fde45b7e3`. No operator action since tick 5.
+
+- **No `pan reload` yet** — verified: dist pattern count still 0, server.js still built 08:14Z, server PIDs still Jun 28 22:46. PAN-2166 fix remains on-main-but-not-live; agent-pan-2086 still wedged at ctx 100%. The recovery is one operator `pan reload` away.
+- **Conflicting trio unchanged** (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). No operator rebase.
+- **PAN-1865 debris partially cleared** — no live pan-1865 tmux sessions remain (no resource drain), though stale agent state dirs (agent-pan-1865-plan, strike-pan-1865) persist. Not worth manual removal; close-out/pan kill normally clears them.
+- **DECISION: did NOT report/close the run.** All remaining cohort members (1982/1718/2063 rebase, 2086 reload) are operator-gated with no flywheel lever, but they are NOT terminal (blocked, not merged/parked-out). With require_uat=false the flywheel can AUTO-MERGE the trio the instant they go CLEAN+green, and a reload would let the deacon auto-recover 2086 — both worth staying alive for. Closing now would forfeit that follow-through and force a fresh run. Per drain-to-quiescence, the loop stays alive at sweep cadence to act on the operator gate-actions. Will reconsider reporting only after sustained quiescence (many ticks, zero operator movement).
+- No flywheel-eligible work to launch (no ready+planned pool; no good plan candidate; cohort drained except operator-gated items). minAgents floor genuinely unmeetable here — repair/await, not neglect.
+- Next tick: (1) `pan reload` done? → watch deacon auto-recover agent-pan-2086. (2) trio rebased? → auto-merge any CLEAN+green via /api/flywheel/auto-merge/schedule. (3) emit steady snapshot. (4) if still fully quiescent after sustained no-op → retrospective + `pan flywheel report`.
+
+## RUN-36 RETROSPECTIVE (tick 7, 2026-06-29 ~10:29Z) — END OF RUN
+
+**Outcome.** Started with a 12-item cohort carried mostly from RUN-35 (merged-but-closeout-blocked, operator-rebase trio, wedged kimi agent, parked, closed-out). Over 7 ticks the flywheel **drained 7 issues to terminal** and **shipped 1 substrate fix to green main**, then reached quiescence behind operator-only gates.
+
+**Closed / drained this run:**
+- PAN-2150, PAN-2152, PAN-2157 — the merged close-out tail RUN-35 left stuck on the PAN-2163 false-positive. Closed out tick 1 after `git fetch origin` + verifying `origin/main..origin/feature/<id>` == 0 (the gate then passed).
+- PAN-1510, PAN-1506 — both already-resolved on main (fixes 7e0dcf208 / 61814fe26); confirmed + closed tick 2.
+- PAN-2166 (NEW) — **the headline win.** Root-caused the live PAN-2086 wedge: kimi's native-endpoint overflow string `exceeded model token limit` was absent from `CONTEXT_OVERFLOW_PATTERNS`, so `isContextOverflowTail` missed it and the PAN-1781 deacon auto-recovery never fired. Struck the one-line pattern + 8 regression tests → MERGED to green main (`fde45b7e3`) → closed out.
+- PAN-1865 — re-scoped (CLIProxy premise OBE per PAN-2102/1781) then closed as superseded by PAN-2166.
+
+**Substrate bugs filed/strengthened:** PAN-2165 (NEW — close-out `close-issue` phase: label step aborts on absent label + intermittent transition no-op; tripped on EVERY close-out this run, high-frequency). PAN-2106 (strengthened with a fresh strike-worktree-failure repro). Referenced PAN-2163/2160/2108.
+
+**Recurring stalls + the guardrails that worked / are needed:**
+1. **Stale-pane misread (tick 1→2).** I credited two "live planning producers" that were actually stalled operator-started agents frozen for ~9h (byte-identical cost/ctx/diff across ticks). FIX adopted: judge liveness by comparing cost/ctx/diff ACROSS ticks + reading state.json `status`, never one pane frame.
+2. **Don't strike an issue that has a live agent/worktree (PAN-2106).** Tick 3 struck PAN-1865 while a planner held `feature/pan-1865`; the strike's `git worktree add` lost the git-lock race → false 'spawned' success, agent stranded in primary main. FIX adopted: route urgent fixes through a FRESH issue (PAN-2166) — no pre-existing worktree, no collision. Worked first try.
+3. **"OBE" ≠ "close" — verify whether a residual is live.** PAN-1865's headline premise was dead, but its residual was the active cause of a wedged agent. Always check for a live residual before closing as OBE.
+4. **A merged deacon/server fix is NOT live until `pan reload`.** PAN-2166 is on green main but the running deacon executes pre-fix compiled dist (verified: server.js built 08:14Z < fix 09:40Z; grep pattern in dist = 0; PIDs Jun 28). agent-pan-2086 stays wedged until the operator reloads. FIX adopted: when a fix targets live-process behavior, check dist build-time + server PID vs merge-time and surface the deploy step — never report the live symptom fixed just because main is green.
+5. **PAN-2163 close-out false-positive** — `git fetch origin` + verify `origin/main..origin/feature/<id>` == 0 before believing "N unmerged commits."
+
+**Flywheel control gaps surfaced (candidate substrate work):**
+- The flywheel cannot `pan kill` a redundant/superseded agent it launched (left planning-pan-1865 churning to a moot vBRIEF; left stale state dirs after the strike re-route).
+- `pan plan --auto` launched by the flywheel does not stamp `flywheelRunId` (governor treats it as operator-started).
+- The conflicting trio + wedged agent have NO flywheel lever — PAN-2108 (flywheel-safe rebase/recovery surface) is the meta-fix that would let the flywheel drain them autonomously.
+
+**Carries to next run (operator-gated, not flywheel-actionable):**
+- PAN-1982 (#2112) / PAN-1718 / PAN-2063 — green-but-CONFLICTING; need operator rebase or PAN-2108. (require_uat=false → flywheel auto-merges the instant any goes CLEAN+green.)
+- PAN-2086 — root cause fixed on main; needs `pan reload` (operator) → deacon then auto-recovers it.
+- PAN-1865 stale agent state dirs (agent-pan-1865-plan, strike-pan-1865) — cosmetic; `pan kill pan-1865` clears.
+- Parked: PAN-806, PAN-1864.
+
+**Two operator actions unblock everything remaining:** (1) `pan reload`; (2) rebase the trio (or land PAN-2108).

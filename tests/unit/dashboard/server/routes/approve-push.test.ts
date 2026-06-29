@@ -1,6 +1,6 @@
 /**
  * Route-level regression tests for the approve-push divergence guard
- * (src/dashboard/server/routes/workspaces.ts — pushApproveMain).
+ * (src/dashboard/server/routes/workspaces/merge-ops.ts — pushApproveMain).
  *
  * The POST /api/issues/:issueId/approve handler calls pushApproveMain() after a
  * successful merge to push the result to origin/main. If origin/main has advanced
@@ -87,7 +87,7 @@ vi.mock('../../../../../src/lib/review-status.js', async (importOriginal) => {
   };
 });
 
-// Stub out modules that workspaces.ts imports at module scope
+// Stub out modules that merge-ops.ts imports at module scope
 vi.mock('../../../../../src/lib/projects.js', () => ({ resolveProjectFromIssue: vi.fn() }));
 vi.mock('../../../../../src/lib/cloister/service.js', () => ({ getCloisterService: vi.fn() }));
 vi.mock('../../../../../src/lib/agents.js', () => ({
@@ -110,7 +110,7 @@ vi.mock('../../../../../src/lib/database/index.js', () => ({
 
 // ─── Import under test (after mocks) ─────────────────────────────────────────
 
-import { pushApproveMain } from '../../../../../src/dashboard/server/routes/workspaces.js';
+import { pushApproveMain } from '../../../../../src/dashboard/server/routes/workspaces/merge-ops.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 

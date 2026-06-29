@@ -27,7 +27,7 @@ interface FlywheelRunDetail extends FlywheelRunSummary {
 }
 
 interface FlywheelRoleConfig {
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex';
   model?: string;
   effort?: 'low' | 'medium' | 'high';
   maxAgents?: number;
@@ -457,7 +457,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             <div>
               <dt className="text-muted-foreground">Harness</dt>
-              <dd className="font-medium text-foreground">{status?.orchestrator.harness ?? config.harness}</dd>
+              <dd className="font-medium text-foreground">{config.harness}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Model</dt>

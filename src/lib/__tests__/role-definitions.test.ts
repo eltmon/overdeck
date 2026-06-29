@@ -77,10 +77,21 @@ describe('role definitions', () => {
       };
       const bashMatcher = hooks.PreToolUse.find((entry) => entry.matcher === 'Bash');
 
-      expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual([
-        '$HOME/.overdeck/bin/gh-issue-trailer-hook',
-        '$HOME/.overdeck/bin/rtk-bash-filter',
-      ]);
+      // PAN-1084: work agents get an extra guard that blocks tmux send-keys to
+      // other agents' sessions; it must run before the Bash rewriter/filter.
+      const expected =
+        role === 'work'
+          ? [
+              '$HOME/.overdeck/bin/tmux-send-keys-guard',
+              '$HOME/.overdeck/bin/gh-issue-trailer-hook',
+              '$HOME/.overdeck/bin/rtk-bash-filter',
+            ]
+          : [
+              '$HOME/.overdeck/bin/gh-issue-trailer-hook',
+              '$HOME/.overdeck/bin/rtk-bash-filter',
+            ];
+
+      expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual(expected);
     },
   );
 

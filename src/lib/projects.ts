@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { ConfigError, ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
-import type { QualityGateConfig, RepoConfig } from './workspace-config.js';
+import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
@@ -48,7 +48,7 @@ export interface WorkspaceConfig {
   dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
   ports?: Record<string, { range: [number, number] }>;
   docker?: { traefik?: string; compose_template?: string };
-  database?: { seed_file?: string; container_name?: string; [key: string]: any };
+  database?: DatabaseConfig;
   agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
   env?: { template?: string; secrets_file?: string };
   services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;

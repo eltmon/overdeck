@@ -105,6 +105,16 @@ vi.mock('../../../lib/config-yaml.js', () => ({
   resolveModel: () => 'claude-sonnet-4-6',
 }));
 
+const mergeBackendMocks = vi.hoisted(() => ({
+  getMergeBackendStatus: vi.fn(async () => ({
+    available: true,
+    mode: 'gh-cli' as const,
+    detail: 'gh CLI is authenticated',
+  })),
+}));
+
+vi.mock('../../../lib/github-app.js', () => mergeBackendMocks);
+
 import {
   emitStatusCommand,
   flywheelAbortCommand,
@@ -240,6 +250,11 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
     flywheelLifecycleMocks.stopAgentProgram.mockClear();
+    mergeBackendMocks.getMergeBackendStatus.mockResolvedValue({
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    });
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -312,7 +327,24 @@ describe('flywheel CLI commands', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Active agents: 0/8'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('RAM: 1024 MiB used / 4096 MiB total'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Last tick: 2026-05-18T12:00:00.000Z'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Merge backend: gh-cli (gh CLI is authenticated)'));
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('renders an unavailable merge backend in human-readable active run status', async () => {
+    mergeBackendMocks.getMergeBackendStatus.mockResolvedValue({
+      available: false,
+      mode: 'none',
+      detail: 'No GitHub App credentials or gh CLI authentication found',
+    });
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelStatusCommand({});
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(
+      'Merge backend: UNAVAILABLE - No GitHub App credentials or gh CLI authentication found',
+    ));
   });
 
   it('emits raw FlywheelStatus JSON with --json', async () => {
@@ -326,6 +358,11 @@ describe('flywheel CLI commands', () => {
     expect(JSON.parse(output)).toEqual({
       ...validStatus,
       system: { ...validStatus.system, agentsActive: 0 },
+      mergeBackend: {
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      },
     });
   });
 

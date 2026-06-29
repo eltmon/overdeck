@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { toCodexSandboxValue } from './runtimes/codex.js';
+import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
@@ -203,7 +204,8 @@ function buildChannelsArgs(config: LauncherConfig): string {
 
 function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
   if (!config.useSupervisor) return cmd;
-  if (config.harness === 'ohmypi' || config.reviewSignal) return cmd;
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (!behavior.supportsPtySupervisor || config.reviewSignal) return cmd;
   if (!config.supervisorScriptPath) {
     throw new Error('LauncherConfig.supervisorScriptPath is required when useSupervisor=true');
   }
@@ -412,12 +414,13 @@ const PROVIDER_ENV_UNSETS = [
 
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
 
   if (config.spawnMode === 'conversation') {
-    if (config.harness === 'ohmypi') {
+    if (behavior.launchCommandKind === 'ohmypi-rpc') {
       return buildOhmypiCommand(config, false);
     }
-    if (config.harness === 'codex') {
+    if (behavior.launchCommandKind === 'codex-work-tui') {
       return buildCodexCommand(config, false);
     }
 
@@ -502,10 +505,11 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (config.harness === 'ohmypi') {
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
   }
-  if (config.harness === 'codex') {
+  if (behavior.launchCommandKind === 'codex-work-tui') {
     return buildCodexCommand(config, useExec);
   }
 
@@ -633,8 +637,23 @@ function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] 
   let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
 
   if (piMode === 'rpc') {
-    const outputLogPath = join(dirname(config.piFifoPath!), 'output.log');
-    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
+    // PAN-2108: capture omp's exit so a silent post-startup death leaves a trace.
+    // The launcher bash must OUTLIVE omp to record the exit code + timestamp, so
+    // the rpc path deliberately does NOT `exec` (exec would replace bash with omp
+    // and the exit would be lost — the failure mode that made the flywheel
+    // orchestrator's death undiagnosable). `remain-on-exit on` keeps the dead
+    // pane for `#{pane_exit_status}`; the exit-status file survives even if the
+    // pane is later reaped. The deacon reads both on death detection.
+    const agentDir = dirname(config.piFifoPath!);
+    const outputLogPath = join(agentDir, 'output.log');
+    const exitStatusPath = join(agentDir, 'exit-status');
+    const runLine = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
+    return [
+      runLine,
+      '__omp_exit=$?',
+      `printf '%s %s\\n' "$__omp_exit" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ${shellQuote(exitStatusPath)}`,
+      'exit $__omp_exit',
+    ];
   }
 
   return [useExec ? `exec ${cmd}` : cmd];
