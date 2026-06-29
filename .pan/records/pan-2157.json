@@ -16,16 +16,17 @@
   ],
   "feedback": [],
   "created": "2026-06-29T03:07:15.168Z",
-  "updated": "2026-06-29T09:27:23.668Z",
+  "updated": "2026-06-29T09:27:36.777Z",
   "pipeline": {
     "issueId": "PAN-2157",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T09:27:23.644Z",
+    "updatedAt": "2026-06-29T09:27:36.758Z",
+    "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "Bead workspace-l5r1m: getMergeBackendStatus() helper added in src/lib/github-app.ts. Type MergeBackendStatus, async getMergeBackendStatus(deps) function, and defaultCheckGhAuth helper using execFileAsync(gh, [auth, status]) with 5000ms timeout in try/catch — all match spec. App-configured path unchanged. execFileAsync used (not execSync) per D3. All 3 ACs covered by 4 unit tests in tests/unit/lib/github-app.test.ts (App path, gh-cli fallback, none, default-gh-fails).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2164",
     "reviewRequestedAt": "2026-06-29T08:08:51.970Z"
@@ -94,7 +95,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.927169,
-        "pricingAsOf": "2026-06-29T09:27:23.668Z"
+        "pricingAsOf": "2026-06-29T09:27:36.777Z"
       }
     },
     "merges": [
