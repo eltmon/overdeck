@@ -90,6 +90,7 @@
   "src/dashboard/server/services/merge-queue-service.ts",
   "src/dashboard/server/services/terminal-service.ts",
   "src/lib/agents.ts",
+  "src/lib/agents/recovery.ts",
   "src/lib/agents/resume.ts",
   "src/lib/agents/spawn.ts",
   "src/lib/claude-mcp.ts",
