@@ -44,6 +44,7 @@ import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
+import { getMergeBackendStatus, type MergeBackendStatus } from '../../../lib/github-app.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/overdeck/review-status-sync.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
@@ -99,6 +100,10 @@ interface FlywheelStatusResponse {
 interface FlywheelStatsResponse {
   status: number;
   body: FlywheelStatsPayload | { error: string; details?: string[] };
+}
+
+interface MergeBackendDeps {
+  getStatus?: () => Promise<MergeBackendStatus>;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -605,11 +610,23 @@ export function getMergeBlockersPayload(): Array<{
   return out;
 }
 
+export async function getMergeBackendPayload(deps: MergeBackendDeps = {}): Promise<MergeBackendStatus> {
+  return (deps.getStatus ?? getMergeBackendStatus)();
+}
+
 const getMergeBlockersRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/merge-blockers',
   httpHandler(Effect.gen(function* () {
     return jsonResponse(getMergeBlockersPayload());
+  })),
+);
+
+const getMergeBackendRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/merge-backend',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => jsonResponse(await getMergeBackendPayload()));
   })),
 );
 
@@ -1004,6 +1021,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getPendingAutoMergeRoute,
   getAutoMergeProblemsRoute,
   getMergeBlockersRoute,
+  getMergeBackendRoute,
   postAutoMergeScheduleRoute,
   postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,

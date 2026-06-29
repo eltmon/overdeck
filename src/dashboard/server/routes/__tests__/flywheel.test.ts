@@ -12,6 +12,7 @@ import {
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  getMergeBackendPayload,
   deleteAutoMergePayload,
   getFlywheelStatsPayload,
   getPendingAutoMergePayload,
@@ -355,6 +356,33 @@ describe('flywheel config routes', () => {
       headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
       body: JSON.stringify({ auto_pickup_backlog: 'yes' }),
     })).resolves.toEqual({ status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } });
+  });
+});
+
+describe('flywheel merge backend route', () => {
+  it('returns the merge backend helper result', async () => {
+    await expect(getMergeBackendPayload({
+      getStatus: async () => ({
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      }),
+    })).resolves.toEqual({
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    });
+  });
+
+  it('accepts GET requests without an Origin header', async () => {
+    const result = await requestFlywheelRoute('/api/flywheel/merge-backend');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      available: expect.any(Boolean),
+      mode: expect.stringMatching(/^(app|gh-cli|none)$/),
+      detail: expect.any(String),
+    });
   });
 });
 
