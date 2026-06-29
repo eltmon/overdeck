@@ -187,6 +187,7 @@
     "mergeStatus": "failed",
     "readyForMerge": false,
     "updatedAt": "2026-06-29T14:26:05.210Z",
+    "reviewNotes": "Workspace is detached at e4f9fee2 instead of on feature/pan-1982",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -195,9 +196,8 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2112",
-    "reviewedAtCommit": "6b15be2766f939a30180421c71877e5f3e4dfc76",
     "lastVerifiedCommit": "6aa2afa4f37b76c3b6d57a14c10b99b0bf8fcbf5",
-    "reviewNotes": "Workspace is detached at e4f9fee2 instead of on feature/pan-1982",
+    "reviewedAtCommit": "6b15be2766f939a30180421c71877e5f3e4dfc76",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "mergeNotes": "github merge failed: Command failed: gh pr merge https://github.com/eltmon/overdeck/pull/2112 --squash\nGraphQL: Pull Request is not mergeable (mergePullRequest)\n",
     "reviewRequestedAt": "2026-06-29T13:19:25.189Z",
