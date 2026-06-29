@@ -45,6 +45,14 @@ Durable cumulative memory across Flywheel orchestrator runs. Status snapshots ar
 - **0 active producers this tick — and that is the honest state.** agent-pan-2157-plan stalled; agent-pan-1982/test idle (done); agent-2086 wedged; planning-pan-1506/1510/2157 are idle zombies (their work done). Backlog top verified-stale (3-for-3). The run is now **OPERATOR-GATED** on: (1) merge PAN-1982/MIN-831/MIN-846; (2) unblock PAN-2157 (answer 'option 2' or land PAN-2158); (3) restart WITHOUT --no-resume (recovers PAN-2086 + lets PAN-1718/2063 rebase). Did NOT force speculative launches — churn, not work.
 - Run drain total: 8 closed/closed-out (1084, 2081, 1506, 1510, 1508, 2054, 1884, 2088) + 2 operator-merged + 3 substrate bugs filed (2157, 2158, and earlier). Excellent drain; remaining blockers are all human-gated.
 
+## RUN-33 tick 4 (2026-06-29 ~04:13Z) — CORRECTED the "no eligible work" call: found the ready decomposition pool; launched 2 genuine producers
+
+- Main still GREEN (5bfa88d). **No operator action on any of the 3 gates since tick 3** (PAN-1982 #2112 unmerged; PAN-2157 agent still stalled at identical ctx/out/cost; no --no-resume restart).
+- **IMPORTANT CORRECTION to tick 3's "0 producers / operator-gated" conclusion.** `gh issue list --label ready` revealed a fresh, NON-stale auto-pickup pool: **PAN-2145..2156 — 12 god-file decomposition tasks**, all operator-marked `ready` + `substrate-improvement`. Verified PAN-2146/2147/2148 are OPEN, no spec, no workspace, no fix commit = genuinely unplanned+unstarted (the `released` co-label is misleading here, same as PAN-2063 — ignore it). **LESSON: when the ranked-backlog top is stale, don't conclude 'no eligible work' — query `--label ready` directly for the real auto-pickup pool.** This is the legitimate way to honor minAgents, not speculative plans on stale bugs.
+- **Launched `pan plan --auto` on PAN-2150 (frontend Settings) + PAN-2152 (cli/commands/workspace.ts)** → planning-pan-2150, planning-pan-2152. Chose independent, low-blast-radius files; deliberately AVOIDED the central src/lib/agents.ts decomp (PAN-2146) which would conflict with everything when the gated agents (PAN-2086/1718/2063/2157) resume. 10 ready decompositions remain for future capacity (launch a couple per tick).
+- Producers now genuinely 2 (PAN-2150 + PAN-2152 plans). PAN-2157 still stalled (operator-gated), PAN-2086 wedged.
+- Consolidated operator actions UNCHANGED and still pending: (1) answer PAN-2157 'option 2'; (2) restart without --no-resume; (3) merge PAN-1982/MIN-831/MIN-846.
+
 ## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
 
 - **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
