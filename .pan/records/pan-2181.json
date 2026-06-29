@@ -42,37 +42,27 @@
       "reason": "feedback",
       "note": "[2026-06-29T23:00Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T23:00:26.596Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T23:00:24Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nRendered styleguide e2e modal coverage violates the explicit non-goal\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T23:00:26Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nRendered styleguide e2e modal coverage violates the explicit non-goal\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T23:05:47.339Z"
     }
   ],
+  "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:00:26.596Z",
+  "updated": "2026-06-29T23:05:51.223Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:00:24.566Z",
-    "reviewNotes": "Rendered styleguide e2e modal coverage violates the explicit non-goal",
+    "updatedAt": "2026-06-29T23:05:51.180Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "lastVerifiedCommit": "1e3638da961a6064811e3df6b00a2bf5b7937eb4",
+    "lastVerifiedCommit": "de5b985233d2aeb8bc8b9b4fd20ec37ae2f52465",
     "reviewRequestedAt": "2026-06-29T22:56:43.964Z"
   },
   "closeOut": {
@@ -111,7 +101,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.290561,
-        "pricingAsOf": "2026-06-29T23:00:24.602Z"
+        "pricingAsOf": "2026-06-29T23:05:51.221Z"
       }
     },
     "merges": [
