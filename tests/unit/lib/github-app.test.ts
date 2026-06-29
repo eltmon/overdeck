@@ -1,7 +1,8 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { existsSyncMock, readFileSyncMock, signMock } = vi.hoisted(() => ({
+const { execFileMock, existsSyncMock, readFileSyncMock, signMock } = vi.hoisted(() => ({
+  execFileMock: vi.fn(),
   existsSyncMock: vi.fn(() => true),
   readFileSyncMock: vi.fn((path: string) => {
     if (path.endsWith('app-id')) return '12345';
@@ -24,7 +25,65 @@ vi.mock('crypto', () => ({
   })),
 }));
 
-import { getCiCheckRunsState } from '../../../src/lib/github-app.js';
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  const execFile = execFileMock;
+  Object.assign(execFile, {
+    [Symbol.for('nodejs.util.promisify.custom')]: vi.fn((command: string, args: string[], options: unknown) =>
+      Promise.resolve(execFile(command, args, options))),
+  });
+  return { ...actual, execFile };
+});
+
+import { getCiCheckRunsState, getMergeBackendStatus } from '../../../src/lib/github-app.js';
+
+describe('getMergeBackendStatus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the GitHub App backend when credentials are configured', async () => {
+    await expect(getMergeBackendStatus({
+      isConfigured: () => true,
+      checkGhAuth: vi.fn(async () => true),
+    })).resolves.toMatchObject({
+      available: true,
+      mode: 'app',
+    });
+  });
+
+  it('falls back to gh CLI when the App is not configured and gh is authenticated', async () => {
+    await expect(getMergeBackendStatus({
+      isConfigured: () => false,
+      checkGhAuth: vi.fn(async () => true),
+    })).resolves.toMatchObject({
+      available: true,
+      mode: 'gh-cli',
+    });
+  });
+
+  it('reports no backend when neither the App nor gh CLI is available', async () => {
+    await expect(getMergeBackendStatus({
+      isConfigured: () => false,
+      checkGhAuth: vi.fn(async () => false),
+    })).resolves.toMatchObject({
+      available: false,
+      mode: 'none',
+    });
+  });
+
+  it('default gh auth check resolves false when gh auth status fails', async () => {
+    execFileMock.mockRejectedValue(new Error('gh not found'));
+
+    await expect(getMergeBackendStatus({
+      isConfigured: () => false,
+    })).resolves.toMatchObject({
+      available: false,
+      mode: 'none',
+    });
+    expect(execFileMock).toHaveBeenCalledWith('gh', ['auth', 'status'], { timeout: 5000 });
+  });
+});
 
 describe('getCiCheckRunsState', () => {
   const fetchMock = vi.fn();
