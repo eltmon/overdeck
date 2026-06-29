@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  type BootReconciliationDecision,
   getBootReconciliationState,
   setBootReconciliationDecision,
   stampBootReconciliation,
@@ -18,7 +19,7 @@ export interface BootReconciliationStartupResult {
   bootId: string;
   graceDeadline: string;
   candidateIds: string[];
-  decision: 'pending' | 'hold_all' | 'resume_all';
+  decision: BootReconciliationDecision;
   timerArmed: boolean;
 }
 
@@ -101,6 +102,26 @@ export function startBootReconciliation(
   const bootId = options.bootId ?? process.env.OVERDECK_BOOT_ID ?? `boot-${now.toISOString()}`;
   const graceDeadline = new Date(now.getTime() + getBootReconciliationGraceSeconds() * 1000).toISOString();
   const candidateIds = listBootReconciliationCandidateIds();
+  const existing = getBootReconciliationState();
+
+  if (existing.bootId === bootId && existing.decision) {
+    const existingGraceDeadline = existing.graceDeadline ?? graceDeadline;
+    if (existing.decision === 'pending') {
+      const timerArmed = armBootReconciliationGraceTimer(existingGraceDeadline, options.onGraceExpired);
+      logDeaconEventSync(`boot reconciliation preserved ${bootId}: pending until ${existingGraceDeadline}`);
+      return { bootId, graceDeadline: existingGraceDeadline, candidateIds, decision: 'pending', timerArmed };
+    }
+
+    clearBootReconciliationGraceTimer();
+    logDeaconEventSync(`boot reconciliation preserved ${bootId}: decision=${existing.decision}`);
+    return {
+      bootId,
+      graceDeadline: existingGraceDeadline,
+      candidateIds,
+      decision: existing.decision,
+      timerArmed: false,
+    };
+  }
 
   stampBootReconciliation(bootId, graceDeadline);
 

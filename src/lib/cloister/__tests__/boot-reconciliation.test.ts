@@ -64,7 +64,11 @@ import {
   listBootReconciliationCandidateIds,
   startBootReconciliation,
 } from '../boot-reconciliation.js';
-import { getBootReconciliationState } from '../../overdeck/control-settings.js';
+import {
+  getBootReconciliationState,
+  setBootReconciliationDecision,
+  stampBootReconciliation,
+} from '../../overdeck/control-settings.js';
 
 const BASE_TIME = new Date('2026-06-29T15:00:00.000Z');
 
@@ -90,6 +94,8 @@ describe('boot reconciliation', () => {
       bootId: null,
       graceDeadline: null,
     };
+    vi.mocked(setBootReconciliationDecision).mockClear();
+    vi.mocked(stampBootReconciliation).mockClear();
   });
 
   afterEach(() => {
@@ -167,6 +173,72 @@ describe('boot reconciliation', () => {
       decision: 'hold_all',
       bootId: 'boot-no-resume',
       graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+  });
+
+  it('preserves an already-written same-boot decision without re-prompting', () => {
+    mocks.bootState = {
+      decision: 'resume_all',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:05.000Z',
+      bootId: 'boot-watchdog',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    };
+    mocks.agents = [
+      { id: 'agent-pan-2076', role: 'work', status: 'stopped', workspace: join(testHome, 'workspace') },
+    ];
+
+    const result = startBootReconciliation({
+      bootId: 'boot-watchdog',
+      now: new Date('2026-06-29T15:01:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      bootId: 'boot-watchdog',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+      candidateIds: ['agent-pan-2076'],
+      decision: 'resume_all',
+      timerArmed: false,
+    });
+    expect(stampBootReconciliation).not.toHaveBeenCalled();
+    expect(setBootReconciliationDecision).not.toHaveBeenCalled();
+    expect(getBootReconciliationState()).toMatchObject({
+      decision: 'resume_all',
+      bootId: 'boot-watchdog',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+  });
+
+  it('uses a fresh boot id to re-open the grace window', () => {
+    mocks.bootState = {
+      decision: 'resume_all',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:05.000Z',
+      bootId: 'boot-watchdog',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    };
+    mocks.agents = [
+      { id: 'agent-pan-2076', role: 'work', status: 'stopped', workspace: join(testHome, 'workspace') },
+    ];
+
+    const result = startBootReconciliation({
+      bootId: 'boot-fresh',
+      now: new Date('2026-06-29T15:02:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      bootId: 'boot-fresh',
+      graceDeadline: '2026-06-29T15:02:30.000Z',
+      candidateIds: ['agent-pan-2076'],
+      decision: 'pending',
+      timerArmed: true,
+    });
+    expect(stampBootReconciliation).toHaveBeenCalledWith('boot-fresh', '2026-06-29T15:02:30.000Z');
+    expect(setBootReconciliationDecision).toHaveBeenCalledWith('pending');
+    expect(getBootReconciliationState()).toMatchObject({
+      decision: 'pending',
+      bootId: 'boot-fresh',
+      graceDeadline: '2026-06-29T15:02:30.000Z',
     });
   });
 });
