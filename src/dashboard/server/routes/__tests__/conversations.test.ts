@@ -171,6 +171,7 @@ describe('shouldReportUnresolvedLiveSession', () => {
 // ─── Conversation DB integration ──────────────────────────────────────────────
 
 let TEST_HOME: string;
+const ORIGINAL_HOME = process.env.HOME;
 
 async function resetDb() {
   const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
@@ -481,8 +482,20 @@ beforeEach(async () => {
 afterEach(async () => {
   await resetDb();
   delete process.env.OVERDECK_HOME;
+  if (ORIGINAL_HOME === undefined) delete process.env.HOME;
+  else process.env.HOME = ORIGINAL_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
+
+async function withTestHome<T>(fn: () => Promise<T>): Promise<T> {
+  process.env.HOME = TEST_HOME;
+  try {
+    return await fn();
+  } finally {
+    if (ORIGINAL_HOME === undefined) delete process.env.HOME;
+    else process.env.HOME = ORIGINAL_HOME;
+  }
+}
 
 describe('conversations route — DB integration', () => {
   describe('conversation live control endpoints', () => {
@@ -1219,93 +1232,97 @@ describe('conversations route — DB integration', () => {
   });
 
   it('creates a summary fork conversation without ending the source conversation', async () => {
-    const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+    await withTestHome(async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+      const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
 
-    const cwd = '/home/test/project';
-    const sessionId = 'session-123';
-    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
-    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
-    mkdirSync(claudeProjectDir, { recursive: true });
-    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
-    writeFileSync(sessionFile, [
-      JSON.stringify({
-        type: 'user',
-        message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken dashboard route' }] },
-      }),
-      JSON.stringify({
-        type: 'assistant',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/overdeck/src/file.ts' } }],
-        },
-      }),
-    ].join('\n') + '\n');
+      const cwd = '/home/test/project';
+      const sessionId = 'session-123';
+      const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+      const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+      mkdirSync(claudeProjectDir, { recursive: true });
+      const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+      writeFileSync(sessionFile, [
+        JSON.stringify({
+          type: 'user',
+          message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken dashboard route' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/overdeck/src/file.ts' } }],
+          },
+        }),
+      ].join('\n') + '\n');
 
-    const conv = createConversation({
-      name: 'source-conv',
-      tmuxSession: 'conv-source-conv',
-      cwd,
-      claudeSessionId: sessionId,
-      title: 'Original conversation',
-      effort: 'medium',
+      const conv = createConversation({
+        name: 'source-conv',
+        tmuxSession: 'conv-source-conv',
+        cwd,
+        claudeSessionId: sessionId,
+        title: 'Original conversation',
+        effort: 'medium',
+      });
+
+      const result = await Effect.runPromise(createSummaryFork(conv, { localSummaryOnly: true }));
+
+      expect(result.conversation.name).not.toBe('source-conv');
+      expect(result.conversation.title).toBe('Summary Fork: Original conversation');
+      expect(result.conversation.model).toBeNull();
+      expect(result.conversation.effort).toBe('medium');
+      expect(result.summary).toContain('Conversation Summary Fork');
+      expect(result.summaryModel).toBeNull();
+
+      const sourceConv = getConversationByName('source-conv');
+      expect(sourceConv?.status).toBe('active');
     });
-
-    const result = await Effect.runPromise(createSummaryFork(conv, { localSummaryOnly: true }));
-
-    expect(result.conversation.name).not.toBe('source-conv');
-    expect(result.conversation.title).toBe('Summary Fork: Original conversation');
-    expect(result.conversation.model).toBeNull();
-    expect(result.conversation.effort).toBe('medium');
-    expect(result.summary).toContain('Conversation Summary Fork');
-    expect(result.summaryModel).toBeNull();
-
-    const sourceConv = getConversationByName('source-conv');
-    expect(sourceConv?.status).toBe('active');
   });
 
   it('creates a plain fork conversation from the forkMode discriminator', async () => {
-    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+    await withTestHome(async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+      const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
 
-    const cwd = '/home/test/plain-project';
-    const sessionId = 'plain-session-123';
-    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
-    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
-    mkdirSync(claudeProjectDir, { recursive: true });
-    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
-    writeFileSync(sessionFile, [
-      JSON.stringify({
-        type: 'user',
-        message: { role: 'user', content: 'Before compaction' },
-      }),
-      JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
-      JSON.stringify({
-        type: 'assistant',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'private chain' }],
-        },
-      }),
-    ].join('\n') + '\n');
+      const cwd = '/home/test/plain-project';
+      const sessionId = 'plain-session-123';
+      const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+      const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+      mkdirSync(claudeProjectDir, { recursive: true });
+      const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+      writeFileSync(sessionFile, [
+        JSON.stringify({
+          type: 'user',
+          message: { role: 'user', content: 'Before compaction' },
+        }),
+        JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'private chain' }],
+          },
+        }),
+      ].join('\n') + '\n');
 
-    const conv = createConversation({
-      name: 'plain-source-conv',
-      tmuxSession: 'conv-plain-source-conv',
-      cwd,
-      claudeSessionId: sessionId,
-      title: 'Plain source',
+      const conv = createConversation({
+        name: 'plain-source-conv',
+        tmuxSession: 'conv-plain-source-conv',
+        cwd,
+        claudeSessionId: sessionId,
+        title: 'Plain source',
+      });
+
+      const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
+
+      expect(result.conversation.title).toBe('Fork: Plain source');
+      expect(result.summary).toBe('');
+      expect(result.summaryModel).toBeNull();
+      const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
+      expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
+      expect(forkedJsonl).not.toContain('"type":"thinking"');
+      expect(forkedJsonl).not.toContain('Before compaction');
     });
-
-    const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
-
-    expect(result.conversation.title).toBe('Fork: Plain source');
-    expect(result.summary).toBe('');
-    expect(result.summaryModel).toBeNull();
-    const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
-    expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
-    expect(forkedJsonl).not.toContain('"type":"thinking"');
-    expect(forkedJsonl).not.toContain('Before compaction');
   });
 });
 
