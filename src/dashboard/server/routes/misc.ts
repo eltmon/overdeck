@@ -76,10 +76,14 @@ import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
-import { isDeaconGloballyPausedSync as isDeaconGloballyPaused, setDeaconGloballyPausedSync as setDeaconGloballyPaused } from '../../../lib/overdeck/control-settings.js';
+import {
+  isDeaconGloballyPausedSync as isDeaconGloballyPaused,
+  setDeaconGloballyPausedSync as setDeaconGloballyPaused,
+} from '../../../lib/overdeck/control-settings.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getAgentStateFilePath } from '../../../lib/agents.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
+import { bootReconciliationRouteLayer } from './boot-reconciliation.js';
 
 const execAsync = promisify(exec);
 
@@ -684,14 +688,7 @@ const getNoResumeModeRoute = HttpRouter.add(
 
 // ─── Route: POST /api/resume-all ─────────────────────────────────────────────
 
-/**
- * Operator "Resume all" — the call-to-action behind the no-resume banner.
- * PAN-1963 makes agent auto-resume OFF by default at every boot, so after the
- * dashboard loads, stopped agents wait for the operator to put them back to
- * work. This clears no-resume mode for the running process (so the Deacon's
- * patrols and lifecycle-event handlers resume agents again) and immediately
- * sweeps the stopped work agents rather than waiting for the next patrol tick.
- */
+// Legacy resume-all endpoint retained for compatibility with existing callers.
 const postResumeAllRoute = HttpRouter.add(
   'POST',
   '/api/resume-all',
@@ -1805,6 +1802,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postRallyValidateRoute,
   getNoResumeModeRoute,
   postResumeAllRoute,
+  bootReconciliationRouteLayer,
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,
