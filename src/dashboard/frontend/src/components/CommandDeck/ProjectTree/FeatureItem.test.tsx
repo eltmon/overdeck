@@ -706,6 +706,9 @@ describe('FeatureItem', () => {
     expect(screen.getByText('api')).toBeTruthy();
     expect(screen.getByText('Up 2m')).toBeTruthy();
     expect(screen.getByText('Up 42s')).toBeTruthy();
+    const logsAction = screen.getByTestId('uat-inline-action-logs');
+    expect(logsAction).toBeTruthy();
+    expect(logsAction.className).not.toMatch(/opacity|hover/);
     toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
     expect(within(toggle).getByTestId('chevron-down')).toBeTruthy();
     expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();

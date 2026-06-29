@@ -5901,6 +5901,48 @@
   letter-spacing: normal;
 }
 
+.uatStackActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.uatStackActionButton {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.uatStackActionButton:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.uatStackActionPrimary {
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success-foreground);
+}
+
+.uatStackActionDanger {
+  border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.uatStackActionMuted {
+  color: var(--muted-foreground);
+}
+
 .uatStackTreeBody {
   padding: 2px 0 4px;
 }
