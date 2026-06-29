@@ -21,6 +21,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-27T15:56:12.984Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T16:04:01.067Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T02:12:46.874Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T02:14Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T02:14:11.298Z"
     }
   ],
   "feedback": [
@@ -28,30 +43,23 @@
       "seq": 1,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-06-27T15:53:16Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nCommitted .pan record marks readyForMerge/passed while carrying failed and unrelated verification evidence\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
+      "timestamp": "2026-06-29T02:14:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nDuplicate PAN-1718 bead records in .beads/issues.jsonl\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
     }
   ],
   "harness": "codex",
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T16:03:28.383Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-06-27T16:03:28.331Z"
-      }
-    ],
+    "updatedAt": "2026-06-29T02:14:10.725Z",
+    "reviewNotes": "Duplicate PAN-1718 bead records in .beads/issues.jsonl",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "reviewedAtCommit": "45cd53244f9fcbb59c0c80c2255679737061ad87",
     "lastVerifiedCommit": "45cd53244f9fcbb59c0c80c2255679737061ad87"
   },
   "closeOut": {
@@ -67,8 +75,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 147922,
-            "output": 10849,
+            "input": 161718,
+            "output": 15042,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -81,11 +89,19 @@
             "cacheWrite": 335117
           }
         },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 31,
+            "output": 3448,
+            "cacheRead": 2118481,
+            "cacheWrite": 184046
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1105316,
-            "output": 125951,
-            "cacheRead": 58994432,
+            "input": 1107740,
+            "output": 127437,
+            "cacheRead": 59838208,
             "cacheWrite": 0
           }
         }
@@ -98,8 +114,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 147922,
-          "output": 10849,
+          "input": 161718,
+          "output": 15042,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -109,16 +125,22 @@
           "cacheRead": 7229224,
           "cacheWrite": 335117
         },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 31,
+          "output": 3448,
+          "cacheRead": 2118481,
+          "cacheWrite": 184046
+        },
         "custom/kimi-k2.7-code": {
-          "input": 1105316,
-          "output": 125951,
-          "cacheRead": 58994432,
+          "input": 1107740,
+          "output": 127437,
+          "cacheRead": 59838208,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.629102,
-        "pricingAsOf": "2026-06-27T16:03:28.429Z"
+        "usd": 21.256843,
+        "pricingAsOf": "2026-06-29T02:14:10.753Z"
       }
     },
     "merges": [
@@ -127,7 +149,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-27T16:03:28.443Z",
+  "updated": "2026-06-29T02:14:11.298Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
