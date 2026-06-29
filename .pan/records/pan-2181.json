@@ -77,19 +77,45 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T23:34:57.563Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T23:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T23:35:44.819Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T23:35Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T23:35:50.817Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T23:35:44Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nDuplicate bead records in .beads/issues.jsonl\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T23:35:50Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nDuplicate bead records in .beads/issues.jsonl\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:35:03.123Z",
+  "updated": "2026-06-29T23:35:50.818Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:35:03.078Z",
+    "updatedAt": "2026-06-29T23:35:44.775Z",
+    "reviewNotes": "Duplicate bead records in .beads/issues.jsonl",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -159,7 +185,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.282759,
-        "pricingAsOf": "2026-06-29T23:35:03.122Z"
+        "pricingAsOf": "2026-06-29T23:35:44.809Z"
       }
     },
     "merges": [
