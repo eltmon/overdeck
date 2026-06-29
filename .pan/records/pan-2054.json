@@ -63,17 +63,18 @@
     }
   ],
   "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-06-27T05:18:55.823Z",
+  "updated": "2026-06-29T05:49:26.873Z",
   "pipeline": {
     "issueId": "PAN-2054",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T05:18:55.806Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "readyForMerge": true,
+    "updatedAt": "2026-06-29T05:49:26.851Z",
+    "reviewNotes": "review passed; terminal close-out production path and residue cleanup look correct",
+    "testNotes": "Quality gates: typecheck ✓, lint ✓ (7480 tests/735 files + 32 frontend tests). All implementation items verified by test suite — closedOut record field, read-door terminal shortcircuit, close-out marking, label stripping, reap-residue helper, patrol integration, integration test, resource-tree regression lock. No new failures. No UAT required for backend lifecycle fix.",
     "inspectNotes": "workspace-m9lki passed: reapIssueResidue matches the vBRIEF helper requirements, uses the merge guard before disk/branch cleanup, uses execAsync plus Effect killSession, and introduces no prohibited execSync/sendKeys pattern.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2092",
     "lastVerifiedCommit": "9ce404869ab723f66deae5e8fd21ed0c86d1f4b5",
@@ -92,8 +93,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 49020,
-            "output": 1486,
+            "input": 57420,
+            "output": 4865,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -105,6 +106,14 @@
             "cacheRead": 5096283,
             "cacheWrite": 191936
           }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 37,
+            "output": 2840,
+            "cacheRead": 1360589,
+            "cacheWrite": 162077
+          }
         }
       },
       "totals": {
@@ -115,8 +124,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 49020,
-          "output": 1486,
+          "input": 57420,
+          "output": 4865,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -125,11 +134,17 @@
           "output": 42932,
           "cacheRead": 5096283,
           "cacheWrite": 191936
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 37,
+          "output": 2840,
+          "cacheRead": 1360589,
+          "cacheWrite": 162077
         }
       },
       "costAtCloseOut": {
-        "usd": 12.125394,
-        "pricingAsOf": "2026-06-27T05:18:55.822Z"
+        "usd": 12.478285,
+        "pricingAsOf": "2026-06-29T05:49:26.873Z"
       }
     },
     "merges": [

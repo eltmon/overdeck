@@ -45,16 +45,17 @@
     "auto-start.ac3": "completed"
   },
   "created": "2026-06-26T03:33:27.321Z",
-  "updated": "2026-06-27T17:19:09.991Z",
+  "updated": "2026-06-29T05:49:25.986Z",
   "pipeline": {
     "issueId": "PAN-1084",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-27T17:19:09.930Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: scoped tmux-send-keys-guard to work agents only so planning/test/inspect/conversation/human sessions keep normal tmux behavior; added tests for non-work pass-through.",
+    "readyForMerge": true,
+    "updatedAt": "2026-06-29T05:49:25.962Z",
+    "reviewNotes": "Approved: work-agent tmux guard is scoped and covered by focused tests",
+    "testNotes": "Verification complete. All quality gates passed: typecheck (✓), lint (✓), test suite (737 test files, 7510 tests ✓, including focused tmux-send-keys-guard tests). Guard correctly scoped to work agents only; non-work sessions pass through silently. Tests verify: (1) non-work sessions do NOT block tmux, (2) work agent targeting self passes, (3) work agent targeting other session blocked with error, (4) send-keys and paste-buffer both blocked against non-self targets. No browser UAT (backend hook feature). AC1-AC3 covered.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2107",
     "lastVerifiedCommit": "0eee912cc6f0fa7ebe9cfbd3f7391ad7b2108d9c"
   },
@@ -63,8 +64,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 47517,
-            "output": 8933,
+            "input": 51201,
+            "output": 9793,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -77,19 +78,27 @@
             "cacheWrite": 217485
           }
         },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 54,
+            "output": 2689,
+            "cacheRead": 1132693,
+            "cacheWrite": 161569
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 922206,
-            "output": 79544,
-            "cacheRead": 32899328,
+            "input": 926332,
+            "output": 80240,
+            "cacheRead": 34608896,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 47517,
-          "output": 8933,
+          "input": 51201,
+          "output": 9793,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -99,16 +108,22 @@
           "cacheRead": 2126851,
           "cacheWrite": 217485
         },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 54,
+          "output": 2689,
+          "cacheRead": 1132693,
+          "cacheWrite": 161569
+        },
         "custom/kimi-k2.7-code": {
-          "input": 922206,
-          "output": 79544,
-          "cacheRead": 32899328,
+          "input": 926332,
+          "output": 80240,
+          "cacheRead": 34608896,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.618725,
-        "pricingAsOf": "2026-06-27T17:19:09.960Z"
+        "usd": 11.278977,
+        "pricingAsOf": "2026-06-29T05:49:25.986Z"
       }
     },
     "merges": [
