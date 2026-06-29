@@ -1,4 +1,0 @@
-{
-  "status": "passed",
-  "notes": "All gates passed: typecheck (TypeScript strict), lint (ESLint + 8 lint passes), npm test (743 tests passed, 7601 total; frontend 3 tests passed, 32 total). AC-1 through AC-7 verified via test suite. No UAT required — review-mode is a code feature with no UI/browser changes. Tests verify: config resolution (quick default, project override, validation), per-issue record field, isExtendedReviewEnabled resolver, convoy spawn branching (full→4 sub-reviewers+synthesis, quick→self-review only), resume-by-default, cross-harness transports, and convoy bug dispositions."
-}
