@@ -12,22 +12,29 @@
       "timestamp": "2026-06-29T20:34:29.209Z",
       "reason": "end",
       "note": "Completed PAN-2146 decomposition: src/lib/agents.ts is now an 86-line re-export barrel, extracted focused agents modules are all under 1000 lines, file-size baseline is ratcheted, all PAN-2146 beads and acceptance criteria are complete, and post-merge typecheck/lint/Vitest gates pass."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T20:37:24.588Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-06-29T20:34:40.015Z",
+  "updated": "2026-06-29T20:38:42.145Z",
   "pipeline": {
     "issueId": "PAN-2146",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T20:34:39.804Z",
+    "updatedAt": "2026-06-29T20:38:42.106Z",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "Bead workspace-ic7qo (commit bb0c18c7ce): 2-line surgical fix removing modelSpawnKey + flywheelRunId from cleanAgentState preservation. Both fields are ephemeral spawn-time inputs (computed/provided in src/lib/agents.ts spawn paths), not persistent runtime state. Their persistence through the disk-read cleaner was a leak that would have re-introduced stale values across restarts. Fields remain in AgentState interface and are still set correctly at spawn sites. Foundation-only edit, no barrel back-import, file-size guard satisfied. PASS.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2180",
+    "lastVerifiedCommit": "5b01bc10567e2f9ff815cf97b3ca5e233736e9dd",
     "reviewRequestedAt": "2026-06-29T20:34:29.211Z"
   },
   "closeOut": {
@@ -80,7 +87,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.691446000000001,
-        "pricingAsOf": "2026-06-29T20:34:39.960Z"
+        "pricingAsOf": "2026-06-29T20:38:42.144Z"
       }
     },
     "merges": [
