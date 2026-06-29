@@ -1,0 +1,184 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T21:46:59.204Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2181: extend boot-reconciliation grace default to 120s and restyle BootReconciliationModal to theme tokens (light/dark).",
+    "updated": "2026-06-29T21:50:36.005Z"
+  },
+  "plan": {
+    "id": "pan-2181",
+    "title": "Boot-reconciliation grace countdown: extend to 2 min + restyle modal to style-guide tokens (light/dark)",
+    "status": "proposed",
+    "uid": "220512c9-ae9e-4f81-bf4a-c267fd1bef46",
+    "author": "agent:claude-opus-4-8",
+    "created": "2026-06-29T21:46:59.204Z",
+    "updated": "2026-06-29T21:50:36.005Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2181",
+        "label": "PAN-2181",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2076",
+        "label": "PAN-2076 (boot-reconciliation gate)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "style-guide",
+      "boot-reconciliation",
+      "deacon",
+      "theming"
+    ],
+    "narratives": {
+      "Problem": "The PAN-2076 boot-reconciliation gate shows the operator a countdown before all stopped work agents auto-resume on a dashboard boot. Two problems. (1) The grace default is 30 seconds, too short to react. The issue body cites only the fallback constant src/lib/cloister/boot-reconciliation.ts:14, but getBootReconciliationGraceSeconds() (boot-reconciliation.ts:40-45) reads loadCloisterConfigSync().startup.reconciliation_grace_secs FIRST and only falls back to the constant when that is missing/<=0. The effective default lives in DEFAULT_CLOISTER_CONFIG at src/lib/cloister/config.ts:289 (reconciliation_grace_secs: 30), which always wins. So changing only the constant would NOT change observed behavior — both sites plus the tests/lib/cloister/config.test.ts:142 assertion (toBe(30)) must change. (2) src/dashboard/frontend/src/components/BootReconciliationModal.tsx is hardcoded to a dark palette (bg-neutral-950, text-neutral-*, text-orange-*, bg-orange-*, bg-emerald-*, bg-zinc-*, bg-sky-*, bg-red-*), violating the style guide (STYLE-GUIDE.md:153 — no hardcoded color values) and rendering dark-on-dark / unreadable in light mode (STYLE-GUIDE.md:25 — both modes first-class). GraceCountdown.tsx is already tokenized and only needs both-modes verification.",
+      "Proposal": "Two independent, additive items. (1) Backend: bump both grace-default sites 30->120 (config.ts:289 effective default + boot-reconciliation.ts:14 fallback constant) and update the config.test.ts:142 assertion to 120; the boot-reconciliation.test.ts fixture sets its own graceSeconds mock so it stays self-consistent. (2) Frontend: replace every hardcoded color class in BootReconciliationModal.tsx with the established theme tokens (bg-card/border-border/text-foreground/text-muted-foreground surface; badge-bg-warning+text-warning warning accent per GraceCountdown.tsx:117; badge-bg-success+text-success remote chip; bg-destructive+text-destructive-foreground Freeze button per DialogProvider.tsx:179; bg-primary+text-primary-foreground neutral solid actions; bg-muted+text-muted-foreground chips/unselected toggles), keep the mode-agnostic bg-black/45 scrim, verify GraceCountdown.tsx, and add a static token-guard test asserting no forbidden color classes remain. Confirm legibility with light+dark screenshots. The existing BootReconciliationModal.test.tsx asserts on testids/text (not colors) so it stays green.",
+      "NonGoals": "- No change to boot-reconciliation logic, the candidate-selection rules, or the timer mechanism beyond the default duration.\n- No refactor of BootReconciliationModal markup, logic, or testids — colors only.\n- No change to GraceCountdown.tsx beyond a residual hardcoded value if one is found (none expected).\n- No new config surface or per-project grace override UI.\n- No edits to the rendered styleguide-conformance e2e routes; the modal is conditional and not on those routes, so coverage is the static token guard, not the e2e."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Change BOTH grace-default sites (config.ts:289 and boot-reconciliation.ts:14), not just the constant the issue cites.",
+        "rationale": "getBootReconciliationGraceSeconds reads the config value first; DEFAULT_CLOISTER_CONFIG.startup.reconciliation_grace_secs=30 always wins over the constant fallback. Changing only the constant leaves the observed default at 30 — a silent no-op. The no-bandaids principle requires fixing the real effective default."
+      },
+      {
+        "summary": "AC4 coverage = a static token-guard unit test, not an addition to styleguide-conformance.spec.ts.",
+        "rationale": "The conformance e2e renders fixed routes (Pipeline/Board/Command Deck/Agents) and never renders BootReconciliationModal, which only mounts when boot reconciliation is pending. A source-scan guard asserting no forbidden color classes is the mechanically-checkable enforcement of AC2 and the realistic 'add coverage' AC4 allows ('if it can target the modal')."
+      },
+      {
+        "summary": "Freeze button uses text-destructive-foreground, not text-white.",
+        "rationale": "AC2/FR-2 explicitly forbids text-white. The codebase convention for solid destructive buttons (DialogProvider.tsx:179) is bg-destructive text-destructive-foreground; the style-guide button recipe's literal 'text-white' is superseded by that token convention and would fail the guard test."
+      },
+      {
+        "summary": "Items 1 and 2 carry no dependency edge.",
+        "rationale": "They touch disjoint files (backend constants vs frontend components) with no output->input, shared mutation, or ordering requirement, so they are parallel-safe per the executor edge semantics."
+      }
+    ],
+    "items": [
+      {
+        "id": "extend-grace-default",
+        "title": "Extend boot-reconciliation grace default 30 -> 120 (AC1)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T21:46:59.204Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2181",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Bump both grace-default sites from 30 to 120: src/lib/cloister/config.ts:289 (reconciliation_grace_secs: 30 -> 120, inside DEFAULT_CLOISTER_CONFIG.startup — the effective default) and src/lib/cloister/boot-reconciliation.ts:14 (DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 30 -> 120 — the fallback constant). Update tests/lib/cloister/config.test.ts:142 (expect(startup.reconciliation_grace_secs).toBe(30) -> toBe(120)). Re-run src/lib/cloister/__tests__/boot-reconciliation.test.ts; it injects its own graceSeconds mock (:16,:87 set 30 explicitly via the config mock at :32) so it stays self-consistent and needs no change — but confirm no assertion couples a deadline to the default. Do not touch boot-reconciliation logic or the resolver."
+        },
+        "items": [
+          {
+            "id": "extend-grace-default.ac1",
+            "title": "DEFAULT_CLOISTER_CONFIG.startup.reconciliation_grace_secs is 120 and DEFAULT_BOOT_RECONCILIATION_GRACE_SECS is 120; tests/lib/cloister/config.test.ts asserts the default is 120 and passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extend-grace-default.ac2",
+            "title": "getBootReconciliationGraceSeconds() returns 120 when no override is set, and still returns the override value (e.g. 45) when startup.reconciliation_grace_secs is a finite value > 0 — config override still wins.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extend-grace-default.ac3",
+            "title": "The src/lib/cloister/__tests__/boot-reconciliation.test.ts suite passes after the default change to 120.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restyle-modal-tokens",
+        "title": "Restyle BootReconciliationModal to theme tokens + verify GraceCountdown + token guard test (AC2, AC3, AC4)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T21:46:59.204Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2181",
+          "requiresInspection": false,
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/BootReconciliationModal.tsx replace every hardcoded color class (full inventory in the PRD draft .pan/drafts/PAN-2181.md, lines 202/206/209/213/214/220/221/225/226/239/253/254/255/256/258/270/279/286/292/314/330/340/350/360) with theme tokens: surface bg-card + border-border + text-foreground/text-muted-foreground; warning accent badge-bg-warning + badge-border-warning + text-warning (pattern from GraceCountdown.tsx:117-118); remote chip badge-bg-success + text-success; role/read-only chips and unselected toggles bg-muted text-muted-foreground; Resume toggle/Apply solid bg-success text-success-foreground; Keep toggle/Resume-all/Keep-all solid bg-primary text-primary-foreground; Freeze bg-destructive text-destructive-foreground (NOT text-white). Keep the bg-black/45 backdrop-blur-sm scrim and already-tokenized classes. Change colors only — markup, logic, and data-testid values stay identical so BootReconciliationModal.test.tsx stays green. Verify GraceCountdown.tsx is token-clean in both modes (no change expected). Add tests/unit/dashboard/boot-reconciliation-modal-tokens.test.ts that reads both source files and asserts none of the FR-2 forbidden patterns (bg-neutral-*, text-neutral-*, bg-zinc-*, text-zinc-*, text-orange-*, bg-orange-*, border-orange-*, bg-emerald-*, text-emerald-*, bg-sky-*, text-sky-*, bg-red-*, text-red-*, bg-gray-*, text-white, text-black) appear. Implementation checkpoint: capture a screenshot of the modal in light AND dark mode and confirm legibility yourself; fallback is rendering the component under each theme class in an RTL harness and screenshotting that."
+        },
+        "items": [
+          {
+            "id": "restyle-modal-tokens.ac1",
+            "title": "tests/unit/dashboard/boot-reconciliation-modal-tokens.test.ts passes, proving BootReconciliationModal.tsx and GraceCountdown.tsx contain no hardcoded color classes (none of bg-neutral-*, text-neutral-*, bg-zinc-*, text-zinc-*, text-orange-*, bg-orange-*, border-orange-*, bg-emerald-*, text-emerald-*, bg-sky-*, text-sky-*, bg-red-*, text-red-*, bg-gray-*, text-white, text-black) — only theme tokens remain.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restyle-modal-tokens.ac2",
+            "title": "The restyled modal renders the Freeze button with bg-destructive text-destructive-foreground (not text-white), the remote chip with the success token (badge-bg-success text-success), and the role/read-only chips with bg-muted text-muted-foreground.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restyle-modal-tokens.ac3",
+            "title": "The boot-reconciliation modal renders legibly in light mode and dark mode, shown by a screenshot of the modal captured in each theme.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restyle-modal-tokens.ac4",
+            "title": "tests/e2e/styleguide-conformance.spec.ts passes; the new static token-guard test provides the modal-specific coverage AC4 requests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restyle-modal-tokens.ac5",
+            "title": "The existing src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx passes unchanged, since its data-testid and text assertions still hold after the color-only restyle.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "issueId": "PAN-2181",
+      "acceptanceCriteria": [
+        "AC1: Boot-reconciliation grace countdown defaults to 120 seconds; existing config override still wins.",
+        "AC2: BootReconciliationModal.tsx and GraceCountdown.tsx contain no hardcoded color classes — only theme tokens.",
+        "AC3: Both components render legibly in light mode and dark mode (verify with a screenshot in each).",
+        "AC4: tests/e2e/styleguide-conformance.spec.ts passes; modal coverage added via the static token-guard test.",
+        "AC5: npm run typecheck, npm run lint, npm test green."
+      ],
+      "canonicalFilename": "2026-06-29-PAN-2181-boot-reconciliation-grace-countdown-extend-to-2-min-restyle-modal-to-style-guide-tokens-light-dark.vbrief.json"
+    },
+    "sequence": 2
+  },
+  "status": "proposed"
+}
