@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T22:24:44.474Z",
+  "updated": "2026-06-29T22:56:31.702Z",
   "pipeline": {
     "issueId": "PAN-2181",
     "reviewStatus": "pending",
@@ -69,5 +69,17 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "restyle-modal-tokens": "completed",
+    "restyle-modal-tokens.ac1": "completed",
+    "restyle-modal-tokens.ac2": "completed",
+    "restyle-modal-tokens.ac3": "completed",
+    "restyle-modal-tokens.ac4": "completed",
+    "restyle-modal-tokens.ac5": "completed",
+    "extend-grace-default": "completed",
+    "extend-grace-default.ac1": "completed",
+    "extend-grace-default.ac2": "completed",
+    "extend-grace-default.ac3": "completed"
+  }
 }
