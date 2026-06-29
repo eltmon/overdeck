@@ -213,3 +213,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - These three stuck agents drain only after PAN-2172 (+PAN-2179) lands AND the operator `pan reload`s (deacon runs compiled dist). Carry to next run.
 
 **Reusable:** distinguish a productive vs zombie fresh-spawn by `ctx%`/`out` advancing across ticks AND `state.json.lastActivity != None`. A `running` status with `lastActivity=None` + `failures=1` = kickoff never landed (PAN-2172/2179), not a live agent.
+
+## RUN-39 tick 3 (2026-06-29) — zombies can self-recover; cohort drains cleanly
+
+- Main green (e2b74a5516 + 0469f6d038 both CI success).
+- **agent-pan-1718 SELF-RECOVERED.** Tick-2 it was a zombie (status=running, lastActivity=None, failures=1). Tick-3: failures=0, lastActivity recent, ctx 72%, actively running git merge-base. The deacon's nudge/re-engage delivered the kickoff after all, AND the agent resolved its conflict: **PR #2103 went CONFLICTING/DIRTY -> MERGEABLE/UNSTABLE.** It's now addressing review feedback (.pan/feedback/001-review-agent-changes-requested.md). Lesson: do NOT prematurely write off a `lastActivity=None`/`failures=1` zombie as dead — the deacon re-delivery sometimes lands a tick later. Re-check before escalating.
+- **PAN-2146 advanced to in-review** (work done) with a healthy convoy (agent-pan-2146-review wrote review.md, not wedged).
+- **agent-pan-2086 is the lone persistent zombie** (status=running, lastActivity=None, failures=1, unchanged across 3 ticks). Operator-started (flywheelRunId=None) -> exempt from reaping; flywheel has no tell/resume/wake lever. Drains only on PAN-2172 fix + operator `pan reload`.
+- PAN-2172 planning healthy (Opus, ctx 22%, advancing). Flagged PAN-2179 dedupe.
+- Accurate cohort count: 12 terminal (10 closed + 2 parked) + 3 in-flight (PAN-2146 in-review healthy, PAN-1718 active healthy, PAN-2086 zombie). Two of three in-flight are moving to merge under their own steam.
