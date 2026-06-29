@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:12:46.643Z",
-  "updated": "2026-06-29T04:33:34.192Z",
+  "updated": "2026-06-29T05:37:48.074Z",
   "pipeline": {
     "issueId": "PAN-2150",
     "reviewStatus": "pending",
@@ -64,5 +64,37 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "wi1-extract-module-level-shared": "completed",
+    "wi1-extract-module-level-shared.ac1": "completed",
+    "wi1-extract-module-level-shared.ac2": "completed",
+    "wi1-extract-module-level-shared.ac3": "completed",
+    "wi2-extract-permissions": "completed",
+    "wi2-extract-permissions.ac1": "completed",
+    "wi2-extract-permissions.ac2": "completed",
+    "wi2-extract-permissions.ac3": "completed",
+    "wi3-extract-cloister-remote": "completed",
+    "wi3-extract-cloister-remote.ac1": "completed",
+    "wi3-extract-cloister-remote.ac2": "completed",
+    "wi3-extract-cloister-remote.ac3": "completed",
+    "wi4-extract-memory": "completed",
+    "wi4-extract-memory.ac1": "completed",
+    "wi4-extract-memory.ac2": "completed",
+    "wi4-extract-memory.ac3": "completed",
+    "wi5-extract-backgroundai-terminal-trackerkeys": "completed",
+    "wi5-extract-backgroundai-terminal-trackerkeys.ac1": "completed",
+    "wi5-extract-backgroundai-terminal-trackerkeys.ac2": "completed",
+    "wi6-extract-appearance-diff": "completed",
+    "wi6-extract-appearance-diff.ac1": "completed",
+    "wi6-extract-appearance-diff.ac2": "completed",
+    "wi7-extract-maintenance-experimental": "completed",
+    "wi7-extract-maintenance-experimental.ac1": "completed",
+    "wi7-extract-maintenance-experimental.ac2": "completed",
+    "wi7-extract-maintenance-experimental.ac3": "completed",
+    "wi8-final-verification": "completed",
+    "wi8-final-verification.ac1": "completed",
+    "wi8-final-verification.ac2": "completed",
+    "wi8-final-verification.ac3": "completed"
+  }
 }
