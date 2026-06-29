@@ -76,6 +76,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T20:50:50.439Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T20:51Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T20:51:32.214Z"
     }
   ],
   "feedback": [
@@ -84,6 +89,13 @@
       "specialist": "review-agent",
       "outcome": "changes-requested",
       "timestamp": "2026-06-29T20:49:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nPAN-2172 planning artifact is included in the PAN-1718 review diff\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T20:51:32Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nPAN-2172 planning artifact is included in the PAN-1718 review diff\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
     }
   ],
@@ -191,7 +203,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T20:51:31.506Z",
+  "updated": "2026-06-29T20:51:32.214Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
