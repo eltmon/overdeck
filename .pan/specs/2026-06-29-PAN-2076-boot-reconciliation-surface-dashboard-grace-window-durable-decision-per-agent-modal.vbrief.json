@@ -4,16 +4,16 @@
     "created": "2026-06-29T14:57:37.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2076: Boot Reconciliation surface (dashboard) — informed per-agent disposition replacing the all-or-nothing Resume-all banner",
-    "updated": "2026-06-29T15:14:10.634Z"
+    "updated": "2026-06-29T17:17:20.228Z"
   },
   "plan": {
     "id": "pan-2076",
     "uid": "f6692c8e-0c48-4cde-9f27-1c0c784b4ad6",
     "title": "Boot Reconciliation surface (dashboard) — grace window + durable decision + per-agent modal",
-    "status": "running",
+    "status": "completed",
     "author": "agent:claude-opus-4-8",
     "created": "2026-06-29T14:57:37.000Z",
-    "updated": "2026-06-29T15:14:10.634Z",
+    "updated": "2026-06-29T17:17:20.228Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2076",
@@ -421,7 +421,7 @@
     "metadata": {
       "canonicalFilename": "2026-06-29-PAN-2076-boot-reconciliation-surface-dashboard.vbrief.json"
     },
-    "sequence": 4
+    "sequence": 5
   },
-  "status": "active"
+  "status": "completed"
 }
