@@ -5871,6 +5871,13 @@
 }
 
 .uatStackTreeHeader {
+  appearance: none;
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -5880,6 +5887,10 @@
   color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.uatStackTreeHeader:hover {
+  background: var(--accent);
 }
 
 .uatStackTreeSummary {
