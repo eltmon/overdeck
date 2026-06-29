@@ -11,6 +11,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T12:47:05.454Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:21:55.100Z"
     }
   ],
   "feedback": [],
@@ -18,15 +23,16 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2063",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:16:28.896Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-06-29T13:21:58.981Z",
+    "reviewNotes": "Agent re-review request (1/25): Completed acceptance criteria",
     "verificationNotes": "Acceptance criteria check FAILED — 4/4 AC incomplete:\n\n### Default the UAT environment panel to collapsed with a working header toggle (4/4 incomplete)\n  - [ ] Given a ready-for-merge feature row with an unhealthy UAT stack and the row expanded, when it first renders, then the UAT panel renders collapsed — the 'UAT environment' label and the 'N/M healthy' header summary are present while the per-service rows (e.g. 'postgres', 'api') and the UatStackStatus body are not rendered.\n  - [ ] When the user clicks the UAT panel header, then the UatStackStatus per-service detail list renders; clicking the header again removes it.\n  - [ ] The UAT panel header renders as a button that exposes aria-expanded and a chevron reflecting state — ChevronRight when collapsed, ChevronDown when expanded — and preserves the existing muted, uppercase header styling.\n  - [ ] FeatureItem.test.tsx renders the UAT panel collapsed on mount (no 'postgres'/'api' service rows) and renders those service rows after a click on the UAT header; npm run typecheck and npm run lint produce no new errors and the frontend vitest suite is green.",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2110"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
+    "lastVerifiedCommit": "fadde2df83f8c574392b735b36ac642c9a665c41"
   },
   "closeOut": {
     "usage": {
@@ -92,7 +98,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.655044,
-        "pricingAsOf": "2026-06-29T13:16:28.932Z"
+        "pricingAsOf": "2026-06-29T13:21:59.029Z"
       }
     },
     "merges": [
@@ -101,7 +107,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-06-29T13:18:07.696Z",
+  "updated": "2026-06-29T13:21:59.033Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
