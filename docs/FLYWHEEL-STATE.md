@@ -3239,3 +3239,15 @@ Land the red-main fix first; the gate is empty until then regardless.
 **Other tick-4 state:** PAN-1982 work agent re-engaged (last tick's review reset +
 untroubled worked) and is actively resolving PR #2112's merge conflict. PAN-2086 fresh
 --host respawn alive but ctx 0%/out 0 — watch for host-mode kickoff-delivery failure.
+
+## RUN-39 (2026-06-29) — auto-merge Origin-header gotcha + drain
+
+**Tick 1.** Main green (467ddd32). Cohort (15) was mostly pre-drained: 9 closed-out + 2 parked (PAN-806, PAN-1864) = 11 terminal at start. In-flight handled:
+- **PAN-2155** ready-for-merge (PR #2176, review+test passed) → scheduled auto-merge (require_uat=false), confirmed it advanced to status `merging` server-side same tick.
+- **PAN-1894** merged (PR #2177) but still OPEN → `pan close pan-1894 --force` → terminal. Drain +1.
+- **PAN-1718** in-review, PR #2103 build+lint GREEN but **CONFLICTING/DIRTY**. Work agent stopped + spurious troubled ("kickoff delivery failed"). Recovery: `pan untroubled` → `pan start --fresh` (resumable session + resume forbidden ⇒ fresh) → kimi work agent re-engaged to rebase+resolve. Conflicting-PR class still has no native flywheel lever (PAN-2108 is the meta-fix).
+- **PAN-2086** (kimi, ctx 34%) + **PAN-2146** (MiniMax inspect, ctx 40%) both healthy/advancing — left running.
+
+**REUSABLE GOTCHA — auto-merge schedule needs an Origin header.** `POST /api/flywheel/auto-merge/schedule` is CSRF-guarded. A plain `curl -X POST ... -d '{"issueId":...}'` returns **403 `{"error":"Missing origin"}`** (the guard at `src/dashboard/server/routes/workspaces.ts:400`), which looks like a substrate bug but is NOT. Add `-H 'Origin: http://localhost:3011'` and it schedules fine. Same applies to any state-mutating flywheel POST via curl.
+
+**PAN-2165 still trips every close-out.** PAN-1894 close-out `close-issue:label` aborted again ('in-planning' not found) — `gh issue edit` fails the whole remove-label op when one target label is absent, so `closed-out` isn't applied and stale labels (merged/verifying-on-main) aren't removed. Issue still closes (non-fatal). Already tracked OPEN (#2165); high-frequency.
