@@ -8,7 +8,6 @@ import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { listSessionNames } from '../tmux.js';
-import { getNoResumeMode } from './no-resume-mode.js';
 import { isIssueClosed } from './issue-closed.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
 
@@ -102,9 +101,6 @@ async function stopClosedAgent(agentId: string, issueId: string, actions: string
  * full agent table or tmux session list.
  */
 export async function handleIssueStatusChangedClosed(issueId: string): Promise<string[]> {
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) return [];
-
   const upperIssueId = issueId.trim().toUpperCase();
   if (!upperIssueId) return [];
 
@@ -146,9 +142,6 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
  * events. The primary path is reactive via handleIssueStatusChangedClosed.
  */
 export async function reconcileClosedIssueAgents(): Promise<string[]> {
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) return [];
-
   const actions: string[] = [];
   const closedChecks = new Map<string, Promise<boolean>>();
   const reapedAgentIds = new Set<string>();

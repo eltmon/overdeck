@@ -12,7 +12,6 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
-import { getNoResumeMode } from './no-resume-mode.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
@@ -327,13 +326,6 @@ export async function handleReviewCoordinatorDied(
   _reason: string,
 ): Promise<string[]> {
   const actions: string[] = [];
-  // PAN-1980: on a no-resume boot the operator's clean slate must hold — do NOT
-  // auto-re-dispatch a review convoy (mirrors recoverOrphanedAgents). Review
-  // dispatch is an auto-advance just like resume; the boot gate must cover it.
-  if (getNoResumeMode().active) {
-    logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped review re-dispatch — OVERDECK_NO_RESUME=1`);
-    return actions;
-  }
   const status = getReviewStatusSync(issueId);
 
   if (!status) {
@@ -535,12 +527,7 @@ async function reconcileReviewStatusOrphan(issueId: string, status: ReviewStatus
     const issueLower = issueId.toLowerCase();
     const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
 
-    if (getNoResumeMode().active) {
-      // PAN-1980: no-resume boot — skip re-dispatching the review convoy so the
-      // operator's clean slate holds. Other reconciliation above still runs.
-      logDeaconEventSync(`reconcileReviewStatusOrphan: ${issueId} skipped review re-dispatch — OVERDECK_NO_RESUME=1`);
-      actions.push(`Skipped review re-dispatch for ${issueId} — no-resume mode active`);
-    } else if (workspace && resolved && !tryReserveAdvancingSlot()) {
+    if (workspace && resolved && !tryReserveAdvancingSlot()) {
       actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
     } else if (workspace && resolved) {
       try {
@@ -868,5 +855,4 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
 
   return actions;
 }
-
 

@@ -5867,26 +5867,26 @@
 .uatStackTreeGroup {
   margin-top: 2px;
   border-top: 1px solid var(--divider);
-  padding: 4px 8px 6px 28px;
+  padding-top: 4px;
 }
 
 .uatStackTreeHeader {
-  appearance: none;
-  background: none;
-  border: none;
-  width: 100%;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 0;
+  padding: 3px 8px 3px 28px;
+  cursor: pointer;
   font-size: 11px;
   font-weight: 500;
   color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  user-select: none;
+  appearance: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
 }
 
 .uatStackTreeHeader:hover {
@@ -5899,6 +5899,110 @@
   color: var(--muted-foreground);
   text-transform: none;
   letter-spacing: normal;
+}
+
+.uatStackActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.uatStackActionButton {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.uatStackActionButton:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.uatStackActionPrimary {
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success-foreground);
+}
+
+.uatStackActionDanger {
+  border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.uatStackActionMuted {
+  color: var(--muted-foreground);
+}
+
+.uatStackTreeBody {
+  padding: 2px 0 4px;
+}
+
+.uatStackTreeReason {
+  margin: 2px 8px 4px 40px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.uatStackContainerRow {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 2px 40px;
+  font-size: 11px;
+  cursor: default;
+}
+
+.uatStackContainerRow:hover {
+  background: var(--accent);
+}
+
+.uatStackContainerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+}
+
+.uatStackContainerDotHealthy {
+  background: var(--success);
+}
+
+.uatStackContainerDotStarting {
+  background: var(--warning);
+}
+
+.uatStackContainerDotUnhealthy {
+  background: var(--destructive);
+}
+
+.uatStackContainerDotStopped {
+  background: var(--muted-foreground);
+}
+
+.uatStackContainerName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.uatStackContainerState {
+  min-width: 0;
+  font-size: 10.5px;
+  white-space: nowrap;
 }
 
 .containerNode {
