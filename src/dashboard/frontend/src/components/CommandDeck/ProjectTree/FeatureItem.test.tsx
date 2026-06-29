@@ -6,6 +6,7 @@ import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { DialogProvider } from '../../DialogProvider';
 import { FeatureItem, pickBestSession } from './FeatureItem';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
+import { resolveUatActions } from '../uat-actions';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -158,6 +159,52 @@ function renderFeature(ui: ReactElement) {
     <QueryClientProvider client={client}>
       <DialogProvider>{ui}</DialogProvider>
     </QueryClientProvider>,
+  );
+}
+
+function stubWorkspace(workspace: Record<string, unknown>) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url === '/api/workspaces/PAN-821') {
+      return {
+        ok: true,
+        json: async () => workspace,
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    };
+  }));
+}
+
+function renderReadyForMergeFeature() {
+  return renderFeature(
+    <FeatureItem
+      feature={makeFeature({
+        stateLabel: 'In Review',
+        readyForMerge: true,
+        resourceSources: ['workspace'],
+        resourceDetails: {
+          hasWorkspace: true,
+          localBranchCount: 0,
+          remoteBranchCount: 0,
+          tmuxSessionCount: 0,
+          prs: [],
+          hasVbrief: false,
+          hasBeads: false,
+          dockerContainerCount: 2,
+        },
+      })}
+      isSelected={false}
+      onSelect={() => {}}
+    />,
   );
 }
 
@@ -746,6 +793,61 @@ describe('FeatureItem', () => {
     expect(screen.queryByText('postgres')).toBeNull();
     expect(screen.queryByText('api')).toBeNull();
     expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
+  });
+
+  it('opens the UAT context menu with resolver actions for an unhealthy stack', async () => {
+    stubWorkspace({
+      exists: true,
+      issueId: 'PAN-821',
+      frontendUrl: 'https://feature-pan-821.pan.localhost',
+      stackHealth: {
+        healthy: false,
+        reasons: ['api unhealthy: connection refused'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: true, uptime: '2m', status: 'running', health: 'healthy', ports: [5432] },
+        api: { running: true, uptime: '42s', status: 'running', health: 'unhealthy', ports: [8080] },
+      },
+    });
+
+    renderReadyForMergeFeature();
+
+    fireEvent.contextMenu(await screen.findByTestId('uat-stack-tree-header'));
+    const items = await screen.findAllByRole('menuitem');
+    const labels = items.map(item => item.textContent);
+    const expected = resolveUatActions('unhealthy').menu.map(action => action.label);
+
+    expect(labels).toEqual(expected);
+    expect(labels.at(-1)).toBe('Reap');
+    expect(items.at(-1)?.className).toContain('text-destructive');
+  });
+
+  it('opens the UAT context menu with resolver actions for a stopped stack', async () => {
+    stubWorkspace({
+      exists: true,
+      issueId: 'PAN-821',
+      stackHealth: {
+        healthy: false,
+        reasons: ['api exited', 'postgres exited'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: false, uptime: '', status: 'exited', health: 'none', ports: [5432] },
+        api: { running: false, uptime: '', status: 'exited', health: 'none', ports: [8080] },
+      },
+    });
+
+    renderReadyForMergeFeature();
+
+    fireEvent.contextMenu(await screen.findByTestId('uat-stack-tree-header'));
+    const items = await screen.findAllByRole('menuitem');
+    const labels = items.map(item => item.textContent);
+    const expected = resolveUatActions('stopped').menu.map(action => action.label);
+
+    expect(labels).toEqual(expected);
+    expect(labels.at(-1)).toBe('Reap');
+    expect(items.at(-1)?.className).toContain('text-destructive');
   });
 
   it('shows cleanup affordances for orphaned resources', () => {

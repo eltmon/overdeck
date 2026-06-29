@@ -1,8 +1,17 @@
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { UatStackStatus, type getUatStackSummary } from '../UatStackStatus';
 import { resolveUatActions, type UatAction, type UatIssueLifecycle } from '../uat-actions';
 import type { WorkspaceData } from '../ZoneCOverviewTabs/queries';
+import {
+  ContextMenuRoot,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuDestructiveItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+} from '../../shared/ContextMenu';
 import styles from '../styles/command-deck.module.css';
 
 type UatStackSummary = NonNullable<ReturnType<typeof getUatStackSummary>>;
@@ -47,6 +56,9 @@ function actionClassName(action: UatAction): string {
 export function UatStackTreeGroup({ summary, workspace, pending, storageKey, issueLifecycle = 'active' }: UatStackTreeGroupProps) {
   const [expanded, setExpanded] = useState(() => readExpanded(storageKey));
   const actions = resolveUatActions(summary.state, issueLifecycle);
+  const handleActionSelect = useCallback((_action: UatAction) => {
+    // WI-6 wires these action ids to the workspace-stack endpoints.
+  }, []);
   const handleToggle = useCallback(() => {
     setExpanded(current => {
       const next = !current;
@@ -57,37 +69,71 @@ export function UatStackTreeGroup({ summary, workspace, pending, storageKey, iss
 
   return (
     <div className={styles.uatStackTreeGroup}>
-      <div
-        role="button"
-        tabIndex={0}
-        className={styles.uatStackTreeHeader}
-        onClick={handleToggle}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return;
-          event.preventDefault();
-          handleToggle();
-        }}
-        aria-expanded={expanded}
-        aria-label="Toggle UAT environment details"
-        title="Toggle UAT environment details"
-      >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <span>UAT environment</span>
-        <span className={styles.uatStackTreeSummary}>{summary.label.replace(/^UAT stack\s*/i, '')}</span>
-        <span className={styles.uatStackActions} aria-label="UAT actions">
-          {actions.inline.map(action => (
-            <button
-              key={action.id}
-              type="button"
-              className={actionClassName(action)}
-              data-testid={`uat-inline-action-${action.id}`}
-              onClick={(event) => event.stopPropagation()}
-            >
-              {action.label}
-            </button>
-          ))}
-        </span>
-      </div>
+      <ContextMenuRoot>
+        <ContextMenuTrigger asChild>
+          <div
+            role="button"
+            tabIndex={0}
+            className={styles.uatStackTreeHeader}
+            onClick={handleToggle}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              handleToggle();
+            }}
+            aria-expanded={expanded}
+            aria-label="Toggle UAT environment details"
+            title="Toggle UAT environment details"
+            data-testid="uat-stack-tree-header"
+            onContextMenu={(event) => event.stopPropagation()}
+          >
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <span>UAT environment</span>
+            <span className={styles.uatStackTreeSummary}>{summary.label.replace(/^UAT stack\s*/i, '')}</span>
+            <span className={styles.uatStackActions} aria-label="UAT actions">
+              {actions.inline.map(action => (
+                <button
+                  key={action.id}
+                  type="button"
+                  className={actionClassName(action)}
+                  data-testid={`uat-inline-action-${action.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleActionSelect(action);
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </span>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuLabel>UAT actions</ContextMenuLabel>
+          {actions.menu.map((action, index) => {
+            const isReap = action.id === 'reap';
+            const item = isReap ? (
+              <ContextMenuDestructiveItem key={action.id} onSelect={() => handleActionSelect(action)}>
+                {action.label}
+              </ContextMenuDestructiveItem>
+            ) : (
+              <ContextMenuItem key={action.id} onSelect={() => handleActionSelect(action)}>
+                {action.label}
+              </ContextMenuItem>
+            );
+
+            if (isReap && index > 0) {
+              return (
+                <Fragment key={action.id}>
+                  <ContextMenuSeparator />
+                  {item}
+                </Fragment>
+              );
+            }
+            return item;
+          })}
+        </ContextMenuContent>
+      </ContextMenuRoot>
       {expanded && (
         <UatStackStatus
           containers={workspace?.containers}
