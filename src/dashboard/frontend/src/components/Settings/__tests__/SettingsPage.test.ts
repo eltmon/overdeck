@@ -72,6 +72,10 @@ const TTS_CONFIGURATION_SECTION_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../sections/TtsConfigurationSection.tsx'),
   'utf8',
 );
+const REMOTE_SECTION_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../sections/RemoteSection.tsx'),
+  'utf8',
+);
 
 describe('SettingsPage role model routing panels', () => {
   it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
@@ -140,11 +144,11 @@ describe('SettingsPage role model routing panels', () => {
 
   it('surfaces remote work-agent provisioning controls', () => {
     expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'remote', label: 'Remote'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('id="remote"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Resiliency tier');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteResiliencyTierChange');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Max concurrent remote agents');
-    expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteMaxConcurrentAgentsChange');
+    expect(REMOTE_SECTION_SOURCE).toContain('id="remote"');
+    expect(REMOTE_SECTION_SOURCE).toContain('Resiliency tier');
+    expect(REMOTE_SECTION_SOURCE).toContain('handleRemoteResiliencyTierChange');
+    expect(REMOTE_SECTION_SOURCE).toContain('Max concurrent remote agents');
+    expect(REMOTE_SECTION_SOURCE).toContain('handleRemoteMaxConcurrentAgentsChange');
   });
 
   it('surfaces conversation search controls', () => {
