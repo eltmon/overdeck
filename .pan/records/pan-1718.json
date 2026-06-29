@@ -131,6 +131,11 @@
       "reason": "feedback",
       "note": "[2026-06-29T21:26Z] review-agent → CHANGES-REQUESTED — seq 7",
       "timestamp": "2026-06-29T21:26:07.456Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T21:35:37.713Z"
     }
   ],
   "feedback": [
@@ -188,17 +193,17 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:26:06.200Z",
-    "reviewNotes": "restart-events lock timeout falls back to unlocked append, so compaction can still lose events",
+    "updatedAt": "2026-06-29T21:35:42.087Z",
+    "reviewNotes": "Agent re-review request (5/25): Removed unlocked append fallback with PID-based lock",
     "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "lastVerifiedCommit": "f0ca2740104127f9d9d7ad4a609465dbef7c2ad9",
+    "lastVerifiedCommit": "5548b0c0a117fe5217c6e9ac14fa75d279880b2c",
     "reviewRequestedAt": "2026-06-29T20:48:38.506Z"
   },
   "closeOut": {
@@ -238,9 +243,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2153416,
-            "output": 273166,
-            "cacheRead": 126754048,
+            "input": 2181002,
+            "output": 289172,
+            "cacheRead": 136279808,
             "cacheWrite": 0
           }
         }
@@ -271,15 +276,15 @@
           "cacheWrite": 184046
         },
         "custom/kimi-k2.7-code": {
-          "input": 2153416,
-          "output": 273166,
-          "cacheRead": 126754048,
+          "input": 2181002,
+          "output": 289172,
+          "cacheRead": 136279808,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.54717,
-        "pricingAsOf": "2026-06-29T21:26:06.236Z"
+        "usd": 37.447296,
+        "pricingAsOf": "2026-06-29T21:35:42.150Z"
       }
     },
     "merges": [
@@ -288,7 +293,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T21:26:07.456Z",
+  "updated": "2026-06-29T21:35:42.153Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
