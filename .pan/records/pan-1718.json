@@ -56,24 +56,34 @@
       "reason": "feedback",
       "note": "[2026-06-29T02:44Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-06-29T02:44:39.936Z"
+    },
+    {
+      "timestamp": "2026-06-29T20:48:38.505Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T20:48:38.774Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T02:44:39.375Z",
+    "updatedAt": "2026-06-29T20:48:46.063Z",
     "reviewNotes": "Unrelated generated record-cost-event hook changes are in the PAN-1718 PR diff",
     "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "lastVerifiedCommit": "74b5e9b0efaf43f8f986eb1a52badf6074188dbd"
+    "reviewRequestedAt": "2026-06-29T20:48:38.506Z"
   },
   "closeOut": {
     "usage": {
@@ -88,8 +98,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 163568,
-            "output": 15588,
+            "input": 169090,
+            "output": 15763,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -112,9 +122,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1525294,
-            "output": 134507,
-            "cacheRead": 71829760,
+            "input": 1890706,
+            "output": 185805,
+            "cacheRead": 84922368,
             "cacheWrite": 0
           }
         }
@@ -127,8 +137,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 163568,
-          "output": 15588,
+          "input": 169090,
+          "output": 15763,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -145,15 +155,15 @@
           "cacheWrite": 184046
         },
         "custom/kimi-k2.7-code": {
-          "input": 1525294,
-          "output": 134507,
-          "cacheRead": 71829760,
+          "input": 1890706,
+          "output": 185805,
+          "cacheRead": 84922368,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.960197,
-        "pricingAsOf": "2026-06-29T02:44:39.410Z"
+        "usd": 27.000127,
+        "pricingAsOf": "2026-06-29T20:48:46.103Z"
       }
     },
     "merges": [
@@ -162,7 +172,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T20:10:11.397Z",
+  "updated": "2026-06-29T20:48:46.103Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
