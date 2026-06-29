@@ -27,24 +27,32 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T21:00:10.920Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T21:02:44.262Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-06-29T21:00:13.764Z",
+  "updated": "2026-06-29T21:22:38.973Z",
   "pipeline": {
     "issueId": "PAN-2146",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:00:13.713Z",
+    "updatedAt": "2026-06-29T21:22:38.936Z",
+    "reviewNotes": "No blocking findings in current refactor review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead workspace-ic7qo (commit bb0c18c7ce): 2-line surgical fix removing modelSpawnKey + flywheelRunId from cleanAgentState preservation. Both fields are ephemeral spawn-time inputs (computed/provided in src/lib/agents.ts spawn paths), not persistent runtime state. Their persistence through the disk-read cleaner was a leak that would have re-introduced stale values across restarts. Fields remain in AgentState interface and are still set correctly at spawn sites. Foundation-only edit, no barrel back-import, file-size guard satisfied. PASS.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2180",
-    "lastVerifiedCommit": "5b01bc10567e2f9ff815cf97b3ca5e233736e9dd",
+    "reviewedAtCommit": "60bd1bb83f0dfe14bb52caf123e8dc5039201cb7",
+    "lastVerifiedCommit": "60bd1bb83f0dfe14bb52caf123e8dc5039201cb7",
     "reviewRequestedAt": "2026-06-29T21:00:07.851Z"
   },
   "closeOut": {
@@ -60,8 +68,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 48624,
-            "output": 6021,
+            "input": 50919,
+            "output": 6593,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -73,6 +81,14 @@
             "cacheRead": 14678225,
             "cacheWrite": 425076
           }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 127,
+            "output": 1912,
+            "cacheRead": 1029940,
+            "cacheWrite": 145620
+          }
         }
       },
       "totals": {
@@ -83,8 +99,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 48624,
-          "output": 6021,
+          "input": 50919,
+          "output": 6593,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -93,11 +109,17 @@
           "output": 176481,
           "cacheRead": 14678225,
           "cacheWrite": 425076
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 127,
+          "output": 1912,
+          "cacheRead": 1029940,
+          "cacheWrite": 145620
         }
       },
       "costAtCloseOut": {
-        "usd": 14.691446000000001,
-        "pricingAsOf": "2026-06-29T21:00:13.752Z"
+        "usd": 14.986153,
+        "pricingAsOf": "2026-06-29T21:22:38.960Z"
       }
     },
     "merges": [
