@@ -91,14 +91,18 @@ export async function sendConversationMessage(
   conversationName: string,
   message: string,
   agentId?: string,
+  deliverAs?: 'steer' | 'follow_up',
 ): Promise<void> {
   const endpoint = agentId
     ? `/api/agents/${encodeURIComponent(agentId)}/message`
     : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
+  const payload = deliverAs && !agentId
+    ? { message, deliverAs }
+    : { message };
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -228,6 +232,7 @@ interface ComposerStore {
   consumeImages(conversationName: string): void;
 
   addOptimistic(conversationName: string, text: string, serverBaseCount: number): void;
+  acknowledgeOptimistic(conversationName: string, text: string): void;
   clearOptimistic(conversationName: string): void;
 
   /** A send POST failed: drop the optimistic copy and add to the retry outbox. */
@@ -368,6 +373,21 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
           },
         ],
       })),
+    })),
+
+  acknowledgeOptimistic: (conversationName, text) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => {
+        let acknowledged = false;
+        return {
+          ...s,
+          optimistic: s.optimistic.map((message) => {
+            if (acknowledged || message.acknowledged || message.text !== text) return message;
+            acknowledged = true;
+            return { ...message, acknowledged: true };
+          }),
+        };
+      }),
     })),
 
   clearOptimistic: (conversationName) =>

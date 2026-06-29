@@ -1327,6 +1327,10 @@ export function setConversationModel(name: string, model: string): void {
   overdeckDb().prepare(`UPDATE conversations SET model = ? WHERE name = ?`).run(model, name);
 }
 
+export function setConversationEffort(name: string, effort: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET effort = ? WHERE name = ?`).run(effort, name);
+}
+
 export function setConversationHarness(name: string, harness: RuntimeName): void {
   overdeckDb().prepare(`UPDATE conversations SET harness = ? WHERE name = ?`).run(harness, name);
 }
