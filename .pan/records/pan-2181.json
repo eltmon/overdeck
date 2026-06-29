@@ -17,20 +17,62 @@
       "timestamp": "2026-06-29T22:56:43.962Z",
       "reason": "end",
       "note": "Anomalies: bd sync is unavailable in this workspace's bd CLI (unknown command), so that step could not run; the first npm test attempt failed under sandbox EPERM on git/socket/local-server tests, then the same npm test command passed with escalation. Deviations: no implementation deviations from the plan. Hazards: none discovered. Delivered: default boot reconciliation grace is 120 seconds with override coverage; BootReconciliationModal uses semantic theme tokens; GraceCountdown remains tokenized; styleguide conformance covers token guard and light/dark modal render."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T22:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T22:58:22.853Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T22:58Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T22:58:32.426Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T22:59:23.774Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T23:00Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T23:00:24.611Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T23:00Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T23:00:26.596Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T23:00:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nRendered styleguide e2e modal coverage violates the explicit non-goal\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T23:00:26Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nRendered styleguide e2e modal coverage violates the explicit non-goal\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T22:56:52.316Z",
+  "updated": "2026-06-29T23:00:26.596Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T22:56:52.280Z",
+    "updatedAt": "2026-06-29T23:00:24.566Z",
+    "reviewNotes": "Rendered styleguide e2e modal coverage violates the explicit non-goal",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
+    "lastVerifiedCommit": "1e3638da961a6064811e3df6b00a2bf5b7937eb4",
     "reviewRequestedAt": "2026-06-29T22:56:43.964Z"
   },
   "closeOut": {
@@ -69,7 +111,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.290561,
-        "pricingAsOf": "2026-06-29T22:56:52.314Z"
+        "pricingAsOf": "2026-06-29T23:00:24.602Z"
       }
     },
     "merges": [

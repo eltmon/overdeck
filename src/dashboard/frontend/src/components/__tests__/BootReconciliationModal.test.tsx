@@ -89,7 +89,18 @@ function renderModal(fetchMock: ReturnType<typeof vi.fn>) {
 describe('BootReconciliationModal', () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('formats a 120-second auto-resume countdown as 2:00', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-29T15:00:00.000Z').getTime());
+    renderModal(vi.fn(async () => jsonResponse({
+      ...pendingState,
+      graceDeadline: '2026-06-29T15:02:00.000Z',
+    })));
+
+    expect(await screen.findByText('Auto-resuming all in 2:00')).toBeInTheDocument();
   });
 
   it('renders grouped held agents and keeps read-only rows non-resumable', async () => {

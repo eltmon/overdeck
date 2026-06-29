@@ -93,6 +93,13 @@ function useCountdown(deadline: string | null): number {
   return Math.max(0, Math.ceil(ms / 1000));
 }
 
+function formatCountdown(seconds: number): string {
+  const clampedSeconds = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(clampedSeconds / 60);
+  const remainingSeconds = clampedSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
 function concernLabel(concern: BootReconciliationConcern): string {
   switch (concern) {
     case 'running_remote':
@@ -222,7 +229,7 @@ export function BootReconciliationModal() {
                 {secondsLeft}
               </div>
               <div className="text-sm">
-                <div className="font-semibold text-warning-foreground">Auto-resuming all in 0:{String(secondsLeft).padStart(2, '0')}</div>
+                <div className="font-semibold text-warning-foreground">Auto-resuming all in {formatCountdown(secondsLeft)}</div>
                 <div className="text-xs text-warning-foreground/70">Concurrency brakes cap the rate.</div>
               </div>
             </div>
