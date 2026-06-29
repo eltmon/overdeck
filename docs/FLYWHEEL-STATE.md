@@ -3050,3 +3050,21 @@ Main GREEN unchanged at origin/main `2d0fb0d36` (no new merges since tick 1). Gr
 - **NOTE — `pan plan --auto` launched by the flywheel does not stamp `flywheelRunId`** on planning-pan-1865's state.json (shows None), so the governor treats it as operator-started / reaping-exempt. Minor; flagged as openQuestion; file only if attribution matters and it recurs.
 
 - Next tick: (1) planning-pan-1865 → vBRIEF+beads? if finalized → `pan start PAN-1865 --auto` (or it auto-chains); watch it doesn't stall like 1510/1506 did. (2) main still green + any operator rebase of the trio → if a PR goes CLEAN+green schedule auto-merge. (3) PAN-2086 still wedged = operator-only. (4) Compare 1865 cost/ctx across ticks to confirm real progress (tick-1 lesson). (5) If no producer survives and no eligible work → retrospective + report.
+
+## RUN-36 tick 3 (2026-06-29 ~09:07Z) — operator-driven: PAN-1865 re-scoped (OBE premise → narrow fix) + STRUCK; root-caused the live PAN-2086 wedge
+
+Operator surfaced that PAN-1865's original premise is OBE and asked: CLOSE as OBE, or re-scope to a narrow detection-hardening check. I verified and DECIDED: **re-scope + strike** (not close as OBE).
+
+- **Premise OBE — verified.** PAN-2102 (CLOSED) moved kimi-k2.7 to claude-code's native Anthropic endpoint (api.kimi.com/coding), no CLIProxy. PAN-1781 (CLOSED, test-locked) landed work-agent context-overflow auto-recovery (summarize+respawn) in deacon-api-recovery.ts + context-overflow.ts. Both of PAN-1865's named gaps are closed on main.
+
+- **The residual is REAL and LIVE — and it root-causes PAN-2086.** I captured agent-pan-2086's actual error: `API Error: 400 Invalid request: Your request exceeded model token limit: 262144 (requested: 336148)`. Then read src/lib/context-overflow.ts:6-9 — `CONTEXT_OVERFLOW_PATTERNS` = ['input exceeds the context window', 'exceeds the context window of this model'] (+ 'prompt is too long','blocking_limit' in isContextOverflowError). **NONE match 'exceeded model token limit'.** So `isContextOverflowTail()` returns false for kimi-native overflow → the PAN-1781 deacon recovery NEVER FIRES → kimi-native overflow wedges forever. **This is the confirmed cause of agent-pan-2086's unrecovered wedge** (and every future kimi-native overflow). Closing PAN-1865 as OBE would have left this live bug unfixed.
+
+- **DECISION + ACTION: re-scoped PAN-1865 body to the narrow fix** (add 'exceeded model token limit' to CONTEXT_OVERFLOW_PATTERNS + unit test; exact file/lines/AC in the issue body), retitled it (the old title said "no strike" for the old architectural scope — the narrow fix IS a clean scoped strike), and **`pan strike PAN-1865`** → strike-pan-1865 (gpt-5.5/codex, branch strike/pan-1865) live and working. Per the brief, an urgent scoped pipeline-unblocker defaults to strike; this directly unblocks the wedged producer + all future kimi overflow.
+
+- **DURABLE LESSON — when an operator says "OBE", verify whether a RESIDUAL is live before closing.** PAN-1865's headline premise was dead, but its residual detection-gap was the active root cause of a wedged agent. The string-match recovery (isContextOverflowTail) is only as good as its pattern list; a new provider/endpoint with a new 400 phrasing silently defeats it. Future: any new harness/endpoint needs its overflow phrasing added to CONTEXT_OVERFLOW_PATTERNS, with a test.
+
+- **Two agents now on PAN-1865:** strike-pan-1865 (authoritative, implements+lands+verifies) and the redundant planning-pan-1865 (launched tick 2 on the stale premise, now producing a MOOT vBRIEF). Planners write no implementation code, so no git conflict; the strike wins. Could NOT pan kill the redundant planner (flywheel-forbidden) — flagged as openQuestion (should re-scoped/superseded plan agents be cancellable?). Minor wasted planning tokens.
+
+- Cohort/floor: minAgents=2 now met by real producers (strike-pan-1865 + planning-pan-1865). Main still GREEN 2d0fb0d36.
+
+- Next tick: (1) strike-pan-1865 — did it land the pattern+test on main + verify? if merged → `pan close PAN-1865`. (2) once landed, does the deacon AUTO-RECOVER agent-pan-2086 (its tail now matches)? watch for the recovery respawn. (3) conflicting trio unchanged (operator/PAN-2108). (4) main green + any rebase → auto-merge. (5) emit status.
