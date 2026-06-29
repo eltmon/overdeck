@@ -3106,3 +3106,14 @@ Main GREEN, advanced to origin/main `fde45b7e3` (CI success 09:40Z).
 - **Cohort drain status:** cohort (12) now: 1884/2088/1084/2054/2150/2152 closed-out + 806/1864 parked + (mid-run) 1510/1506/2157/2166/1865 closed = strong drain. Remaining cohort blockers: 1982/1718/2063 (operator rebase) + 2086 (now fixable via pan reload, then deacon auto-recovers). NONE flywheel-actionable further this run.
 
 - Next tick: (1) did the operator `pan reload`? if dist now contains the pattern + server restarted AFTER 09:40Z → watch deacon auto-recover agent-pan-2086. (2) operator rebase of trio → if any CLEAN+green, schedule auto-merge. (3) `pan kill pan-1865` debris cleared? (4) if cohort fully wound down + nothing flywheel-actionable → RETROSPECTIVE + `pan flywheel report`.
+
+## RUN-36 tick 6 (2026-06-29 ~10:12Z) — steady state; no operator gate-action; loop kept alive to drain on reload/rebase
+
+Main GREEN unchanged `fde45b7e3`. No operator action since tick 5.
+
+- **No `pan reload` yet** — verified: dist pattern count still 0, server.js still built 08:14Z, server PIDs still Jun 28 22:46. PAN-2166 fix remains on-main-but-not-live; agent-pan-2086 still wedged at ctx 100%. The recovery is one operator `pan reload` away.
+- **Conflicting trio unchanged** (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). No operator rebase.
+- **PAN-1865 debris partially cleared** — no live pan-1865 tmux sessions remain (no resource drain), though stale agent state dirs (agent-pan-1865-plan, strike-pan-1865) persist. Not worth manual removal; close-out/pan kill normally clears them.
+- **DECISION: did NOT report/close the run.** All remaining cohort members (1982/1718/2063 rebase, 2086 reload) are operator-gated with no flywheel lever, but they are NOT terminal (blocked, not merged/parked-out). With require_uat=false the flywheel can AUTO-MERGE the trio the instant they go CLEAN+green, and a reload would let the deacon auto-recover 2086 — both worth staying alive for. Closing now would forfeit that follow-through and force a fresh run. Per drain-to-quiescence, the loop stays alive at sweep cadence to act on the operator gate-actions. Will reconsider reporting only after sustained quiescence (many ticks, zero operator movement).
+- No flywheel-eligible work to launch (no ready+planned pool; no good plan candidate; cohort drained except operator-gated items). minAgents floor genuinely unmeetable here — repair/await, not neglect.
+- Next tick: (1) `pan reload` done? → watch deacon auto-recover agent-pan-2086. (2) trio rebased? → auto-merge any CLEAN+green via /api/flywheel/auto-merge/schedule. (3) emit steady snapshot. (4) if still fully quiescent after sustained no-op → retrospective + `pan flywheel report`.
