@@ -6,6 +6,11 @@
       "id": "D-test-waived",
       "summary": "Test gate waived: Pure relocation/refactor; existing MessagesTimeline behavior coverage remains in src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx blob be37e7a2e95e92066e6cec0456c45ae519018a21, plus frontend and full suites passed.",
       "recordedAt": "2026-06-29T16:54:42.717Z"
+    },
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Pure relocation/refactor; existing MessagesTimeline behavior coverage remains in src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx blob be37e7a2e95e92066e6cec0456c45ae519018a21, plus typecheck/lint after sync-main passed and prior full suites passed.",
+      "recordedAt": "2026-06-29T18:28:49.043Z"
     }
   ],
   "sessionHistory": [
@@ -24,11 +29,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T17:36:55.472Z"
+    },
+    {
+      "timestamp": "2026-06-29T18:28:58.974Z",
+      "reason": "end",
+      "note": "Resolved main drift via pan sync-main pan-2155 after PR #2177. Conflict was unrelated .pan/records/pan-1894.json; resolved by adopting origin/main record state. Post-sync verification passed: npm run typecheck and npm run lint.\n\nTest gate waived: Pure relocation/refactor; existing MessagesTimeline behavior coverage remains in src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx blob be37e7a2e95e92066e6cec0456c45ae519018a21, plus typecheck/lint after sync-main passed and prior full suites passed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T18:31:12.115Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T15:41:56.572Z",
-  "updated": "2026-06-29T17:36:55.473Z",
+  "updated": "2026-06-29T18:32:41.700Z",
   "pipeline": {
     "issueId": "PAN-2155",
     "reviewStatus": "reviewing",
@@ -36,10 +51,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T17:36:55.048Z",
+    "updatedAt": "2026-06-29T18:32:41.665Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2176",
-    "lastVerifiedCommit": "b85cb243e22339d1890be7858b8a2f960ce6c8f8",
+    "lastVerifiedCommit": "08033b8e81338feae425af8b121c2f039b9d41a8",
     "reviewRequestedAt": "2026-06-29T16:54:53.791Z"
   },
   "closeOut": {
@@ -78,7 +93,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.255119,
-        "pricingAsOf": "2026-06-29T17:36:55.250Z"
+        "pricingAsOf": "2026-06-29T18:32:41.699Z"
       }
     },
     "merges": [
