@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T03:07:15.168Z",
-  "updated": "2026-06-29T09:27:36.777Z",
+  "updated": "2026-06-29T09:27:53.520Z",
   "pipeline": {
     "issueId": "PAN-2157",
     "reviewStatus": "passed",
@@ -103,8 +103,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
   "statusOverrides": {
     "gh-pr-state-fallback": "completed",
     "gh-pr-state-fallback.ac1": "completed",
