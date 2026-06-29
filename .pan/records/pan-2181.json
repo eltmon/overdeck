@@ -87,35 +87,31 @@
       "reason": "feedback",
       "note": "[2026-06-29T23:35Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T23:35:50.817Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T23:35:44Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nDuplicate bead records in .beads/issues.jsonl\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T23:35:50Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nDuplicate bead records in .beads/issues.jsonl\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T23:37:30.473Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T23:39:58.177Z"
     }
   ],
+  "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:35:50.818Z",
+  "updated": "2026-06-29T23:40:25.127Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:35:44.775Z",
-    "reviewNotes": "Duplicate bead records in .beads/issues.jsonl",
+    "updatedAt": "2026-06-29T23:40:25.088Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -124,7 +120,7 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "lastVerifiedCommit": "e3358d23d5856ca05c64c2031449e2b22a0369d4",
+    "lastVerifiedCommit": "c62faa7d557e3eee796bc5888b8bf523de5ed66f",
     "reviewRequestedAt": "2026-06-29T23:34:57.285Z"
   },
   "closeOut": {
@@ -185,7 +181,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.282759,
-        "pricingAsOf": "2026-06-29T23:35:44.809Z"
+        "pricingAsOf": "2026-06-29T23:40:25.126Z"
       }
     },
     "merges": [
