@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-29T16:05:00.000Z",
-    "updated": "2026-06-29T15:58:25.211Z",
+    "updated": "2026-06-29T16:20:05.322Z",
     "author": "agent:claude-opus-4-8",
     "description": "Plan for PAN-2155: Decompose chat/MessagesTimeline.tsx (1620 lines) into focused submodules behind a thin barrel — behavior-preserving."
   },
@@ -10,10 +10,10 @@
     "id": "pan-2155",
     "uid": "24e762d5-78a2-46ce-b220-74566eb2ca14",
     "title": "Decompose MessagesTimeline.tsx into focused modules",
-    "status": "proposed",
+    "status": "running",
     "author": "agent:claude-opus-4-8",
     "created": "2026-06-29T16:05:00.000Z",
-    "updated": "2026-06-29T15:58:25.211Z",
+    "updated": "2026-06-29T16:20:05.322Z",
     "references": [
       "src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx",
       ".pan/drafts/PAN-2155.md",
@@ -206,7 +206,7 @@
     "metadata": {
       "canonicalFilename": "2026-06-29-PAN-2155-decompose-messagestimeline-tsx-into-focused-modules.vbrief.json"
     },
-    "sequence": 2
+    "sequence": 4
   },
-  "status": "proposed"
+  "status": "active"
 }
