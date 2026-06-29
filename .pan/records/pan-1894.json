@@ -42,25 +42,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T17:31:08.767Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T18:19:35.707Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T18:19:35.721Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T14:58:24.745Z",
-  "updated": "2026-06-29T17:37:26.919Z",
+  "updated": "2026-06-29T18:19:35.967Z",
   "pipeline": {
     "issueId": "PAN-1894",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "failed",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-06-29T17:37:26.875Z",
-    "reviewNotes": "UAT stack route auth fixed; no blocking findings in reviewed PR diff",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T18:19:35.938Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-1894-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity and constraint compliance passed for bead workspace-hfuig. resolveUatActions covers the documented UAT states/lifecycles, inline actions render visibly in the UAT tree row, and no PRD/CLAUDE constraints were violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2177",
-    "reviewedAtCommit": "2b0612a4e46d312796982345cf9cba34f61a9c11",
     "lastVerifiedCommit": "d714a87bff52c4a2e28852f9c7e1b7fad0bef267",
     "reviewRequestedAt": "2026-06-29T17:21:16.076Z"
   },
@@ -77,8 +86,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 46604,
-            "output": 8707,
+            "input": 49637,
+            "output": 9535,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -93,10 +102,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 88,
-            "output": 2909,
-            "cacheRead": 1742529,
-            "cacheWrite": 137847
+            "input": 89,
+            "output": 3532,
+            "cacheRead": 1843709,
+            "cacheWrite": 138286
           }
         }
       },
@@ -108,8 +117,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 46604,
-          "output": 8707,
+          "input": 49637,
+          "output": 9535,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -120,15 +129,15 @@
           "cacheWrite": 272551
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 88,
-          "output": 2909,
-          "cacheRead": 1742529,
-          "cacheWrite": 137847
+          "input": 89,
+          "output": 3532,
+          "cacheRead": 1843709,
+          "cacheWrite": 138286
         }
       },
       "costAtCloseOut": {
-        "usd": 16.800027,
-        "pricingAsOf": "2026-06-29T17:37:26.917Z"
+        "usd": 16.81381,
+        "pricingAsOf": "2026-06-29T18:19:35.961Z"
       }
     },
     "merges": [
