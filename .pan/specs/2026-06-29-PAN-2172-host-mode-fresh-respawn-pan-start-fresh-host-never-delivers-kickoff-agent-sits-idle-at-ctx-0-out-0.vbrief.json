@@ -4,17 +4,17 @@
     "created": "2026-06-29T20:43:18.735Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2172: host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0",
-    "updated": "2026-06-29T20:49:39.216Z"
+    "updated": "2026-06-29T21:18:48.261Z"
   },
   "plan": {
     "id": "pan-2172",
     "title": "host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0",
-    "status": "proposed",
+    "status": "running",
     "uid": "a84f7176-93ee-4580-b804-4499623d8233",
     "author": "agent:claude-opus-4-8",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-06-29T20:43:18.735Z",
-    "updated": "2026-06-29T20:49:39.216Z",
+    "updated": "2026-06-29T21:18:48.261Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2172",
@@ -246,5 +246,5 @@
       "canonicalFilename": "2026-06-29-PAN-2172-host-mode-fresh-respawn-pan-start-fresh-host-never-delivers-kickoff-agent-sits-idle-at-ctx-0-out-0.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
