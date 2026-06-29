@@ -33,6 +33,7 @@ import {
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { getMergeBackendStatus, type MergeBackendStatus } from '../../lib/github-app.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -434,6 +435,26 @@ export function formatFlywheelStatus(status: FlywheelStatus): string {
   ].join('\n');
 }
 
+function formatMergeBackendStatus(status: MergeBackendStatus): string {
+  if (status.available) {
+    return `Merge backend: ${status.mode} (${status.detail})`;
+  }
+  return `Merge backend: UNAVAILABLE - ${status.detail}`;
+}
+
+async function loadMergeBackendStatusForCli(): Promise<MergeBackendStatus> {
+  try {
+    return await getMergeBackendStatus();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      available: false,
+      mode: 'none',
+      detail: `Unable to determine merge backend: ${message}`,
+    };
+  }
+}
+
 export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {
   try {
     const status = await loadActiveFlywheelStatus();
@@ -443,7 +464,10 @@ export async function flywheelStatusCommand(options: StatusOptions): Promise<voi
       return;
     }
 
-    console.log(options.json ? JSON.stringify(status, null, 2) : formatFlywheelStatus(status));
+    const mergeBackend = await loadMergeBackendStatusForCli();
+    console.log(options.json
+      ? JSON.stringify({ ...status, mergeBackend }, null, 2)
+      : `${formatFlywheelStatus(status)}\n${formatMergeBackendStatus(mergeBackend)}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
