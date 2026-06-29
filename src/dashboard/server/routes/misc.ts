@@ -49,10 +49,8 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { getNoResumeMode, disableNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
-import { autoResumeStoppedWorkAgents } from '../../../lib/cloister/deacon.js';
+import { applyBootReconciliationDecision } from '../../../lib/cloister/deacon.js';
 import { createSession, killSession, listSessionNames, resizeWindow, sendKeys, sessionExists } from '../../../lib/tmux.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
@@ -77,6 +75,8 @@ import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
 import {
+  getBootReconciliationState,
+  setBootReconciliationDecision,
   isDeaconGloballyPausedSync as isDeaconGloballyPaused,
   setDeaconGloballyPausedSync as setDeaconGloballyPaused,
 } from '../../../lib/overdeck/control-settings.js';
@@ -678,25 +678,24 @@ const postRallyValidateRoute = HttpRouter.add(
   }),
 );
 
-// ─── Route: GET /api/no-resume-mode ─────────────────────────────────────────
-
 const getNoResumeModeRoute = HttpRouter.add(
   'GET',
   '/api/no-resume-mode',
-  Effect.sync(() => jsonResponse(getNoResumeMode())),
+  Effect.sync(() => {
+    const state = getBootReconciliationState();
+    const active = state.decision === 'pending' || state.decision === 'hold_all';
+    return jsonResponse({ active, since: active ? state.decidedAt ?? state.graceDeadline : null });
+  }),
 );
 
-// ─── Route: POST /api/resume-all ─────────────────────────────────────────────
-
-// Legacy resume-all endpoint retained for compatibility with existing callers.
 const postResumeAllRoute = HttpRouter.add(
   'POST',
   '/api/resume-all',
   Effect.promise(async () => {
     try {
-      disableNoResumeMode();
-      const resumed = await autoResumeStoppedWorkAgents();
-      console.log(`[resume-all] No-resume mode cleared; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
+      setBootReconciliationDecision('resume_all');
+      const resumed = await applyBootReconciliationDecision();
+      console.log(`[resume-all] Boot reconciliation decision set to resume_all; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
       return jsonResponse({ ok: true, resumed, count: resumed.length });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

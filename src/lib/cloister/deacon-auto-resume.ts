@@ -11,7 +11,6 @@ import {
   getBootReconciliationPendingHoldSet,
   listBootReconciliationCandidates,
 } from './boot-reconciliation.js';
-import { getNoResumeMode } from './no-resume-mode.js';
 import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
@@ -119,12 +118,6 @@ export async function handleAgentHeartbeatDeadEvent(
   context: string | undefined,
   deps: AutoResumeNotifierDeps,
 ): Promise<string[]> {
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) {
-    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — OVERDECK_NO_RESUME=1`);
-    return [];
-  }
-
   const state = getAgentStateSync(agentId);
   if (!state) {
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — no state`);
@@ -255,12 +248,6 @@ export async function recoverOrphanedAgents(context: string | undefined, deps: A
 }
 
 async function recoverOrphanedAgentsOnce(context: string | undefined, deps: AutoResumeNotifierDeps): Promise<string[]> {
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) {
-    logDeaconEventSync(`OVERDECK_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
-    return [];
-  }
-
   // PAN-1908: authoritative registry is the agents table; no directory scan.
   const candidates = listAllAgents()
     .filter((agent) => agent.status === 'running' || agent.status === 'starting')
@@ -577,12 +564,6 @@ export async function handleAgentStoppedEvent(
   deps: AutoResumeNotifierDeps,
 ): Promise<string | null> {
   const { skipGlobalGates = false, context = 'event' } = opts;
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — OVERDECK_NO_RESUME=1`);
-    return null;
-  }
-
   const state = getAgentStateSync(agentId);
   if (!state) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — no state`);
@@ -795,12 +776,6 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
   const workSlots = workResumeSlotsAvailable(runningBefore, concurrencyLimits);
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) {
-    logDeaconEventSync('OVERDECK_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
-    orphanFailureRecordedForAutoResume.clear();
-    return resumed;
-  }
 
   // PAN-1908: authoritative registry is the agents table; no directory scan.
   const bootReconciliationHoldSet = getBootReconciliationPendingHoldSet();
@@ -922,12 +897,6 @@ export async function applyBootReconciliationDecision(
  * this is only a fallback.
  */
 export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Promise<string[]> {
-  const noResumeMode = getNoResumeMode();
-  if (noResumeMode.active) {
-    logDeaconEventSync('OVERDECK_NO_RESUME=1 — skipping reconcileAgentLiveness');
-    return [];
-  }
-
   const actions: string[] = [];
   const agents = listAllAgents();
 

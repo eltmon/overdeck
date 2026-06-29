@@ -145,7 +145,6 @@ export { nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, isRapid
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
-import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
