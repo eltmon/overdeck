@@ -62,34 +62,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T23:11:02.913Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T23:07:01Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nNew countdown test leaks a mocked Date.now into later tests\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T23:07:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nNew countdown test leaks a mocked Date.now into later tests\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T23:34:31.015Z"
     }
   ],
+  "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:31:17.462Z",
+  "updated": "2026-06-29T23:34:31.022Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:31:17.092Z",
+    "updatedAt": "2026-06-29T23:34:30.903Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -98,7 +88,6 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "reviewedAtCommit": "bc5edc18a829434c5aa6c5df0dcd899ae50a41b9",
     "lastVerifiedCommit": "e3358d23d5856ca05c64c2031449e2b22a0369d4"
   },
   "closeOut": {
@@ -114,8 +103,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 37788,
-            "output": 2199,
+            "input": 38828,
+            "output": 2839,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -145,8 +134,8 @@
           "cacheWrite": 386098
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 37788,
-          "output": 2199,
+          "input": 38828,
+          "output": 2839,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -159,7 +148,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.282759,
-        "pricingAsOf": "2026-06-29T23:31:17.301Z"
+        "pricingAsOf": "2026-06-29T23:34:30.949Z"
       }
     },
     "merges": [
@@ -167,8 +156,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "restyle-modal-tokens": "completed",
     "restyle-modal-tokens.ac1": "completed",
