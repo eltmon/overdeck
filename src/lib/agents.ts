@@ -1693,6 +1693,43 @@ async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, 
   });
 }
 
+async function recordFatalWorkKickoffDeliveryFailure(state: AgentState, issueId: string, failure: string): Promise<never> {
+  await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
+  try {
+    await Effect.runPromise(stopAgent(state.id));
+  } catch (err) {
+    console.warn(`[${state.id}] failed to stop after kickoff delivery failure:`, err instanceof Error ? err.message : String(err));
+  }
+
+  const now = new Date().toISOString();
+  const failedState = await Effect.runPromise(getAgentState(state.id));
+  if (failedState) {
+    failedState.status = 'stopped';
+    failedState.stoppedAt = now;
+    delete failedState.stoppedByUser;
+    failedState.kickoffDelivered = false;
+    failedState.troubled = true;
+    failedState.troubledAt ??= now;
+    failedState.lastFailureReason = 'kickoff delivery failed';
+    await Effect.runPromise(saveAgentState(failedState));
+  }
+
+  state.status = 'stopped';
+  state.stoppedAt = now;
+  delete state.stoppedByUser;
+  state.kickoffDelivered = false;
+  state.troubled = true;
+  state.troubledAt ??= now;
+  state.lastFailureReason = 'kickoff delivery failed';
+  emitActivityEntrySync({
+    source: 'work-agent',
+    level: 'error',
+    message: `${state.id}: fatal kickoff delivery failed`,
+    issueId,
+  });
+  throw new Error(`Agent ${state.id} kickoff delivery failed: ${failure}`);
+}
+
 interface ChannelsDecision {
   eligible: boolean;
   reason?: string;
@@ -3263,6 +3300,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } catch (err) {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
+        if (role === 'work') {
+          await recordFatalWorkKickoffDeliveryFailure(state, options.issueId, err instanceof Error ? err.message : String(err));
+        }
         await recordKickoffDeliveryFailure(state, options.issueId, role);
         if (role === 'strike') {
           await Effect.runPromise(stopAgent(agentId));
@@ -3284,6 +3324,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } else if (tracksKickoffDelivery) {
       if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
         await recordStartupSessionExit(state, options.issueId, role);
+      }
+      if (role === 'work') {
+        await recordFatalWorkKickoffDeliveryFailure(state, options.issueId, delivery.failure ?? 'unknown error');
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       if (role === 'strike') {

@@ -11,6 +11,7 @@ import {
   getAgentState,
   saveAgentState,
   getAgentDir,
+  getLatestSessionIdSync,
   waitForPromptReady,
   SESSION_EXITED_BEFORE_KICKOFF,
 } from '../agents.js';
@@ -399,9 +400,23 @@ export async function deliverInitialPromptWithRetry(
 
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     try {
+      const latestState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
+      const workspace = latestState?.workspace;
+      const sessionId = getLatestSessionIdSync(normalizeAgentId(agentId));
+      const before = workspace && sessionId
+        ? await captureTranscriptUserRecordSnapshot(workspace, sessionId)
+        : null;
       const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
-      if (result.ok) return result;
-      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+      if (result.ok && workspace && sessionId && before) {
+        if (await waitForTranscriptUserRecordLanding(workspace, sessionId, before, captureTranscriptUserRecordSnapshot)) {
+          return result;
+        }
+        lastFailure = `transcript-confirmation-timeout:${sessionId}`;
+      } else if (result.ok) {
+        lastFailure = 'transcript-confirmation-unavailable';
+      } else {
+        lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+      }
     } catch (err) {
       lastFailure = err instanceof Error ? err.message : String(err);
     }

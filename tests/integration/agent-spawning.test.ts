@@ -353,6 +353,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         const agentDir = getAgentDir(agentId);
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+        writeFileSync(join(agentDir, 'session.id'), `${agentId}-session`);
       }),
     );
     const cliproxy = await import('../../src/lib/cliproxy.js');
@@ -496,7 +497,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(tmux.sendKeys).toHaveBeenCalledWith('agent-pan-kickoff-1', expect.stringContaining('do the work'));
     });
 
-    it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
+    it('treats failed work-agent kickoff delivery as fatal instead of leaving a running zombie', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
       let sessionCreated = false;
@@ -506,19 +507,19 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       vi.mocked(tmux.sessionExists).mockImplementation(() => Effect.succeed(sessionCreated));
 
       try {
-        const state = await spawnAgent({
+        await expect(spawnAgent({
           issueId: 'PAN-KICKOFF-FAIL',
           workspace: testWorkspace,
           role: 'work',
           prompt: 'do the work',
-        });
+        })).rejects.toThrow('Agent agent-pan-kickoff-fail kickoff delivery failed');
         const reloaded = getAgentStateSync('agent-pan-kickoff-fail');
 
-        expect(state.status).toBe('running');
-        expect(state.kickoffDelivered).toBe(false);
-        expect(reloaded?.status).toBe('running');
+        expect(reloaded?.status).toBe('stopped');
         expect(reloaded?.kickoffDelivered).toBe(false);
+        expect(reloaded?.troubled).toBe(true);
         expect(reloaded?.lastFailureReason).toBe('kickoff delivery failed');
+        expect(tmux.killSession).toHaveBeenCalledWith('agent-pan-kickoff-fail');
         expect(tmux.sendKeys).not.toHaveBeenCalledWith('agent-pan-kickoff-fail', expect.stringContaining('do the work'));
       } finally {
         vi.useRealTimers();
@@ -549,7 +550,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       }
     });
 
-    it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', { timeout: 30_000 }, async () => {
+    it('covers the ghost prevention lifecycle: failed kickoff stops the agent and preserves the kickoff prompt', { timeout: 30_000 }, async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(new Date('2026-06-05T21:00:00.000Z'));
       const tmux = await import('../../src/lib/tmux.js');
@@ -558,54 +559,34 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       let createCount = 0;
       let sessionAlive = false;
       let firstCreated!: () => void;
-      let secondCreated!: () => void;
       const firstCreatedPromise = new Promise<void>((resolve) => { firstCreated = resolve; });
-      const secondCreatedPromise = new Promise<void>((resolve) => { secondCreated = resolve; });
       vi.mocked(tmux.sessionExists).mockImplementation(() => Effect.succeed(sessionAlive));
       vi.mocked(tmux.createSession).mockImplementation((agentId: string) => Effect.sync(() => {
         createCount += 1;
         sessionAlive = true;
-        if (createCount === 1) {
-          firstCreated();
-          return;
-        }
         const agentDir = getAgentDir(agentId);
         mkdirSync(agentDir, { recursive: true });
-        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
-        secondCreated();
+        if (createCount === 1) firstCreated();
       }));
 
       try {
-        await spawnAgent({
+        await expect(spawnAgent({
           issueId: 'PAN-GHOST-LIFE',
           workspace,
           role: 'work',
           prompt: 'original ghost kickoff',
-        });
+        })).rejects.toThrow('Agent agent-pan-ghost-life kickoff delivery failed');
         await firstCreatedPromise;
-        sessionAlive = false;
 
-        writeFileSync(join(getAgentDir('agent-pan-ghost-life'), 'session.id'), 'agent-pan-ghost-life-session');
-
-        let reloaded = getAgentStateSync('agent-pan-ghost-life');
-        expect(reloaded?.status).toBe('running');
+        const reloaded = getAgentStateSync('agent-pan-ghost-life');
+        expect(reloaded?.status).toBe('stopped');
         expect(reloaded?.kickoffDelivered).toBe(false);
+        expect(reloaded?.troubled).toBe(true);
         expect(reloaded?.lastFailureReason).toBe('kickoff delivery failed');
+        expect(readFileSync(join(getAgentDir('agent-pan-ghost-life'), 'initial-prompt.md'), 'utf-8')).toContain('original ghost kickoff');
+        expect(tmux.killSession).toHaveBeenCalledWith('agent-pan-ghost-life');
 
         vi.advanceTimersByTime(5 * 60 * 1000);
-        await expect(Effect.runPromise(determineHealthStatus(
-          'agent-pan-ghost-life',
-          join(getAgentDir('agent-pan-ghost-life'), 'state.json'),
-          new Set(['agent-pan-ghost-life']),
-        ))).resolves.toMatchObject({ status: 'stalled' });
-
-        vi.useRealTimers();
-        await expect(resumeAgent('agent-pan-ghost-life')).resolves.toEqual({ success: true, messageDelivered: true });
-        await secondCreatedPromise;
-        expect(tmux.sendKeys).toHaveBeenCalledWith('agent-pan-ghost-life', expect.stringContaining('original ghost kickoff'));
-
-        reloaded = getAgentStateSync('agent-pan-ghost-life');
-        expect(reloaded?.kickoffDelivered).toBe(true);
         await expect(Effect.runPromise(determineHealthStatus(
           'agent-pan-ghost-life',
           join(getAgentDir('agent-pan-ghost-life'), 'state.json'),
