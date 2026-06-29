@@ -36,6 +36,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T13:26:23.885Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T13:29:25.797Z"
     }
   ],
   "feedback": [],
@@ -43,15 +48,12 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2063",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:27:32.159Z",
-    "reviewNotes": "No blocking findings; UAT panel collapse extraction meets requirements and non-goals.",
-    "testNotes": "Verification gates passed: npm run typecheck (TypeScript strict mode), npm run lint (ESLint + all sub-linters), npm test (root + frontend suites). Root suite: 7496 tests passed, 52 skipped. Frontend suite: 32 tests passed. Implementation verified: FeatureItem.tsx line 938 initializes uatExpanded=false; lines 1287-1309 render collapse/expand button with proper aria-expanded, aria-label, and chevron indicators; button toggles uatExpanded state; UatStackStatus rendered conditionally on uatExpanded. CSS button reset applied at command-deck.module.css .uatStackTreeHeader with appearance/background/border/cursor/font resets. Test updated at FeatureItem.test.tsx:626 to assert collapsed-by-default (header/badge visible, service rows absent on mount), then click-to-expand assertion (postgres/api rows appear), then collapse-again assertion. All acceptance criteria met: AC1 (collapsed by default), AC2 (click header toggles), AC3 (button with proper aria + chevrons), AC4 (test + quality gates).",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-06-29T13:29:25.628Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
     "reviewedAtCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
     "lastVerifiedCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
@@ -78,10 +80,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 123,
-            "output": 8527,
-            "cacheRead": 4585836,
-            "cacheWrite": 408035
+            "input": 132,
+            "output": 8800,
+            "cacheRead": 4759866,
+            "cacheWrite": 410408
           }
         },
         "work": {
@@ -107,10 +109,10 @@
           "cacheWrite": 281556
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 123,
-          "output": 8527,
-          "cacheRead": 4585836,
-          "cacheWrite": 408035
+          "input": 132,
+          "output": 8800,
+          "cacheRead": 4759866,
+          "cacheWrite": 410408
         },
         "custom/glm-5.2": {
           "input": 237548,
@@ -120,8 +122,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 9.857095,
-        "pricingAsOf": "2026-06-29T13:27:32.202Z"
+        "usd": 9.878839,
+        "pricingAsOf": "2026-06-29T13:29:25.709Z"
       }
     },
     "merges": [
@@ -130,7 +132,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-06-29T13:27:32.203Z",
+  "updated": "2026-06-29T13:29:25.797Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
