@@ -26,12 +26,12 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2150",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T06:48:04.296Z",
+    "updatedAt": "2026-06-29T08:54:30.875Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2162",
     "lastVerifiedCommit": "2b173c1524d0616f0cf53a031b21be9b5eb37a49",
     "reviewRequestedAt": "2026-06-29T05:39:42.933Z"
@@ -41,8 +41,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 38562,
-            "output": 1753,
+            "input": 46033,
+            "output": 3804,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -54,12 +54,20 @@
             "cacheRead": 10103823,
             "cacheWrite": 356322
           }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 52,
+            "output": 3318,
+            "cacheRead": 1517159,
+            "cacheWrite": 155377
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 38562,
-          "output": 1753,
+          "input": 46033,
+          "output": 3804,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -68,11 +76,17 @@
           "output": 98815,
           "cacheRead": 10103823,
           "cacheWrite": 356322
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 52,
+          "output": 3318,
+          "cacheRead": 1517159,
+          "cacheWrite": 155377
         }
       },
       "costAtCloseOut": {
-        "usd": 9.934204,
-        "pricingAsOf": "2026-06-29T06:48:04.322Z"
+        "usd": 10.296784,
+        "pricingAsOf": "2026-06-29T08:54:30.907Z"
       }
     },
     "merges": [
@@ -81,7 +95,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T05:44:17.015Z",
-  "updated": "2026-06-29T06:48:04.323Z",
+  "updated": "2026-06-29T08:54:30.907Z",
   "statusOverrides": {
     "wi1-extract-module-level-shared": "completed",
     "wi1-extract-module-level-shared.ac1": "completed",
