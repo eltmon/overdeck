@@ -4,17 +4,17 @@
     "created": "2026-06-29T17:56:33.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2146: Decompose src/lib/agents.ts (4572 lines) into focused modules",
-    "updated": "2026-06-29T18:05:37.119Z"
+    "updated": "2026-06-29T18:45:34.812Z"
   },
   "plan": {
     "id": "pan-2146",
     "title": "Decompose src/lib/agents.ts (4572 lines) into focused modules",
-    "status": "proposed",
+    "status": "running",
     "uid": "66125ef3-8d15-4b73-b22a-af00e22822aa",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-29T17:56:33.000Z",
-    "updated": "2026-06-29T18:05:37.119Z",
+    "updated": "2026-06-29T18:45:34.812Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2146",
@@ -766,5 +766,5 @@
       "canonicalFilename": "2026-06-29-PAN-2146-decompose-src-lib-agents-ts-4572-lines-into-focused-modules.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
