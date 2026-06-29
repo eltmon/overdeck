@@ -414,6 +414,21 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     return workspace;
   }
 
+  function writeResumableReviewSubAgent(agentId: string, harness: 'claude-code' | 'ohmypi'): string {
+    const workspace = writeResumableWorkAgent(agentId, true);
+    const agentDir = getAgentDir(agentId);
+    const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
+    state.issueId = 'PAN-RESUME-REVIEW';
+    state.harness = harness;
+    state.role = 'review';
+    state.reviewSubRole = 'security';
+    state.reviewRunId = 'agent-pan-resume-review-abcdef12';
+    state.reviewOutputPath = join(workspace, '.pan', 'review', state.reviewRunId, 'security.md');
+    state.reviewSynthesisAgentId = 'agent-pan-resume-review';
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state));
+    return workspace;
+  }
+
   function setRuntimeOrigin(agentId: string, sessionModel?: string, sessionHarness?: string): void {
     runtimeMirrorMocks.snapshots.set(agentId, {
       id: agentId,
@@ -683,6 +698,46 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         }),
       );
       expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+    });
+
+    it('resumeAgent delivers convoy re-review prompts through the OhMyPi FIFO for ohmypi review sub-agents', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-review-security-pi';
+      const message = 'Re-run security review for the current convoy run.';
+      writeResumableReviewSubAgent(agentId, 'ohmypi');
+      configMocks.providerHarnesses = { anthropic: 'ohmypi' };
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'ohmypi');
+
+      const result = await resumeAgent(agentId, message);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      expect(ohmypiFifoMocks.writeOhmypiCommand).toHaveBeenCalledWith(
+        agentId,
+        expect.objectContaining({
+          type: 'prompt',
+          message,
+        }),
+      );
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining(message));
+      expect(piFifoMocks.writePiCommand).not.toHaveBeenCalled();
+    });
+
+    it('resumeAgent delivers convoy re-review prompts through tmux for claude-code review sub-agents', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-review-security-claude';
+      const message = 'Re-run security review for the current convoy run.';
+      writeResumableReviewSubAgent(agentId, 'claude-code');
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+
+      const result = await resumeAgent(agentId, message);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining(message));
+      expect(ohmypiFifoMocks.writeOhmypiCommand).not.toHaveBeenCalledWith(
+        agentId,
+        expect.objectContaining({ message: expect.stringContaining(message) }),
+      );
+      expect(piFifoMocks.writePiCommand).not.toHaveBeenCalled();
     });
 
     it('resumeAgent preserves failure counters until deacon can classify rapid post-resume deaths', async () => {

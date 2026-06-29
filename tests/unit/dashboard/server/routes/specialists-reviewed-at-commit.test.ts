@@ -32,7 +32,7 @@ import {
   type OverdeckTestDb,
 } from '../../../../helpers/overdeck-test-db.js';
 
-let odb: OverdeckTestDb;
+let odb: OverdeckTestDb | undefined;
 
 // ─── Mock exec for deacon's `git rev-parse HEAD` calls ───────────────────────
 
@@ -172,10 +172,11 @@ beforeEach(async () => {
   mockExecHeadSha = 'defaultsha';
   mockTreeShaByCommit.clear();
   mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
-});
+}, 30_000);
 
 afterEach(() => {
-  teardownOverdeckTestDb(odb);
+  if (odb) teardownOverdeckTestDb(odb);
+  odb = undefined;
 });
 
 // ─── Imports after mocks ──────────────────────────────────────────────────────

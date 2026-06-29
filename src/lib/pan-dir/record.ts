@@ -23,6 +23,7 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import type { ReviewMode } from '../config-yaml.js';
 import type {
   ContinueBeadsMapping,
   ContinueDecision,
@@ -109,6 +110,8 @@ export interface PanIssueRecord {
   harness?: RuntimeName;
   /** Agent model (from state.json; PAN-1919). */
   model?: string;
+  /** Per-issue review mode override; beats project/global config. */
+  reviewMode?: ReviewMode;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];

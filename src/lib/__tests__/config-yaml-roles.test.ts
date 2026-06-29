@@ -145,8 +145,34 @@ describe('role model configuration', () => {
 
     expect(config.workhorses).toEqual(DEFAULT_WORKHORSES);
     expect(config.roles).toEqual(DEFAULT_ROLES);
+    expect(config.roles?.review?.mode).toBe('quick');
     expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
     expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-8');
+  });
+
+  it('uses project review mode over lower-precedence global review mode', () => {
+    const { config } = mergeConfigs(
+      {
+        roles: {
+          review: { model: 'workhorse:expensive', mode: 'full' },
+        },
+      },
+      {
+        roles: {
+          review: { model: 'workhorse:expensive', mode: 'quick' },
+        },
+      },
+    );
+
+    expect(config.roles?.review?.mode).toBe('full');
+  });
+
+  it('rejects review mode values outside quick or full', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        review: { model: 'workhorse:expensive', mode: 'extended' as never },
+      },
+    })).toThrow('config.yaml: roles.review.mode must be quick or full');
   });
 
   it('seeds missing roles while preserving partial user role config', () => {
