@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T14:57:37.612Z",
-  "updated": "2026-06-29T15:14:03.150Z",
+  "updated": "2026-06-29T16:28:26.431Z",
   "pipeline": {
     "issueId": "PAN-2076",
     "reviewStatus": "pending",
@@ -64,5 +64,34 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "durable-decision": "completed",
+    "durable-decision.ac1": "completed",
+    "durable-decision.ac2": "completed",
+    "durable-decision.ac3": "completed",
+    "grace-window": "completed",
+    "grace-window.ac1": "completed",
+    "grace-window.ac2": "completed",
+    "grace-window.ac3": "completed",
+    "apply-decision": "completed",
+    "apply-decision.ac1": "completed",
+    "apply-decision.ac2": "completed",
+    "apply-decision.ac3": "completed",
+    "dashboard-modal": "completed",
+    "dashboard-modal.ac1": "completed",
+    "dashboard-modal.ac2": "completed",
+    "dashboard-modal.ac3": "completed",
+    "dashboard-modal.ac4": "completed",
+    "dashboard-modal.ac5": "completed",
+    "dashboard-modal.ac6": "completed",
+    "demote-no-resume": "completed",
+    "demote-no-resume.ac1": "completed",
+    "demote-no-resume.ac2": "completed",
+    "demote-no-resume.ac3": "completed",
+    "watchdog-preserve": "completed",
+    "watchdog-preserve.ac1": "completed",
+    "watchdog-preserve.ac2": "completed",
+    "watchdog-preserve.ac3": "completed"
+  }
 }
