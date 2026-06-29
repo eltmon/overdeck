@@ -166,8 +166,8 @@
     "testNotes": "PAN-1982 verification complete. Gates: npm run typecheck (✓), npm run lint (✓ includes skills lint), npm test (✓ 7531 core + 32 frontend tests passed). Implementation verified: resolveReviewMode() synchronous resolver at review-agent.ts properly resolves per-issue→project→global→'quick'. Spawn path branches on isExtendedReviewEnabled(opts.issueId) and conditionally spawns spawnConvoyReviewers. Dashboard reviewer-tree gate at reviewer-tree.ts:322 passes issueId to isExtendedReviewEnabled(). Config field roles.review.mode added to config-yaml.ts with validation. CLI command 'pan review mode <id> <quick|full>' registered and persists reviewMode to per-issue record. SKILL.md updated with new subcommand documentation. Resume-by-default preserved for convoy re-review via reviewResumeDecision. All six parked convoy bugs (PAN-1861, PAN-1864, PAN-1130, PAN-1207, PAN-838, PAN-1131) re-verified and marked obsolete in continue.json. Browser dashboard server (Node 22) started and tested. UAT verified: review mode configuration gating reviewed lanes on/off, spawn path bifurcation, and CLI setter working correctly.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2112",
-    "reviewRequestedAt": "2026-06-29T13:19:25.189Z",
     "reviewedAtCommit": "6b15be2766f939a30180421c71877e5f3e4dfc76",
+    "reviewRequestedAt": "2026-06-29T13:19:25.189Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
