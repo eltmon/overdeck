@@ -16,16 +16,16 @@
   ],
   "feedback": [],
   "created": "2026-06-29T03:07:15.168Z",
-  "updated": "2026-06-29T08:09:04.794Z",
+  "updated": "2026-06-29T09:27:23.668Z",
   "pipeline": {
     "issueId": "PAN-2157",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T08:09:04.749Z",
+    "updatedAt": "2026-06-29T09:27:23.644Z",
     "inspectNotes": "Bead workspace-l5r1m: getMergeBackendStatus() helper added in src/lib/github-app.ts. Type MergeBackendStatus, async getMergeBackendStatus(deps) function, and defaultCheckGhAuth helper using execFileAsync(gh, [auth, status]) with 5000ms timeout in try/catch — all match spec. App-configured path unchanged. execFileAsync used (not execSync) per D3. All 3 ACs covered by 4 unit tests in tests/unit/lib/github-app.test.ts (App path, gh-cli fallback, none, default-gh-fails).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2164",
     "reviewRequestedAt": "2026-06-29T08:08:51.970Z"
@@ -43,8 +43,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 37299,
-            "output": 3961,
+            "input": 39280,
+            "output": 4352,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -56,6 +56,14 @@
             "cacheRead": 6087127,
             "cacheWrite": 287412
           }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 51,
+            "output": 3956,
+            "cacheRead": 2646498,
+            "cacheWrite": 151604
+          }
         }
       },
       "totals": {
@@ -66,8 +74,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 37299,
-          "output": 3961,
+          "input": 39280,
+          "output": 4352,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -76,11 +84,17 @@
           "output": 54590,
           "cacheRead": 6087127,
           "cacheWrite": 287412
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 51,
+          "output": 3956,
+          "cacheRead": 2646498,
+          "cacheWrite": 151604
         }
       },
       "costAtCloseOut": {
-        "usd": 6.453185,
-        "pricingAsOf": "2026-06-29T08:09:04.791Z"
+        "usd": 6.927169,
+        "pricingAsOf": "2026-06-29T09:27:23.668Z"
       }
     },
     "merges": [
