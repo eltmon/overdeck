@@ -11,7 +11,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 
-export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 30;
+export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 120;
 
 type ReconciliationAgent = ReturnType<typeof listAllAgentsSync>[number];
 
