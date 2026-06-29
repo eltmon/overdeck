@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2076",
   "schemaVersion": 2,
-  "created": "2026-06-29T14:57:37.612Z",
-  "updated": "2026-06-29T14:57:42.527Z",
-  "pipeline": {
-    "issueId": "PAN-2076",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T14:57:37.612Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-2076: Boot Reconciliation surface (dashboard) — informed, per-agent disposition replacing the all-or-nothing Resume-all banner",
       "timestamp": "2026-06-29T14:57:42.527Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T14:57:37.612Z",
+  "updated": "2026-06-29T15:14:03.150Z",
+  "pipeline": {
+    "issueId": "PAN-2076",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T15:14:03.133Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7609,
+            "output": 358,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 36388,
+            "output": 89222,
+            "cacheRead": 11374427,
+            "cacheWrite": 373790
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7609,
+          "output": 358,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 36388,
+          "output": 89222,
+          "cacheRead": 11374427,
+          "cacheWrite": 373790
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 10.435896,
+        "pricingAsOf": "2026-06-29T15:14:03.150Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
