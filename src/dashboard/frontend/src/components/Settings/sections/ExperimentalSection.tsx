@@ -53,16 +53,6 @@ export function ExperimentalSection({
     });
   };
 
-  const handleHarnessModelPermutationsToggle = (enabled: boolean) => {
-    onSettingsChange({
-      ...formData,
-      experimental: {
-        ...formData.experimental,
-        showHarnessModelPermutations: enabled,
-      },
-    });
-  };
-
   const handleRtkToggle = (enabled: boolean) => {
     onSettingsChange({
       ...formData,

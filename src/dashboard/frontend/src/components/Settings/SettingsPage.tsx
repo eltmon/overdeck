@@ -40,7 +40,6 @@ import { useAutosavePipeline } from './hooks/useAutosavePipeline';
 import { useConversationSearch } from './hooks/useConversationSearch';
 import { type CloisterConfig, type OpenRouterCatalogResponse, type SaveSettingsResponse } from './SettingsPage.types';
 import { loadVoiceHardwareSettings, normalizeVoiceSettings, VOICE_HARDWARE_STORAGE_KEY } from './voiceSettingsDefaults';
-import { buildMiniMaxFormData } from './miniMaxFormData';
 import { SETTINGS_NAV_ITEMS } from './settingsPageConstants';
 
 export { buildMiniMaxFormData } from './miniMaxFormData';
