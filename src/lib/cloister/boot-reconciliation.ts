@@ -51,9 +51,12 @@ export function isBootReconciliationCandidate(agent: ReconciliationAgent): boole
 }
 
 export function listBootReconciliationCandidateIds(): string[] {
+  return listBootReconciliationCandidates().map((agent) => agent.id);
+}
+
+export function listBootReconciliationCandidates(): ReconciliationAgent[] {
   return listAllAgentsSync()
-    .filter(isBootReconciliationCandidate)
-    .map((agent) => agent.id);
+    .filter(isBootReconciliationCandidate);
 }
 
 export function getBootReconciliationPendingHoldSet(): Set<string> {

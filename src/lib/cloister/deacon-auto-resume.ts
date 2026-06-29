@@ -7,13 +7,17 @@ import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
-import { getBootReconciliationPendingHoldSet } from './boot-reconciliation.js';
+import {
+  getBootReconciliationPendingHoldSet,
+  listBootReconciliationCandidates,
+} from './boot-reconciliation.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
 import { getReviewStatusSync } from '../review-status.js';
+import { getBootReconciliationState } from '../overdeck/control-settings.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import {
   buildDefaultResumeContinueMessage,
@@ -46,6 +50,7 @@ export interface AutoResumeNotifierDeps {
 }
 
 const orphanFailureRecordedForAutoResume = new Set<string>();
+const appliedBootReconciliationDecisions = new Set<string>();
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
   if (state.paused !== true || !state.issueId) return false;
@@ -840,6 +845,72 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
     logDeaconEventSync(`autoResumeStoppedWorkAgents completed: no agents resumed`);
   }
   orphanFailureRecordedForAutoResume.clear();
+  return resumed;
+}
+
+function bootReconciliationDecisionKey(): string | null {
+  const state = getBootReconciliationState();
+  if (!state.decision || state.decision === 'pending') return null;
+  return `${state.bootId ?? 'boot'}:${state.decision}:${JSON.stringify(state.perAgent)}`;
+}
+
+export async function applyBootReconciliationDecision(
+  deps: AutoResumeNotifierDeps,
+): Promise<string[]> {
+  const decisionKey = bootReconciliationDecisionKey();
+  if (!decisionKey) return [];
+  if (appliedBootReconciliationDecisions.has(decisionKey)) {
+    logDeaconEventSync('applyBootReconciliationDecision: decision already applied');
+    return [];
+  }
+
+  const state = getBootReconciliationState();
+  if (state.decision === 'hold_all') {
+    appliedBootReconciliationDecisions.add(decisionKey);
+    logDeaconEventSync('applyBootReconciliationDecision: hold_all — no agents resumed');
+    return [];
+  }
+
+  let candidates = listBootReconciliationCandidates();
+  if (state.decision === 'per_agent') {
+    candidates = candidates.filter((agent) => state.perAgent[agent.issueId] === 'resume');
+  }
+
+  const resumed: string[] = [];
+  let resumeAttempts = 0;
+  const concurrencyLimits = getConcurrencyLimits();
+  const runningBefore = countRunningAgents();
+  const workSlots = workResumeSlotsAvailable(runningBefore, concurrencyLimits);
+  const cores = cpus().length || 1;
+  const loadCeiling = cores * RESUME_LOAD_FACTOR;
+
+  for (const agent of candidates) {
+    if (resumeAttempts >= workSlots) {
+      logDeaconEventSync(`applyBootReconciliationDecision: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates`);
+      break;
+    }
+    const load1 = loadavg()[0];
+    if (load1 > loadCeiling) {
+      logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
+      break;
+    }
+    if (resumeAttempts > 0) {
+      await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
+    }
+
+    const result = await handleAgentStoppedEvent(
+      agent.id,
+      { skipGlobalGates: true, context: 'boot-reconciliation' },
+      deps,
+    );
+    if (result) {
+      resumed.push(result);
+      resumeAttempts++;
+    }
+  }
+
+  appliedBootReconciliationDecisions.add(decisionKey);
+  logDeaconEventSync(`applyBootReconciliationDecision: decision=${state.decision} resumed ${resumed.length} agent(s)`);
   return resumed;
 }
 

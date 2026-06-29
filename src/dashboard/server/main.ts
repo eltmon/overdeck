@@ -33,7 +33,7 @@ import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { resetPatrolHeartbeatForStartup, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { applyBootReconciliationDecision, resetPatrolHeartbeatForStartup, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -602,7 +602,7 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
-  startBootReconciliation();
+  startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
   resetPatrolHeartbeatForStartup();
   getCloisterService().start().catch((err) => {
     console.error('[overdeck] Cloister auto-start failed:', err);
