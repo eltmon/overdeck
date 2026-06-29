@@ -48,6 +48,10 @@ const SETTINGS_PAGE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../SettingsPage.tsx'),
   'utf8',
 );
+const SETTINGS_PAGE_CONSTANTS_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../../settingsPageConstants.ts'),
+  'utf8',
+);
 const AUTOSAVE_PIPELINE_SOURCE = readFileSync(
   resolve(fileURLToPath(import.meta.url), '../../hooks/useAutosavePipeline.ts'),
   'utf8',
@@ -81,7 +85,7 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('includes the TTS sidebar item and settings section controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
+    expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('id="tts"');
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ enabled:');
     expect(TTS_CONFIGURATION_SECTION_SOURCE).toContain('handleTtsConfigChange({ volume:');
@@ -135,7 +139,7 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces remote work-agent provisioning controls', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'remote', label: 'Remote'");
+    expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'remote', label: 'Remote'");
     expect(SETTINGS_PAGE_SOURCE).toContain('id="remote"');
     expect(SETTINGS_PAGE_SOURCE).toContain('Resiliency tier');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteResiliencyTierChange');
@@ -159,7 +163,7 @@ describe('SettingsPage role model routing panels', () => {
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
+    expect(SETTINGS_PAGE_CONSTANTS_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
     expect(SETTINGS_PAGE_SOURCE).toContain('OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values');
     expect(SETTINGS_PAGE_SOURCE).toContain('Extraction provider');
     expect(SETTINGS_PAGE_SOURCE).toContain('Fallback provider');

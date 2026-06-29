@@ -3,30 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Loader2,
-  Code,
   Beaker,
   Eye,
-  Terminal,
   Brain,
-  SplitSquareVertical,
-  BarChart3,
-  Route,
-  MessageCircle,
   AlertTriangle,
-  Key,
-  GitBranch,
   Flag,
   RefreshCw,
-  Palette,
-  Wrench,
-  Monitor,
   ShieldCheck,
-  Volume2,
-  Mic,
   Gauge,
   Globe,
 } from 'lucide-react';
-import { SettingsConfig, ModelId, type BackgroundAiConfig, type BackgroundAiFeature, type VoiceHardwareSettings, type VoiceSettings, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, ModelId, type BackgroundAiConfig, type VoiceHardwareSettings, type VoiceSettings, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -45,29 +32,17 @@ import {
   SettingsLayout,
   SettingsHeader,
   SettingsSidebarNav,
-  type NavItem,
 } from './primitives';
 import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
 import { AUTOSAVE_DEBOUNCE_MS, useAutosavePipeline } from './hooks/useAutosavePipeline';
 import { useConversationSearch } from './hooks/useConversationSearch';
 import { EMBEDDING_MODELS_BY_PROVIDER } from './embeddingModels';
+import { type CloisterConfig, type OpenRouterCatalogResponse, type SaveSettingsResponse } from './SettingsPage.types';
+import { loadVoiceHardwareSettings, normalizeVoiceSettings, VOICE_HARDWARE_STORAGE_KEY } from './voiceSettingsDefaults';
+import { buildMiniMaxFormData } from './miniMaxFormData';
+import { BG_FEATURE_COST_SOURCE, SETTINGS_NAV_ITEMS, TRACKERS, type TrackerType } from './settingsPageConstants';
 
-// OpenRouter types matching OpenRouterModelBrowser
-interface OpenRouterModelCatalog {
-  id: string;
-  name: string;
-  promptCostPer1M: number;
-  completionCostPer1M: number;
-  contextLength: number;
-  supportsThinking: boolean;
-  category: 'free' | 'chat' | 'code' | 'other';
-  topProvider?: string;
-}
-
-interface OpenRouterCatalogResponse {
-  models: OpenRouterModelCatalog[];
-  favorites: string[];
-}
+export { buildMiniMaxFormData } from './miniMaxFormData';
 
 async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | null> {
   try {
@@ -84,21 +59,6 @@ async function fetchSettings(): Promise<SettingsConfig> {
   const res = await fetch('/api/settings');
   if (!res.ok) throw new Error('Failed to fetch settings');
   return res.json();
-}
-
-interface SaveSettingsResponse {
-  success: boolean;
-  message: string;
-  warnings?: string[];
-}
-
-interface CloisterConfig {
-  concurrency?: {
-    max_work_agents?: number;
-    reserved_advancing_slots?: number;
-    exempt_operator_started?: boolean;
-  };
-  [key: string]: unknown;
 }
 
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
@@ -203,48 +163,6 @@ async function saveCloisterConfig(config: CloisterConfig): Promise<void> {
   }
 }
 
-const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  stt: {
-    provider: 'moonshine',
-    moonshine: { model: 'base' },
-    googleCloud: { apiKey: '', model: 'latest_long' },
-  },
-  autopreso: {
-    provider: 'openai',
-    model: 'gpt-4.1-mini',
-  },
-};
-
-const DEFAULT_VOICE_HARDWARE_SETTINGS: VoiceHardwareSettings = {
-  inputDevice: '',
-  outputDevice: '',
-  volume: 1,
-};
-
-const VOICE_HARDWARE_STORAGE_KEY = 'overdeck.voice.hardwareSettings';
-
-function loadVoiceHardwareSettings(): VoiceHardwareSettings {
-  try {
-    const raw = window.localStorage.getItem(VOICE_HARDWARE_STORAGE_KEY);
-    if (!raw) return DEFAULT_VOICE_HARDWARE_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<VoiceHardwareSettings>;
-    return {
-      inputDevice: typeof parsed.inputDevice === 'string' ? parsed.inputDevice : '',
-      outputDevice: typeof parsed.outputDevice === 'string' ? parsed.outputDevice : '',
-      volume: typeof parsed.volume === 'number' ? Math.max(0, Math.min(1, parsed.volume)) : 1,
-    };
-  } catch {
-    return DEFAULT_VOICE_HARDWARE_SETTINGS;
-  }
-}
-
-function normalizeVoiceSettings(settings: Partial<VoiceSettings>): VoiceSettings {
-  return {
-    stt: settings.stt ?? DEFAULT_VOICE_SETTINGS.stt,
-    autopreso: settings.autopreso ?? DEFAULT_VOICE_SETTINGS.autopreso,
-  };
-}
-
 async function fetchVoiceSettings(): Promise<VoiceSettings> {
   const res = await fetch('/api/voice/settings');
   if (!res.ok) throw new Error('Failed to fetch voice settings');
@@ -263,71 +181,6 @@ async function saveVoiceSettings(settings: VoiceSettings): Promise<VoiceSettings
   }
   return res.json();
 }
-
-/** Pure merge: apply MiniMax model preset while preserving all non-model settings. */
-export function buildMiniMaxFormData(
-  formData: SettingsConfig | null,
-  miniMaxDefaults: SettingsConfig,
-): SettingsConfig {
-  return {
-    models: {
-      providers: { ...miniMaxDefaults.models.providers },
-      overrides: { ...miniMaxDefaults.models.overrides },
-      gemini_thinking_level: formData?.models.gemini_thinking_level,
-    },
-    api_keys: { ...(formData?.api_keys || {}) },
-    agents: { ...(formData?.agents || miniMaxDefaults.agents || {}) },
-    tracker_keys: { ...(formData?.tracker_keys || {}) },
-    conversationSearch: { ...(formData?.conversationSearch || miniMaxDefaults.conversationSearch || {}) },
-    conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
-    memory: { ...(formData?.memory || miniMaxDefaults.memory || {}) },
-    tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
-    openrouter: { ...(formData?.openrouter || miniMaxDefaults.openrouter || {}) },
-    tts: { ...(formData?.tts || miniMaxDefaults.tts || {}) },
-    remote: { ...(formData?.remote || miniMaxDefaults.remote || {}) },
-  };
-}
-
-// Tracker definitions
-type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
-const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; placeholder: string }[] = [
-  { id: 'linear', name: 'Linear', icon: BarChart3, envVar: 'LINEAR_API_KEY', placeholder: 'lin_api_...' },
-  { id: 'github', name: 'GitHub', icon: Code, envVar: 'GITHUB_TOKEN', placeholder: 'ghp_...' },
-  { id: 'gitlab', name: 'GitLab', icon: GitBranch, envVar: 'GITLAB_TOKEN', placeholder: 'glpat-...' },
-  { id: 'rally', name: 'Rally', icon: Flag, envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
-];
-
-/** Cost-ledger source tag per background feature (matches the backend tags). */
-const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
-  conversationTitles: 'background:conversationTitles',
-  titleRefinement: 'background:titleRefinement',
-  memoryExtraction: 'memory-extraction',
-  memoryQueryExpansion: 'background:memoryQueryExpansion',
-  conversationEnrichment: 'background:conversationEnrichment',
-  sessionEmbeddings: 'background:sessionEmbeddings',
-  summaryFork: 'background:summaryFork',
-  ttsSummarizer: 'background:ttsSummarizer',
-};
-
-const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { id: 'model-routing', label: 'Model Routing', icon: Route },
-  { id: 'providers', label: 'Providers', icon: Key },
-  { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
-  { id: 'cloister', label: 'Cloister', icon: Flag },
-  { id: 'remote', label: 'Remote', icon: Globe },
-  { id: 'voice', label: 'Voice', icon: Mic },
-  { id: 'conversations', label: 'Conversations', icon: MessageCircle },
-  { id: 'memory', label: 'Memory', icon: Brain },
-  { id: 'background-ai', label: 'Background AI', icon: Gauge },
-  { id: 'terminal', label: 'Terminal', icon: Terminal },
-  { id: 'tts', label: 'TTS', icon: Volume2 },
-  { id: 'tracker-keys', label: 'Tracker Keys', icon: GitBranch },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'diff', label: 'Diff', icon: SplitSquareVertical },
-  { id: 'desktop', label: 'Desktop App', icon: Monitor },
-  { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-  { id: 'experimental', label: 'Experimental', icon: Beaker },
-];
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
