@@ -201,5 +201,35 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T13:12:18.327Z",
-  "updated": "2026-06-29T13:12:25.842Z"
+  "updated": "2026-06-29T13:18:00.647Z",
+  "statusOverrides": {
+    "reverify-parked-convoy-bugs": "completed",
+    "reverify-parked-convoy-bugs.ac1": "completed",
+    "reverify-parked-convoy-bugs.ac2": "completed",
+    "convoy-cross-harness-resume-test": "completed",
+    "convoy-cross-harness-resume-test.ac1": "completed",
+    "convoy-cross-harness-resume-test.ac2": "completed",
+    "review-mode-cli-setter": "completed",
+    "review-mode-cli-setter.ac1": "completed",
+    "review-mode-cli-setter.ac2": "completed",
+    "review-mode-cli-setter.ac3": "completed",
+    "review-mode-cli-setter.ac4": "completed",
+    "reviewer-tree-gate": "completed",
+    "reviewer-tree-gate.ac1": "completed",
+    "reviewer-tree-gate.ac2": "completed",
+    "unpark-convoy-spawn": "completed",
+    "unpark-convoy-spawn.ac1": "completed",
+    "unpark-convoy-spawn.ac2": "completed",
+    "unpark-convoy-spawn.ac3": "completed",
+    "unpark-convoy-spawn.ac4": "completed",
+    "review-mode-resolver": "completed",
+    "review-mode-resolver.ac1": "completed",
+    "review-mode-resolver.ac2": "completed",
+    "review-mode-resolver.ac3": "completed",
+    "review-mode-resolver.ac4": "completed",
+    "config-review-mode": "completed",
+    "config-review-mode.ac1": "completed",
+    "config-review-mode.ac2": "completed",
+    "config-review-mode.ac3": "completed"
+  }
 }
