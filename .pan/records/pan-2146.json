@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2146",
   "schemaVersion": 2,
-  "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-06-29T17:48:19.915Z",
-  "pipeline": {
-    "issueId": "PAN-2146",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T17:48:06.928Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,84 @@
       "note": "Planning session started for PAN-2146: Decompose src/lib/agents.ts (4572 lines) into focused modules",
       "timestamp": "2026-06-29T17:48:19.915Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T17:48:06.928Z",
+  "updated": "2026-06-29T20:17:33.570Z",
+  "pipeline": {
+    "issueId": "PAN-2146",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T19:04:58.064Z",
+    "inspectNotes": "Bead workspace-ic7qo (commit bb0c18c7ce): 2-line surgical fix removing modelSpawnKey + flywheelRunId from cleanAgentState preservation. Both fields are ephemeral spawn-time inputs (computed/provided in src/lib/agents.ts spawn paths), not persistent runtime state. Their persistence through the disk-read cleaner was a leak that would have re-introduced stale values across restarts. Fields remain in AgentState interface and are still set correctly at spawn sites. Foundation-only edit, no barrel back-import, file-size guard satisfied. PASS."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "custom/MiniMax-M3": {
+            "input": 222625,
+            "output": 13470,
+            "cacheRead": 2917120,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 35986,
+            "output": 1417,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 40015,
+            "output": 176481,
+            "cacheRead": 14678225,
+            "cacheWrite": 425076
+          }
+        }
+      },
+      "totals": {
+        "custom/MiniMax-M3": {
+          "input": 222625,
+          "output": 13470,
+          "cacheRead": 2917120,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 35986,
+          "output": 1417,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 40015,
+          "output": 176481,
+          "cacheRead": 14678225,
+          "cacheWrite": 425076
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 14.690897,
+        "pricingAsOf": "2026-06-29T19:04:58.095Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "wi-1-agent-state": "completed",
+    "wi-1-agent-state.ac1": "completed",
+    "wi-1-agent-state.ac2": "completed",
+    "wi-1-agent-state.ac3": "completed",
+    "wi-1-agent-state.ac4": "completed"
+  }
 }
