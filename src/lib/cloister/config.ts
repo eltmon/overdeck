@@ -302,7 +302,7 @@ export interface CloisterConfig {
 export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   startup: {
     auto_start: true,
-    reconciliation_grace_secs: 30,
+    reconciliation_grace_secs: 120,
   },
   thresholds: {
     stale: 5,
