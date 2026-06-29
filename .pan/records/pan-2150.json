@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2150",
   "schemaVersion": 2,
-  "created": "2026-06-29T04:12:46.643Z",
-  "updated": "2026-06-29T04:12:55.691Z",
-  "pipeline": {
-    "issueId": "PAN-2150",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T04:12:46.643Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-2150: Decompose src/dashboard/frontend/src/components/Settings/SettingsPage.tsx (2043 lines) into focused modules",
       "timestamp": "2026-06-29T04:12:55.691Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T04:12:46.643Z",
+  "updated": "2026-06-29T04:33:34.192Z",
+  "pipeline": {
+    "issueId": "PAN-2150",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T04:33:34.174Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 11850,
+            "output": 834,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 36979,
+            "output": 98815,
+            "cacheRead": 10103823,
+            "cacheWrite": 356322
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 11850,
+          "output": 834,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 36979,
+          "output": 98815,
+          "cacheRead": 10103823,
+          "cacheWrite": 356322
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.934204,
+        "pricingAsOf": "2026-06-29T04:33:34.191Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
