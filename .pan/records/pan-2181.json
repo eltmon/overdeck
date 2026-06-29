@@ -12,27 +12,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T22:24:44.468Z"
+    },
+    {
+      "timestamp": "2026-06-29T22:56:43.962Z",
+      "reason": "end",
+      "note": "Anomalies: bd sync is unavailable in this workspace's bd CLI (unknown command), so that step could not run; the first npm test attempt failed under sandbox EPERM on git/socket/local-server tests, then the same npm test command passed with escalation. Deviations: no implementation deviations from the plan. Hazards: none discovered. Delivered: default boot reconciliation grace is 120 seconds with override coverage; BootReconciliationModal uses semantic theme tokens; GraceCountdown remains tokenized; styleguide conformance covers token guard and light/dark modal render."
     }
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T22:56:31.702Z",
+  "updated": "2026-06-29T22:56:52.316Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T22:17:45.877Z"
+    "updatedAt": "2026-06-29T22:56:52.280Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
+    "reviewRequestedAt": "2026-06-29T22:56:43.964Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 17791,
-            "output": 1118,
+            "input": 33488,
+            "output": 1472,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -48,8 +55,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 17791,
-          "output": 1118,
+          "input": 33488,
+          "output": 1472,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -62,10 +69,12 @@
       },
       "costAtCloseOut": {
         "usd": 8.290561,
-        "pricingAsOf": "2026-06-29T22:17:45.897Z"
+        "pricingAsOf": "2026-06-29T22:56:52.314Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2183"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
