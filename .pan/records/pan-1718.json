@@ -41,32 +41,38 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T02:25:03.345Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T02:14:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nDuplicate PAN-1718 bead records in .beads/issues.jsonl\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T02:41:18.227Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T02:41:34.089Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T02:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T02:44:39.936Z"
     }
   ],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-06-29T02:26:48.389Z",
-    "reviewNotes": "Agent re-review request (2/25): Deduplicated PAN-1718 bead records in .beads/issues.jsonl",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T02:44:39.375Z",
+    "reviewNotes": "Unrelated generated record-cost-event hook changes are in the PAN-1718 PR diff",
     "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "reviewedAtCommit": "74b5e9b0efaf43f8f986eb1a52badf6074188dbd",
     "lastVerifiedCommit": "74b5e9b0efaf43f8f986eb1a52badf6074188dbd"
   },
   "closeOut": {
@@ -82,8 +88,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 161718,
-            "output": 15042,
+            "input": 163568,
+            "output": 15588,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -106,9 +112,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1518940,
-            "output": 132891,
-            "cacheRead": 67336960,
+            "input": 1525294,
+            "output": 134507,
+            "cacheRead": 71829760,
             "cacheWrite": 0
           }
         }
@@ -121,8 +127,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 161718,
-          "output": 15042,
+          "input": 163568,
+          "output": 15588,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -139,15 +145,15 @@
           "cacheWrite": 184046
         },
         "custom/kimi-k2.7-code": {
-          "input": 1518940,
-          "output": 132891,
-          "cacheRead": 67336960,
+          "input": 1525294,
+          "output": 134507,
+          "cacheRead": 71829760,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.094065,
-        "pricingAsOf": "2026-06-29T02:26:48.431Z"
+        "usd": 23.960197,
+        "pricingAsOf": "2026-06-29T02:44:39.410Z"
       }
     },
     "merges": [
@@ -156,7 +162,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T02:26:48.546Z",
+  "updated": "2026-06-29T20:10:11.397Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
