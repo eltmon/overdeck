@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T03:07:15.168Z",
-  "updated": "2026-06-29T07:32:13.126Z",
+  "updated": "2026-06-29T07:58:33.576Z",
   "pipeline": {
     "issueId": "PAN-2157",
     "reviewStatus": "pending",
@@ -80,5 +80,31 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3"
+  "model": "MiniMax-M3",
+  "statusOverrides": {
+    "gh-pr-state-fallback": "completed",
+    "gh-pr-state-fallback.ac1": "completed",
+    "gh-pr-state-fallback.ac2": "completed",
+    "gh-pr-state-fallback.ac3": "completed",
+    "gh-pr-state-fallback.ac4": "completed",
+    "eligibility-contain-read-failure": "completed",
+    "eligibility-contain-read-failure.ac1": "completed",
+    "eligibility-contain-read-failure.ac2": "completed",
+    "merge-backend-status-helper": "completed",
+    "merge-backend-status-helper.ac1": "completed",
+    "merge-backend-status-helper.ac2": "completed",
+    "merge-backend-status-helper.ac3": "completed",
+    "flywheel-status-merge-backend-line": "completed",
+    "flywheel-status-merge-backend-line.ac1": "completed",
+    "flywheel-status-merge-backend-line.ac2": "completed",
+    "merge-backend-endpoint": "completed",
+    "merge-backend-endpoint.ac1": "completed",
+    "merge-backend-endpoint.ac2": "completed",
+    "merge-backend-card-warning": "completed",
+    "merge-backend-card-warning.ac1": "completed",
+    "merge-backend-card-warning.ac2": "completed",
+    "startup-warn-no-backend": "completed",
+    "startup-warn-no-backend.ac1": "completed",
+    "startup-warn-no-backend.ac2": "completed"
+  }
 }
