@@ -7,25 +7,47 @@ import { Effect } from 'effect';
  * database-integration behavior through the conversations-db module.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
+  clearPendingConversationControlAcksForTests,
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
+  getPendingConversationControlAckCount,
   getInFlightForkPipelineCount,
+  deliverConversationViaControlChannel,
+  handleConversationAbort,
+  handleConversationCompact,
+  handleConversationControlAck,
+  handleConversationSwitchModel,
+  handleConversationThinkingLevel,
   parseSummaryForkFocus,
+  pickDeliverAs,
   readExistingHandoffDoc,
   recoverStuckForks,
+  registerConversationControlAck,
   registerInFlightForkPipeline,
+  validateConversationControlAckOrigin,
+  resolveConversationDeliveryMethod,
+  resolveConversationControlAck,
+  piConversationSystemPromptFiles,
   shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
+import { deliverAgentMessage } from '../../../../lib/agents.js';
+import { sendKeysAsync } from '../../../../lib/tmux.js';
+import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
   return { ...(actual as object), deliverAgentMessage: vi.fn().mockResolvedValue(undefined) };
+});
+
+vi.mock('../../../../lib/tmux.js', async () => {
+  const actual = await vi.importActual('../../../../lib/tmux.js');
+  return { ...(actual as object), sendKeysAsync: vi.fn().mockResolvedValue(undefined) };
 });
 
 // ─── Sanitize / name generation logic ────────────────────────────────────────
@@ -149,6 +171,7 @@ describe('shouldReportUnresolvedLiveSession', () => {
 // ─── Conversation DB integration ──────────────────────────────────────────────
 
 let TEST_HOME: string;
+const ORIGINAL_HOME = process.env.HOME;
 
 async function resetDb() {
   const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
@@ -166,6 +189,15 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
 function decodeTextResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
+}
+
+async function readPendingControlCommand(agentId: string): Promise<Record<string, unknown>> {
+  const controlDir = join(process.env.OVERDECK_HOME!, 'agents', agentId, 'control');
+  await vi.waitFor(() => {
+    expect(readdirSync(controlDir).filter((name) => name.endsWith('.json'))).toHaveLength(1);
+  });
+  const file = join(controlDir, readdirSync(controlDir).find((name) => name.endsWith('.json'))!);
+  return JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
 }
 
 describe('buildForkRequest', () => {
@@ -254,6 +286,145 @@ describe('in-flight fork pipeline shutdown grace', () => {
   });
 });
 
+describe('conversation control ack registry', () => {
+  afterEach(() => {
+    clearPendingConversationControlAcksForTests();
+    vi.useRealTimers();
+    _resetTrustedOriginsForTests();
+  });
+
+  it('resolves a pending command when a successful ack arrives', async () => {
+    const pending = registerConversationControlAck('cmd-1');
+
+    expect(getPendingConversationControlAckCount()).toBe(1);
+    expect(handleConversationControlAck({ id: 'cmd-1', ok: true })).toEqual({
+      status: 200,
+      body: { ok: true, outcome: 'resolved' },
+    });
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(getPendingConversationControlAckCount()).toBe(0);
+  });
+
+  it('rejects and cleans up when no ack arrives before the timeout', async () => {
+    vi.useFakeTimers();
+    const pending = registerConversationControlAck('cmd-timeout', 2_000);
+    const rejection = expect(pending).rejects.toThrow('Timed out waiting for conversation control ack cmd-timeout');
+
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await rejection;
+    expect(getPendingConversationControlAckCount()).toBe(0);
+  });
+
+  it('ignores unknown ack ids without affecting pending commands', async () => {
+    const pending = registerConversationControlAck('cmd-real');
+
+    expect(handleConversationControlAck({ id: 'cmd-missing', ok: true })).toEqual({
+      status: 200,
+      body: { ok: true, outcome: 'unknown' },
+    });
+    expect(getPendingConversationControlAckCount()).toBe(1);
+    expect(resolveConversationControlAck({ id: 'cmd-real', ok: true })).toBe('resolved');
+
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('rejects malformed endpoint payloads without mutating pending commands', () => {
+    registerConversationControlAck('cmd-real');
+
+    expect(handleConversationControlAck({ ok: true })).toEqual({
+      status: 400,
+      body: { error: 'id is required' },
+    });
+    expect(getPendingConversationControlAckCount()).toBe(1);
+  });
+
+  it('rejects a pending command when the ack reports failure', async () => {
+    const pending = registerConversationControlAck('cmd-fail');
+
+    expect(resolveConversationControlAck({ id: 'cmd-fail', ok: false, error: 'unsupported' })).toBe('rejected');
+
+    await expect(pending).rejects.toThrow('unsupported');
+    expect(getPendingConversationControlAckCount()).toBe(0);
+  });
+
+  it('accepts no-origin extension ack posts from the local Pi runtime', () => {
+    expect(validateConversationControlAckOrigin({}, 'POST')).toEqual({ ok: true });
+  });
+
+  it('still rejects browser ack posts from untrusted origins', () => {
+    expect(validateConversationControlAckOrigin({ origin: 'https://evil.example' }, 'POST')).toEqual({
+      ok: false,
+      error: 'Invalid origin',
+    });
+  });
+});
+
+describe('conversation control channel delivery', () => {
+  afterEach(() => {
+    clearPendingConversationControlAcksForTests();
+  });
+
+  it('writes a prompt command and resolves when the ack arrives', async () => {
+    const delivery = deliverConversationViaControlChannel(
+      { tmuxSession: 'conv-pi' },
+      'hello pi',
+      { source: 'operator', deliverAs: 'prompt' },
+    );
+    const controlDir = join(process.env.OVERDECK_HOME!, 'agents', 'conv-pi', 'control');
+    await vi.waitFor(() => {
+      expect(readdirSync(controlDir).filter((name) => name.endsWith('.json'))).toHaveLength(1);
+    });
+    const file = join(controlDir, readdirSync(controlDir).find((name) => name.endsWith('.json'))!);
+    const command = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+
+    expect(command).toMatchObject({
+      type: 'prompt',
+      message: 'hello pi',
+      source: 'operator',
+    });
+
+    handleConversationControlAck({ id: command.id, ok: true });
+    await expect(delivery).resolves.toBeUndefined();
+  });
+
+  it('defaults busy pi conversations to steer and honors follow_up override', () => {
+    const heartbeatDir = join(process.env.OVERDECK_HOME!, 'heartbeats');
+    mkdirSync(heartbeatDir, { recursive: true });
+    writeFileSync(join(heartbeatDir, 'conv-busy.json'), JSON.stringify({
+      timestamp: new Date().toISOString(),
+      last_action: 'tool_end',
+    }));
+
+    expect(pickDeliverAs({ tmuxSession: 'conv-idle' }, undefined)).toBe('prompt');
+    expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, undefined)).toBe('steer');
+    expect(pickDeliverAs({ tmuxSession: 'conv-busy' }, 'follow_up')).toBe('follow_up');
+  });
+});
+
+describe('pi conversation source contract and delivery retirement', () => {
+  it('adds the extension source contract to pi system prompt files', async () => {
+    const files = await piConversationSystemPromptFiles(process.cwd());
+    const contractFile = files.find((file) => file.endsWith('pi-conversation-source-contract.md'));
+
+    expect(contractFile).toBeDefined();
+    const contract = readFileSync(contractFile!, 'utf8');
+    expect(contract).toContain("source:'extension'");
+    expect(contract).toContain('Overdeck orchestrator or another agent');
+    expect(contract).toContain('not typed by the human operator');
+    expect(contract).toContain('Treat it as coordination guidance');
+  });
+
+  it('does not default pi or ohmypi conversation body delivery to tmux', () => {
+    expect(resolveConversationDeliveryMethod({ harness: 'pi', deliveryMethod: null } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'pi', deliveryMethod: 'tmux' } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'ohmypi', deliveryMethod: null } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'ohmypi', deliveryMethod: 'tmux' } as never)).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'claude-code', deliveryMethod: 'tmux' } as never)).toBe('tmux');
+  });
+});
+
 describe('readExistingHandoffDoc', () => {
   it('reuses a persisted handoff document when it still exists', async () => {
     const docPath = join(TEST_HOME, 'handoff.md');
@@ -311,10 +482,215 @@ beforeEach(async () => {
 afterEach(async () => {
   await resetDb();
   delete process.env.OVERDECK_HOME;
+  if (ORIGINAL_HOME === undefined) delete process.env.HOME;
+  else process.env.HOME = ORIGINAL_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
+async function withTestHome<T>(fn: () => Promise<T>): Promise<T> {
+  process.env.HOME = TEST_HOME;
+  try {
+    return await fn();
+  } finally {
+    if (ORIGINAL_HOME === undefined) delete process.env.HOME;
+    else process.env.HOME = ORIGINAL_HOME;
+  }
+}
+
 describe('conversations route — DB integration', () => {
+  describe('conversation live control endpoints', () => {
+    afterEach(() => {
+      clearPendingConversationControlAcksForTests();
+      vi.mocked(sendKeysAsync).mockClear();
+    });
+
+    it('writes a thinking-level command and persists the effort', async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-thinking',
+        tmuxSession: 'conv-pi-thinking',
+        cwd: process.cwd(),
+        harness: 'pi',
+        status: 'active',
+      });
+
+      const responsePromise = handleConversationThinkingLevel('pi-thinking', { level: 'high' });
+      const command = await readPendingControlCommand('conv-pi-thinking');
+
+      expect(command).toMatchObject({
+        type: 'set_thinking_level',
+        level: 'high',
+      });
+
+      handleConversationControlAck({ id: command.id, ok: true });
+      const response = await responsePromise;
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true, effort: 'high' });
+      expect(getConversationByName('pi-thinking')?.effort).toBe('high');
+    });
+
+    it('rejects invalid thinking levels without writing a command', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-bad-thinking',
+        tmuxSession: 'conv-pi-bad-thinking',
+        cwd: process.cwd(),
+        harness: 'pi',
+        status: 'active',
+      });
+
+      const response = await handleConversationThinkingLevel('pi-bad-thinking', { level: 'turbo' });
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Invalid thinking level');
+      expect(existsSync(join(process.env.OVERDECK_HOME!, 'agents', 'conv-pi-bad-thinking', 'control'))).toBe(false);
+    });
+
+    it('writes a compact command for pi conversations', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-compact',
+        tmuxSession: 'conv-pi-compact',
+        cwd: process.cwd(),
+        harness: 'ohmypi',
+        status: 'active',
+      });
+
+      const responsePromise = handleConversationCompact('pi-compact');
+      const command = await readPendingControlCommand('conv-pi-compact');
+
+      expect(command).toMatchObject({ type: 'compact' });
+
+      handleConversationControlAck({ id: command.id, ok: true });
+      const response = await responsePromise;
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true });
+    });
+
+    it('updates a running pi conversation model through the control channel', async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-switch-model',
+        tmuxSession: 'conv-pi-switch-model',
+        cwd: process.cwd(),
+        harness: 'pi',
+        model: 'old-model',
+        claudeSessionId: 'pi-session-jsonl',
+        status: 'active',
+      });
+
+      const responsePromise = handleConversationSwitchModel('pi-switch-model', { model: 'new-model' });
+      const command = await readPendingControlCommand('conv-pi-switch-model');
+
+      expect(command).toMatchObject({
+        type: 'set_model',
+        model: 'new-model',
+      });
+
+      handleConversationControlAck({ id: command.id, ok: true });
+      const response = await responsePromise;
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body.model).toBe('new-model');
+      expect(getConversationByName('pi-switch-model')?.model).toBe('new-model');
+    });
+
+    it('keeps started claude-code conversations locked to their model', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'claude-switch-model',
+        tmuxSession: 'conv-claude-switch-model',
+        cwd: process.cwd(),
+        harness: 'claude-code',
+        model: 'old-model',
+        claudeSessionId: 'claude-session-jsonl',
+        status: 'active',
+      });
+
+      const response = await handleConversationSwitchModel('claude-switch-model', { model: 'new-model' });
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(409);
+      expect(body.error).toBe('Conversation model is locked once a conversation has started');
+      expect(existsSync(join(process.env.OVERDECK_HOME!, 'agents', 'conv-claude-switch-model', 'control'))).toBe(false);
+    });
+
+    it('sends the verified Escape interrupt key for pi abort', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'pi-abort',
+        tmuxSession: 'conv-pi-abort',
+        cwd: process.cwd(),
+        harness: 'pi',
+        status: 'active',
+      });
+
+      const response = await handleConversationAbort('pi-abort');
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true, key: 'Escape' });
+      expect(sendKeysAsync).toHaveBeenCalledWith('conv-pi-abort', 'Escape', 'conversation-abort');
+    });
+
+    it('rejects abort for non-pi conversations without sending a tmux key', async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+
+      createConversation({
+        name: 'claude-abort',
+        tmuxSession: 'conv-claude-abort',
+        cwd: process.cwd(),
+        harness: 'claude-code',
+        status: 'active',
+      });
+
+      const response = await handleConversationAbort('claude-abort');
+      const body = decodeJsonResponse(response);
+
+      expect(response.status).toBe(400);
+      expect(body.error).toBe('Abort control endpoint is only supported for Pi conversations');
+      expect(sendKeysAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  it('keeps claude-code composer delivery on deliverAgentMessage', async () => {
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { handleConversationMessage } = await import('../conversations.js');
+    vi.mocked(deliverAgentMessage).mockClear();
+
+    createConversation({
+      name: 'claude-conv',
+      tmuxSession: 'conv-claude',
+      cwd: '/tmp',
+      harness: 'claude-code',
+      status: 'active',
+    });
+
+    const response = await handleConversationMessage('claude-conv', { message: 'hello claude' });
+    const body = decodeJsonResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(deliverAgentMessage).toHaveBeenCalledWith(
+      'conv-claude',
+      'hello claude',
+      'conversation-message',
+      'auto',
+    );
+  });
+
   it('returns a persisted handoff document as markdown', async () => {
     const { createConversation, getConversationByName, recordConversationHandoff } = await import('../../../../lib/overdeck/conversations.js');
     const { handleConversationHandoffDoc } = await import('../conversations.js');
@@ -856,93 +1232,97 @@ describe('conversations route — DB integration', () => {
   });
 
   it('creates a summary fork conversation without ending the source conversation', async () => {
-    const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
-    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+    await withTestHome(async () => {
+      const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+      const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
 
-    const cwd = '/home/test/project';
-    const sessionId = 'session-123';
-    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
-    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
-    mkdirSync(claudeProjectDir, { recursive: true });
-    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
-    writeFileSync(sessionFile, [
-      JSON.stringify({
-        type: 'user',
-        message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken dashboard route' }] },
-      }),
-      JSON.stringify({
-        type: 'assistant',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/overdeck/src/file.ts' } }],
-        },
-      }),
-    ].join('\n') + '\n');
+      const cwd = '/home/test/project';
+      const sessionId = 'session-123';
+      const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+      const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+      mkdirSync(claudeProjectDir, { recursive: true });
+      const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+      writeFileSync(sessionFile, [
+        JSON.stringify({
+          type: 'user',
+          message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken dashboard route' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/overdeck/src/file.ts' } }],
+          },
+        }),
+      ].join('\n') + '\n');
 
-    const conv = createConversation({
-      name: 'source-conv',
-      tmuxSession: 'conv-source-conv',
-      cwd,
-      claudeSessionId: sessionId,
-      title: 'Original conversation',
-      effort: 'medium',
+      const conv = createConversation({
+        name: 'source-conv',
+        tmuxSession: 'conv-source-conv',
+        cwd,
+        claudeSessionId: sessionId,
+        title: 'Original conversation',
+        effort: 'medium',
+      });
+
+      const result = await Effect.runPromise(createSummaryFork(conv, { localSummaryOnly: true }));
+
+      expect(result.conversation.name).not.toBe('source-conv');
+      expect(result.conversation.title).toBe('Summary Fork: Original conversation');
+      expect(result.conversation.model).toBeNull();
+      expect(result.conversation.effort).toBe('medium');
+      expect(result.summary).toContain('Conversation Summary Fork');
+      expect(result.summaryModel).toBeNull();
+
+      const sourceConv = getConversationByName('source-conv');
+      expect(sourceConv?.status).toBe('active');
     });
-
-    const result = await Effect.runPromise(createSummaryFork(conv, { localSummaryOnly: true }));
-
-    expect(result.conversation.name).not.toBe('source-conv');
-    expect(result.conversation.title).toBe('Summary Fork: Original conversation');
-    expect(result.conversation.model).toBeNull();
-    expect(result.conversation.effort).toBe('medium');
-    expect(result.summary).toContain('Conversation Summary Fork');
-    expect(result.summaryModel).toBeNull();
-
-    const sourceConv = getConversationByName('source-conv');
-    expect(sourceConv?.status).toBe('active');
   });
 
   it('creates a plain fork conversation from the forkMode discriminator', async () => {
-    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
+    await withTestHome(async () => {
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+      const { createSummaryFork } = await import('../../../../lib/conversations/summary-fork.js');
 
-    const cwd = '/home/test/plain-project';
-    const sessionId = 'plain-session-123';
-    const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
-    const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
-    mkdirSync(claudeProjectDir, { recursive: true });
-    const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
-    writeFileSync(sessionFile, [
-      JSON.stringify({
-        type: 'user',
-        message: { role: 'user', content: 'Before compaction' },
-      }),
-      JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
-      JSON.stringify({
-        type: 'assistant',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'private chain' }],
-        },
-      }),
-    ].join('\n') + '\n');
+      const cwd = '/home/test/plain-project';
+      const sessionId = 'plain-session-123';
+      const encodedCwd = cwd.replace(/[^a-zA-Z0-9]/g, '-');
+      const claudeProjectDir = join(process.env.HOME || '', '.claude', 'projects', encodedCwd);
+      mkdirSync(claudeProjectDir, { recursive: true });
+      const sessionFile = join(claudeProjectDir, `${sessionId}.jsonl`);
+      writeFileSync(sessionFile, [
+        JSON.stringify({
+          type: 'user',
+          message: { role: 'user', content: 'Before compaction' },
+        }),
+        JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'private chain' }],
+          },
+        }),
+      ].join('\n') + '\n');
 
-    const conv = createConversation({
-      name: 'plain-source-conv',
-      tmuxSession: 'conv-plain-source-conv',
-      cwd,
-      claudeSessionId: sessionId,
-      title: 'Plain source',
+      const conv = createConversation({
+        name: 'plain-source-conv',
+        tmuxSession: 'conv-plain-source-conv',
+        cwd,
+        claudeSessionId: sessionId,
+        title: 'Plain source',
+      });
+
+      const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
+
+      expect(result.conversation.title).toBe('Fork: Plain source');
+      expect(result.summary).toBe('');
+      expect(result.summaryModel).toBeNull();
+      const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
+      expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
+      expect(forkedJsonl).not.toContain('"type":"thinking"');
+      expect(forkedJsonl).not.toContain('Before compaction');
     });
-
-    const result = await Effect.runPromise(createSummaryFork(conv, { forkMode: 'plain' }));
-
-    expect(result.conversation.title).toBe('Fork: Plain source');
-    expect(result.summary).toBe('');
-    expect(result.summaryModel).toBeNull();
-    const forkedJsonl = readFileSync(result.sessionFile, 'utf-8');
-    expect(forkedJsonl).toContain('[Thinking]\\nprivate chain');
-    expect(forkedJsonl).not.toContain('"type":"thinking"');
-    expect(forkedJsonl).not.toContain('Before compaction');
   });
 });
 
