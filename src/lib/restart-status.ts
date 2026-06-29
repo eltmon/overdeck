@@ -1,9 +1,52 @@
-import { appendFile, mkdir, readFile, rename, rmdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, rmdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 
 const MAX_JOURNAL_ENTRIES = 200;
+const LOCK_POLL_MS = 10;
+const LOCK_MAX_WAIT_MS = 5000;
+const STALE_LOCK_MS = 30000;
+
+function restartEventsLockPath(): string {
+  return `${restartEventsPath()}.lock`;
+}
+
+async function acquireRestartEventsLock(): Promise<boolean> {
+  const lockPath = restartEventsLockPath();
+  const start = Date.now();
+  while (true) {
+    try {
+      await mkdir(lockPath);
+      return true;
+    } catch (error) {
+      if (!isErrnoException(error) || error.code !== 'EEXIST') {
+        // Unexpected lock failure; proceed without locking.
+        return false;
+      }
+      try {
+        const lockStat = await stat(lockPath);
+        if (Date.now() - lockStat.mtimeMs > STALE_LOCK_MS) {
+          await rmdir(lockPath);
+          continue;
+        }
+      } catch {
+        // Lock disappeared or became inaccessible; retry immediately.
+        continue;
+      }
+      if (Date.now() - start > LOCK_MAX_WAIT_MS) return false;
+      await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS));
+    }
+  }
+}
+
+async function releaseRestartEventsLock(): Promise<void> {
+  try {
+    await rmdir(restartEventsLockPath());
+  } catch {
+    // ignore
+  }
+}
 
 export type RestartTrigger = 'pan reload' | 'pan restart' | 'watchdog';
 
@@ -80,29 +123,26 @@ function parseRestartEventLine(line: string): RestartStatus | null {
 }
 
 async function appendRestartEvent(entry: RestartStatus): Promise<void> {
+  const locked = await acquireRestartEventsLock();
   try {
     const path = restartEventsPath();
     await mkdir(dirname(path), { recursive: true });
     await appendFile(path, `${JSON.stringify(entry)}\n`, 'utf8');
   } catch {
     // Journal append is best-effort and must never fail the primary status write.
+  } finally {
+    if (locked) await releaseRestartEventsLock();
   }
 }
 
 /** Trim the persisted journal to MAX_JOURNAL_ENTRIES using an atomic temp-file
- *  rename. A mkdir-based lock prevents concurrent compactions from racing. */
+ *  rename. The shared mkdir lock serializes compaction with appends so no
+ *  appended event is overwritten between read and rename. */
 async function compactRestartEvents(): Promise<void> {
-  const path = restartEventsPath();
-  const lockPath = `${path}.lock`;
+  const locked = await acquireRestartEventsLock();
+  if (!locked) return; // Another process holds the lock; let it compact.
   try {
-    await mkdir(lockPath);
-  } catch (error) {
-    if (isErrnoException(error) && error.code === 'EEXIST') return;
-    // Lock acquisition failed for another reason; skip compact.
-    return;
-  }
-
-  try {
+    const path = restartEventsPath();
     const content = await readFile(path, 'utf8');
     const lines = content.split('\n').filter((line) => line.trim() !== '');
     if (lines.length <= MAX_JOURNAL_ENTRIES) return;
@@ -115,11 +155,7 @@ async function compactRestartEvents(): Promise<void> {
     if (isErrnoException(error) && error.code === 'ENOENT') return;
     // Best-effort compact; ignore other errors.
   } finally {
-    try {
-      await rmdir(lockPath);
-    } catch {
-      // ignore
-    }
+    await releaseRestartEventsLock();
   }
 }
 
