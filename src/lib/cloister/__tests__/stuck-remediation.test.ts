@@ -474,9 +474,13 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(actions).toEqual(['[deacon] stuck-remediation stage=3 issue=FLYWHEEL idleMin=95 action=paused-and-troubled']);
-    expect(mocks.pauseFlywheel).toHaveBeenCalledOnce();
-    expect(mocks.markAgentTroubled).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(actions).toEqual([
+      '[deacon] FLYWHEEL orchestrator wedged (idle 95min) — fresh-launched (relaunch 1/3)',
+    ]);
+    expect(mocks.killSessionSync).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
   });
 
   it('skips when the orchestrator is already paused (no re-pause loop)', async () => {
@@ -521,14 +525,17 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(actions[0]).toContain('fresh-launched');
   });
 
-  it('does not auto-relaunch a dead orchestrator under OVERDECK_NO_RESUME', async () => {
+  it('auto-relaunches a dead orchestrator even under OVERDECK_NO_RESUME', async () => {
     mocks.sessionExistsSync.mockReturnValue(false);
     mocks.getNoResumeMode.mockReturnValue({ active: true, since: 'x' });
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
-    expect(actions[0]).toContain('OVERDECK_NO_RESUME=1, not auto-relaunching');
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(actions).toEqual([
+      '[deacon] FLYWHEEL orchestrator DIED (exit=1 at 2026-05-23T11:59:00Z) — fresh-launched (relaunch 1/3)',
+    ]);
+    expect(actions[0]).not.toContain('not auto-relaunching');
   });
 
   it('does not resurrect when there is no active flywheel run (operator stopped it)', async () => {
