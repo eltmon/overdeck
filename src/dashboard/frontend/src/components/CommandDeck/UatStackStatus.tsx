@@ -1,7 +1,8 @@
 import { Check, Circle, ExternalLink, Loader2, X } from 'lucide-react';
 import type { WorkspaceContainerStatus, WorkspaceStackHealth } from './ZoneCOverviewTabs/queries';
+import styles from './styles/command-deck.module.css';
 
-type Density = 'compact' | 'full';
+type Density = 'compact' | 'full' | 'tree';
 export type UatContainerState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'unknown';
 export type UatStackState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'stale';
 export type UatStackLifecycle = 'active' | 'merged' | 'idle';
@@ -59,6 +60,19 @@ function statusTone(status: WorkspaceContainerStatus): string {
   }
 }
 
+function statusDotClass(status: WorkspaceContainerStatus): string {
+  switch (normalizeStatus(status)) {
+    case 'healthy':
+      return styles.uatStackContainerDotHealthy;
+    case 'starting':
+      return styles.uatStackContainerDotStarting;
+    case 'unhealthy':
+      return styles.uatStackContainerDotUnhealthy;
+    default:
+      return styles.uatStackContainerDotStopped;
+  }
+}
+
 function StatusIcon({ status, pending }: { status: WorkspaceContainerStatus; pending?: boolean }) {
   const normalized = normalizeStatus(status);
   if (pending || normalized === 'starting') return <Loader2 className="h-3 w-3 animate-spin text-warning" />;
@@ -105,6 +119,15 @@ function formatStoppedAge(entries: Array<[string, WorkspaceContainerStatus]>): s
     .at(-1);
   const formatted = formatLastProbe(newestProbe);
   return formatted ? formatted.replace(/\s+ago$/, '') : null;
+}
+
+function containerStatusText(status: WorkspaceContainerStatus): string {
+  if (status.uptime) return `Up ${status.uptime}`;
+  if (status.status) {
+    const lastProbe = formatLastProbe(status.lastProbeAt);
+    return lastProbe ? `${status.status} ${lastProbe}` : status.status;
+  }
+  return status.running ? statusLabel(status) : 'not running';
 }
 
 export function resolveUatStackState({
@@ -202,6 +225,21 @@ export function UatStackStatus({
   const lastProbe = entries
     .map(([, status]) => formatLastProbe(status.lastProbeAt))
     .find(Boolean);
+
+  if (density === 'tree') {
+    return (
+      <div className={`${styles.uatStackTreeBody} ${className}`} data-testid="uat-stack-status">
+        {reason && <p className={styles.uatStackTreeReason}>{reason}</p>}
+        {entries.map(([name, status]) => (
+          <div key={name} className={styles.uatStackContainerRow}>
+            <span className={`${styles.uatStackContainerDot} ${statusDotClass(status)}`} aria-hidden="true" />
+            <span className={styles.uatStackContainerName} title={name}>{friendlyContainerName(name)}</span>
+            <span className={`${styles.uatStackContainerState} ${statusTone(status)}`}>{containerStatusText(status)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={`rounded-md border border-border bg-muted/20 p-2.5 text-xs ${className}`} data-testid="uat-stack-status">

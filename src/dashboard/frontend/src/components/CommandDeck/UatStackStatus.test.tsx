@@ -90,7 +90,7 @@ describe('UAT stack status semantics', () => {
           lastProbeAt: '2026-06-28T12:00:00.000Z',
         }),
       },
-      stackHealth: { healthy: true, reasons: [], lastObserved: '2026-06-29T12:00:00.000Z' },
+      stackHealth: { healthy: false, reasons: ['api exited'], lastObserved: '2026-06-29T12:00:00.000Z' },
     });
 
     expect(summary?.state).toBe('stopped');
@@ -102,7 +102,7 @@ describe('UAT stack status semantics', () => {
         containers={{
           api: container({ running: false, uptime: null, status: 'exited (0)', health: 'unknown' }),
         }}
-        stackHealth={{ healthy: true, reasons: [], lastObserved: '2026-06-29T12:00:00.000Z' }}
+        stackHealth={{ healthy: false, reasons: ['api exited'], lastObserved: '2026-06-29T12:00:00.000Z' }}
       />,
     );
 
@@ -151,5 +151,48 @@ describe('UAT stack status semantics', () => {
     expect(screen.getByText('UAT stack 1/2 unhealthy')).toBeTruthy();
     expect(screen.getByText('api unhealthy: connection refused')).toBeTruthy();
     expect(screen.getByTestId('uat-stack-status').querySelector('.text-destructive')).toBeTruthy();
+  });
+
+  it('renders tree density as flat container rows without the compact card chrome', () => {
+    render(
+      <UatStackStatus
+        density="tree"
+        containers={{
+          postgres: container({ uptime: '2m' }),
+          api: container({
+            running: false,
+            uptime: null,
+            status: 'exited (0)',
+            health: 'unknown',
+            lastProbeAt: '2026-06-28T12:00:00.000Z',
+          }),
+        }}
+        stackHealth={{ healthy: false, reasons: ['api exited'], lastObserved: '2026-06-29T12:00:00.000Z' }}
+      />,
+    );
+
+    const status = screen.getByTestId('uat-stack-status');
+    expect(status.className).not.toContain('rounded-md');
+    expect(status.className).not.toContain('border');
+    expect(status.className).not.toContain('bg-muted');
+    expect(status.innerHTML).not.toContain('border-border');
+    expect(screen.getByText('postgres')).toBeTruthy();
+    expect(screen.getByText('Up 2m')).toBeTruthy();
+    expect(screen.getByText('api')).toBeTruthy();
+    expect(screen.getByText('exited (0) 1d ago')).toBeTruthy();
+  });
+
+  it('preserves compact density card rendering', () => {
+    render(
+      <UatStackStatus
+        density="compact"
+        containers={{
+          postgres: container({ uptime: '2m' }),
+        }}
+        stackHealth={{ healthy: true, reasons: [], lastObserved: '2026-06-29T12:00:00.000Z' }}
+      />,
+    );
+
+    expect(screen.getByTestId('uat-stack-status').className).toContain('rounded-md border border-border bg-muted/20');
   });
 });

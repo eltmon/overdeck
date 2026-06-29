@@ -696,11 +696,12 @@ describe('FeatureItem', () => {
     expect(screen.queryByText('postgres')).toBeNull();
     expect(screen.queryByText('api')).toBeNull();
 
-    // Clicking the header expands and renders the per-service detail list.
+    // Clicking the header expands and renders the per-service tree rows.
     fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
     expect(await screen.findByText('postgres')).toBeTruthy();
     expect(screen.getByText('api')).toBeTruthy();
-    expect(screen.getByText('UAT stack 1/2 healthy')).toBeTruthy();
+    expect(screen.getByText('Up 2m')).toBeTruthy();
+    expect(screen.getByText('Up 42s')).toBeTruthy();
 
     // Clicking again collapses and removes the service rows.
     fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));

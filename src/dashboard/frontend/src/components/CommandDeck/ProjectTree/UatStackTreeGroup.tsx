@@ -36,7 +36,7 @@ export function UatStackTreeGroup({ summary, workspace, pending }: UatStackTreeG
           frontendUrl={workspace?.frontendUrl}
           apiUrl={workspace?.apiUrl}
           pending={pending}
-          density="compact"
+          density="tree"
         />
       )}
     </div>
