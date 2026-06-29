@@ -2902,3 +2902,118 @@ despite config requesting harness=claude-code** (Cloister provider-default routi
 - **Scanned all open bugs for a clean pipeline-unblocker to strike as a 2nd producer — NONE qualify.** The gate is blocked on operator rebases, not a strikable substrate bug; auto_pickup_backlog=false bars ordinary backlog pickup; PAN-2106/2108 are filed-but-not-strikable (not active unblockers; 2108 architectural). Honest conclusion: minAgents=2 cannot be sustained autonomously here — repair>launch, not a stall. PAN-1982 is the one producer.
 
 - Next tick: (1) watch PAN-1982 → review; (2) if operator finally merges PAN-1084 / rebases 1718/1884/2088, drain + close out; (3) keep snapshots current. **The autonomous levers are genuinely exhausted; the cohort drains only on operator gate action. The operator-prompted "are you stuck" check is answered: not stuck — producing via 1982, and waiting on the operator-only rebases+merge.**
+
+## RUN-35 tick 1 (2026-06-29 ~05:00Z) — MAIN GREEN; 2 healthy producers; THREE green-but-conflicting items jam the gate; auto_pickup=true but top sequence exhausted
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=high`, `harness=claude-code`, `scope=all-tracked-projects`, **`auto_pickup_backlog=true`**, **`require_uat_before_merge=false`**. Producers routed to gpt-5.5/codex via provider-default (surfaced as openQuestion).
+
+- **Main GREEN** at `5bfa88d14` (CI success, 03:25Z). PRs #2109 (PAN-1884) + #2097 (PAN-2088) merged just before/at run start. RAM 16.7/64 GB used, swap 0. No P0. No OOM risk.
+
+- **Cohort (12): 4 terminal** — PAN-1884, PAN-2088, PAN-1084, PAN-2054 (all CLOSED + closed-out + verifying-on-main). **2 parked-out** — PAN-806 (objection/critical/architecture), PAN-1864 (parked+objection). 6/12 terminal-or-parked.
+
+- **minAgents=2 GENUINELY satisfied this run** (unlike RUN-30/31): agent-pan-2150 (decompose Settings) + agent-pan-2152 (decompose workspace.ts) are BOTH actively working gpt-5.5 producers — broken stacks self-healed on spawn (PAN-1618 recovery live again). Plus review/test/plan activity on 1506/1510/1508/2157.
+
+- **DURABLE LESSON — the green-but-conflicting jam has spread from 1 item (RUN-31) to THREE (RUN-35).** PAN-1982 (#2112, ALL 8 checks SUCCESS), PAN-1718 (#2103), PAN-2063 (#2110) are ALL `CONFLICTING/DIRTY` with main — merge-ready-after-rebase, but the flywheel is structurally forbidden to rebase (pan sync-main forbidden, feature-branch edits barred) and their work agents are idle (1982: gpt-5.5 idle-at-prompt, NOT ctx-exhausted, so deacon idle-nudge *should* drive it) or dead (1718/2063 sessions gone). `pan review restart` does NOT fix a merge conflict, so even the allowed review-recovery lever is useless here. **This is now the dominant drain bottleneck — 3 merge-ready items stranded behind an operator-only/PAN-2108 rebase step.** PAN-2108 (flywheel-safe rebase/recovery surface) is the tracking fix; its absence is now blocking 3 items at once.
+
+- **PAN-2086 wedged** (kimi 100% ctx, token-limit 262144) — flywheel-unrecoverable (resume --compact forbidden; agent gate-exempt). 17+ commits safe on branch. PAN-2108 family.
+
+- **Did NOT launch new agents despite auto_pickup=true + maxAgents=20.** The ranked sequencer reported "no eligible issue in sequence — fall back to normal priority": top items are all in-flight (1982/2150/2152), objection (806), parked (1864), or already in planning/review (1506/1510/1508/2157). minAgents floor met by 2150/2152; pipeline is busy (~8 active sessions); the bottleneck is the rebase gate, not capacity — piling more PRs behind the same conflict wall doesn't drain it. Repair > launch holds, but THIS time the floor is met by real producers, not plan engines.
+
+- **MIN-831/846 ready-for-merge** (review+test passed, GitLab). require_uat=false would permit auto-merge, but the flywheel auto-merge endpoint's GitLab support is unproven and MIN is outside the PAN cohort — surfaced as operator `merge` suggestions rather than risk a wrong-tracker auto-merge POST.
+
+- Next tick: (1) watch PAN-2150/2152 → review/PR (will they ALSO land conflicting? watch the rebase-on-done step); (2) if operator/PAN-2108 rebases 1982/1718/2063, they merge immediately (all green); (3) confirm deacon idle-nudge picks up idle agent-pan-1982 for self-rebase; (4) keep snapshots current.
+
+## RUN-35 ticks 2-4 (2026-06-29 ~05:17-05:58Z) — steady gate-blocked holding pattern; wakeup drift = symptom of PAN-2160
+
+- **Steady state across 3 ticks, no operator/deacon gate action:** main GREEN `5bfa88d14` (unchanged); PAN-2150 + PAN-2152 still the 2 healthy gpt-5.5 producers (2150 hit 1h+ on its decomposition bead — long but actively in-turn, not wedged; watch it); the 3 green-but-conflicting PRs (PAN-1982 #2112, PAN-1718 #2103, PAN-2063 #2110) ALL still CONFLICTING — no rebase. PAN-2086 still wedged. No flywheel lever for any of them; minAgents=2 stays met by 2150/2152.
+
+- **DURABLE LESSON — the flywheel's "appears stuck / wakeup drift" is a SYMPTOM of PAN-2160, not orchestrator failure.** Every scheduled `ScheduleWakeup(1000s)` drifted to ~30-44 min actual re-invocation, each time via the deacon STUCK-WATCHDOG, never the scheduled wakeup. Root cause is PAN-2160 (already filed, eltmon, ready/released): the dashboard reverts to `OVERDECK_NO_RESUME=1` on watchdog/health restart, which (wrongly) gates the FLYWHEEL orchestrator's own self-heal — so the deacon stops nudging the idle orchestrator (no backup to ScheduleWakeup) and the only thing that re-invokes it is stuck-remediation. Net for future runs: do NOT re-file wakeup-drift bugs; it's PAN-2160. The loop still functions (watchdog drives it ~every 30-44min, each wake emits a current snapshot), just at a coarser cadence than the 20-min target until PAN-2160's NO_RESUME-exemption fix is confirmed live.
+
+- **PAN-1901 #2042 ready-listing was STALE** — already merged + closed-out. MIN-831/846 ready-for-merge left as operator merge (GitLab MRs, outside the flywheel auto-merge endpoint's proven GitHub scope).
+
+- Honest position: the flywheel's autonomous drain levers are exhausted for this cohort state. Remaining drain = operator rebases of the 3 conflicting PRs (or PAN-2108 fix) + the 2 producers reaching clean PRs. Each watchdog wake: re-verify main green, check producers + conflicting PRs, emit snapshot, watch for a clean PR to merge (require_uat=false → schedulable via /api/flywheel/auto-merge/schedule for GitHub PAN PRs).
+
+## RUN-35 tick 5 (2026-06-29 ~06:12Z) — PAN-2152 MERGED (#2161); GitHub GraphQL rate limit EXCEEDED; close-out deferred
+
+- **DRAIN PROGRESS: PAN-2152 PR #2161 merged to main** (main `5bfa88d14`→`2a41e2ecb`). One of the 2 producers (the workspace.ts decomposition) reached a CLEAN PR and merged — proving 2150/2152 do NOT all land conflicting (the rebase-on-done worked for 2152). agent-pan-2152 now idle/done. agent-pan-2150 advanced to a new bead (working ~10m). prsMerged=3 this run window.
+
+- **GITHUB GRAPHQL RATE LIMIT EXCEEDED (user 678719).** All `gh pr view` / `gh issue view` (GraphQL) calls fail with "API rate limit already exceeded"; REST core still shows ~4993/5000 (separate bucket). 5,000/hr is shared across ALL tools+agents — the busy pipeline (review/test convoys) plus the flywheel's own per-tick gh-pr polling of the 3 conflicting PRs exhausted it. **Deferred PAN-2152 close-out** — `pan close` step 6 (close tracker issue) needs GraphQL and would leave a half-closed state; the interactive prompt was NOT confirmed (process exited at default N). Retry close-out next tick after reset.
+
+- **DURABLE LESSON — the flywheel's per-tick gh-pr polling is itself a GraphQL-rate-limit contributor.** Re-running `gh pr view <pr>` for each of the 3 conflicting PRs every wake (×5 ticks) burns GraphQL against a shared 5k/hr budget already loaded by review/test convoys. Future ticks: check `gh api rate_limit --jq .resources.graphql` FIRST; if low/exhausted, emit local-data-only snapshots (pan review pending / git log work without GraphQL) and back off gh-pr polling. Candidate substrate fix: cache PR mergeable-state per tick + 403-backoff. (File once gh is usable again if it recurs.)
+
+- Next tick (gh permitting): (1) retry `pan close PAN-2152` (merged, verify-merged gate is the net) — use --force to skip the interactive prompt if rate-limit clear; (2) check PAN-2150 → did it reach PR / merge?; (3) re-check 3 conflicting PRs ONLY if GraphQL budget allows; (4) keep snapshots current. Cohort now ~7/12 terminal-or-parked (added PAN-2152).
+
+## RUN-35 tick 6 (2026-06-29 ~06:24Z) — GraphQL recovered; PAN-2150 #2162 CI-green-in-review; PAN-2152 close-out BLOCKED (branch diverged); 0 active work producers
+
+- **GraphQL recovered** (4404/5000). Retried PAN-2152 close-out → **BLOCKED by verify-merged gate: "60 unmerged commit(s) on feature/pan-2152."** PR #2161's *changes* are on main (head 2a41e2ecb) but the feature branch advanced 60 commits past the merge point, so the ancestry check correctly refuses. Close-out tail stuck behind branch/main reconciliation the flywheel can't do (no sync-main/branch-edit lever). NOT forced. Likely substrate gap: post-merge commits on a merged branch defeat close-out's ancestry gate — worth an issue if it recurs, but did not file yet (verify it's not a one-off of this specific PR first).
+
+- **PAN-2150 PR #2162 is CLEAN/MERGEABLE, ALL 8 CI checks SUCCESS, but Overdeck review not yet review=passed** (not in `pan review pending --ready`; agent-pan-2150-review spawned 01:39, idle at placeholder prompt). The work agent finished cleanly and handed to review — healthy, NOT a crash (earlier 'agent-pan-2150 gone' was the work→review handoff). Decision: did NOT `pan review restart` — review is recent + CI green; restart risks discarding in-progress synthesis. If still idle next tick → restart to drive review=passed → auto-merge (require_uat=false, main green → schedulable via /api/flywheel/auto-merge/schedule).
+
+- **Both cohort producers now finished** (2152 merged, 2150→review) → 0 active WORK producers. minAgents=2 floor unmet, BUT: remaining cohort gate-blocked (3 conflicting PRs operator-rebase-bound, PAN-2086 wedged, 806/1864 parked) and sequencer found no eligible ready+planned+unblocked backlog item. This is genuine cohort-drain wind-down, not neglected idle capacity. Held launches.
+
+- **The operator's repeated "Stage 2 idle Nmin / emit-or-pause" alerts are the PAN-2160 wakeup-drift symptom**, NOT a hang — the orchestrator is functioning (drained PAN-2152, advanced PAN-2150 this run) and emits a current snapshot on every watchdog wake. Until PAN-2160's NO_RESUME-exemption fix lands, the loop runs at the watchdog's ~30-66min cadence, not the 20-min ScheduleWakeup target.
+
+- Cohort drain: 6/12 hard-terminal (1884/2088/1084/2054 closed-out + 806/1864 parked) + PAN-2152 merged-pending-closeout + PAN-2150 in-review-to-merge = ~8/12 effectively resolved or near. Remaining true blockers: 1982/1718/2063 (operator rebase) + 2086 (wedged).
+
+## RUN-35 tick 7 (2026-06-29 ~06:41Z) — diagnosed + drove through PAN-2150 (NOT a stalled review; a needs-you-paused blocked verdict); PAN-2152 close-out still gate-blocked
+
+- **PAN-2150 was NOT a stalled review — the review COMPLETED and correctly BLOCKED it.** agent-pan-2150-review wrote a blocked verdict: 2 PR-scoped TS6133 unused-var errors fail `npm run build` (frontend) — SettingsPage.tsx:43 `buildMiniMaxFormData`, ExperimentalSection.tsx:56 `handleHarnessModelPermutationsToggle`. (The PR's CI `build` check passed but the frontend typecheck-in-build caught these — two-test-signals mismatch.) The verdict recorded locally but the **PR-comment post FAILED on network**, and the work session was already torn down → feedback had no live target.
+
+- **`pan start PAN-2150` revealed the real state: PAUSED at needs-you 'verification stuck after 3/3 attempts (vbrief-ac)'.** The work agent had already failed the AC gate 3x on these same trivial errors. **Decision: `pan start PAN-2150 --force`** (act-and-correct, drive-through-pushback) — re-dispatched the work agent (gpt-5.5/codex, 8 beads) now that the review pinpointed the exact 2 lines. This restores a producer AND drives 2150 toward merge. **If it re-pauses next tick = confirmed needs-you blocker + a real substrate gap (blocked-review feedback can't reach a torn-down work session when PR-comment delivery also fails) → FILE it then.**
+
+- **DURABLE LESSON — a needs-you 'verification stuck 3/3' pause + a network-failed review-comment = an issue silently stuck with NO automated path forward.** The review verdict is correct and on-disk, but nothing delivers it to a work agent (session gone; PR comment failed; flywheel can't pan tell). The force-restart is the only flywheel-allowed drive-through; whether the resumed agent actually picks up the on-disk review.md is the open question for next tick.
+
+- **PAN-2152 close-out STILL blocked** (60 unmerged commits on feature/pan-2152 even with --force) across ticks 5-7. Changes are on main; ancestry broken (likely post-merge rebase rewrote SHAs). Functionally delivered; ceremony stuck. Watch whether postMergeLifecycle/close-out ever reconciles; candidate substrate bug (relates to PAN-2054).
+
+- 3 conflicting PRs (1982/1718/2063) STILL CONFLICTING (operator-rebase-bound). GraphQL recovered to 3013/5000. Fixed a self-inflicted status.json JSON-escape break by rewriting the file clean (lesson: large multi-Edit on a JSON string field risks structural breakage — validate with python json.load before emit).
+
+- Next tick: (1) PAN-2150 — did the re-dispatched work agent fix the 2 errors + re-submit PR 2162? If review=passed → schedule auto-merge. If re-paused at needs-you → file the feedback-delivery gap + leave for operator. (2) retry PAN-2152 close-out; (3) conflicting PRs; (4) if cohort drains → retrospective + report.
+
+## RUN-35 tick 8 (2026-06-29 ~06:58Z) — PAN-2150 fix VERIFIED + review re-requested; the force-restart paid off
+
+- **PAN-2150 force-restart (tick 7) WORKED.** The re-dispatched work agent removed the 2 unused symbols (commit `fce202554 fix(dashboard): remove unused Settings extraction symbols`): `buildMiniMaxFormData` is now re-exported+test-used, `handleHarnessModelPermutationsToggle` is now wired to onHarnessModelPermutationsToggle. **Verified independently in-workspace: `npm run build` (frontend) passes clean — 5790 modules, 3.04s, zero TS6133.** Pushed to PR #2162.
+
+- **DURABLE LESSON — a fixed work agent may NOT auto-re-request review; the flywheel must `pan review request <id>`.** agent-pan-2150 pushed the fix then sat idle: "I did not re-request review because the latest verification feedback explicitly said not to re-request review automatically." That conservative behavior would have stranded a green fix forever. `pan review request PAN-2150` succeeded (1/25 auto-requeues) → fresh review convoy now running → on review=passed, auto-merge. This is the canonical flywheel drive-through for a post-fix work agent that holds at idle: verify the fix in-workspace, then `pan review request`.
+
+- **The act-and-correct call on tick 7 (force past needs-you 3/3) was correct** — the fix was trivial+diagnosed, and one forced retry with the review's exact line-pointers cleared a gate that had stuck the work agent 3x. Validates the brief's drive-through-pushback / never-block-on-operator stance over leaving it at needs-you.
+
+- **PAN-2152 close-out STILL blocked (ticks 5-8, 60 unmerged commits).** Stopping per-tick close-out retries — it will not change without branch/main reconciliation. Decision: do NOT file yet (may self-resolve via postMergeLifecycle; conserve GraphQL which dropped to 1330/5000); re-evaluate next tick — if still blocked, file the close-out verify-merged-vs-rebased-branch substrate gap.
+
+- **GraphQL budget management is now a live constraint** (1330/5000). Did NOT re-poll the 3 conflicting PRs (unchanged 7 ticks, operator-rebase-bound). Per-tick discipline: check graphql budget first; skip stable-state gh-pr polling; spend the budget on the items actually moving (PAN-2150 review).
+
+- Cohort drain ~8-9/12 resolved-or-near: 6 hard-terminal/parked + PAN-2152 merged (closeout-blocked) + PAN-2150 fix-verified-in-review. Remaining true blockers: 1982/1718/2063 (operator rebase) + 2086 (wedged).
+
+## RUN-35 tick 9 (2026-06-29 ~07:15Z) — PAN-2150 MERGED (#2162); filed PAN-2163 (close-out false-positive); run approaching end-of-run quiescence
+
+- **PAN-2150 MERGED to main** (#2162, `ac60a693f`; review=passed test=passed). The full arc — tick-7 force-restart through needs-you 3/3 → fix `fce202554` verified in-workspace → tick-8 `pan review request` → review passed → merged — is the run's headline win. A work agent stuck at needs-you (3 failed verifications + undelivered review feedback) was driven all the way to merge by the flywheel without operator action. Close-out pending main CI green (main CI re-running post-merge); will `pan close PAN-2150` next tick once green.
+
+- **Filed PAN-2163** — close-out verify-merged FALSE-POSITIVE. PAN-2152 PR #2161 is 100pct merged (`git rev-list origin/main..origin/feature/pan-2152` = 0) yet `pan close --force` reports "60 unmerged commits." The gate checks stale local/worktree refs instead of `origin/main` vs `origin/feature/<id>`. Strands merged issues in the close-out tail. Routed to normal pipeline (not flywheel-fixable). This is the root cause of PAN-2152's stuck close-out and likely recurs for any merged-then-locally-rebased branch.
+
+- **DURABLE LESSON — use `git rev-list --count origin/main..origin/feature/<id>` to ground-truth merged-ness**, NOT the close-out gate's word. The gate's local-ref check lied; origin showed 0 unmerged. Always confirm against origin before believing a verify-merged failure.
+
+- **Run state: cohort ~8/12 effectively drained; eligible flywheel work nearly exhausted.** After PAN-2150 close-out (next tick), remaining cohort = 1982/1718/2063 (operator rebase, no flywheel lever), 2086 (wedged, no lever), 2152 (close-out blocked by PAN-2163, no lever). NONE are flywheel-actionable. Per brief, once PAN-2150 closes and no eligible work remains → do the retrospective + `pan flywheel report`. The 4 stuck items carry to the next run (or operator action).
+
+- Substrate bugs filed/surfaced this run: PAN-2163 (close-out false-positive, NEW). Referenced existing: PAN-2160 (wakeup drift / orchestrator self-heal), PAN-2108 (flywheel-safe rebase/recovery), PAN-2054 (close-out-not-terminal).
+
+- Next tick: (1) main CI green? → `pan close PAN-2150`; (2) if cohort eligible-work exhausted → RETROSPECTIVE + `pan flywheel report`; (3) keep snapshot current.
+
+## RUN-35 RETROSPECTIVE (tick 10, 2026-06-29 ~07:30Z) — END OF RUN
+
+**Outcome.** Started gate-blocked (most of the 12-item cohort behind operator rebases). Over 10 ticks the flywheel drove **2 producers all the way to merge** (PAN-2150 #2162, PAN-2152 #2161 — both gpt-5.5/codex decomposition tasks), filed **1 new substrate bug** (PAN-2163), and confirmed/surfaced 3 existing ones (PAN-2160, PAN-2108, PAN-2054). Final cohort: 4 closed-out-terminal (1884/2088/1084/2054) + 2 parked (806/1864) + 2 merged-but-close-out-blocked (2150/2152, by PAN-2163) + 3 operator-rebase-bound (1982/1718/2063) + 1 wedged (2086). **No eligible flywheel work remained** → reporting.
+
+**Headline win.** PAN-2150 was stranded at a `needs-you` gate (3 failed verifications on 2 trivial TS6133 unused-var errors) with its review-blocked feedback undelivered (PR-comment post failed on network + work session torn down). The flywheel recovered it end-to-end with ZERO operator action: force-restart through the gate → fix landed → **verified the build in-workspace** → `pan review request` → review passed → merged. This is the strongest evidence this run that the flywheel can drive a wedged work agent to merge.
+
+**Recurring stalls + the guardrails that worked:**
+1. **needs-you + undelivered review feedback = silent permanent stall.** A blocked-review verdict cannot reach a work agent whose tmux session was torn down (and PR-comment delivery failed). Drive-through recipe that worked: `pan start <id> --force` (clear needs-you) → confirm fix in-workspace (`npm run build` / grep the flagged symbols) → `pan review request <id>`. Candidate substrate fix: deliver blocked-review feedback durably (on-disk brief the resumed agent reads) instead of only via the (fragile) PR comment + live tmux.
+2. **close-out verify-merged FALSE-POSITIVE (PAN-2163).** Reports "N unmerged commits" on branches that are 100pct merged at origin (checks local/worktree refs, not `origin/main..origin/feature/<id>`). Confirmed on BOTH PAN-2150 and PAN-2152 — it strands the entire close-out tail. Highest-leverage substrate fix for flywheel throughput right now.
+3. **wakeup drift (PAN-2160).** ScheduleWakeup(1000s) drifted to ~30-66min actual; the deacon stuck-watchdog (not the scheduled wakeup) drove the loop because NO_RESUME gates the orchestrator's own self-heal. The loop still functioned (every wake emitted a current snapshot) but at coarse cadence and tripping stage-2 stuck-remediation repeatedly.
+4. **green-but-conflicting PRs (PAN-2108).** 1982/1718/2063 stayed all-checks-green-but-CONFLICTING for the whole run; the flywheel is structurally forbidden to rebase and the work agents were idle/dead. No flywheel lever — pure operator-rebase backlog.
+5. **GraphQL 5k/hr shared budget is a live constraint.** Dropped to ~1330 mid-run from review/test convoys + the flywheel's own per-tick gh-pr polling. Discipline adopted: check `gh api rate_limit --jq .resources.graphql` first; skip re-polling stable-state items (the 3 conflicting PRs unchanged 7+ ticks); spend budget on items actually moving.
+
+**Process lessons for future runs:**
+- **Ground-truth merged-ness with `git rev-list --count origin/main..origin/feature/<id>`** — do NOT trust the close-out gate's "unmerged commits" (PAN-2163 lies via local refs).
+- **VALIDATE status.json with `python3 -c "import json;json.load(open(...))"` before every emit** — a multi-Edit on a JSON string field broke the file at tick 7 (and a background emit silently no-op'd at tick 2). Emit in FOREGROUND and verify `latest.json` ticks incremented.
+- **A fixed work agent often will NOT auto-re-request review** — the flywheel must `pan review request <id>` after verifying the fix; otherwise green fixes sit idle forever.
+- **The operator's "Stage 2 idle Nmin" alerts during this run were PAN-2160 drift, not hangs** — the flywheel was productive throughout. Until PAN-2160 lands, expect watchdog-cadence ticks.
+
+**Carries to next run (not flywheel-actionable now):** PAN-2150 + PAN-2152 close-outs (need PAN-2163 fix), PAN-1982/1718/2063 (operator rebase or PAN-2108), PAN-2086 (wedged; operator recovery).
