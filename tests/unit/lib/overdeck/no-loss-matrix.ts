@@ -226,6 +226,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/flywheel/auto-merge/pending',                kind: 'http', disposition: 'READ',        door: 'MergeResolver.listAutoMerges({active})' },
   { surface: 'GET /api/flywheel/auto-merge/problems',               kind: 'http', disposition: 'READ',        door: 'MergeResolver.listAutoMerges({problems})' },
   { surface: 'GET /api/flywheel/merge-blockers',                    kind: 'http', disposition: 'READ',        door: 'MergeResolver.listBlockers' },
+  { surface: 'GET /api/flywheel/merge-backend',                     kind: 'http', disposition: 'READ',        door: 'MergeResolver.getMergeBackendStatus' },
   { surface: 'POST /api/flywheel/auto-merge/schedule',              kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.scheduleAutoMerge' },
   { surface: 'POST /api/flywheel/merge-next',                       kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.mergeNext' },
   { surface: 'DELETE /api/flywheel/auto-merge/:id',                 kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.cancelAutoMerge' },
