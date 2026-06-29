@@ -11,6 +11,7 @@ import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync } from '../overde
 import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { normalizeAgentId } from './identity.js';
 
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 
@@ -113,25 +114,6 @@ export interface AgentState {
 
 const toAgentFsError = (operation: string, path: string, cause: unknown): FsError =>
   new FsError({ operation, path, cause });
-
-/** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
-// Singleton runners spawn under their own bare ID (spawnRun creates the tmux
-// session and agent dir from the raw ID). They MUST be listed here so
-// normalizeAgentId is a no-op for them — otherwise message delivery and state
-// lookups would target `agent-<id>` and miss the real session (PAN-1866: the
-// sequencer spawned but its prompt was delivered to a nonexistent
-// `agent-sequencer-runner` pane, leaving the agent idle).
-const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator', 'sequencer-runner']);
-
-/** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
-export function normalizeAgentId(agentId: string): string {
-  if (SINGLETON_AGENT_IDS.has(agentId)) return agentId;
-  if (AGENT_PREFIXES.some(p => agentId.startsWith(p))) {
-    return agentId;
-  }
-  return `agent-${agentId.toLowerCase()}`;
-}
 
 export function getAgentDir(agentId: string): string {
   return join(getOverdeckHome(), 'agents', agentId);

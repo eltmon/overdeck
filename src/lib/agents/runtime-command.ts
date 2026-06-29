@@ -26,6 +26,7 @@ import { getProviderForModelSync } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
+import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
 
 const execAsync = promisify(exec);
@@ -294,37 +295,6 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
     await new Promise((r) => setTimeout(r, 500));
   }
   return false;
-}
-
-/**
- * Get path to agent's ready signal file (written by SessionStart hook)
- */
-function getReadySignalPath(agentId: string): string {
-  return join(getAgentDir(agentId), 'ready.json');
-}
-
-function isReadySignalPresent(readyPath: string): boolean {
-  if (!existsSync(readyPath)) return false;
-  try {
-    const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
-    // Accept both the Claude hook shape ({ ready: true, ... }) and the Pi
-    // extension shape ({ agentId, sessionId, ... } with no `ready` field).
-    return Boolean(signal && typeof signal === 'object' && signal.ready !== false);
-  } catch {
-    // File exists but mid-write / invalid — keep waiting.
-    return false;
-  }
-}
-
-export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
-  const readyPath = getReadySignalPath(agentId);
-
-  for (let i = 0; i < timeoutSeconds; i++) {
-    if (isReadySignalPresent(readyPath)) return true;
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
-  }
-
-  return isReadySignalPresent(readyPath);
 }
 
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
