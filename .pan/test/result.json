@@ -1,4 +1,1 @@
-{
-  "status": "passed",
-  "notes": "Quality gates passed: npm run typecheck (✔), npm run lint (✔), npx vitest run --configLoader runner (✔ 7627 tests passed, 0 failed). Refactoring is pure relocation with no logic changes; no browser UAT required. All 12 beads successfully extracted src/lib/agents.ts (4572 lines) into focused submodules with thin re-export barrel preserving public API surface. Export-surface snapshot test confirms no exports lost."
-}
+{"status":"passed","notes":"Quality gates: npm run typecheck (✔), npm run lint (✔ all linters passed), npx vitest run --configLoader runner (✔ 7640 tests passed, 52 skipped, 0 failed). PAN-1718 implementation verified: (1) restart lock acquired before pan dev SIGUSR2 branch (reload.ts), (2) append-only restart-events.jsonl journal with concurrent-writer detection (restart-status.ts), (3) supervisor stop/start robustness with wait-for-exit and verify-survival (supervisor.ts). CLI-only fix with no dashboard/UI changes; no browser UAT required."}

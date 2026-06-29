@@ -189,22 +189,20 @@
       "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nrestart-events lock timeout falls back to unlocked append, so compaction can still lose events\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
     }
   ],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:35:42.087Z",
-    "reviewNotes": "Agent re-review request (5/25): Removed unlocked append fallback with PID-based lock",
-    "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
+    "readyForMerge": true,
+    "updatedAt": "2026-06-29T22:28:05.505Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "lastVerifiedCommit": "5548b0c0a117fe5217c6e9ac14fa75d279880b2c",
-    "reviewRequestedAt": "2026-06-29T20:48:38.506Z"
+    "reviewedAtCommit": "3371d14b5bb971d568c3097c4f9d19b89b98af24",
+    "lastVerifiedCommit": "5548b0c0a117fe5217c6e9ac14fa75d279880b2c"
   },
   "closeOut": {
     "usage": {
@@ -219,8 +217,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 170889,
-            "output": 15892,
+            "input": 173292,
+            "output": 16599,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -235,17 +233,17 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 31,
-            "output": 3448,
-            "cacheRead": 2118481,
-            "cacheWrite": 184046
+            "input": 210,
+            "output": 5797,
+            "cacheRead": 3435469,
+            "cacheWrite": 316898
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2181002,
-            "output": 289172,
-            "cacheRead": 136279808,
+            "input": 2183982,
+            "output": 289676,
+            "cacheRead": 137984256,
             "cacheWrite": 0
           }
         }
@@ -258,8 +256,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 170889,
-          "output": 15892,
+          "input": 173292,
+          "output": 16599,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -270,21 +268,21 @@
           "cacheWrite": 335117
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 31,
-          "output": 3448,
-          "cacheRead": 2118481,
-          "cacheWrite": 184046
+          "input": 210,
+          "output": 5797,
+          "cacheRead": 3435469,
+          "cacheWrite": 316898
         },
         "custom/kimi-k2.7-code": {
-          "input": 2181002,
-          "output": 289172,
-          "cacheRead": 136279808,
+          "input": 2183982,
+          "output": 289676,
+          "cacheRead": 137984256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.447296,
-        "pricingAsOf": "2026-06-29T21:35:42.150Z"
+        "usd": 38.085675,
+        "pricingAsOf": "2026-06-29T22:28:05.555Z"
       }
     },
     "merges": [
@@ -293,7 +291,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T21:35:42.153Z",
+  "updated": "2026-06-29T22:28:05.564Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
