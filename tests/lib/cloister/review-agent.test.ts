@@ -23,6 +23,8 @@ import {
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
+  resolveReviewMode,
+  isExtendedReviewEnabled,
   spawnReviewRoleForIssue,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
@@ -40,6 +42,12 @@ const {
   mockSetReviewStatus,
   mockGetReviewStatus,
   mockArchiveFeedbackFiles,
+  mockLoadConfigSync,
+  mockReadIssueRecordSync,
+  mockResolveProjectForIssue,
+  mockGetLatestSessionIdSync,
+  mockResumeAgent,
+  mockWipeAgentStateDirs,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +61,12 @@ const {
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
   mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
+  mockLoadConfigSync: vi.fn(() => ({ config: {} })),
+  mockReadIssueRecordSync: vi.fn(() => null),
+  mockResolveProjectForIssue: vi.fn(() => ({ name: 'test', path: '/tmp/project' })),
+  mockGetLatestSessionIdSync: vi.fn(() => null),
+  mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
+  mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -72,21 +86,37 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentState: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
+  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   messageAgent: mockMessageAgent,
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
-  getLatestSessionIdSync: vi.fn().mockReturnValue(null),
-  resumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
+  getLatestSessionIdSync: mockGetLatestSessionIdSync,
+  resumeAgent: mockResumeAgent,
+  wipeAgentStateDirs: mockWipeAgentStateDirs,
+  getProviderAuthMode: vi.fn(async () => 'apikey'),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
-  loadConfigSync: vi.fn(() => ({ config: {} })),
+  loadConfigSync: mockLoadConfigSync,
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
 }));
+
+vi.mock('../../../src/lib/pan-dir/record.js', () => ({
+  readIssueRecordSync: mockReadIssueRecordSync,
+  resolveProjectForIssue: mockResolveProjectForIssue,
+  writeAgentHarnessModelSync: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/paths.js')>();
+  return {
+    ...actual,
+    AGENTS_DIR: '/tmp/pan-review-agent-test-agents',
+  };
+});
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
@@ -116,10 +146,47 @@ beforeEach(() => {
   mockMessageAgent.mockResolvedValue(undefined);
   mockGetAgentState.mockReturnValue(null);
   mockGetReviewStatus.mockReturnValue(null);
+  mockLoadConfigSync.mockReturnValue({ config: {} });
+  mockReadIssueRecordSync.mockReturnValue(null);
+  mockResolveProjectForIssue.mockReturnValue({ name: 'test', path: '/tmp/project' });
+  mockGetLatestSessionIdSync.mockReturnValue(null);
+  mockResumeAgent.mockResolvedValue({ success: false, error: 'no session' });
+  mockWipeAgentStateDirs.mockResolvedValue(undefined);
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+});
+
+describe('review mode resolution', () => {
+  it('defaults to quick when neither the issue record nor config sets review mode', () => {
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+
+    expect(mockResolveProjectForIssue).toHaveBeenCalledWith('PAN-1982');
+    expect(mockReadIssueRecordSync).toHaveBeenCalledWith({ name: 'test', path: '/tmp/project' }, 'PAN-1982');
+    expect(mockLoadConfigSync).toHaveBeenCalled();
+  });
+
+  it('uses full mode from merged config when no per-issue override exists', () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
+    });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
+  });
+
+  it('uses per-issue reviewMode over merged project and global config', () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'quick' } } },
+    });
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'full' });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
+    expect(mockLoadConfigSync).not.toHaveBeenCalled();
+  });
 });
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
@@ -336,6 +403,84 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
     expect(block.indexOf('resolveConflictGate')).toBeLessThan(block.indexOf('archiveFeedbackFiles'));
     expect(block).toContain('if (gate.gated)');
     expect(block).toContain('return { success: false, gated: true, message }');
+  });
+});
+
+// ── review mode fan-out dispatch ─────────────────────────────────────────────
+
+describe('spawnReviewRoleForIssue review mode fan-out', () => {
+  const reviewOpts = {
+    issueId: 'PAN-1982',
+    workspace: '/tmp/pan-review-mode',
+    branch: 'feature/pan-1982',
+    force: true,
+  };
+
+  beforeEach(() => {
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: options.subRole
+        ? `agent-${issueId.toLowerCase()}-review-${options.subRole}`
+        : `agent-${issueId.toLowerCase()}-review`,
+    }));
+  });
+
+  it('quick mode spawns only the parent self-review session', async () => {
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'quick' });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Self-review spawned: agent-pan-1982-review',
+    });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    const [_issueId, _role, parentOptions] = mockSpawnRun.mock.calls[0];
+    expect(parentOptions).not.toHaveProperty('subRole');
+    expect(parentOptions.prompt).toContain('you are the sole reviewer');
+    expect(parentOptions.prompt).not.toContain('STANDBY');
+  });
+
+  it('full mode branches to synthesis prompt and fans out every sub-reviewer lane', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const dispatchBlock = agentSrc.match(
+      /const fullReview = isExtendedReviewEnabled\(opts\.issueId\);[\s\S]*?Review role \(self-review\) spawned/,
+    );
+    expect(dispatchBlock).not.toBeNull();
+    const block = dispatchBlock![0];
+
+    expect(block).toContain('buildReviewRolePrompt');
+    expect(block).toContain('buildSelfReviewPrompt');
+    expect(block).toContain('REVIEW_SUB_ROLES.map');
+    expect(block).toContain('spawnReviewSubRoleForIssue');
+    expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
+    expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
+    expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
+  });
+
+  it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const resumeBlock = agentSrc.match(
+      /if \(canResumeReview\) \{[\s\S]*?falling back to a fresh session/,
+    );
+    expect(resumeBlock).not.toBeNull();
+    const block = resumeBlock![0];
+
+    expect(block).toContain('resumeAgent(reviewAgentId, prompt)');
+    expect(block).toContain('if (fullReview)');
+    expect(block).toContain('await spawnConvoyReviewers(reviewAgentId)');
+    expect(block).toContain('Convoy review resumed (session preserved)');
   });
 });
 
