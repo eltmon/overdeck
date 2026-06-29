@@ -57,10 +57,10 @@ describe('UAT stack status semantics', () => {
 
     expect(resolveUatStackState({
       containers: {
-        api: container({ running: false, uptime: null, status: 'exited (0)', health: 'unknown' }),
-        frontend: container({ running: false, uptime: null, status: 'exited (255)', health: 'unknown' }),
+        api: container({ running: false, uptime: null, status: 'exited (0)', health: 'unhealthy' }),
+        frontend: container({ running: false, uptime: null, status: 'exited (255)', health: 'unhealthy' }),
       },
-      stackHealth: { healthy: true, reasons: [], lastObserved: '2026-06-29T12:00:00.000Z' },
+      stackHealth: { healthy: false, reasons: ['api exited'], lastObserved: '2026-06-29T12:00:00.000Z' },
     })).toBe('stopped');
 
     expect(resolveUatStackState({
