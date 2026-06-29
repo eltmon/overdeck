@@ -35,6 +35,16 @@ Durable cumulative memory across Flywheel orchestrator runs. Status snapshots ar
 - Run drain total: 6 closed/closed-out (1084, 2081, 1506, 1510, 1508, 2054) + 2 operator-merged (1884, 2088) + PAN-2157 filed & in-progress.
 - Next tick (tick-2 wakeup still pending, NOT rescheduled): verify main CI on 5bfa88d; if green close out PAN-1884/2088; watch agent-pan-2157-plan + agent-pan-1982-review.
 
+## RUN-33 tick 3 (2026-06-29 ~03:52Z) — main GREEN, PAN-1884/2088 closed out; merge-unblocker STALLED on a question; run is operator-gated
+
+- **Main CI GREEN on 5bfa88d** (success). Closed out **PAN-1884 + PAN-2088** (merged + main green). Cohort now ~11/17 terminal.
+- **PAN-1982 review convoy COMPLETED** (session gone, review=passed test=passed). It + MIN-831 + MIN-846 are ready-for-merge, main green — but auto-merge is dead (PAN-2157), so they need operator merge (gh pr merge --admin).
+- **CRITICAL: the PAN-2157 merge-unblocker agent STALLED asking the operator a question.** `pan plan PAN-2157 --auto` analyzed all 3 fix options, strongly recommended option 2 (gh/installation token), then ended with *\"Which way do you want me to go?\"* and went idle — `--auto` escalated to interactive on a decision the PRD already defaulted. The flywheel CANNOT unblock it (pan tell forbidden). So the single most important producer is stranded on a trivially-answerable question.
+  - **Filed PAN-2158** (bug/critical/substrate): `pan plan --auto` must auto-decide from PRD-documented options + default (record in plan.autoDecisions) instead of escalating; secondary: flywheel/deacon needs a path to advance a stalled-on-question agent.
+  - **Recorded the decision on PAN-2157** (comment): proceed with option 2 (gh-token). To unblock now, operator answers the agent 'go with option 2'.
+- **0 active producers this tick — and that is the honest state.** agent-pan-2157-plan stalled; agent-pan-1982/test idle (done); agent-2086 wedged; planning-pan-1506/1510/2157 are idle zombies (their work done). Backlog top verified-stale (3-for-3). The run is now **OPERATOR-GATED** on: (1) merge PAN-1982/MIN-831/MIN-846; (2) unblock PAN-2157 (answer 'option 2' or land PAN-2158); (3) restart WITHOUT --no-resume (recovers PAN-2086 + lets PAN-1718/2063 rebase). Did NOT force speculative launches — churn, not work.
+- Run drain total: 8 closed/closed-out (1084, 2081, 1506, 1510, 1508, 2054, 1884, 2088) + 2 operator-merged + 3 substrate bugs filed (2157, 2158, and earlier). Excellent drain; remaining blockers are all human-gated.
+
 ## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
 
 - **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
