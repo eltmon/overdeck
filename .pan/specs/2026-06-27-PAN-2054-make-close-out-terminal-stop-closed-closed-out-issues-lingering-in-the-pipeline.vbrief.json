@@ -4,17 +4,17 @@
     "created": "2026-06-27T03:58:53.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2054: Close-out is not terminal — closed/closed-out issues linger in the pipeline",
-    "updated": "2026-06-27T04:12:47.439Z"
+    "updated": "2026-06-29T03:46:13.854Z"
   },
   "plan": {
     "id": "pan-2054",
     "title": "Make close-out terminal: stop closed/closed-out issues lingering in the pipeline",
-    "status": "running",
+    "status": "completed",
     "uid": "78a6e9c3-f74a-4847-b3c5-5adb23a642a2",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-06-27T03:58:53.000Z",
-    "updated": "2026-06-27T04:12:47.439Z",
+    "updated": "2026-06-29T03:46:13.854Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2054",
@@ -482,5 +482,5 @@
       "canonicalFilename": "2026-06-27-PAN-2054-make-close-out-terminal-stop-closed-closed-out-issues-lingering-in-the-pipeline.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
