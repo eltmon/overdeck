@@ -623,7 +623,7 @@ describe('FeatureItem', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
   });
 
-  it('shows expanded UAT environment state for ready-for-merge issues', async () => {
+  it('collapses UAT environment panel by default and expands on header click for ready-for-merge issues', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url === '/api/workspaces/PAN-821') {
         return {
@@ -688,12 +688,24 @@ describe('FeatureItem', () => {
       />,
     );
 
+    // Collapsed by default: header, summary count and badge are visible; the
+    // per-service body (full label + service rows) is not rendered.
     expect(await screen.findByText('UAT environment')).toBeTruthy();
-    expect(await screen.findByText('UAT stack 1/2 healthy')).toBeTruthy();
-    expect(screen.getByText('api unhealthy: connection refused')).toBeTruthy();
-    expect(screen.getByText('postgres')).toBeTruthy();
-    expect(screen.getByText('api')).toBeTruthy();
     expect(screen.getByTestId('feature-uat-stack')).toBeTruthy();
+    expect(screen.queryByText('UAT stack 1/2 healthy')).toBeNull();
+    expect(screen.queryByText('postgres')).toBeNull();
+    expect(screen.queryByText('api')).toBeNull();
+
+    // Clicking the header expands and renders the per-service detail list.
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
+    expect(await screen.findByText('postgres')).toBeTruthy();
+    expect(screen.getByText('api')).toBeTruthy();
+    expect(screen.getByText('UAT stack 1/2 healthy')).toBeTruthy();
+
+    // Clicking again collapses and removes the service rows.
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
+    expect(screen.queryByText('postgres')).toBeNull();
+    expect(screen.queryByText('api')).toBeNull();
   });
 
   it('shows cleanup affordances for orphaned resources', () => {
