@@ -1,0 +1,431 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T04:16:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2152: Decompose src/cli/commands/workspace.ts (1791 lines) into focused modules",
+    "updated": "2026-06-29T04:23:11.634Z"
+  },
+  "plan": {
+    "id": "pan-2152",
+    "title": "Decompose src/cli/commands/workspace.ts (1791 lines) into focused modules",
+    "status": "proposed",
+    "uid": "46fd4b7e-9f43-471f-b6e7-9ac0ce9de247",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-29T04:16:23Z",
+    "updated": "2026-06-29T04:23:11.634Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2152",
+        "label": "PAN-2152",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codebase-health",
+      "refactor",
+      "cli",
+      "behavior-preserving"
+    ],
+    "narratives": {
+      "Problem": "src/cli/commands/workspace.ts is 1791 lines — well over the 1000-line file-size guard ceiling (scripts/lint-file-size.sh, baseline 1791). It mixes local workspace creation, remote (Fly) workspace lifecycle, list/destroy, beads bootstrap, and maintenance commands (use-config/update/add-repo) in one god file. The file is only baselined, not under-ceiling, so it must shrink to ratchet the codebase-health campaign forward.",
+      "Proposal": "Behavior-preserving decomposition. Extract five cohesive command groups into sibling `workspace-<group>.ts` files next to workspace.ts, matching the existing sibling-file convention (workspace-render-devcontainer.ts, workspace-deep-clean.ts, workspace-rebuild.ts, workspace-reap.ts). workspace.ts stays as the entry/barrel: it retains registerWorkspaceCommands (the program-wiring entry), statically imports the moved command functions, and re-exports destroyCommand + __testInternals so every existing importer (src/cli/index.ts, tests/cli/commands/workspace-beads-version.test.ts) resolves byte-for-byte unchanged. Pure relocation: no logic edits, no renamed exports, no signature changes. Each new file is far under 1000 lines. Extraction order follows the call graph (leaves first): beads -> remote -> create -> list -> maintenance, then a final guard-ratchet seam. After EACH seam: npm run typecheck && npm run lint && npx vitest run --configLoader runner (0 failed).",
+      "NonGoals": "- No logic changes, no bug fixes, no behavioral changes of any kind (pure move + re-export).\n- No renamed or removed exports; the public surface (registerWorkspaceCommands, destroyCommand, __testInternals) is preserved exactly.\n- No call-site / importer edits in src/cli/index.ts or any non-test consumer.\n- No changes to the already-extracted sibling files (workspace-render-devcontainer.ts, workspace-deep-clean.ts, workspace-rebuild.ts, workspace-reap.ts) or their dynamic-import wiring.\n- Not introducing any NEW `any`; existing `any` casts move verbatim with their code.\n- Not adding new submodules to scripts/file-size-baseline.txt (they pass as new files under the 1000-line ceiling); only the existing workspace.ts baseline entry is lowered.\n- Not converting execSync to async or otherwise modernizing moved code beyond what relocation requires."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose sibling `workspace-<group>.ts` files in src/cli/commands/ rather than a new src/cli/commands/workspace/ subdirectory.",
+        "rationale": "The repo already has the sibling-file pattern in active use (workspace-render-devcontainer.ts, workspace-deep-clean.ts, workspace-rebuild.ts, workspace-reap.ts) and they are wired via dynamic import from workspace.ts. Matching the established convention minimizes churn and keeps the barrel's import paths consistent; a new subdirectory would diverge from working precedent for no benefit."
+      },
+      {
+        "summary": "Grouped into 5 modules (beads, remote, create, list, maintenance) rather than one-file-per-command.",
+        "rationale": "Cohesion + the 1000-line ceiling drive the split. Per-command files would fragment tightly-coupled code (createRemoteWorkspace + convertToSshUrl + the remote start/stop/ssh commands belong together; createCommand alone is 411 lines). Five groups each land comfortably under the ceiling while keeping callers and callees co-located."
+      },
+      {
+        "summary": "registerWorkspaceCommands stays in workspace.ts rather than moving to its own file.",
+        "rationale": "The issue asks for workspace.ts to remain a thin entry/barrel. registerWorkspaceCommands IS the entry point that src/cli/index.ts calls; keeping it in workspace.ts (importing the moved handlers) keeps the public entry stable and the barrel naturally thin (~230 lines)."
+      },
+      {
+        "summary": "Linear bead chain (each blocks the next) instead of parallel extraction.",
+        "rationale": "Every extraction mutates the same workspace.ts (removing the moved code + adjusting the barrel imports/re-exports). Parallel extraction by separate subagents would conflict on workspace.ts. Shared-mutation is a legitimate dependency edge, so the beads are serialized."
+      },
+      {
+        "summary": "Added a final guard-ratchet bead to lower the workspace.ts entry in scripts/file-size-baseline.txt.",
+        "rationale": "The file-size guard lets a baselined file shrink but never grow; leaving the baseline at 1791 would permit silent regrowth. Lowering it to the post-refactor count locks the codebase-health win, which is the point of the campaign."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-beads",
+        "title": "Extract beads helpers into workspace-beads.ts (incl. __testInternals)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T04:16:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/workspace-beads.ts and move the beads-bootstrap helpers out of workspace.ts: `encodeBeadsVersion` (workspace.ts:47), `getBeadsVersion` (:58), the `REDIRECT_MANAGED_BEADS_VERSION` const (:45), `initializeWorkspaceBeads` (:96), and the `__testInternals` object (:165). Move only the imports these use (child_process exec/promisify, etc.). In workspace.ts, replace the moved code with `import { initializeWorkspaceBeads } from './workspace-beads.js'` (used by createCommand for now via the same module) and `export { __testInternals } from './workspace-beads.js'` so the existing test still resolves it from the barrel. Add the new file to eslint-any-allowlist.json (it carries the `catch (error: any)` at old :160). Remove now-unused imports from workspace.ts. Pure move — no logic edits."
+        },
+        "items": [
+          {
+            "id": "extract-beads.ac1",
+            "title": "workspace-beads.ts is created exporting initializeWorkspaceBeads and __testInternals; `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-beads.ac2",
+            "title": "tests/cli/commands/workspace-beads-version.test.ts passes unchanged (it imports __testInternals from commands/workspace.js, now re-exported from the barrel)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-beads.ac3",
+            "title": "src/cli/commands/workspace-beads.ts is added to eslint-any-allowlist.json and `npm run lint` exits 0 (no new explicit any, no unused imports)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-beads.ac4",
+            "title": "`npx vitest run --configLoader runner` exits 0 with no failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-remote",
+        "title": "Extract remote (Fly) workspace lifecycle into workspace-remote.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T04:16:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/workspace-remote.ts and move the remote-workspace functions out of workspace.ts: `convertToSshUrl` (:74), `createRemoteWorkspace` (:987), `MigrateOptions` (:1287) + `migrateCommand` (:1293), `syncAuthCommand` (:1310), `sshCommand` (:1361), `startCommand` (:1387), `stopCommand` (:1420), `destroyRemoteWorkspace` (:1450). Export createRemoteWorkspace, destroyRemoteWorkspace, migrateCommand, syncAuthCommand, sshCommand, startCommand, stopCommand (registerWorkspaceCommands wires migrate/ssh/sync-auth/start/stop; createCommand/destroyCommand consume createRemoteWorkspace/destroyRemoteWorkspace). In workspace.ts, import these from './workspace-remote.js'. Move the remote-only imports (createFlyProviderFromConfig, isRemoteAvailable, RemoteWorkspaceMetadata, workspace-metadata helpers) to the new file; drop them from workspace.ts if no longer used there. Add the new file to eslint-any-allowlist.json (carries `catch (error: any)` at old :1272). Pure move."
+        },
+        "items": [
+          {
+            "id": "extract-remote.ac1",
+            "title": "workspace-remote.ts is created and exports createRemoteWorkspace, destroyRemoteWorkspace, migrateCommand, syncAuthCommand, sshCommand, startCommand, stopCommand; `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-remote.ac2",
+            "title": "registerWorkspaceCommands wires the migrate/ssh/sync-auth/start/stop subcommands to the imported handlers; `pan workspace --help` prints those five subcommands identically to before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-remote.ac3",
+            "title": "src/cli/commands/workspace-remote.ts is added to eslint-any-allowlist.json and `npm run lint` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-remote.ac4",
+            "title": "workspace-remote.ts contains fewer than 1000 lines and `npx vitest run --configLoader runner` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-create",
+        "title": "Extract createCommand into workspace-create.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T04:16:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/workspace-create.ts and move `CreateOptions` (:307) + `createCommand` (:317-728) out of workspace.ts. The new file imports `initializeWorkspaceBeads` from './workspace-beads.js' and `createRemoteWorkspace` from './workspace-remote.js' (both already extracted). Export createCommand and CreateOptions. In workspace.ts, import createCommand from './workspace-create.js' and wire it in registerWorkspaceCommands (the `workspace create <issueId>` command at :174). Move createCommand's imports (worktree, template, context-layers, skills-merge, workspace-manager, claude-permissions, etc.) into the new file; prune any now-unused from workspace.ts. Add the new file to eslint-any-allowlist.json (carries 6 `any` casts: old :455/645/661/666/672/723). Pure move."
+        },
+        "items": [
+          {
+            "id": "extract-create.ac1",
+            "title": "workspace-create.ts is created exporting createCommand; it imports initializeWorkspaceBeads from ./workspace-beads.js and createRemoteWorkspace from ./workspace-remote.js; `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-create.ac2",
+            "title": "registerWorkspaceCommands wires `workspace create <issueId>` to the imported createCommand with identical options; `pan workspace create --help` prints unchanged options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-create.ac3",
+            "title": "src/cli/commands/workspace-create.ts is added to eslint-any-allowlist.json, is under 1000 lines, and `npm run lint` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-create.ac4",
+            "title": "`npx vitest run --configLoader runner` exits 0 with no failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-list",
+        "title": "Extract listCommand + destroyCommand into workspace-list.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T04:16:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/workspace-list.ts and move `ListOptions` (:729) + `listCommand` (:734), `DestroyOptions` (:865) + `destroyCommand` (:870-986) out of workspace.ts. The new file imports `destroyRemoteWorkspace` from './workspace-remote.js' (destroyCommand calls it at old :880). Export listCommand and destroyCommand. In workspace.ts: import listCommand from './workspace-list.js' for registerWorkspaceCommands' `list`/`destroy` wiring, AND `export { destroyCommand } from './workspace-list.js'` because src/cli/index.ts imports destroyCommand from the barrel (must not be edited). Add the new file to eslint-any-allowlist.json (carries `any` at old :931/971). Pure move."
+        },
+        "items": [
+          {
+            "id": "extract-list.ac1",
+            "title": "workspace-list.ts is created exporting listCommand and destroyCommand; it imports destroyRemoteWorkspace from ./workspace-remote.js; `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-list.ac2",
+            "title": "workspace.ts re-exports destroyCommand from ./workspace-list.js so src/cli/index.ts's `import { destroyCommand ... } from './commands/workspace.js'` resolves unchanged (index.ts is NOT edited)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-list.ac3",
+            "title": "src/cli/commands/workspace-list.ts is added to eslint-any-allowlist.json and `npm run lint` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-list.ac4",
+            "title": "`npx vitest run --configLoader runner` exits 0 with no failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-maintenance",
+        "title": "Extract use-config/update/add-repo into workspace-maintenance.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T04:16:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/workspace-maintenance.ts and move the maintenance commands out of workspace.ts: `UseConfigOptions` (:1489) + `useConfigCommand` (:1493), `UpdateOptions` (:1548) + `updateCommand` (:1552), `AddRepoOptions` (:1628) + `RepoGroups` (:1634) + `loadRepoGroups` (:1641) + `addRepoCommand` (:1649-1791). Export useConfigCommand, updateCommand, addRepoCommand. In workspace.ts, import them from './workspace-maintenance.js' and wire the `use-config`/`update`/`add-repo` subcommands. Move maintenance-only imports (copyOverdeckSettingsToWorkspaceSync, addReposToWorkspace, etc.) to the new file; prune unused from workspace.ts. Add the new file to eslint-any-allowlist.json (carries `any` at old :1542/1622/1750/1758/1759). Pure move."
+        },
+        "items": [
+          {
+            "id": "extract-maintenance.ac1",
+            "title": "workspace-maintenance.ts is created exporting useConfigCommand, updateCommand, addRepoCommand; `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-maintenance.ac2",
+            "title": "registerWorkspaceCommands wires `use-config`, `update`, and `add-repo` to the imported handlers; `pan workspace --help` prints all three subcommands identically to before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-maintenance.ac3",
+            "title": "src/cli/commands/workspace-maintenance.ts is added to eslint-any-allowlist.json and `npm run lint` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-maintenance.ac4",
+            "title": "`npx vitest run --configLoader runner` exits 0 with no failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-guard",
+        "title": "Ratchet the file-size baseline for workspace.ts and confirm the win",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T04:16:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "After all five extractions land, workspace.ts holds only its import header, registerWorkspaceCommands, and the destroyCommand/__testInternals re-exports (~230 lines). Lower the workspace.ts entry in scripts/file-size-baseline.txt from `1791 src/cli/commands/workspace.ts` to its actual new line count (use `wc -l src/cli/commands/workspace.ts`). Do NOT add the new submodules to the baseline — they pass the 1000-line ceiling as new files. Confirm every new submodule is under 1000 lines. Run the full gate one final time."
+        },
+        "items": [
+          {
+            "id": "ratchet-guard.ac1",
+            "title": "scripts/file-size-baseline.txt records the workspace.ts entry as the current `wc -l src/cli/commands/workspace.ts` count, far below 1791",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-guard.ac2",
+            "title": "Every src/cli/commands/workspace-*.ts file created by this issue contains fewer than 1000 lines and `npm run lint:file-size` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-guard.ac3",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npx vitest run --configLoader runner` exits 0 with no failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-guard.ac4",
+            "title": "src/cli/commands/workspace.ts preserves its public surface: registerWorkspaceCommands, destroyCommand, and re-exported __testInternals all resolve from the barrel unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-beads",
+        "to": "extract-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-remote",
+        "to": "extract-create",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-create",
+        "to": "extract-list",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-list",
+        "to": "extract-maintenance",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-maintenance",
+        "to": "ratchet-guard",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2152-decompose-src-cli-commands-workspace-ts-1791-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
