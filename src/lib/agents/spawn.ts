@@ -63,6 +63,7 @@ import {
   dismissDevChannelsDialog,
   prepareSupervisorForFreshLaunch,
   recordKickoffDeliveryFailure,
+  recordFatalWorkKickoffDeliveryFailure,
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
@@ -674,6 +675,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } catch (err) {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
+        if (role === 'work') {
+          await recordFatalWorkKickoffDeliveryFailure(state, options.issueId, err instanceof Error ? err.message : String(err));
+        }
         await recordKickoffDeliveryFailure(state, options.issueId, role);
         if (role === 'strike') {
           await Effect.runPromise(stopAgent(agentId));
@@ -695,6 +699,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } else if (tracksKickoffDelivery) {
       if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
         await recordStartupSessionExit(state, options.issueId, role);
+      }
+      if (role === 'work') {
+        await recordFatalWorkKickoffDeliveryFailure(state, options.issueId, delivery.failure ?? 'unknown error');
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       if (role === 'strike') {
