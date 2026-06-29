@@ -128,6 +128,8 @@ export interface QualityGateConfig {
 }
 
 export interface DatabaseConfig extends Record<string, unknown> {
+  /** Built-in database provisioner implementation */
+  provisioner?: 'flyway-postgres';
   /** Database name used by workspace database commands */
   name: string;
   /** Path to seed file for database initialization */
