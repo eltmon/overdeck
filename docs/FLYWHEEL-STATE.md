@@ -13,6 +13,11 @@ Durable cumulative memory across Flywheel orchestrator runs. Status snapshots ar
 - Cohort tally: 9 terminal + PAN-1884 merged (verifying). Remaining active: PAN-1982 (ready-merge), 2054/1718/2063 (in-review), 2086 (wedged), 806/1864 (held).
 - Next tick: (1) **verify main CI conclusion** on 5bfa88d — if red, P0; if green, close out PAN-1884/2088 and push PAN-1982/MIN merges; (2) watch agent-pan-2157-plan → review (it bootstraps autonomous merge); (3) watch planning-pan-1506 → work.
 
+### RUN-33 tick-2 addendum (~03:37Z) — PAN-1506 already-fixed → CLOSED; producer re-pointed at PAN-1510
+
+- **planning-pan-1506 came back "already resolved, no vBRIEF" — and it was RIGHT.** PAN-1506 (strike agents missing from frontend store) was already fixed by PAN-1908/1938/1979 (role-guard now includes `strike`, `/api/agents` + WS snapshot both read unified overdeck.db, projection-cache fast-bootstrap removed). **Verified before closing:** ran `src/dashboard/server/__tests__/read-model-agent-source.test.ts` → 4/4 passing; `VALID_ROLES` (read-model.ts:226) includes `strike`; documented at docs/ROLES.md + resource-discovery.ts (PAN-1682). **Closed PAN-1506 as completed** with evidence comment. LESSON: treat a plan agent's "already-fixed, recommend close" as data → verify the strongest claim (run the named regression test) → close. Don't spawn a work agent on a non-bug.
+- **Re-pointed the 2nd producer: launched `pan plan PAN-1510 --auto` → planning-pan-1510** (parallel "newly-filed issues missing from store" bug). Unlike 1506, PAN-1510 has NO obvious regression test and a distinct code path (issue-data-service cache invalidation, not agent source), so it's genuinely unverified — worth planning (will fix or report already-resolved). Kept the existing tick-2 wakeup; did not reschedule.
+
 ## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
 
 - **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
