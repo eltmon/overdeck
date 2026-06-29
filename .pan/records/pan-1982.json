@@ -80,30 +80,44 @@
       "timestamp": "2026-06-20T23:57:03.003Z"
     },
     {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-29T03:40:09.640Z"
+      "reason": "feedback",
+      "note": "[2026-06-29T13:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T13:12:18.331Z"
     },
     {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-29T13:11:26.741Z"
+      "reason": "feedback",
+      "note": "[2026-06-29T13:12Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-29T13:12:25.842Z"
     }
   ],
-  "feedback": [],
-  "created": "2026-06-29T03:03:17.555Z",
-  "updated": "2026-06-29T13:11:26.741Z",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T13:12:18Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1982\n\nWorkspace detached at b14f5100 with unresolved scripts/file-size-baseline.txt conflict; requested head 4cd21d1d not reviewable\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1982 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T13:12:25Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1982\n\nWorkspace detached at b14f5100 with unresolved scripts/file-size-baseline.txt conflict; requested head 4cd21d1d not reviewable\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1982 -m \"Fixed review issues\"`"
+    }
+  ],
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1982",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:11:26.611Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
-    "testNotes": "PAN-1982 verification complete. Gates: npm run typecheck (✓), npm run lint (✓ includes skills lint), npm test (✓ 7531 core + 32 frontend tests passed). Implementation verified: resolveReviewMode() synchronous resolver at review-agent.ts properly resolves per-issue→project→global→'quick'. Spawn path branches on isExtendedReviewEnabled(opts.issueId) and conditionally spawns spawnConvoyReviewers. Dashboard reviewer-tree gate at reviewer-tree.ts:322 passes issueId to isExtendedReviewEnabled(). Config field roles.review.mode added to config-yaml.ts with validation. CLI command 'pan review mode <id> <quick|full>' registered and persists reviewMode to per-issue record. SKILL.md updated with new subcommand documentation. Resume-by-default preserved for convoy re-review via reviewResumeDecision. All six parked convoy bugs (PAN-1861, PAN-1864, PAN-1130, PAN-1207, PAN-838, PAN-1131) re-verified and marked obsolete in continue.json. Browser dashboard server (Node 22) started and tested. UAT verified: review mode configuration gating reviewed lanes on/off, spawn path bifurcation, and CLI setter working correctly.",
+    "updatedAt": "2026-06-29T13:12:18.285Z",
+    "reviewNotes": "Workspace detached at b14f5100 with unresolved scripts/file-size-baseline.txt conflict; requested head 4cd21d1d not reviewable",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2112"
   },
   "closeOut": {
@@ -178,7 +192,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.709705,
-        "pricingAsOf": "2026-06-29T13:11:26.678Z"
+        "pricingAsOf": "2026-06-29T13:12:18.324Z"
       }
     },
     "merges": [
@@ -186,6 +200,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "created": "2026-06-29T13:12:18.327Z",
+  "updated": "2026-06-29T13:12:25.842Z"
 }
