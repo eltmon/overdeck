@@ -363,6 +363,30 @@ export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
+export const BOOT_RECONCILIATION_DECISION_KEY = 'boot_reconciliation.decision';
+export const BOOT_RECONCILIATION_PER_AGENT_KEY = 'boot_reconciliation.per_agent';
+export const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_at';
+export const BOOT_RECONCILIATION_BOOT_ID_KEY = 'boot_reconciliation.boot_id';
+export const BOOT_RECONCILIATION_GRACE_DEADLINE_KEY = 'boot_reconciliation.grace_deadline';
+
+export type BootReconciliationDecision = 'pending' | 'resume_all' | 'hold_all' | 'per_agent';
+export type BootReconciliationPerAgentAction = 'resume' | 'hold';
+export type BootReconciliationPerAgentMap = Record<string, BootReconciliationPerAgentAction>;
+
+export interface BootReconciliationState {
+  decision: BootReconciliationDecision | null;
+  perAgent: BootReconciliationPerAgentMap;
+  decidedAt: string | null;
+  bootId: string | null;
+  graceDeadline: string | null;
+}
+
+const BOOT_RECONCILIATION_DECISIONS = new Set<BootReconciliationDecision>([
+  'pending',
+  'resume_all',
+  'hold_all',
+  'per_agent',
+]);
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
@@ -379,6 +403,59 @@ export function setSetting(key: string, value: string): void {
     `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
   ).run(key, value, now);
+}
+
+function parseBootReconciliationDecision(value: string | null): BootReconciliationDecision | null {
+  if (value && BOOT_RECONCILIATION_DECISIONS.has(value as BootReconciliationDecision)) {
+    return value as BootReconciliationDecision;
+  }
+  return null;
+}
+
+function parseBootReconciliationPerAgent(value: string | null): BootReconciliationPerAgentMap {
+  if (!value) return {};
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+
+    const perAgent: BootReconciliationPerAgentMap = {};
+    for (const [issueId, action] of Object.entries(parsed)) {
+      if (action === 'resume' || action === 'hold') {
+        perAgent[issueId] = action;
+      }
+    }
+    return perAgent;
+  } catch (err) {
+    console.warn('[control-settings] Failed to parse boot reconciliation per-agent map:', err);
+    return {};
+  }
+}
+
+export function getBootReconciliationState(): BootReconciliationState {
+  return {
+    decision: parseBootReconciliationDecision(getSetting(BOOT_RECONCILIATION_DECISION_KEY)),
+    perAgent: parseBootReconciliationPerAgent(getSetting(BOOT_RECONCILIATION_PER_AGENT_KEY)),
+    decidedAt: getSetting(BOOT_RECONCILIATION_DECIDED_AT_KEY),
+    bootId: getSetting(BOOT_RECONCILIATION_BOOT_ID_KEY),
+    graceDeadline: getSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY),
+  };
+}
+
+export function setBootReconciliationDecision(
+  decision: BootReconciliationDecision,
+  perAgent: BootReconciliationPerAgentMap = {},
+): void {
+  setSetting(BOOT_RECONCILIATION_DECISION_KEY, decision);
+  setSetting(BOOT_RECONCILIATION_PER_AGENT_KEY, JSON.stringify(perAgent));
+  setSetting(BOOT_RECONCILIATION_DECIDED_AT_KEY, new Date().toISOString());
+}
+
+export function stampBootReconciliation(bootId: string, graceDeadline: string): void {
+  setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
+  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
 }
 
 /** Synchronous check of the global Deacon pause flag. */

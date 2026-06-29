@@ -49,10 +49,8 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { getNoResumeMode, disableNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
-import { autoResumeStoppedWorkAgents } from '../../../lib/cloister/deacon.js';
+import { applyBootReconciliationDecision } from '../../../lib/cloister/deacon.js';
 import { createSession, killSession, listSessionNames, resizeWindow, sendKeys, sessionExists } from '../../../lib/tmux.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
@@ -76,10 +74,16 @@ import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
-import { isDeaconGloballyPausedSync as isDeaconGloballyPaused, setDeaconGloballyPausedSync as setDeaconGloballyPaused } from '../../../lib/overdeck/control-settings.js';
+import {
+  getBootReconciliationState,
+  setBootReconciliationDecision,
+  isDeaconGloballyPausedSync as isDeaconGloballyPaused,
+  setDeaconGloballyPausedSync as setDeaconGloballyPaused,
+} from '../../../lib/overdeck/control-settings.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getAgentStateFilePath } from '../../../lib/agents.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
+import { bootReconciliationRouteLayer } from './boot-reconciliation.js';
 
 const execAsync = promisify(exec);
 
@@ -674,32 +678,24 @@ const postRallyValidateRoute = HttpRouter.add(
   }),
 );
 
-// ─── Route: GET /api/no-resume-mode ─────────────────────────────────────────
-
 const getNoResumeModeRoute = HttpRouter.add(
   'GET',
   '/api/no-resume-mode',
-  Effect.sync(() => jsonResponse(getNoResumeMode())),
+  Effect.sync(() => {
+    const state = getBootReconciliationState();
+    const active = state.decision === 'pending' || state.decision === 'hold_all';
+    return jsonResponse({ active, since: active ? state.decidedAt ?? state.graceDeadline : null });
+  }),
 );
 
-// ─── Route: POST /api/resume-all ─────────────────────────────────────────────
-
-/**
- * Operator "Resume all" — the call-to-action behind the no-resume banner.
- * PAN-1963 makes agent auto-resume OFF by default at every boot, so after the
- * dashboard loads, stopped agents wait for the operator to put them back to
- * work. This clears no-resume mode for the running process (so the Deacon's
- * patrols and lifecycle-event handlers resume agents again) and immediately
- * sweeps the stopped work agents rather than waiting for the next patrol tick.
- */
 const postResumeAllRoute = HttpRouter.add(
   'POST',
   '/api/resume-all',
   Effect.promise(async () => {
     try {
-      disableNoResumeMode();
-      const resumed = await autoResumeStoppedWorkAgents();
-      console.log(`[resume-all] No-resume mode cleared; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
+      setBootReconciliationDecision('resume_all');
+      const resumed = await applyBootReconciliationDecision();
+      console.log(`[resume-all] Boot reconciliation decision set to resume_all; resumed ${resumed.length} work agent(s)${resumed.length ? `: ${resumed.join(', ')}` : ''}`);
       return jsonResponse({ ok: true, resumed, count: resumed.length });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -1805,6 +1801,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postRallyValidateRoute,
   getNoResumeModeRoute,
   postResumeAllRoute,
+  bootReconciliationRouteLayer,
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,

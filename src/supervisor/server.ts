@@ -78,7 +78,10 @@ async function heldRestartMessage(): Promise<string> {
   return `restart in progress (${heldBy})`;
 }
 
-async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promise<SpawnRestartResult> {
+async function spawnRestart(options: {
+  restartLockHeld?: boolean;
+  bootId?: string | null;
+} = {}): Promise<SpawnRestartResult> {
   let lock: RestartLockHandle | null = null;
   if (!options.restartLockHeld) {
     lock = await Effect.runPromise(acquireRestartLock('supervisor restart'));
@@ -100,6 +103,7 @@ async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promis
         ...process.env,
         OVERDECK_RESTART_LOCK_HELD: '1',
         OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
+        ...(options.bootId ? { OVERDECK_BOOT_ID: options.bootId } : {}),
       },
     });
 

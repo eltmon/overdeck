@@ -119,6 +119,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/cloister/config',                  kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG cloister.toml' },
   { surface: 'PUT /api/cloister/config',                  kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG cloister.toml' },
   { surface: 'GET /api/cloister/agents/health',           kind: 'http', disposition: 'RELOCATE',    door: 'AgentsResolver.getHealthHistory ×N' },
+  { surface: 'GET /api/boot-reconciliation',              kind: 'http', disposition: 'AGGREGATE',   door: 'BootReconciliationRuntime.getState + AgentsResolver.list' },
+  { surface: 'POST /api/boot-reconciliation/decision',    kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.bootReconciliationDecision + CloisterRuntime.apply' },
 
   // ── codex-auth.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/settings/codex-auth',              kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
