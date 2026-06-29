@@ -109,14 +109,22 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       if (dev) {
         try {
           process.kill(dev.pid, 'SIGUSR2');
-          console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
-          console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
-          await recordReloadStatus(startedAt, true, undefined);
         } catch (err: any) {
           const msg = `Failed to signal pan dev (pid ${dev.pid}): ${err.message}`;
           console.error(chalk.red(msg));
           await recordReloadStatus(startedAt, false, msg);
           process.exitCode = 2;
+          return;
+        }
+        console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
+        console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
+        try {
+          await recordReloadStatus(startedAt, true, undefined);
+        } catch (err: any) {
+          const msg = `Reload signaled, but failed to record reload status: ${err.message}`;
+          console.error(chalk.red(msg));
+          process.exitCode = 2;
+          return;
         }
         return;
       }

@@ -133,9 +133,8 @@ export function startSupervisorProcessSync(): void {
   // Give the child a moment to either come up or crash (e.g. port still held).
   sleepMs(150);
   if (!isProcessAlive(child.pid)) {
-    console.error(
-      `[supervisor] child ${child.pid} exited immediately; the supervisor port may still be held by a previous instance`,
-    );
+    const message = `[supervisor] child ${child.pid} exited immediately; the supervisor port may still be held by a previous instance`;
+    console.error(message);
     try {
       unlinkSync(SUPERVISOR_PID_PATH);
     } catch {
@@ -146,7 +145,7 @@ export function startSupervisorProcessSync(): void {
     } catch {
       // ignore
     }
-    return;
+    throw new Error(message);
   }
 
   child.unref();

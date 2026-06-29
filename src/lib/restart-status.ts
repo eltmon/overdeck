@@ -79,24 +79,11 @@ function parseRestartEventLine(line: string): RestartStatus | null {
   }
 }
 
-async function trimRestartEvents(path: string): Promise<void> {
-  try {
-    const content = await readFile(path, 'utf8');
-    const lines = content.split('\n').filter((line) => line.trim() !== '');
-    if (lines.length <= MAX_JOURNAL_ENTRIES) return;
-    const trimmed = lines.slice(-MAX_JOURNAL_ENTRIES);
-    await writeFile(path, `${trimmed.join('\n')}\n`, 'utf8');
-  } catch {
-    // Best-effort cap.
-  }
-}
-
 async function appendRestartEvent(entry: RestartStatus): Promise<void> {
   try {
     const path = restartEventsPath();
     await mkdir(dirname(path), { recursive: true });
     await appendFile(path, `${JSON.stringify(entry)}\n`, 'utf8');
-    await trimRestartEvents(path);
   } catch {
     // Journal append is best-effort and must never fail the primary status write.
   }
@@ -111,7 +98,7 @@ async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   await appendRestartEvent(entry);
 }
 
-async function readRestartEventsPromise(limit?: number): Promise<RestartStatus[]> {
+async function readRestartEventsPromise(limit: number = MAX_JOURNAL_ENTRIES): Promise<RestartStatus[]> {
   try {
     const content = await readFile(restartEventsPath(), 'utf8');
     const events: RestartStatus[] = [];
@@ -119,13 +106,13 @@ async function readRestartEventsPromise(limit?: number): Promise<RestartStatus[]
       const event = parseRestartEventLine(line);
       if (event) events.push(event);
     }
-    if (limit !== undefined && limit >= 0 && events.length > limit) {
+    if (limit >= 0 && events.length > limit) {
       return events.slice(-limit);
     }
     return events;
   } catch (error) {
     if (isErrnoException(error) && error.code === 'ENOENT') return [];
-    return [];
+    throw error;
   }
 }
 

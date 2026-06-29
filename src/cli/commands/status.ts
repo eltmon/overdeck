@@ -53,7 +53,12 @@ export function formatRestartStatusLines(status: RestartStatus | null, events: R
   if (status.error) {
     lines.push(`  ${chalk.dim(status.error)}`);
   }
-  const concurrent = detectConcurrentRestartWriters(events);
+  const statusTs = new Date(status.ts).getTime();
+  const windowEvents = events.filter((event) => {
+    const eventTs = new Date(event.ts).getTime();
+    return Number.isFinite(eventTs) && Math.abs(eventTs - statusTs) <= 60_000;
+  });
+  const concurrent = detectConcurrentRestartWriters(windowEvents);
   if (concurrent.length > 0) {
     const descriptions = concurrent
       .map((event) => `pid ${event.pid ?? 'unknown'}${event.initiator ? ` (${event.initiator})` : ''}`)

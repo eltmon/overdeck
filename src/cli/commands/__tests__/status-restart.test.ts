@@ -1,8 +1,9 @@
-import chalk from 'chalk';
 import { describe, expect, it } from 'vitest';
 import { formatRestartStatusLines } from '../status.js';
 
-chalk.level = 0;
+function stripAnsi(value: string): string {
+  return value.replace(/\x1b\[[0-9;]*m/g, '');
+}
 
 describe('formatRestartStatusLines', () => {
   it('renders pid and initiator on the restart line', () => {
@@ -17,7 +18,7 @@ describe('formatRestartStatusLines', () => {
         initiator: 'conv-20260610-573d',
       },
       [],
-    );
+    ).map(stripAnsi);
 
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('pid 1733121');
@@ -47,7 +48,7 @@ describe('formatRestartStatusLines', () => {
       },
     ];
 
-    const lines = formatRestartStatusLines(events[1], events);
+    const lines = formatRestartStatusLines(events[1], events).map(stripAnsi);
 
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain('Concurrent restart writers detected');
@@ -65,7 +66,7 @@ describe('formatRestartStatusLines', () => {
         attempts: 1,
       },
       [],
-    );
+    ).map(stripAnsi);
 
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/^Last dashboard restart:/);

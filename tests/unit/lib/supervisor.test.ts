@@ -74,7 +74,7 @@ describe('supervisor lifecycle', () => {
         fakeChild(DEAD_PID) as never,
       );
 
-      startSupervisorProcessSync();
+      expect(() => startSupervisorProcessSync()).toThrow(/exited immediately/);
 
       expect(existsSync(join(home, 'supervisor.pid'))).toBe(false);
       expect(isSupervisorRunningSync()).toBe(false);
