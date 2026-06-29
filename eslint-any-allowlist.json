@@ -43,6 +43,7 @@
   "src/cli/commands/workspace-beads.ts",
   "src/cli/commands/workspace-create.ts",
   "src/cli/commands/workspace-list.ts",
+  "src/cli/commands/workspace-maintenance.ts",
   "src/cli/commands/workspace-migrate.ts",
   "src/cli/commands/workspace-remote.ts",
   "src/cli/commands/workspace-reap.ts",
