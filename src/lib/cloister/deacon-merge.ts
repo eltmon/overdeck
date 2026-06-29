@@ -400,6 +400,70 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
   return actions;
 }
 
+const staleMergeBlockerCooldowns = new Map<string, number>();
+const STALE_MERGE_BLOCKER_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+
+/**
+ * Reconciler: re-evaluate stale merge-blockers so resolved conflicts unstick.
+ *
+ * resolveConflictGate() already clears a stale merge_conflict/not_mergeable
+ * blocker once the branch is mergeable against main again — but it only runs
+ * on-demand from the review-dispatch routes. An issue that picks up a
+ * merge-blocker (so readyForMerge stays false) and then falls out of the active
+ * review flow is therefore never re-evaluated: the blocker persists forever and
+ * the merge train never picks it up. That is the "stuck after review" failure
+ * mode (PAN-2143) — a PR that was conflicting while main moved stays blocked
+ * even after the conflict is resolved.
+ *
+ * This patrol runs resolveConflictGate for every in-pipeline issue still
+ * carrying a merge-blocker. When the branch became mergeable again it clears the
+ * stale blocker (which lets setReviewStatus recompute readyForMerge so the merge
+ * train resumes); when the branch is genuinely conflicting, resolveConflictGate
+ * dispatches the conflict resolver on its existing throttle. A per-issue 2-min
+ * cooldown bounds the git-probe cost; resolveConflictGate also caches its
+ * mergeability probe.
+ */
+export async function reconcileStaleMergeBlockers(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { resolveConflictGate, buildRealConflictGateDeps } = await import('./conflict-gate.js');
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+    const deps = buildRealConflictGateDeps();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus === 'merged') continue;
+      const hasMergeBlocker = (status.blockerReasons ?? []).some(
+        (b) => b.type === 'merge_conflict' || b.type === 'not_mergeable',
+      );
+      if (!hasMergeBlocker) continue;
+
+      const cooledUntil = staleMergeBlockerCooldowns.get(issueId);
+      if (cooledUntil && now < cooledUntil) continue;
+      staleMergeBlockerCooldowns.set(issueId, now + STALE_MERGE_BLOCKER_COOLDOWN_MS);
+
+      const resolved = resolveProjectFromIssueSync(issueId);
+      if (!resolved) continue;
+      const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+      if (!existsSync(workspacePath)) continue;
+
+      try {
+        const result = await resolveConflictGate(issueId, workspacePath, 'main', deps);
+        if (result.clearedStaleBlocker) {
+          const msg = `Cleared stale merge blocker for ${issueId} — branch is mergeable again; readyForMerge will recompute`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        }
+      } catch (gateErr: unknown) {
+        console.warn(`[deacon] reconcileStaleMergeBlockers: ${issueId} conflict-gate failed: ${gateErr instanceof Error ? gateErr.message : String(gateErr)}`);
+      }
+    }
+  } catch (err: unknown) {
+    console.warn(`[deacon] Error in reconcileStaleMergeBlockers: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return actions;
+}
+
 export async function reconcileMergedButReviewing(): Promise<string[]> {
   const actions: string[] = [];
   try {
