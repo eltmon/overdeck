@@ -12,6 +12,11 @@
       "timestamp": "2026-06-27T17:41:07.922Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-27T17:42:50.253Z"
     }
   ],
   "feedback": [],
@@ -23,17 +28,25 @@
     "auto-start.ac4": "completed"
   },
   "created": "2026-06-26T03:32:56.369Z",
-  "updated": "2026-06-27T17:41:15.317Z",
+  "updated": "2026-06-29T00:41:10.985Z",
   "pipeline": {
     "issueId": "PAN-1884",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T17:41:15.271Z",
+    "updatedAt": "2026-06-29T00:41:10.964Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-29T00:41:10.964Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2109",
-    "reviewRequestedAt": "2026-06-27T17:41:07.923Z"
+    "reviewedAtCommit": "66d3c01292b8fc594110ac31f62f9568bee99b1b",
+    "lastVerifiedCommit": "66d3c01292b8fc594110ac31f62f9568bee99b1b"
   },
   "closeOut": {
     "usage": {
@@ -56,9 +69,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 525259,
-            "output": 116101,
-            "cacheRead": 39705600,
+            "input": 534609,
+            "output": 118491,
+            "cacheRead": 42561280,
             "cacheWrite": 0
           }
         }
@@ -77,15 +90,15 @@
           "cacheWrite": 204001
         },
         "custom/kimi-k2.7-code": {
-          "input": 525259,
-          "output": 116101,
-          "cacheRead": 39705600,
+          "input": 534609,
+          "output": 118491,
+          "cacheRead": 42561280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.092443,
-        "pricingAsOf": "2026-06-27T17:41:15.316Z"
+        "usd": 11.653463,
+        "pricingAsOf": "2026-06-29T00:41:10.983Z"
       }
     },
     "merges": [
@@ -93,6 +106,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code"
 }
