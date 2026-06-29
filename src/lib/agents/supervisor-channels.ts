@@ -21,7 +21,6 @@ import {
   type AgentState,
   type Role,
 } from './agent-state.js';
-import { stopAgent } from './termination.js';
 
 interface SupervisorChannelsSpawnOptions {
   issueId: string;
@@ -82,51 +81,6 @@ export async function recordKickoffDeliveryFailure(state: AgentState, issueId: s
     message: `${state.id}: kickoff delivery failed`,
     issueId,
   });
-}
-
-// PAN-2179: a work-agent kickoff that fails delivery must NOT be left running
-// (the silent-zombie failure mode that produced plan-only "completions"). Stop
-// the session so liveness checks see it as not-running, mark it troubled, and
-// throw so the spawn fails loudly. The resume path re-delivers the kickoff
-// (buildResumeMessageForAgent re-reads initial-prompt.md when kickoffDelivered
-// is false) once the operator clears the troubled gate.
-export async function recordFatalWorkKickoffDeliveryFailure(
-  state: AgentState,
-  issueId: string,
-  failure: string,
-): Promise<never> {
-  await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
-  try {
-    await Effect.runPromise(stopAgent(state.id));
-  } catch (err) {
-    console.warn(`[${state.id}] failed to stop after kickoff delivery failure:`, err instanceof Error ? err.message : String(err));
-  }
-  const now = new Date().toISOString();
-  const failedState = await Effect.runPromise(getAgentState(state.id));
-  if (failedState) {
-    failedState.status = 'stopped';
-    failedState.stoppedAt = now;
-    delete failedState.stoppedByUser;
-    failedState.kickoffDelivered = false;
-    failedState.troubled = true;
-    failedState.troubledAt ??= now;
-    failedState.lastFailureReason = 'kickoff delivery failed';
-    await Effect.runPromise(saveAgentState(failedState));
-  }
-  state.status = 'stopped';
-  state.stoppedAt = now;
-  delete state.stoppedByUser;
-  state.kickoffDelivered = false;
-  state.troubled = true;
-  state.troubledAt ??= now;
-  state.lastFailureReason = 'kickoff delivery failed';
-  emitActivityEntrySync({
-    source: 'work-agent',
-    level: 'error',
-    message: `${state.id}: fatal kickoff delivery failed`,
-    issueId,
-  });
-  throw new Error(`Agent ${state.id} kickoff delivery failed: ${failure}`);
 }
 
 interface ChannelsDecision {

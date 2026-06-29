@@ -15,7 +15,6 @@ import {
   SESSION_EXITED_BEFORE_KICKOFF,
 } from '../agents.js';
 import { sendKeys, sessionExists } from '../tmux.js';
-import { getLatestSessionIdSync } from './activity.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
@@ -400,28 +399,9 @@ export async function deliverInitialPromptWithRetry(
 
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     try {
-      // PAN-2179: don't trust deliverAgentMessage's `ok` alone — the tmux
-      // fallback reports ok even when the paste never lands. Confirm the kickoff
-      // actually appeared in the transcript before declaring success, so a silent
-      // non-delivery is reported as a failure (→ fatal for work agents) instead
-      // of a running zombie.
-      const latestState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
-      const workspace = latestState?.workspace;
-      const sessionId = getLatestSessionIdSync(normalizeAgentId(agentId));
-      const before = workspace && sessionId
-        ? await captureTranscriptUserRecordSnapshot(workspace, sessionId)
-        : null;
       const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
-      if (result.ok && workspace && sessionId && before) {
-        if (await waitForTranscriptUserRecordLanding(workspace, sessionId, before, captureTranscriptUserRecordSnapshot)) {
-          return result;
-        }
-        lastFailure = `transcript-confirmation-timeout:${sessionId}`;
-      } else if (result.ok) {
-        lastFailure = 'transcript-confirmation-unavailable';
-      } else {
-        lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
-      }
+      if (result.ok) return result;
+      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
     } catch (err) {
       lastFailure = err instanceof Error ? err.message : String(err);
     }
