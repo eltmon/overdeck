@@ -81,6 +81,16 @@
       "reason": "feedback",
       "note": "[2026-06-29T20:51Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T20:51:32.214Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-29T20:54:12.860Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T20:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-29T20:54:57.882Z"
     }
   ],
   "feedback": [
@@ -88,14 +98,7 @@
       "seq": 1,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-06-29T20:49:53Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nPAN-2172 planning artifact is included in the PAN-1718 review diff\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T20:51:32Z",
+      "timestamp": "2026-06-29T20:54:57Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nPAN-2172 planning artifact is included in the PAN-1718 review diff\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
     }
   ],
@@ -109,11 +112,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T20:51:31.473Z",
+    "updatedAt": "2026-06-29T20:54:57.057Z",
     "reviewNotes": "PAN-2172 planning artifact is included in the PAN-1718 review diff",
     "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
-    "lastVerifiedCommit": "b4672b30dfa3252a3d570d63c6a070c28865369d",
+    "lastVerifiedCommit": "0020a201f162e6dc6d8bffe3b815e6cdb2d1681d",
     "reviewRequestedAt": "2026-06-29T20:48:38.506Z"
   },
   "closeOut": {
@@ -153,9 +156,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1994750,
-            "output": 194924,
-            "cacheRead": 88684288,
+            "input": 2004154,
+            "output": 198806,
+            "cacheRead": 91088128,
             "cacheWrite": 0
           }
         }
@@ -186,15 +189,15 @@
           "cacheWrite": 184046
         },
         "custom/kimi-k2.7-code": {
-          "input": 1994750,
-          "output": 194924,
-          "cacheRead": 88684288,
+          "input": 2004154,
+          "output": 198806,
+          "cacheRead": 91088128,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 27.850212,
-        "pricingAsOf": "2026-06-29T20:51:31.502Z"
+        "usd": 28.331404,
+        "pricingAsOf": "2026-06-29T20:54:57.086Z"
       }
     },
     "merges": [
@@ -203,7 +206,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T20:51:32.214Z",
+  "updated": "2026-06-29T20:54:57.882Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
