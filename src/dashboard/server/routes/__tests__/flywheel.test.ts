@@ -12,7 +12,6 @@ import {
   getFlywheelConversationPayload,
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
-  getMergeBackendPayload,
   deleteAutoMergePayload,
   getFlywheelStatsPayload,
   getPendingAutoMergePayload,
@@ -25,6 +24,7 @@ import {
   postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
+import { getMergeBackendPayload } from '../flywheel-merge-backend.js';
 import { initEventStore } from '../../event-store.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';

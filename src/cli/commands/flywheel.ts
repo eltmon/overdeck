@@ -33,7 +33,7 @@ import {
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
-import { getMergeBackendStatus, type MergeBackendStatus } from '../../lib/github-app.js';
+import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -433,26 +433,6 @@ export function formatFlywheelStatus(status: FlywheelStatus): string {
     `Main HEAD: ${status.system.mainHead.slice(0, 7)}`,
     `Last tick: ${status.lastTickAt}`,
   ].join('\n');
-}
-
-function formatMergeBackendStatus(status: MergeBackendStatus): string {
-  if (status.available) {
-    return `Merge backend: ${status.mode} (${status.detail})`;
-  }
-  return `Merge backend: UNAVAILABLE - ${status.detail}`;
-}
-
-async function loadMergeBackendStatusForCli(): Promise<MergeBackendStatus> {
-  try {
-    return await getMergeBackendStatus();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      available: false,
-      mode: 'none',
-      detail: `Unable to determine merge backend: ${message}`,
-    };
-  }
 }
 
 export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {

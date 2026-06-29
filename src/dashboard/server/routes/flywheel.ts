@@ -44,7 +44,6 @@ import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
-import { getMergeBackendStatus, type MergeBackendStatus } from '../../../lib/github-app.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/overdeck/review-status-sync.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
@@ -58,6 +57,7 @@ import {
   type ScheduleAutoMergeInput,
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
+import { getMergeBackendRoute } from './flywheel-merge-backend.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -100,10 +100,6 @@ interface FlywheelStatusResponse {
 interface FlywheelStatsResponse {
   status: number;
   body: FlywheelStatsPayload | { error: string; details?: string[] };
-}
-
-interface MergeBackendDeps {
-  getStatus?: () => Promise<MergeBackendStatus>;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -353,7 +349,6 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
   return { status: 200, body: result.entry };
 }
-
 export function getPendingAutoMergePayload(): PendingAutoMerge[] {
   return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
 }
@@ -610,23 +605,11 @@ export function getMergeBlockersPayload(): Array<{
   return out;
 }
 
-export async function getMergeBackendPayload(deps: MergeBackendDeps = {}): Promise<MergeBackendStatus> {
-  return (deps.getStatus ?? getMergeBackendStatus)();
-}
-
 const getMergeBlockersRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/merge-blockers',
   httpHandler(Effect.gen(function* () {
     return jsonResponse(getMergeBlockersPayload());
-  })),
-);
-
-const getMergeBackendRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/merge-backend',
-  httpHandler(Effect.gen(function* () {
-    return yield* Effect.promise(async () => jsonResponse(await getMergeBackendPayload()));
   })),
 );
 
@@ -666,7 +649,6 @@ export async function postFlywheelMergeNextPayload(payload: unknown, deps: Merge
   const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
   return { status: 200, body: { outcomes } };
 }
-
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',

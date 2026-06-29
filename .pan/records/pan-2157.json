@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2157",
   "schemaVersion": 2,
-  "created": "2026-06-29T03:07:15.168Z",
-  "updated": "2026-06-29T03:07:29.474Z",
-  "pipeline": {
-    "issueId": "PAN-2157",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T03:07:15.168Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,77 @@
       "note": "Planning session started for PAN-2157: fix(flywheel): auto-merge schedule endpoint fails 'GitHub App not configured' — autonomous merge gate non-functional with require_uat_before_merge=false",
       "timestamp": "2026-06-29T03:07:29.473Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T03:07:15.168Z",
+  "updated": "2026-06-29T07:32:13.126Z",
+  "pipeline": {
+    "issueId": "PAN-2157",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-29T07:32:13.072Z",
+    "inspectNotes": "Bead workspace-l5r1m: getMergeBackendStatus() helper added in src/lib/github-app.ts. Type MergeBackendStatus, async getMergeBackendStatus(deps) function, and defaultCheckGhAuth helper using execFileAsync(gh, [auth, status]) with 5000ms timeout in try/catch — all match spec. App-configured path unchanged. execFileAsync used (not execSync) per D3. All 3 ACs covered by 4 unit tests in tests/unit/lib/github-app.test.ts (App path, gh-cli fallback, none, default-gh-fails)."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "custom/MiniMax-M3": {
+            "input": 281082,
+            "output": 11187,
+            "cacheRead": 1236615,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 30174,
+            "output": 2045,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 30089,
+            "output": 54590,
+            "cacheRead": 6087127,
+            "cacheWrite": 287412
+          }
+        }
+      },
+      "totals": {
+        "custom/MiniMax-M3": {
+          "input": 281082,
+          "output": 11187,
+          "cacheRead": 1236615,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 30174,
+          "output": 2045,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 30089,
+          "output": 54590,
+          "cacheRead": 6087127,
+          "cacheWrite": 287412
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.452839,
+        "pricingAsOf": "2026-06-29T07:32:13.120Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "MiniMax-M3"
 }
