@@ -3068,3 +3068,21 @@ Operator surfaced that PAN-1865's original premise is OBE and asked: CLOSE as OB
 - Cohort/floor: minAgents=2 now met by real producers (strike-pan-1865 + planning-pan-1865). Main still GREEN 2d0fb0d36.
 
 - Next tick: (1) strike-pan-1865 — did it land the pattern+test on main + verify? if merged → `pan close PAN-1865`. (2) once landed, does the deacon AUTO-RECOVER agent-pan-2086 (its tail now matches)? watch for the recovery respawn. (3) conflicting trio unchanged (operator/PAN-2108). (4) main green + any rebase → auto-merge. (5) emit status.
+
+## RUN-36 tick 4 (2026-06-29 ~09:32Z) — PAN-1865 strike WEDGED on PAN-2106; re-routed the fix to PAN-2166 (struck clean) — follow-through held
+
+Main GREEN unchanged at origin/main `2d0fb0d36`. RAM 14/64 GB.
+
+- **The tick-3 strike (strike-pan-1865) WEDGED on PAN-2106.** `pan strike PAN-1865` printed `✔ spawned` (Workspace feature-pan-1865-strike, Branch strike/pan-1865) but the worktree + branch were NEVER created — only an orphan dir at `workspaces/feature-pan-1865-strike` that resolves up to the primary repo. The strike agent (gpt-5.5) correctly SELF-HALTED on worktree discipline before editing (the only thing that stopped strike work landing on main). **PAN-2106 is exactly this bug** ("pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race)") — strengthened it with a fresh repro comment. Likely trigger: the concurrently-running planning-pan-1865 held `feature/pan-1865`, and the strike's `git worktree add` raced its git ops and lost the lock.
+
+- **The redundant planner (planning-pan-1865) finished with a WRONG-SCOPE vBRIEF.** It planned "investigate a launch-time window knob, explicitly NO deacon-side recovery (H3)" — it never identified the actual residual (the missing CONTEXT_OVERFLOW_PATTERNS string), so the normal work chain off it would NOT add the pattern. Confirms tick-3's worry: striking over a live planner was a mistake (PAN-2106 trigger), and the planner alone wouldn't have landed the fix either.
+
+- **FOLLOW-THROUGH (brief: "file a tighter issue + re-strike"): split the verified fix to PAN-2166 and struck it CLEAN.** New issue PAN-2166 carries only the one-line pattern add + test (exact spec). `pan strike PAN-2166` → strike-pan-2166 (gpt-5.5) with a VERIFIED worktree (`feature-pan-2166-strike` registered on `strike/pan-2166` @ 2d0fb0d36) — agent actively running the strike flow. A FRESH issue has no pre-existing worktree, so it dodged the PAN-2106 same-issue git-lock collision. This lands the fix on main + verifies → unblocks the live PAN-2086 wedge. DURABLE LESSON: do NOT `pan strike` an issue that already has a live agent/worktree (planner or work) — it triggers PAN-2106; either wait for the agent to clear or route the fix through a fresh issue.
+
+- **PAN-1865 annotated superseded-by-PAN-2166** + operator cleanup recommended (`pan kill pan-1865` clears the stranded strike-pan-1865 + idle planning-pan-1865 + orphan worktree). Flywheel cannot pan kill — surfaced, not blocked. Close PAN-1865 once PAN-2166 lands.
+
+- **Two flywheel-control gaps compounded** (both surfaced as openQuestions, not re-filed): (1) flywheel can't pan kill a redundant/superseded agent it launched; (2) pan strike vs an issue with a live worktree hits PAN-2106. Net effect: the tiny kimi-overflow fix took a re-route (PAN-1865 strike → wedge → PAN-2166 strike) rather than landing directly — but it IS now in flight, not stalled.
+
+- Conflicting trio unchanged (1982=12, 1718=24, 2063=12 ahead; merge-blockers lists only 1982). No flywheel lever. Main green.
+
+- Next tick: (1) strike-pan-2166 — landed on main + verified? grep `exceeded model token limit` on origin/main; if merged → `pan close PAN-2166` AND recommend close PAN-1865 as superseded. (2) Once pattern on main, does deacon AUTO-RECOVER agent-pan-2086 (tail now matches isContextOverflowTail)? watch ~/.overdeck/logs/deacon.log for a recovery respawn. (3) trio unchanged unless operator rebases. (4) emit status. (5) PAN-1865 cleanup is operator's (pan kill).
