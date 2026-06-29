@@ -106,6 +106,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-29T21:14:53.575Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T21:15Z] review-agent → CHANGES-REQUESTED — seq 4",
+      "timestamp": "2026-06-29T21:15:53.350Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-29T21:15Z] review-agent → CHANGES-REQUESTED — seq 5",
+      "timestamp": "2026-06-29T21:15:56.412Z"
     }
   ],
   "feedback": [
@@ -129,20 +139,34 @@
       "outcome": "changes-requested",
       "timestamp": "2026-06-29T21:07:33Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nrestart-events.jsonl is only capped on read; persisted journal growth remains unbounded\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 4,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T21:15:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nrestart-events compaction can overwrite concurrent appends and lose forensic events\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 5,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-29T21:15:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1718\n\nrestart-events compaction can overwrite concurrent appends and lose forensic events\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1718 -m \"Fixed review issues\"`"
     }
   ],
   "harness": "codex",
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1718",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T21:14:55.569Z",
-    "reviewNotes": "Agent re-review request (3/25): Added persisted compaction for restart-events.jsonl",
+    "updatedAt": "2026-06-29T21:15:53.312Z",
+    "reviewNotes": "restart-events compaction can overwrite concurrent appends and lose forensic events",
     "testNotes": "PAN-1718: CLI restart-status concurrency fix. Ran: npm run typecheck (PASS), npm run lint (PASS, no errors), npm test (7504/7567 tests PASSED; 4 pre-existing unrelated failures in harness-resolve/providers tests unmodified by this PR). No UAT required — CLI-only fix with no dashboard changes. All PAN-1718 implementation and test files verified: reload lock acquisition sequencing, append-only restart events journal with concurrent-writer detection, supervisor stop/start robustness (wait-for-exit, verify-survival).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2103",
     "lastVerifiedCommit": "0f95444a5fcb8a43202df92243a3765622ff3b69",
@@ -185,9 +209,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2107782,
-            "output": 249254,
-            "cacheRead": 115086592,
+            "input": 2112276,
+            "output": 250442,
+            "cacheRead": 117233408,
             "cacheWrite": 0
           }
         }
@@ -218,15 +242,15 @@
           "cacheWrite": 184046
         },
         "custom/kimi-k2.7-code": {
-          "input": 2107782,
-          "output": 249254,
-          "cacheRead": 115086592,
+          "input": 2112276,
+          "output": 250442,
+          "cacheRead": 117233408,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.191354,
-        "pricingAsOf": "2026-06-29T21:14:55.655Z"
+        "usd": 33.60827,
+        "pricingAsOf": "2026-06-29T21:15:53.341Z"
       }
     },
     "merges": [
@@ -235,7 +259,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T15:46:20.441Z",
-  "updated": "2026-06-29T21:14:55.659Z",
+  "updated": "2026-06-29T21:15:56.412Z",
   "statusOverrides": {
     "reload-lock-first": "completed",
     "reload-lock-first.ac1": "completed",
