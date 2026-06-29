@@ -7,13 +7,13 @@
  *   POST /api/workspaces/:issueId/memory-summary
  *   POST /api/workspaces/:issueId/refresh-db
  *
- * Shared singletons (activity log, pending ops, project helpers, repairFlywayIfNeeded)
+ * Shared singletons (activity log, pending ops, project helpers)
  * stay owned by ../workspaces.js and are imported here.
  */
 
 import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -27,6 +27,10 @@ import {
   findProjectByTeamSync,
   listProjectsSync,
 } from '../../../../lib/projects.js';
+import {
+  DatabaseProvisionerError,
+  getDatabaseProvisioner,
+} from '../../../../lib/db-provisioners/index.js';
 import { DEVCONTAINER_DIRNAME } from '../../../../lib/workspace/devcontainer-renderer.js';
 import type { DatabaseConfig } from '../../../../lib/workspace-config.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -35,7 +39,6 @@ import {
   appendActivityOutput,
   getProjectPath,
   logActivity,
-  repairFlywayIfNeeded,
   requireTrustedMutationOrigin,
   updateActivity,
 } from '../workspaces.js';
@@ -51,18 +54,6 @@ function requireDatabaseName(dbConfig: DatabaseConfig | undefined): string {
     throw new Error('Missing required database.name in projects.yaml database config');
   }
   return name;
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function sqlIdentifier(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
-function sqlString(value: string): string {
-  return value.replace(/'/g, "''");
 }
 
 // ─── Route: POST /api/workspaces/:issueId/containerize ───────────────────────
@@ -325,33 +316,32 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     ));
     const projectName = projectNameOut.trim();
 
-    // Pre-start Flyway repair for API containers
+    // Pre-start migration repair for API containers
     if (
       containerName.toLowerCase() === 'api' &&
       ['start', 'restart'].includes(action)
     ) {
       const tPrefix = extractTeamPrefix(issueId);
       const pConfig = tPrefix ? findProjectByTeamSync(tPrefix) : null;
-      if (
-        pConfig?.workspace?.database?.migrations?.type === 'flyway' &&
-        projectName
-      ) {
+      const dbConfig = pConfig?.workspace?.database;
+      const provisioner = getDatabaseProvisioner(dbConfig);
+      if (pConfig && dbConfig && provisioner && projectName) {
         const databaseName = requireDatabaseName(pConfig.workspace.database);
         const pgContainer = `${projectName}-postgres-1`;
         try {
-          const result = yield* Effect.promise(() => repairFlywayIfNeeded(
+          const result = yield* Effect.promise(() => provisioner.repairMigrations({
             issueId,
             pgContainer,
             databaseName,
-            pConfig,
-            workspacePath!
-          ));
+            projectConfig: pConfig,
+            workspacePath: workspacePath!,
+          }));
           if (result.repaired) {
             console.log(`[container-control] ${result.message}`);
           }
         } catch (repairErr: unknown) {
           console.warn(
-            `[container-control] Flyway pre-check failed (non-fatal): ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`
+            `[container-control] migration pre-check failed (non-fatal): ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`
           );
         }
       }
@@ -438,6 +428,14 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
     }
 
     const dbConfig = projectConfig.workspace?.database;
+    const provisioner = getDatabaseProvisioner(dbConfig);
+    if (!provisioner) {
+      return jsonResponse(
+        { error: 'No database configuration found in projects.yaml' },
+        { status: 400 }
+      );
+    }
+
     if (!dbConfig?.seed_file) {
       return jsonResponse(
         { error: 'No seed_file configured in projects.yaml database config' },
@@ -454,12 +452,13 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
       );
     }
 
-    const flywayFile = join(dirname(seedFile), 'zzz-flyway-workspace-baseline.sql');
-    if (!existsSync(flywayFile)) {
-      return jsonResponse(
-        { error: `Flyway baseline not found: ${flywayFile}` },
-        { status: 400 }
-      );
+    try {
+      provisioner.validateRefreshDatabase({ seedFile });
+    } catch (err: unknown) {
+      if (err instanceof DatabaseProvisionerError) {
+        return jsonResponse({ error: err.message }, { status: err.status });
+      }
+      throw err;
     }
 
     const issueLower = issueId.toLowerCase();
@@ -509,59 +508,24 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
 
     console.log(`[refresh-db] Starting DB refresh for ${issueId} (project: ${projectName})`);
 
-    try {
-      yield* Effect.promise(() => execAsync(`docker stop "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 }));
-    } catch {
-      console.log(`[refresh-db] API container not running or already stopped`);
-    }
-
-    yield* Effect.promise(() => execAsync(
-      `docker exec ${shellQuote(pgContainer)} psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${sqlString(databaseName)}' AND pid <> pg_backend_pid();"`,
-      { encoding: 'utf-8', timeout: 10000 }
-    ));
-    yield* Effect.promise(() => execAsync(
-      `docker exec ${shellQuote(pgContainer)} psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS ${sqlIdentifier(databaseName)};"`,
-      { encoding: 'utf-8', timeout: 10000 }
-    ));
-    yield* Effect.promise(() => execAsync(
-      `docker exec ${shellQuote(pgContainer)} psql -U postgres -d postgres -c "CREATE DATABASE ${sqlIdentifier(databaseName)} OWNER postgres;"`,
-      { encoding: 'utf-8', timeout: 10000 }
-    ));
-
-    console.log(`[refresh-db] Loading seed file: ${seedFile}`);
-    yield* Effect.promise(() => execAsync(
-      `docker exec -i ${shellQuote(pgContainer)} psql -U postgres -d ${shellQuote(databaseName)} < ${shellQuote(seedFile)}`,
-      { encoding: 'utf-8', timeout: 600000 }
-    ));
-
-    const repairResult = yield* Effect.promise(() => repairFlywayIfNeeded(
+    const { seedVerifyResult } = yield* Effect.promise(() => provisioner.refreshDatabase({
       issueId,
-      pgContainer,
-      databaseName,
       projectConfig,
       workspacePath,
-      (msg) => console.log(`[refresh-db] ${msg}`)
-    ));
-    console.log(`[refresh-db] Flyway setup: ${repairResult.message}`);
-
-    try {
-      yield* Effect.promise(() => execAsync(`docker start "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 }));
-    } catch {
-      console.log(`[refresh-db] Could not start API container (may need manual start)`);
-    }
-
-    let seedVerifyResult: string | undefined;
-    if (dbConfig.seedVerifyQuery) {
-      try {
-        const { stdout } = yield* Effect.promise(() => execAsync(
-          `docker exec ${shellQuote(pgContainer)} psql -U postgres -d ${shellQuote(databaseName)} -t -A -c ${shellQuote(dbConfig.seedVerifyQuery)}`,
-          { encoding: 'utf-8', timeout: 10000 }
-        ));
-        seedVerifyResult = stdout.trim();
-      } catch {}
-    }
-
-    console.log(`[refresh-db] DB refresh complete for ${issueId}`);
+      pgContainer,
+      apiContainer,
+      databaseName,
+      seedFile,
+      seedVerifyQuery: dbConfig.seedVerifyQuery,
+      logger: {
+        setText: (msg) => console.log(`[refresh-db] ${msg}`),
+        info: (msg) => console.log(`[refresh-db] ${msg}`),
+        warn: (msg) => console.warn(`[refresh-db] ${msg}`),
+        fail: (msg) => console.error(`[refresh-db] ${msg}`),
+        succeed: (msg) => console.log(`[refresh-db] ${msg}`),
+        log: (msg) => console.log(`[refresh-db] ${msg}`),
+      },
+    }));
 
     return jsonResponse({
       success: true,
