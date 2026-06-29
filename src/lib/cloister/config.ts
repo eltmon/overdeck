@@ -82,6 +82,7 @@ export interface ConcurrencyConfig {
  */
 export interface StartupConfig {
   auto_start: boolean; // Start Cloister when dashboard starts
+  reconciliation_grace_secs: number; // Boot reconciliation grace window before default resume
 }
 
 /**
@@ -282,6 +283,7 @@ export interface CloisterConfig {
 export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   startup: {
     auto_start: true,
+    reconciliation_grace_secs: 30,
   },
   thresholds: {
     stale: 5,
