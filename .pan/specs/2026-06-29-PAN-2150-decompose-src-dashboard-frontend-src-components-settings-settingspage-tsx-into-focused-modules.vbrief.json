@@ -4,7 +4,7 @@
     "created": "2026-06-29T04:30:00.000Z",
     "author": "agent:claude-opus-4-8",
     "description": "Plan for PAN-2150: Decompose SettingsPage.tsx (2043 lines) into focused submodules — behavior-preserving.",
-    "updated": "2026-06-29T04:22:06.194Z"
+    "updated": "2026-06-29T04:28:04.857Z"
   },
   "plan": {
     "id": "pan-2150",
@@ -13,7 +13,7 @@
     "uid": "pan2150-de00-4c00-9a00-000000002150",
     "author": "agent:claude-opus-4-8",
     "created": "2026-06-29T04:30:00.000Z",
-    "updated": "2026-06-29T04:22:06.194Z",
+    "updated": "2026-06-29T04:28:04.857Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2150",
@@ -174,7 +174,7 @@
           ]
         },
         "narrative": {
-          "Action": "Re-find <section id=\"cloister\"> (~1090–1143) and <section id=\"remote\"> (~1144–1188) by their id anchors. Create sections/CloisterSection.tsx and sections/RemoteSection.tsx following the WI-2 recipe. Section-only handlers move in (cloister: saveCloisterSnapshot, updateCloisterConcurrency; remote: handleTmuxConfigModeChange, handleRemoteResiliencyTierChange, handleRemoteMaxConcurrentAgentsChange); shared handlers pass as props. The cloister section consumes the local CloisterConfig type now in SettingsPage.types.ts. Replace both blocks with <CloisterSection …/> and <RemoteSection …/> at the same positions and add imports.",
+          "Action": "Re-find <section id=\"cloister\"> (~1090–1143) and <section id=\"remote\"> (~1144–1188) by their id anchors. Create sections/CloisterSection.tsx and sections/RemoteSection.tsx following the WI-2 recipe. Section-only handlers move in (cloister: saveCloisterSnapshot, updateCloisterConcurrency; remote: handleTmuxConfigModeChange, handleRemoteResiliencyTierChange, handleRemoteMaxConcurrentAgentsChange); shared handlers pass as props. The cloister section consumes the local CloisterConfig type now in SettingsPage.types.ts. Replace both blocks with <CloisterSection …/> and <RemoteSection …/> at the same positions and add imports. TEST-GUARD REPOINT: __tests__/SettingsPage.test.ts asserts remote content against SETTINGS_PAGE_SOURCE (~lines 139-143: id=\"remote\", 'Resiliency tier', handleRemoteResiliencyTierChange, 'Max concurrent remote agents', handleRemoteMaxConcurrentAgentsChange). After moving the remote JSX, add REMOTE_SECTION_SOURCE = readFileSync('../../sections/RemoteSection.tsx') and repoint those five assertions to it (mirror the existing TTS_CONFIGURATION_SECTION_SOURCE pattern). Leave the nav assertion `{ id: 'remote', label: 'Remote'` pointed at SETTINGS_PAGE_SOURCE. Do not delete assertions.",
           "Why": "Two cohesive mid-sized sections; continues the shrink and keeps each new file well under the ceiling."
         },
         "items": [
@@ -189,6 +189,14 @@
           {
             "id": "wi3-extract-cloister-remote.ac2",
             "title": "Given the refactor, when the rendered Settings page is inspected, then the cloister and remote sections appear in the same order/position with identical controls.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-extract-cloister-remote.ac3",
+            "title": "Given the moved remote JSX, when SettingsPage.test.ts runs, then its remote source-text assertions read from a new REMOTE_SECTION_SOURCE (sections/RemoteSection.tsx) and resolve, while the `{ id: 'remote' }` nav assertion still resolves against SettingsPage.tsx.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -213,7 +221,7 @@
           ]
         },
         "narrative": {
-          "Action": "Re-find <section id=\"memory\"> (~1233–1402) by its id anchor. Create sections/MemorySection.tsx per the WI-2 recipe. Section-only handlers move in (updateMemorySettings, handleMemoryNumberChange); shared handlers/state pass as props. Replace the block with <MemorySection …/> at the same position and add the import.",
+          "Action": "Re-find <section id=\"memory\"> (~1233–1402) by its id anchor. Create sections/MemorySection.tsx per the WI-2 recipe. Section-only handlers move in (updateMemorySettings, handleMemoryNumberChange); shared handlers/state pass as props. Replace the block with <MemorySection …/> at the same position and add the import. TEST-GUARD REPOINT: __tests__/SettingsPage.test.ts asserts memory content against SETTINGS_PAGE_SOURCE (~lines 163-171: 'OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values', 'Extraction provider', 'Fallback provider', 'Daily cost cap', '0 disables the cap', aria-label=\"Disable memory observations\", aria-label=\"Toggle prompt-time memory injection\", 'Rollup threshold', 'Sidebar refresh interval'). After moving the memory JSX, add MEMORY_SECTION_SOURCE = readFileSync('../../sections/MemorySection.tsx') and repoint those assertions to it. Leave the nav assertion `{ id: 'memory', label: 'Memory'` pointed at SETTINGS_PAGE_SOURCE. Do not delete assertions.",
           "Why": "memory is one of the three largest inline sections (~170 lines)."
         },
         "items": [
@@ -228,6 +236,14 @@
           {
             "id": "wi4-extract-memory.ac2",
             "title": "Given MemorySection.tsx, when wc -l runs on it, then it is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-extract-memory.ac3",
+            "title": "Given the moved memory JSX, when SettingsPage.test.ts runs, then its memory source-text assertions read from a new MEMORY_SECTION_SOURCE (sections/MemorySection.tsx) and resolve, while the `{ id: 'memory' }` nav assertion still resolves against SettingsPage.tsx.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -331,7 +347,7 @@
           ]
         },
         "narrative": {
-          "Action": "Re-find <section id=\"maintenance\"> (~1819–1853) and the experimental <section id=\"experimental\"> (~1860–2042) by id anchors. Create sections/MaintenanceSection.tsx and sections/ExperimentalSection.tsx per the WI-2 recipe. Section-only handlers move in (experimental: handleClaudeCodeChannelsToggle, handleExperimentalFeaturesToggle, handleStreamdownToggle, handleHarnessModelPermutationsToggle, handleRtkToggle, handleTldrToggle; maintenance: the clearingCache/reloadingTldr handlers). Both blocks contain `catch (err: any)` (maintenance ~:1837, experimental ~:1942) — add BOTH new files to eslint-any-allowlist.json in this commit. Preserve all data-testid attributes verbatim (experimental-section, experimental-features-toggle, experimental-rtk-toggle, experimental-tldr-toggle, experimental-claude-code-channels-toggle, experimental-streamdown-toggle, legacy-import-open-button) so existing tests still target them. Replace both blocks at the same positions and add imports.",
+          "Action": "Re-find <section id=\"maintenance\"> (~1819–1853) and the experimental <section id=\"experimental\"> (~1860–2042) by id anchors. Create sections/MaintenanceSection.tsx and sections/ExperimentalSection.tsx per the WI-2 recipe. Section-only handlers move in (experimental: handleClaudeCodeChannelsToggle, handleExperimentalFeaturesToggle, handleStreamdownToggle, handleHarnessModelPermutationsToggle, handleRtkToggle, handleTldrToggle; maintenance: the clearingCache/reloadingTldr handlers). Both blocks contain `catch (err: any)` (maintenance ~:1837, experimental ~:1942) — add BOTH new files to eslint-any-allowlist.json in this commit. Preserve all data-testid attributes verbatim (experimental-section, experimental-features-toggle, experimental-rtk-toggle, experimental-tldr-toggle, experimental-claude-code-channels-toggle, experimental-streamdown-toggle, legacy-import-open-button) so existing tests still target them. Replace both blocks at the same positions and add imports. TEST-GUARD REPOINT: __tests__/SettingsPage.test.ts asserts experimental content against SETTINGS_PAGE_SOURCE (~lines 195-206: 'RTK Bash compression', aria-label=\"Enable RTK Bash compression\", experimental-rtk-toggle, handleRtkToggle(!formData.agents?.rtk?.enabled), 'Streamdown renderer', 'Render chat markdown with Streamdown — research preview', aria-label=\"Render chat markdown with Streamdown\", experimental-streamdown-toggle, handleStreamdownToggle(!formData.experimental?.streamdownRenderer)). After moving the experimental JSX, add EXPERIMENTAL_SECTION_SOURCE = readFileSync('../../sections/ExperimentalSection.tsx') and repoint those assertions to it. Do not delete assertions.",
           "Why": "Final two inline sections; the experimental section is large (~182 lines) and test-targeted via data-testid, so verbatim preservation matters."
         },
         "items": [
@@ -350,6 +366,14 @@
             "metadata": {
               "kind": "acceptance_criterion"
             }
+          },
+          {
+            "id": "wi7-extract-maintenance-experimental.ac3",
+            "title": "Given the moved experimental JSX, when SettingsPage.test.ts runs, then its RTK and Streamdown source-text assertions read from a new EXPERIMENTAL_SECTION_SOURCE (sections/ExperimentalSection.tsx) and resolve.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -359,7 +383,7 @@
         "status": "pending",
         "priority": "high",
         "metadata": {
-          "difficulty": "easy",
+          "difficulty": "simple",
           "issueLabel": "pan-2150",
           "requiresInspection": false,
           "inspectionDepth": "fast",
@@ -444,7 +468,7 @@
     "metadata": {
       "canonicalFilename": "2026-06-29-PAN-2150-decompose-src-dashboard-frontend-src-components-settings-settingspage-tsx-into-focused-modules.vbrief.json"
     },
-    "sequence": 1
+    "sequence": 2
   },
   "status": "proposed"
 }
