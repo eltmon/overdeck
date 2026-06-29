@@ -4,7 +4,7 @@
     "created": "2026-06-29T13:08:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2168: Global navigation affordance to Flywheel openQuestions from anywhere",
-    "updated": "2026-06-29T13:11:36.101Z"
+    "updated": "2026-06-29T13:19:16.543Z"
   },
   "plan": {
     "id": "pan-2168",
@@ -13,7 +13,7 @@
     "uid": "a2191679-9394-4039-bf60-fc85d3cd5cc8",
     "author": "agent:claude-opus-4-8",
     "created": "2026-06-29T13:08:04Z",
-    "updated": "2026-06-29T13:11:36.101Z",
+    "updated": "2026-06-29T13:19:16.543Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2168",
@@ -334,7 +334,7 @@
     "metadata": {
       "canonicalFilename": "2026-06-29-PAN-2168-global-navigation-affordance-to-flywheel-openquestions-from-anywhere.vbrief.json"
     },
-    "sequence": 1
+    "sequence": 2
   },
   "status": "proposed"
 }
