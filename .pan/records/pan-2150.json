@@ -1,39 +1,19 @@
 {
   "issueId": "PAN-2150",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-29T05:40:30.373Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-06-29T05:41Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-06-29T05:41:39.476Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-29T05:41:39Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2150\n\nFrontend build fails on unused extracted symbols\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2150 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2150",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T05:41:39.420Z",
+    "updatedAt": "2026-06-29T05:44:16.994Z",
     "reviewNotes": "Frontend build fails on unused extracted symbols",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (13609ms):\n\nsrc/components/Settings/SettingsPage.tsx(43,1): error TS6133: 'buildMiniMaxFormData' is declared but its value is never read.\nsrc/components/Settings/sections/ExperimentalSection.tsx(56,9): error TS6133: 'handleHarnessModelPermutationsToggle' is declared but its value is never read.\n",
+    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\t.pan/records/pan-2150.json\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2162",
     "reviewRequestedAt": "2026-06-29T05:39:42.933Z"
   },
@@ -73,7 +53,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.934204,
-        "pricingAsOf": "2026-06-29T05:41:39.465Z"
+        "pricingAsOf": "2026-06-29T05:44:17.012Z"
       }
     },
     "merges": [
@@ -81,6 +61,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-06-29T05:40:30.351Z",
-  "updated": "2026-06-29T05:41:39.476Z"
+  "created": "2026-06-29T05:44:17.015Z",
+  "updated": "2026-06-29T05:44:17.015Z"
 }
