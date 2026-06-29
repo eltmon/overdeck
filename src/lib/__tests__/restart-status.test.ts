@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -113,6 +113,28 @@ describe('restart status', () => {
     expect(events).toHaveLength(200);
     expect(events[0].pid).toBe(5);
     expect(events[199].pid).toBe(204);
+  });
+
+  it('compacts the persisted journal file, not just the read view', async () => {
+    const baseTime = new Date('2026-05-17T15:00:00.000Z').getTime();
+    for (let i = 0; i < 205; i++) {
+      await Effect.runPromise(
+        writeRestartStatus({
+          ts: new Date(baseTime + i * 1000).toISOString(),
+          trigger: 'watchdog',
+          success: true,
+          durationMs: i,
+          attempts: 1,
+          pid: i,
+        }),
+      );
+    }
+
+    const journalPath = join(testHome, 'restart-events.jsonl');
+    const lines = readFileSync(journalPath, 'utf8')
+      .split('\n')
+      .filter((line) => line.trim() !== '');
+    expect(lines).toHaveLength(200);
   });
 
   it('does not fail the primary write when the journal path is unwritable', async () => {

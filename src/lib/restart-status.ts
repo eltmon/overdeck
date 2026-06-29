@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, rmdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
@@ -89,6 +89,40 @@ async function appendRestartEvent(entry: RestartStatus): Promise<void> {
   }
 }
 
+/** Trim the persisted journal to MAX_JOURNAL_ENTRIES using an atomic temp-file
+ *  rename. A mkdir-based lock prevents concurrent compactions from racing. */
+async function compactRestartEvents(): Promise<void> {
+  const path = restartEventsPath();
+  const lockPath = `${path}.lock`;
+  try {
+    await mkdir(lockPath);
+  } catch (error) {
+    if (isErrnoException(error) && error.code === 'EEXIST') return;
+    // Lock acquisition failed for another reason; skip compact.
+    return;
+  }
+
+  try {
+    const content = await readFile(path, 'utf8');
+    const lines = content.split('\n').filter((line) => line.trim() !== '');
+    if (lines.length <= MAX_JOURNAL_ENTRIES) return;
+
+    const trimmed = lines.slice(-MAX_JOURNAL_ENTRIES);
+    const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tmp, `${trimmed.join('\n')}\n`, 'utf8');
+    await rename(tmp, path);
+  } catch (error) {
+    if (isErrnoException(error) && error.code === 'ENOENT') return;
+    // Best-effort compact; ignore other errors.
+  } finally {
+    try {
+      await rmdir(lockPath);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   const path = restartStatusPath();
   await mkdir(dirname(path), { recursive: true });
@@ -96,6 +130,7 @@ async function writeRestartStatusPromise(entry: RestartStatus): Promise<void> {
   await writeFile(tmp, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
   await rename(tmp, path);
   await appendRestartEvent(entry);
+  await compactRestartEvents();
 }
 
 async function readRestartEventsPromise(limit: number = MAX_JOURNAL_ENTRIES): Promise<RestartStatus[]> {
