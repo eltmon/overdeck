@@ -45,7 +45,7 @@ vi.mock('../paths.js', async (importOriginal) => {
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
-import { deliverAgentMessage, deliverAgentPermissionDecision, deliverResumeMessageWithTranscriptConfirmation, type AgentState } from '../agents.js';
+import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
@@ -183,6 +183,162 @@ describe('resume auto-continue transcript confirmation', () => {
 
     await expect(result).resolves.toMatchObject({ delivered: true, attempts: 2 });
     expect(deliver).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('initial kickoff transcript confirmation', () => {
+  const baseState: AgentState = {
+    id: 'agent-kickoff-confirm',
+    issueId: 'PAN-TEST',
+    workspace: '/tmp/workspace',
+    harness: 'claude-code',
+    role: 'work',
+    model: 'claude-opus-4-7',
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    sessionId: 'session-1',
+  };
+
+  const baseOptions = {
+    timeoutMs: 300,
+    intervalMs: 100,
+    settleDelayMs: 0,
+    waitForReady: vi.fn(async () => true),
+    sessionExists: vi.fn(async () => true),
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns kickoff-not-confirmed after ok delivery when no user record lands', async () => {
+    vi.useFakeTimers();
+    const snapshot = vi.fn(async (_workspace: string, _sessionId: string, options?: { fromByteOffset?: number }) => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: 0,
+      fileSize: 100,
+      rangeStartByte: options?.fromByteOffset ?? 0,
+      readOffset: options?.fromByteOffset ?? 100,
+    }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    );
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(result).resolves.toMatchObject({
+      ok: false,
+      failure: 'kickoff-not-confirmed',
+    });
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns ok on first delivery when a new user record lands', async () => {
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount,
+      fileSize: 100,
+      rangeStartByte: 0,
+      readOffset: 100,
+    }));
+    const deliver = vi.fn(async () => {
+      userRecordCount = 1;
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    await expect(deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips transcript confirmation for ohmypi and preserves delivery result behavior', async () => {
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+
+    await expect(deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => ({ ...baseState, harness: 'ohmypi' })),
+        deliver,
+        snapshot,
+      },
+    )).resolves.toMatchObject({ ok: true, path: 'tmux' });
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(snapshot).not.toHaveBeenCalled();
+  });
+
+  it('does not count a pre-existing user record as kickoff landing', async () => {
+    vi.useFakeTimers();
+    const snapshot = vi.fn(async (_workspace: string, _sessionId: string, options?: { fromByteOffset?: number }) => (
+      options?.fromByteOffset === undefined
+        ? {
+          sessionFile: '/tmp/session.jsonl',
+          userRecordCount: 1,
+          fileSize: 100,
+          rangeStartByte: 0,
+          readOffset: 100,
+        }
+        : {
+          sessionFile: '/tmp/session.jsonl',
+          userRecordCount: 0,
+          fileSize: 100,
+          rangeStartByte: options.fromByteOffset,
+          readOffset: options.fromByteOffset,
+        }
+    ));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    );
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(result).resolves.toMatchObject({
+      ok: false,
+      failure: 'kickoff-not-confirmed',
+    });
   });
 });
 

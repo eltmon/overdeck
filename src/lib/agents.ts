@@ -3343,7 +3343,7 @@ export { listRunningAgentsSync, listAgentStates, listRunningAgents, warnOnBareNu
 export { stopAgentSync, stopAgent } from './agents/termination.js';
 export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionIdSync, getLatestSessionId } from './agents/activity.js';
 export { type AgentResolution, type AgentRuntimeState, getAgentRuntimeStateSync, getAgentRuntimeState, saveAgentRuntimeState } from './agents/runtime-state.js';
-export { deliverAgentMessage, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
+export { deliverAgentMessage, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
 
 
 function queueAgentMail(agentId: string, message: string): void {

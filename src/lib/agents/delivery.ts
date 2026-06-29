@@ -14,6 +14,7 @@ import {
   waitForPromptReady,
   SESSION_EXITED_BEFORE_KICKOFF,
 } from '../agents.js';
+import { getAgentRuntimeState } from './runtime-state.js';
 import { sendKeys, sessionExists } from '../tmux.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
@@ -347,12 +348,61 @@ export async function deliverInitialPromptWithRetry(
   prompt: string,
   caller: string,
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
+  options: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    settleDelayMs?: number;
+    deliver?: typeof deliverAgentMessage;
+    snapshot?: typeof captureTranscriptUserRecordSnapshot;
+    getState?: (agentId: string) => Promise<AgentState | null>;
+    waitForReady?: typeof waitForPromptReady;
+    sessionExists?: (agentId: string) => Promise<boolean>;
+  } = {},
 ): Promise<DeliveryResult> {
+  const normalizedId = normalizeAgentId(agentId);
+  const deliver = options.deliver ?? deliverAgentMessage;
+  const snapshot = options.snapshot ?? captureTranscriptUserRecordSnapshot;
+  const getState = options.getState ?? (async (id: string) => {
+    try {
+      return await Effect.runPromise(getAgentState(normalizeAgentId(id)));
+    } catch {
+      return null;
+    }
+  });
+  const waitForReady = options.waitForReady ?? waitForPromptReady;
+  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => (
+    Effect.runPromise(sessionExists(normalizeAgentId(id)))
+  ));
+
   function promptReadyTimeoutSeconds(): number {
     const raw = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
     if (!raw) return 30;
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+  }
+
+  async function resolveTranscriptConfirmationTarget(
+    state: AgentState | null,
+  ): Promise<{ workspace: string; sessionId: string; before: TranscriptUserRecordSnapshot } | null> {
+    if (!state?.workspace || getHarnessBehavior(state.harness).transcriptKind !== 'claude-jsonl') {
+      return null;
+    }
+
+    let sessionId = state.sessionId;
+    if (!sessionId) {
+      try {
+        sessionId = (await Effect.runPromise(getAgentRuntimeState(normalizedId)))?.claudeSessionId;
+      } catch {
+        sessionId = undefined;
+      }
+    }
+    if (!sessionId) return null;
+
+    return {
+      workspace: state.workspace,
+      sessionId,
+      before: await snapshot(state.workspace, sessionId),
+    };
   }
 
   // PAN-1803: the codex TUI mangles a large pasted kickoff prompt — a multi-
@@ -362,10 +412,10 @@ export async function deliverInitialPromptWithRetry(
   // pattern that makes file-backed handoffs reliable). Only codex needs this;
   // claude-code/pi line-based input handle the full prompt fine.
   let deliveredPrompt = prompt;
+  let state = await getState(agentId);
   try {
-    const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
-    if (codexState?.harness && getHarnessBehavior(codexState.harness).usesCodexHome && codexState.workspace) {
-      const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
+    if (state?.harness && getHarnessBehavior(state.harness).usesCodexHome && state.workspace) {
+      const kickoffPath = join(state.workspace, '.pan', 'kickoff.md');
       mkdirSync(dirname(kickoffPath), { recursive: true });
       writeFileSync(kickoffPath, prompt, 'utf-8');
       deliveredPrompt =
@@ -378,18 +428,20 @@ export async function deliverInitialPromptWithRetry(
     // Non-fatal: fall back to delivering the full prompt inline.
   }
 
+  const confirmationTarget = await resolveTranscriptConfirmationTarget(state);
   let lastFailure = 'not-attempted';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     let harness: RuntimeName | undefined;
     try {
-      harness = (await Effect.runPromise(getAgentState(normalizeAgentId(agentId))))?.harness;
+      state = await getState(agentId);
+      harness = state?.harness;
     } catch {
       harness = undefined;
     }
     const readyTimeoutSeconds = promptReadyTimeoutSeconds();
-    const ready = await waitForPromptReady(agentId, harness, readyTimeoutSeconds);
+    const ready = await waitForReady(agentId, harness, readyTimeoutSeconds);
     if (!ready) {
-      const alive = await Effect.runPromise(sessionExists(normalizeAgentId(agentId)));
+      const alive = await sessionExistsForAgent(agentId);
       lastFailure = alive ? 'ready-signal-timeout' : SESSION_EXITED_BEFORE_KICKOFF;
       const displayName = getHarnessBehavior(harness).displayName;
       console.error(`[${agentId}] ${displayName} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
@@ -397,11 +449,27 @@ export async function deliverInitialPromptWithRetry(
       continue;
     }
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    const settleDelayMs = options.settleDelayMs ?? 500;
+    if (settleDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, settleDelayMs));
+    }
     try {
-      const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
-      if (result.ok) return result;
-      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+      const result = await deliver(agentId, deliveredPrompt, caller, deliveryMethod);
+      if (result.ok) {
+        if (!confirmationTarget) return result;
+        const confirmed = await waitForTranscriptUserRecordLanding(
+          confirmationTarget.workspace,
+          confirmationTarget.sessionId,
+          confirmationTarget.before,
+          snapshot,
+          options.timeoutMs,
+          options.intervalMs,
+        );
+        if (confirmed) return result;
+        lastFailure = 'kickoff-not-confirmed';
+      } else {
+        lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+      }
     } catch (err) {
       lastFailure = err instanceof Error ? err.message : String(err);
     }
