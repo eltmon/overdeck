@@ -369,21 +369,6 @@ function hasLandedUserRecordSinceResume(state: AgentState, snapshot: Awaited<Ret
   return lastUserAt >= resumeAt;
 }
 
-function stalledResumeCooldownActive(agentId: string): boolean {
-  const cooldownFile = join(getAgentDir(agentId), '.last-stalled-resume-nudge');
-  if (!existsSync(cooldownFile)) return false;
-  try {
-    const last = parseInt(readFileSync(cooldownFile, 'utf-8').trim(), 10);
-    return !Number.isNaN(last) && Date.now() - last < STALLED_RESUME_NUDGE_COOLDOWN_MS;
-  } catch {
-    return false;
-  }
-}
-
-function recordStalledResumeCooldown(agentId: string): void {
-  writeFileSync(join(getAgentDir(agentId), '.last-stalled-resume-nudge'), String(Date.now()), 'utf-8');
-}
-
 function cooldownActive(agentId: string, filename: string, cooldownMs: number): boolean {
   const cooldownFile = join(getAgentDir(agentId), filename);
   if (!existsSync(cooldownFile)) return false;
@@ -424,7 +409,7 @@ export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
     if (await isIssueClosed(state.issueId)) continue;
     if (!await Effect.runPromise(sessionExists(agentId))) continue;
     if (!isAgentIdleForNudge(agentId)) continue;
-    if (stalledResumeCooldownActive(agentId)) continue;
+    if (cooldownActive(agentId, '.last-stalled-resume-nudge', STALLED_RESUME_NUDGE_COOLDOWN_MS)) continue;
 
     const sessionId = state.sessionId;
     if (!sessionId) continue;
@@ -437,7 +422,7 @@ export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
     try {
       const { messageAgent } = await import('../agents.js');
       await messageAgent(agentId, message);
-      recordStalledResumeCooldown(agentId);
+      recordCooldown(agentId, '.last-stalled-resume-nudge');
       const action = `Re-sent stalled resume prompt to ${agentId} (${state.issueId})`;
       actions.push(action);
       logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${action}`);
@@ -474,12 +459,7 @@ export async function redeliverUndeliveredKickoffs(): Promise<string[]> {
     }
 
     recordCooldown(agentId, '.last-kickoff-redelivery');
-    const delivery = await deliverInitialPromptWithRetry(
-      agentId,
-      prompt,
-      'deacon:redeliver-undelivered-kickoff',
-      state.deliveryMethod,
-    );
+    const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'deacon:redeliver-undelivered-kickoff', state.deliveryMethod);
 
     if (delivery.ok) {
       const updated = { ...state, kickoffDelivered: true };
@@ -495,19 +475,8 @@ export async function redeliverUndeliveredKickoffs(): Promise<string[]> {
     logDeaconEventSync(`redeliverUndeliveredKickoffs: ${reason}`);
     if (failedState?.troubled === true) {
       const message = `${agentId} is troubled after repeated kickoff re-delivery failures; operator intervention is required.`;
-      emitActivityEntrySync({
-        source: 'cloister',
-        level: 'error',
-        message,
-        issueId: state.issueId,
-      });
-      emitActivityTtsSync({
-        utterance: message,
-        priority: 0,
-        issueId: state.issueId,
-        source: 'cloister',
-        eventType: 'kickoff_redelivery_failed',
-      });
+      emitActivityEntrySync({ source: 'cloister', level: 'error', message, issueId: state.issueId });
+      emitActivityTtsSync({ utterance: message, priority: 0, issueId: state.issueId, source: 'cloister', eventType: 'kickoff_redelivery_failed' });
       actions.push(message);
     }
   }
