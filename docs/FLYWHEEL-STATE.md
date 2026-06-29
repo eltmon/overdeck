@@ -53,6 +53,15 @@ Durable cumulative memory across Flywheel orchestrator runs. Status snapshots ar
 - Producers now genuinely 2 (PAN-2150 + PAN-2152 plans). PAN-2157 still stalled (operator-gated), PAN-2086 wedged.
 - Consolidated operator actions UNCHANGED and still pending: (1) answer PAN-2157 'option 2'; (2) restart without --no-resume; (3) merge PAN-1982/MIN-831/MIN-846.
 
+## RUN-33 tick 5 (2026-06-29 ~04:35Z) — decomposition plans completed → STARTED 2 work agents; filed 3rd plan-machinery bug
+
+- Main GREEN. **Operator gates STILL unactioned across ticks 3→5** (PAN-1982 #2112 unmerged; PAN-2157 agent stalled at identical ctx; PAN-2158 open; no --no-resume restart).
+- **CRITICAL LESSON — `pan plan --auto` does PLANNING ONLY; it does NOT auto-start the work agent.** Both PAN-2150 and PAN-2152 planning agents finished and explicitly said: *\"Issue is in Planned... no work agent was spawned — it waits for `pan start`\"*. So after `pan plan --auto`, the orchestrator MUST run `pan start <id>` to get a work producer. (My tick-4 assumption that they'd auto-promote was wrong.) Did so this tick: **`pan start PAN-2150` + `pan start PAN-2152`** → agent-pan-2150 + agent-pan-2152 live work agents (genuine decomposition producers).
+- **Filed PAN-2159** (bug/substrate): a single `pan plan <id> --auto` leaves BOTH a `planning-pan-<id>` and an `agent-pan-<id>-plan` session; for PAN-2152 the two raced on `pan plan finalize` → bd process-lock thrashing (the plan agent flagged it; plan landed cleanly but it's a real race). Fix: one planning path per invocation + idempotency guard on finalize.
+- **Three substrate bugs filed this run on the plan/merge automation** — PAN-2157 (merge backend dead), PAN-2158 (auto-plan interactive stall), PAN-2159 (duplicate planning spawn). The auto-plan/auto-merge machinery has compounding gaps; surfaced as a 'focused fix pass' openQuestion.
+- Producers: agent-pan-2150 + agent-pan-2152 (working). 10 ready decompositions remain (PAN-2146/2147/2148/2149/2151/2153/2154/2155/2156) for future capacity — launch a couple per tick, plan THEN start, avoid central agents.ts while gated agents may resume.
+- Run drain total: 8 closed/closed-out + 2 operator-merged + 4 substrate bugs filed (2157/2158/2159 + the earlier store-bug verifications) + 2 decomposition work agents started.
+
 ## RUN-33 tick 1 (2026-06-29 ~03:08Z) — the merge bottleneck MOVED: rebases cleared, but auto-merge mechanism is DEAD (GitHub App not configured → PAN-2157)
 
 - **Main GREEN** (CI success, `51aa596`). Cohort (17): now **9 terminal** — closed out PAN-1084 and PAN-2081 this tick (both merged+verifying-on-main; gate passed). Prior terminal: 1919,1559,1638,1652,1722,1793,1900.
