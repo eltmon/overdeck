@@ -71,27 +71,31 @@
     }
   ],
   "created": "2026-06-27T03:27:37.390Z",
-  "updated": "2026-06-27T13:37:05.829Z",
+  "updated": "2026-06-29T01:56:01.859Z",
   "pipeline": {
     "issueId": "PAN-2088",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-27T13:37:05.747Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed verification error",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - sync-sources/hooks/record-cost-event.js.map",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2097",
-    "reviewRequestedAt": "2026-06-27T08:09:53.029Z"
+    "updatedAt": "2026-06-29T01:56:01.778Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-29T01:54:31.547Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2097"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 42250,
-            "output": 5502,
+            "input": 46235,
+            "output": 6753,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -103,12 +107,20 @@
             "cacheRead": 6770548,
             "cacheWrite": 327129
           }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 85,
+            "output": 2588,
+            "cacheRead": 1501894,
+            "cacheWrite": 138369
+          }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 42250,
-          "output": 5502,
+          "input": 46235,
+          "output": 6753,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -117,11 +129,17 @@
           "output": 76114,
           "cacheRead": 6770548,
           "cacheWrite": 327129
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 85,
+          "output": 2588,
+          "cacheRead": 1501894,
+          "cacheWrite": 138369
         }
       },
       "costAtCloseOut": {
-        "usd": 7.49788,
-        "pricingAsOf": "2026-06-27T13:37:05.804Z"
+        "usd": 7.834053,
+        "pricingAsOf": "2026-06-29T01:56:01.852Z"
       }
     },
     "merges": [
