@@ -138,10 +138,12 @@ export function BootReconciliationModal() {
 
   useEffect(() => {
     if (!data) return;
+    const agents = Array.isArray(data.set) ? data.set : [];
+    const selected = data.perAgent ?? {};
     setPerAgent(Object.fromEntries(
-      data.set
+      agents
         .filter((agent) => !agent.readOnly)
-        .map((agent) => [agent.issueId, data.perAgent[agent.issueId] ?? 'resume']),
+        .map((agent) => [agent.issueId, selected[agent.issueId] ?? 'resume']),
     ));
   }, [data]);
 
@@ -176,7 +178,8 @@ export function BootReconciliationModal() {
   const grouped = useMemo(() => {
     const groups = new Map<BootReconciliationConcern, BootReconciliationAgent[]>();
     for (const concern of CONCERN_ORDER) groups.set(concern, []);
-    for (const agent of data?.set ?? []) {
+    const agents = Array.isArray(data?.set) ? data.set : [];
+    for (const agent of agents) {
       groups.get(agent.concern)?.push(agent);
     }
     return groups;
@@ -185,7 +188,8 @@ export function BootReconciliationModal() {
   const secondsLeft = useCountdown(data?.graceDeadline ?? null);
   if (data?.decision !== 'pending') return null;
 
-  const resumableCount = data.set.filter((agent) => !agent.readOnly).length;
+  const agentSet = Array.isArray(data.set) ? data.set : [];
+  const resumableCount = agentSet.filter((agent) => !agent.readOnly).length;
   const pending = decisionMutation.isPending || freezeMutation.isPending;
 
   const submitReview = () => {
