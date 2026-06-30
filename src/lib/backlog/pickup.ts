@@ -216,6 +216,23 @@ export function selectUnblockTargets(
     .slice(0, cap);
 }
 
+/** Ready-but-unplanned issues the Flywheel should plan to prevent backlog starvation. */
+export function selectNeedsPlanning(
+  nodes: readonly SequenceNode[],
+  lk: ClassifyLookups,
+  opts: { cap?: number } = {},
+): ForecastNode[] {
+  const cap = Math.max(1, opts.cap ?? 2);
+  return nodes
+    .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
+    .filter((n) => {
+      const s = n.state;
+      return s.ready && !s.planned && !s.parked && !s.vetoed && !s.objection && !s.inPipeline;
+    })
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, cap);
+}
+
 export interface ForecastStats {
   total: number;
   inFlight: number;
