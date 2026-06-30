@@ -24,7 +24,9 @@ import {
   getAgentStateSync,
   resumeAgent,
   restartAgent,
+  saveAgentStateSync,
   type SpawnOptions,
+  type AgentState,
   getAgentDir,
 } from '../../src/lib/agents.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
@@ -442,6 +444,21 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   }
 
   describe('work role (spawnAgent)', () => {
+    function writeRunningSlotAgent(agentId: string, issueId: string): void {
+      const workspace = join(testOverdeckHome, `${agentId}-workspace`);
+      mkdirSync(workspace, { recursive: true });
+      saveAgentStateSync({
+        id: agentId,
+        issueId,
+        workspace,
+        harness: 'claude-code',
+        role: 'work',
+        model: DEFAULT_WORKHORSES.mid,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+      } satisfies AgentState);
+    }
+
     it('writes role: "work" to AgentState and resolves the work model from roles config', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-1',
@@ -479,6 +496,18 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect((reloaded as unknown as { phase?: string }).phase).toBeUndefined();
       expect((reloaded as unknown as { workType?: string }).workType).toBeUndefined();
       expect((reloaded as unknown as { agentType?: string }).agentType).toBeUndefined();
+    });
+
+    it('counts active registered slot agents against the per-issue slot cap', async () => {
+      writeRunningSlotAgent('agent-pan-1762-slot-1', 'PAN-1762');
+      writeRunningSlotAgent('agent-pan-1762-slot-2', 'PAN-1762');
+
+      await expect(spawnRun('PAN-1762', 'work', {
+        workspace: testWorkspace,
+        slotIndex: 3,
+        slotItemId: 'third-item',
+        maxRegisteredSlots: 2,
+      })).rejects.toThrow('Registered slot cap reached for PAN-1762: 2/2 active slot agents.');
     });
 
     it('marks kickoffDelivered true after a ready work-agent kickoff is delivered', async () => {

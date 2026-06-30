@@ -765,7 +765,7 @@ function assertRegisteredSlotCap(issueId: string, configuredCap?: number): void 
   }
 
   const issueLower = issueId.toLowerCase();
-  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-\\d+$`);
+  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-\\d+$`);
   const activeSlots = listAgentStates({ role: 'work' }).filter(agent =>
     slotAgentPattern.test(agent.id)
     && (agent.status === 'starting' || agent.status === 'running')
