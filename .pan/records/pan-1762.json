@@ -133,15 +133,17 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1762",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T18:58:25.129Z",
+    "updatedAt": "2026-06-30T19:36:19.354Z",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "INSPECTION PASSED for bead workspace-qcwbs. Spec fidelity: slot-spawn-tier diff adds optional slot options, derives agent-pan-1762-n, feature/pan-1762/slot-n, and slot workspace paths, preserves default single-agent path, creates slot worktrees, and enforces a registered-slot cap. Constraint compliance: no prohibited swarm runtime/server route restoration, no execSync or sync tmux use, and scope stays within spawn.ts/spawn-prep.ts plus focused unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2196",
+    "lastVerifiedCommit": "762d6f8ef4aa1b12156061abad6ef172f771a92b",
     "reviewRequestedAt": "2026-06-30T17:28:02.597Z"
   },
   "closeOut": {
@@ -171,8 +173,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 49446,
-            "output": 6955,
+            "input": 65327,
+            "output": 7191,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -206,15 +208,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 49446,
-          "output": 6955,
+          "input": 65327,
+          "output": 7191,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 38.596459,
-        "pricingAsOf": "2026-06-30T18:58:25.156Z"
+        "pricingAsOf": "2026-06-30T19:36:19.410Z"
       }
     },
     "merges": [
@@ -223,7 +225,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-30T17:39:33.566Z",
-  "updated": "2026-06-30T19:17:15.528Z",
+  "updated": "2026-06-30T19:36:19.412Z",
   "statusOverrides": {
     "foreman-e2e": "completed",
     "foreman-e2e.ac1": "completed",
