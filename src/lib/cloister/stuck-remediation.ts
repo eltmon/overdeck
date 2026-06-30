@@ -327,21 +327,21 @@ async function evaluateFlywheelOrchestrator(
   // PAN-2160: the terminal idle stage RELAUNCHES the wedged orchestrator (capped),
   // it never pause+troubles it. RUN-36 was parked here at idleMin=205 and the
   // whole pipeline stalled.
-  if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
+  if (idleMinutes >= config.flywheel_stage3_minutes && lastStage < 3) {
     await remediateFlywheelOrchestrator(agentId, now, actions, `wedged (idle ${idleMinutes}min)`);
     return;
   }
 
-  if (idleMinutes >= config.stage2_minutes && lastStage < 2) {
-    const message = `Stage 2: idle ${idleMinutes} min — flywheel ticks should be sub-minute. Emit a status snapshot via \`pan flywheel emit-status\` or run \`pan flywheel pause\` to hand off cleanly.`;
+  if (idleMinutes >= config.flywheel_stage2_minutes && lastStage < 2) {
+    const message = `Stage 2: idle ${idleMinutes} min — flywheel ticks should be sub-minute. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question and do NOT just re-emit a stale status — advance the pipeline.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(2, now, firstStuck, stuckState));
     logAction(actions, transitionAction(2, 'FLYWHEEL', idleMinutes, 'escalated-nudge'));
     return;
   }
 
-  if (idleMinutes >= config.stage1_minutes && lastStage < 1) {
-    const message = `You appear stuck — ${idleMinutes} min since last tick. Flywheel ticks should complete in under a minute. Emit a current status via \`pan flywheel emit-status --file <path>\`, or run \`pan flywheel pause\` if you're done.`;
+  if (idleMinutes >= config.flywheel_stage1_minutes && lastStage < 1) {
+    const message = `You appear stuck — ${idleMinutes} min since your last tick. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question and do NOT just re-emit a stale status — advance the pipeline.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck, stuckState));
     logAction(actions, transitionAction(1, 'FLYWHEEL', idleMinutes, 'poked'));

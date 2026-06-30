@@ -59,6 +59,9 @@ vi.mock('../config.js', () => ({
       stage1_minutes: 20,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
     },
   },
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
@@ -101,6 +104,9 @@ const DEFAULT_CONFIG = {
     stage1_minutes: 20,
     stage2_minutes: 45,
     stage3_minutes: 90,
+    flywheel_stage1_minutes: 20,
+    flywheel_stage2_minutes: 24,
+    flywheel_stage3_minutes: 28,
   },
 };
 
@@ -436,16 +442,31 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     vi.restoreAllMocks();
   });
 
-  it('pokes the orchestrator (stage 1) at 25 min idle with a flywheel-specific nudge', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+  it.each([16, 17])('does not fire a flywheel stage inside the healthy self-wake window at %i min idle', async (idleMinutes) => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(idleMinutes));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    const expectedAction = '[deacon] stuck-remediation stage=1 issue=FLYWHEEL idleMin=25 action=poked';
+    expect(actions).toEqual([]);
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('pokes the orchestrator (stage 1) at 20 min idle with a flywheel-specific full-tick nudge', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(20));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    const expectedAction = '[deacon] stuck-remediation stage=1 issue=FLYWHEEL idleMin=20 action=poked';
     expect(actions).toEqual([expectedAction]);
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
-      expect.stringContaining('Flywheel ticks should complete in under a minute'),
+      expect.stringContaining('inventory'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('ScheduleWakeup'),
     );
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
     expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
@@ -455,27 +476,33 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(mocks.getReviewStatusSync).not.toHaveBeenCalled();
   });
 
-  it('escalates to stage 2 nudge at 50 min idle (no resumeAgent for flywheel)', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
+  it('escalates to stage 2 nudge at 24 min idle (no resumeAgent for flywheel)', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(24));
+    mocks.readStuckRemediationState.mockReturnValue(state(1, 24));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(actions).toEqual(['[deacon] stuck-remediation stage=2 issue=FLYWHEEL idleMin=50 action=escalated-nudge']);
+    expect(actions).toEqual(['[deacon] stuck-remediation stage=2 issue=FLYWHEEL idleMin=24 action=escalated-nudge']);
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
       expect.stringContaining('Stage 2'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('ScheduleWakeup'),
     );
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
   });
 
-  it('pauses and marks troubled at stage 3 (95 min idle)', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(95));
+  it('fresh-launches at stage 3 (28 min idle)', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(28));
+    mocks.readStuckRemediationState.mockReturnValue(state(2, 28));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
     expect(actions).toEqual([
-      '[deacon] FLYWHEEL orchestrator wedged (idle 95min) — fresh-launched (relaunch 1/3)',
+      '[deacon] FLYWHEEL orchestrator wedged (idle 28min) — fresh-launched (relaunch 1/3)',
     ]);
     expect(mocks.killSessionSync).toHaveBeenCalledWith('flywheel-orchestrator');
     expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
