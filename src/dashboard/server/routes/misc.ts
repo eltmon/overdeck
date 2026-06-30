@@ -1216,7 +1216,7 @@ Continue the PLANNING session. Do NOT implement anything.
         }
 
         const { getAgentCommandSync } = await import('../../../lib/settings.js');
-        let msgPlanningModel = 'claude-sonnet-4-6';
+        let msgPlanningModel = 'claude-sonnet-5';
         try {
           msgPlanningModel = resolveModel('plan', undefined, loadYamlConfig().config);
         } catch { /* fall back to default */ }
