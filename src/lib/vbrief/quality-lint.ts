@@ -1,4 +1,13 @@
-import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefSubItem } from './types.js';
+import {
+  subItemsOf,
+  type FilesScopeConfidence,
+  type ItemReadiness,
+  type VBriefDifficulty,
+  type VBriefDocument,
+  type VBriefItem,
+  type VBriefItemMetadata,
+  type VBriefSubItem,
+} from './types.js';
 
 export interface QualityIssue {
   itemId: string | null;
@@ -30,6 +39,11 @@ const BANNED_AC_PATTERNS = [
   ...VAGUE_AC_PATTERNS,
 ];
 
+const FILES_SCOPE_CONFIDENCE_VALUES = new Set<FilesScopeConfidence>(['high', 'medium', 'low']);
+const ITEM_READINESS_VALUES = new Set<ItemReadiness>(['ready', 'sequential', 'needs_refinement']);
+const HEAVY_DIFFICULTIES = new Set<VBriefDifficulty>(['complex', 'expert']);
+const PARALLEL_SAFE_REASON_FIELDS = ['parallelSafeReason', 'parallel_safe_reason', 'readinessReason', 'readiness_reason'];
+
 function issue(itemId: string | null, rule: string, message: string): QualityIssue {
   return { itemId, rule, message, severity: 'error' };
 }
@@ -49,6 +63,75 @@ function hasAcJustification(item: VBriefItem): boolean {
 
 function wordCount(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === 'string' ? value.trim() : null;
+}
+
+function hasParallelSafeReason(metadata: VBriefItemMetadata): boolean {
+  return PARALLEL_SAFE_REASON_FIELDS.some(field => (stringValue(metadata[field])?.length ?? 0) > 0);
+}
+
+function hasFilenameLikeSegment(value: string): boolean {
+  const segment = value.split('/').filter(Boolean).at(-1) ?? value;
+  return segment.includes('.');
+}
+
+function isBroadFilesScope(value: string): boolean {
+  const scope = value.trim();
+  if (!scope) return true;
+  if (scope.includes('**')) return true;
+  if (scope.endsWith('/')) return true;
+  if (scope.includes('*') && !scope.includes('/')) return true;
+  return !scope.includes('*') && !hasFilenameLikeSegment(scope);
+}
+
+function lintRequiredDispatchMetadata(item: VBriefItem): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  const metadata = item.metadata ?? {};
+  const filesScope = metadata.files_scope;
+
+  if (!Array.isArray(filesScope) || filesScope.length === 0) {
+    issues.push(issue(item.id, 'files-scope-missing', `Item ${item.id} metadata.files_scope is required and must name at least one concrete file or narrow glob`));
+  } else {
+    for (const scope of filesScope) {
+      if (typeof scope !== 'string' || scope.trim().length === 0) {
+        issues.push(issue(item.id, 'files-scope-invalid', `Item ${item.id} metadata.files_scope contains an empty or non-string entry`));
+      } else if (isBroadFilesScope(scope)) {
+        issues.push(issue(item.id, 'files-scope-broad', `Item ${item.id} metadata.files_scope entry "${scope}" is too broad; use concrete files or narrow globs`));
+      }
+    }
+  }
+
+  if (!FILES_SCOPE_CONFIDENCE_VALUES.has(metadata.files_scope_confidence as FilesScopeConfidence)) {
+    issues.push(issue(item.id, 'files-scope-confidence-missing', `Item ${item.id} metadata.files_scope_confidence is required and must be high, medium, or low`));
+  }
+
+  if (!ITEM_READINESS_VALUES.has(metadata.readiness as ItemReadiness)) {
+    issues.push(issue(item.id, 'readiness-missing', `Item ${item.id} metadata.readiness is required and must be ready, sequential, or needs_refinement`));
+  }
+
+  if (metadata.readiness === 'ready' && metadata.files_scope_confidence === 'low') {
+    issues.push(issue(item.id, 'ready-low-confidence', `Item ${item.id} cannot be readiness:ready with files_scope_confidence:low`));
+  }
+
+  if (metadata.readiness === 'ready' && metadata.difficulty && HEAVY_DIFFICULTIES.has(metadata.difficulty) && !hasParallelSafeReason(metadata)) {
+    issues.push(warning(item.id, 'complex-ready-without-reason', `Item ${item.id} is ${metadata.difficulty} and readiness:ready but does not state why it is parallel-safe`));
+  }
+
+  const expectedOutputs = metadata.expected_outputs;
+  if (Array.isArray(expectedOutputs)) {
+    for (const [index, output] of expectedOutputs.entries()) {
+      if (typeof output !== 'string') continue;
+      const banned = BANNED_AC_PATTERNS.find(pattern => output.toLowerCase().includes(pattern));
+      if (banned) {
+        issues.push(issue(item.id, 'expected-output-banned-phrase', `Item ${item.id} metadata.expected_outputs[${index}] contains banned phrase "${banned}"`));
+      }
+    }
+  }
+
+  return issues;
 }
 
 function lintItem(item: VBriefItem): QualityIssue[] {
@@ -85,6 +168,8 @@ function lintItem(item: VBriefItem): QualityIssue[] {
   if (item.metadata?.requiresInspection === true && (!Array.isArray(foundationFor) || foundationFor.length === 0)) {
     issues.push(issue(item.id, 'inspection-without-foundation', `Item ${item.id} requires inspection but has no metadata.foundationFor entries`));
   }
+
+  issues.push(...lintRequiredDispatchMetadata(item));
 
   return issues;
 }

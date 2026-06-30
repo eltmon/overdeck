@@ -12,17 +12,28 @@ function ac(id: string, title: string) {
 }
 
 function item(overrides: Partial<VBriefItem> = {}): VBriefItem {
+  const id = overrides.id ?? 'item-1';
+  const defaultMetadata = {
+    requiresInspection: false,
+    files_scope: [`src/${id}.ts`],
+    files_scope_confidence: 'high' as const,
+    readiness: 'sequential' as const,
+  };
+
   return {
-    id: 'item-1',
+    id,
     title: 'Implement behavior',
     status: 'pending',
     narrative: { Action: 'Implement the behavior with explicit files and verification steps' },
-    metadata: { requiresInspection: false },
     subItems: [
-      ac('item-1.ac1', 'Given a valid request then it returns success'),
-      ac('item-1.ac2', 'The command rejects invalid requests with a clear error'),
+      ac(`${id}.ac1`, 'Given a valid request then it returns success'),
+      ac(`${id}.ac2`, 'The command rejects invalid requests with a clear error'),
     ],
     ...overrides,
+    metadata: {
+      ...defaultMetadata,
+      ...(overrides.metadata ?? {}),
+    },
   };
 }
 
@@ -126,12 +137,68 @@ describe('lintPlanQuality story quality', () => {
   });
 });
 
+describe('lintPlanQuality dispatch metadata', () => {
+  it('errors when required dispatch metadata is missing', () => {
+    const candidate = item();
+    candidate.metadata = { requiresInspection: false };
+
+    expect(lintPlanQuality(doc([candidate]))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'item-1', rule: 'files-scope-missing', severity: 'error' }),
+      expect.objectContaining({ itemId: 'item-1', rule: 'files-scope-confidence-missing', severity: 'error' }),
+      expect.objectContaining({ itemId: 'item-1', rule: 'readiness-missing', severity: 'error' }),
+    ]));
+  });
+
+  it('errors on broad files_scope declarations', () => {
+    const issues = lintPlanQuality(doc([
+      item({ metadata: { files_scope: ['src/**', 'src', '*.ts'] } }),
+    ]));
+
+    expect(issues.filter(issue => issue.rule === 'files-scope-broad')).toEqual([
+      expect.objectContaining({ itemId: 'item-1', severity: 'error' }),
+      expect.objectContaining({ itemId: 'item-1', severity: 'error' }),
+      expect.objectContaining({ itemId: 'item-1', severity: 'error' }),
+    ]);
+  });
+
+  it('errors when readiness ready uses low confidence scope', () => {
+    expect(lintPlanQuality(doc([
+      item({ metadata: { readiness: 'ready', files_scope_confidence: 'low' } }),
+    ]))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'item-1', rule: 'ready-low-confidence', severity: 'error' }),
+    ]));
+  });
+
+  it('warns when complex ready work does not state why it is parallel-safe', () => {
+    expect(lintPlanQuality(doc([
+      item({ metadata: { difficulty: 'complex', readiness: 'ready' } }),
+    ]))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'item-1', rule: 'complex-ready-without-reason', severity: 'warn' }),
+    ]));
+  });
+
+  it('accepts complex ready work with an explicit parallel-safe reason', () => {
+    const issues = lintPlanQuality(doc([
+      item({ metadata: { difficulty: 'complex', readiness: 'ready', parallelSafeReason: 'The item only touches one isolated file with its own verification.' } }),
+    ]));
+
+    expect(issues.map(issue => issue.rule)).not.toContain('complex-ready-without-reason');
+  });
+
+  it('errors when expected_outputs reuses a banned acceptance-criteria phrase', () => {
+    expect(lintPlanQuality(doc([
+      item({ metadata: { expected_outputs: ['passes tests'] } }),
+    ]))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'item-1', rule: 'expected-output-banned-phrase', severity: 'error' }),
+    ]));
+  });
+});
+
 describe('lintPlanQuality DAG and references', () => {
   function validItem(id: string, overrides: Partial<VBriefItem> = {}): VBriefItem {
     return item({
       id,
       title: id,
-      metadata: { requiresInspection: false },
       subItems: [
         ac(`${id}.ac1`, 'Given input then it returns output'),
         ac(`${id}.ac2`, 'The command rejects invalid input'),
@@ -204,8 +271,13 @@ describe('lintPlanQuality DAG and references', () => {
   });
 
   it('flags missing requiresInspection', () => {
+    const candidate = validItem('a');
+    const metadata = { ...(candidate.metadata ?? {}) };
+    delete metadata.requiresInspection;
+    candidate.metadata = metadata;
+
     const issues = lintPlanQuality(doc([
-      validItem('a', { metadata: {} }),
+      candidate,
     ]));
 
     expect(issues).toEqual(expect.arrayContaining([
@@ -256,7 +328,12 @@ describe('lintPlanQuality observable-term tuning (PAN-1796)', () => {
       id: 'pan-1', title: 't', status: 'approved',
       items: [{
         id: 'a', title: 'item a', status: 'pending',
-        metadata: { requiresInspection: false },
+        metadata: {
+          requiresInspection: false,
+          files_scope: ['src/a.ts'],
+          files_scope_confidence: 'high',
+          readiness: 'sequential',
+        },
         narrative: { Action: 'Do a concrete focused thing across the named files now' },
         items: [
           { id: 'a.ac1', title: acTitle, status: 'pending', metadata: { kind: 'acceptance_criterion' } },
