@@ -3,7 +3,8 @@
     "version": "0.6",
     "created": "2026-06-30T01:24:23Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2154: Decompose src/lib/workspace-manager.ts (1736 lines) into focused modules"
+    "description": "Plan for PAN-2154: Decompose src/lib/workspace-manager.ts (1736 lines) into focused modules",
+    "updated": "2026-06-30T01:48:16.126Z"
   },
   "plan": {
     "id": "pan-2154",
@@ -11,9 +12,9 @@
     "status": "proposed",
     "uid": "7be76342-63e2-47bc-a10c-79225971b80e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-06-30T01:24:23Z",
-    "updated": "2026-06-30T01:24:23Z",
+    "updated": "2026-06-30T01:48:16.126Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2154",
@@ -578,7 +579,10 @@
         "to": "wi-8-barrel-trim",
         "type": "blocks"
       }
-    ]
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-30-PAN-2154-decompose-src-lib-workspace-manager-ts-1736-lines-into-focused-modules.vbrief.json"
+    }
   },
   "status": "proposed"
 }
