@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2174",
   "schemaVersion": 2,
-  "created": "2026-06-29T19:19:51.780Z",
-  "updated": "2026-06-29T19:20:07.806Z",
-  "pipeline": {
-    "issueId": "PAN-2174",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T19:19:51.780Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-2174: bug(flywheel): intermittently idles (asks a question / drops ScheduleWakeup) instead of ticking",
       "timestamp": "2026-06-29T19:20:07.806Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T19:19:51.780Z",
+  "updated": "2026-06-30T01:09:29.581Z",
+  "pipeline": {
+    "issueId": "PAN-2174",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-30T01:09:29.556Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 12894,
+            "output": 1257,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 29438,
+            "output": 65518,
+            "cacheRead": 7509396,
+            "cacheWrite": 303584
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 12894,
+          "output": 1257,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 29438,
+          "output": 65518,
+          "cacheRead": 7509396,
+          "cacheWrite": 303584
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.437241,
+        "pricingAsOf": "2026-06-30T01:09:29.579Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
