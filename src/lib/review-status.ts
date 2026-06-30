@@ -133,7 +133,7 @@ export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationSt
  * failed, UAT ok, merge not started). Extracted so both setReviewStatusSync and the
  * journal→DB reconcile in getReviewStatusSync derive readyForMerge identically.
  */
-function reviewGatesPassedSync(
+export function reviewGatesPassedSync(
   s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
 ): boolean {
   return (
