@@ -17,26 +17,35 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-30T01:40:25.309Z"
+    },
+    {
+      "timestamp": "2026-06-30T02:15:38.279Z",
+      "reason": "end",
+      "note": "Reconfirming completion after review and tests passed. No additional implementation changes."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-30T02:15:38.692Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T19:19:31.903Z",
-  "updated": "2026-06-30T02:14:51.622Z",
+  "updated": "2026-06-30T02:15:44.663Z",
   "pipeline": {
     "issueId": "PAN-2173",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "running",
-    "mergeStatus": "verifying",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T02:14:51.577Z",
+    "updatedAt": "2026-06-30T02:15:44.628Z",
     "reviewNotes": "Review passed: no PR-scoped correctness, security, requirements, or performance blockers found",
     "testNotes": "Quality gates: npm run typecheck (✔), npm run lint (✔ all linters passed), npx vitest run --configLoader runner (✔ 7640 tests passed, 52 skipped, 0 failed). PAN-1718 implementation verified: (1) restart lock acquired before pan dev SIGUSR2 branch (reload.ts), (2) append-only restart-events.jsonl journal with concurrent-writer detection (restart-status.ts), (3) supervisor stop/start robustness with wait-for-exit and verify-survival (supervisor.ts). CLI-only fix with no dashboard/UI changes; no browser UAT required.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2184",
     "reviewedAtCommit": "7a58095ab9bcf50a09ef02c57ea588c7c9239c1d",
     "lastVerifiedCommit": "7a58095ab9bcf50a09ef02c57ea588c7c9239c1d",
-    "reviewRequestedAt": "2026-06-30T01:36:43.046Z"
+    "reviewRequestedAt": "2026-06-30T02:15:38.288Z"
   },
   "closeOut": {
     "usage": {
@@ -88,7 +97,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.929934,
-        "pricingAsOf": "2026-06-30T02:14:51.620Z"
+        "pricingAsOf": "2026-06-30T02:15:44.663Z"
       }
     },
     "merges": [
