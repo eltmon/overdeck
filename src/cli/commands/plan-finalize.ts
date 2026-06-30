@@ -11,6 +11,7 @@ import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -37,6 +38,46 @@ export function evaluatePlanFinalizeQualityGate(
   return errors.length > 0
     ? { ok: false, skipped: false, issues }
     : { ok: true, skipped: false, issues };
+}
+
+export function formatReadinessReport(verdict: SwarmReadinessVerdict): string[] {
+  const lines: string[] = ['Readiness report:'];
+  lines.push('  dependency waves:');
+  if (verdict.waves.length === 0) {
+    lines.push('    none');
+  } else {
+    for (const wave of verdict.waves) {
+      const ids = wave.items.map(item => item.id).join(', ') || 'none';
+      lines.push(`    wave ${wave.index}: ${ids}`);
+    }
+  }
+
+  lines.push('  file-overlap matrix:');
+  const matrixRows = Object.entries(verdict.overlapMatrix);
+  if (matrixRows.length === 0) {
+    lines.push('    none');
+  } else {
+    let printed = false;
+    for (const [itemId, overlaps] of matrixRows) {
+      for (const [otherId, sharedFiles] of Object.entries(overlaps)) {
+        if (itemId > otherId) continue;
+        printed = true;
+        lines.push(`    ${itemId} <-> ${otherId}: ${sharedFiles.length > 0 ? sharedFiles.join(', ') : '(conservative overlap)'}`);
+      }
+    }
+    if (!printed) lines.push('    no cross-item file overlaps');
+  }
+
+  lines.push('  conflict groups:');
+  if (verdict.conflictGroups.length === 0) {
+    lines.push('    none');
+  } else {
+    for (const group of verdict.conflictGroups) {
+      const shared = group.sharedFiles.length > 0 ? ` - ${group.sharedFiles.join(', ')}` : '';
+      lines.push(`    ${group.itemIds.join(' + ')} (${group.reason})${shared}`);
+    }
+  }
+  return lines;
 }
 
 interface PromotePlanningResult {
@@ -132,6 +173,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const planDoc = readPlanSync(planPath);
   const prdText = readPrdDraftText(workspacePath, issueId);
   const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText });
+  const readinessReport = formatReadinessReport(analyzeSwarmReadiness(planDoc));
   if (qualityGate.skipped) {
     if (!options.json) {
       console.error(chalk.yellow('⚠ quality lint SKIPPED (--no-quality-lint)'));
@@ -145,6 +187,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         for (const line of formatQualityIssues(qualityGate.issues)) {
           console.error(chalk.red('  ' + line));
         }
+        console.error('');
+        for (const line of readinessReport) console.error(chalk.dim(line));
         console.error(chalk.dim('Use --no-quality-lint only for an emergency one-run bypass.'));
       }
       process.exit(3);
@@ -160,6 +204,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         }
       }
     }
+  }
+  if (!options.json) {
+    for (const line of readinessReport) console.error(chalk.dim(line));
   }
 
   emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
