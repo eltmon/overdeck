@@ -4,17 +4,17 @@
     "created": "2026-06-29T19:24:43.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2173: bug(flywheel): under-plans new ready+released backlog while busy draining a cohort",
-    "updated": "2026-06-29T19:30:36.287Z"
+    "updated": "2026-06-30T01:09:31.658Z"
   },
   "plan": {
     "id": "pan-2173",
     "title": "Flywheel planning floor — plan new ready backlog while draining a cohort",
-    "status": "proposed",
+    "status": "running",
     "uid": "71e0960b-eedf-43cb-ae44-9246fed2b82d",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-29T19:24:43.000Z",
-    "updated": "2026-06-29T19:30:36.287Z",
+    "updated": "2026-06-30T01:09:31.658Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2173",
@@ -223,5 +223,5 @@
       "canonicalFilename": "2026-06-29-PAN-2173-flywheel-planning-floor-plan-new-ready-backlog-while-draining-a-cohort.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
