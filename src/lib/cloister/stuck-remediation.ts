@@ -333,7 +333,7 @@ async function evaluateFlywheelOrchestrator(
   }
 
   if (idleMinutes >= config.flywheel_stage2_minutes && lastStage < 2) {
-    const message = `Stage 2: idle ${idleMinutes} min — flywheel ticks should be sub-minute. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question and do NOT just re-emit a stale status — advance the pipeline.`;
+    const message = `Stage 2: idle ${idleMinutes} min — run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question, do NOT wait, and do NOT just emit a stale status or pause.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(2, now, firstStuck, stuckState));
     logAction(actions, transitionAction(2, 'FLYWHEEL', idleMinutes, 'escalated-nudge'));
@@ -341,7 +341,7 @@ async function evaluateFlywheelOrchestrator(
   }
 
   if (idleMinutes >= config.flywheel_stage1_minutes && lastStage < 1) {
-    const message = `You appear stuck — ${idleMinutes} min since your last tick. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question and do NOT just re-emit a stale status — advance the pipeline.`;
+    const message = `You appear stuck — ${idleMinutes} min since your last tick. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question, do NOT wait, and do NOT just emit a stale status or pause.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck, stuckState));
     logAction(actions, transitionAction(1, 'FLYWHEEL', idleMinutes, 'poked'));

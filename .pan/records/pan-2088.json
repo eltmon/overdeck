@@ -81,15 +81,17 @@
     }
   ],
   "created": "2026-06-27T03:27:37.390Z",
-  "updated": "2026-06-29T02:12:39.730Z",
+  "updated": "2026-06-30T00:38:42.905Z",
   "pipeline": {
     "issueId": "PAN-2088",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "running",
-    "mergeStatus": "pending",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T02:12:39.699Z",
+    "updatedAt": "2026-06-30T00:38:42.879Z",
+    "reviewNotes": "review passed; no blocking findings",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2097",
     "reviewRequestedAt": "2026-06-29T02:12:33.753Z"
   },
@@ -98,8 +100,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 46235,
-            "output": 6753,
+            "input": 55127,
+            "output": 8729,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -114,17 +116,17 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 85,
-            "output": 2588,
-            "cacheRead": 1501894,
-            "cacheWrite": 138369
+            "input": 165,
+            "output": 7290,
+            "cacheRead": 4715364,
+            "cacheWrite": 285819
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 46235,
-          "output": 6753,
+          "input": 55127,
+          "output": 8729,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -135,15 +137,15 @@
           "cacheWrite": 327129
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 85,
-          "output": 2588,
-          "cacheRead": 1501894,
-          "cacheWrite": 138369
+          "input": 165,
+          "output": 7290,
+          "cacheRead": 4715364,
+          "cacheWrite": 285819
         }
       },
       "costAtCloseOut": {
-        "usd": 7.834053,
-        "pricingAsOf": "2026-06-29T02:12:39.729Z"
+        "usd": 8.363304,
+        "pricingAsOf": "2026-06-30T00:38:42.905Z"
       }
     },
     "merges": [

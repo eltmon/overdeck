@@ -442,7 +442,7 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     vi.restoreAllMocks();
   });
 
-  it.each([16, 17])('does not fire a flywheel stage inside the healthy self-wake window at %i min idle', async (idleMinutes) => {
+  it.each([16, 17])('does not fire a flywheel stage inside the healthy 1000s self-wake window at %i min idle', async (idleMinutes) => {
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(idleMinutes));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
@@ -453,7 +453,7 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
   });
 
-  it('pokes the orchestrator (stage 1) at 20 min idle with a flywheel-specific full-tick nudge', async () => {
+  it('pokes the orchestrator (stage 1) at 20 min idle with a full-tick nudge', async () => {
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(20));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
@@ -462,11 +462,15 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(actions).toEqual([expectedAction]);
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
-      expect.stringContaining('inventory'),
+      expect.stringContaining('FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work'),
     );
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
-      expect.stringContaining('ScheduleWakeup'),
+      expect.stringContaining('ScheduleWakeup(delaySeconds:1000)'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('Do NOT ask the operator a question'),
     );
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
     expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
@@ -489,13 +493,17 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     );
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
-      expect.stringContaining('ScheduleWakeup'),
+      expect.stringContaining('FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('ScheduleWakeup(delaySeconds:1000)'),
     );
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
   });
 
-  it('fresh-launches at stage 3 (28 min idle)', async () => {
+  it('fresh-launches a wedged orchestrator at flywheel stage 3 (28 min idle)', async () => {
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(28));
     mocks.readStuckRemediationState.mockReturnValue(state(2, 28));
 

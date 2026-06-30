@@ -88,7 +88,7 @@ describe('loadCloisterConfig', () => {
     });
   });
 
-  it('deep-merges a partial flywheel stuck-remediation block', () => {
+  it('deep-merges a partial flywheel stuck-remediation override', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue('[stuck_remediation]\nflywheel_stage3_minutes = 30\n');
 

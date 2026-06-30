@@ -1,0 +1,220 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T20:00:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2174: bug(flywheel): intermittently idles (asks a question / drops ScheduleWakeup) instead of ticking",
+    "updated": "2026-06-30T01:09:35.780Z"
+  },
+  "plan": {
+    "id": "pan-2174",
+    "title": "bug(flywheel): intermittently idles (asks a question / drops ScheduleWakeup) instead of ticking",
+    "status": "running",
+    "uid": "a9842a08-425e-4141-bb1f-34708c43ba49",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-06-29T20:00:00.000Z",
+    "updated": "2026-06-30T01:09:35.780Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2174",
+        "label": "PAN-2174",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "deacon",
+      "stuck-remediation",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "The singleton flywheel orchestrator (opus/claude-code) intermittently drops its ScheduleWakeup self-schedule or emits a blocking AskUserQuestion and then sits idle at the prompt (RUN-37: 46 min idle), violating roles/flywheel.md:111 (never block on operator) and :121 (ScheduleWakeup every tick). Recovery exists but is weak: the deacon stage-1/2 idle nudge tells the agent to 'emit a status or pause' rather than to run a real tick, and the terminal relaunch fires at the shared 90-minute threshold — far too late for a sub-minute-tick singleton that is the pipeline's last stand.",
+      "Proposal": "Two recovery-side changes in src/lib/cloister. (a) Rewrite the flywheel stage-1 and stage-2 nudge messages in evaluateFlywheelOrchestrator() so they direct the orchestrator to run a FULL tick now (inventory->diagnose->suggest->launch->emit-status) and re-arm ScheduleWakeup(1000s), forbidding ask-and-wait. (b) Add flywheel-specific stage thresholds to StuckRemediationConfig (flywheel_stage1_minutes=20, flywheel_stage2_minutes=24, flywheel_stage3_minutes=28) so the relaunch fires at 28 min instead of the shared 90, without changing work-agent thresholds. Stage 1 stays at 20 min so healthy 1000s (~16.7 min) self-wakes are not pre-empted.",
+      "NonGoals": "- Do NOT attempt a harness-level fix that makes opus/claude-code never drop ScheduleWakeup or never emit a blocking question; this is recovery-side hardening only.\n- Do NOT change work-agent stuck-remediation thresholds (20/45/90) or any non-flywheel remediation behavior.\n- Do NOT change the flywheel ScheduleWakeup interval (stays 1000s).\n- Do NOT remove or raise the relaunch cap (FLYWHEEL_MAX_RESPAWNS=3) or the pause+troubled terminal escalation.\n- Do NOT programmatically auto-answer or dismiss the orchestrator's AskUserQuestion modal; relaunch (fresh session) is the recovery.\n- Do NOT lower flywheel stage 1 below 20 min."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Flywheel relaunch threshold set to 28 min.",
+        "rationale": "Within the issue's stated 25-30 min target. Fresh-launch is the only reliable recovery for a session wedged at an AskUserQuestion modal that may ignore pasted nudges; 28 min bounds dead-air without thrashing."
+      },
+      {
+        "summary": "Flywheel stage 1 stays at 20 min; stage 2 at 24 min.",
+        "rationale": "A healthy flywheel self-wakes at 1000s (~16.7 min), so 20 min is the first provable missed wake; lowering it pre-empts healthy sleeps. 24 min gives the stage-1 full-tick nudge ~4 min (a tick is sub-minute) to land before escalating."
+      },
+      {
+        "summary": "Implement via new flywheel-specific config fields rather than overloading the shared stage*_minutes.",
+        "rationale": "Keeps work-agent behavior (20/45/90) untouched and makes the flywheel thresholds independently tunable via TOML deep-merge."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-fields",
+        "title": "Add flywheel-specific stage thresholds to StuckRemediationConfig",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T20:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2174",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/config.ts, add three fields to the StuckRemediationConfig interface (after stage3_minutes): flywheel_stage1_minutes, flywheel_stage2_minutes, flywheel_stage3_minutes (all number). In DEFAULT_CLOISTER_CONFIG.stuck_remediation (around line 300-305), add flywheel_stage1_minutes: 20, flywheel_stage2_minutes: 24, flywheel_stage3_minutes: 28 alongside the existing stage1_minutes:20/stage2_minutes:45/stage3_minutes:90. No parse wiring is needed — loadCloisterConfigSync() deep-merges parsed TOML over defaults. Add coverage in src/lib/cloister/__tests__/config.test.ts: (1) the default-config assertion includes the three new fields with 20/24/28; (2) a TOML-override case (e.g. 'flywheel_stage3_minutes = 30') deep-merges over the default while leaving the other flywheel fields and the shared stage fields at their defaults."
+        },
+        "items": [
+          {
+            "id": "config-fields.ac1",
+            "title": "The StuckRemediationConfig type accepts flywheel_stage1_minutes, flywheel_stage2_minutes, flywheel_stage3_minutes as number fields (typecheck succeeds for code reading config.flywheel_stage3_minutes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-fields.ac2",
+            "title": "loadCloisterConfigSync() with no config file returns flywheel_stage1_minutes=20, flywheel_stage2_minutes=24, flywheel_stage3_minutes=28 (asserted by config.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-fields.ac3",
+            "title": "A TOML file overriding one flywheel field (e.g. flywheel_stage3_minutes=30) deep-merges so that field returns 30 while the other flywheel fields and shared stage1/2/3_minutes remain at defaults",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-fields.ac4",
+            "title": "loadCloisterConfigSync() preserves the shared stage1_minutes=20, stage2_minutes=45, stage3_minutes=90 defaults unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rewire-remediation",
+        "title": "Rewire flywheel idle remediation: full-tick nudges + tighter 28-min relaunch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T20:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2174",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/stuck-remediation.ts evaluateFlywheelOrchestrator() (~line 291): change the three threshold comparisons to read config.flywheel_stage3_minutes (relaunch, ~line 330), config.flywheel_stage2_minutes (~line 335), config.flywheel_stage1_minutes (~line 343) instead of the shared config.stage{3,2,1}_minutes. Rewrite the stage-1 message to a hard full-tick directive, e.g.: 'You appear stuck — ${idleMinutes} min since your last tick. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> `pan flywheel emit-status`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question and do NOT just re-emit a stale status — advance the pipeline.' Rewrite the stage-2 message as an escalated version of the same directive (keep a 'Stage 2' marker and the full-tick + ScheduleWakeup instruction; still no pause-as-primary). Preserve isAgentIdleForNudge(5min) gate, the dead-process self-heal branch, remediateFlywheelOrchestrator()/FLYWHEEL_MAX_RESPAWNS logic, and the transitionAction/log action strings (stage=N issue=FLYWHEEL action=poked/escalated-nudge). Update the flywheel-coverage block in src/lib/cloister/__tests__/stuck-remediation.test.ts to the new thresholds and message substrings, and add an NFR-1 guard test that NO stage fires for a flywheel idle 16-17 min (healthy self-wake window)."
+        },
+        "items": [
+          {
+            "id": "rewire-remediation.ac1",
+            "title": "Given a flywheel idle >= flywheel_stage1_minutes (20) and < stage2, when the patrol runs, it calls messageAgent with a message instructing a FULL tick (contains 'inventory' and 'ScheduleWakeup') and emits a stage=1 action=poked log line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewire-remediation.ac2",
+            "title": "Given a flywheel idle >= flywheel_stage2_minutes (24) with prior stage-1 state, the patrol sends the escalated full-tick nudge (contains 'Stage 2' and 'ScheduleWakeup') and emits a stage=2 action=escalated-nudge log line; pauseFlywheel is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewire-remediation.ac3",
+            "title": "Given a flywheel idle >= flywheel_stage3_minutes (28) with prior stage-2 state, the patrol kills the session and calls resumeFlywheel exactly once (fresh-launch relaunch 1/3); markAgentTroubled is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewire-remediation.ac4",
+            "title": "Given a flywheel idle 16-17 min (within the healthy 1000s self-wake window), no stage fires: messageAgent, resumeFlywheel, and pauseFlywheel are all uncalled (NFR-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewire-remediation.ac5",
+            "title": "The work-agent path (evaluateAgent) preserves the shared 20/45/90 thresholds: a work agent idle 50 min emits a stage=2 nudge, unaffected by the flywheel_* fields (FR-4, NFR-2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-doc",
+        "title": "Update roles/flywheel.md to describe full-tick nudge + 28-min relaunch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-29T20:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-2174",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In roles/flywheel.md, update the periodic-sweep paragraph (around line 121) so the deacon-nudge description matches the new behavior: the deacon's idle patrol now sends a 'run a FULL tick now' directive (not 'emit a status or pause'), and a wedged flywheel is fresh-launched at ~28 min (flywheel-specific), not the shared 90 min. Keep it to a sentence or two; do not restructure the rest of the role file."
+        },
+        "items": [
+          {
+            "id": "role-doc.ac1",
+            "title": "Running `grep -i 'full tick' roles/flywheel.md` returns the updated periodic-sweep line describing the deacon idle nudge as a full-tick directive (inventory->...->emit-status)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-doc.ac2",
+            "title": "Running `grep -iE '28[ -]?min|flywheel-specific' roles/flywheel.md` returns a line stating the wedged-flywheel relaunch fires at the flywheel-specific ~28-min threshold rather than the shared 90-min one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-fields",
+        "to": "rewire-remediation",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2174-bug-flywheel-intermittently-idles-asks-a-question-drops-schedulewakeup-instead-of-ticking.vbrief.json"
+    }
+  },
+  "status": "active"
+}
