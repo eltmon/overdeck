@@ -17,6 +17,7 @@ import {
 } from '../../../lib/backlog/label-ops.js';
 import {
   normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats, computeEpicGroups,
+  selectNeedsPlanning,
   type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
@@ -299,7 +300,7 @@ const getBacklogForecastRoute = HttpRouter.add(
         const projectRoot = process.cwd();
         const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
         if (!existsSync(seqPath)) {
-          return jsonResponse({ n, stats: null, inFlight: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [], epics: [], contains: [] });
+          return jsonResponse({ n, stats: null, inFlight: [], needsPlanning: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [], epics: [], contains: [] });
         }
         const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
         if (!parsed.ok) throw new Error(`parse error: ${parsed.error}`);
@@ -335,6 +336,7 @@ const getBacklogForecastRoute = HttpRouter.add(
           .filter((x) => x.state.inPipeline)
           .sort((a, b) => a.rank - b.rank)
           .map(enrich);
+        const needsPlanning = selectNeedsPlanning(nodes, lk).map(enrich);
         const waves = computeWaves(nodes, lk, n).map((w) => w.map(enrich));
         const lanesRaw = computeLanes(nodes, lk, n);
         const lanes = {
@@ -349,7 +351,7 @@ const getBacklogForecastRoute = HttpRouter.add(
           title: titleByIssue.get(e.issue.toUpperCase()) ?? '',
         }));
 
-        return jsonResponse({ n, stats, inFlight, waves, lanes, cohort, epics, contains: groups.contains });
+        return jsonResponse({ n, stats, inFlight, needsPlanning, waves, lanes, cohort, epics, contains: groups.contains });
       },
       catch: (err) => new Error(String(err)),
     });
