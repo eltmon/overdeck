@@ -104,10 +104,10 @@ const branchExists = (branch: string, cwd: string) =>
     );
   });
 
-const changedFilesVsMain = (branch: string, cwd: string) =>
+export const changedFilesVsMain = (branch: string, cwd: string, base = 'main') =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const cmd = ChildProcess.make('git', ['diff', '--name-only', `main...${branch}`], { cwd });
+    const cmd = ChildProcess.make('git', ['diff', '--name-only', `${base}...${branch}`], { cwd });
     return yield* spawner.string(cmd).pipe(
       Effect.map((stdout) => new Set(stdout.trim().split('\n').filter(Boolean))),
       Effect.orElseSucceed(() => new Set<string>()),
