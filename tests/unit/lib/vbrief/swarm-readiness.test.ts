@@ -1,5 +1,10 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
+import { analyzeSwarmReadiness, computeIssueFootprint, resolveIssueFootprint } from '../../../../src/lib/vbrief/swarm-readiness.js';
+import { buildPanSpecFilename } from '../../../../src/lib/pan-dir/specs.js';
 import type { FilesScopeConfidence, ItemReadiness, VBriefDocument, VBriefItemStatus } from '../../../../src/lib/vbrief/types.js';
 
 function makeDoc(
@@ -128,5 +133,48 @@ describe('analyzeSwarmReadiness', () => {
       { itemIds: ['a', 'b'], sharedFiles: [], reason: 'low_confidence' },
       { itemIds: ['a', 'c'], sharedFiles: [], reason: 'low_confidence' },
     ]);
+  });
+});
+
+describe('computeIssueFootprint', () => {
+  it('returns the deduped union of all item file scopes', () => {
+    const doc = makeDoc([
+      readyItem('a', ['src/a.ts', 'src/shared.ts']),
+      readyItem('b', ['src/shared.ts', 'src/b.ts']),
+    ]);
+
+    expect(computeIssueFootprint(doc)).toEqual(['src/a.ts', 'src/b.ts', 'src/shared.ts']);
+  });
+
+  it('returns an empty array when no item declares file scope', () => {
+    const doc = makeDoc([{ id: 'a' }, { id: 'b' }]);
+
+    expect(computeIssueFootprint(doc)).toEqual([]);
+  });
+
+  it('resolves an issue spec via findSpecByIssue and returns its footprint', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'pan-footprint-test-'));
+    try {
+      const specsDir = join(projectRoot, '.pan', 'specs');
+      mkdirSync(specsDir, { recursive: true });
+      const doc = {
+        ...makeDoc([
+          readyItem('a', ['src/a.ts']),
+          readyItem('b', ['src/b.ts']),
+        ]),
+        status: 'active',
+      };
+      writeFileSync(
+        join(specsDir, buildPanSpecFilename('PAN-1762', 'footprint-test', '2026-06-30')),
+        JSON.stringify(doc, null, 2),
+      );
+
+      await expect(Effect.runPromise(resolveIssueFootprint(projectRoot, 'PAN-1762'))).resolves.toEqual([
+        'src/a.ts',
+        'src/b.ts',
+      ]);
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 });
