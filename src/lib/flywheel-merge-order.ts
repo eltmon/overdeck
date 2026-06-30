@@ -280,6 +280,10 @@ export function pickFromSequence(
      *  label are eligible (the hard entry gate). The live Flywheel passes true;
      *  legacy callers omit it and keep their pre-DoR behavior. */
     requireReady?: boolean;
+    /** PAN-2059 + vision.mdx blanket release: when auto-pickup is ON the toggle
+     *  satisfies the per-issue `released` gate for the whole backlog. The live Flywheel
+     *  passes its auto_pickup_backlog setting; legacy callers omit it (default OFF). */
+    autoPickupBacklog?: boolean;
   },
 ): SequencePickResult | null {
   // Single source of truth: the same classifier the Forecast UI uses (PAN-2006).
@@ -301,7 +305,7 @@ export function pickFromSequence(
     const state = classifyIssue(node, lookups);
     // DoR is conditional: when not required, treat readiness as satisfied so the
     // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
-    if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true })) continue;
+    if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false)) continue;
     if (opts?.excludeIssueIds?.has(node.issue)) continue;
     if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) continue;
     return { issueId: node.issue, rank: node.rank, gate: node.gate, planning: node.planning };

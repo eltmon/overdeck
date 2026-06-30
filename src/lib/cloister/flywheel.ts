@@ -134,7 +134,7 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true });
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog });
           let nextLine: string;
           let pickInstruction: string;
           if (!nextPick) {
@@ -277,7 +277,7 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     if (existsSync(seqPath)) {
       const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
       if (parsed.ok) {
-        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5));
+        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
       }
     }
   } catch { /* cohort snapshot is best-effort */ }

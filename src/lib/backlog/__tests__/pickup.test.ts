@@ -94,6 +94,16 @@ describe('isAutoPickable', () => {
     expect(isAutoPickable({ ...base, vetoed: true })).toBe(false);
     expect(isAutoPickable({ ...base, inPipeline: true })).toBe(false);
   });
+
+  it('auto_pickup_backlog ON blanket-releases planned-but-unreleased items; other gates still bite', () => {
+    expect(isAutoPickable({ ...base, released: false })).toBe(false);        // OFF: needs its own release
+    expect(isAutoPickable({ ...base, released: false }, true)).toBe(true);   // ON: the toggle is the blanket release
+    // gates that still hard-stop under blanket release:
+    expect(isAutoPickable({ ...base, released: false, vetoed: true }, true)).toBe(false);
+    expect(isAutoPickable({ ...base, released: false, parked: true }, true)).toBe(false);
+    expect(isAutoPickable({ ...base, released: false, objection: true }, true)).toBe(false);
+    expect(isAutoPickable({ ...base, released: false, planned: false }, true)).toBe(false);
+  });
 });
 
 describe('isUnblockEligible (override)', () => {
