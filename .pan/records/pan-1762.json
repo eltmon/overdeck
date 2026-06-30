@@ -123,6 +123,11 @@
       "timestamp": "2026-06-30T19:39:55.230Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-30T20:05:59.211Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -138,13 +143,13 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1762",
-    "reviewStatus": "reviewing",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T19:50:15.017Z",
+    "updatedAt": "2026-06-30T20:06:04.780Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "INSPECTION PASSED for bead workspace-qcwbs. Spec fidelity: slot-spawn-tier diff adds optional slot options, derives agent-pan-1762-n, feature/pan-1762/slot-n, and slot workspace paths, preserves default single-agent path, creates slot worktrees, and enforces a registered-slot cap. Constraint compliance: no prohibited swarm runtime/server route restoration, no execSync or sync tmux use, and scope stays within spawn.ts/spawn-prep.ts plus focused unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2196",
@@ -221,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 38.596459,
-        "pricingAsOf": "2026-06-30T19:50:15.061Z"
+        "pricingAsOf": "2026-06-30T20:06:04.815Z"
       }
     },
     "merges": [
@@ -230,7 +235,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-30T17:39:33.566Z",
-  "updated": "2026-06-30T19:50:15.062Z",
+  "updated": "2026-06-30T20:06:04.815Z",
   "statusOverrides": {
     "foreman-e2e": "completed",
     "foreman-e2e.ac1": "completed",
