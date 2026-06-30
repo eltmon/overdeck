@@ -336,7 +336,7 @@ const getBacklogForecastRoute = HttpRouter.add(
           .filter((x) => x.state.inPipeline)
           .sort((a, b) => a.rank - b.rank)
           .map(enrich);
-        const needsPlanning = selectNeedsPlanning(nodes, lk).map(enrich);
+        const needsPlanning = selectNeedsPlanning(nodes, lk, { cap: n * 2 }).map(enrich);
         const waves = computeWaves(nodes, lk, n).map((w) => w.map(enrich));
         const lanesRaw = computeLanes(nodes, lk, n);
         const lanes = {

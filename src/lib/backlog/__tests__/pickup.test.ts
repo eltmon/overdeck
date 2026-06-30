@@ -233,17 +233,17 @@ describe('selectNeedsPlanning', () => {
     expect(selectNeedsPlanning(nodes, lk)).toEqual([]);
   });
 
-  it('respects cap 1 and defaults to cap 2', () => {
+  it('respects the cap and defaults to two items', () => {
     const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 }), node({ issue: 'C', rank: 3 })];
     const lk = lookups({ A: { labels: ['ready'] }, B: { labels: ['ready'] }, C: { labels: ['ready'] } });
 
-    expect(selectNeedsPlanning(nodes, lk, { cap: 1 }).map((t) => t.issue)).toEqual(['A']);
     expect(selectNeedsPlanning(nodes, lk).map((t) => t.issue)).toEqual(['A', 'B']);
+    expect(selectNeedsPlanning(nodes, lk, { cap: 1 }).map((t) => t.issue)).toEqual(['A']);
   });
 
   it('returns an empty array when no issue needs planning', () => {
     const nodes = [node({ issue: 'A', rank: 1 }), node({ issue: 'B', rank: 2 })];
-    const lk = lookups({ A: {}, B: { labels: ['ready'], planned: true } });
+    const lk = lookups({ A: { labels: ['ready'], planned: true }, B: { labels: [] } });
 
     expect(selectNeedsPlanning(nodes, lk)).toEqual([]);
   });

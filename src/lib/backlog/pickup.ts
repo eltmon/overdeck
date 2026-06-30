@@ -216,7 +216,11 @@ export function selectUnblockTargets(
     .slice(0, cap);
 }
 
-/** Ready-but-unplanned issues the Flywheel should plan to prevent backlog starvation. */
+/**
+ * Planning floor targets: ready issues that still need a plan, capped in rank
+ * order. Planning stops at the Release gate; this selector surfaces the backlog
+ * the flywheel should keep planning even while a current work cohort drains.
+ */
 export function selectNeedsPlanning(
   nodes: readonly SequenceNode[],
   lk: ClassifyLookups,
