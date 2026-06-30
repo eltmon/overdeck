@@ -1,0 +1,437 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-30T13:50:02Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1791: foreman-independent tiered execution planning artifacts only. PAN-1762's durable foreman is still open, so this plan implements configuration, plan-time tier scheduling, relevance-map generation, and persisted readback artifacts without adding a second runtime loop."
+  },
+  "plan": {
+    "id": "pan-1791",
+    "title": "Tiered execution: difficulty-routed bead dispatch with plan-filtered commit-feed artifacts",
+    "status": "proposed",
+    "uid": "0d9f904c-0c3e-4926-9b44-ed7fe9ba2feb",
+    "author": "agent:gpt-5",
+    "sequence": 1,
+    "created": "2026-06-30T13:50:02Z",
+    "updated": "2026-06-30T13:50:02Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1791",
+        "label": "PAN-1791",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1762",
+        "label": "PAN-1762",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1791.md",
+        "label": "PAN-1791 PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-1762.md",
+        "label": "PAN-1762 durable foreman PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "src/lib/vbrief/dag.ts",
+        "label": "vBRIEF DAG scheduling helpers",
+        "type": "doc"
+      },
+      {
+        "uri": "src/lib/cloister/config.ts",
+        "label": "Cloister config surface",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "tiered-execution",
+      "planning-artifact",
+      "foreman-independent",
+      "blocked-by-pan-1762",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "PAN-1791's full design depends on PAN-1762's durable foreman. PAN-1762 is still open and docs/FLYWHEEL-STATE.md marks it operator-held at proposed, so implementing PAN-1791's runtime foreman loop now would create a second bead loop/status writer/commit dispatcher and violate the PRD's D2 rule: extend PAN-1762's foreman, do not design a second loop.",
+      "Proposal": "Implement only the foreman-independent pieces now: (1) the disabled-by-default tiered_execution config contract and validation, (2) a pure plan-time tier scheduler that maps vBRIEF items through the tier table into deterministic tier runs, (3) a pure plan-time relevance-map builder using blocks edges, metadata.foundationFor, and files_scope overlap, (4) persistence/readback of the schedule and relevance map as plan metadata, and (5) explicit documentation/markers that runtime standing agents, supervisor dispatch, replay, pilot measurement, and commit/feed delivery are blocked by PAN-1762.",
+      "NonGoals": "- No durable foreman implementation in PAN-1791.\n- No new bead loop, statusOverrides writer, commit runner, or supervisor dispatch loop.\n- No standing tier-agent lifecycle, respawn, replay, or deliverAgentMessage feed delivery.\n- No auto-start, merge, or runtime scheduling behavior changes.\n- No hardcoded claude-code harness selection for CLIProxy-routed models; provider default routing remains authoritative.",
+      "Constraints": "All code must be pure planning/config substrate unless the PRD explicitly lists it in the foreman-independent slice. Missing or overlapping difficulty mappings fail validation at plan time. Items missing metadata.difficulty fail schedule construction with an actionable diagnostic. Specs on main remain immutable after planning; any runtime status later still belongs in workspace continue.json statusOverrides."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Choose option B from the 2026-06-30 kickoff.",
+        "rationale": "Planning only the foreman-independent slices preserves PAN-1791's architecture and avoids inventing a second runtime loop while PAN-1762 remains open."
+      },
+      {
+        "summary": "Persist the artifact under plan.metadata.tieredExecution.",
+        "rationale": "plan.metadata already supports Overdeck extensions such as canonicalFilename. A single nested key keeps the schedule/relevance artifact durable without changing vBRIEF's top-level shape."
+      },
+      {
+        "summary": "Use pure libraries for scheduler and relevance map.",
+        "rationale": "The artifacts must be deterministic, unit-testable, and safe to consume later from PAN-1762's foreman without touching agents, tmux, git status, bead status, or delivery transports."
+      },
+      {
+        "summary": "Keep tiered_execution disabled by default.",
+        "rationale": "The runtime implementation is blocked by PAN-1762, so configuration support must not change current execution behavior until a later issue wires the foreman."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-30-PAN-1791-tiered-execution-foreman-independent-planning-artifacts.vbrief.json",
+      "scopeDecision": "option-b-foreman-independent-slices",
+      "blockedRuntimeDependency": "PAN-1762",
+      "allowedNow": [
+        "FR-1 deterministic routing artifacts",
+        "FR-3 plan-time relevance-map computation only",
+        "FR-6 plan-time tier scheduling",
+        "FR-8 tier table config"
+      ],
+      "blockedUntilPan1762": [
+        "FR-2 foreman bureaucracy ownership",
+        "FR-3 standing tier-agent lifecycle and feed delivery",
+        "FR-4 event-driven supervisor",
+        "FR-5 replay-based recovery",
+        "FR-7 deliverAgentMessage runtime feed transport",
+        "pilot cost measurement"
+      ]
+    },
+    "items": [
+      {
+        "id": "tiered-config-schema",
+        "title": "Add disabled-by-default tiered_execution config schema and validation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T13:50:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "tier-scheduler-lib",
+            "relevance-map-lib",
+            "persist-tier-plan-artifact"
+          ],
+          "files_scope": [
+            "src/lib/cloister/config.ts",
+            "src/lib/config-yaml.ts",
+            "src/lib/harness-policy.ts",
+            "src/lib/cloister/__tests__/**/*.test.ts",
+            "src/lib/__tests__/**/*config*.test.ts"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the existing Cloister configuration surface with a `tiered_execution` section whose default is `enabled: false`. Define tiers as named entries with `model`, optional/provider-resolved `harness`, and `difficulties`; define `supervisor.subscribe` as `all | flagged | sampled`; preserve existing `model_selection.complexity_routing` behavior. Validation must require every vBRIEF difficulty (`trivial`, `simple`, `medium`, `complex`, `expert`) to map to exactly one tier when enabled, reject overlaps and gaps by name, reject unknown supervisor policies, and apply existing harness/provider policy checks instead of hardcoding `claude-code` for CLIProxy-routed models. No runtime execution path may read this config to spawn or dispatch agents in this issue."
+        },
+        "items": [
+          {
+            "id": "tiered-config-schema.ac1",
+            "title": "Default loaded config contains tiered_execution.enabled === false and existing non-tiered execution behavior remains unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tiered-config-schema.ac2",
+            "title": "Validation accepts a complete non-overlapping difficulty mapping and rejects missing, duplicate, or unknown difficulty entries with messages naming the offending difficulty.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tiered-config-schema.ac3",
+            "title": "Validation rejects unknown supervisor.subscribe values and unsafe harness/provider combinations using the existing harness policy surface.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tiered-config-schema.ac4",
+            "title": "No work-agent spawn, foreman loop, tmux, deliverAgentMessage, git status, or statusOverrides path is introduced or modified by this bead.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-scheduler-lib",
+        "title": "Create pure plan-time tier scheduler",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T13:50:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "persist-tier-plan-artifact"
+          ],
+          "files_scope": [
+            "src/lib/vbrief/dag.ts",
+            "src/lib/vbrief/tier-scheduler.ts",
+            "src/lib/vbrief/__tests__/tier-scheduler.test.ts",
+            "packages/contracts/src/**/*.ts"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a pure library, likely `src/lib/vbrief/tier-scheduler.ts`, that accepts a parsed `VBriefDocument` plus the validated tier table and returns an ordered schedule artifact. Reuse `groupItemsByWave(doc)` from `src/lib/vbrief/dag.ts` for DAG order, map each actionable item by `metadata.difficulty`, and coalesce consecutive same-tier items into tier runs. The function must be deterministic, side-effect free, and must fail with actionable diagnostics for missing `metadata.difficulty` or an unroutable difficulty. Do not spawn agents, do not update vBRIEF status, and do not read live beads or git state."
+        },
+        "items": [
+          {
+            "id": "tier-scheduler-lib.ac1",
+            "title": "Given a valid plan and tier table, the scheduler returns stable ordered tier runs containing item IDs and tier names in DAG/wave order.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-scheduler-lib.ac2",
+            "title": "Consecutive actionable items assigned to the same tier are coalesced into one run, while tier changes create a new run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-scheduler-lib.ac3",
+            "title": "Missing metadata.difficulty and unroutable difficulty values fail before runtime with diagnostics naming the item ID and difficulty.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-scheduler-lib.ac4",
+            "title": "The scheduler has no dependencies on agent state, tmux, bd, git, statusOverrides, or deliverAgentMessage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relevance-map-lib",
+        "title": "Create pure plan-time relevance-map builder",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T13:50:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "persist-tier-plan-artifact"
+          ],
+          "files_scope": [
+            "src/lib/vbrief/dag.ts",
+            "src/lib/vbrief/tier-relevance-map.ts",
+            "src/lib/vbrief/__tests__/tier-relevance-map.test.ts",
+            "docs/VBRIEF.md"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a pure relevance-map builder, likely `src/lib/vbrief/tier-relevance-map.ts`, that consumes the parsed plan plus the scheduler artifact and returns, for each completed/source item, which future tier runs or items need to ingest that source commit and why. A source item is relevant when it blocks a future item by `blocks` reachability, appears in `metadata.foundationFor`, or overlaps a future item's `files_scope` using the existing `hasFileOverlap()` behavior from `src/lib/vbrief/dag.ts`. Preserve reason details in the artifact, including the source item, destination item, tier, and reason (`blocks`, `foundationFor`, `files_scope`). Do not construct commit diffs or deliver messages; this is a plan-time map only."
+        },
+        "items": [
+          {
+            "id": "relevance-map-lib.ac1",
+            "title": "The builder records blocks-edge relevance from source items to downstream tier-assigned items, including transitive dependency reachability where the DAG says the downstream item cannot start before the source chain completes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relevance-map-lib.ac2",
+            "title": "The builder records metadata.foundationFor relevance with a distinct reason and ignores unknown foundationFor IDs only by returning a named validation diagnostic.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relevance-map-lib.ac3",
+            "title": "The builder records files_scope overlap relevance using the existing hasFileOverlap semantics and includes the overlapping scope information in the reason payload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relevance-map-lib.ac4",
+            "title": "Items with no relevant future tier work produce empty relevance entries rather than runtime deliveries.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "persist-tier-plan-artifact",
+        "title": "Persist and read the tier schedule plus relevance map as plan metadata",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T13:50:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vbrief/io.ts",
+            "src/lib/vbrief/types.ts",
+            "src/lib/vbrief/tier-scheduler.ts",
+            "src/lib/vbrief/tier-relevance-map.ts",
+            "src/lib/vbrief/__tests__/**/*.test.ts",
+            "docs/VBRIEF.md"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Define a stable artifact shape under `plan.metadata.tieredExecution` containing the validated tier table snapshot or tier names, ordered `runs`, and the relevance map with reason payloads. Wire read/write helpers so planning/finalization code can attach the artifact to the proposed vBRIEF and callers can read it without recomputation. Preserve vBRIEF's two top-level key shape and existing metadata fields such as canonicalFilename. Tests should round-trip a spec with the artifact and confirm unrelated metadata survives. No runtime status field, workspace continue.json, bead status, or dashboard live-agent state should be written by this bead."
+        },
+        "items": [
+          {
+            "id": "persist-tier-plan-artifact.ac1",
+            "title": "A proposed vBRIEF can include plan.metadata.tieredExecution with runs and relevance-map entries, and JSON read/write round-trips preserve the artifact exactly.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-tier-plan-artifact.ac2",
+            "title": "Existing plan.metadata fields, especially canonicalFilename, survive artifact writes unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-tier-plan-artifact.ac3",
+            "title": "The artifact is read-only planning data for PAN-1791 and does not update plan.status, item status, continue.json statusOverrides, beads, tmux sessions, or agent state.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-tier-plan-artifact.ac4",
+            "title": "docs/VBRIEF.md documents the plan.metadata.tieredExecution extension and states that runtime consumption is blocked by PAN-1762.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-blocked-runtime-followups",
+        "title": "Mark runtime tiered-execution slices blocked on PAN-1762",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T13:50:02Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "files_scope": [
+            ".pan/drafts/PAN-1791.md",
+            ".pan/specs/2026-06-30-PAN-1791-tiered-execution-foreman-independent-planning-artifacts.vbrief.json",
+            "docs/FLYWHEEL-STATE.md"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Keep PAN-1791's PRD and spec explicit that runtime tiered execution remains blocked until PAN-1762 lands. If follow-up tracker work is created, it must be blocked by PAN-1762 and must consume the persisted plan artifact instead of creating a parallel foreman loop. Mention the blocked runtime slices by name: foreman bureaucracy ownership, standing tier-agent lifecycle, supervisor commit-event dispatch, replay, deliverAgentMessage feed delivery, and pilot cost measurement."
+        },
+        "items": [
+          {
+            "id": "document-blocked-runtime-followups.ac1",
+            "title": "The PRD and vBRIEF both state that PAN-1791 implements only foreman-independent planning/config artifacts while PAN-1762 is open.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-blocked-runtime-followups.ac2",
+            "title": "The runtime follow-up list explicitly names the blocked slices and says they must extend PAN-1762's foreman rather than adding a second loop.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-blocked-runtime-followups.ac3",
+            "title": "No issue comment, doc, or spec wording implies that PAN-1791 may spawn standing agents, dispatch supervisor events, run replay, or write runtime status before PAN-1762 lands.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tiered-config-schema",
+        "to": "tier-scheduler-lib",
+        "type": "blocks"
+      },
+      {
+        "from": "tiered-config-schema",
+        "to": "relevance-map-lib",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-scheduler-lib",
+        "to": "persist-tier-plan-artifact",
+        "type": "blocks"
+      },
+      {
+        "from": "relevance-map-lib",
+        "to": "persist-tier-plan-artifact",
+        "type": "blocks"
+      },
+      {
+        "from": "persist-tier-plan-artifact",
+        "to": "document-blocked-runtime-followups",
+        "type": "blocks"
+      }
+    ]
+  }
+}
