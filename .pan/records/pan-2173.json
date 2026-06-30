@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T19:19:31.903Z",
-  "updated": "2026-06-30T01:09:25.266Z",
+  "updated": "2026-06-30T01:23:56.841Z",
   "pipeline": {
     "issueId": "PAN-2173",
     "reviewStatus": "pending",
@@ -64,5 +64,21 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "needs-planning-selector": "completed",
+    "needs-planning-selector.ac1": "completed",
+    "needs-planning-selector.ac2": "completed",
+    "needs-planning-selector.ac3": "completed",
+    "needs-planning-selector.ac4": "completed",
+    "forecast-needs-planning-field": "completed",
+    "forecast-needs-planning-field.ac1": "completed",
+    "forecast-needs-planning-field.ac2": "completed",
+    "forecast-needs-planning-field.ac3": "completed",
+    "flywheel-rule": "completed",
+    "flywheel-rule.ac1": "completed",
+    "flywheel-rule.ac2": "completed",
+    "flywheel-rule.ac3": "completed",
+    "flywheel-rule.ac4": "completed"
+  }
 }
