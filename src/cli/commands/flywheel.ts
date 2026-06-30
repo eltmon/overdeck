@@ -20,6 +20,7 @@ import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } fro
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { stopAgent } from '../../lib/agents.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
+import { resolveHarness } from '../../lib/harness-resolve.js';
 import {
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
@@ -253,12 +254,17 @@ function mb(bytes: number): number {
   return Math.round(bytes / 1024 / 1024);
 }
 
-function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
+async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> {
   const { config } = loadConfigSync();
   const flywheel = config.roles?.flywheel;
+  const model = resolveModel('flywheel', undefined, config);
+  // Harness is provider-default-only (PAN-1984): derive it from the model's provider via the
+  // canonical resolver — never a per-role pin or a hardcoded claude-code fallback, which would
+  // route gpt-5.5/glm/kimi through CLIProxy into the 200k-window-illusion deadlock (PAN-1865).
+  const harness = await resolveHarness({ model });
   return {
-    harness: flywheel?.harness ?? 'claude-code',
-    model: resolveModel('flywheel', undefined, config),
+    harness,
+    model,
     effort: flywheel?.effort ?? 'high',
     minAgents: flywheel?.minAgents ?? 20,
     maxAgents: flywheel?.maxAgents ?? 30,
@@ -362,7 +368,7 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
   });
-  const roleConfig = resolveFlywheelRoleConfig();
+  const roleConfig = await resolveFlywheelRoleConfig();
   const agent = await spawnFlywheel({
     runId,
     briefPath: brief.absolutePath,
@@ -757,7 +763,7 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
     throw new Error(`Flywheel run ${before.activeRunId} is missing launch metadata; cannot resume safely`);
   }
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
-  const roleConfig = resolveFlywheelRoleConfig();
+  const roleConfig = await resolveFlywheelRoleConfig();
   await resumeFlywheel({
     workspace: launch.workspace,
     briefPath: brief.absolutePath,
