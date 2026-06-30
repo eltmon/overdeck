@@ -154,7 +154,9 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     }
 
     // Sonnet models
-    if (model.includes('sonnet-4-5') || model.includes('sonnet-4.5')) {
+    if (model.includes('sonnet-5') || model.includes('sonnet.5')) {
+      normalizedModel = 'claude-sonnet-5';
+    } else if (model.includes('sonnet-4-5') || model.includes('sonnet-4.5')) {
       normalizedModel = 'claude-sonnet-4-6';
     } else if (model.includes('sonnet-4') || model.includes('sonnet')) {
       normalizedModel = 'claude-sonnet-4';

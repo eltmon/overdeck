@@ -8,7 +8,9 @@ import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
-import { pickFromSequence } from '../flywheel-merge-order.js';
+import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
+import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
+import type { VBriefDocument } from '../vbrief/types.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,
@@ -113,12 +115,25 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
           const specsDir = join(projectRoot, '.pan', 'specs');
           const workspacesDir = join(projectRoot, 'workspaces');
           const issuesWithSpecs = new Set<string>();
+          const declaredFootprints: IssueFileFootprint[] = [];
           if (existsSync(specsDir)) {
             for (const f of readdirSync(specsDir)) {
               const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
-              if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
+              if (!match) continue;
+              const issueId = match[1]!.toUpperCase();
+              issuesWithSpecs.add(issueId);
+              try {
+                const doc = JSON.parse(readFileSync(join(specsDir, f), 'utf-8')) as VBriefDocument;
+                declaredFootprints.push(declaredIssueFootprint(issueId, doc));
+              } catch {
+                // A malformed spec should not break flywheel startup; planned-ness
+                // still comes from the filename and the normal plan gate handles parse errors.
+              }
             }
           }
+          const predictedConflictSignals = computePredictedConflictSignals(declaredFootprints, {
+            hotspots: getProjectSwarmHotspots(findProjectByPathSync(projectRoot)),
+          });
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
             // ready = spec AND beads exist in the workspace
@@ -134,7 +149,7 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog });
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog, predictedConflictSignals });
           let nextLine: string;
           let pickInstruction: string;
           if (!nextPick) {
@@ -145,7 +160,10 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
             nextLine = `NEEDS OPERATOR ACTION: ${nextPick.issueId} (rank ${nextPick.rank}) has planning=interactive — do NOT auto-start; operator must run 'pan plan ${nextPick.issueId}'`;
             pickInstruction = `\n\nIMPORTANT: auto_pickup_backlog=true. The top-ranked issue requires interactive planning and MUST NOT be auto-started. Surface it to the operator for manual 'pan plan' invocation instead of auto-picking it.`;
           } else {
-            nextLine = `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`;
+            const conflictSuffix = typeof nextPick.predictedConflictCount === 'number'
+              ? `, predictedConflicts=${nextPick.predictedConflictCount}${nextPick.predictedConflictsWith?.length ? ` with ${nextPick.predictedConflictsWith.join(', ')}` : ''}`
+              : '';
+            nextLine = `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning}${conflictSuffix})`;
             pickInstruction = `\n\nIMPORTANT: auto_pickup_backlog=true. You MUST pick the "MUST start next" issue above as your next startup target. Do NOT apply your own P0-P3/oldest-first ranking while a sequence is available.`;
           }
           sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked):\n${top10.join('\n')}\n${nextLine}${pickInstruction}`;

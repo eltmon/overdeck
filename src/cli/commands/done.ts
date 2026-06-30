@@ -14,21 +14,34 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-l
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import * as NodePath from '@effect/platform-node/NodePath';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
+import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
   appendSessionEntrySync,
   getProjectConfigFromWorkspacePath,
   readRecordContinueViewSync,
   resolveProjectForIssue,
   writeRecordDecisionsSync,
+  writeRecordScopeDriftSync,
 } from '../../lib/pan-dir/record.js';
 import type { MergeSet } from '../../lib/merge-set.js';
+import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { compileGlob } from '../../lib/vbrief/dag.js';
+import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
+import type { VBriefDocument } from '../../lib/vbrief/types.js';
+
+const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+);
 
 interface DoneOptions {
   comment?: string;
@@ -183,6 +196,65 @@ export function augmentCommentWithWaiver(comment: string | undefined, waiverReas
   const waiverText = `Test gate waived: ${waiverReason}`;
   if (!comment) return waiverText;
   return `${comment}\n\n${waiverText}`;
+}
+
+function pathMatchesDeclaredScope(filePath: string, declaredScope: string[]): boolean {
+  return declaredScope.some((pattern) => {
+    const compiled = compileGlob(pattern);
+    return compiled.regex.test(filePath) || compiled.exactDirectory === filePath;
+  });
+}
+
+function declaredScopeMatchesChangedFile(pattern: string, actualChangedFiles: string[]): boolean {
+  const compiled = compileGlob(pattern);
+  return actualChangedFiles.some((filePath) => compiled.regex.test(filePath) || compiled.exactDirectory === filePath);
+}
+
+export function declaredScopeUnion(doc: VBriefDocument): string[] {
+  return Array.from(
+    new Set(
+      doc.plan.items.flatMap((item) => item.metadata?.files_scope ?? []),
+    ),
+  ).sort();
+}
+
+export function computeScopeDrift(
+  doc: VBriefDocument,
+  actualChangedFiles: Iterable<string>,
+  recordedAt: string,
+): ScopeDriftRecord | null {
+  const declaredScope = declaredScopeUnion(doc);
+  if (declaredScope.length === 0) return null;
+
+  const actual = Array.from(new Set(actualChangedFiles)).sort();
+  return {
+    outsideDeclaredScope: actual.filter((filePath) => !pathMatchesDeclaredScope(filePath, declaredScope)),
+    declaredScopeUntouched: declaredScope.filter((pattern) => !declaredScopeMatchesChangedFile(pattern, actual)),
+    declaredScope,
+    actualChangedFiles: actual,
+    recordedAt,
+  };
+}
+
+async function recordScopeDriftForDone(
+  issueId: string,
+  workspacePath: string,
+): Promise<ScopeDriftRecord | undefined> {
+  try {
+    const plan = readWorkspacePlanSync(workspacePath);
+    if (!plan) return undefined;
+    const actualChangedFiles = await Effect.runPromise(
+      changedFilesVsMain('HEAD', workspacePath, 'origin/main').pipe(Effect.provide(childProcessLayer)),
+    );
+    const drift = computeScopeDrift(plan, actualChangedFiles, new Date().toISOString());
+    if (!drift) return undefined;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    writeRecordScopeDriftSync(project, issueId, drift);
+    return drift;
+  } catch (err: any) {
+    console.warn(`[pan done] Failed to record scope drift for ${issueId} (non-fatal): ${err?.message ?? err}`);
+    return undefined;
+  }
 }
 
 async function isMergeSetMergedIntoTargets(
@@ -520,6 +592,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);
     }
 
+    const scopeDrift = await recordScopeDriftForDone(issueId, workspacePath);
+
     spinner.text = 'Creating review artifacts...';
     const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
     const { setReviewStatusSync } = await import('../../lib/review-status.js');
@@ -630,6 +704,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       verificationCycleCount: 0,
       autoRequeueCount: 0,
       reviewRequestedAt: new Date().toISOString(),
+      scopeDrift,
     });
 
     await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));

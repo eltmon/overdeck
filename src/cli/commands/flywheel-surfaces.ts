@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { Command } from 'commander';
 import { parseSequenceMd } from '../../lib/backlog/sequence-io.js';
 import { buildClassifyLookups } from '../../lib/backlog/lookups.js';
@@ -21,8 +23,23 @@ import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
  * CLI and the dashboard can never disagree.
  */
 
+const execAsync = promisify(exec);
+
+/** Labels for all open issues, keyed by bare number — fetched via gh so it works inside a
+ *  sandboxed harness (the in-memory issue service is server-only, unreachable from a CLI). */
+async function fetchOpenIssueLabels(): Promise<Map<string, string[]>> {
+  const byNumber = new Map<string, string[]>();
+  try {
+    const { stdout } = await execAsync('gh issue list --state open --json number,labels --limit 1000', { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    for (const i of JSON.parse(stdout) as Array<{ number: number; labels: Array<{ name: string }> }>) {
+      byNumber.set(String(i.number), i.labels.map((l) => l.name));
+    }
+  } catch { /* gh unavailable — labels stay empty (degraded, never throws) */ }
+  return byNumber;
+}
+
 /** `pan backlog forecast` — the pickup forecast (pickable waves, needs-planning, cohort, stats). */
-export function backlogForecastCommand(opts: { n?: string } = {}): void {
+export async function backlogForecastCommand(opts: { n?: string } = {}): Promise<void> {
   const projectRoot = process.cwd();
   const n = Math.max(1, Math.min(20, Number.parseInt(opts.n ?? '5', 10) || 5));
   const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
@@ -37,7 +54,8 @@ export function backlogForecastCommand(opts: { n?: string } = {}): void {
     return;
   }
   const nodes = parsed.doc.nodes;
-  const lk = buildClassifyLookups(projectRoot);
+  const labelsByNumber = await fetchOpenIssueLabels();
+  const lk = buildClassifyLookups(projectRoot, { labels: (id) => labelsByNumber.get(id.replace(/^[A-Za-z]+-/, '')) ?? [] });
   const autoPickupBacklog = isFlywheelAutoPickupBacklog();
   const inFlight = nodes
     .map((x) => ({ issue: x.issue, rank: x.rank, state: classifyIssue(x, lk) }))
