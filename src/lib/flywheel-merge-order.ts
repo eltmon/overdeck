@@ -5,6 +5,10 @@ import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } 
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
+import { compileGlob, type CompiledGlob } from './vbrief/dag.js';
+import { computeIssueFootprint } from './vbrief/swarm-readiness.js';
+import type { VBriefDocument } from './vbrief/types.js';
+import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -29,6 +33,19 @@ export interface MergeCandidateMeta {
   footprint: number;
   /** How many other ready branches this one overlaps files with. */
   conflictCount: number;
+}
+
+export type FootprintSource = 'declared' | 'actual';
+
+export interface IssueFileFootprint {
+  issueId: string;
+  files: Iterable<string>;
+  source: FootprintSource;
+}
+
+export interface PredictedConflictSignal extends MergeCandidateMeta {
+  source: FootprintSource;
+  conflictsWith: string[];
 }
 
 /**
@@ -70,6 +87,73 @@ export function planMergeTrain<T extends MergeCandidateMeta>(candidates: Readonl
     serialize: ordered.filter((c) => c.conflictCount > 0).map((c) => c.issueId),
     order: ordered.map((c) => c.issueId),
   };
+}
+
+export function declaredIssueFootprint(issueId: string, doc: VBriefDocument): IssueFileFootprint {
+  return { issueId, files: computeIssueFootprint(doc), source: 'declared' };
+}
+
+function pathMatchesAnyCompiled(filePath: string, patterns: CompiledGlob[]): boolean {
+  return patterns.some(pattern => pattern.regex.test(filePath) || pattern.exactDirectory === filePath);
+}
+
+function normalizedFootprintFiles(files: Iterable<string>, hotspots: CompiledGlob[]): Set<string> {
+  const normalized = new Set<string>();
+  for (const file of files) {
+    if (!file || pathMatchesAnyCompiled(file, hotspots)) continue;
+    normalized.add(file);
+  }
+  return normalized;
+}
+
+function sourcePriority(source: FootprintSource): number {
+  return source === 'actual' ? 2 : 1;
+}
+
+export function computePredictedConflictSignals(
+  footprints: ReadonlyArray<IssueFileFootprint>,
+  options: { hotspots?: string[] } = {},
+): PredictedConflictSignal[] {
+  const hotspots = (options.hotspots ?? []).map(compileGlob);
+  const byIssue = new Map<string, { issueId: string; source: FootprintSource; files: Set<string> }>();
+
+  for (const footprint of footprints) {
+    const files = normalizedFootprintFiles(footprint.files, hotspots);
+    const current = byIssue.get(footprint.issueId);
+    if (!current || sourcePriority(footprint.source) > sourcePriority(current.source)) {
+      byIssue.set(footprint.issueId, { issueId: footprint.issueId, source: footprint.source, files });
+      continue;
+    }
+    if (sourcePriority(footprint.source) === sourcePriority(current.source)) {
+      for (const file of files) current.files.add(file);
+    }
+  }
+
+  const conflictsMap = new Map<string, Set<string>>();
+  const entries = Array.from(byIssue.values());
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const left = entries[i]!;
+      const right = entries[j]!;
+      if (![...left.files].some(file => right.files.has(file))) continue;
+      if (!conflictsMap.has(left.issueId)) conflictsMap.set(left.issueId, new Set());
+      if (!conflictsMap.has(right.issueId)) conflictsMap.set(right.issueId, new Set());
+      conflictsMap.get(left.issueId)!.add(right.issueId);
+      conflictsMap.get(right.issueId)!.add(left.issueId);
+    }
+  }
+
+  return entries.map(entry => {
+    const conflictsWith = [...(conflictsMap.get(entry.issueId) ?? [])]
+      .sort((a, b) => issueNumber(a) - issueNumber(b));
+    return {
+      issueId: entry.issueId,
+      source: entry.source,
+      footprint: entry.files.size,
+      conflictCount: conflictsWith.length,
+      conflictsWith,
+    };
+  });
 }
 
 export interface UatCandidatePlan {
@@ -137,6 +221,8 @@ export interface ComputeMergeQueueOptions {
   eligibility?: (issueId: string) => MergeGateEligibility;
   /** Called for each verb-tagged item the eligibility gate rejects. */
   onIneligible?: (issueId: string, reason: string) => void;
+  /** Files treated as common hotspots and excluded from predicted-conflict math. */
+  hotspots?: string[];
 }
 
 /** Default eligibility: the issue's review-status record, read synchronously. */
@@ -198,20 +284,13 @@ export const computeMergeQueue = (
       existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
       { concurrency: gitConcurrency },
     );
-
-    const conflictsMap = new Map<string, Set<string>>();
-    for (let i = 0; i < existing.length; i++) {
-      for (let j = i + 1; j < existing.length; j++) {
-        const idA = existing[i]!.item.issueId;
-        const idB = existing[j]!.item.issueId;
-        if ([...fileSets[i]!].some((f) => fileSets[j]!.has(f))) {
-          if (!conflictsMap.has(idA)) conflictsMap.set(idA, new Set());
-          if (!conflictsMap.has(idB)) conflictsMap.set(idB, new Set());
-          conflictsMap.get(idA)!.add(idB);
-          conflictsMap.get(idB)!.add(idA);
-        }
-      }
-    }
+    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot));
+    const conflictSignals = computePredictedConflictSignals(
+      existing.map((e, i) => ({ issueId: e.item.issueId, source: 'actual' as const, files: fileSets[i]! })),
+      { hotspots },
+    );
+    const signalByIssue = new Map(conflictSignals.map(signal => [signal.issueId, signal]));
+    const conflictsMap = new Map(conflictSignals.map(signal => [signal.issueId, new Set(signal.conflictsWith)]));
 
     // PAN-1691: conflict-aware order. Disjoint (no-conflict) items go first so
     // they can batch through in a single verification pass; then conflicting
@@ -222,8 +301,8 @@ export const computeMergeQueue = (
       existing.map((e, i) => ({
         item: e.item,
         issueId: e.item.issueId,
-        footprint: fileSets[i]!.size,
-        conflictCount: conflictsMap.get(e.item.issueId)?.size ?? 0,
+        footprint: signalByIssue.get(e.item.issueId)?.footprint ?? fileSets[i]!.size,
+        conflictCount: signalByIssue.get(e.item.issueId)?.conflictCount ?? 0,
       })),
     );
 
@@ -244,6 +323,8 @@ export interface SequencePickResult {
   rank: number;
   gate: string;
   planning: string;
+  predictedConflictCount?: number;
+  predictedConflictsWith?: string[];
 }
 
 
@@ -284,6 +365,11 @@ export function pickFromSequence(
      *  satisfies the per-issue `released` gate for the whole backlog. The live Flywheel
      *  passes its auto_pickup_backlog setting; legacy callers omit it (default OFF). */
     autoPickupBacklog?: boolean;
+    /**
+     * Advisory pre-branch conflict signal. When present, lower predicted-conflict
+     * counts sort first among otherwise pickable issues; no issue is filtered out.
+     */
+    predictedConflictSignals?: ReadonlyArray<PredictedConflictSignal>;
   },
 ): SequencePickResult | null {
   // Single source of truth: the same classifier the Forecast UI uses (PAN-2006).
@@ -300,15 +386,41 @@ export function pickFromSequence(
     },
   };
 
-  const sorted = [...nodes].sort((a, b) => a.rank - b.rank);
-  for (const node of sorted) {
+  const signalByIssue = new Map((opts?.predictedConflictSignals ?? []).map(signal => [signal.issueId.toUpperCase(), signal]));
+  const eligible = [...nodes]
+    .sort((a, b) => a.rank - b.rank)
+    .filter((node) => {
+      const state = classifyIssue(node, lookups);
+      // DoR is conditional: when not required, treat readiness as satisfied so the
+      // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
+      if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false)) return false;
+      if (opts?.excludeIssueIds?.has(node.issue)) return false;
+      if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) return false;
+      return true;
+    });
+
+  if (signalByIssue.size > 0) {
+    eligible.sort((a, b) => {
+      const aSignal = signalByIssue.get(a.issue.toUpperCase());
+      const bSignal = signalByIssue.get(b.issue.toUpperCase());
+      const aConflicts = aSignal?.conflictCount ?? 0;
+      const bConflicts = bSignal?.conflictCount ?? 0;
+      if (aConflicts !== bConflicts) return aConflicts - bConflicts;
+      return a.rank - b.rank;
+    });
+  }
+
+  for (const node of eligible) {
     const state = classifyIssue(node, lookups);
-    // DoR is conditional: when not required, treat readiness as satisfied so the
-    // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
-    if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false)) continue;
-    if (opts?.excludeIssueIds?.has(node.issue)) continue;
-    if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) continue;
-    return { issueId: node.issue, rank: node.rank, gate: node.gate, planning: node.planning };
+    const signal = signalByIssue.get(node.issue.toUpperCase());
+    return {
+      issueId: node.issue,
+      rank: node.rank,
+      gate: node.gate,
+      planning: node.planning,
+      predictedConflictCount: signal?.conflictCount,
+      predictedConflictsWith: signal?.conflictsWith,
+    };
   }
   return null;
 }
