@@ -4,17 +4,17 @@
     "created": "2026-06-30T14:32:05.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1762: Swarm v2 — tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
-    "updated": "2026-06-30T15:30:36.464Z"
+    "updated": "2026-06-30T18:58:35.264Z"
   },
   "plan": {
     "id": "pan-1762",
     "title": "Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
-    "status": "running",
+    "status": "approved",
     "uid": "3b9e36a9-dc3f-48a1-80a4-43c865efb845",
     "author": "agent:claude-opus-4-8",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-06-30T14:32:05.000Z",
-    "updated": "2026-06-30T15:30:36.464Z",
+    "updated": "2026-06-30T18:58:35.264Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1762",
