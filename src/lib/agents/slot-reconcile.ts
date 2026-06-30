@@ -113,7 +113,7 @@ export async function listSlotBranches(issueId: string, workspace: string): Prom
 
 export function listSlotAgents(issueId: string): ReconciledSlotAgent[] {
   const issueLower = issueId.toLowerCase();
-  const pattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-(\\d+)$`);
+  const pattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`);
   return listAgentStates({ role: 'work' })
     .map(agent => {
       const match = pattern.exec(agent.id);

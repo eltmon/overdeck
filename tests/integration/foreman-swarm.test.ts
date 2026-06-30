@@ -86,14 +86,14 @@ describe('foreman swarm dogfood', () => {
 
     expect(slotSpawns).toEqual([
       {
-        agentId: 'agent-pan-1762-1',
+        agentId: 'agent-pan-1762-slot-1',
         branch: 'feature/pan-1762-slot-1',
         workspace: '/repo/workspaces/feature-pan-1762-slot-1',
         slotIndex: 1,
         slotItemId: 'tier-table-config',
       },
       {
-        agentId: 'agent-pan-1762-2',
+        agentId: 'agent-pan-1762-slot-2',
         branch: 'feature/pan-1762-slot-2',
         workspace: '/repo/workspaces/feature-pan-1762-slot-2',
         slotIndex: 2,
@@ -119,8 +119,8 @@ describe('foreman swarm dogfood', () => {
     });
 
     expect(discovered.inFlight).toEqual([
-      expect.objectContaining({ itemId: 'tier-table-config', slotIndex: 1, agentId: 'agent-pan-1762-1' }),
-      expect.objectContaining({ itemId: 'scheduler-relevance-map', slotIndex: 2, agentId: 'agent-pan-1762-2' }),
+      expect.objectContaining({ itemId: 'tier-table-config', slotIndex: 1, agentId: 'agent-pan-1762-slot-1' }),
+      expect.objectContaining({ itemId: 'scheduler-relevance-map', slotIndex: 2, agentId: 'agent-pan-1762-slot-2' }),
     ]);
 
     const mergedBranches = new Set<string>();

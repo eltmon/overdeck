@@ -11,7 +11,7 @@ describe('resolveRegisteredSlotSpawn', () => {
       slotIndex: 2,
       slotItemId: 'workspace-qcwbs',
     })).toEqual({
-      agentId: 'agent-pan-1762-2',
+      agentId: 'agent-pan-1762-slot-2',
       branch: 'feature/pan-1762-slot-2',
       workspace: '/repo/workspaces/feature-pan-1762-slot-2',
       slotIndex: 2,

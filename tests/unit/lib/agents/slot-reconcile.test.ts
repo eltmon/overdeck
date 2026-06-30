@@ -39,7 +39,7 @@ describe('reconcileSlotState', () => {
       statusOverrides: { a: 'completed' },
       deps: deps(
         [{ slotIndex: 2, branch: 'feature/pan-1762-slot-2', merged: false }],
-        [{ slotIndex: 2, agentId: 'agent-pan-1762-2', status: 'running' }],
+        [{ slotIndex: 2, agentId: 'agent-pan-1762-slot-2', status: 'running' }],
       ),
     });
 
@@ -50,7 +50,7 @@ describe('reconcileSlotState', () => {
         slotIndex: 2,
         status: 'in_flight',
         branch: 'feature/pan-1762-slot-2',
-        agentId: 'agent-pan-1762-2',
+        agentId: 'agent-pan-1762-slot-2',
       },
     ]);
     expect(result.pending.map(item => item.itemId)).toEqual(['c']);

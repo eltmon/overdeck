@@ -153,7 +153,7 @@ export function resolveRegisteredSlotSpawn(
 
   const issueLower = issueId.toLowerCase();
   return {
-    agentId: `agent-${issueLower}-${slotIndex}`,
+    agentId: `agent-${issueLower}-slot-${slotIndex}`,
     branch: `feature/${issueLower}-slot-${slotIndex}`,
     workspace: `${baseWorkspace}-slot-${slotIndex}`,
     slotIndex,
