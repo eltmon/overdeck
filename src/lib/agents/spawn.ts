@@ -22,6 +22,8 @@ import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
+import { createActiveSlice } from '../vbrief/dag.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 import {
   getAgentDir,
   markAgentRunning,
@@ -84,13 +86,16 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
       await ensureRegisteredSlotWorktree(workspace, slot);
     }
+    const prompt = slot
+      ? buildRegisteredSlotPrompt(issueId, workspace, slot, options.prompt)
+      : options.prompt;
     return spawnAgent({
       issueId,
       workspace: slot?.workspace ?? workspace,
       agentId: slot?.agentId,
       harness: options.harness,
       model: selectedModel,
-      prompt: options.prompt,
+      prompt,
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
@@ -775,6 +780,47 @@ function assertRegisteredSlotCap(issueId: string, configuredCap?: number): void 
       `Registered slot cap reached for ${issueId}: ${activeSlots.length}/${cap} active slot agents.`
     );
   }
+}
+
+function buildRegisteredSlotPrompt(
+  issueId: string,
+  baseWorkspace: string,
+  slot: RegisteredSlotSpawn,
+  extraPrompt?: string,
+): string {
+  const doc = readWorkspacePlanSync(baseWorkspace);
+  if (!doc) {
+    throw new Error(
+      `Registered slot spawn for ${issueId} requires a readable vBRIEF plan in ${baseWorkspace}.`
+    );
+  }
+
+  const slice = createActiveSlice(doc, {
+    issueId: issueId.toUpperCase(),
+    itemId: slot.slotItemId,
+    currentItemIds: [slot.slotItemId],
+  });
+
+  const lines = [
+    `# Registered Slot Assignment: ${slot.slotItemId}`,
+    '',
+    `Issue: ${issueId}`,
+    `Slot: ${slot.slotIndex}`,
+    `Agent: ${slot.agentId}`,
+    `Branch: ${slot.branch}`,
+    `Workspace: ${slot.workspace}`,
+    '',
+    'You are a registered slot work agent. Implement only the target vBRIEF item below, keep changes scoped to that item, and do not merge this slot branch yourself.',
+    '',
+    slice.prompt,
+  ];
+
+  const trimmedExtra = extraPrompt?.trim();
+  if (trimmedExtra) {
+    lines.push('', '## Additional Foreman Instructions', trimmedExtra);
+  }
+
+  return lines.join('\n');
 }
 
 async function ensureRegisteredSlotWorktree(baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
