@@ -67,72 +67,47 @@ For every bead:
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
 
-## Parallel work via subagents
+## Foreman wave-driver protocol
 
-When the bead DAG (`edges[]` in `.pan/spec.vbrief.json`) shows multiple unblocked beads in the same dependency layer, you may fan out **subagents** for ones that are genuinely independent. This uses Claude Code's built-in `Agent` tool (or your harness's equivalent) — **not** a Overdeck-orchestrated swarm.
+The serial per-bead workflow above remains the default. Use the foreman path only when the vBRIEF is swarm-eligible: items are vertical tracer-bullet slices with declared `files_scope`, `files_scope_confidence`, `readiness`, `verify_commands`, and `expected_outputs`.
 
-Subagents share your filesystem and return their work to you as text replies. You remain the durable, supervised work agent for the issue: you decide what to fan out, integrate the results, and own the commits.
+You remain the durable work agent for the issue. The foreman path is not a revived server-side swarm runtime: there is no `SynthesisOutput` state, no slot callback endpoint, no auto-advance poller, and no per-slot PR. The issue still lands as one reviewed branch.
 
-### When to fan out
+### Wave loop
 
-Fan out when **all** of these hold:
+1. Read `.pan/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/vbrief/dag.ts`.
+2. Run `analyzeSwarmReadiness(doc)` from `src/lib/vbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
+3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>/slot-*` branches, `agent-<issue>-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
+4. For each pending item in the current wave, call `chooseDispatchTier(item)` from `src/lib/agents/dispatch-tier.ts`.
+5. Dispatch `in-context` items through the harness's in-context subagent primitive. These are cheap/mechanical slices whose output comes back to you for review, staging, and the normal one-bead commit.
+6. Dispatch `registered-slot` items with `spawnRun(issue, 'work', { slotIndex, slotItemId })`. The slot runs in its own worktree on `feature/<issue>/slot-<n>` and registers as `agent-<issue>-<n>`.
+7. Do not advance a dependent wave until every blocking parent is merged, completed serially, or intentionally cancelled.
 
-- 2+ unblocked beads in the same layer (no edges between them in the DAG)
-- Each bead touches a different set of files (no overlap)
-- Each bead is substantial enough to amortize subagent startup (rough rule of thumb: ~10+ minutes of work)
-- No bead's output is another's input
+### Verify then merge
 
-Use `getDispatchableItems(doc, completedIds)` from `src/lib/vbrief/dag.ts` to see what's currently ready, and `groupItemsByWave(doc)` from the same module to see the topological layering. These are read-only helpers — they inform your decision, they do not drive dispatch.
+Registered slots never merge directly into the feature branch. When a slot reports completion:
 
-### When NOT to fan out
+1. Run `verifyAndMergeSlot(issue, slotIndex, item)` from `src/lib/agents/slot-merge.ts`.
+2. The helper runs the item's `metadata.verify_commands` in the slot worktree and checks that `metadata.expected_outputs` are present as the evidence contract for that item.
+3. Only after green verification may the slot branch merge into the issue feature branch.
+4. If verification fails, do not merge. Feed the failure back to the slot once, then fall back to serial execution in your own context if it fails again.
+5. If the merge conflicts, do not force-apply the slot. Surface the conflict to the foreman loop, resolve it deliberately, and keep the feature branch continuously green.
 
-- Items share files — the next bead must see the previous commit
-- Items are small (a few minutes each) — orchestration cost exceeds the savings
-- You're uncertain about ordering — default to serial
-- Any item involves the build system, migrations, or other global state where ordering matters more than you might think
+### Convergence synthesis
 
-When in doubt, run serial. Fan-out is a tool, not a default.
+At a DAG convergence point, where an item has more than one blocking parent, compose an in-context synthesis digest before dispatching the convergent item.
 
-### How to fan out
-
-1. Spawn one subagent per independent bead via the harness's `Agent` primitive. Give each a focused prompt naming the bead, its acceptance criteria, and its file scope.
-2. Subagents share your filesystem — they read and write directly in the workspace.
-3. Receive each subagent's reply describing what it did and what it changed.
-4. If two subagents' changes collide (shouldn't happen with no file overlap, but verify), resolve manually before staging.
-5. Commit each bead's contribution as a **separate commit** — one bead = one commit, per the rule above. Do not bundle multiple subagents' outputs into a single commit.
-6. Close each bead via `bd close <id>` after its commit lands. If a bead has `metadata.requiresInspection: true`, run the inspection gate on its commit before closing, exactly as in the serial per-bead workflow.
+The digest is built from the merged parent items' `expected_outputs` and the evidence produced by their verification. Inline that digest into the convergent item's prompt. Do not resurrect runtime synthesis state or store a `SynthesisOutput` object; the merged feature branch plus the prompt digest is the handoff.
 
 ### Failure handling
 
-If a subagent fails or returns wrong output:
+For any in-context subagent or registered slot failure:
 
-- Retry once with a clarified prompt that names the specific failure.
-- If it fails again, fall back to doing the bead yourself, serially.
-- Record the fan-out attempt and any failure in a `pan tell` message and in the commit body so review and crash recovery have context.
+- Retry once with feedback that names the exact failing command, missing expected output, or merge conflict.
+- If the retry fails, stop distributing that item and do the work serially in the foreman's own context.
+- Record the fallback in the commit body when it matters for review or crash recovery.
 
-Do **not** loop forever on a failing subagent. Two attempts, then serial fallback.
-
-### Cost shaping
-
-You pick the model for each fan-out via the subagent's `model` parameter:
-
-- Mechanical work (fixture regeneration, file rename, mass replace) → cheap subagent (Haiku, etc.)
-- Nuanced work (writing logic, choosing APIs) → match the parent's own model
-
-Do not pass `--model` to `pan` itself unless the task genuinely warrants it — Cloister routing handles the parent. Subagent model selection happens inside the parent's harness call.
-
-### Concrete trigger examples
-
-| Task shape | Fan out? | Notes |
-|---|---|---|
-| "Regenerate snapshots for 4 components" | Yes — 4 subagents | Independent file scopes |
-| "Audit these 6 routes for missing auth checks" | Yes — 6 subagents | Read-only or non-overlapping edits |
-| "Summarize each of these N test failures" | Yes — N subagents | Pure text output, no file conflicts |
-| "Update import paths across 8 non-overlapping modules" | Yes | Verify no shared imports first |
-| "Implement the OAuth flow" | No — chain of dependencies | Auth schema → middleware → routes → tests |
-| "Add a new field to this model" | No — single point of edit | Wouldn't help anyway |
-| "Refactor X to use Y" | No — shared state, sequencing matters | |
-| "Write tests AND the code for one feature" | No — output → input | Tests inform the code |
+Do not loop forever on a failing worker. One redo, then serial fallback.
 
 ## Jidoka Inspection Gates
 
