@@ -99,7 +99,7 @@ export async function reconcileSlotState(
 
 export async function listSlotBranches(issueId: string, workspace: string): Promise<ReconciledSlotBranch[]> {
   const issueLower = issueId.toLowerCase();
-  const pattern = `feature/${issueLower}/slot-*`;
+  const pattern = `feature/${issueLower}-slot-*`;
   const [allBranches, mergedBranches] = await Promise.all([
     gitBranchNames(workspace, pattern, false),
     gitBranchNames(workspace, pattern, true),
@@ -140,7 +140,7 @@ async function gitBranchNames(workspace: string, pattern: string, merged: boolea
 }
 
 function slotIndexFromBranch(issueLower: string, branch: string): number | null {
-  const match = new RegExp(`^feature/${escapeRegExp(issueLower)}/slot-(\\d+)$`).exec(branch);
+  const match = new RegExp(`^feature/${escapeRegExp(issueLower)}-slot-(\\d+)$`).exec(branch);
   if (!match) return null;
   return Number(match[1]);
 }

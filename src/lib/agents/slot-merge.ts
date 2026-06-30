@@ -44,7 +44,7 @@ export async function verifyAndMergeSlot(
     ? defaultRunWorkspace(issue)
     : issue.featureWorkspace ?? defaultRunWorkspace(issue.issueId);
   const slotWorkspace = `${featureWorkspace}-slot-${slotIndex}`;
-  const slotBranch = `feature/${issueId.toLowerCase()}/slot-${slotIndex}`;
+  const slotBranch = `feature/${issueId.toLowerCase()}-slot-${slotIndex}`;
   const deps: SlotMergeDeps = {
     run: async (command, cwd) => execAsync(command, { cwd }),
     ...options.deps,

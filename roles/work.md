@@ -77,10 +77,10 @@ You remain the durable work agent for the issue. The foreman path is not a reviv
 
 1. Read `.pan/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/vbrief/dag.ts`.
 2. Run `analyzeSwarmReadiness(doc)` from `src/lib/vbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
-3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>/slot-*` branches, `agent-<issue>-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
+3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>-slot-*` branches, `agent-<issue>-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
 4. For each pending item in the current wave, call `chooseDispatchTier(item)` from `src/lib/agents/dispatch-tier.ts`.
 5. Dispatch `in-context` items through the harness's in-context subagent primitive. These are cheap/mechanical slices whose output comes back to you for review, staging, and the normal one-bead commit.
-6. Dispatch `registered-slot` items with `spawnRun(issue, 'work', { slotIndex, slotItemId })`. The slot runs in its own worktree on `feature/<issue>/slot-<n>` and registers as `agent-<issue>-<n>`.
+6. Dispatch `registered-slot` items with `spawnRun(issue, 'work', { slotIndex, slotItemId })`. The slot runs in its own worktree on `feature/<issue>-slot-<n>` and registers as `agent-<issue>-<n>`.
 7. Do not advance a dependent wave until every blocking parent is merged, completed serially, or intentionally cancelled.
 
 ### Verify then merge

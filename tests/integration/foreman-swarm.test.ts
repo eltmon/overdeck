@@ -87,14 +87,14 @@ describe('foreman swarm dogfood', () => {
     expect(slotSpawns).toEqual([
       {
         agentId: 'agent-pan-1762-1',
-        branch: 'feature/pan-1762/slot-1',
+        branch: 'feature/pan-1762-slot-1',
         workspace: '/repo/workspaces/feature-pan-1762-slot-1',
         slotIndex: 1,
         slotItemId: 'tier-table-config',
       },
       {
         agentId: 'agent-pan-1762-2',
-        branch: 'feature/pan-1762/slot-2',
+        branch: 'feature/pan-1762-slot-2',
         workspace: '/repo/workspaces/feature-pan-1762-slot-2',
         slotIndex: 2,
         slotItemId: 'scheduler-relevance-map',
@@ -146,12 +146,12 @@ describe('foreman swarm dogfood', () => {
       expect.objectContaining({ verified: true, merged: true, conflicts: false }),
       expect.objectContaining({ verified: true, merged: true, conflicts: false }),
     ]);
-    expect(mergedBranches).toEqual(new Set(['feature/pan-1762/slot-1', 'feature/pan-1762/slot-2']));
+    expect(mergedBranches).toEqual(new Set(['feature/pan-1762-slot-1', 'feature/pan-1762-slot-2']));
     expect(commandCalls).toEqual([
       { command: 'npm run test:tier-table', cwd: '/repo/workspaces/feature-pan-1762-slot-1' },
-      { command: 'git merge --no-ff "feature/pan-1762/slot-1"', cwd: FEATURE_WORKSPACE },
+      { command: 'git merge --no-ff "feature/pan-1762-slot-1"', cwd: FEATURE_WORKSPACE },
       { command: 'npm run test:relevance-map', cwd: '/repo/workspaces/feature-pan-1762-slot-2' },
-      { command: 'git merge --no-ff "feature/pan-1762/slot-2"', cwd: FEATURE_WORKSPACE },
+      { command: 'git merge --no-ff "feature/pan-1762-slot-2"', cwd: FEATURE_WORKSPACE },
     ]);
     expect(new Set(slotSpawns.map(slot => slot!.slotItemId))).toEqual(new Set(doc.plan.items.map(planItem => planItem.id)));
   });

@@ -38,7 +38,7 @@ describe('reconcileSlotState', () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
       statusOverrides: { a: 'completed' },
       deps: deps(
-        [{ slotIndex: 2, branch: 'feature/pan-1762/slot-2', merged: false }],
+        [{ slotIndex: 2, branch: 'feature/pan-1762-slot-2', merged: false }],
         [{ slotIndex: 2, agentId: 'agent-pan-1762-2', status: 'running' }],
       ),
     });
@@ -49,7 +49,7 @@ describe('reconcileSlotState', () => {
         itemId: 'b',
         slotIndex: 2,
         status: 'in_flight',
-        branch: 'feature/pan-1762/slot-2',
+        branch: 'feature/pan-1762-slot-2',
         agentId: 'agent-pan-1762-2',
       },
     ]);
@@ -59,7 +59,7 @@ describe('reconcileSlotState', () => {
   it('marks a slot branch already merged into the feature branch as complete', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b']), {
       deps: deps(
-        [{ slotIndex: 1, branch: 'feature/pan-1762/slot-1', merged: true }],
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
         [],
       ),
     });
@@ -69,7 +69,7 @@ describe('reconcileSlotState', () => {
         itemId: 'a',
         slotIndex: 1,
         status: 'merged',
-        branch: 'feature/pan-1762/slot-1',
+        branch: 'feature/pan-1762-slot-1',
         agentId: undefined,
       },
     ]);

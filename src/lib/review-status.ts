@@ -177,7 +177,6 @@ export function mergeGateEligibility(
   if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
   return { eligible: true };
 }
-
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
@@ -804,7 +803,6 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   return enriched;
 }
 
-
 /**
  * On server startup, clear any mergeStatus stuck at 'merging'.
  * Pending merge operations are in-memory only — they don't survive a restart.
@@ -1016,7 +1014,6 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
     console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
 }
-
 
 /** Tagged error for review-status Effect variants. */
 export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{

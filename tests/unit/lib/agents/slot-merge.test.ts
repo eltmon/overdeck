@@ -50,7 +50,7 @@ describe('verifyAndMergeSlot', () => {
     expect(run).toHaveBeenNthCalledWith(1, 'npm test', '/repo/workspaces/feature-pan-1762-slot-2');
     expect(run).toHaveBeenNthCalledWith(
       2,
-      'git merge --no-ff "feature/pan-1762/slot-2"',
+      'git merge --no-ff "feature/pan-1762-slot-2"',
       '/repo/workspaces/feature-pan-1762',
     );
     expect(result.evidence.commandOutputs).toEqual([{ command: 'npm test', stdout: 'ok', stderr: '' }]);
