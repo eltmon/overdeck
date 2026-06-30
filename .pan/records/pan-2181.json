@@ -107,19 +107,24 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-30T23:41:54.080Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-30T23:52:27.369Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-30T23:51:04.607Z",
+  "updated": "2026-06-30T23:52:27.369Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T23:51:00.632Z",
+    "updatedAt": "2026-06-30T23:52:27.122Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -127,8 +132,7 @@
         "detectedAt": "2026-06-30T23:47:42.075Z"
       }
     ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "reviewedAtCommit": "6c5808a1c7a13e47e04713373b40cc6f99f15125"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2183"
   },
   "closeOut": {
     "usage": {
@@ -168,9 +172,9 @@
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
             "input": 149,
-            "output": 9476,
-            "cacheRead": 4184576,
-            "cacheWrite": 507818
+            "output": 9590,
+            "cacheRead": 4274287,
+            "cacheWrite": 508439
           }
         }
       },
@@ -195,14 +199,14 @@
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 149,
-          "output": 9476,
-          "cacheRead": 4184576,
-          "cacheWrite": 507818
+          "output": 9590,
+          "cacheRead": 4274287,
+          "cacheWrite": 508439
         }
       },
       "costAtCloseOut": {
-        "usd": 12.909587,
-        "pricingAsOf": "2026-06-30T23:51:04.447Z"
+        "usd": 12.919904,
+        "pricingAsOf": "2026-06-30T23:52:27.224Z"
       }
     },
     "merges": [
