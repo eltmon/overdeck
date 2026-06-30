@@ -34,20 +34,17 @@
     }
   ],
   "created": "2026-06-29T19:19:51.780Z",
-  "updated": "2026-06-30T02:18:30.261Z",
+  "updated": "2026-06-30T02:20:47.487Z",
   "pipeline": {
     "issueId": "PAN-2174",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "running",
+    "mergeStatus": "verifying",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T02:18:28.530Z",
-    "reviewNotes": "No blocking findings in current PR diff",
-    "testNotes": "All gates passed: npm run typecheck (tsc --noEmit + contracts build), npm run lint (eslint + effect + permissions + state-writes + overdeck-boundaries + skills + prompts + file-size), npx vitest run (src/lib/cloister/__tests__/stuck-remediation.test.ts + src/lib/cloister/__tests__/config.test.ts, 33 tests). Implementation verified: (1) StuckRemediationConfig adds flywheel_stage1_minutes=20, flywheel_stage2_minutes=24, flywheel_stage3_minutes=28 fields with defaults; (2) evaluateFlywheelOrchestrator() switches stage thresholds to config.flywheel_stage{3,2,1}_minutes and rewrites stage-1/2 nudge messages to direct FULL tick + ScheduleWakeup(1000s) instead of pause/status-only; (3) roles/flywheel.md updated with 'full tick' directive and '~28-minute' flywheel-specific relaunch threshold. No browser UAT required (backend-only recovery fix). All acceptance criteria met.",
+    "updatedAt": "2026-06-30T02:20:47.338Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2185",
-    "reviewedAtCommit": "14e703176467606a4eeea0dcdbb8e9c968c54cdd",
     "lastVerifiedCommit": "e84f4f8cf6aca3662bba710d935fe76de905faf9",
     "reviewRequestedAt": "2026-06-30T01:37:56.097Z"
   },
@@ -101,7 +98,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.678417,
-        "pricingAsOf": "2026-06-30T02:18:30.096Z"
+        "pricingAsOf": "2026-06-30T02:20:47.425Z"
       }
     },
     "merges": [
