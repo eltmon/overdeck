@@ -1,279 +1,137 @@
 {
   "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "2026-06-11T03:16:56-04:00",
-    "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1762: Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
-    "updated": "2026-06-11T07:21:17.629Z"
+    "version": "0.6",
+    "created": "2026-06-30T14:32:05.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1762: Swarm v2 — tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)"
   },
   "plan": {
     "id": "pan-1762",
     "title": "Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
     "status": "proposed",
-    "uid": "a0b99e55-8f19-4b64-a731-27bbc311a6e6",
-    "author": "agent:claude-fable-5",
-    "sequence": 2,
-    "created": "2026-06-11T03:16:56-04:00",
-    "updated": "2026-06-11T07:21:17.629Z",
+    "uid": "3b9e36a9-dc3f-48a1-80a4-43c865efb845",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 1,
+    "created": "2026-06-30T14:32:05.000Z",
+    "updated": "2026-06-30T14:32:05.000Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1762",
+        "uri": "https://github.com/eltmon/overdeck/issues/1762",
         "label": "PAN-1762",
         "type": "issue"
       },
       {
         "uri": ".pan/drafts/pan-1762.md",
-        "label": "PRD",
+        "label": "PRD draft (refreshed 2026-06-30)",
         "type": "doc"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1517",
-        "label": "PAN-1517 (swarm removal)",
+        "uri": "https://github.com/eltmon/overdeck/issues/1791",
+        "label": "PAN-1791 (downstream consumer, blocked on Path B)",
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1691",
-        "label": "PAN-1691 (merge train)",
+        "uri": "https://github.com/eltmon/overdeck/issues/1517",
+        "label": "PAN-1517 (swarm runtime removal)",
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1737",
-        "label": "PAN-1737 (UAT generations)",
+        "uri": "https://github.com/eltmon/overdeck/issues/1691",
+        "label": "PAN-1691 (merge train — integration safety net)",
         "type": "issue"
       }
     ],
     "tags": [
       "swarm",
-      "planning-contract",
+      "planning",
       "foreman",
-      "merge-train",
-      "vbrief"
+      "vbrief",
+      "dispatch",
+      "merge-train"
     ],
     "narratives": {
-      "Problem": "PAN-1517 deleted the slot swarm runtime (~6,021 lines). The in-context subagent replacement lost durability (subagents die with the parent session), distribution (shared filesystem, never cross-machine), and continuous integration (no per-item verify-then-merge). Separately, Panopticon plans declare no per-item file scopes or verify commands, so nothing can predict conflicts, order dispatch, or verify slices independently. Wall-clock latency of single large issues is now a real constraint.",
-      "Proposal": "Two paths sharing one contract. Path A (planning discipline): mandate tracer-bullet vertical slicing with per-item files_scope (+confidence) and verify_commands in all planning surfaces; add an advisory readiness lint at pan plan finalize (--strict to block) with a per-project hotspot list; record scope drift at pan done; feed declared footprints into merge-queue predicted conflicts and flywheel launch ordering as soft signals. Path B (foreman swarm): the issue's durable work agent becomes the foreman — it computes waves via groupItemsByWave(), serializes overlapping items via hasFileOverlap(), dispatches cheap items as worktree-isolated in-context subagents and heavy items as registered slot agents (spawnRun, per-item worktree, flat sibling branch feature/<issue>-slot-<n>), runs each item's verify_commands before merging its slot branch into the feature branch, and composes synthesis digests at DAG convergence points. No server runtime is rebuilt; a small pan slot CLI gives the foreman deterministic spawn/merge/status primitives. Overlap is always an ordering signal, never a refusal — the merge train remains the hard integration guarantee. Phase 6 (Fly remote slots) is re-scoped to a follow-up issue per the PRD's own out-of-scope-for-v1 marker."
+      "Problem": "PAN-1517 deleted the slot swarm (~6,021 lines); the in-context subagent replacement covers cheap mechanical parallelism but lost durable/registered workers, cross-machine distribution, and continuous integration with synthesis at DAG convergence. Single-issue wall-clock parallelism is gone just as big issues arrive, and PAN-1791 (a flagship) is blocked because it is designed to extend a foreman that does not exist. The deeper gap Directive exposed was never supervision — it was the CONTRACT: vertical tracer-bullet slices, declared file scopes + confidence, per-item verify commands, and a machine readiness audit before any worker launches. The old swarm had none of these; its slot merges into the feature branch ran zero quality gates.",
+      "Proposal": "Two complementary paths, shipped together under one issue. Path A (planning discipline): mandate vertical tracer-bullet slicing in the canonical planning prompt; add typed contract metadata (files_scope + confidence, verify_commands, expected_outputs, tri-state readiness); extend the EXISTING finalize quality-lint with a readiness audit; record scope drift at pan done; surface cross-issue predicted-conflict signals. A single shared module (swarm-readiness.ts) computes swarmability ONCE and is consumed by both the lint and the foreman — swarmability is a property of the plan, not a special case. Path B (foreman): the issue's durable work agent drives waves itself via groupItemsByWave + hasFileOverlap (no server runtime, no route, no poller); dispatches each item via one of two tiers (in-context subagent vs registered slot agent rebuilt on spawnRun in per-item worktrees on feature/<issue>/slot-<n>); verify-then-merges each slot into the feature branch; composes in-context synthesis digests at convergence. Overlap is an ordering signal, never a refusal — the merge train (PAN-1691/PAN-1737) is the hard integration guarantee. Reuse what survives (dag.ts, spawnRun, harness subagents, resource-discovery); rebuild what PAN-1517 removed (per-item slot spawning, the wave-driver, verify-then-merge).",
+      "NonGoals": "- Restoring the old swarm runtime wholesale: routes/swarm.ts, the auto-advance poller, the slot-merged HTTP callback, SwarmRuntime/SwarmSlotRuntime/SynthesisOutput continue-state, the detectMergedSwarmSlots deacon patrol, SwarmDispatchDialog, and DEFAULT_SWARM_MODEL stay deleted (PAN-1517).\n- Hard refuse-to-dispatch on predicted overlap at any level — overlap orders work, it never blocks; the merge train (PAN-1691/PAN-1737) is the guarantee (§1.4, §10.9).\n- Per-slot PRs or per-slot review — the issue's single PR remains the review unit; slots are implementation steps reviewed together.\n- Per-worker provider/model policy UI — Cloister routing already covers model choice.\n- Cohort ceremonies (swarm:complete-cohort etc.) — issue close-out already owns lifecycle completion.\n- Phase 6 remote slots on Fly — out of scope, tracked separately as PAN-1773.\n- §10.6 boundary-map mechanical checks at wave convergence — deferred follow-up (the PRD marks them 'may optionally').\n- §10.7 automated `pan plan split --check/apply` tooling — deferred follow-up; only the prompt-level 'prefer splitting' guidance ships in A1.\n- §10.8 historical drift-table→confidence-default feedback loop — deferred follow-up; A4 ships drift RECORDING only.\n- A new --strict finalize flag — not added; new lint checks are warn-first (errors only for malformed declarations), and --no-quality-lint is the existing emergency bypass.\n- Special-casing PAN-1791 (or any issue id) in the foreman or dispatch — the dispatch decision is a pure function of item metadata.\n- Refreshing or removing stale docs/SWARM.md + docs/swarm-diagrams/ — tracked separately as PAN-1555, not this issue."
     },
     "autoDecisions": [
       {
-        "summary": "Slot branches use flat sibling naming feature/<issue>-slot-<n>, not the PRD's hierarchical feature/<issue>/slot-<n>.",
-        "rationale": "Git refs are files: refs/heads/feature/pan-1762 existing as a leaf makes any feature/pan-1762/* ref impossible. The deleted runtime hit exactly this and used `${parentBranch}-slot-${slotNum}` (swarm.ts:521 at 59f1e6cd4~1). Reuse the proven naming."
+        "summary": "Swarmability computed once in a shared module (swarm-readiness.ts) consumed by both the finalize lint and the foreman.",
+        "rationale": "Operator ask #2: swarmability is a property of the plan, not a special case. One code path prevents the lint and the foreman from disagreeing about whether a plan is swarm-eligible."
       },
       {
-        "summary": "Phase 6 (B5, remote slots on Fly) is deferred to a follow-up issue filed at planning time.",
-        "rationale": "PRD §4 B5 explicitly says 'Out of scope for v1'; PRD §5 permits re-scoping into sibling issues at planning. The slot-branch architecture delivered here is the enabler; the Fly wiring is independent follow-up work."
+        "summary": "Add optional TYPED metadata fields (files_scope_confidence, verify_commands, expected_outputs, readiness) instead of riding only the [key:string]:unknown index signature.",
+        "rationale": "Minor deviation from PRD §A1 'no schema change'; additive and backward-compatible; gives the lint and foreman type-safe consumption instead of `as` casts. files_scope already exists at types.ts:71."
       },
       {
-        "summary": "New CLI namespace `pan slot` (spawn/merge/status) instead of resurrecting `pan swarm`; added to the skills exclusion list, no wrapper skill.",
-        "rationale": "`pan swarm` no longer exists in the CLI (removed with PAN-1517; skill/exclusion references are stale). Slot operations act on a single slot, so the noun matches. SKILLS-CONVENTION already excludes power-user verbs documented in topical docs (docs/SWARM.md, roles/work.md)."
+        "summary": "Lint severity split: malformed declarations (broad globs §10.1, readiness:ready+confidence:low §10.2) are errors from the start; advisory checks (missing scope, overlap audit, large+parallel-safe) are warn-first. No new --strict flag.",
+        "rationale": "Reconciles §A2 'warn initially' with §10.1/§10.2 'reject'. A self-evidently malformed scope declaration is a typo-class error now; a prediction is advisory until scopes are reliably populated. --no-quality-lint already covers emergency bypass."
       },
       {
-        "summary": "Slot agent IDs are agent-<issue>-slot-<n>.",
-        "rationale": "Matched by kill.ts's existing agent-<issue>-* discovery and by dashboard resource discovery; the explicit 'slot-' segment avoids ambiguity with role suffixes like agent-<issue>-review."
+        "summary": "Addendum §10 split: ship §10.1–§10.5; defer §10.6 (boundary maps), §10.7 (automated split tooling), §10.8 (historical confidence feedback) to follow-ups.",
+        "rationale": "§10.6 is 'may optionally' per the PRD; §10.7/§10.8 are sizable refinements layered on top of the v1 core. The integral contract + analyzer + foreman ship; the prompt-level prefer-splitting guidance (A1) and drift recording (A4) still ship."
       },
       {
-        "summary": "Readiness lint is advisory (warnings) by default; --strict on pan plan finalize blocks.",
-        "rationale": "PRD A2 specifies exactly this posture; consistent with 'overlap is an ordering signal, never a refusal'."
-      },
-      {
-        "summary": "Foreman treats items with missing files_scope or files_scope_confidence: low as overlapping-with-everything (serialize within wave), without changing hasFileOverlap()'s missing=non-overlapping default in dag.ts.",
-        "rationale": "PRD risk #4 mandates conservative scheduling for low-confidence scopes. Changing dag.ts semantics would alter the existing in-context fan-out path; the conservative policy belongs in the foreman protocol where swarm dispatch decisions are made."
-      },
-      {
-        "summary": "Scope drift is recorded as an optional structured scopeDrift field on the workspace continue state plus a sessionHistory note, and surfaced into review; it never blocks pan done.",
-        "rationale": "PRD A4 says record and surface, not gate. Optional field keeps older issues and existing consumers unaffected."
-      },
-      {
-        "summary": "A3 flywheel launch ordering is delivered as data surfacing (predicted conflicts in the merge-queue API/CLI from declared footprints, converging to actual changedFilesVsMain once branches exist) plus guidance in docs/flywheel-brief.md — no coded scoring function.",
-        "rationale": "There is no coded launch-ordering function to extend: the flywheel orchestrator is an LLM reading flywheel-brief.md and run state. Surfacing footprint overlap where the orchestrator already looks is the minimal correct integration."
-      },
-      {
-        "summary": "Slot dispatch prompts reuse createActiveSlice()/renderActiveSlicePrompt() from dag.ts.",
-        "rationale": "The bounded per-item prompt contract (item, ACs, blockers, synthesis context) already exists and is tested; slots need exactly that payload."
+        "summary": "A3 cross-issue signals land as issue-footprint + predicted-conflicts; the 'launch-ordering soft preference' is the surfaced predicted-conflict signal, not a new hard scheduler.",
+        "rationale": "Faithful to §A3 'soft preference, not a gate' and reuses the existing flywheel-merge-order pairwise math; avoids inventing a scheduler the flywheel (an orchestrator agent) does not need."
       }
     ],
     "items": [
       {
-        "id": "a1-roles-plan-slicing",
-        "title": "Tracer-bullet slicing + swarm metadata contract in plan role prompt and planning template",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 1,
-          "files_scope": [
-            "roles/plan.md",
-            "src/dashboard/server/routes/misc.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck"
-          ]
-        },
-        "narrative": {
-          "Action": "Update roles/plan.md and the planning-session prompt template (the orchestration context string in src/dashboard/server/routes/misc.ts containing the 'Task Granularity' section) to mandate the swarm-ready contract: (1) items MUST be vertical tracer-bullet slices, each independently verifiable end-to-end, never horizontal layer-slices; (2) every item MUST declare metadata.files_scope (repo-relative globs, hasFileOverlap() semantics) plus metadata.files_scope_confidence (high|medium|low); (3) every item SHOULD declare metadata.verify_commands proving the slice works alone; (4) prefer splitting big issues into independently shippable sibling issues over one mega vBRIEF (sibling issues parallelize through the flywheel with full per-unit review). Keep edits surgical: extend the existing item/metadata guidance, do not restructure either document."
-        },
-        "subItems": [
-          {
-            "id": "a1-roles-plan-slicing.ac1",
-            "title": "roles/plan.md states the vertical-slice mandate and requires files_scope + files_scope_confidence on every item, with verify_commands as SHOULD",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "a1-roles-plan-slicing.ac2",
-            "title": "The planning template in src/dashboard/server/routes/misc.ts carries the same contract (slicing mandate, metadata requirements, prefer-splitting doctrine) so injected planning sessions see it",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "a1-roles-plan-slicing.ac3",
-            "title": "Prefer-splitting guidance explicitly says sibling issues parallelize via the flywheel today and carry full per-issue review/test/UAT rigor",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "a1-skills-contract",
-        "title": "Swarm metadata contract in write-vbrief and pan-plan skills",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 1,
-          "files_scope": [
-            "skills/write-vbrief/SKILL.md",
-            "skills/pan-plan/SKILL.md"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "bash scripts/lint-skills.sh"
-          ]
-        },
-        "narrative": {
-          "Action": "Add the same contract to skills/write-vbrief/SKILL.md (metadata table rows for files_scope, files_scope_confidence, verify_commands with glob semantics and an example item) and skills/pan-plan/SKILL.md (note that finalize lints these fields). Keep consistent with roles/plan.md wording from a1-roles-plan-slicing. scripts/lint-skills.sh must stay green — do not reference CLI flags that don't exist yet (the --strict flag is documented by a2-finalize-wiring in the same commit that adds it)."
-        },
-        "subItems": [
-          {
-            "id": "a1-skills-contract.ac1",
-            "title": "write-vbrief SKILL.md documents files_scope, files_scope_confidence, and verify_commands with glob semantics and at least one populated example item",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "a1-skills-contract.ac2",
-            "title": "scripts/lint-skills.sh passes (no references to not-yet-existing CLI flags)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "a2-hotspot-config",
-        "title": "Add hotspot_files per-project config field",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 2,
-          "files_scope": [
-            "src/lib/projects.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck"
-          ]
-        },
-        "narrative": {
-          "Action": "Add optional `hotspot_files?: string[]` to the ProjectConfig interface in src/lib/projects.ts (~line 88) with a doc comment explaining: globs for files every feature touches (CHANGELOG.md, bun.lock, generated files); excluded from overlap math in the readiness lint and from scope-drift reporting; owned by merge-train resolution conventions. YAML parsing needs no custom deserialization. No default value — absent means empty list."
-        },
-        "subItems": [
-          {
-            "id": "a2-hotspot-config.ac1",
-            "title": "ProjectConfig has hotspot_files?: string[] with a doc comment covering purpose and consumers; typecheck passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "a2-readiness-lint-lib",
-        "title": "Readiness lint library for vBRIEF plans",
+        "id": "schema-fields",
+        "title": "Add typed swarm-contract metadata fields to VBriefItemMetadata",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-11T03:16:56-04:00",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
-          "difficulty": "medium",
+          "difficulty": "simple",
           "issueLabel": "pan-1762",
           "requiresInspection": true,
-          "inspectionDepth": "fast",
+          "inspectionDepth": "deep",
           "foundationFor": [
-            "a2-finalize-wiring"
+            "planning-prompt-contract",
+            "write-vbrief-skill",
+            "readiness-analyzer",
+            "lint-item-checks",
+            "slot-spawn-tier",
+            "scope-drift-record",
+            "issue-footprint",
+            "verify-then-merge"
           ],
-          "phase": 2,
           "files_scope": [
-            "src/lib/vbrief/readiness-lint.ts",
-            "src/lib/vbrief/types.ts",
-            "tests/unit/lib/vbrief/readiness-lint.test.ts"
+            "src/lib/vbrief/types.ts"
           ],
           "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck",
-            "npx vitest run tests/unit/lib/vbrief/readiness-lint.test.ts"
+          "readiness": "ready",
+          "traces": [
+            "A1",
+            "10.3",
+            "10.4"
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/vbrief/readiness-lint.ts: a pure function lintPlanReadiness(doc: VBriefDocument, opts: { hotspotFiles?: string[] }) returning structured findings [{ level: 'warning'|'info', code, itemIds, message, sharedScope? }]. Findings: (1) warning per item missing files_scope (code 'missing-files-scope'); (2) info per item missing verify_commands ('missing-verify-commands' — SHOULD, not MUST); (3) warning per pair of edge-unconnected sibling items whose files_scope sets overlap, naming the shared files/patterns ('unconnected-overlap') — reuse the compileGlob/cross-matching semantics from dag.ts (export or import compileGlob; do not duplicate the regex logic), exclude any pattern matching opts.hotspotFiles from the overlap math; (4) info per item with files_scope_confidence 'low' ('low-confidence-scope'). 'Edge-unconnected' means no blocks-edge path connects the pair in either direction. Also add typed optional fields files_scope_confidence?: 'high'|'medium'|'low' and verify_commands?: string[] to VBriefItem.metadata in src/lib/vbrief/types.ts (they already fit the index signature; naming them documents the contract). Unit tests cover each finding code, hotspot exclusion, transitively-connected pairs producing no warning, and glob-vs-glob overlap."
+          "Action": "Add optional typed swarm-contract fields to VBriefItemMetadata in src/lib/vbrief/types.ts (alongside the existing files_scope at :71 and difficulty at :67): files_scope_confidence?: 'high'|'medium'|'low'; verify_commands?: string[]; expected_outputs?: string[]; readiness?: 'ready'|'sequential'|'needs_refinement'. Keep the existing [key:string]:unknown index signature (:74). Export shared union types (e.g. FilesScopeConfidence, ItemReadiness) so the analyzer, lint, and foreman import them rather than re-declaring string literals. This is the cross-cutting schema every other bead encodes assumptions about."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a2-readiness-lint-lib.ac1",
-            "title": "lintPlanReadiness returns the four finding codes with item IDs and shared-scope details, as pure data (no I/O, no process.exit)",
+            "id": "schema-fields.ac1",
+            "title": "Given the edited types.ts, when tsc runs, then VBriefItemMetadata exposes optional files_scope_confidence, verify_commands, expected_outputs, and readiness fields and the project typechecks with no errors",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a2-readiness-lint-lib.ac2",
-            "title": "Hotspot-matched patterns are excluded from overlap math; a pair overlapping only on a hotspot file produces no unconnected-overlap warning",
+            "id": "schema-fields.ac2",
+            "title": "Given an existing spec that declares none of the new fields, when it is loaded, then it still typechecks and finalizes (the change is additive — no field is made required and it preserves backward compatibility)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a2-readiness-lint-lib.ac3",
-            "title": "Pairs connected by a blocks-edge path (directly or transitively) are never flagged for overlap",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "a2-readiness-lint-lib.ac4",
-            "title": "VBriefItem.metadata has typed files_scope_confidence and verify_commands fields; unit tests pass",
+            "id": "schema-fields.ac3",
+            "title": "Then types.ts exports shared union types for files_scope_confidence and readiness, and a unit reference importing them compiles",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -282,50 +140,58 @@
         ]
       },
       {
-        "id": "a2-finalize-wiring",
-        "title": "Wire readiness lint into pan plan finalize with --strict",
+        "id": "planning-prompt-contract",
+        "title": "Mandate tracer-bullet slicing + contract metadata in the planning prompt",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 2,
           "files_scope": [
-            "src/cli/commands/plan-finalize.ts",
-            "src/cli/index.ts",
-            "skills/pan-plan/SKILL.md"
+            "src/lib/cloister/prompts/planning.md"
           ],
           "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck",
-            "bash scripts/lint-skills.sh"
+          "readiness": "ready",
+          "traces": [
+            "A1",
+            "10.3",
+            "10.4",
+            "10.7"
           ]
         },
         "narrative": {
-          "Action": "In planFinalizeCommand (src/cli/commands/plan-finalize.ts), run lintPlanReadiness on the plan before stampPlanForFinalization (~line 91), loading hotspot_files from the resolved project config. Print findings: warnings in yellow, info dimmed; include them in --json output as a findings array. Add a --strict option (register on the finalize subcommand in src/cli/index.ts ~line 378): when set and any warning-level finding exists, exit 1 before stamping/beads/promotion with a clear message listing the warnings. Default remains advisory. Update skills/pan-plan/SKILL.md to document --strict in the same commit (scripts/lint-skills.sh enforces flag consistency)."
+          "Action": "Extend the canonical planning prompt src/lib/cloister/prompts/planning.md (NOT roles/plan.md) to mandate the swarm contract, added near the existing difficulty (:210) and foundationFor (:250) mandates in the same established style. Cover: vertical tracer-bullet slices; per-item files_scope + files_scope_confidence; verify_commands + expected_outputs for slot-eligible items; the tri-state readiness vocabulary (§10.3); and a 'prefer splitting big issues into independently shippable sibling issues' instruction (§A1, §10.7 prompt-level guidance only)."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a2-finalize-wiring.ac1",
-            "title": "pan plan finalize prints lint findings (warnings + info) and includes them in --json output; advisory by default — finalize proceeds despite warnings",
+            "id": "planning-prompt-contract.ac1",
+            "title": "Then planning.md instructs planners to author items as vertical tracer-bullet slices (each independently verifiable end-to-end) and rejects horizontal layer-slices such as 'all the DB work' or 'all the UI work'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a2-finalize-wiring.ac2",
-            "title": "pan plan finalize --strict exits non-zero on any warning-level finding, before beads creation or promotion",
+            "id": "planning-prompt-contract.ac2",
+            "title": "Then planning.md requires every item to declare metadata.files_scope plus files_scope_confidence, and to declare verify_commands and expected_outputs for slot-eligible items",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a2-finalize-wiring.ac3",
-            "title": "skills/pan-plan/SKILL.md documents --strict and scripts/lint-skills.sh passes",
+            "id": "planning-prompt-contract.ac3",
+            "title": "Then planning.md documents the tri-state metadata.readiness (ready|sequential|needs_refinement) and when a planner applies each value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-contract.ac4",
+            "title": "Then planning.md instructs planners to prefer splitting a big issue into independently shippable sibling issues over one mega-vBRIEF, stating siblings parallelize through the flywheel with full per-unit review/test/UAT",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -334,41 +200,47 @@
         ]
       },
       {
-        "id": "a4-scope-drift-lib",
-        "title": "Scope-drift computation library",
+        "id": "write-vbrief-skill",
+        "title": "Mirror contract metadata fields into the write-vbrief skill",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 3,
           "files_scope": [
-            "src/lib/vbrief/scope-drift.ts",
-            "tests/unit/lib/vbrief/scope-drift.test.ts"
+            "sync-sources/skills/write-vbrief/SKILL.md"
           ],
           "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck",
-            "npx vitest run tests/unit/lib/vbrief/scope-drift.test.ts"
+          "readiness": "ready",
+          "traces": [
+            "A1"
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/vbrief/scope-drift.ts: pure computeScopeDrift(declaredScopes: string[], changedFiles: string[], hotspotFiles: string[]) returning { declaredUnion: string[], outOfScope: string[], untouchedScopePatterns: string[], driftRatio: number }. outOfScope = changed files matching neither declared scopes nor hotspots (glob semantics shared with dag.ts via compileGlob). untouchedScopePatterns = declared patterns matching zero changed files. driftRatio = outOfScope.length / max(1, changedFiles.length). Unit tests cover glob matching, hotspot exclusion, empty declarations (everything out of scope, but callers treat empty declarations as no-data), and clean runs."
+          "Action": "Mirror the new contract metadata fields into sync-sources/skills/write-vbrief/SKILL.md so self-planning and work agents that author a spec directly emit files_scope, files_scope_confidence, verify_commands, expected_outputs, and readiness with the same names/values as types.ts and planning.md."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a4-scope-drift-lib.ac1",
-            "title": "computeScopeDrift returns outOfScope, untouchedScopePatterns, and driftRatio with dag.ts-consistent glob semantics; hotspot files never count as drift",
+            "id": "write-vbrief-skill.ac1",
+            "title": "Then write-vbrief SKILL.md documents files_scope, files_scope_confidence, verify_commands, expected_outputs, and readiness using the same field names and allowed values as types.ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a4-scope-drift-lib.ac2",
-            "title": "Unit tests pass covering globs, hotspots, empty-declaration, and zero-drift cases",
+            "id": "write-vbrief-skill.ac2",
+            "title": "Then the SKILL's example vBRIEF item contains the new fields populated with realistic values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "write-vbrief-skill.ac3",
+            "title": "When npm run lint runs, then the skills lint passes (no CLI/skill drift introduced)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -377,49 +249,431 @@
         ]
       },
       {
-        "id": "a4-done-recording",
+        "id": "readiness-analyzer",
+        "title": "Shared swarm-readiness analyzer (the single swarmability decider)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1762",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "hotspot-config",
+            "lint-overlap-audit",
+            "readiness-report-cli",
+            "readiness-report-ui",
+            "issue-footprint",
+            "foreman-tier-decision",
+            "foreman-protocol-doc"
+          ],
+          "files_scope": [
+            "src/lib/vbrief/swarm-readiness.ts",
+            "tests/unit/lib/vbrief/swarm-readiness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/vbrief/swarm-readiness.test.ts"
+          ],
+          "expected_outputs": [
+            "analyzeSwarmReadiness exported from src/lib/vbrief/swarm-readiness.ts",
+            "swarm-readiness.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "A2",
+            "10.5",
+            "B1",
+            "B2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/vbrief/swarm-readiness.ts exporting a PURE analyzeSwarmReadiness(doc, opts?: { hotspots?: string[] }) that reuses dag.ts primitives (groupItemsByWave :39, hasFileOverlap :336, getDispatchableItems :217). Return a structured verdict: per item { id, readiness, slotEligible, scopeConfidence, missingScope, overlaps: { itemId, sharedFiles }[] } and plan-level { waves, conflictGroups, overlapMatrix, swarmEligible }. Files matched by opts.hotspots are excluded from ALL overlap math. Items with files_scope_confidence:'low' are treated as overlapping-with-everything for scheduling (conservative) but are never marked blocked. This module is the single swarmability decision consumed by both the A2 lint and the Path B foreman (operator ask #2)."
+        },
+        "items": [
+          {
+            "id": "readiness-analyzer.ac1",
+            "title": "Given a VBriefDocument, when analyzeSwarmReadiness runs, then it returns a plan-level verdict containing waves (from groupItemsByWave), an overlap matrix, conflict groups, and a swarmEligible boolean",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-analyzer.ac2",
+            "title": "Given two items with overlapping files_scope and no connecting blocks-edge, then the verdict marks them overlapping and lists the shared files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-analyzer.ac3",
+            "title": "Given a hotspots list, when two items share only a hotspot file, then the verdict reports them non-overlapping (hotspot files excluded from overlap math)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-analyzer.ac4",
+            "title": "Given an item with files_scope_confidence:'low', then the verdict treats it as overlapping-with-all for scheduling yet never sets its blocked status solely on that basis",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-analyzer.ac5",
+            "title": "Then analyzeSwarmReadiness is pure (performs no I/O and holds no process state) and is exported for reuse by the lint and the foreman",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hotspot-config",
+        "title": "Per-project hotspot list excluded from overlap math",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/config-yaml.ts",
+            "src/lib/projects.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "traces": [
+            "A2",
+            "10.1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an optional per-project hotspot list to the projects.yaml project config (e.g. a swarm.hotspots: string[] — CHANGELOG.md, bun.lock, generated files) and parse it in the project-config loader (src/lib/config-yaml.ts, and/or src/lib/projects.ts — confirm the exact ProjectConfig type at implementation). Plumb the resolved hotspots into analyzeSwarmReadiness({ hotspots }) at its call sites. Default to an empty list when unset. Hotspots are EXCLUDED from overlap math (complementary to broad-glob rejection, which rejects at declaration time)."
+        },
+        "items": [
+          {
+            "id": "hotspot-config.ac1",
+            "title": "Given a project that declares a swarm hotspot list, when the config loads, then the parser returns those hotspot patterns; when a project declares none, then it defaults to an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hotspot-config.ac2",
+            "title": "When the analyzer is invoked for a project with hotspots, then those hotspots are passed through so hotspot files are excluded from overlap detection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hotspot-config.ac3",
+            "title": "Then a unit test covers a project with hotspots resolving to the declared list and a project without hotspots resolving to []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-item-checks",
+        "title": "Per-item scope/field checks in the finalize quality-lint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vbrief/quality-lint.ts",
+            "tests/unit/lib/vbrief/quality-lint.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vbrief/quality-lint.test.ts"
+          ],
+          "expected_outputs": [
+            "quality-lint.test.ts covers the four new per-item checks and passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "A2",
+            "10.1",
+            "10.2",
+            "10.4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add per-item checks to lintItem in src/lib/vbrief/quality-lint.ts: (1) WARN when an item is missing files_scope; (2) ERROR on broad-glob scopes (src/**, bare directory names, **-suffixed roots) — these are malformed declarations, rejected from the start (§10.1); (3) cross-field consistency (§10.2): readiness:'ready' + files_scope_confidence:'low' → ERROR; difficulty in {complex,expert} marked parallel-safe with no stated reason → WARN; (4) expected_outputs entries reuse the existing VAGUE_AC_PATTERNS / BANNED_AC_PATTERNS (:24,:27) banned-phrase check (§10.4). Severity split per decision D7/§10.1/§10.2: malformed declarations are errors now, advisory checks are warn-first."
+        },
+        "items": [
+          {
+            "id": "lint-item-checks.ac1",
+            "title": "Given an item missing files_scope, when the lint runs, then it emits a warn-severity issue naming the item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-item-checks.ac2",
+            "title": "Given an item whose files_scope contains a broad glob (src/**, a bare directory, or a **-suffixed root), then the lint emits an error-severity issue that blocks finalize",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-item-checks.ac3",
+            "title": "Given an item with readiness:'ready' and files_scope_confidence:'low', then the lint emits an error; given a complex|expert item marked parallel-safe with no stated reason, then it emits a warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-item-checks.ac4",
+            "title": "Given an expected_outputs entry containing a banned vague phrase (reusing VAGUE_AC_PATTERNS/BANNED_AC_PATTERNS), when the lint runs, then it emits a quality issue for that entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-overlap-audit",
+        "title": "Cross-item overlap audit (warn-only) in the finalize quality-lint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/vbrief/quality-lint.ts",
+            "tests/unit/lib/vbrief/quality-lint.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vbrief/quality-lint.test.ts"
+          ],
+          "expected_outputs": [
+            "overlap-audit test asserts warn-only severity and shared-file listing"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "A2",
+            "10.9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a cross-item overlap audit to lintPlanQuality (in src/lib/vbrief/quality-lint.ts) that calls analyzeSwarmReadiness and, for any two edge-unconnected sibling items with overlapping scopes (hotspots excluded), emits a WARN listing the shared files and advising the planner to add an edge, merge the items, or accept serialization. It MUST NEVER emit error and MUST NEVER refuse finalize — overlap is an ordering signal (§10.9). Lands in the same file as lint-item-checks (serialized after it)."
+        },
+        "items": [
+          {
+            "id": "lint-overlap-audit.ac1",
+            "title": "Given two items with overlapping files_scope and no connecting blocks-edge, when the lint runs, then it emits a warn-severity issue listing the shared file(s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-overlap-audit.ac2",
+            "title": "Given the same two items connected by a blocks-edge, then the lint emits no overlap warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-overlap-audit.ac3",
+            "title": "Given two items overlapping only on a configured hotspot file, then the lint emits no overlap warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-overlap-audit.ac4",
+            "title": "Then the overlap audit never emits severity:'error' and never blocks finalize (overlap orders work, it does not refuse it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readiness-report-cli",
+        "title": "Render the readiness report at pan plan finalize",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "tests/unit/cli/plan-finalize-report.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "traces": [
+            "10.5"
+          ]
+        },
+        "narrative": {
+          "Action": "At pan plan finalize, render a human-readable readiness report from analyzeSwarmReadiness: dependency waves, conflict groups, and a file-overlap matrix, printed alongside the existing quality-lint output (src/cli/commands/plan-finalize.ts). Advisory only — it prints regardless of warnings and does not change the finalize pass/fail decision."
+        },
+        "items": [
+          {
+            "id": "readiness-report-cli.ac1",
+            "title": "When pan plan finalize runs, then it prints a readiness report showing the dependency waves for the plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-report-cli.ac2",
+            "title": "Then the report renders the cross-item file-overlap matrix and any conflict groups, with hotspot files excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-report-cli.ac3",
+            "title": "Then the report prints regardless of warnings and by itself neither blocks nor passes finalize (advisory)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readiness-report-ui",
+        "title": "Surface the readiness report in the VBriefViewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/vbrief/VBriefReadinessPanel.tsx",
+            "src/dashboard/frontend/src/components/vbrief/VBriefViewer.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "traces": [
+            "10.5"
+          ]
+        },
+        "narrative": {
+          "Action": "Surface the readiness report in the VBriefViewer (src/dashboard/frontend/src/components/vbrief/): a panel rendering waves + overlap matrix + conflict groups from the same analyzer verdict. Expose the verdict to the frontend via the existing plan payload (the route serving GET /api/workspaces/:issueId/plan) or a sibling RPC — pick the lighter path at implementation. Follow pan-style-guide (no pill badges, no decorative color, muted status text)."
+        },
+        "items": [
+          {
+            "id": "readiness-report-ui.ac1",
+            "title": "Given a plan with a readiness verdict, when the VBriefViewer opens, then it renders a readiness panel showing the dependency waves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-report-ui.ac2",
+            "title": "Then the panel renders the file-overlap matrix and conflict groups, with hotspot files excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readiness-report-ui.ac3",
+            "title": "Then the panel respects pan-style-guide (no pill badges, no decorative color, muted status text) and the frontend test suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-drift-record",
         "title": "Record scope drift at pan done",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 3,
           "files_scope": [
             "src/cli/commands/done.ts",
-            "src/lib/vbrief/continue-state.ts"
+            "src/lib/review-status.ts"
           ],
-          "files_scope_confidence": "high",
+          "files_scope_confidence": "medium",
           "verify_commands": [
             "npm run typecheck",
-            "npx vitest run tests/unit/lib/vbrief"
+            "npx vitest run tests/unit/lib/review-status.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "A4",
+            "10.8"
           ]
         },
         "narrative": {
-          "Action": "In doneCommand (src/cli/commands/done.ts), after rebase/push succeeds and alongside the existing continue-state sessionHistory append (~lines 458-470): compute changed files via `git diff --name-only origin/main...HEAD` (async exec) in the workspace; load the issue's spec from main via findSpecByIssue and take the union of item files_scope; load hotspot_files from project config; call computeScopeDrift. Record the result as a new optional structured field scopeDrift?: { computedAt, declaredUnion, outOfScope, untouchedScopePatterns, driftRatio } on ContinueState (extend src/lib/vbrief/continue-state.ts) plus a one-line sessionHistory note. Skip silently (with a debug log) when the spec has no files_scope anywhere — plans predating the contract produce no drift record. Strictly advisory: any error here must never fail pan done."
+          "Action": "At pan done (src/cli/commands/done.ts) / the verification gate, compute the actual changed-file set vs origin/main (reuse changedFilesVsMain at src/lib/flywheel-merge-order.ts:107, which runs git diff --name-only origin/main...HEAD) and diff it against the declared scope union (union of item files_scope from the spec). Record drift — files changed outside any declared scope, and declared scope files left untouched — into the workspace continue state and the review status (src/lib/review-status.ts) so it surfaces to the review role. RECORDING ONLY; the historical drift-table→confidence feedback loop (§10.8) is a deferred follow-up."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a4-done-recording.ac1",
-            "title": "After pan done on a plan with declared scopes, the workspace continue.json contains a scopeDrift field with outOfScope/untouchedScopePatterns/driftRatio",
+            "id": "scope-drift-record.ac1",
+            "title": "When pan done runs, then it computes the actual changed-file set vs origin/main and compares it to the declared scope union",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a4-done-recording.ac2",
-            "title": "Plans with no files_scope produce no scopeDrift field and no error; drift computation failures never block pan done",
+            "id": "scope-drift-record.ac2",
+            "title": "Given files changed outside the declared scope union, then they are recorded as drift in the workspace continue state",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a4-done-recording.ac3",
-            "title": "Drift computation uses async exec (no execSync) and excludes hotspot files",
+            "id": "scope-drift-record.ac3",
+            "title": "Given declared scope files that were never touched, then they are recorded as drift",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-drift-record.ac4",
+            "title": "Then the drift record persists to the issue's review status so the review role's input contains it",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -428,316 +682,51 @@
         ]
       },
       {
-        "id": "a4-review-surface",
-        "title": "Surface scope drift in review status and review context",
+        "id": "issue-footprint",
+        "title": "Compute an issue's footprint from its declared scopes",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 3,
-          "files_scope": [
-            "src/lib/review-status.ts",
-            "src/lib/agents.ts",
-            "roles/review.md"
-          ],
-          "files_scope_confidence": "low",
-          "verify_commands": [
-            "npm run typecheck"
-          ]
-        },
-        "narrative": {
-          "Action": "Make the recorded scopeDrift visible to the review role: when review is triggered for an issue, read the workspace continue state's scopeDrift and (1) store a compact summary on the issue's review status record (src/lib/review-status.ts or wherever the review record is composed), and (2) include a short scope-drift section in the review role's spawn context (where the review prompt is assembled in src/lib/agents.ts / the review trigger path) listing out-of-scope files so reviewers scrutinize undeclared changes. Mention the signal in roles/review.md. All additions optional-safe: issues without drift data render nothing. Exact wiring points may shift during implementation — keep the change minimal and confined to the review trigger path."
-        },
-        "subItems": [
-          {
-            "id": "a4-review-surface.ac1",
-            "title": "An issue with recorded drift shows the drift summary in the review role's spawn context (out-of-scope files listed)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "a4-review-surface.ac2",
-            "title": "Issues without drift data trigger review exactly as before (no errors, no empty sections)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "b-slot-spawn-lib",
-        "title": "Slot worktree creation + registered slot agent spawning",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1762",
-          "requiresInspection": true,
-          "inspectionDepth": "fast",
-          "foundationFor": [
-            "b-slot-cli",
-            "b-foreman-role"
-          ],
-          "phase": 4,
-          "files_scope": [
-            "src/lib/swarm/slots.ts",
-            "tests/unit/lib/swarm/slots.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck",
-            "npx vitest run tests/unit/lib/swarm/slots.test.ts"
-          ]
-        },
-        "narrative": {
-          "Action": "Create src/lib/swarm/slots.ts with two functions. (1) createSlotWorktree(projectRoot, issueId, slotNum): worktree at workspaces/feature-<issue>-slot-<n>, branch feature/<issue>-slot-<n> created from the issue's feature branch (flat sibling naming — hierarchical refs collide with the leaf feature branch; port the logic from the deleted runtime, reference `git show 59f1e6cd4~1:src/dashboard/server/routes/swarm.ts` createSlotWorktree ~line 2040-2110, including idempotent reuse of existing worktree/branch and the beads contributor redirect). (2) spawnSlotAgent(issueId, slotNum, itemId, opts): builds the per-item dispatch prompt via createActiveSlice/renderActiveSlicePrompt from dag.ts (with optional synthesisContext passed in by the foreman), then calls spawnRun(issueId, 'work', { workspace: <slot worktree>, agentId: 'agent-<issue>-slot-<n>', prompt, model: opts.model }). All git/exec async (this code is server-reachable). Unit tests for branch/worktree naming, idempotency, and agent-id construction (mock spawnRun/git at the boundary)."
-        },
-        "subItems": [
-          {
-            "id": "b-slot-spawn-lib.ac1",
-            "title": "createSlotWorktree creates (or idempotently reuses) workspaces/feature-<issue>-slot-<n> on branch feature/<issue>-slot-<n> branched from the feature branch, with beads contributor redirect",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-slot-spawn-lib.ac2",
-            "title": "spawnSlotAgent registers a real agent (state.json with issueId, tmux session) named agent-<issue>-slot-<n>, with a bounded active-slice dispatch prompt",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-slot-spawn-lib.ac3",
-            "title": "Slot agents appear under their issue in the dashboard via existing resource discovery, and pan kill <issue> finds them (agent-<issue>-* pattern)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-slot-spawn-lib.ac4",
-            "title": "No execSync anywhere in the new module; unit tests pass",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "b-verify-merge-lib",
-        "title": "Per-slot verify_commands runner + slot branch merge",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 4,
-          "files_scope": [
-            "src/lib/swarm/slot-verify-merge.ts",
-            "tests/unit/lib/swarm/slot-verify-merge.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck",
-            "npx vitest run tests/unit/lib/swarm/slot-verify-merge.test.ts"
-          ]
-        },
-        "narrative": {
-          "Action": "Create src/lib/swarm/slot-verify-merge.ts. (1) runSlotVerify(item, slotWorktree): execute the item's metadata.verify_commands sequentially in the slot worktree via async exec with a per-command timeout; return { passed, results: [{ command, exitCode, tailOutput }] }; an item with no verify_commands returns passed=true with an explicit 'no-verify-commands' marker so the foreman can surface it. (2) mergeSlotBranch(featureWorkspace, slotBranch): require a clean feature-branch worktree, run `git merge --no-ff <slotBranch>` in the issue workspace; on conflict, `git merge --abort` and return { merged: false, conflictFiles }; on success return { merged: true, mergeCommit }. Never auto-resolve — conflict resolution is the foreman's job in its own context. Async exec only. Tests use temp git repos for merge/conflict/abort paths and fake commands for the verify runner (fake timers for timeout tests per the repo testing rule)."
-        },
-        "subItems": [
-          {
-            "id": "b-verify-merge-lib.ac1",
-            "title": "runSlotVerify executes verify_commands in the slot worktree and reports per-command pass/fail with output tails; missing verify_commands yields passed=true with an explicit marker",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-verify-merge-lib.ac2",
-            "title": "mergeSlotBranch merges clean slot branches with --no-ff and aborts cleanly on conflict, returning the conflicting file list with the workspace left clean",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-verify-merge-lib.ac3",
-            "title": "Timeout behavior is tested with fake timers; no execSync; unit tests pass",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "b-slot-cli",
-        "title": "pan slot CLI command group (spawn/merge/status)",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 4,
-          "files_scope": [
-            "src/cli/commands/slot.ts",
-            "src/cli/index.ts",
-            "docs/SKILLS-CONVENTION.md"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npm run typecheck",
-            "node dist/cli/index.js slot --help"
-          ]
-        },
-        "narrative": {
-          "Action": "Create src/cli/commands/slot.ts and register a `pan slot` command group in src/cli/index.ts, giving the foreman deterministic primitives: `pan slot spawn <issue> <item-id> [--model <m>] [--json]` (allocates next slot number, createSlotWorktree + spawnSlotAgent, prints agent id/branch/worktree); `pan slot merge <issue> <n> [--json]` (resolves the item bound to the slot, runSlotVerify in the slot worktree, refuses to merge on red verify with the failing command output, mergeSlotBranch on green, reports conflictFiles on conflict); `pan slot status <issue> [--json]` (lists each slot: number, item id, branch, worktree path, agent state from state.json, verify state if recorded, merged-into-feature-branch yes/no via git ancestry). Slot→item binding persisted in the slot worktree's .pan/ directory at spawn time. Add `pan slot` to the SKILLS-CONVENTION exclusion list (power-user verb documented in docs/SWARM.md and roles/work.md — no wrapper skill)."
-        },
-        "subItems": [
-          {
-            "id": "b-slot-cli.ac1",
-            "title": "pan slot spawn creates the worktree/branch/registered agent and prints (or emits as JSON) agent id, branch, and worktree path",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-slot-cli.ac2",
-            "title": "pan slot merge runs the item's verify_commands first and refuses to merge on failure; on green it merges and reports the merge commit; on conflict it reports conflict files and leaves the workspace clean",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-slot-cli.ac3",
-            "title": "pan slot status reports slot number, item, branch, agent state, and merged/unmerged for every slot of the issue (machine-readable with --json)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-slot-cli.ac4",
-            "title": "pan slot is on the SKILLS-CONVENTION exclusion list and scripts/lint-skills.sh passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "b-foreman-role",
-        "title": "Foreman protocol in roles/work.md",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-11T03:16:56-04:00",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1762",
-          "requiresInspection": false,
-          "phase": 4,
-          "files_scope": [
-            "roles/work.md"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "bash scripts/lint-skills.sh"
-          ]
-        },
-        "narrative": {
-          "Action": "Evolve the 'Parallel work via subagents' section of roles/work.md into the foreman protocol. The work agent, when the plan is swarm-eligible (multiple unblocked items with populated files_scope): (1) compute waves via groupItemsByWave(); (2) within a wave, partition by hasFileOverlap() — non-overlapping items dispatch in parallel, overlapping items serialize; items with missing files_scope or files_scope_confidence: low are treated as overlapping-with-everything (serialize, never refuse); (3) per item choose a dispatch tier: in-context subagent with worktree isolation for cheap/mechanical items (< ~15 min), `pan slot spawn` registered slot agent for heavy items or when durability matters; (4) on slot completion run `pan slot merge` — never merge red; on conflict, resolve in the foreman's own context then merge; (5) at convergence items (metadata.requiresSynthesis), compose an in-context synthesis digest of what the merged parents actually did and inline it into the convergent item's dispatch prompt; (6) failure protocol: one redo with feedback, then serial fallback in the foreman's own context (extends the existing subagent protocol); (7) checkpoint wave progress in .pan/continue.json after each wave; (8) reconciliation-on-resume: a respawned foreman runs `pan slot status`, reconciles statusOverrides + slot branch state + running slot agents, adopts orphans, and continues the correct wave. Cap concurrent heavy slots (default ~3) to avoid bun install/build contention. Keep the existing in-context-only fan-out path for plans without scope metadata."
-        },
-        "subItems": [
-          {
-            "id": "b-foreman-role.ac1",
-            "title": "roles/work.md defines the full foreman loop: waves, overlap partition with the conservative missing/low-confidence rule, two dispatch tiers with selection criteria",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-foreman-role.ac2",
-            "title": "Verify-then-merge is mandatory: the protocol forbids merging a slot whose verify_commands failed, and routes conflicts to foreman-context resolution",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-foreman-role.ac3",
-            "title": "Synthesis digests at requiresSynthesis convergence points are composed in-context and inlined into the convergent item's dispatch prompt",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "b-foreman-role.ac4",
-            "title": "The protocol includes wave checkpointing in continue.json and an explicit reconciliation-on-resume step using pan slot status",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "a3-footprint-lib",
-        "title": "Issue footprint utility (union of declared scopes)",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 5,
           "files_scope": [
-            "src/lib/vbrief/footprint.ts",
-            "tests/unit/lib/vbrief/footprint.test.ts"
+            "src/lib/vbrief/swarm-readiness.ts",
+            "tests/unit/lib/vbrief/swarm-readiness.test.ts"
           ],
           "files_scope_confidence": "high",
           "verify_commands": [
-            "npm run typecheck",
-            "npx vitest run tests/unit/lib/vbrief/footprint.test.ts"
+            "npx vitest run tests/unit/lib/vbrief/swarm-readiness.test.ts"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "A3"
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/vbrief/footprint.ts: issueFootprint(doc: VBriefDocument): string[] returning the deduplicated union of all items' files_scope patterns, plus footprintsOverlap(a: string[], b: string[]): boolean using the same compileGlob cross-matching semantics as dag.ts/readiness-lint (share the helper, don't duplicate). Plus an Effect-friendly loader issueFootprintForIssue(projectRoot, issueId) that resolves the spec on main via findSpecByIssue and returns the footprint (empty array when no spec or no scopes). Unit tests."
+          "Action": "Add computeIssueFootprint(doc): string[] (pure deduped union of all item files_scope) to src/lib/vbrief/swarm-readiness.ts, plus a resolver that loads an issue's spec via findSpecByIssue (src/lib/pan-dir/specs.ts:216) and returns its footprint. This is the cross-issue signal input consumed by predicted-conflicts. Lands in the same module as readiness-analyzer (serialized after it)."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a3-footprint-lib.ac1",
-            "title": "issueFootprint returns the deduplicated scope union; footprintsOverlap matches dag.ts glob semantics; loader returns [] for missing specs",
+            "id": "issue-footprint.ac1",
+            "title": "Given a document with item file scopes, when computeIssueFootprint runs, then it returns the deduped union of all items' files_scope",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a3-footprint-lib.ac2",
-            "title": "Unit tests pass",
+            "id": "issue-footprint.ac2",
+            "title": "Given an issue with no declared scopes, then computeIssueFootprint returns an empty array and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-footprint.ac3",
+            "title": "Given an on-main spec resolvable by findSpecByIssue, when the spec-resolving variant runs, then it returns that issue's footprint",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -746,42 +735,62 @@
         ]
       },
       {
-        "id": "a3-merge-queue-predicted",
-        "title": "Predicted conflicts in merge queue from declared footprints",
+        "id": "predicted-conflicts",
+        "title": "Pre-branch predicted-conflict signal from declared footprints",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
-          "difficulty": "medium",
+          "difficulty": "complex",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 5,
           "files_scope": [
             "src/lib/flywheel-merge-order.ts",
-            "src/dashboard/server/routes/flywheel.ts",
             "tests/unit/lib/flywheel-merge-order.test.ts"
           ],
           "files_scope_confidence": "medium",
           "verify_commands": [
-            "npm run typecheck",
             "npx vitest run tests/unit/lib/flywheel-merge-order.test.ts"
+          ],
+          "expected_outputs": [
+            "flywheel-merge-order.test.ts covers declared-footprint contribution and passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "A3"
           ]
         },
         "narrative": {
-          "Action": "Extend computeMergeQueue (src/lib/flywheel-merge-order.ts): for each queue item, load the declared footprint (issueFootprintForIssue); compute pairwise predicted overlap on declared footprints (hotspots excluded) and expose it as predictedConflictsWith: string[] on MergeQueueItem, distinct from the existing actual conflictsWith (from changedFilesVsMain). Convergence rule: when a branch exists with real commits, actual conflict data is authoritative — predicted is supplementary display data and must not change batchGroup partitioning. Surface predictedConflictsWith in the /api/flywheel/merge-queue response. Unit tests cover predicted-vs-actual distinction and the no-footprint case (empty predictions, identical behavior to today)."
+          "Action": "Extend the pairwise file-set conflict math in src/lib/flywheel-merge-order.ts (the conflict map at :197-214; planMergeTrain :66) so that issues WITHOUT a branch yet contribute their DECLARED footprint (computeIssueFootprint) to the pairwise predicted-conflict computation, converging to actual changedFilesVsMain (:107) once a branch exists. Exclude hotspot files. Surface the predicted-conflict counts on the merge-queue/backlog surface the flywheel consults — this IS the launch-ordering soft signal (soft preference, never a gate)."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a3-merge-queue-predicted.ac1",
-            "title": "MergeQueueItem carries predictedConflictsWith computed from declared footprints with hotspots excluded, separate from actual conflictsWith",
+            "id": "predicted-conflicts.ac1",
+            "title": "Given two not-yet-branched issues with overlapping declared footprints, when the conflict math runs, then their predicted-conflict count is non-zero",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a3-merge-queue-predicted.ac2",
-            "title": "Actual conflict data remains authoritative for batch/serialize partitioning; issues without footprints behave exactly as today; tests pass",
+            "id": "predicted-conflicts.ac2",
+            "title": "Given an issue that now has a branch, then its actual changedFilesVsMain set replaces its declared footprint in the computation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "predicted-conflicts.ac3",
+            "title": "Given configured hotspot files, then they are excluded from the predicted-conflict computation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "predicted-conflicts.ac4",
+            "title": "Then the predicted-conflict signal is advisory only — it changes ordering and never blocks a launch or a merge",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -790,40 +799,147 @@
         ]
       },
       {
-        "id": "a3-flywheel-ordering-signal",
-        "title": "Footprint overlap signal for flywheel launch ordering",
+        "id": "slot-spawn-tier",
+        "title": "Rebuild per-item registered slot spawning on spawnRun",
         "status": "pending",
-        "priority": "low",
-        "created": "2026-06-11T03:16:56-04:00",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1762",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "verify-then-merge",
+            "foreman-reconcile",
+            "foreman-protocol-doc",
+            "foreman-e2e"
+          ],
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/spawn-prep.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents"
+          ],
+          "expected_outputs": [
+            "spawnRun accepts slot options and registers agent-<issue>-<n>",
+            "default one-work-agent path unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "B2",
+            "7.3",
+            "7.5"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-add per-item registered slot spawning to spawnRun (src/lib/agents/spawn.ts:72), reversing the PAN-1517 removal (spawn-prep.ts:83-84; 'one work agent per issue, period' spawn.ts:365). Re-introduce OPTIONAL SpawnRunOptions slot fields (slotIndex, slotItemId); create a per-item worktree on branch feature/<issue>/slot-<n>; register the agent as agent-<issue>-<n> with its own state file (existing dashboard resource-discovery already nests it under the issue — no new UI). Respect a configurable cap on concurrent registered slots (hazard H3). Teardown compat already exists (kill.ts:49). Keep the existing single-work-agent path the DEFAULT — slot spawning is opt-in via the new options."
+        },
+        "items": [
+          {
+            "id": "slot-spawn-tier.ac1",
+            "title": "Given slot options (slotIndex, slotItemId), when spawnRun runs, then it creates a worktree on feature/<issue>/slot-<n> and registers an agent named agent-<issue>-<n> with its own state file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-spawn-tier.ac2",
+            "title": "Given no slot options, when spawnRun runs, then it preserves the current one-work-agent-per-issue behavior unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-spawn-tier.ac3",
+            "title": "Then resource-discovery surfaces agent-<issue>-<n> nested under its issue (no new dialog) and cost is attributed to that agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-spawn-tier.ac4",
+            "title": "Given a configured maximum number of concurrent registered slots, when more slots are requested, then spawns beyond the cap wait or are refused (the cap is respected)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-spawn-tier.ac5",
+            "title": "When pan kill <issue> runs, then it tears down slot agents and their worktrees via the existing agent-<issue>-<n> recognition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-tier-decision",
+        "title": "Pure dispatch-tier decision (the PAN-1791 tier-table seam)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 5,
           "files_scope": [
-            "docs/flywheel-brief.md",
-            "src/cli/commands/flywheel.ts"
+            "src/lib/agents/dispatch-tier.ts",
+            "tests/unit/lib/agents/dispatch-tier.test.ts"
           ],
-          "files_scope_confidence": "medium",
+          "files_scope_confidence": "high",
           "verify_commands": [
-            "npm run typecheck"
+            "npx vitest run tests/unit/lib/agents/dispatch-tier.test.ts"
+          ],
+          "expected_outputs": [
+            "chooseDispatchTier exported",
+            "dispatch-tier.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "B2",
+            "10.2"
           ]
         },
         "narrative": {
-          "Action": "Flywheel launch ordering is LLM-driven (the orchestrator reads docs/flywheel-brief.md and run state; there is no coded scoring function). Deliver the soft signal where the orchestrator already looks: (1) render predictedConflictsWith in the flywheel merge-queue CLI/status output the orchestrator consumes (src/cli/commands/flywheel.ts or the status payload it reads); (2) add launch-ordering guidance to docs/flywheel-brief.md: prefer not co-starting issues whose predicted footprints heavily overlap; treat it as a soft preference, never a gate. Keep the diff minimal — this bead is data plumbing plus one brief paragraph."
+          "Action": "Create a pure chooseDispatchTier(item): 'in-context' | 'registered-slot' in a dedicated module src/lib/agents/dispatch-tier.ts, deciding ONLY from item metadata (difficulty, files_scope, readiness, files_scope_confidence): cheap/mechanical + high-confidence → in-context; heavy (complex|expert) or anything to distribute → registered-slot; complex|expert default to foreman-serialized unless explicitly parallel-safe with a stated reason (§10.2). It MUST be a pure function of metadata so PAN-1791's per-difficulty tier table can drive it WITHOUT a second dispatcher. No PAN-1791-specific (or any issue-id-specific) branches."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "a3-flywheel-ordering-signal.ac1",
-            "title": "The flywheel-facing merge-queue/status output includes predicted-conflict hints for in-flight and queued issues",
+            "id": "foreman-tier-decision.ac1",
+            "title": "Given a low-difficulty, high-confidence, non-distributed item, when chooseDispatchTier runs, then it returns 'in-context'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "a3-flywheel-ordering-signal.ac2",
-            "title": "docs/flywheel-brief.md instructs the orchestrator to avoid co-starting heavily-overlapping issues as a soft preference",
+            "id": "foreman-tier-decision.ac2",
+            "title": "Given a complex or expert item, when chooseDispatchTier runs, then it returns 'registered-slot'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-tier-decision.ac3",
+            "title": "Given identical item metadata, then chooseDispatchTier returns the identical tier every time (pure — no I/O, no global state)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-tier-decision.ac4",
+            "title": "Then no code path special-cases a specific issue id; grep over the module confirms the decision reads only difficulty/files_scope/readiness metadata",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -832,40 +948,243 @@
         ]
       },
       {
-        "id": "docs-swarm-v2",
-        "title": "Rewrite docs/SWARM.md for swarm v2",
+        "id": "verify-then-merge",
+        "title": "Per-slot verify-then-merge into the feature branch",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T03:16:56-04:00",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
         "metadata": {
-          "difficulty": "medium",
+          "difficulty": "complex",
           "issueLabel": "pan-1762",
           "requiresInspection": false,
-          "phase": 4,
           "files_scope": [
-            "docs/SWARM.md",
-            "skills/pan-swarm/SKILL.md"
+            "src/lib/agents/slot-merge.ts",
+            "tests/unit/lib/agents/slot-merge.test.ts"
           ],
           "files_scope_confidence": "medium",
           "verify_commands": [
-            "bash scripts/lint-skills.sh"
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/slot-merge.test.ts"
+          ],
+          "expected_outputs": [
+            "verifyAndMergeSlot refuses merge on red verify_commands",
+            "clean merge into feature branch on green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "B3",
+            "10.4"
           ]
         },
         "narrative": {
-          "Action": "Rewrite docs/SWARM.md to describe the v2 model: the planning contract (tracer-bullet slicing, files_scope/confidence/verify_commands), readiness lint + hotspots, the foreman protocol with two dispatch tiers, flat slot branch naming and why (ref collision), pan slot CLI, verify-then-merge, scope-drift loop, cross-issue signals, and explicit non-goals (no server runtime, no per-slot PRs, no overlap refusal). Add a history section pointing at the deleted v1 runtime (PAN-1517, recoverable at 59f1e6cd4~1) and mark old dispatch diagrams as historical. Update skills/pan-swarm/SKILL.md — it currently describes the deleted `pan swarm` command — to redirect to the v2 docs and the foreman model (or the pan slot primitives); scripts/lint-skills.sh must pass."
+          "Action": "Create verifyAndMergeSlot(issue, slotIndex, item) in src/lib/agents/slot-merge.ts that, in the slot worktree: (1) runs the item's verify_commands and asserts its expected_outputs are present; (2) ONLY on green, merges feature/<issue>/slot-<n> into the feature branch with a clean (or foreman-resolved) 3-way merge; (3) returns a terse structured result (verified, merged, conflicts, evidence). On red it does NOT merge and returns the failure for the foreman's redo-then-serial protocol. This fixes the old swarm's biggest gap (slots merged with zero gates) and keeps the feature branch continuously green. Use async exec/spawn — never execSync."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "docs-swarm-v2.ac1",
-            "title": "docs/SWARM.md describes the v2 contract, foreman protocol, slot CLI, and non-goals, with the v1 history pointer; no instructions reference deleted machinery as current",
+            "id": "verify-then-merge.ac1",
+            "title": "Given an item whose verify_commands fail in the slot worktree, when verifyAndMergeSlot runs, then it does not merge the slot branch and returns a failure result",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "docs-swarm-v2.ac2",
-            "title": "skills/pan-swarm/SKILL.md no longer documents the deleted pan swarm command as live; scripts/lint-skills.sh passes",
+            "id": "verify-then-merge.ac2",
+            "title": "Given green verify_commands and present expected_outputs, when verifyAndMergeSlot runs, then it merges the slot branch into the feature branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-then-merge.ac3",
+            "title": "Given a non-overlapping slot branch, then a clean 3-way merge succeeds; given a conflicting slot branch, then the conflict is surfaced (not force-applied) for foreman resolution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-then-merge.ac4",
+            "title": "Given a successful slot merge, then the feature branch contains the slot's committed changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-reconcile",
+        "title": "Reconcile slot state so a respawned foreman resumes mid-swarm",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/agents/slot-reconcile.ts",
+            "tests/unit/lib/agents/slot-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/slot-reconcile.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "7.2",
+            "B1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create a reconcile helper in src/lib/agents/slot-reconcile.ts that the foreman calls on (re)start: enumerate existing slot branches (feature/<issue>/slot-*) and registered slot agents (agent-<issue>-<n>), cross-reference the spec's statusOverrides, and return the wave state (which items are merged / in-flight / pending) so a respawned foreman resumes the correct wave instead of restarting the swarm (hazard H2)."
+        },
+        "items": [
+          {
+            "id": "foreman-reconcile.ac1",
+            "title": "Given existing feature/<issue>/slot-* branches and statusOverrides, when reconcile runs, then it returns which items are already merged, in-flight, or pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-reconcile.ac2",
+            "title": "Given a slot branch already contained in the feature branch, then reconcile reports that item complete and it is not re-dispatched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-reconcile.ac3",
+            "title": "Given no slot branches present, then reconcile returns a clean initial state (nothing in flight)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-protocol-doc",
+        "title": "Foreman wave-driver protocol in roles/work.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "traces": [
+            "B1",
+            "B3",
+            "10.5"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace/extend the 'Parallel work via subagents' section of roles/work.md (:70) with the foreman protocol: (1) read the DAG and compute waves (groupItemsByWave); (2) consult analyzeSwarmReadiness for swarmability + intra-wave serialization (overlap orders, never blocks); (3) per item, chooseDispatchTier → in-context subagent OR registered slot (slot-spawn-tier); (4) on item completion, verifyAndMergeSlot before the slot merges into the feature branch; (5) at DAG convergence points (item with >1 blocking parents), compose an in-context synthesis digest from the merged parents' expected_outputs and inline it into the convergent item's dispatch prompt (no SynthesisOutput state); (6) failure handling: one redo with feedback, then serial fallback in the foreman's own context; (7) on (re)start, run the reconcile helper to resume mid-swarm. Keep the existing serial per-bead workflow as the DEFAULT; the foreman path is for swarm-eligible plans."
+        },
+        "items": [
+          {
+            "id": "foreman-protocol-doc.ac1",
+            "title": "Then roles/work.md documents the foreman wave loop: waves via groupItemsByWave, swarmability/serialization via analyzeSwarmReadiness, and per-item tier via chooseDispatchTier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-protocol-doc.ac2",
+            "title": "Then roles/work.md instructs the foreman to verify-then-merge each slot (verify_commands green + expected_outputs present) before it merges into the feature branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-protocol-doc.ac3",
+            "title": "Then roles/work.md specifies composing an in-context synthesis digest from merged parents' expected_outputs at convergence points, with no resurrected runtime state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-protocol-doc.ac4",
+            "title": "Then roles/work.md specifies the failure protocol (one redo with feedback, then serial fallback) and the reconcile-on-restart step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-e2e",
+        "title": "End-to-end: foreman dispatches a real multi-item plan (dogfood)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T14:32:05.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1762",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/integration/foreman-swarm.test.ts"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npx vitest run tests/integration/foreman-swarm.test.ts"
+          ],
+          "expected_outputs": [
+            "foreman-swarm.test.ts exercises dispatch+verify+merge of a multi-item plan and passes",
+            "no PAN-1791-specific dispatch branch present"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "8",
+            "operator-ask-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an end-to-end test/dogfood (tests/integration/foreman-swarm.test.ts, taggable @slow if it spawns real registered agents) exercising the full foreman path on a REAL multi-item plan whose items pass the readiness lint as swarm-eligible (independent vertical slices with declared files_scope + verify_commands). Candidate plan: PAN-1791's buildable WI-1 (tier-table config) + WI-2 (plan-time scheduler/relevance-map) slice IF swarmable at the time; otherwise a representative synthetic multi-item plan. Operator ask #1. The dispatch path MUST contain no PAN-1791-specific code — swarmability is a plan property certified by the readiness analyzer."
+        },
+        "items": [
+          {
+            "id": "foreman-e2e.ac1",
+            "title": "Given a multi-item plan the readiness analyzer certifies swarm-eligible, when the foreman runs, then it dispatches the non-overlapping wave as registered slot agents, each in its own worktree on feature/<issue>/slot-<n>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-e2e.ac2",
+            "title": "Given each dispatched slot, when it completes, then it merges into the feature branch only on green verify_commands, and the final feature branch contains all items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-e2e.ac3",
+            "title": "Then the end-to-end path selects dispatch tiers purely from item metadata — a grep over the dispatch path confirms no issue-id special-casing for PAN-1791",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-e2e.ac4",
+            "title": "Then resource-discovery reports the dispatched slot agents nested under the issue during the run",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -876,84 +1195,141 @@
     ],
     "edges": [
       {
-        "from": "a1-skills-contract",
-        "to": "a2-finalize-wiring",
+        "from": "schema-fields",
+        "to": "planning-prompt-contract",
         "type": "blocks"
       },
       {
-        "from": "a2-hotspot-config",
-        "to": "a2-finalize-wiring",
+        "from": "schema-fields",
+        "to": "write-vbrief-skill",
         "type": "blocks"
       },
       {
-        "from": "a2-readiness-lint-lib",
-        "to": "a2-finalize-wiring",
+        "from": "schema-fields",
+        "to": "readiness-analyzer",
         "type": "blocks"
       },
       {
-        "from": "a2-hotspot-config",
-        "to": "a4-done-recording",
+        "from": "schema-fields",
+        "to": "lint-item-checks",
         "type": "blocks"
       },
       {
-        "from": "a4-scope-drift-lib",
-        "to": "a4-done-recording",
+        "from": "schema-fields",
+        "to": "slot-spawn-tier",
         "type": "blocks"
       },
       {
-        "from": "a4-done-recording",
-        "to": "a4-review-surface",
+        "from": "schema-fields",
+        "to": "scope-drift-record",
         "type": "blocks"
       },
       {
-        "from": "b-slot-spawn-lib",
-        "to": "b-slot-cli",
+        "from": "readiness-analyzer",
+        "to": "hotspot-config",
         "type": "blocks"
       },
       {
-        "from": "b-verify-merge-lib",
-        "to": "b-slot-cli",
+        "from": "readiness-analyzer",
+        "to": "lint-overlap-audit",
         "type": "blocks"
       },
       {
-        "from": "b-slot-cli",
-        "to": "b-foreman-role",
+        "from": "readiness-analyzer",
+        "to": "readiness-report-cli",
         "type": "blocks"
       },
       {
-        "from": "a1-roles-plan-slicing",
-        "to": "b-foreman-role",
-        "type": "informs"
-      },
-      {
-        "from": "a2-finalize-wiring",
-        "to": "b-foreman-role",
-        "type": "informs"
-      },
-      {
-        "from": "a3-footprint-lib",
-        "to": "a3-merge-queue-predicted",
+        "from": "readiness-analyzer",
+        "to": "readiness-report-ui",
         "type": "blocks"
       },
       {
-        "from": "a3-merge-queue-predicted",
-        "to": "a3-flywheel-ordering-signal",
+        "from": "readiness-analyzer",
+        "to": "issue-footprint",
         "type": "blocks"
       },
       {
-        "from": "b-foreman-role",
-        "to": "docs-swarm-v2",
+        "from": "readiness-analyzer",
+        "to": "foreman-tier-decision",
         "type": "blocks"
       },
       {
-        "from": "a2-finalize-wiring",
-        "to": "docs-swarm-v2",
-        "type": "informs"
+        "from": "hotspot-config",
+        "to": "lint-overlap-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "hotspot-config",
+        "to": "predicted-conflicts",
+        "type": "blocks"
+      },
+      {
+        "from": "lint-item-checks",
+        "to": "lint-overlap-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-footprint",
+        "to": "predicted-conflicts",
+        "type": "blocks"
+      },
+      {
+        "from": "slot-spawn-tier",
+        "to": "verify-then-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "slot-spawn-tier",
+        "to": "foreman-reconcile",
+        "type": "blocks"
+      },
+      {
+        "from": "readiness-analyzer",
+        "to": "foreman-protocol-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "slot-spawn-tier",
+        "to": "foreman-protocol-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-tier-decision",
+        "to": "foreman-protocol-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-then-merge",
+        "to": "foreman-protocol-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-reconcile",
+        "to": "foreman-protocol-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-protocol-doc",
+        "to": "foreman-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-then-merge",
+        "to": "foreman-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "slot-spawn-tier",
+        "to": "foreman-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "lint-overlap-audit",
+        "to": "foreman-e2e",
+        "type": "blocks"
       }
-    ],
-    "metadata": {
-      "canonicalFilename": "2026-06-11-PAN-1762-swarm-v2-tracer-bullet-planning-contract-path-a-foreman-driven-intra-issue-swarms-path-b.vbrief.json"
-    }
+    ]
   },
   "status": "proposed"
 }
