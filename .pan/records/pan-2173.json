@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2173",
   "schemaVersion": 2,
-  "created": "2026-06-29T19:19:31.903Z",
-  "updated": "2026-06-29T19:19:40.339Z",
-  "pipeline": {
-    "issueId": "PAN-2173",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T19:19:31.903Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,61 @@
       "note": "Planning session started for PAN-2173: bug(flywheel): under-plans new ready+released backlog while busy draining a cohort",
       "timestamp": "2026-06-29T19:19:40.339Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-29T19:19:31.903Z",
+  "updated": "2026-06-30T01:09:25.266Z",
+  "pipeline": {
+    "issueId": "PAN-2173",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-30T01:09:25.247Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 24376,
+            "output": 5164,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 34493,
+            "output": 86977,
+            "cacheRead": 7952537,
+            "cacheWrite": 354188
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 24376,
+          "output": 5164,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 34493,
+          "output": 86977,
+          "cacheRead": 7952537,
+          "cacheWrite": 354188
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 8.536835,
+        "pricingAsOf": "2026-06-30T01:09:25.265Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
