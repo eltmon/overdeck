@@ -42,7 +42,13 @@ function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'dr
           title: 'Promote the spec',
           status: 'pending',
           narrative: { Action: 'Promote the finalized workspace spec into the project specs directory' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.pan/specs/*.vbrief.json'],
+            files_scope_confidence: 'high',
+            readiness: 'sequential',
+            verify_commands: ['npm test -- src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts'],
+          },
           subItems: [
             {
               id: 'item-1.ac1',
@@ -63,7 +69,13 @@ function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'dr
           title: 'Start the work agent',
           status: 'pending',
           narrative: { Action: 'Start the work agent only when auto-start policy allows it' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['src/lib/agents.ts'],
+            files_scope_confidence: 'high',
+            readiness: 'sequential',
+            verify_commands: ['npm test -- src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts'],
+          },
           subItems: [
             {
               id: 'item-2.ac1',

@@ -1050,7 +1050,7 @@ Be specific: reference actual file names, function names, requirement text, disc
 
   const apiSettings = loadSettingsApi();
   const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
-    || 'claude-sonnet-4-6';
+    || 'claude-sonnet-5';
   const { command: cliCmd, args: cliArgs } = getAgentCommandSync(statusModelId);
   const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
   const promptFile = join(planningDir, '.status-review-prompt.tmp');

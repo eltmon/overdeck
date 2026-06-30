@@ -85,6 +85,8 @@ Same as creation but the prior sequence.md is available for reference. Re-read a
 - `medium` importance: P2, or self-contained features of clear value.
 - `low` importance: tech debt, cleanup, cosmetic, speculative.
 
+**Substrate-hardening first.** An issue labeled `substrate-improvement`, `architecture`, or `v1.0-required` is at least `high` importance (`critical` if it unblocks the pipeline or other substrate work) and ranks ahead of routine feature work of equal impact — a stable substrate is the prerequisite for everything else (`vision.mdx`). When a substrate epic ranks high, lift its CHILDREN's ranks together; the children are what get picked. (This is the label-driven floor; do not rank such an issue `low` merely because it reads as cleanup.)
+
 Size and score are independent of importance. Score (0–100) is your confidence-weighted impact estimate.
 
 **Never re-rank in-pipeline issues.** An issue is in-pipeline when its `inPipeline` flag is true. Pin it at rank 1 (or its prior rank if it had one) and mark its `gate` as `ready` unless the operator set it otherwise.

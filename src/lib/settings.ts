@@ -4,7 +4,7 @@ import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-05-23)
   | 'gpt-5.5'
@@ -78,8 +78,8 @@ const DEFAULT_SETTINGS: SettingsConfig = {
   models: {
     specialists: {
       review_agent: 'claude-opus-4-6',
-      test_agent: 'claude-sonnet-4-6',
-      merge_agent: 'claude-sonnet-4-6',
+      test_agent: 'claude-sonnet-5',
+      merge_agent: 'claude-sonnet-5',
     },
     status_review: 'claude-opus-4-6',
     complexity: {
@@ -245,6 +245,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-opus-4-6',
+    'claude-sonnet-5',
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
   ];
@@ -314,6 +315,7 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
     'claude-opus-4-6': 'opus',
+    'claude-sonnet-5': 'sonnet',
     'claude-sonnet-4-6': 'sonnet',
     'claude-sonnet-4-5': 'sonnet',
     'claude-haiku-4-5': 'haiku',

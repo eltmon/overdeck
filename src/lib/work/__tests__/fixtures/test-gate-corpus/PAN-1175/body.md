@@ -30,7 +30,7 @@ async function resolveParentFeatureBranch(
   const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd: projectPath });
   const currentBranch = stdout.trim();
   // ...
-  if (!currentBranch.startsWith('feature/') || currentBranch.includes('/slot-')) {
+  if (!currentBranch.startsWith('feature/') || /-slot-\d+$/.test(currentBranch)) {
     throw new Error(\`Cannot dispatch swarm from non-feature parent branch \${currentBranch}\`);
   }
   // ...

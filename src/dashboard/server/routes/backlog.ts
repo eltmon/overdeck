@@ -23,6 +23,7 @@ import {
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
+import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
 import {
@@ -336,15 +337,19 @@ const getBacklogForecastRoute = HttpRouter.add(
           .filter((x) => x.state.inPipeline)
           .sort((a, b) => a.rank - b.rank)
           .map(enrich);
+        // PAN-2059 + vision.mdx: when auto-pickup is ON the toggle blanket-releases the
+        // backlog, so the forecast's pickable/waves/lanes/cohort must reflect that too —
+        // keeping the dashboard view and the Flywheel's pick decision in lockstep (PAN-2006).
+        const autoPickup = isFlywheelAutoPickupBacklog();
         const needsPlanning = selectNeedsPlanning(nodes, lk, { cap: n * 2 }).map(enrich);
-        const waves = computeWaves(nodes, lk, n).map((w) => w.map(enrich));
-        const lanesRaw = computeLanes(nodes, lk, n);
+        const waves = computeWaves(nodes, lk, n, autoPickup).map((w) => w.map(enrich));
+        const lanesRaw = computeLanes(nodes, lk, n, autoPickup);
         const lanes = {
           makespan: lanesRaw.makespan,
           blocks: lanesRaw.blocks.map((b: LaneBlock) => ({ ...enrich(b), lane: b.lane, start: b.start, end: b.end })),
         };
-        const cohort = computeCohort(nodes, lk, n);
-        const stats = computeStats(nodes, lk);
+        const cohort = computeCohort(nodes, lk, n, autoPickup);
+        const stats = computeStats(nodes, lk, autoPickup);
         const groups = computeEpicGroups(nodes, parsed.doc.edges, lk);
         const epics = groups.epics.map((e) => ({
           issue: e.issue,

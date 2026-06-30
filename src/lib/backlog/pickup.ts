@@ -99,12 +99,17 @@ export function classifyIssue(node: SequenceNode, lk: ClassifyLookups): Pipeline
  * Routine auto-pickup for WORK: Ready AND Planned AND Released AND not
  * parked/vetoed/objected/in-flight. The DoR `ready` is the entry gate; `released`
  * (PAN-2059) is the operator's explicit "go" after reviewing the plan — a Planned
- * item is NOT pickable until released. An open `objection` halts pickup until the
- * operator overrides or parks. An `epic` is a container, never directly workable —
- * its children carry the work, so it is excluded regardless of the other gates.
+ * item is NOT pickable until released, UNLESS auto_pickup_backlog is ON, which
+ * blanket-releases the whole backlog (vision.mdx). An open `objection` halts pickup
+ * until the operator overrides or parks. An `epic` is a container, never directly
+ * workable — its children carry the work, so it is excluded regardless of other gates.
  */
-export function isAutoPickable(s: PipelineState): boolean {
-  return s.ready && s.planned && s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline && !s.epic;
+export function isAutoPickable(s: PipelineState, autoPickupBacklog = false): boolean {
+  // Blanket release: when the operator flips auto-pickup ON the toggle satisfies the
+  // per-issue `released` gate for the entire backlog; when OFF, each item needs its own
+  // `released` label. vetoed / parked / objection / in-pipeline / epic gate in both modes.
+  const released = s.released || autoPickupBacklog;
+  return s.ready && s.planned && released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline && !s.epic;
 }
 
 /**
@@ -140,16 +145,16 @@ export interface ForecastNode {
 }
 
 /** The auto-pickable queue, in pickup order (promoted first, then rank). */
-export function pickableQueue(nodes: readonly SequenceNode[], lk: ClassifyLookups): ForecastNode[] {
+export function pickableQueue(nodes: readonly SequenceNode[], lk: ClassifyLookups, autoPickupBacklog = false): ForecastNode[] {
   return nodes
     .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
-    .filter((n) => isAutoPickable(n.state))
+    .filter((n) => isAutoPickable(n.state, autoPickupBacklog))
     .sort((a, b) => pickOrder({ gate: a.state.gate, rank: a.rank }, { gate: b.state.gate, rank: b.rank }));
 }
 
 /** Batch the pickup queue into waves of up to `n`. */
-export function computeWaves(nodes: readonly SequenceNode[], lk: ClassifyLookups, n: number): ForecastNode[][] {
-  const q = pickableQueue(nodes, lk);
+export function computeWaves(nodes: readonly SequenceNode[], lk: ClassifyLookups, n: number, autoPickupBacklog = false): ForecastNode[][] {
+  const q = pickableQueue(nodes, lk, autoPickupBacklog);
   const size = Math.max(1, n);
   const waves: ForecastNode[][] = [];
   for (let i = 0; i < q.length; i += size) waves.push(q.slice(i, i + size));
@@ -167,11 +172,12 @@ export function computeLanes(
   nodes: readonly SequenceNode[],
   lk: ClassifyLookups,
   n: number,
+  autoPickupBacklog = false,
 ): { blocks: LaneBlock[]; makespan: number } {
   const lanes = Math.max(1, n);
   const free = new Array<number>(lanes).fill(0);
   const blocks: LaneBlock[] = [];
-  for (const item of pickableQueue(nodes, lk)) {
+  for (const item of pickableQueue(nodes, lk, autoPickupBacklog)) {
     let li = 0;
     for (let i = 1; i < lanes; i++) if (free[i]! < free[li]!) li = i;
     const start = free[li]!;
@@ -187,12 +193,12 @@ export function computeLanes(
  * ∪ the auto-pickable issues in the current + next wave (top `2 × n` by pickup order).
  * Returns the issue ids; the Run completes when all of them reach a terminal state.
  */
-export function computeCohort(nodes: readonly SequenceNode[], lk: ClassifyLookups, n: number): string[] {
+export function computeCohort(nodes: readonly SequenceNode[], lk: ClassifyLookups, n: number, autoPickupBacklog = false): string[] {
   const ids = new Set<string>();
   for (const node of nodes) {
     if (classifyIssue(node, lk).inPipeline) ids.add(node.issue);
   }
-  for (const item of pickableQueue(nodes, lk).slice(0, Math.max(1, n) * 2)) {
+  for (const item of pickableQueue(nodes, lk, autoPickupBacklog).slice(0, Math.max(1, n) * 2)) {
     ids.add(item.issue);
   }
   return [...ids];
@@ -229,7 +235,10 @@ export function selectNeedsPlanning(
   const cap = Math.max(1, opts.cap ?? 2);
   return nodes
     .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
-    .filter((n) => n.state.ready && !n.state.planned && !n.state.parked && !n.state.vetoed && !n.state.objection && !n.state.inPipeline)
+    .filter((n) => {
+      const s = n.state;
+      return s.ready && !s.planned && !s.parked && !s.vetoed && !s.objection && !s.inPipeline;
+    })
     .sort((a, b) => a.rank - b.rank)
     .slice(0, cap);
 }
@@ -250,7 +259,7 @@ export interface ForecastStats {
 }
 
 /** Aggregate counts for the forecast header / filter bar. */
-export function computeStats(nodes: readonly SequenceNode[], lk: ClassifyLookups): ForecastStats {
+export function computeStats(nodes: readonly SequenceNode[], lk: ClassifyLookups, autoPickupBacklog = false): ForecastStats {
   const stats: ForecastStats = {
     total: nodes.length, inFlight: 0, ready: 0, planned: 0, released: 0, objection: 0,
     pickable: 0, needsPlanning: 0, needsRelease: 0, parked: 0, vetoed: 0, blocksMain: 0,
@@ -265,7 +274,7 @@ export function computeStats(nodes: readonly SequenceNode[], lk: ClassifyLookups
     if (s.parked) stats.parked++;
     if (s.vetoed) stats.vetoed++;
     if (s.blocksMain) stats.blocksMain++;
-    if (isAutoPickable(s)) stats.pickable++;
+    if (isAutoPickable(s, autoPickupBacklog)) stats.pickable++;
     // "needs planning" = wants to run (ready, not parked/vetoed/objected/in-flight) but no spec yet
     if (s.ready && !s.planned && !s.parked && !s.vetoed && !s.objection && !s.inPipeline) stats.needsPlanning++;
     // "needs release" = planned + ready but the operator hasn't released it yet (PAN-2059)

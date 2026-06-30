@@ -62,6 +62,7 @@ export const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6 },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15 },
       { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45 },
       { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', costPer1MTokens: 1 },
@@ -412,7 +413,7 @@ function pickModelForHarness(
   const allowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
 
   // Hardcoded preferences match HARNESS_DEFAULT_MODEL in the chat picker.
-  const preferred = newHarness === 'ohmypi' ? 'gpt-5.5' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-4-6';
+  const preferred = newHarness === 'ohmypi' ? 'gpt-5.5' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-5';
   if (allModels.some((m) => m.id === preferred) && allowed(preferred)) return preferred;
 
   const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;

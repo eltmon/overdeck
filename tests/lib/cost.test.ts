@@ -36,6 +36,16 @@ describe('cost module', () => {
       expect(pricing?.cacheWrite1hPer1k).toBe(0.006);
     });
 
+    it('should have correct introductory pricing for claude-sonnet-5', () => {
+      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-sonnet-5');
+      expect(pricing).toBeDefined();
+      expect(pricing?.inputPer1k).toBe(0.002);
+      expect(pricing?.outputPer1k).toBe(0.010);
+      expect(pricing?.cacheReadPer1k).toBe(0.0002);
+      expect(pricing?.cacheWrite5mPer1k).toBe(0.0025);
+      expect(pricing?.cacheWrite1hPer1k).toBe(0.004);
+    });
+
     it('should have correct pricing for claude-haiku-4-5', () => {
       const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-haiku-4-5');
       expect(pricing).toBeDefined();
@@ -226,7 +236,7 @@ describe('cost module', () => {
       currency: 'USD',
     };
 
-    const sonnet45Pricing: ModelPricing = {
+    const sonnet46Pricing: ModelPricing = {
       provider: 'anthropic',
       model: 'claude-sonnet-4-6',
       inputPer1k: 0.003,
@@ -255,13 +265,13 @@ describe('cost module', () => {
       expect(cost).toBe(1.725);
     });
 
-    it('should apply long-context pricing for >200K tokens (sonnet-4.5)', () => {
+    it('should NOT apply long-context pricing for >200K tokens (sonnet-4.6)', () => {
       const usage: TokenUsage = {
         inputTokens: 250000,
         outputTokens: 10000,
       };
-      const cost = calculateCostSync(usage, sonnet45Pricing);
-      expect(cost).toBe(1.725);
+      const cost = calculateCostSync(usage, sonnet46Pricing);
+      expect(cost).toBe(0.9);
     });
 
     it('should include cache tokens in 200K threshold calculation', () => {
@@ -417,6 +427,12 @@ describe('cost module', () => {
       const result = normalizeModelName('claude-opus-4.1-20250101');
       expect(result.provider).toBe('anthropic');
       expect(result.model).toBe('claude-opus-4-1');
+    });
+
+    it('should normalize sonnet-5 to claude-sonnet-5', () => {
+      const result = normalizeModelName('claude-sonnet-5-20260630');
+      expect(result.provider).toBe('anthropic');
+      expect(result.model).toBe('claude-sonnet-5');
     });
 
     it('should normalize opus-4-1 to claude-opus-4-1', () => {

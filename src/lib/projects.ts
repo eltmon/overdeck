@@ -93,6 +93,11 @@ export interface SpecialistConfig {
   };
 }
 
+export interface SwarmConfig {
+  /** File paths/globs that are intentionally high-churn and ignored for overlap scheduling. */
+  hotspots?: string[];
+}
+
 /**
  * Project configuration
  */
@@ -131,6 +136,8 @@ export interface ProjectConfig {
   specialists?: SpecialistConfig;
   /** Per-project auto-resume failure tracking and backoff overrides */
   autoResume?: Partial<AutoResumeConfig>;
+  /** Per-project foreman/swarm settings. */
+  swarm?: SwarmConfig;
   /**
    * PAN-1695: per-project auto-merge default for issues with no explicit
    * per-issue setting. 'auto' = auto-merge when ready, 'hold' = hold for UAT.
@@ -169,6 +176,12 @@ export interface ProjectConfig {
 /** Resolve the issue prefix for a project. */
 export function getIssuePrefix(config: ProjectConfig): string | undefined {
   return config.issue_prefix;
+}
+
+export function getProjectSwarmHotspots(project: ProjectConfig | null | undefined): string[] {
+  return Array.isArray(project?.swarm?.hotspots)
+    ? project.swarm.hotspots.filter((hotspot): hotspot is string => typeof hotspot === 'string' && hotspot.length > 0)
+    : [];
 }
 
 /**

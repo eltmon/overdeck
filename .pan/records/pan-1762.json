@@ -1,0 +1,326 @@
+{
+  "issueId": "PAN-1762",
+  "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Slot branches use flat sibling naming feature/<issue>-slot-<n> (worktree workspaces/feature-<issue>-slot-<n>), NOT the PRD's hierarchical feature/<issue>/slot-<n>. Git ref files make feature/pan-X/slot-1 impossible while feature/pan-X exists as a branch. The deleted runtime already solved this identically (swarm.ts:521 and createSlotWorktree at `git show 59f1e6cd4~1:src/dashboard/server/routes/swarm.ts` ~line 2070); port that logic, including idempotent worktree reuse and the beads contributor redirect.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Phase 6 (B5 remote slots on Fly) is re-scoped to a follow-up issue, per the PRD's own 'Out of scope for v1' marker in §4 B5 and the re-scope permission in §5. Phases 1-5 all ship in this issue — no other partial delivery.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Foreman primitives are a new `pan slot` CLI group (spawn/merge/status) — `pan swarm` no longer exists in the CLI (removed in PAN-1517; skills/pan-swarm and the SKILLS-CONVENTION exclusion entry are stale references, addressed in docs-swarm-v2). pan slot joins the skills exclusion list; no wrapper skill.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Slot agent IDs: agent-<issue>-slot-<n>. Already matched by kill.ts agent-<issue>-* discovery and by dashboard resource discovery; the slot- segment disambiguates from role suffixes (agent-<issue>-review etc.).",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "hasFileOverlap()'s missing-scope=non-overlapping default in dag.ts is NOT changed. The conservative rule (missing files_scope or confidence:low => treat as overlapping-with-everything, serialize within wave) lives in the foreman protocol in roles/work.md, so the existing in-context fan-out path keeps current behavior.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Readiness lint is a pure library (src/lib/vbrief/readiness-lint.ts) returning structured findings; plan-finalize wires it in advisory-by-default with a --strict flag that blocks before stamping/beads/promotion. Glob semantics are shared with dag.ts via compileGlob (export it; do not duplicate regex logic).",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Scope drift: recorded at pan done as optional ContinueState.scopeDrift field + sessionHistory note; surfaced into review status and review spawn context; strictly advisory — never blocks done or review. Plans with no files_scope produce no drift record.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "A3 flywheel ordering = data surfacing only: predictedConflictsWith on MergeQueueItem (declared footprints, hotspots excluded, actual changedFilesVsMain remains authoritative for batch/serialize) + a soft-preference paragraph in docs/flywheel-brief.md. No coded launch-scoring exists to extend — the orchestrator is LLM-driven.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Slot dispatch prompts reuse createActiveSlice()/renderActiveSlicePrompt() from dag.ts (bounded per-item context with ACs, blockers, and synthesisContext) rather than inventing a new prompt format.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "src/cli/index.ts is touched by two unconnected beads (a2-finalize-wiring, b-slot-cli). Accepted as in-wave serialization via the overlap rule rather than a fake dependency edge — registration hubs are exactly the hotspot-shaped overlap the design tolerates.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Hierarchical slot branch names (feature/<issue>/slot-<n>) are impossible in git when feature/<issue> exists — ref file/directory collision.",
+      "mitigation": "Flat sibling naming per D1; b-slot-spawn-lib tests assert the naming scheme."
+    },
+    {
+      "id": "H2",
+      "summary": "Foreman context pressure: driving many waves can bloat the foreman's context and trigger compaction mid-swarm.",
+      "mitigation": "Slot agents return terse structured reports; foreman checkpoints wave progress in continue.json after each wave; reconciliation-on-resume re-derives state from pan slot status + statusOverrides."
+    },
+    {
+      "id": "H3",
+      "summary": "Foreman dies mid-swarm while registered slots keep running.",
+      "mitigation": "Explicit reconciliation step in roles/work.md: respawned foreman runs pan slot status, reconciles statusOverrides + slot branches + running agents, adopts orphans, continues the correct wave."
+    },
+    {
+      "id": "H4",
+      "summary": "Concurrent bun install / build contention across slot worktrees on one machine.",
+      "mitigation": "Foreman caps concurrent heavy slots (default ~3, stated in roles/work.md); slot worktrees follow the existing bun-install workspace discipline (never symlink node_modules)."
+    },
+    {
+      "id": "H5",
+      "summary": "Junk files_scope predictions produce junk serialization decisions.",
+      "mitigation": "A4 drift loop measures prediction quality per plan; confidence:low items are scheduled conservatively (overlap-with-everything) but never blocked."
+    },
+    {
+      "id": "H6",
+      "summary": "hasFileOverlap() treats items WITHOUT files_scope as non-overlapping — unsafe default for swarm dispatch if relied on blindly.",
+      "mitigation": "D5: foreman serializes scope-less items; readiness lint warns on missing files_scope at finalize so swarm-eligible plans arrive fully scoped."
+    },
+    {
+      "id": "H7",
+      "summary": "scripts/lint-skills.sh fails CI when a SKILL.md references CLI flags/commands that don't exist yet (cross-bead ordering trap: a1-skills-contract must not mention --strict before a2-finalize-wiring lands).",
+      "mitigation": "Bead ordering: a1-skills-contract blocks a2-finalize-wiring; --strict documentation lands in the same commit as the flag; pan slot joins the exclusion list in b-slot-cli's commit."
+    },
+    {
+      "id": "H8",
+      "summary": "Slot verify/merge helpers are server-reachable in principle — execSync would freeze the dashboard event loop.",
+      "mitigation": "All new swarm/* and drift code uses async exec only; explicit AC on b-slot-spawn-lib and b-verify-merge-lib; retry/timeout tests use fake timers per repo rule."
+    },
+    {
+      "id": "H9",
+      "summary": "Review/done paths must tolerate absent drift/footprint data (all pre-contract issues).",
+      "mitigation": "scopeDrift and predictedConflictsWith are optional fields; explicit ACs require no-data behavior identical to today; drift errors never fail pan done."
+    },
+    {
+      "id": "H10",
+      "summary": "Per-slot cost attribution: dashboard must roll agent-<issue>-slot-<n> costs up under the issue (PRD risk #5).",
+      "mitigation": "Slot IDs follow the agent-<issue>-* convention resource discovery already groups by; b-slot-spawn-lib AC3 verifies dashboard nesting."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<!-- panopticon:orchestration-context-start -->\n<!-- This is Panopticon orchestration context injected automatically.\n     It contains planning session setup instructions, not agent reasoning.\n     Session summarizers should SKIP this block and focus on the agent's\n     actual work, decisions, and tradeoffs that follow. -->\n\n# Planning Session: PAN-1762\n\n## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION\n\n**YOU ARE IN PLANNING MODE. DO NOT:**\n- Write or modify any code files (except continue.vbrief.json)\n- Run implementation commands (npm install, docker compose, make, etc.)\n- Create actual features or functionality\n- Start implementing the solution\n\n**YOU SHOULD ONLY:**\n- Ask clarifying questions (use AskUserQuestion tool)\n- Explore the codebase to understand context (read files, grep)\n- Generate planning artifacts:\n  - **continue.json** at `.pan/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.\n  - **vBRIEF plan** at `.pan/spec.vbrief.json` (workspace working copy — `plan finalize` promotes it to main's `.pan/specs/`)\n- Present options and tradeoffs for the user to decide\n\n**Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:\n\n```\npan plan finalize\n```\n\nThis converts your `.pan/spec.vbrief.json` into beads tasks and marks the workspace spec as `plan.status = \"proposed\"`, which lets the dashboard show the **Done** button. Do NOT run `bd create` yourself — `pan plan finalize` does it deterministically from the vBRIEF.\n\nAfter `pan plan finalize` succeeds, STOP. Tell the user: \"Planning finalized — click Done in the dashboard to hand off to the implementation agent.\" Do not kill the tmux session yourself; the Stop button handles that if needed.\n\n## Panopticon Agent Taxonomy\n\nPanopticon orchestrates issue work through five lifecycle **roles**. **You are running the `plan` role.** The other roles have different responsibilities, working directories, and instruction files. Confusing roles with Claude Code subagents is a common planning error — read this section carefully before exploring the codebase.\n\n### Roles in the Panopticon pipeline\n\n| Role | Responsibility | Working dir | Instruction source |\n|------|----------------|-------------|--------------------|\n| **plan** (you) | Discovery, vBRIEF, continue.json. No code. | workspace worktree | `roles/plan.md` + this template |\n| **work** | Implementation from your vBRIEF + beads tasks | workspace worktree | `roles/work.md` |\n| **review** | Review synthesis and approval/blocking decision | project root | `roles/review.md` |\n| **test** | Automated verification and required browser UAT | project root | `roles/test.md` |\n| **ship** | Rebase/verify/push preparation for human merge | project root | `roles/ship.md` |\n\nSub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles include `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.\n\n**Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test/ship must enforce should be encoded in the vBRIEF as acceptance criteria, because those criteria propagate through the role prompts and review/test artifacts.\n\n### Claude Code subagents (NOT Panopticon roles)\n\nYou may spawn ephemeral **Claude Code subagents** via the `Agent` tool for parallel exploration. These are NOT Panopticon lifecycle roles:\n\n- `codebase-explorer`, `general-purpose` — fast read-only code search\n- `Plan` — architectural planning helper\n\nThe review convoy sub-roles (`review.security`, `review.correctness`, `review.performance`, `review.requirements`) are NOT Claude Code subagents — they are harness-agnostic prompt templates in `roles/review-<subRole>.md` that the review role's orchestrator inlines into each convoy spawn message. Plan around the review role itself; convoy mechanics are an implementation detail.\n\n**Claude Code subagents live and die inside one Claude Code session.** They do not own issue state, do not transition the Panopticon pipeline, and do not replace `plan`/`work`/`review`/`test`/`ship`. If you encounter legacy helper model slots or files in `.claude/agents/`, treat them as role-internal helpers, not standalone pipeline agents.\n\n### What happens after you finalize\n\nAfter `pan plan finalize` and the user clicks **Done**, the pipeline runs without you: `work` → optional `work.inspect`/`work.inspect-deep` on flagged beads → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.\n\n---\n\n## Auto Planning Mode\n\nThe user invoked `pan plan --auto`. Complete planning end-to-end without asking the user questions or waiting for interactive confirmation.\n\n- Do not use AskUserQuestion.\n- When normal planning would ask a question, choose the most defensible default and record it in `plan.autoDecisions[]` as `{ \"summary\": \"...\", \"rationale\": \"...\" }`.\n- Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.\n- Still produce the same complete vBRIEF and beads via `pan plan finalize` when no contradiction exists.\n\n## Issue Details\n- **ID:** PAN-1762\n- **Title:** Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)\n- **URL:** https://github.com/eltmon/panopticon-cli/issues/1762\n\n## Description\n**PRD:** [`.pan/drafts/pan-1762.md`](https://github.com/eltmon/panopticon-cli/blob/main/.pan/drafts/pan-1762.md)\n\n## Vision\n\nPanopticon regains **single-issue wall-clock parallelism** — without resurrecting the deleted swarm runtime — by combining a Directive-style planning contract (**Path A**) with a **foreman-driven** intra-issue dispatch model (**Path B**), backstopped by the UAT merge train as the integration-safety net.\n\n## Motivation\n\n- PAN-1517 deleted the slot swarm (~6,021 lines). The replacement (in-context subagent fan-out per `roles/work.md`) covers mechanical parallelism but lost three things: **durable/registered workers** (subagents die with the parent session), **cross-machine distribution** (subagents share one filesystem; slots had per-item worktrees and could have run on Fly), and **continuous integration with synthesis at DAG convergence points**.\n- Comparison with Deft Directive's swarm showed the old runtime's real gap was never supervision — it was the **contract**: Directive enforces vertical tracer-bullet slicing, mandatory `file_scope` declarations, a machine pre-flight readiness audit, and per-story `verify_commands` before any worker launches. Our deleted swarm had none of that (slot merges into the feature branch ran zero quality gates).\n- Big issues are coming up where wall-clock latency matters. Splitting at planning (Path A) is the first answer; for genuinely unsplittable issues, Path B is the second.\n- Unlike Directive, we do NOT refuse on predicted overlap — the merge train (PAN-1691/PAN-1737) resolves real conflicts at integration time, so overlap prediction is an **ordering signal, not a gate**.\n\n## Design goals\n\n1. **Contract before dispatch** — swarm-eligible plans must declare per-item `files_scope` (+ confidence) and `verify_commands`; a readiness lint at `pan plan finalize` refuses ill-formed cohorts.\n2. **Foreman, not external runtime** — the issue's durable work agent drives waves itself via `groupItemsByWave()`. No server poll loop, no slot-merged HTTP callback, no swarm route. (The old route was 2,598 lines mostly because the runtime lived outside the agent.)\n3. **Per-slot verification before merge** — each item's `verify_commands` must pass before its slot branch merges into the feature branch (fixes the old swarm's biggest gap).\n4. **Overlap tolerance** — `hasFileOverlap()` serializes colliding items within a wave; everything else runs parallel. The train is the hard guarantee.\n5. **Reuse existing primitives** — `dag.ts` (waves + overlap, already on main), `spawnRun` registered agents, harness worktree-isolated subagents, existing Fly per-issue remote machinery (PAN-1676).\n\n## Key capabilities (phased)\n\n**Path A — planning discipline:**\n1. `roles/plan.md` + planning skills mandate tracer-bullet vertical slicing; require `files_scope` (with confidence) and per-item `verify_commands`; prefer splitting big issues into independently shippable sibling issues (flywheel parallelizes them today, local + Fly).\n2. Readiness lint at `pan plan finalize` (overlap audit across unconnected siblings; per-project hotspot list — CHANGELOG, lockfiles — excluded from overlap math).\n3. Cross-issue soft signals: issue footprint (union of item scopes) feeds flywheel launch ordering + predicted-conflict hints in the merge queue.\n4. Scope-drift feedback: at `pan done`, diff actual changed files vs declared union; record drift.\n\n**Path B — foreman-driven intra-issue swarm:**\n5. Foreman dispatch: cheap items → in-context subagents (worktree isolation); heavy items → **registered** slot agents via `spawnRun` in per-item worktrees on `feature/<issue>/slot-<n>` branches (dashboard-visible, deacon-recoverable, Fly-distributable).\n6. Per-slot verify-then-merge into the feature branch, in dependency-wave order; synthesis digests composed by the foreman at convergence points (in-context, no SynthesisOutput runtime state).\n7. (Phase 2) Slot agents on Fly VMs — one big issue soaks remote capacity.\n\n## Non-goals\n\n- Restoring the old runtime wholesale (route, auto-advance poller, slot-merged callback, SwarmRuntime continue-state, SwarmDispatchDialog).\n- Per-slot PRs/review — the issue's PR remains the review unit; slots are implementation steps.\n- Hard refuse-to-dispatch on predicted overlap (Directive's posture) at any level.\n\nRefs: PAN-1517 (removal), PAN-977 (original DAG dispatch), PAN-1691 / PAN-1737 (merge train + UAT generations), PAN-1676 (Fly remote agents), `docs/SWARM.md`, `src/lib/vbrief/dag.ts`, deleted runtime recoverable at `git show 59f1e6cd4~1`.\n\n\n---\n\n## Your Mission\n\nYou are a planning agent conducting a **discovery session** for this issue.\n\n### Phase 1: Understand Context\n1. **If a spec file was provided above**, read it thoroughly — it's your primary input\n2. Read the codebase to understand relevant files and patterns\n3. Identify what subsystems/files this issue affects\n4. Note any existing patterns we should follow\n\n### Phase 2: Discovery Conversation\nUse AskUserQuestion tool to ask contextual questions:\n- What's the scope? What's explicitly OUT of scope?\n- Any technical constraints or preferences?\n- What does \"done\" look like?\n- Are there edge cases we need to handle?\n- **Are there foundational decisions later beads will depend on?** Flag those for `metadata.requiresInspection: true` (see \"Inspection Requirement\" below). The rest default to `false`.\n\n### Playwright Isolation\n\nIf the issue will require browser-based verification, encode that expectation clearly in continue.json and acceptance criteria:\n- Playwright/browser verification must use an isolated browser instance/profile.\n- Agents must not depend on another agent's Playwright session or shared browser state.\n- Any required login/setup should be reproducible inside the isolated session.\n\n### TLDR: Token-Efficient Code Discovery\n\nYou have access to TLDR MCP tools for broad codebase discovery without reading full files first. Prefer these summaries during exploration, then use full Reads only when you need exact implementation details for the vBRIEF:\n- `tldr_context <file>` — summarize a candidate file's structure, imports, exports, and key functions\n- `tldr_structure <directory>` — understand a subsystem layout before choosing files to inspect\n- `tldr_semantic <query>` — find code by behavior or concept when the affected files are unknown\n- `tldr_calls <function> <file>` — identify callers that may constrain the plan\n- `tldr_impact <function> <file>` — see what a function touches before defining bead boundaries or hazards\n\nUse TLDR first for discovery breadth, and reserve full Reads for authoritative details you will encode into decisions, hazards, acceptance criteria, or bead descriptions.\n\n### Task Granularity — Decompose Aggressively\n\n**Default to the smallest bead you can defend.** Your job is to produce a *lot* of small, independently reviewable beads — not a handful of large ones.\n\nA well-sized bead has all of these properties:\n- **One focused change.** One command added, one file moved, one collapsed handler, one rename batch. If you need the word \"and\" in the title, it's probably two beads.\n- **Independently reviewable.** A reviewer can verify the acceptance criteria by reading the diff for this bead alone, without cross-referencing others.\n- **Independently mergeable.** Landing this bead on its own leaves the tree in a working state. If it can only ship as part of a set, it's a sub-step inside a larger bead, not a bead itself.\n- **Testable in isolation.** The acceptance criteria name a specific behavior you can exercise after this bead and no others.\n\n**When a PRD has phases, phases are NOT bead boundaries.** Phases are organizational scaffolding for humans reading the PRD. A single phase will typically decompose into many beads. For example, a phase that says \"rename 10 commands\" is 10 beads (or 10 sub-items under one rename bead), not 1.\n\n**Concrete heuristics:**\n- One collapsed command = one bead. (`pan show`, `pan review`, `pan issues`, `pan plan finalize` → four beads, not one.)\n- One renamed verb = one bead, unless several renames are mechanically identical and land in the same file — then they can be sub-items under one bead.\n- One admin group moved under a new namespace = one bead per group.\n- One distributed-skill rename batch = one bead per logical group (lifecycle shortcuts, admin namespace, umbrella skill, description rewrite sweep). Not one bead for \"rename all skills.\"\n- One snapshot test = one bead.\n- One doc migration = one bead (per doc or per logical doc cluster, not one bead for \"update all docs\").\n\n**When in doubt, split.** The cost of too-small beads is mild (more rows to track); the cost of too-large beads is severe (reviewers can't reason about them, work agents deliver partial results, downstream roles can't pinpoint which acceptance criterion failed, and the `work.inspect` gate can't verify mid-implementation). Err on the side of more beads.\n\n**What this does NOT mean:**\n- It does NOT mean ship partial features. CLAUDE.md's \"Deliver Complete Features\" rule still applies: every bead's acceptance criteria must be fully met before it's marked done, and every bead in the plan must ship before the issue itself is marked done. Decomposition is about *reviewability and verifiability*, not about scope reduction.\n- It does NOT mean creating beads for trivia that doesn't need tracking (e.g. \"update one line in a comment\"). If the acceptance criterion fits inside another bead's existing scope and tests, absorb it as a sub-item instead of inflating the bead count.\n\nIf the user ever asks \"should this be one bead or many?\", the answer is almost always \"many\" unless you can point to a specific reason the work is genuinely indivisible (e.g. a single atomic rename that touches N call sites in one commit).\n\n### Difficulty Estimation\n\nFor each sub-task, estimate difficulty using this rubric:\n\n| Level | When to Use | Model |\n|-------|-------------|-------|\n| `trivial` | Typo, comment, formatting only | haiku |\n| `simple` | Bug fix, single file, obvious change | haiku |\n| `medium` | New feature, 3-5 files, standard patterns | sonnet |\n| `complex` | Refactor, migration, 6+ files, some risk | sonnet |\n| `expert` | Architecture, security, performance, high risk | opus |\n\n### Inspection Requirement — `metadata.requiresInspection`\n\n**For every bead, decide whether it needs the work.inspect gate before subsequent beads can start.** This is a deliberate, per-bead decision — not a default-on, not a default-off. The decision is recorded as `metadata.requiresInspection: true|false` on each plan item.\n\n**Why this exists:** PAN-382 introduced the work.inspect gate after MIN-796, where an agent built `KaiaRuntime.ts` on the wrong foundation (React state machine instead of HTTP/SSE service). That single wrong foundation infected 7 subsequent beads — about 5,800 lines that all had to be redone. Bead-level inspection is Panopticon's Jidoka gate: stop the line at each step, never pass a foundation defect downstream.\n\n**But it's not free.** Per-bead inspection adds wall-clock time and cost to every step. Applying it indiscriminately turns a 12-bead refactor into a 12-step interview. Apply it only where its absence would let a structural defect cascade.\n\n**Set `requiresInspection: true` when ANY of the following are true for this bead:**\n\n1. **Foundation for downstream beads.** Subsequent beads depend on this bead's interfaces, types, file layout, or module boundaries. A wrong choice here is *recoverable only* by redoing the dependent beads. (e.g., \"create the runtime layer that all message handling sits on top of,\" \"introduce the new state machine other components will subscribe to.\")\n2. **Architectural decision crystallizing in code.** The bead encodes a decision the team would want to second-guess at a checkpoint — naming a public API, choosing a library boundary, picking an event shape that other beads will produce or consume.\n3. **Spec ambiguity risk.** The bead's description is broad enough that the agent could plausibly produce two very different diffs that both look \"done\" — the inspector earns its keep by pinning down which one matches the spec.\n4. **Security/permission/auth surface.** The bead touches a security boundary, sandbox, or trust gate. Defects propagating into later beads are expensive to unwind once dependent code assumes the security posture.\n5. **Cross-cutting protocol or schema.** Wire format, database schema migration, RPC contract, event payload — anything where the *next* bead encodes assumptions about *this* bead's output.\n\n**Set `requiresInspection: false` (the default for most beads) when:**\n\n- The bead is mechanically simple — flag flip, value rename, single-line config change, one-liner bug fix.\n- The bead is a leaf — no other bead depends on its internal structure, only on the fact that it shipped.\n- The bead is a test, doc, or comment-only update.\n- A wrong implementation would surface immediately at typecheck, lint, the verification gate, or end-of-MR review — not as silent foundation rot.\n- The bead is part of a parallel batch of mechanically identical operations (10 provider flips, 12 doc renames) where each one's correctness is independently obvious.\n\n**Heuristic shortcut:** if you would expect the work.inspect gate to read a 15-line diff and respond \"yes that matches the bead description\" with no judgment call, set `requiresInspection: false`. Inspection's value is in catching the *judgment-call* defects, not in rubber-stamping mechanical ones.\n\n**You MUST set this field explicitly on every bead.** Omitting it is a planning error — the work prompt requires it. Default to `false` for the typical mechanical bead; flip to `true` only when one of the criteria above genuinely applies. Most plans will have 0–2 beads with `requiresInspection: true`. If a plan has more than 3, ask yourself whether you've under-decomposed — large beads are more often the actual problem.\n\nWhen `requiresInspection: true`, you MUST also populate `metadata.foundationFor: [<beadId>, …]` listing the downstream beads that depend on this one. The list answers the question \"if this bead were implemented wrong, which other beads would have to be redone?\" If you cannot name at least one dependent bead, the inspection criterion has not actually been met — flip `requiresInspection` back to `false`. Criteria 2-5 above (architectural decision, spec ambiguity, security boundary, cross-cutting protocol) still qualify; in those cases list the beads that *encode assumptions about this bead's output*. An empty `foundationFor` on a `requiresInspection: true` bead is a planning error.\n\nWhen `requiresInspection` is `true`, set `metadata.inspectionDepth` to `\"fast\"` unless the bead needs a broader architecture/safety review. Use `\"deep\"` only for high-risk foundation, security, schema, or cross-cutting protocol beads where the inspector should answer \"was this done correctly?\" rather than only \"was the deed done?\"\n\n### Phase 3: Generate Artifacts (NO CODE!)\nWhen discovery is complete:\n1. Create **continue.json** at `.pan/continue.json` with decisions, hazards, and approach context (see format below).\n2. Create a **vBRIEF plan** at `.pan/spec.vbrief.json` — **MUST follow the exact format below**.\n3. Run `pan plan finalize` from the workspace root. This creates beads tasks from your vBRIEF and sets `plan.status` to `proposed`.\n4. Summarize the plan and STOP\n\n**DO NOT run `bd create` commands directly.** `pan plan finalize` is the only sanctioned way to materialize beads from a workspace vBRIEF plan — it's deterministic and idempotent.\n\n### vBRIEF Plan Format (REQUIRED)\n\nThe plan file MUST conform to vBRIEF v0.5 spec (https://github.com/deftai/vBRIEF).\nIt MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.\n\n```json\n{\n  \"vBRIEFInfo\": {\n    \"version\": \"0.5\",\n    \"created\": \"<ISO 8601 timestamp>\",\n    \"author\": \"panopticon-cli/0.0.0\",\n    \"description\": \"Plan for PAN-1762: <issue title>\"\n  },\n  \"plan\": {\n    \"id\": \"pan-1762\",\n    \"title\": \"<issue title>\",\n    \"status\": \"approved\",\n    \"uid\": \"<generate a UUID v4>\",\n    \"author\": \"agent:claude-fable-5\",\n    \"sequence\": 1,\n    \"created\": \"<ISO 8601 timestamp — same as vBRIEFInfo.created>\",\n    \"updated\": \"<ISO 8601 timestamp — same as created>\",\n    \"references\": [\n      { \"uri\": \"https://github.com/eltmon/panopticon-cli/issues/1762\", \"label\": \"PAN-1762\", \"type\": \"issue\" }\n    ],\n    \"tags\": [\"<relevant tags>\"],\n    \"narratives\": {\n      \"Problem\": \"<what problem this solves>\",\n      \"Proposal\": \"<the approach chosen>\"\n    },\n    \"autoDecisions\": [\n      { \"summary\": \"<inferred choice made in --auto mode>\", \"rationale\": \"<why this default is defensible>\" }\n    ],\n    \"items\": [\n      {\n        \"id\": \"<short-kebab-id>\",\n        \"title\": \"<task title>\",\n        \"status\": \"pending\",\n        \"priority\": \"medium\",\n        \"created\": \"<ISO 8601 timestamp>\",\n        \"metadata\": {\n          \"difficulty\": \"trivial|simple|medium|complex|expert\",\n          \"issueLabel\": \"pan-1762\",\n          \"requiresInspection\": false,\n          \"inspectionDepth\": \"fast\"\n        },\n        \"narrative\": { \"Action\": \"<what needs to be done>\" },\n        \"subItems\": [\n          {\n            \"id\": \"<parent-id>.ac1\",\n            \"title\": \"<specific testable acceptance criterion>\",\n            \"status\": \"pending\",\n            \"metadata\": { \"kind\": \"acceptance_criterion\" }\n          }\n        ]\n      }\n    ],\n    \"edges\": [\n      { \"from\": \"<source-item-id>\", \"to\": \"<target-item-id>\", \"type\": \"blocks\" }\n    ]\n  }\n}\n```\n\n**CRITICAL vBRIEF rules:**\n- The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys\n- `plan.id` MUST be the issue ID in lowercase (e.g., \"pan-1762\")\n- `plan.uid` MUST be a freshly generated UUID v4\n- Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`\n- `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled\n- Acceptance criteria MUST be `subItems` with `metadata.kind: \"acceptance_criterion\"`\n- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, and `metadata.inspectionDepth` are Panopticon extensions to the vBRIEF spec\n- `metadata.requiresInspection` is REQUIRED on every plan item — see the \"Inspection Requirement\" section above for the decision criteria. Default to `false` unless the bead lays a foundation other beads depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.\n- `metadata.inspectionDepth` defaults to `\"fast\"` when omitted. Set it to `\"deep\"` only when `requiresInspection` is true and the bead needs a stronger architecture/safety review.\n- Edge types: `blocks` (hard dependency), `informs` (soft), `invalidates`, `suggests`\n\n### continue.vbrief.json Format\n\nThe continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` in the workspace; the pipeline mirrors a project-level continue file on main as part of plan finalization. You do not write that mirror yourself — `pan plan finalize` handles it.\n\n```json\n{\n  \"version\": \"1\",\n  \"issueId\": \"PAN-1762\",\n  \"created\": \"<ISO 8601 timestamp>\",\n  \"updated\": \"<ISO 8601 timestamp>\",\n  \"gitState\": { \"branch\": \"<current branch>\", \"sha\": \"<short sha>\", \"dirty\": false },\n  \"decisions\": [\n    { \"id\": \"D1\", \"summary\": \"<decision text>\", \"recordedAt\": \"<ISO 8601 timestamp>\" }\n  ],\n  \"hazards\": [\n    { \"id\": \"H1\", \"summary\": \"<risk/edge case>\", \"mitigation\": \"<how to handle it>\" }\n  ],\n  \"resumePoint\": null,\n  \"beadsMapping\": {},\n  \"agentModel\": \"agent:claude-fable-5\",\n  \"sessionHistory\": [\n    { \"timestamp\": \"<ISO 8601 timestamp>\", \"reason\": \"planning\", \"note\": \"Initial planning session\", \"agentModel\": \"agent:claude-fable-5\" }\n  ]\n}\n```\n\n**Continue file rules:**\n- `version` MUST be `\"1\"`\n- `issueId` MUST match the issue ID in UPPERCASE (e.g., \"PAN-1762\")\n- `decisions` — every architectural or scope decision you make goes here. Future agents (work, review, merge) read these.\n- `hazards` — risks, edge cases, and gotchas the work agent should watch for.\n- `resumePoint` — leave as `null` during planning; the work agent will populate it.\n- `beadsMapping` — leave as `{}`; `pan plan finalize` populates it when creating beads.\n- `sessionHistory` — start with one entry for this planning session.\n\n**Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.\n\nStart by exploring the codebase to understand the context, then begin the discovery conversation.\n\n<!-- panopticon:orchestration-context-end -->\n",
+      "note": "Planning session started for PAN-1762: Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
+      "timestamp": "2026-06-11T07:08:27.075Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-30T17:46Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-30T17:46:33.998Z"
+    },
+    {
+      "timestamp": "2026-06-30T19:39:55.230Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-30T20:05:59.211Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 4,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-30T17:46:33Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-1762 (attempt 3/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\t.pan/records/pan-1762.json\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-1762, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
+    }
+  ],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "pipeline": {
+    "issueId": "PAN-1762",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "running",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-30T20:06:04.780Z",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "inspectNotes": "INSPECTION PASSED for bead workspace-qcwbs. Spec fidelity: slot-spawn-tier diff adds optional slot options, derives agent-pan-1762-n, feature/pan-1762/slot-n, and slot workspace paths, preserves default single-agent path, creates slot worktrees, and enforces a registered-slot cap. Constraint compliance: no prohibited swarm runtime/server route restoration, no execSync or sync tmux use, and scope stays within spawn.ts/spawn-prep.ts plus focused unit coverage.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2196",
+    "lastVerifiedCommit": "a796e7310c3e8f390e71a4928dd1d93ca1cecdc8",
+    "reviewRequestedAt": "2026-06-30T17:28:02.597Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 23004,
+            "output": 249,
+            "cacheRead": 33978,
+            "cacheWrite": 76638
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 14962,
+            "output": 98713,
+            "cacheRead": 11924928,
+            "cacheWrite": 196656
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 1139676,
+            "output": 47832,
+            "cacheRead": 8221696,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 65327,
+            "output": 7191,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 31135,
+            "output": 144100,
+            "cacheRead": 10188539,
+            "cacheWrite": 1204989
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 23004,
+          "output": 249,
+          "cacheRead": 33978,
+          "cacheWrite": 76638
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 46097,
+          "output": 242813,
+          "cacheRead": 22113467,
+          "cacheWrite": 1401645
+        },
+        "openai/gpt-5.5": {
+          "input": 1139676,
+          "output": 47832,
+          "cacheRead": 8221696,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 65327,
+          "output": 7191,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 38.596459,
+        "pricingAsOf": "2026-06-30T20:06:04.815Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2196"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-06-30T17:39:33.566Z",
+  "updated": "2026-06-30T20:06:04.815Z",
+  "statusOverrides": {
+    "foreman-e2e": "completed",
+    "foreman-e2e.ac1": "completed",
+    "foreman-e2e.ac2": "completed",
+    "foreman-e2e.ac3": "completed",
+    "foreman-e2e.ac4": "completed",
+    "foreman-protocol-doc": "completed",
+    "foreman-protocol-doc.ac1": "completed",
+    "foreman-protocol-doc.ac2": "completed",
+    "foreman-protocol-doc.ac3": "completed",
+    "foreman-protocol-doc.ac4": "completed",
+    "predicted-conflicts": "completed",
+    "predicted-conflicts.ac1": "completed",
+    "predicted-conflicts.ac2": "completed",
+    "predicted-conflicts.ac3": "completed",
+    "predicted-conflicts.ac4": "completed",
+    "lint-overlap-audit": "completed",
+    "lint-overlap-audit.ac1": "completed",
+    "lint-overlap-audit.ac2": "completed",
+    "lint-overlap-audit.ac3": "completed",
+    "lint-overlap-audit.ac4": "completed",
+    "foreman-reconcile": "completed",
+    "foreman-reconcile.ac1": "completed",
+    "foreman-reconcile.ac2": "completed",
+    "foreman-reconcile.ac3": "completed",
+    "verify-then-merge": "completed",
+    "verify-then-merge.ac1": "completed",
+    "verify-then-merge.ac2": "completed",
+    "verify-then-merge.ac3": "completed",
+    "verify-then-merge.ac4": "completed",
+    "foreman-tier-decision": "completed",
+    "foreman-tier-decision.ac1": "completed",
+    "foreman-tier-decision.ac2": "completed",
+    "foreman-tier-decision.ac3": "completed",
+    "foreman-tier-decision.ac4": "completed",
+    "issue-footprint": "completed",
+    "issue-footprint.ac1": "completed",
+    "issue-footprint.ac2": "completed",
+    "issue-footprint.ac3": "completed",
+    "readiness-report-ui": "completed",
+    "readiness-report-ui.ac1": "completed",
+    "readiness-report-ui.ac2": "completed",
+    "readiness-report-ui.ac3": "completed",
+    "readiness-report-cli": "completed",
+    "readiness-report-cli.ac1": "completed",
+    "readiness-report-cli.ac2": "completed",
+    "readiness-report-cli.ac3": "completed",
+    "hotspot-config": "completed",
+    "hotspot-config.ac1": "completed",
+    "hotspot-config.ac2": "completed",
+    "hotspot-config.ac3": "completed",
+    "scope-drift-record": "completed",
+    "scope-drift-record.ac1": "completed",
+    "scope-drift-record.ac2": "completed",
+    "scope-drift-record.ac3": "completed",
+    "scope-drift-record.ac4": "completed",
+    "slot-spawn-tier": "completed",
+    "slot-spawn-tier.ac1": "completed",
+    "slot-spawn-tier.ac2": "completed",
+    "slot-spawn-tier.ac3": "completed",
+    "slot-spawn-tier.ac4": "completed",
+    "slot-spawn-tier.ac5": "completed",
+    "lint-item-checks": "completed",
+    "lint-item-checks.ac1": "completed",
+    "lint-item-checks.ac2": "completed",
+    "lint-item-checks.ac3": "completed",
+    "lint-item-checks.ac4": "completed",
+    "readiness-analyzer": "completed",
+    "readiness-analyzer.ac1": "completed",
+    "readiness-analyzer.ac2": "completed",
+    "readiness-analyzer.ac3": "completed",
+    "readiness-analyzer.ac4": "completed",
+    "readiness-analyzer.ac5": "completed",
+    "write-vbrief-skill": "completed",
+    "write-vbrief-skill.ac1": "completed",
+    "write-vbrief-skill.ac2": "completed",
+    "write-vbrief-skill.ac3": "completed",
+    "planning-prompt-contract": "completed",
+    "planning-prompt-contract.ac1": "completed",
+    "planning-prompt-contract.ac2": "completed",
+    "planning-prompt-contract.ac3": "completed",
+    "planning-prompt-contract.ac4": "completed",
+    "schema-fields": "completed",
+    "schema-fields.ac1": "completed",
+    "schema-fields.ac2": "completed",
+    "schema-fields.ac3": "completed"
+  }
+}

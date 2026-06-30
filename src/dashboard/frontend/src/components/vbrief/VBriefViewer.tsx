@@ -5,6 +5,7 @@ import { VBriefHeader } from './VBriefHeader';
 import { VBriefNarratives } from './VBriefNarratives';
 import { VBriefReferences } from './VBriefReferences';
 import { VBriefItemList } from './VBriefItemList';
+import { VBriefReadinessPanel } from './VBriefReadinessPanel';
 
 export type VBriefViewTab = 'list' | 'dag' | 'raw';
 
@@ -78,6 +79,7 @@ export function VBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
             {doc.plan.references && doc.plan.references.length > 0 && (
               <VBriefReferences references={doc.plan.references} />
             )}
+            <VBriefReadinessPanel doc={doc} />
             <VBriefItemList items={doc.plan.items} />
           </>
         )}

@@ -8,7 +8,7 @@
  * Scores: 0-100 where 100 = best in class
  * Cost: $/1M tokens (input + output average)
  *
- * Last updated: 2026-01-29
+ * Last updated: 2026-06-30
  * Sources:
  * - SWE-bench Verified leaderboard (vals.ai)
  * - LiveCodeBench v6
@@ -269,6 +269,31 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     },
     effortLevels: ['low', 'medium', 'high', 'max'],
     notes: 'Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning.',
+  },
+
+  'claude-sonnet-5': {
+    model: 'claude-sonnet-5',
+    provider: 'anthropic',
+    displayName: 'Claude Sonnet 5',
+    // Introductory pricing through 2026-08-31: $2/M input, $10/M output.
+    // Standard pricing starts 2026-09-01: $3/M input, $15/M output.
+    costPer1MTokens: 6.0,
+    contextWindow: 1000000,
+    skills: {
+      'code-generation': 96,
+      'code-review': 96,
+      debugging: 94,
+      planning: 92,
+      documentation: 94,
+      testing: 94,
+      security: 90,
+      performance: 90,
+      synthesis: 92,
+      speed: 70,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high'],
+    notes: 'Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; introductory pricing through 2026-08-31 is $2/M input and $10/M output, then $3/M input and $15/M output from 2026-09-01. Scores are provisional until benchmarks are verified.',
   },
 
   'claude-sonnet-4-6': {

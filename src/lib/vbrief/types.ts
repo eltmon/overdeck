@@ -28,6 +28,10 @@ export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 
+export type FilesScopeConfidence = 'high' | 'medium' | 'low';
+
+export type ItemReadiness = 'ready' | 'sequential' | 'needs_refinement';
+
 export interface VBriefReference {
   uri: string;
   label?: string;
@@ -48,6 +52,21 @@ export interface VBriefSubItem {
   };
 }
 
+export interface VBriefItemMetadata {
+  difficulty?: VBriefDifficulty;
+  issueLabel?: string;
+  phase?: number;
+  /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
+  files_scope?: string[];
+  files_scope_confidence?: FilesScopeConfidence;
+  verify_commands?: string[];
+  expected_outputs?: string[];
+  readiness?: ItemReadiness;
+  /** True when this item has >1 blocking parent (DAG convergence point). Auto-derived by planner. */
+  requiresSynthesis?: boolean;
+  [key: string]: unknown;
+}
+
 export interface VBriefItem {
   id: string;
   title: string;
@@ -63,16 +82,7 @@ export interface VBriefItem {
   endDate?: string;
   /** RFC 3339 date-time (e.g., "2025-10-01T00:00:00Z"). NOT plain date. */
   dueDate?: string;
-  metadata?: {
-    difficulty?: VBriefDifficulty;
-    issueLabel?: string;
-    phase?: number;
-    /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
-    files_scope?: string[];
-    /** True when this item has >1 blocking parent (DAG convergence point). Auto-derived by planner. */
-    requiresSynthesis?: boolean;
-    [key: string]: unknown;
-  };
+  metadata?: VBriefItemMetadata;
   narrative?: {
     Action?: string;
     [key: string]: string | undefined;

@@ -88,7 +88,7 @@ const mockLoadConfig = vi.hoisted(() => () => ({
   config: {
     roles: {
       flywheel: {
-        harness: 'pi',
+        harness: 'claude-code',
         model: 'claude-sonnet-4-6',
         effort: 'low',
         maxAgents: 3,
@@ -103,6 +103,13 @@ vi.mock('../../../lib/config-yaml.js', () => ({
   loadConfig: mockLoadConfig,
   loadConfigSync: mockLoadConfig,
   resolveModel: () => 'claude-sonnet-4-6',
+}));
+
+// Harness is provider-default-only (PAN-1984): the flywheel start path derives it from the
+// model via resolveHarness, NOT from the per-role config. Mock it so this unit test doesn't
+// shell out to `command -v`; the real derivation is covered by harness-resolve.test.ts.
+vi.mock('../../../lib/harness-resolve.js', () => ({
+  resolveHarness: vi.fn(async () => 'claude-code'),
 }));
 
 const mergeBackendMocks = vi.hoisted(() => ({
@@ -466,7 +473,7 @@ describe('flywheel CLI commands', () => {
       runId: 'RUN-1',
       briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
       workspace: tempDir,
-      harness: 'pi',
+      harness: 'claude-code',
       model: 'claude-sonnet-4-6',
       effort: 'low',
       maxAgents: 3,
@@ -483,7 +490,7 @@ describe('flywheel CLI commands', () => {
       briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
       briefDisplayPath: 'docs/flywheel-brief.md',
     });
-    expect(latest.orchestrator).toMatchObject({ harness: 'pi', model: 'claude-sonnet-4-6', effort: 'low' });
+    expect(latest.orchestrator).toMatchObject({ harness: 'claude-code', model: 'claude-sonnet-4-6', effort: 'low' });
     expect(latest.system.agentsCap).toBe(3);
     expect(latest.agents[0]?.id).toBe('flywheel-orchestrator');
     expect(logSpy).toHaveBeenCalledWith('Flywheel started: RUN-1');
@@ -579,7 +586,7 @@ describe('flywheel CLI commands', () => {
     expect(flywheelLifecycleMocks.resumeFlywheel).toHaveBeenCalledWith(expect.objectContaining({
       workspace: repoDir,
       briefPath,
-      harness: 'pi',
+      harness: 'claude-code',
       model: 'claude-sonnet-4-6',
       effort: 'low',
       maxAgents: 3,

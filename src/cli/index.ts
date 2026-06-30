@@ -355,7 +355,7 @@ review
 review
   .command('restart <id>')
   .description('Kill running reviewers and dispatch fresh review pipeline')
-  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-4-6)')
+  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-5)')
   .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
   .action(reviewRestartCommand);
 

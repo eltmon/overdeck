@@ -2447,7 +2447,7 @@ const postAgentRestartFreshRoute = HttpRouter.add(
     // Auto-spawn path: dispatch to the existing /api/agents spawn flow.
     // We don't go through HTTP — we call the spawn primitives directly so
     // the caller gets a single 200 with both wipe and spawn confirmed.
-    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-4-6';
+    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
     let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null = null;
     if (harness) {
       const harnessDecision = yield* Effect.promise(async () =>

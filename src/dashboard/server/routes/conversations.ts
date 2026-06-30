@@ -4636,7 +4636,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const newName = `${timestamp}-${suffix}`;
         const newTmux = `conv-${newName}`;
         const launchModel = model || conv.model;
-        const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
+        const effectiveSummaryModel = summaryModel || 'claude-sonnet-5';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
         const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
