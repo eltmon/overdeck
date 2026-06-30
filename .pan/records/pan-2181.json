@@ -101,27 +101,25 @@
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-29T23:40:25.127Z",
+  "updated": "2026-06-30T23:36:10.786Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T23:40:25.088Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "updatedAt": "2026-06-30T23:36:10.688Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
-        "detectedAt": "2026-06-29T23:18:04.615Z"
+        "detectedAt": "2026-06-30T23:34:31.612Z"
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "lastVerifiedCommit": "c62faa7d557e3eee796bc5888b8bf523de5ed66f",
-    "reviewRequestedAt": "2026-06-29T23:34:57.285Z"
+    "reviewedAtCommit": "b699c0c291aa4876c4046d55bcbeca27acbc80e0",
+    "lastVerifiedCommit": "c62faa7d557e3eee796bc5888b8bf523de5ed66f"
   },
   "closeOut": {
     "usage": {
@@ -136,8 +134,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 38828,
-            "output": 2839,
+            "input": 40543,
+            "output": 2990,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -148,6 +146,14 @@
             "output": 60086,
             "cacheRead": 8541781,
             "cacheWrite": 376116
+          }
+        },
+        "review": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 15,
+            "output": 11129,
+            "cacheRead": 1086550,
+            "cacheWrite": 75494
           }
         },
         "test": {
@@ -167,10 +173,16 @@
           "cacheWrite": 386098
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 38828,
-          "output": 2839,
+          "input": 40543,
+          "output": 2990,
           "cacheRead": 0,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 15,
+          "output": 11129,
+          "cacheRead": 1086550,
+          "cacheWrite": 75494
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 105,
@@ -180,8 +192,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.282759,
-        "pricingAsOf": "2026-06-29T23:40:25.126Z"
+        "usd": 12.058805,
+        "pricingAsOf": "2026-06-30T23:36:10.780Z"
       }
     },
     "merges": [
@@ -189,8 +201,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "restyle-modal-tokens": "completed",
     "restyle-modal-tokens.ac1": "completed",
