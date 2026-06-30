@@ -161,8 +161,9 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    --json status,conclusion,headSha,url,createdAt`. Treat `status != completed` or
    missing/unknown `conclusion` as NOT green (a green HEAD sha is not a green CI). Then
    inventory active PAN issues, plus ready backlog when `auto_pickup_backlog=true`. Pull
-   runtime truth from CLI/API, never raw state files: `pan review pending --ready`,
-   `GET /api/flywheel/merge-blockers`, `GET /api/backlog/forecast`.
+   runtime truth from sandbox-safe CLI surfaces (they read SQLite/`sequence.md` directly — no
+   HTTP, so they work even when your harness sandboxes localhost): `pan review pending --ready`,
+   `pan flywheel merge-blockers --json`, `pan backlog forecast`.
 2. **Orient.** Classify each issue: healthy, ghost, stuck, stalled, wrong-column, reverting,
    awaiting-UAT, merge-ready, blocked. Relevance-vet every launch candidate (above). An idle
    issue is a bug unless explicitly parked with a concrete reason.
@@ -175,9 +176,9 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
 4. **Act.** Saturate toward `roles.flywheel.minAgents` always-running, ceiling
    `roles.flywheel.maxAgents` (distinct from `cloister.concurrency.max_work_agents`). When
    `auto_pickup_backlog` is ON, start auto-pickable backlog in **sequencer-priority order**
-   (`GET /api/backlog/forecast`); when OFF, from released items + emergency strikes. Keep the
+   (`pan backlog forecast`); when OFF, from released items + emergency strikes. Keep the
    awaiting-release queue deep either way via the **Planning floor (PAN-2173):** each tick read
-   `needsPlanning[]` from the forecast and `pan plan --auto` up to 2 of them (never
+   `needsPlanning[]` from `pan backlog forecast` and `pan plan --auto` up to 2 of them (never
    `--auto-start`), even while draining a cohort — a ready, vetted, capacity-available issue
    should be planned within 1–2 ticks, not stranded. Drive merge-blockers and stalled reviews
    through Recovery (below); never `wait` on a stuck PR. Then close out the tail: `pan close
@@ -205,10 +206,12 @@ Record every call (issue, decision, divergence evidence) in `docs/FLYWHEEL-STATE
 
 ## Recovery actions (drive through — do not surface)
 
-- **Merge-blockers (PAN-1620):** `GET /api/flywheel/merge-blockers` each tick. `merge_conflict`
+- **Merge-blockers (PAN-1620):** `pan flywheel merge-blockers --json` each tick. `merge_conflict`
   on a stopped branch → resync/restart decision; `failing_checks` → resume/restart the agent.
-- **Auto-merge problems:** `GET /api/flywheel/auto-merge/problems` → emit `investigate` for
-  each `failed`/`blocked`.
+- **Auto-merge problems** (only when auto-merge is active — `require_uat_before_merge=false`):
+  `GET /api/flywheel/auto-merge/problems` → emit `investigate` for each `failed`/`blocked`. HTTP-only
+  (no CLI surface); skip if your harness sandboxes localhost — it is moot while UAT-before-merge is
+  on (the default).
 - **Stalled review convoy:** `pan review restart <id>` (re-dispatch), or `pan review
   request|abort|reset <id>`. Pipeline-recovery, distinct from the forbidden `pan resume`/`pan wake`.
 
@@ -239,8 +242,11 @@ prior context — and then propose a default, never an open question. Record dec
 - **Merge policy (PAN-1486).** With `require_uat_before_merge=true` (default), do NOT schedule
   merges — each tick keep a UAT bundle assembled (`GET /api/flywheel/uat-candidate` → `POST
   /api/flywheel/assemble-uat`; idempotent, never touches `main`) so the operator ships a batch.
-  With it `false`, schedule via `POST /api/flywheel/auto-merge/schedule`. Operator-named merges
-  use `gh pr merge --admin --squash --delete-branch` — never admin-merge while `main` is red.
+  With it `false`, schedule via `POST /api/flywheel/auto-merge/schedule`. These UAT/auto-merge
+  endpoints are HTTP-only (no CLI surface yet) — fine from a non-sandboxed harness; if yours
+  sandboxes localhost, surface the merge-ready set in `suggestions[]` and let the operator
+  assemble/ship from the dashboard (UAT + merge are operator-gated regardless). Operator-named
+  merges use `gh pr merge --admin --squash --delete-branch` — never admin-merge while `main` is red.
 - **Strike harness routing.** Do not pass `--harness`/`--model` unless the operator asked —
   provider defaults route correctly (kimi→ohmypi, gpt-5.5→codex, claude-*→claude-code). Never
   force `--harness claude-code` on a kimi/gpt model: the 200k-window illusion deadlocks it (PAN-1865).
@@ -248,10 +254,14 @@ prior context — and then propose a default, never an open question. Record dec
   `pan wipe`; editing feature branches or committing code from this role; `--no-verify` or
   skipped hooks; force-push/reset/history rewrite; deep-wipe; deleting JSONL session files;
   `pan sync-main` except the startup-triage resync above.
-- **Operational truth.** All `/api/...` calls hit `http://127.0.0.1:3011`. If the API is down,
-  check `~/.overdeck/restart-status.json` + the supervisor log, retry once after ~15s, then
-  proceed with git/`gh` inventory rather than stalling. SQLite is authoritative for
-  review/test/merge state, surfaced only via the CLI/API above — never read
+- **Operational truth — prefer sandbox-safe CLI surfaces.** Your harness may run commands in a
+  network-isolated sandbox (codex's bwrap), where `curl http://127.0.0.1:3011/api/...` cannot reach
+  the dashboard. Read state through the **CLI surfaces that hit SQLite/`sequence.md` directly** —
+  `pan review pending --ready`, `pan flywheel merge-blockers --json`, `pan backlog forecast`,
+  `pan flywheel status` — not raw `/api/...` curls. The dashboard HTTP API is a fallback for
+  non-sandboxed harnesses only; if you do use it and it is unreachable, don't burn the tick on it
+  (check `~/.overdeck/restart-status.json` + the supervisor log, then proceed with the CLI surfaces
+  + git/`gh`). SQLite is authoritative for review/test/merge state; never read
   `~/.overdeck/review-status.json` (legacy scratch).
 
 ## Pauses and end of run

@@ -35,6 +35,7 @@ import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
+import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -933,6 +934,7 @@ export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
     .description('Flywheel orchestrator lifecycle and status helpers');
+  registerFlywheelSurfaceCommands(program);
 
   flywheel
     .command('start')
