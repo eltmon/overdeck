@@ -94,6 +94,11 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
           "issueLabel": "<issue-id-lowercase>",
           "requiresInspection": false,
           "inspectionDepth": "fast",
+          "files_scope": ["src/path/to/file.ts"],
+          "files_scope_confidence": "high",
+          "verify_commands": ["npm run typecheck"],
+          "expected_outputs": ["typecheck completes without errors"],
+          "readiness": "ready",
           "traces": ["FR-1", "NFR-2"]
         },
         "narrative": { "Action": "<what needs to be done>" },
@@ -125,6 +130,11 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
 | `plan.narratives.NonGoals` | Required narrative. List everything discovery established as out of scope (`"none"` if genuinely nothing); review enforces these as must-not constraints. |
 | `items[].metadata.requiresInspection` | **Required on every item.** See inspection rules below. |
 | `items[].metadata.inspectionDepth` | `"fast"` (default) or `"deep"`. Only matters when `requiresInspection: true`. |
+| `items[].metadata.files_scope` | Required `string[]` of files/globs this item is expected to touch. Use concrete paths or narrow globs, not broad repo-wide patterns. |
+| `items[].metadata.files_scope_confidence` | Required confidence in `files_scope`: `"high"`, `"medium"`, or `"low"`. |
+| `items[].metadata.verify_commands` | Required for slot-eligible items. List commands that verify this item before slot merge, e.g. `["npm run typecheck", "npx vitest run tests/unit/foo.test.ts"]`. |
+| `items[].metadata.expected_outputs` | Required for slot-eligible items. List the observable evidence expected from `verify_commands`, e.g. `["foo.test.ts passes"]`. |
+| `items[].metadata.readiness` | Required tri-state swarm readiness: `"ready"` for parallel-safe work, `"sequential"` for intentionally serialized work, `"needs_refinement"` when the item is not ready to dispatch. |
 | `items[].metadata.traces` | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) this item satisfies. |
 | nested `items` with `metadata.kind: "acceptance_criterion"` | Each item must have at least one acceptance-criterion child item. |
 
@@ -267,6 +277,8 @@ Before running `pan plan finalize`:
 - [ ] `plan.uid` is a fresh UUID v4
 - [ ] `plan.status` is `"approved"`
 - [ ] Every item has `metadata.requiresInspection` (boolean)
+- [ ] Every item has `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness`
+- [ ] Every slot-eligible item has `metadata.verify_commands` and `metadata.expected_outputs`
 - [ ] Every item has at least one nested `items` AC entry
 - [ ] `foundationFor` populated on every `requiresInspection: true` item
 - [ ] No spurious edges

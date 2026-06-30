@@ -15,6 +15,7 @@ import {
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
+import type { ScopeDriftRecord } from './vbrief/continue-state.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -113,6 +114,8 @@ export interface ReviewStatus {
   deaconIgnoredAt?: string;
   /** Optional free-form reason shown alongside the ignore toggle. */
   deaconIgnoredReason?: string;
+  /** PAN-1762: advisory files_scope drift recorded at pan done and surfaced to review. */
+  scopeDrift?: ScopeDriftRecord;
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
@@ -174,7 +177,6 @@ export function mergeGateEligibility(
   if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
   return { eligible: true };
 }
-
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
@@ -801,7 +803,6 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   return enriched;
 }
 
-
 /**
  * On server startup, clear any mergeStatus stuck at 'merging'.
  * Pending merge operations are in-memory only — they don't survive a restart.
@@ -1013,7 +1014,6 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
     console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
 }
-
 
 /** Tagged error for review-status Effect variants. */
 export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
