@@ -35,7 +35,12 @@ function makePlanDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDoc
         title: 'Task one',
         status: 'pending',
         narrative: { Action: 'Implement the change with exact files and verification steps' },
-        metadata: { requiresInspection: false },
+        metadata: {
+          requiresInspection: false,
+          files_scope: ['src/task-one.ts'],
+          files_scope_confidence: 'high',
+          readiness: 'sequential',
+        },
         subItems: [
           {
             id: 'task-1.ac1',
@@ -172,7 +177,12 @@ describe('evaluatePlanFinalizeQualityGate', () => {
         title: 'Task one',
         status: 'pending',
         narrative: { Action: 'Implement the change with exact files and verification steps' },
-        metadata: { requiresInspection: false },
+        metadata: {
+          requiresInspection: false,
+          files_scope: ['src/task-one.ts'],
+          files_scope_confidence: 'high',
+          readiness: 'sequential',
+        },
         subItems: [
           {
             id: 'task-1.ac1',

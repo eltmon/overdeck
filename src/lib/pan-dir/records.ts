@@ -31,6 +31,7 @@ import type {
   ContinueHazard,
   ContinueResumePoint,
   ContinueSessionEntry,
+  ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
@@ -65,9 +66,10 @@ interface ContinueFile {
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   agentModel?: string;
+  scopeDrift?: ScopeDriftRecord;
 }
 
-function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback'> {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback' | 'scopeDrift'> {
   return {
     decisions: raw?.decisions,
     hazards: raw?.hazards,
@@ -75,6 +77,7 @@ function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisi
     beadsMapping: raw?.beadsMapping,
     sessionHistory: raw?.sessionHistory,
     feedback: raw?.feedback ?? [],
+    scopeDrift: raw?.scopeDrift,
   };
 }
 
@@ -114,6 +117,7 @@ function projectPipeline(
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
+    scopeDrift: status.scopeDrift,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,
     deaconIgnoredAt: status.deaconIgnoredAt,
