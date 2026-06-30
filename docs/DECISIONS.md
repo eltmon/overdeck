@@ -63,9 +63,11 @@ pickup via `isAutoPickable` in `src/lib/backlog/pickup.ts`. This registry gives 
   production. Source: `docs/codebase-health/REMAINING-BACKLOG.md` §4; memory
   `feedback_interactive_mockup_for_ux_redesign`.
 
-- **TENET-9 — Review-synthesis-wedge-first sequencing.** Land deterministic deacon-side review
-  synthesis (PAN-1864) before flooding the Flywheel with the refactor backlog — otherwise PRs pass
-  review but never merge. Source: PAN-1864; `docs/codebase-health/REMAINING-BACKLOG.md`.
+- **TENET-9 — Review→merge reliable before the flood.** Confirm work reliably advances from
+  *passing review* to *merged* before flooding the Flywheel with the refactor backlog — otherwise
+  PRs pass review but pile up unmerged. (The convoy-synthesis fix PAN-1864 is **parked as moot**
+  while convoy review is off by default — `roles.review.mode: quick`; revisit only if convoy
+  review is revived under PAN-1982.) Source: `docs/codebase-health/REMAINING-BACKLOG.md`; PAN-1982.
 
 - **TENET-10 — Pipeline-machinery refactors stay on supervised handoff.** A refactor of the code
   the pipeline runs on (deacon, the flywheel loop, `conversations` live-control, merge/review
