@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T19:19:51.780Z",
-  "updated": "2026-06-30T01:09:29.581Z",
+  "updated": "2026-06-30T01:25:11.477Z",
   "pipeline": {
     "issueId": "PAN-2174",
     "reviewStatus": "pending",
@@ -64,5 +64,21 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "config-fields": "completed",
+    "config-fields.ac1": "completed",
+    "config-fields.ac2": "completed",
+    "config-fields.ac3": "completed",
+    "config-fields.ac4": "completed",
+    "rewire-remediation": "completed",
+    "rewire-remediation.ac1": "completed",
+    "rewire-remediation.ac2": "completed",
+    "rewire-remediation.ac3": "completed",
+    "rewire-remediation.ac4": "completed",
+    "rewire-remediation.ac5": "completed",
+    "role-doc": "completed",
+    "role-doc.ac1": "completed",
+    "role-doc.ac2": "completed"
+  }
 }
