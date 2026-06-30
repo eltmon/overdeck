@@ -112,19 +112,29 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-30T23:52:27.369Z"
+    },
+    {
+      "timestamp": "2026-06-30T23:52:44.438Z",
+      "reason": "end",
+      "note": "Anomalies: initial npm test failed under sandbox with EPERM on git subprocesses, localhost listeners, and Unix sockets; reran outside sandbox. First escalated full npm test had one timeout in tests/lib/cloister/auto-resume-gating.test.ts, but that file passed in isolation and the second full escalated npm test passed. Deviations: no code changes in this resumed session; work was already implemented and beads were closed. Hazards: restored an unrelated generated scratch file/status artifact from test execution before submit. Delivered: verified grace default is 120 seconds, modal/countdown tokenization remains in place, and typecheck, lint, and full tests passed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-30T23:52:44.828Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-06-30T23:52:27.369Z",
+  "updated": "2026-06-30T23:53:13.403Z",
   "pipeline": {
     "issueId": "PAN-2181",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T23:52:27.122Z",
+    "updatedAt": "2026-06-30T23:53:13.059Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -132,7 +142,8 @@
         "detectedAt": "2026-06-30T23:47:42.075Z"
       }
     ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2183"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
+    "reviewRequestedAt": "2026-06-30T23:52:44.441Z"
   },
   "closeOut": {
     "usage": {
@@ -163,18 +174,18 @@
         },
         "review": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 22,
-            "output": 16328,
-            "cacheRead": 1410000,
-            "cacheWrite": 158394
+            "input": 23,
+            "output": 18153,
+            "cacheRead": 1490536,
+            "cacheWrite": 160905
           }
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 149,
-            "output": 9590,
-            "cacheRead": 4274287,
-            "cacheWrite": 508439
+            "input": 150,
+            "output": 12181,
+            "cacheRead": 5351975,
+            "cacheWrite": 520179
           }
         }
       },
@@ -192,21 +203,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 22,
-          "output": 16328,
-          "cacheRead": 1410000,
-          "cacheWrite": 158394
+          "input": 23,
+          "output": 18153,
+          "cacheRead": 1490536,
+          "cacheWrite": 160905
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 149,
-          "output": 9590,
-          "cacheRead": 4274287,
-          "cacheWrite": 508439
+          "input": 150,
+          "output": 12181,
+          "cacheRead": 5351975,
+          "cacheWrite": 520179
         }
       },
       "costAtCloseOut": {
-        "usd": 12.919904,
-        "pricingAsOf": "2026-06-30T23:52:27.224Z"
+        "usd": 13.116258,
+        "pricingAsOf": "2026-06-30T23:53:13.276Z"
       }
     },
     "merges": [
@@ -214,8 +225,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "restyle-modal-tokens": "completed",
     "restyle-modal-tokens.ac1": "completed",
