@@ -17,6 +17,11 @@
       "reason": "feedback",
       "note": "[2026-06-30T01:39Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-30T01:39:45.879Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-30T01:44:39.545Z"
     }
   ],
   "feedback": [
@@ -29,7 +34,7 @@
     }
   ],
   "created": "2026-06-29T19:19:51.780Z",
-  "updated": "2026-06-30T01:40:44.216Z",
+  "updated": "2026-06-30T01:44:43.879Z",
   "pipeline": {
     "issueId": "PAN-2174",
     "reviewStatus": "reviewing",
@@ -37,10 +42,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T01:40:44.054Z",
-    "reviewNotes": "Unrelated PAN-2146 bead records are included in .beads/issues.jsonl",
+    "updatedAt": "2026-06-30T01:44:43.834Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2185",
-    "lastVerifiedCommit": "84b6e739f69748127f37ad48c97858941ef396ba",
+    "lastVerifiedCommit": "e84f4f8cf6aca3662bba710d935fe76de905faf9",
     "reviewRequestedAt": "2026-06-30T01:37:56.097Z"
   },
   "closeOut": {
@@ -79,7 +84,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.437241,
-        "pricingAsOf": "2026-06-30T01:40:44.145Z"
+        "pricingAsOf": "2026-06-30T01:44:43.854Z"
       }
     },
     "merges": [
