@@ -229,7 +229,10 @@ export function selectNeedsPlanning(
   const cap = Math.max(1, opts.cap ?? 2);
   return nodes
     .map((n) => ({ issue: n.issue, rank: n.rank, size: n.size, state: classifyIssue(n, lk) }))
-    .filter((n) => n.state.ready && !n.state.planned && !n.state.parked && !n.state.vetoed && !n.state.objection && !n.state.inPipeline)
+    .filter((n) => {
+      const s = n.state;
+      return s.ready && !s.planned && !s.parked && !s.vetoed && !s.objection && !s.inPipeline;
+    })
     .sort((a, b) => a.rank - b.rank)
     .slice(0, cap);
 }
