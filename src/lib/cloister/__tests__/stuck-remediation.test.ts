@@ -442,8 +442,8 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     vi.restoreAllMocks();
   });
 
-  it('does not fire a flywheel stage inside the healthy 1000s self-wake window', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(17));
+  it.each([16, 17])('does not fire a flywheel stage inside the healthy 1000s self-wake window at %i min idle', async (idleMinutes) => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(idleMinutes));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
