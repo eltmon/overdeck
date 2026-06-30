@@ -1,25 +1,112 @@
 {
   "issueId": "PAN-1762",
   "schemaVersion": 2,
-  "created": "2026-06-30T14:17:38.720Z",
-  "updated": "2026-06-30T15:13:06.094Z",
-  "pipeline": {
-    "issueId": "PAN-1762",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-30T14:17:38.720Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Slot branches use flat sibling naming feature/<issue>-slot-<n> (worktree workspaces/feature-<issue>-slot-<n>), NOT the PRD's hierarchical feature/<issue>/slot-<n>. Git ref files make feature/pan-X/slot-1 impossible while feature/pan-X exists as a branch. The deleted runtime already solved this identically (swarm.ts:521 and createSlotWorktree at `git show 59f1e6cd4~1:src/dashboard/server/routes/swarm.ts` ~line 2070); port that logic, including idempotent worktree reuse and the beads contributor redirect.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
     },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
+    {
+      "id": "D2",
+      "summary": "Phase 6 (B5 remote slots on Fly) is re-scoped to a follow-up issue, per the PRD's own 'Out of scope for v1' marker in §4 B5 and the re-scope permission in §5. Phases 1-5 all ship in this issue — no other partial delivery.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Foreman primitives are a new `pan slot` CLI group (spawn/merge/status) — `pan swarm` no longer exists in the CLI (removed in PAN-1517; skills/pan-swarm and the SKILLS-CONVENTION exclusion entry are stale references, addressed in docs-swarm-v2). pan slot joins the skills exclusion list; no wrapper skill.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Slot agent IDs: agent-<issue>-slot-<n>. Already matched by kill.ts agent-<issue>-* discovery and by dashboard resource discovery; the slot- segment disambiguates from role suffixes (agent-<issue>-review etc.).",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "hasFileOverlap()'s missing-scope=non-overlapping default in dag.ts is NOT changed. The conservative rule (missing files_scope or confidence:low => treat as overlapping-with-everything, serialize within wave) lives in the foreman protocol in roles/work.md, so the existing in-context fan-out path keeps current behavior.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Readiness lint is a pure library (src/lib/vbrief/readiness-lint.ts) returning structured findings; plan-finalize wires it in advisory-by-default with a --strict flag that blocks before stamping/beads/promotion. Glob semantics are shared with dag.ts via compileGlob (export it; do not duplicate regex logic).",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Scope drift: recorded at pan done as optional ContinueState.scopeDrift field + sessionHistory note; surfaced into review status and review spawn context; strictly advisory — never blocks done or review. Plans with no files_scope produce no drift record.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "A3 flywheel ordering = data surfacing only: predictedConflictsWith on MergeQueueItem (declared footprints, hotspots excluded, actual changedFilesVsMain remains authoritative for batch/serialize) + a soft-preference paragraph in docs/flywheel-brief.md. No coded launch-scoring exists to extend — the orchestrator is LLM-driven.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Slot dispatch prompts reuse createActiveSlice()/renderActiveSlicePrompt() from dag.ts (bounded per-item context with ACs, blockers, and synthesisContext) rather than inventing a new prompt format.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "src/cli/index.ts is touched by two unconnected beads (a2-finalize-wiring, b-slot-cli). Accepted as in-wave serialization via the overlap rule rather than a fake dependency edge — registration hubs are exactly the hotspot-shaped overlap the design tolerates.",
+      "recordedAt": "2026-06-11T07:16:56.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Hierarchical slot branch names (feature/<issue>/slot-<n>) are impossible in git when feature/<issue> exists — ref file/directory collision.",
+      "mitigation": "Flat sibling naming per D1; b-slot-spawn-lib tests assert the naming scheme."
+    },
+    {
+      "id": "H2",
+      "summary": "Foreman context pressure: driving many waves can bloat the foreman's context and trigger compaction mid-swarm.",
+      "mitigation": "Slot agents return terse structured reports; foreman checkpoints wave progress in continue.json after each wave; reconciliation-on-resume re-derives state from pan slot status + statusOverrides."
+    },
+    {
+      "id": "H3",
+      "summary": "Foreman dies mid-swarm while registered slots keep running.",
+      "mitigation": "Explicit reconciliation step in roles/work.md: respawned foreman runs pan slot status, reconciles statusOverrides + slot branches + running agents, adopts orphans, continues the correct wave."
+    },
+    {
+      "id": "H4",
+      "summary": "Concurrent bun install / build contention across slot worktrees on one machine.",
+      "mitigation": "Foreman caps concurrent heavy slots (default ~3, stated in roles/work.md); slot worktrees follow the existing bun-install workspace discipline (never symlink node_modules)."
+    },
+    {
+      "id": "H5",
+      "summary": "Junk files_scope predictions produce junk serialization decisions.",
+      "mitigation": "A4 drift loop measures prediction quality per plan; confidence:low items are scheduled conservatively (overlap-with-everything) but never blocked."
+    },
+    {
+      "id": "H6",
+      "summary": "hasFileOverlap() treats items WITHOUT files_scope as non-overlapping — unsafe default for swarm dispatch if relied on blindly.",
+      "mitigation": "D5: foreman serializes scope-less items; readiness lint warns on missing files_scope at finalize so swarm-eligible plans arrive fully scoped."
+    },
+    {
+      "id": "H7",
+      "summary": "scripts/lint-skills.sh fails CI when a SKILL.md references CLI flags/commands that don't exist yet (cross-bead ordering trap: a1-skills-contract must not mention --strict before a2-finalize-wiring lands).",
+      "mitigation": "Bead ordering: a1-skills-contract blocks a2-finalize-wiring; --strict documentation lands in the same commit as the flag; pan slot joins the exclusion list in b-slot-cli's commit."
+    },
+    {
+      "id": "H8",
+      "summary": "Slot verify/merge helpers are server-reachable in principle — execSync would freeze the dashboard event loop.",
+      "mitigation": "All new swarm/* and drift code uses async exec only; explicit AC on b-slot-spawn-lib and b-verify-merge-lib; retry/timeout tests use fake timers per repo rule."
+    },
+    {
+      "id": "H9",
+      "summary": "Review/done paths must tolerate absent drift/footprint data (all pre-contract issues).",
+      "mitigation": "scopeDrift and predictedConflictsWith are optional fields; explicit ACs require no-data behavior identical to today; drift errors never fail pan done."
+    },
+    {
+      "id": "H10",
+      "summary": "Per-slot cost attribution: dashboard must roll agent-<issue>-slot-<n> costs up under the issue (PRD risk #5).",
+      "mitigation": "Slot IDs follow the agent-<issue>-* convention resource discovery already groups by; b-slot-spawn-lib AC3 verifies dashboard nesting."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
   "sessionHistory": [
     {
       "reason": "planning",
@@ -32,5 +119,97 @@
       "agentModel": "claude-opus-4-8",
       "timestamp": "2026-06-30T15:13:06.094Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-30T14:17:38.720Z",
+  "updated": "2026-06-30T17:01:27.390Z",
+  "pipeline": {
+    "issueId": "PAN-1762",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-30T16:03:01.747Z",
+    "inspectNotes": "INSPECTION PASSED for bead workspace-qcwbs. Spec fidelity: slot-spawn-tier diff adds optional slot options, derives agent-pan-1762-n, feature/pan-1762/slot-n, and slot workspace paths, preserves default single-agent path, creates slot worktrees, and enforces a registered-slot cap. Constraint compliance: no prohibited swarm runtime/server route restoration, no execSync or sync tmux use, and scope stays within spawn.ts/spawn-prep.ts plus focused unit coverage."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 23004,
+            "output": 249,
+            "cacheRead": 33978,
+            "cacheWrite": 76638
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 4,
+            "output": 6114,
+            "cacheRead": 799369,
+            "cacheWrite": 6895
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 1137520,
+            "output": 47380,
+            "cacheRead": 7988224,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 46839,
+            "output": 6737,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 31135,
+            "output": 144100,
+            "cacheRead": 10188539,
+            "cacheWrite": 1204989
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 23004,
+          "output": 249,
+          "cacheRead": 33978,
+          "cacheWrite": 76638
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 31139,
+          "output": 150214,
+          "cacheRead": 10987908,
+          "cacheWrite": 1211884
+        },
+        "openai/gpt-5.5": {
+          "input": 1137520,
+          "output": 47380,
+          "cacheRead": 7988224,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 46839,
+          "output": 6737,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 29.316831,
+        "pricingAsOf": "2026-06-30T16:03:01.839Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
