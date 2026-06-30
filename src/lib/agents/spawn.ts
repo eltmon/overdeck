@@ -4,7 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { homedir } from 'os';
-import { join, resolve } from 'path';
+import { dirname, join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { assertIssueHasBeads, BeadsMissingError } from '../beads-query.js';
@@ -50,14 +50,18 @@ import {
   buildAgentLaunchConfig,
   defaultRunWorkspace,
   flywheelEnvExports,
+  resolveRegisteredSlotSpawn,
   resolveFlywheelSpawnEnv,
   runAgentId,
   transitionIssueToInProgress,
   withSpawnTimeMemoryContext,
   assertWorkspaceStackHealthyForSpawn,
+  type RegisteredSlotSpawn,
   type SpawnOptions,
   type SpawnRunOptions,
 } from './spawn-prep.js';
+import { getConcurrencyLimits } from '../cloister/concurrency.js';
+import { listAgentStates } from './queries.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -75,9 +79,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
 
   if (role === 'work') {
+    const slot = resolveRegisteredSlotSpawn(issueId, workspace, options);
+    if (slot) {
+      assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
+      await ensureRegisteredSlotWorktree(workspace, slot);
+    }
     return spawnAgent({
       issueId,
-      workspace,
+      workspace: slot?.workspace ?? workspace,
+      agentId: slot?.agentId,
       harness: options.harness,
       model: selectedModel,
       prompt: options.prompt,
@@ -362,9 +372,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
-  // PAN-1517: slot-suffixed agent ids removed alongside the swarm runtime;
-  // there is one work agent per issue, period.
-  const agentId = `${sessionPrefix}-${options.issueId.toLowerCase()}`;
+  const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await Effect.runPromise(sessionExists(agentId))) {
@@ -748,6 +756,51 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   return state;
+}
+
+function assertRegisteredSlotCap(issueId: string, configuredCap?: number): void {
+  const cap = configuredCap ?? getConcurrencyLimits().maxWorkAgents;
+  if (!Number.isInteger(cap) || cap < 1) {
+    throw new Error(`Registered slot cap must be a positive integer; got ${cap}.`);
+  }
+
+  const issueLower = issueId.toLowerCase();
+  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-\\d+$`);
+  const activeSlots = listAgentStates({ role: 'work' }).filter(agent =>
+    slotAgentPattern.test(agent.id)
+    && (agent.status === 'starting' || agent.status === 'running')
+  );
+  if (activeSlots.length >= cap) {
+    throw new Error(
+      `Registered slot cap reached for ${issueId}: ${activeSlots.length}/${cap} active slot agents.`
+    );
+  }
+}
+
+async function ensureRegisteredSlotWorktree(baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
+  if (existsSync(slot.workspace)) return;
+
+  await mkdir(dirname(slot.workspace), { recursive: true });
+  const branchExists = await gitBranchExists(baseWorkspace, slot.branch);
+  const target = JSON.stringify(slot.workspace);
+  const branch = JSON.stringify(slot.branch);
+  const command = branchExists
+    ? `git worktree add ${target} ${branch}`
+    : `git worktree add -b ${branch} ${target} HEAD`;
+  await execAsync(command, { cwd: baseWorkspace });
+}
+
+async function gitBranchExists(workspace: string, branch: string): Promise<boolean> {
+  try {
+    await execAsync(`git show-ref --verify --quiet ${JSON.stringify(`refs/heads/${branch}`)}`, { cwd: workspace });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**

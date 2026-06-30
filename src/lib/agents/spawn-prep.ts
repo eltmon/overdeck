@@ -80,10 +80,11 @@ export interface SpawnOptions {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Explicit work type ID (overrides phase-based detection)
 
-  // PAN-1517: swarm slot fields removed (slotId, swarmItemId). Parallelism
-  // is now in-context via subagents (see roles/work.md), not via slot agents.
-  // `allowHost` (workspace-isolation override) stays — it predates the swarm
-  // runtime and is used by review/test/ship agents independently.
+  /**
+   * Optional registered slot agent id. Omitted for the default one-work-agent
+   * path; set only by spawnRun when launching a per-item slot.
+   */
+  agentId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
@@ -116,6 +117,48 @@ export interface SpawnRunOptions {
   effort?: RoleEffort;
   resumeSessionId?: string;
   flywheelRunId?: string;
+  /** 1-based registered slot index for per-item work-agent spawning. */
+  slotIndex?: number;
+  /** vBRIEF item id assigned to this registered slot. Required with slotIndex. */
+  slotItemId?: string;
+  /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
+  maxRegisteredSlots?: number;
+}
+
+export interface RegisteredSlotSpawn {
+  agentId: string;
+  branch: string;
+  workspace: string;
+  slotIndex: number;
+  slotItemId: string;
+}
+
+export function resolveRegisteredSlotSpawn(
+  issueId: string,
+  baseWorkspace: string,
+  options: Pick<SpawnRunOptions, 'slotIndex' | 'slotItemId'>,
+): RegisteredSlotSpawn | null {
+  const { slotIndex, slotItemId: slotItemIdRaw } = options;
+  if (slotIndex === undefined && slotItemIdRaw === undefined) return null;
+  if (slotIndex === undefined || slotItemIdRaw === undefined) {
+    throw new Error('Registered slot spawn requires both slotIndex and slotItemId.');
+  }
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) {
+    throw new Error(`Registered slot index must be a positive integer; got ${slotIndex}.`);
+  }
+  const slotItemId = slotItemIdRaw.trim();
+  if (!slotItemId) {
+    throw new Error('Registered slot spawn requires a non-empty slotItemId.');
+  }
+
+  const issueLower = issueId.toLowerCase();
+  return {
+    agentId: `agent-${issueLower}-${slotIndex}`,
+    branch: `feature/${issueLower}/slot-${slotIndex}`,
+    workspace: `${baseWorkspace}-slot-${slotIndex}`,
+    slotIndex,
+    slotItemId,
+  };
 }
 
 /**
