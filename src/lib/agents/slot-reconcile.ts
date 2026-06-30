@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
 import { analyzeSwarmReadiness } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import { listAgentStates } from './queries.js';
@@ -63,7 +64,8 @@ export async function reconcileSlotState(
   const agents = deps.listAgents(issueId);
   const branchesBySlot = new Map(branches.map(branch => [branch.slotIndex, branch]));
   const agentsBySlot = new Map(agents.map(agent => [agent.slotIndex, agent]));
-  const slotItems = analyzeSwarmReadiness(doc).items
+  const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspace));
+  const slotItems = analyzeSwarmReadiness(doc, { hotspots }).items
     .filter(item => item.slotEligible)
     .map((item, index) => ({ itemId: item.id, slotIndex: index + 1 }));
 

@@ -12,6 +12,7 @@ import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
+import { findProjectByPathSync, getProjectSwarmHotspots } from '../../lib/projects.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -173,7 +174,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const planDoc = readPlanSync(planPath);
   const prdText = readPrdDraftText(workspacePath, issueId);
   const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText });
-  const readinessReport = formatReadinessReport(analyzeSwarmReadiness(planDoc));
+  const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspacePath));
+  const readinessReport = formatReadinessReport(analyzeSwarmReadiness(planDoc, { hotspots }));
   if (qualityGate.skipped) {
     if (!options.json) {
       console.error(chalk.yellow('⚠ quality lint SKIPPED (--no-quality-lint)'));
