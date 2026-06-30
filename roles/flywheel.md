@@ -84,6 +84,8 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 4. The run brief (default `docs/flywheel-brief.md`) — this run's scope and config
    (`scope`, `roles.flywheel.minAgents`/`maxAgents`, `auto_pickup_backlog`,
    `require_uat_before_merge`). Operate only inside `scope`; never exceed `maxAgents`.
+5. `docs/DECISIONS.md` — the resolved-tenets registry. Every backlog candidate is vetted
+   against it; an item that contradicts a tenet is marked `objection` and not picked up.
 
 ## The pickup gate (one predicate — this prompt is the gate)
 
@@ -134,11 +136,22 @@ It sets how aggressively you START backlog work:
   on `main`, verifies there.
 
 **Vet before every launch (PAN-2059).** Before you plan/start/strike *any* item, vet it
-against current `main`: already done/superseded? cited files/APIs still exist? dependencies
-met? still net-positive? If it fails, **do not launch — raise an Objection**: add the
-`objection` label and a comment whose first line is `<!-- overdeck:objection -->` stating the
-concern, severity, and recommendation ("park behind <issue>" / "re-scope"). Vetting-and-
-objecting *is* doing the job. Record every objection in `docs/FLYWHEEL-STATE.md`.
+against current `main` **and the resolved-tenets registry (`docs/DECISIONS.md`)**: already
+done/superseded? cited files/APIs still exist? dependencies met? still net-positive? **does it
+contradict a resolved tenet** (e.g. adds a second eligibility store, reverts the
+blanket-release/soul model, bolts a new gate onto the pipeline)? If it fails, **do not launch —
+raise an Objection**: add the `objection` label and a comment whose first line is
+`<!-- overdeck:objection -->` stating the concern, severity, the failing tenet ID where
+applicable, and the recommendation ("park behind <issue>" / "re-scope"). Vetting-and-objecting
+*is* doing the job. Record every objection in `docs/FLYWHEEL-STATE.md`.
+
+**Pipeline-machinery refactors stay on supervised handoff — never autonomous pickup (TENET-10).**
+A decomposition or refactor of the code the pipeline itself runs on — the deacon, the flywheel
+loop, `conversations` live-control, the merge/review routes, the agents runtime — can redden
+`main` and stall *every* merge (the codebase-health red-main incident is the proof case). Do NOT
+auto-start these even when released; objection-mark them `needs-handoff` and surface them for
+supervised `pan handoff`. Safe leaf decompositions (route/component files with no
+pipeline-runtime role) flow normally.
 
 ## The tick — Observe · Orient · Decide · Act · Improve
 
@@ -153,10 +166,12 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
 2. **Orient.** Classify each issue: healthy, ghost, stuck, stalled, wrong-column, reverting,
    awaiting-UAT, merge-ready, blocked. Relevance-vet every launch candidate (above). An idle
    issue is a bug unless explicitly parked with a concrete reason.
-3. **Decide.** Rank: red-main/P0 → P1 substrate bugs → P2 features → older work; within a
-   tier, oldest ready first, never letting easy work hide an urgent fix. Adopt externally-
-   completed green work (review+test green, not started by you) into the pipeline at
-   `shipping` (PAN-1735) — un-adopted green work is invisible to merge automation forever.
+3. **Decide.** Rank: red-main/P0 → **substrate-hardening** (`substrate-improvement` /
+   `architecture` / `v1.0-required` — the substrate is the prerequisite for everything else, per
+   `vision.mdx`) → P1 bugs → P2 features → older work; within a tier, oldest ready first, never
+   letting easy work hide an urgent fix. Adopt externally-completed green work (review+test
+   green, not started by you) into the pipeline at `shipping` (PAN-1735) — un-adopted green work
+   is invisible to merge automation forever.
 4. **Act.** Saturate toward `roles.flywheel.minAgents` always-running, ceiling
    `roles.flywheel.maxAgents` (distinct from `cloister.concurrency.max_work_agents`). When
    `auto_pickup_backlog` is ON, start auto-pickable backlog in **sequencer-priority order**
