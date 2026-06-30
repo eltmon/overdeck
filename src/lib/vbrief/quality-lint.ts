@@ -8,6 +8,7 @@ import {
   type VBriefItemMetadata,
   type VBriefSubItem,
 } from './types.js';
+import { analyzeSwarmReadiness } from './swarm-readiness.js';
 
 export interface QualityIssue {
   itemId: string | null;
@@ -25,6 +26,7 @@ export class PlanQualityLintError extends Error {
 
 export interface QualityLintOptions {
   prdText?: string;
+  hotspots?: string[];
 }
 
 // These lists are summarized in src/lib/cloister/prompts/planning.md (WI-14) — update both together.
@@ -238,6 +240,46 @@ function lintTraceCoverage(doc: VBriefDocument, prdText?: string): QualityIssue[
     .map(id => warning(null, 'trace-uncovered', `Requirement ${id} is declared in the PRD but no plan item metadata.traces references it`));
 }
 
+function orderedPairKey(left: string, right: string): string {
+  return [left, right].sort().join('\0');
+}
+
+function connectedBlocksPairs(doc: VBriefDocument): Set<string> {
+  const itemIds = new Set(doc.plan.items.map(item => item.id));
+  const pairs = new Set<string>();
+  for (const edge of doc.plan.edges ?? []) {
+    if (edge.type !== 'blocks' || !itemIds.has(edge.from) || !itemIds.has(edge.to)) continue;
+    pairs.add(orderedPairKey(edge.from, edge.to));
+  }
+  return pairs;
+}
+
+function lintOverlapAudit(doc: VBriefDocument, options: Pick<QualityLintOptions, 'hotspots'> = {}): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  const activeItemIds = new Set(doc.plan.items.filter(item => item.status !== 'cancelled').map(item => item.id));
+  const connectedPairs = connectedBlocksPairs(doc);
+  const seenPairs = new Set<string>();
+  const verdict = analyzeSwarmReadiness(doc, { hotspots: options.hotspots });
+
+  for (const group of verdict.conflictGroups) {
+    if (group.itemIds.length !== 2 || group.sharedFiles.length === 0) continue;
+    const [left, right] = group.itemIds;
+    if (!left || !right || !activeItemIds.has(left) || !activeItemIds.has(right)) continue;
+
+    const pairKey = orderedPairKey(left, right);
+    if (connectedPairs.has(pairKey) || seenPairs.has(pairKey)) continue;
+    seenPairs.add(pairKey);
+
+    issues.push(warning(
+      null,
+      'files-scope-overlap',
+      `Items ${left} and ${right} have overlapping metadata.files_scope entries: ${group.sharedFiles.join(', ')}. Add a blocks edge, merge the items, or accept serialization.`,
+    ));
+  }
+
+  return issues;
+}
+
 function hasBlocksCycle(doc: VBriefDocument): boolean {
   const itemIds = new Set(doc.plan.items.map(item => item.id));
   const inDegree = new Map<string, number>();
@@ -274,6 +316,7 @@ export function lintPlanQuality(doc: VBriefDocument, options: QualityLintOptions
     ...doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item)),
     ...lintDocumentReferences(doc),
     ...lintTraceCoverage(doc, options.prdText),
+    ...lintOverlapAudit(doc, options),
   ];
 }
 

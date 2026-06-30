@@ -29,12 +29,12 @@ export type PlanFinalizeQualityGateResult =
 
 export function evaluatePlanFinalizeQualityGate(
   doc: VBriefDocument,
-  options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string } = {},
+  options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string; hotspots?: string[] } = {},
 ): PlanFinalizeQualityGateResult {
   if (options.qualityLint === false) {
     return { ok: true, skipped: true, issues: [] };
   }
-  const issues = lintPlanQuality(doc, { prdText: options.prdText });
+  const issues = lintPlanQuality(doc, { prdText: options.prdText, hotspots: options.hotspots });
   const errors = issues.filter(issue => issue.severity === 'error');
   return errors.length > 0
     ? { ok: false, skipped: false, issues }
@@ -173,8 +173,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planDoc = readPlanSync(planPath);
   const prdText = readPrdDraftText(workspacePath, issueId);
-  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText });
   const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspacePath));
+  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText, hotspots });
   const readinessReport = formatReadinessReport(analyzeSwarmReadiness(planDoc, { hotspots }));
   if (qualityGate.skipped) {
     if (!options.json) {

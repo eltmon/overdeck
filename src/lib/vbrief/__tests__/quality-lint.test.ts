@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS } from '../quality-lint.js';
+import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, qualityLintErrors } from '../quality-lint.js';
 import type { VBriefDocument, VBriefItem } from '../types.js';
 
 function ac(id: string, title: string) {
@@ -191,6 +191,47 @@ describe('lintPlanQuality dispatch metadata', () => {
     ]))).toEqual(expect.arrayContaining([
       expect.objectContaining({ itemId: 'item-1', rule: 'expected-output-banned-phrase', severity: 'error' }),
     ]));
+  });
+});
+
+describe('lintPlanQuality overlap audit', () => {
+  it('warns when two edge-unconnected items have overlapping files_scope entries', () => {
+    const issues = lintPlanQuality(doc([
+      item({ id: 'a', metadata: { files_scope: ['src/shared.ts'] } }),
+      item({ id: 'b', metadata: { files_scope: ['src/shared.ts'] } }),
+    ]));
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        itemId: null,
+        rule: 'files-scope-overlap',
+        severity: 'warn',
+        message: expect.stringContaining('src/shared.ts'),
+      }),
+    ]));
+    expect(qualityLintErrors(doc([
+      item({ id: 'a', metadata: { files_scope: ['src/shared.ts'] } }),
+      item({ id: 'b', metadata: { files_scope: ['src/shared.ts'] } }),
+    ])).map(issue => issue.rule)).not.toContain('files-scope-overlap');
+  });
+
+  it('does not warn when a blocks edge orders the overlapping items', () => {
+    const plan = doc([
+      item({ id: 'a', metadata: { files_scope: ['src/shared.ts'] } }),
+      item({ id: 'b', metadata: { files_scope: ['src/shared.ts'] } }),
+    ]);
+    plan.plan.edges = [{ from: 'a', to: 'b', type: 'blocks' }];
+
+    expect(lintPlanQuality(plan).map(issue => issue.rule)).not.toContain('files-scope-overlap');
+  });
+
+  it('does not warn when the overlap is only a configured hotspot', () => {
+    const plan = doc([
+      item({ id: 'a', metadata: { files_scope: ['package-lock.json'] } }),
+      item({ id: 'b', metadata: { files_scope: ['package-lock.json'] } }),
+    ]);
+
+    expect(lintPlanQuality(plan, { hotspots: ['package-lock.json'] }).map(issue => issue.rule)).not.toContain('files-scope-overlap');
   });
 });
 
