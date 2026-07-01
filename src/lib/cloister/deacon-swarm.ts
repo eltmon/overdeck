@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
-import { getAgentRuntimeStateSync, type AgentRuntimeState } from '../agents.js';
+import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 import { spawnRun } from '../agents/spawn.js';
 import type { SpawnRunOptions } from '../agents/spawn-prep.js';
 import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
@@ -58,7 +59,7 @@ export interface CoordinateSwarmSlotsDeps {
   listSessionNames: () => Promise<readonly string[]>;
   isPaneDead: (sessionName: string) => Promise<boolean>;
   getPaneExitStatus: (sessionName: string) => Promise<number | null>;
-  getAgentRuntimeState: (agentId: string) => AgentRuntimeState | null;
+  getAgentRuntimeState: (agentId: string) => Promise<Pick<AgentRuntimeSnapshot, 'resolution'> | null>;
   getPaneOutputDigest: (sessionName: string) => Promise<string>;
   getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
@@ -91,7 +92,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
     const status = Number(raw);
     return Number.isFinite(status) ? status : null;
   },
-  getAgentRuntimeState: getAgentRuntimeStateSync,
+  getAgentRuntimeState: (agentId) => Effect.runPromise(getAgentRuntimeSnapshot(agentId)),
   getPaneOutputDigest: async (sessionName) => Effect.runPromise(capturePane(sessionName, 200)),
   getBranchTipCommitTime: async (workspacePath, branch) => {
     try {
@@ -222,7 +223,7 @@ export async function classifyInFlightSlots(
       continue;
     }
 
-    const runtimeState = deps.getAgentRuntimeState?.(slot.agentId);
+    const runtimeState = deps.getAgentRuntimeState ? await deps.getAgentRuntimeState(slot.agentId) : null;
     if (runtimeState?.resolution === 'done' || runtimeState?.resolution === 'completed') {
       classified.push({ ...slot, lifecycle: 'ready-to-merge', exitStatus: 0 });
       continue;

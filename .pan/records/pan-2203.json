@@ -6,19 +6,16 @@
   "model": "MiniMax-M3",
   "pipeline": {
     "issueId": "PAN-2203",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T15:34:22.261Z",
-    "reviewNotes": "No blocking findings in reviewed PAN-2203 diff",
-    "testNotes": "Typecheck: PASS. Lint: PASS. Tests: 19 FAILED / 7643 passed. Failures: (1) synced-skills.test.ts: pan-swarm skill added but fixture not updated; (2) foreman-swarm.test.ts: dispatch logic not wired (empty inFlight); (3) auto-resume-gating.test.ts (16 failures): mock for releaseAdvancingSlot missing. Root cause: incomplete deacon-swarm integration, missing export, stale skills fixture. Per vBRIEF, all wi-1..wi-12 remain pending — implementation is incomplete.",
+    "updatedAt": "2026-07-01T15:37:30.286Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
-    "reviewedAtCommit": "3b4430379f4cacd53fcfdba2c1e43f6ba2a46b95",
     "reviewRequestedAt": "2026-07-01T13:10:33.200Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -131,10 +128,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 47,
-            "output": 1277,
-            "cacheRead": 544063,
-            "cacheWrite": 122980
+            "input": 48,
+            "output": 1604,
+            "cacheRead": 637679,
+            "cacheWrite": 123632
           }
         }
       },
@@ -164,15 +161,15 @@
           "cacheWrite": 883825
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 47,
-          "output": 1277,
-          "cacheRead": 544063,
-          "cacheWrite": 122980
+          "input": 48,
+          "output": 1604,
+          "cacheRead": 637679,
+          "cacheWrite": 123632
         }
       },
       "costAtCloseOut": {
-        "usd": 29.438368,
-        "pricingAsOf": "2026-07-01T15:34:22.323Z"
+        "usd": 29.450181,
+        "pricingAsOf": "2026-07-01T15:37:30.319Z"
       }
     },
     "merges": [
@@ -181,5 +178,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T15:34:18.466Z",
-  "updated": "2026-07-01T15:34:22.344Z"
+  "updated": "2026-07-01T15:37:30.325Z"
 }

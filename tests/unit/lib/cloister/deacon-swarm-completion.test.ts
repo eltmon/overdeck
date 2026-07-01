@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { classifyInFlightSlots, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { ReconciledSlotItem } from '../../../../src/lib/agents/slot-reconcile.js';
-import type { AgentRuntimeState } from '../../../../src/lib/agents.js';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 
 function slot(slotIndex: number, agentId = `agent-pan-2203-slot-${slotIndex}`): ReconciledSlotItem {
   return {
@@ -17,13 +17,13 @@ function deps(options: {
   sessions?: string[];
   dead?: Record<string, boolean>;
   exitStatus?: Record<string, number | null>;
-  runtime?: Record<string, Partial<AgentRuntimeState>>;
+  runtime?: Record<string, Pick<AgentRuntimeSnapshot, 'resolution'>>;
 }): Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus' | 'getAgentRuntimeState'> {
   return {
     listSessionNames: vi.fn(async () => options.sessions ?? []),
     isPaneDead: vi.fn(async (sessionName: string) => options.dead?.[sessionName] ?? false),
     getPaneExitStatus: vi.fn(async (sessionName: string) => options.exitStatus?.[sessionName] ?? null),
-    getAgentRuntimeState: vi.fn((agentId: string) => options.runtime?.[agentId] as AgentRuntimeState | undefined ?? null),
+    getAgentRuntimeState: vi.fn(async (agentId: string) => options.runtime?.[agentId] ?? null),
   };
 }
 
@@ -48,10 +48,7 @@ describe('deacon-swarm completion classification', () => {
       dead: { [agentId]: false },
       runtime: {
         [agentId]: {
-          state: 'idle',
-          lastActivity: '2026-07-01T00:00:00.000Z',
           resolution: 'completed',
-          resolutionCount: 1,
         },
       },
     }))).resolves.toEqual([
