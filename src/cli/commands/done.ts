@@ -445,6 +445,7 @@ async function completeSlotWork(issueId: string, slot: SlotCompletionContext, co
   saveAgentRuntimeState(slot.agentId, {
     state: 'idle',
     resolution: 'completed',
+    resolutionCount: 1,
     resolutionUpdatedAt: now,
     lastActivity: now,
   });
