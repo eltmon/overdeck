@@ -66,6 +66,22 @@ function makeDoc(issueId: string, itemCount: number): VBriefDocument {
 }
 
 describe('coordinateSwarmSlots enumerate-swarms', () => {
+  it('preserves feature workspace listing for existing cleanup callers by default', async () => {
+    const { listFeatureWorkspaces } = await import('../../../../src/lib/cloister/deacon-workspaces.js');
+    const projectPath = join(tempRoot, 'project');
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-099'), { recursive: true });
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-099-slot-1'), { recursive: true });
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    expect(listFeatureWorkspaces().map(workspace => workspace.issueId).sort()).toEqual([
+      'PAN-099',
+      'PAN-099-SLOT-1',
+    ]);
+    expect(listFeatureWorkspaces({ includeSlotWorkspaces: false }).map(workspace => workspace.issueId)).toEqual([
+      'PAN-099',
+    ]);
+  });
+
   it('enumerates feature workspaces whose main-side vBRIEF is swarm eligible', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
