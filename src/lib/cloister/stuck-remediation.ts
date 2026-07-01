@@ -14,7 +14,7 @@ import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { describeAgentDeath } from './agent-death.js';
-import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
+import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
   clearStuckRemediationState,
   readStuckRemediationState,
@@ -187,6 +187,7 @@ async function evaluateAgent(
 //      idleMin=205 and the entire pipeline stalled).
 const FLYWHEEL_RESPAWN_WINDOW_MS = 30 * 60 * 1000;
 const FLYWHEEL_MAX_RESPAWNS = 3;
+const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
 export type FlywheelRemediationDecision =
   | { kind: 'noop' }
@@ -348,19 +349,47 @@ async function evaluateFlywheelOrchestrator(
   }
 }
 
+async function reconcileActiveFlywheelWithoutRunningAgent(now: number, actions: string[]): Promise<void> {
+  if (!getFlywheelActiveRunId()) return;
+  if (isFlywheelGloballyPaused()) return;
+  if (sessionExistsSync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) return;
+
+  await remediateFlywheelOrchestrator(
+    FLYWHEEL_ORCHESTRATOR_AGENT_ID,
+    now,
+    actions,
+    `DIED (${describeAgentDeath(FLYWHEEL_ORCHESTRATOR_AGENT_ID)})`,
+  );
+}
+
 export async function checkStuckAgentRemediation(opts: StuckRemediationOptions = {}): Promise<string[]> {
   const config = loadCloisterConfigSync().stuck_remediation ?? DEFAULT_CLOISTER_CONFIG.stuck_remediation!;
   if (!config.enabled) return [];
 
   const actions: string[] = [];
   const now = opts.now ?? Date.now();
+  const runningAgents = listRunningAgentsSync();
+  let sawFlywheelOrchestrator = false;
 
-  for (const agent of listRunningAgentsSync()) {
+  for (const agent of runningAgents) {
+    if (agent.id === FLYWHEEL_ORCHESTRATOR_AGENT_ID || agent.role === 'flywheel') {
+      sawFlywheelOrchestrator = true;
+    }
     try {
       await evaluateAgent(agent, config, now, actions);
     } catch (error) {
       const agentId = agent.id || '(unknown)';
       const message = `[deacon] stuck-remediation agent=${agentId} error=${error instanceof Error ? error.message : String(error)}`;
+      console.error(message, error);
+      logDeaconEventSync(message);
+    }
+  }
+
+  if (!sawFlywheelOrchestrator) {
+    try {
+      await reconcileActiveFlywheelWithoutRunningAgent(now, actions);
+    } catch (error) {
+      const message = `[deacon] stuck-remediation agent=${FLYWHEEL_ORCHESTRATOR_AGENT_ID} error=${error instanceof Error ? error.message : String(error)}`;
       console.error(message, error);
       logDeaconEventSync(message);
     }
