@@ -9,7 +9,13 @@ import { reconcileSlotState, type ReconciledSlotItem, type SlotReconcileResult }
 import { listAgentStates } from '../agents/queries.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
 import { isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
-import { applyTaskOperationToPlanFile, getDispatchableItems, type PersistedTaskOperation } from '../vbrief/dag.js';
+import {
+  applyTaskOperationToPlanFile,
+  blockingParentCount,
+  createActiveSlice,
+  getDispatchableItems,
+  type PersistedTaskOperation,
+} from '../vbrief/dag.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getConcurrencyLimits, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
@@ -268,10 +274,11 @@ export async function dispatchNextWave(
         workspace: workspacePath,
         slotIndex,
         slotItemId: item.id,
+        prompt: promptForDispatchItem(issueId, doc, item),
       });
       occupiedSlotIndexes.add(slotIndex);
       selectedItemIds.push(item.id);
-      actions.push(`[swarm] dispatched slot ${slotIndex} (item ${item.id}) for ${issueId}`);
+      actions.push(`[swarm] dispatched ${dispatchPhaseForItem(doc, item)} slot ${slotIndex} (item ${item.id}) for ${issueId}`);
     } catch (error) {
       await deps.applyTaskOperationToPlanFile(planPath, {
         type: 'unblock',
@@ -285,6 +292,46 @@ export async function dispatchNextWave(
   }
 
   return actions;
+}
+
+function dispatchPhaseForItem(doc: VBriefDocument, item: VBriefItem): 'implementation' | 'synthesis' {
+  return itemRequiresSynthesis(doc, item) && !synthesisContextForItem(item) ? 'synthesis' : 'implementation';
+}
+
+function promptForDispatchItem(issueId: string, doc: VBriefDocument, item: VBriefItem): string | undefined {
+  if (!itemRequiresSynthesis(doc, item)) return undefined;
+
+  const synthesisContext = synthesisContextForItem(item);
+  if (synthesisContext) {
+    return createActiveSlice(doc, {
+      issueId,
+      itemId: item.id,
+      currentItemIds: [item.id],
+      synthesisOutputs: { [item.id]: { contextUpdate: synthesisContext } },
+    }).prompt;
+  }
+
+  const parentIds = doc.plan.edges
+    .filter(edge => edge.type === 'blocks' && edge.to === item.id)
+    .map(edge => edge.from);
+
+  return [
+    `SYNTHESIS PHASE for ${item.id}`,
+    '',
+    'Do not implement this item yet. Summarize the blocking parent outputs into a concise context update for the implementation slot.',
+    `Blocking parents: ${parentIds.join(', ') || '(none)'}`,
+    '',
+    'Persist the synthesis context on the vBRIEF item metadata as synthesisContext, commit it, then stop.',
+  ].join('\n');
+}
+
+function itemRequiresSynthesis(doc: VBriefDocument, item: VBriefItem): boolean {
+  return item.metadata?.requiresSynthesis === true || blockingParentCount(doc, item.id) > 1;
+}
+
+function synthesisContextForItem(item: VBriefItem): string | undefined {
+  const raw = item.metadata?.synthesisContext;
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw : undefined;
 }
 
 function lowestFreeSlotIndex(occupiedSlotIndexes: Set<number>): number {

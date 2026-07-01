@@ -103,8 +103,8 @@ describe('deacon-swarm next-wave dispatch', () => {
       analyzeSwarmReadiness(plan),
       fakeDeps,
     )).resolves.toEqual([
-      '[swarm] dispatched slot 1 (item wi-a) for PAN-2203',
-      '[swarm] dispatched slot 2 (item wi-b) for PAN-2203',
+      '[swarm] dispatched implementation slot 1 (item wi-a) for PAN-2203',
+      '[swarm] dispatched implementation slot 2 (item wi-b) for PAN-2203',
     ]);
 
     expect(fakeDeps.spawnRun).toHaveBeenCalledTimes(2);
@@ -135,7 +135,7 @@ describe('deacon-swarm next-wave dispatch', () => {
       analyzeSwarmReadiness(plan),
       fakeDeps,
     )).resolves.toEqual([
-      '[swarm] dispatched slot 1 (item wi-a) for PAN-2203',
+      '[swarm] dispatched implementation slot 1 (item wi-a) for PAN-2203',
       '[swarm] deferred wi-b for PAN-2203: files_scope overlaps wi-a',
     ]);
 
