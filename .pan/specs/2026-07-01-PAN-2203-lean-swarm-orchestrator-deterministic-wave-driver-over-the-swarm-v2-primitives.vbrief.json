@@ -1,0 +1,929 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-01T02:37:04.022Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2203: Lean swarm orchestrator: deterministic wave-driver over the swarm-v2 primitives (deferred PAN-1762 follow-up)",
+    "updated": "2026-07-01T02:44:10.005Z"
+  },
+  "plan": {
+    "id": "pan-2203",
+    "title": "Lean swarm orchestrator: deterministic wave-driver over the swarm-v2 primitives",
+    "status": "proposed",
+    "uid": "8883aa29-8773-4457-b1a3-e0011a33a786",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-01T02:37:04.022Z",
+    "updated": "2026-07-01T02:44:10.005Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2203",
+        "label": "PAN-2203",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2203.md",
+        "label": "PRD: PAN-2203 Lean Swarm Orchestrator",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "cloister",
+      "deacon",
+      "orchestration",
+      "pan-1762-followup"
+    ],
+    "narratives": {
+      "Problem": "PAN-1762 shipped the swarm-v2 primitives (dispatch-tier, swarm-readiness, resolveRegisteredSlotSpawn, verifyAndMergeSlot, reconcileSlotState) but ZERO production callers wire them into a loop — verifyAndMergeSlot / reconcileSlotState / spawnRun({slotIndex}) have only test callers, analyzeSwarmReadiness is called only by the finalize readiness report, and there is no `pan swarm` command. Parallel intra-issue execution therefore only works if a work-agent LLM hand-executes the prose foreman protocol at roles/work.md:70-107 — fragile and unsafe unattended. The full old orchestrator (src/dashboard/server/routes/swarm.ts, 2598 lines) was deleted in 59f1e6cd4a partly for cause (no recovery when a slot's branch becomes unmergeable, PAN-1194).",
+      "Proposal": "Turn the prose foreman loop into a deterministic, deacon-integrated coordination pass over the existing primitives: dispatch wave -> detect completion -> verify+merge -> advance -> recover. A new coordinateSwarmSlots() pass in src/lib/cloister/deacon-swarm.ts runs each runPatrol() tick (successor to the deleted detectMergedSwarmSlots patrol), with an optional agent.stopped reactive fast-path for near-instant advance. A thin `pan swarm <id>` CLI validates readiness and dispatches wave 0, then hands ongoing coordination to the deacon. Derive-don't-store: each tick re-derives merged/in-flight/pending from live git slot branches + tmux + the immutable main-side vBRIEF via reconcileSlotState; the only durable state is the vBRIEF item status the pipeline already owns. The deleted route is the LOGIC reference (auto-advance, cooldown, failed-merge recovery), not the revival — its stateful bloat is dropped.",
+      "NonGoals": "- Remote Fly slots (tracked in PAN-1773, Phase 2; depends on this + PAN-1676)\n- Difficulty/model routing, tier table, and supervisor feeds (PAN-1791's axis; layers on top of this loop, sequenced after)\n- Cross-issue concurrency slot manager (PAN-1666; different axis, interacts only at the shared local agent-pool ceiling)\n- Reviving the deleted stateful SwarmState.slots array or its dual continue.json/sidecar persistence (explicitly rejected by D1/NFR-1)\n- Any new HTTP route or dashboard-server endpoint for swarm coordination (deacon-integrated by D2)\n- Direct mutation of the main-side vBRIEF spec (forbidden by the PAN-1124 single-spec-on-main invariant)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Accepted the PRD's locked design decisions D1-D6 verbatim as the plan basis without operator confirmation (auto mode).",
+        "rationale": "The PRD (.pan/drafts/pan-2203.md) is an explicit implementation brief whose file paths, symbols, and insertion points were re-verified accurate against main on 2026-06-30 during this session. No contradiction between the issue body and the PRD was found, so the auto-mode default is to execute the brief as written."
+      },
+      {
+        "summary": "Split PRD work item WI-10 into three independent beads: wi-10-dashboard (per-slot dashboard identity, PAN-1263), wi-10-verdict (verdict->owning-slot routing, PAN-1472), and wi-10-gc (terminal slot GC, PAN-1202).",
+        "rationale": "The decompose-aggressively planning guidance says folded-issue bundles should be split into independently reviewable/mergeable beads; these three touch different subsystems (frontend tree vs verdict routing vs git worktree GC) and fold three distinct old issues, so each is separately testable."
+      },
+      {
+        "summary": "Marked most implementation beads readiness:sequential rather than ready, and only wi-1 as readiness:ready.",
+        "rationale": "wi-2..wi-7, wi-9, and wi-10-gc all edit the same new file src/lib/cloister/deacon-swarm.ts; dispatching them as concurrent slots would collide on that file. Honest readiness classification serializes them behind the wi-1 foundation. This epic is largely a single-file build-up, not a wide parallel swarm."
+      },
+      {
+        "summary": "Assigned requiresInspection:true to exactly two beads — wi-1 (deep) and wi-4 (fast).",
+        "rationale": "wi-1 defines the coordinateSwarmSlots module + signature + enumerate contract that every other bead builds on (foundation); wi-4 defines the capacity+overlap+claim-before-spawn dispatch contract that wi-5 (recovery re-dispatch) and wi-7 (synthesis dispatch) encode assumptions about. All other beads are leaf/mechanical or fail-fast at typecheck/review, so they default to false."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi-1",
+        "title": "deacon-swarm.ts skeleton + coordinateSwarmSlots enumerate-swarms + patrol wiring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "wi-2",
+            "wi-3",
+            "wi-4",
+            "wi-5",
+            "wi-6",
+            "wi-7",
+            "wi-9",
+            "wi-10-gc"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-enumerate.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "wi-1 is the sole wave-0 foundation bead; it runs alone (nothing else dispatches concurrently), so its edits to the new deacon-swarm.ts cannot collide with any sibling.",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/deacon-swarm.ts exporting `coordinateSwarmSlots(opts?: {issueId?: string}): Promise<string[]>`. Implement enumerate-swarms (PRD 3.2 step 1): listFeatureWorkspaces() (deacon.ts:878) -> {issueId, workspacePath}; skip -slot-N sub-workspaces; keep issues whose main-side vBRIEF has analyzeSwarmReadiness(doc).swarmEligible === true (replaces the deleted discoverActiveSwarmIssueIds). Return [] when no swarms. Wire the 3-line call site (PRD 3.1 After) into runPatrol() (deacon.ts:2571) between checkFailedMergeRetry (deacon.ts:2899) and reconcileStaleMergeStatus (deacon.ts:2904), following the deacon.ts:2894-2901 idiom; import + re-export coordinateSwarmSlots alongside the other cloister passes (deacon.ts:35 import cluster / deacon.ts:142 re-export cluster), following the deacon-merge.ts module pattern. Async primitives only."
+        },
+        "items": [
+          {
+            "id": "wi-1.ac1",
+            "title": "Given a feature workspace whose main-side vBRIEF has >=2 slot-eligible items, coordinateSwarmSlots() enumerates it and includes its issueId in the returned actions/considered set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1.ac2",
+            "title": "Given a single-item or non-swarm-eligible vBRIEF, coordinateSwarmSlots() excludes that issue; given no feature workspaces, it returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1.ac3",
+            "title": "Given one patrol tick, runPatrol calls coordinateSwarmSlots exactly once between checkFailedMergeRetry and reconcileStaleMergeStatus, and the existing deacon patrol suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1.ac4",
+            "title": "Given the new module, deacon.ts re-exports coordinateSwarmSlots and typecheck passes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-2",
+        "title": "Reconcile slot state + deterministic completion detection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-completion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-completion.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-completion.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per enumerated swarm, call reconcileSlotState(issueId, workspace, doc) (slot-reconcile.ts:52) to derive {merged, inFlight, pending} from live git slot branches (listSlotBranches, slot-reconcile.ts:100) + tmux slot agents (listSlotAgents, slot-reconcile.ts:114). For each in-flight slot, classify as `running` / `ready-to-merge` / `failed` by cross-checking listSessionNames (tmux.ts:970) + isPaneDead (tmux.ts:1237) + pane exit status against agent-<issue>-slot-N: pane exited 0 -> ready-to-merge; non-zero -> failed; vanished session -> failed. Inject the tmux/reconcile dependency so it is fakeable in tests. Async primitives only."
+        },
+        "items": [
+          {
+            "id": "wi-2.ac1",
+            "title": "Given a slot whose pane exited 0, the classifier returns `ready-to-merge` for that slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2.ac2",
+            "title": "Given a slot whose pane exited non-zero, the classifier returns `failed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2.ac3",
+            "title": "Given a slot whose tmux session has vanished, the classifier returns `failed`; a slot with a live running pane returns `running`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-3",
+        "title": "Verify + no-ff merge ready slots, then mark the vBRIEF item done via the write door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-merge.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-merge.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "For each ready-to-merge slot (pane exit 0, branch unmerged), call verifyAndMergeSlot(issueId, slotIndex, item) (slot-merge.ts:36) — it runs item.metadata.verify_commands in the slot workspace then git merge --no-ff feature/<issue>-slot-N into the feature workspace. On merged:true, apply the canonical vBRIEF `done` for the item via applyTaskOperationToPlanFile (dag-cli.ts:140, the write door — the same op the deleted onSlotMergeComplete made). Emit `[swarm] merged slot N (item X) for <issue>`. On conflicts:true, emit a failed-merge action and leave the item claimed for recovery (deferred to wi-5). Never mutate the main-side spec directly."
+        },
+        "items": [
+          {
+            "id": "wi-3.ac1",
+            "title": "Given verifyAndMergeSlot returns merged:true, the slot's vBRIEF item status flips to `done` through applyTaskOperationToPlanFile (write door) and a `[swarm] merged slot` action is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3.ac2",
+            "title": "Given verifyAndMergeSlot returns merged:false, no vBRIEF item status write occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3.ac3",
+            "title": "Given verifyAndMergeSlot returns conflicts:true, the item is left claimed (not marked done) and a failed-merge action is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-4",
+        "title": "Next-wave dispatch: capacity + files_scope overlap selection + claim-before-spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-2203",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi-5",
+            "wi-7",
+            "wi-8"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-dispatch.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-11",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Compute mergedItemIds from reconcile `merged` bucket -> getDispatchableItems(doc, mergedItemIds) (dag.ts:217). For each newly-ready item with a free slot index and no live slot agent: run capacity+overlap selection — defer by assertRegisteredSlotCap ceiling (spawn.ts:766) or by files_scope overlap against running+selected items (from analyzeSwarmReadiness().overlapMatrix). Allocate the lowest free slot index; reserve budget with tryReserveAdvancingSlot() (concurrency.ts, imported deacon.ts:147); claim the item via applyTaskOperationToPlanFile type `claim`; then spawnRun(issueId, 'work', {slotIndex, slotItemId}) (spawn.ts:78). On spawn throw, release the claim (unblock) AND release the advancing-slot budget — no orphan claims. Slot worktrees are created only via ensureRegisteredSlotWorktree (inside spawnRun); never git checkout inside a workspace."
+        },
+        "items": [
+          {
+            "id": "wi-4.ac1",
+            "title": "Given two non-overlapping newly-dispatchable items and free capacity, exactly two slots are dispatched (2 spawnRun calls with distinct slotIndex)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4.ac2",
+            "title": "Given two items whose files_scope overlap, exactly one is dispatched and the other is deferred (not dispatched concurrently)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4.ac3",
+            "title": "Given the registered-slot cap is reached, additional dispatchable items are deferred rather than spawned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4.ac4",
+            "title": "Given spawnRun throws, the item's claim is released (unblock) and the reserved advancing-slot budget is released",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-5",
+        "title": "Unmergeability detection + failed-slot recovery (retry / drop / handoff)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-recovery.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "On verifyAndMergeSlot conflicts:true, transition the slot to `failed-merge` and block auto-advance for that issue until resolved (D6 / PAN-1194 — never silently halt or skip). Implement the three recovery actions the deleted recoverSwarmCommand had: retry (unblock the item + re-dispatch via the wi-4 dispatch path), drop (mark the item `done` via the write door + let the wave proceed), handoff (pause auto-advance + record an operator note). Expose these as a function the wi-8 `pan swarm recover` CLI subcommand calls."
+        },
+        "items": [
+          {
+            "id": "wi-5.ac1",
+            "title": "Given a slot with conflicts:true, the slot becomes `failed-merge` and the issue's auto-advance is blocked (no further wave dispatch) until recovery runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5.ac2",
+            "title": "Given a failed-merge slot and action=retry, the item is unblocked and re-dispatched through the wi-4 dispatch path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5.ac3",
+            "title": "Given a failed-merge slot and action=drop, the item is marked done and the wave proceeds; given action=handoff, auto-advance stays paused with an operator note recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-6",
+        "title": "Auto-advance cadence: idempotency + per-slot cooldown + per-issue backoff",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-backoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-backoff.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-backoff.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add loop-safety to coordinateSwarmSlots: a module-level per-slot-branch refire cooldown map (like the deleted recentSlotMergeFires / SLOT_MERGE_REFIRE_COOLDOWN_MS) so an in-flight merge is not re-fired within the tick window; a per-issue failure counter that, after >=3 consecutive advance failures, imposes a 60s cooldown before retrying (like recordAutoAdvanceFailure / isAutoAdvanceCoolingDown); and a guard against re-dispatching a live (slot,item). All delay/cooldown tests MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() — never real setTimeout (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "wi-6.ac1",
+            "title": "Given a merge fired for a slot-branch this tick, a subsequent tick within the cooldown window does not re-fire the merge for that branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6.ac2",
+            "title": "Given 3 consecutive advance failures for an issue, the next advance is suppressed until 60s elapse, verified via vi.advanceTimersByTimeAsync (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6.ac3",
+            "title": "Given a (slot,item) already live, coordinateSwarmSlots does not issue a second spawnRun for the same pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-7",
+        "title": "Synthesis phase for DAG convergence items",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-synthesis.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "When a convergence item (>1 blocking parent — blockingParentCount (dag.ts:255) > 1, flagged requiresSynthesis by deriveSynthesisMetadata (dag.ts:270)) first becomes dispatchable with no persisted synthesis output, spawn a synthesis-phase slot that summarizes the parents' outputs into a context blob. On its completion, capture that context and dispatch the implementation slot carrying it via createActiveSlice(..., {synthesisOutputs}) (dag.ts:452). The implementation slot must not dispatch before the synthesis output exists."
+        },
+        "items": [
+          {
+            "id": "wi-7.ac1",
+            "title": "Given a dispatchable item with >1 blocking parent and no synthesis output, a synthesis-phase slot is dispatched first (before the implementation slot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7.ac2",
+            "title": "Given the synthesis slot has completed, the implementation slot is dispatched with the synthesis context present in its active slice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7.ac3",
+            "title": "Given a single-parent item, no synthesis slot is dispatched and the item goes straight to implementation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-8",
+        "title": "pan swarm CLI command (trigger + recover) + /pan-swarm skill",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "src/cli/index.ts",
+            "skills/pan-swarm/SKILL.md",
+            "tests/unit/cli/commands/swarm.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "swarm.test.ts passes",
+            "lint-skills.sh exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/swarm.ts and register it in src/cli/index.ts. `pan swarm <id>`: resolve id -> load main-side plan -> analyzeSwarmReadiness; if not swarmEligible, print why and exit non-zero; else ensure the feature workspace exists (reuse pan start's workspace setup) and dispatch wave 0 by calling the SAME first-wave selection the deacon uses (D3), then print the dispatched slots and hand ongoing coordination to the deacon. `pan swarm recover <id> <slotIndex> --action retry|drop|handoff` calls the wi-5 recovery function. Add skills/pan-swarm/SKILL.md (wrapper skill) and keep its flags/subcommands in sync so scripts/lint-skills.sh passes."
+        },
+        "items": [
+          {
+            "id": "wi-8.ac1",
+            "title": "Given a non-swarm-eligible plan, `pan swarm <id>` prints the reason and exits non-zero without dispatching",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8.ac2",
+            "title": "Given a swarm-eligible plan, `pan swarm <id>` ensures the workspace and dispatches wave 0 (invokes the shared first-wave selection)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8.ac3",
+            "title": "Given `pan swarm recover <id> <slot> --action retry`, the command spawns the recovery path for that slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8.ac4",
+            "title": "scripts/lint-skills.sh exits 0 with skills/pan-swarm/SKILL.md present and its documented flags matching `pan swarm --help`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-9",
+        "title": "Reactive agent.stopped fast-path for near-instant swarm advance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service.ts",
+            "tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "service-swarm-fastpath.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-15",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In the agent.stopped handler in src/lib/cloister/service.ts (handleCloisterDomainEventPromise, ~line 423), when the stopped agentId matches ^agent-<issue>-slot-N$, call coordinateSwarmSlots({issueId}) so the swarm advances without waiting for the next 60s patrol. Non-slot agents must not trigger it. This is additive; the patrol remains the safety net (D4)."
+        },
+        "items": [
+          {
+            "id": "wi-9.ac1",
+            "title": "Given an agent.stopped event whose agentId matches agent-<issue>-slot-N, exactly one coordinateSwarmSlots({issueId}) call is made for that issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9.ac2",
+            "title": "Given an agent.stopped event for a non-slot agent, coordinateSwarmSlots is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-10-dashboard",
+        "title": "Per-slot dashboard identity (surface agent-<issue>-slot-N on the issue tree/drawer)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "SessionNode test renders slot rows"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Give each slot a distinct, navigable dashboard identity (folds PAN-1263). Ensure resource-discovery (src/dashboard/server/services/resource-discovery.ts) nests agent-<issue>-slot-N agents under their issue, and that the frontend tree/drawer (SessionNode.tsx, DrawerAgentSession.tsx) render slot agents as distinct rows with openable terminals on the issue's pipeline row / drawer. Verify exact frontend anchor files during work (files_scope_confidence: medium)."
+        },
+        "items": [
+          {
+            "id": "wi-10-dashboard.ac1",
+            "title": "Given a swarm with slots agent-<issue>-slot-1 and slot-2 running, resource-discovery nests both under the issue and the frontend renders two distinct slot rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-dashboard.ac2",
+            "title": "Given a rendered slot row, it exposes the slot's terminal/session as an openable navigable identity (not collapsed into the parent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-10-verdict",
+        "title": "Route inspection/review verdicts to the owning slot agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "src/lib/cloister/test-verdict.ts",
+            "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-verdict-routing.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Route inspection/review verdicts to the owning slot agent (agent-<issue>-slot-N), not a missing parent agent (folds PAN-1472). Where verdict feedback is delivered (review-verdict-feedback.ts / test-verdict.ts), resolve the target from the item's owning slot (slotItemId -> slotIndex) and deliver to agent-<issue>-slot-N via the async delivery primitive (sendKeysAsync / deliverAgentMessage). Confirm exact routing call sites during work (files_scope_confidence: medium)."
+        },
+        "items": [
+          {
+            "id": "wi-10-verdict.ac1",
+            "title": "Given a verdict for an item owned by slot N, the feedback is delivered to agent-<issue>-slot-N",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-verdict.ac2",
+            "title": "Given the parent (non-slot) agent no longer exists, the verdict still reaches the owning slot rather than being dropped or targeted at the missing parent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-10-gc",
+        "title": "Terminal (merged) slot worktree + branch GC after wave convergence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-gc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-gc.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-gc.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "After a wave's items are all `merged`, prune the merged slots' worktrees + branches (folds PAN-1202). In coordinateSwarmSlots, once reconcile shows a slot's item merged and its branch integrated, remove the slot worktree (git worktree remove) and delete the slot branch, using async primitives. Only merged/terminal slots are GC'd — running or failed-merge slots are never pruned."
+        },
+        "items": [
+          {
+            "id": "wi-10-gc.ac1",
+            "title": "Given a slot whose item is merged and branch integrated, its worktree and slot branch are removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-gc.ac2",
+            "title": "Given a running or failed-merge slot, its worktree and branch are preserved (not GC'd)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-11",
+        "title": "Rewrite docs/SWARM.md for swarm-v2 + the coordinateSwarmSlots orchestrator",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SWARM.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "lint-skills.sh exits 0",
+            "docs/SWARM.md describes coordinateSwarmSlots, pan swarm, recovery, and derive-don't-store"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite docs/SWARM.md (folds PAN-1555) to describe the swarm-v2 model + this orchestrator: the coordinateSwarmSlots deacon loop (enumerate -> reconcile/detect -> verify+merge -> advance -> recover), the pan swarm CLI trigger and pan swarm recover, derive-don't-store (NFR-1), and note that PAN-1791 layers difficulty-tiers/model-routing on top. Confirm the CLAUDE.md work-agents-via-pan `pan swarm <id>` reference is now accurate against the shipped command."
+        },
+        "items": [
+          {
+            "id": "wi-11.ac1",
+            "title": "docs/SWARM.md contains sections covering the coordinateSwarmSlots loop stages, the pan swarm and pan swarm recover commands, and the derive-don't-store design",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-11.ac2",
+            "title": "The doc states remote Fly slots (PAN-1773) and difficulty/model routing (PAN-1791) are out of scope / layered on top, and scripts/lint-skills.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi-1",
+        "to": "wi-2",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2",
+        "to": "wi-3",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1",
+        "to": "wi-4",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3",
+        "to": "wi-4",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-5",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-6",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-7",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-8",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5",
+        "to": "wi-8",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1",
+        "to": "wi-9",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-10-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-10-verdict",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3",
+        "to": "wi-10-gc",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-8",
+        "to": "wi-11",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5",
+        "to": "wi-11",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-01-PAN-2203-lean-swarm-orchestrator-deterministic-wave-driver-over-the-swarm-v2-primitives.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
