@@ -1,5 +1,5 @@
 ---
-scope: dev
+scope: universal
 ---
 ### `pan handoff` focus is capped at 500 chars — put long briefs in a file
 
