@@ -2061,7 +2061,8 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
       const resolution = runtimeState.resolution;
       const count = runtimeState.resolutionCount || 0;
-      const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+      const slotAgentMatch = /^agent-(.+)-slot-\d+$/.exec(agent.id);
+      const issueId = (agent.issueId || slotAgentMatch?.[1] || agent.id.replace('agent-', '')).toUpperCase();
 
       // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
       // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
@@ -2076,6 +2077,20 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       }
 
       if (resolution === 'done' && count >= 1) {
+        if (slotAgentMatch) {
+          console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: coordinating swarm slot merge instead of issue-level review`);
+          const swarmActions = await coordinateSwarmSlots({ issueId });
+          saveAgentRuntimeState(agent.id, {
+            resolution: 'completed',
+            resolutionCount: count + 1,
+            resolutionUpdatedAt: new Date().toISOString(),
+          });
+          actions.push(`Deacon routed completed slot ${agent.id} (${issueId}) to swarm coordination`);
+          actions.push(...swarmActions);
+          addLog('action', `Routed completed slot ${agent.id} (${issueId}) to swarm coordination`, undefined);
+          continue;
+        }
+
         // PAN-534: lowered from >= 2 to >= 1. A single done signal is sufficient
         // evidence. The old threshold deadlocked when review failed and reset to
         // pending — the agent never re-signaled done, so count stayed at 1 forever.

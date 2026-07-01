@@ -126,4 +126,15 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     expect(staleMergeIndex).toBeGreaterThan(swarmIndex);
     expect(source).toContain("export { coordinateSwarmSlots } from './deacon-swarm.js';");
   });
+
+  it('routes slot done-resolution patrols to swarm coordination instead of issue-level pan done', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
+    const slotGuardIndex = source.indexOf("console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: coordinating swarm slot merge instead of issue-level review`);");
+    const slotCoordinationIndex = source.indexOf('const swarmActions = await coordinateSwarmSlots({ issueId });', slotGuardIndex);
+    const panDoneIndex = source.indexOf("await execFileAsync(bin, ['work', 'done', issueId", slotGuardIndex);
+
+    expect(slotGuardIndex).toBeGreaterThanOrEqual(0);
+    expect(slotCoordinationIndex).toBeGreaterThan(slotGuardIndex);
+    expect(panDoneIndex).toBeGreaterThan(slotCoordinationIndex);
+  });
 });
