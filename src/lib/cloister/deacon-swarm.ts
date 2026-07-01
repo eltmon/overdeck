@@ -28,6 +28,17 @@ const SWARM_ADVANCE_FAILURE_COOLDOWN_MS = 60_000;
 
 const recentSlotMergeFires = new Map<string, number>();
 const issueAdvanceFailures = new Map<string, { count: number; cooldownUntil: number }>();
+const failedMergeBlocks = new Map<string, FailedMergeBlock>();
+
+export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff';
+
+export interface FailedMergeBlock {
+  issueId: string;
+  itemId: string;
+  slotIndex: number;
+  branch?: string;
+  note: string;
+}
 
 export interface CoordinateSwarmSlotsOptions {
   issueId?: string;
@@ -102,6 +113,11 @@ export async function coordinateSwarmSlots(
     if (filterIssueId && issueId !== filterIssueId) continue;
     if (isSwarmAdvanceCoolingDown(issueId)) {
       actions.push(`[swarm] deferred ${issueId}: advance backoff active`);
+      continue;
+    }
+    const failedMergeBlock = failedMergeBlocks.get(issueId);
+    if (failedMergeBlock) {
+      actions.push(`[swarm] blocked ${issueId}: failed-merge slot ${failedMergeBlock.slotIndex} (item ${failedMergeBlock.itemId})`);
       continue;
     }
 
@@ -232,6 +248,13 @@ export async function mergeReadySlots(
     }
 
     if (result.conflicts) {
+      recordFailedMergeBlock({
+        issueId,
+        itemId: item.id,
+        slotIndex: slot.slotIndex,
+        branch: slot.branch,
+        note: `Slot branch ${slot.branch ?? slot.slotIndex} did not merge cleanly`,
+      });
       actions.push(`[swarm] failed-merge slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
     }
   }
@@ -242,6 +265,7 @@ export async function mergeReadySlots(
 export function resetSwarmLoopSafetyForTests(): void {
   recentSlotMergeFires.clear();
   issueAdvanceFailures.clear();
+  failedMergeBlocks.clear();
 }
 
 export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): void {
@@ -263,6 +287,79 @@ export function recordSwarmAdvanceSuccess(issueId: string): void {
 export function isSwarmAdvanceCoolingDown(issueId: string, now = Date.now()): boolean {
   const record = issueAdvanceFailures.get(issueId.toUpperCase());
   return record !== undefined && record.cooldownUntil > now;
+}
+
+export function getFailedMergeBlock(issueId: string): FailedMergeBlock | undefined {
+  return failedMergeBlocks.get(issueId.toUpperCase());
+}
+
+export function recordFailedMergeBlock(block: FailedMergeBlock): void {
+  failedMergeBlocks.set(block.issueId.toUpperCase(), { ...block, issueId: block.issueId.toUpperCase() });
+}
+
+export async function recoverFailedMergeSlot(
+  issueId: string,
+  workspacePath: string,
+  doc: VBriefDocument,
+  action: SwarmRecoveryAction,
+  deps: Pick<
+    CoordinateSwarmSlotsDeps,
+    'applyTaskOperationToPlanFile'
+    | 'registeredSlotCapacityAvailable'
+    | 'tryReserveAdvancingSlot'
+    | 'releaseAdvancingSlot'
+    | 'spawnRun'
+  > = defaultDeps,
+): Promise<string[]> {
+  const normalizedIssueId = issueId.toUpperCase();
+  const block = failedMergeBlocks.get(normalizedIssueId);
+  if (!block) return [`[swarm] no failed-merge slot for ${normalizedIssueId}`];
+
+  const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+  if (action === 'handoff') {
+    block.note = `Operator handoff required for slot ${block.slotIndex} (item ${block.itemId})`;
+    failedMergeBlocks.set(normalizedIssueId, block);
+    return [`[swarm] handoff paused ${normalizedIssueId} slot ${block.slotIndex} (item ${block.itemId})`];
+  }
+
+  if (action === 'drop') {
+    await deps.applyTaskOperationToPlanFile(planPath, {
+      type: 'done',
+      itemId: block.itemId,
+      writerId: 'deacon-swarm',
+      reason: 'Dropped failed swarm slot after operator recovery',
+    }, workspacePath);
+    failedMergeBlocks.delete(normalizedIssueId);
+    return [`[swarm] dropped failed-merge slot ${block.slotIndex} (item ${block.itemId}) for ${normalizedIssueId}`];
+  }
+
+  await deps.applyTaskOperationToPlanFile(planPath, {
+    type: 'unblock',
+    itemId: block.itemId,
+    writerId: 'deacon-swarm',
+    reason: 'Retrying failed swarm slot after merge conflict',
+  }, workspacePath);
+  failedMergeBlocks.delete(normalizedIssueId);
+  const retryDoc = {
+    ...doc,
+    plan: {
+      ...doc.plan,
+      items: doc.plan.items.map(item =>
+        item.id === block.itemId ? { ...item, status: 'pending' as const } : item
+      ),
+    },
+  };
+  return [
+    `[swarm] retrying failed-merge slot ${block.slotIndex} (item ${block.itemId}) for ${normalizedIssueId}`,
+    ...await dispatchNextWave(normalizedIssueId, workspacePath, retryDoc, {
+      issueId: normalizedIssueId,
+      merged: [],
+      inFlight: [],
+      pending: [],
+      branches: [],
+      agents: [],
+    }, analyzeSwarmReadiness(retryDoc), deps),
+  ];
 }
 
 function recordSlotMergeFire(branchKey: string, now = Date.now()): void {
