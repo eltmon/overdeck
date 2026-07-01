@@ -33,7 +33,9 @@ import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { listFeatureWorkspaces } from './deacon-workspaces.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
 // keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
 // Deferred review re-dispatch for, Deferred post-review re-dispatch for.
@@ -140,6 +142,7 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
 export { reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+export { coordinateSwarmSlots } from './deacon-swarm.js';
 export { nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
@@ -875,34 +878,6 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
-function listFeatureWorkspaces(): Array<{ issueId: string; workspacePath: string }> {
-  const projects = listProjectsSync();
-  const workspaces: Array<{ issueId: string; workspacePath: string }> = [];
-
-  for (const { config: projectConfig } of projects) {
-    const workspacesRoot = join(projectConfig.path, 'workspaces');
-    if (!existsSync(workspacesRoot)) continue;
-
-    let entries: string[];
-    try {
-      entries = readdirSync(workspacesRoot, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
-        .map(e => e.name);
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      workspaces.push({
-        issueId: entry.replace(/^feature-/, '').toUpperCase(),
-        workspacePath: join(workspacesRoot, entry),
-      });
-    }
-  }
-
-  return workspaces;
-}
-
 export async function cleanupAbandonedFeedback(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -2899,6 +2874,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const failedMergeRetryActions = await checkFailedMergeRetry();
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-2203: deterministic swarm coordination. This pass derives active
+  // swarms from workspaces + vBRIEF readiness; later beads fill in merge,
+  // dispatch, recovery, and cooldown behavior.
+  const swarmActions = await coordinateSwarmSlots();
+  actions.push(...swarmActions);
+  for (const a of swarmActions) addLog('action', a, state.patrolCycle);
 
   // Reconcile stale merge status: detect branches merged to main outside the dashboard
   const staleMergeActions = await reconcileStaleMergeStatus();
