@@ -28,7 +28,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-06-29T12:59:43.678Z",
+  "updated": "2026-06-29T22:30:42.575Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "pending",
@@ -111,7 +111,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "MiniMax-M3",
   "statusOverrides": {
     "traefik-readiness-gate": "completed",
     "traefik-readiness-gate.ac1": "completed",
