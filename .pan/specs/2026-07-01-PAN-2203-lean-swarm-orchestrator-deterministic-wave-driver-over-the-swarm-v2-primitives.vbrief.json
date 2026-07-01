@@ -4,7 +4,7 @@
     "created": "2026-07-01T02:37:04.022Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2203: Lean swarm orchestrator: deterministic wave-driver over the swarm-v2 primitives (deferred PAN-1762 follow-up)",
-    "updated": "2026-07-01T03:09:13.101Z"
+    "updated": "2026-07-01T03:34:02.237Z"
   },
   "plan": {
     "id": "pan-2203",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8883aa29-8773-4457-b1a3-e0011a33a786",
     "author": "agent:claude-opus-4-8",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-01T02:37:04.022Z",
-    "updated": "2026-07-01T03:09:13.101Z",
+    "updated": "2026-07-01T03:34:02.237Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2203",
