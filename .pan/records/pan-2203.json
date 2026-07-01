@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2203",
   "schemaVersion": 2,
-  "created": "2026-07-01T02:34:46.098Z",
-  "updated": "2026-07-01T03:12:30.111Z",
-  "pipeline": {
-    "issueId": "PAN-2203",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-01T02:34:46.098Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -38,5 +19,61 @@
       "agentModel": "claude-opus-4-8",
       "timestamp": "2026-07-01T03:12:30.110Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-07-01T02:34:46.098Z",
+  "updated": "2026-07-01T03:47:26.189Z",
+  "pipeline": {
+    "issueId": "PAN-2203",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-01T03:47:26.169Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 21128,
+            "output": 1274,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 70234,
+            "output": 232853,
+            "cacheRead": 25153697,
+            "cacheWrite": 883825
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 21128,
+          "output": 1274,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 70234,
+          "output": 232853,
+          "cacheRead": 25153697,
+          "cacheWrite": 883825
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 24.273269,
+        "pricingAsOf": "2026-07-01T03:47:26.188Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
