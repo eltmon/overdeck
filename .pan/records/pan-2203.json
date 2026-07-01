@@ -8,11 +8,11 @@
     "issueId": "PAN-2203",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T16:11:58.803Z",
+    "updatedAt": "2026-07-01T16:28:28.604Z",
     "reviewNotes": "pan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map",
     "verificationNotes": "Verification FAILED at test (68445ms):\n\n--global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-merge.test.ts > deacon-swarm ready-slot merge > emits failed-merge without marking done when the slot branch conflicts\nAssertionError: promise rejected \"Error: EACCES: permission denied, mkdir '… { …(4) }\" instead of resolving\n ❯ tests/unit/lib/cloister/deacon-swarm-merge.test.ts:101:92\n     99|     const fakeDeps = deps({ merged: false, conflicts: true });\n    100|\n    101|     await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [rea…\n       |                                                                                            ^\n    102|       .resolves.toEqual(['[swarm] failed-merge slot 1 (item wi-1) for …\n    103|\n\nCaused by: Error: EACCES: permission denied, mkdir '/workspace/.pan/records'\n ❯ guardedFsWrite tests/setup/no-real-home-writes.ts:49:20\n ❯ writeIssueRecordForWorkspaceSync src/lib/pan-dir/record.ts:211:5\n ❯ writeSwarmFailedMergeBlock src/lib/cloister/deacon-swarm.ts:496:3\n ❯ recordFailedMergeBlock src/lib/cloister/deacon-swarm.ts:395:22\n ❯ mergeReadySlots src/lib/cloister/deacon-swarm.ts:341:7\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nSerialized Error: { errno: -13, code: 'EACCES', syscall: 'mkdir', path: '/workspace/.pan/records' }\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
@@ -213,7 +213,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.450181,
-        "pricingAsOf": "2026-07-01T16:11:58.837Z"
+        "pricingAsOf": "2026-07-01T16:28:29.440Z"
       }
     },
     "merges": [
@@ -222,5 +222,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T16:11:58.847Z",
-  "updated": "2026-07-01T16:11:58.847Z"
+  "updated": "2026-07-01T16:28:33.444Z"
 }
