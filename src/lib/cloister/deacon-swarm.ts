@@ -1,3 +1,5 @@
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
 import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
@@ -8,6 +10,8 @@ import { applyTaskOperationToPlanFile, type PersistedTaskOperation } from '../vb
 import { analyzeSwarmReadiness } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
+
+const execAsync = promisify(exec);
 
 export interface CoordinateSwarmSlotsOptions {
   issueId?: string;
@@ -33,6 +37,7 @@ export interface CoordinateSwarmSlotsDeps {
     operation: PersistedTaskOperation,
     workspacePath?: string,
   ) => Promise<unknown>;
+  runGitCommand: (command: string, cwd: string) => Promise<unknown>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -50,6 +55,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   verifyAndMergeSlot,
   applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
     Effect.runPromise(applyTaskOperationToPlanFile(planPath, operation, workspacePath)),
+  runGitCommand: (command, cwd) => execAsync(command, { cwd }),
 };
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed';
@@ -87,9 +93,32 @@ export async function coordinateSwarmSlots(
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
       }
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
+      actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
     } catch (err) {
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  return actions;
+}
+
+export async function gcMergedSlots(
+  issueId: string,
+  workspacePath: string,
+  slots: ReconciledSlotItem[],
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> = defaultDeps,
+): Promise<string[]> {
+  const actions: string[] = [];
+
+  for (const slot of slots) {
+    if (slot.status !== 'merged') continue;
+
+    const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;
+    const slotBranch = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+
+    await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
+    await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+    actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
   }
 
   return actions;
