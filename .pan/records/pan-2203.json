@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-01T02:34:46.098Z",
-  "updated": "2026-07-01T04:21:41.972Z",
+  "updated": "2026-07-01T04:56:49.993Z",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "pending",
@@ -105,5 +105,78 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3"
+  "model": "MiniMax-M3",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/pan-2203.md",
+      ".pan/records/pan-2203.json",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/cloister/deacon-workspaces.ts",
+      "sync-sources/skills/pan-swarm/SKILL.md",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "skills/pan-swarm/SKILL.md",
+      "src/dashboard/server/services/resource-discovery.ts"
+    ],
+    "declaredScope": [
+      "docs/SWARM.md",
+      "skills/pan-swarm/SKILL.md",
+      "src/cli/commands/swarm.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "src/lib/cloister/deacon-swarm.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/service.ts",
+      "src/lib/cloister/test-verdict.ts",
+      "tests/unit/cli/commands/swarm.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-backoff.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-merge.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-2203.md",
+      ".pan/records/pan-2203.json",
+      "docs/SWARM.md",
+      "src/cli/commands/swarm.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/cloister/deacon-swarm.ts",
+      "src/lib/cloister/deacon-workspaces.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/service.ts",
+      "src/lib/cloister/test-verdict.ts",
+      "sync-sources/skills/pan-swarm/SKILL.md",
+      "tests/unit/cli/commands/swarm.test.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-backoff.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-merge.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
+    ],
+    "recordedAt": "2026-07-01T04:56:49.992Z"
+  }
 }
