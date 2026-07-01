@@ -85,6 +85,10 @@ export interface SpawnOptions {
    * path; set only by spawnRun when launching a per-item slot.
    */
   agentId?: string;
+  /** Registered swarm slot index for per-item work-agent spawning. */
+  slotIndex?: number;
+  /** vBRIEF item id assigned to the registered swarm slot. */
+  slotItemId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */

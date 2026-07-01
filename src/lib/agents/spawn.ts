@@ -100,6 +100,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
       effort: options.effort,
+      slotIndex: slot?.slotIndex,
+      slotItemId: slot?.slotItemId,
     });
   }
 
@@ -146,6 +148,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     startedAt: new Date().toISOString(),
     costSoFar: 0,
     hostOverride: options.allowHost || undefined,
+    slotIndex: options.slotIndex,
+    slotItemId: options.slotItemId,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises

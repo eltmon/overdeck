@@ -20,6 +20,7 @@ export interface ReconciledSlotAgent {
   slotIndex: number;
   agentId: string;
   status: AgentState['status'];
+  slotItemId?: string;
 }
 
 export interface ReconciledSlotItem {
@@ -65,9 +66,10 @@ export async function reconcileSlotState(
   const branchesBySlot = new Map(branches.map(branch => [branch.slotIndex, branch]));
   const agentsBySlot = new Map(agents.map(agent => [agent.slotIndex, agent]));
   const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspace));
-  const slotItems = analyzeSwarmReadiness(doc, { hotspots }).items
+  const slotEligibleItemIds = new Set(analyzeSwarmReadiness(doc, { hotspots }).items
     .filter(item => item.slotEligible)
-    .map((item, index) => ({ itemId: item.id, slotIndex: index + 1 }));
+    .map(item => item.id));
+  const slotItems = resolveSlotItemOwnership(doc, slotEligibleItemIds, branches, agents);
 
   const result: SlotReconcileResult = {
     issueId,
@@ -118,11 +120,13 @@ export function listSlotAgents(issueId: string): ReconciledSlotAgent[] {
     .map(agent => {
       const match = pattern.exec(agent.id);
       if (!match) return null;
-      return {
+      const entry: ReconciledSlotAgent = {
         slotIndex: Number(match[1]),
         agentId: agent.id,
         status: agent.status,
       };
+      if (agent.slotItemId) entry.slotItemId = agent.slotItemId;
+      return entry;
     })
     .filter((agent): agent is ReconciledSlotAgent => agent !== null)
     .sort((a, b) => a.slotIndex - b.slotIndex);
@@ -137,6 +141,49 @@ async function gitBranchNames(workspace: string, pattern: string, merged: boolea
     .split('\n')
     .map(line => line.replace(/^[*+\s]+/, '').trim())
     .filter(Boolean);
+}
+
+function resolveSlotItemOwnership(
+  doc: VBriefDocument,
+  slotEligibleItemIds: Set<string>,
+  branches: ReconciledSlotBranch[],
+  agents: ReconciledSlotAgent[],
+): Array<{ itemId: string; slotIndex: number }> {
+  const ownership = new Map<string, number>();
+  const usedSlots = new Set<number>();
+
+  for (const agent of agents) {
+    if (!agent.slotItemId || !slotEligibleItemIds.has(agent.slotItemId)) continue;
+    ownership.set(agent.slotItemId, agent.slotIndex);
+    usedSlots.add(agent.slotIndex);
+  }
+
+  const legacySlotIndexes = new Set([
+    ...branches.map(branch => branch.slotIndex),
+    ...agents.map(agent => agent.slotIndex),
+  ]);
+  const slotEligibleItems = doc.plan.items.filter(item => slotEligibleItemIds.has(item.id));
+  for (const [index, item] of slotEligibleItems.entries()) {
+    if (ownership.has(item.id)) continue;
+    const legacySlotIndex = index + 1;
+    if (!legacySlotIndexes.has(legacySlotIndex) || usedSlots.has(legacySlotIndex)) continue;
+    ownership.set(item.id, legacySlotIndex);
+    usedSlots.add(legacySlotIndex);
+  }
+
+  for (const item of slotEligibleItems) {
+    if (ownership.has(item.id)) continue;
+    ownership.set(item.id, lowestFreeSlotIndex(usedSlots));
+  }
+
+  return slotEligibleItems.map(item => ({ itemId: item.id, slotIndex: ownership.get(item.id)! }));
+}
+
+function lowestFreeSlotIndex(usedSlots: Set<number>): number {
+  let slotIndex = 1;
+  while (usedSlots.has(slotIndex)) slotIndex++;
+  usedSlots.add(slotIndex);
+  return slotIndex;
 }
 
 function slotIndexFromBranch(issueLower: string, branch: string): number | null {

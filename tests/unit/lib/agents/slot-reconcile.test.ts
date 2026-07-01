@@ -87,4 +87,24 @@ describe('reconcileSlotState', () => {
     expect(result.branches).toEqual([]);
     expect(result.agents).toEqual([]);
   });
+
+  it('uses persisted slot item ownership instead of slot-eligible item order', async () => {
+    const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: false }],
+        [{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'running', slotItemId: 'c' }],
+      ),
+    });
+
+    expect(result.inFlight).toEqual([
+      {
+        itemId: 'c',
+        slotIndex: 1,
+        status: 'in_flight',
+        branch: 'feature/pan-1762-slot-1',
+        agentId: 'agent-pan-1762-slot-1',
+      },
+    ]);
+    expect(result.pending.map(item => item.itemId)).toEqual(['a', 'b']);
+  });
 });
