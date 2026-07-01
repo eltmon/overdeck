@@ -1,0 +1,1407 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-01T00:40:28.622Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1791: Tiered execution — difficulty-routed model tiers, standing warm tier agents, event-driven supervisor (folds in PAN-1196 difficulty/subject routing + PAN-1311 trivial fast-track)",
+    "updated": "2026-07-01T01:06:47.784Z"
+  },
+  "plan": {
+    "id": "pan-1791",
+    "title": "Tiered execution: difficulty-routed bead dispatch + event-driven supervisor review (standing tier agents with commit feeds)",
+    "status": "proposed",
+    "uid": "7f384779-7142-4c96-9a77-f33e47ed8bc6",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-07-01T00:40:28.622Z",
+    "updated": "2026-07-01T01:06:47.784Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1791",
+        "label": "PAN-1791",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1196",
+        "label": "PAN-1196 (folded in)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1311",
+        "label": "PAN-1311 (folded in)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1762",
+        "label": "PAN-1762 foreman (dependency, shipped)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tiered-execution",
+      "swarm",
+      "model-routing",
+      "supervisor",
+      "cloister",
+      "foreman"
+    ],
+    "narratives": {
+      "Problem": "Every bead in an issue runs on the same model even though each bead is labeled with a difficulty — the label is captured and ignored (PAN-1196). There is no way to keep a spectrum of model tiers warm and route each bead to the tier its difficulty deserves, no event-driven supervisor reviewing work at commit boundaries, and trivial mechanical items pay full swarm-slot overhead (PAN-1311). Expensive-model attention is a participant, not an interrupt handler.",
+      "Proposal": "Build on the PAN-1762 foreman (prompt-driven wave-driver in roles/work.md + helper libs; chooseDispatchTier is its seam). (A) Generalize the claude-only, hardcoded difficulty->model routing into a configurable any-model/any-harness tier table with a resolution chain (per-bead override -> byKind -> byDifficulty -> role default), and wire it into dispatch so difficulty actually selects the working model. (B) Keep one long-lived registered slot per tier alive for the issue, warmed by a commit feed that broadcasts every commit's diff to all standing tiers (everyone hears everything). (C) Add a standing frontier supervisor subscribed to commit events that reviews each diff against the bead's acceptance criteria and posts an ack or a blocking finding on the existing inspect-status surface, halting dependent dispatch until a fix lands. (D) Fast-track trivial mechanical beads: batch them, skip the convoy, typecheck-gated auto-merge, with fail-open escalation. (E) Replay (respawn + re-deliver the commit feed from git log) doubles as crash recovery and threshold-triggered context compaction. (F) Measurement scaffolding: stamp feed deliveries and attribute cost per tier. Everything off by default (tiered_execution.enabled=false).",
+      "NonGoals": "- Plan-filtered / per-tier commit relevance filtering (everyone hears everything in v1; filtering is a deferred cost optimization).\n- Running the live cost pilot or writing the tiered-vs-monolithic savings report (post-merge operational activity, not code).\n- Remote (Fly) tier agents (PAN-1676); design must not preclude them but v1 runs tiers locally.\n- Multiple models autonomously deciding to intervene (the router decides by difficulty).\n- In-session model switching (tiers are separate standing sessions; fresh-session invariant stands).\n- Replacing the convoy review pipeline at pan done (the supervisor complements it).\n- Rebuilding any deleted server-side swarm runtime (PAN-1517 removed swarmRuntime; do not resurrect it).\n- Adding a hardcoded model fallback anywhere (unset resolution must fail loud, not pick a literal)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Everyone-hears-everything (no per-tier commit filtering) in v1.",
+        "rationale": "Operator decision; live evidence shows listening is ~1-5% of implementer cost with prompt caching, so the filtering complexity can be deferred until measurement justifies it."
+      },
+      {
+        "summary": "Standing tier agent = long-lived registered slot (spawnRun) kept warm by the feed, riding the as-built per-slot-branch + verify-then-merge model.",
+        "rationale": "The PAN-1762 foreman shipped parallel slots, superseding the PRD's shared-worktree/foreman-commits D9/D12; reuse what landed instead of a second model."
+      },
+      {
+        "summary": "4 beads carry requiresInspection=true (tier-table config, resolution chain, standing-tier lifecycle, fast-track auto-merge).",
+        "rationale": "Three are genuine interface foundations other beads consume; the auto-merge bead crosses a review/trust boundary. All others are leaves or test-verified, so kept false."
+      },
+      {
+        "summary": "This issue is implemented BY the swarm; every bead carries the full dispatch contract and file ownership is designed so no two parallel beads share a file.",
+        "rationale": "Operator directed swarm execution; maximizes parallelism while the readiness lint + blocks edges keep hotspot files (roles/work.md, dispatch-tier.ts, fast-track.ts, tier-supervisor.ts, standing-tiers.ts, tier-feed.ts) serialized."
+      }
+    ],
+    "items": [
+      {
+        "id": "tier-table-config",
+        "title": "Tier table config section + validation (generalizes complexity_routing) + supervisor policy, off by default",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "tier-resolution-chain",
+            "dispatch-model-selection",
+            "standing-tier-lifecycle",
+            "supervisor-subscribe",
+            "enablement-gate-test"
+          ],
+          "traces": [
+            "FR-8"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/cloister/config.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 0. Sole owner of the new tier-table.ts and the tiered_execution config block; no concurrent bead writes these files.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-table.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-table.ts defining a `tiered_execution` config shape: { enabled: boolean (default false), tiers: Record<tierName,{model,harness,difficulties: VBriefDifficulty[]}>, supervisor: {model,harness,subscribe:'all'|'flagged'|'sampled'}, replay_threshold: number (default 0.5) }. Add the section to the cloister config (src/lib/cloister/config.ts) and config-yaml defaults/merge so it loads and merges. Write a loader+validator: every difficulty maps to exactly one tier (total, non-overlapping); unknown model/harness rejected at load; the pi+Anthropic+subscription ToS gate (src/lib/harness-policy.ts) applies to tier and supervisor definitions. This is the schema the rest of the feature consumes."
+        },
+        "items": [
+          {
+            "id": "tier-table-config.ac1",
+            "title": "Given a config where a difficulty maps to zero or to two tiers, loading rejects it with a named validation error identifying the offending difficulty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-table-config.ac2",
+            "title": "Given a tier with an unknown model or harness, loading rejects it, and a pi+Anthropic+subscription tier is rejected by the existing ToS gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-table-config.ac3",
+            "title": "With no tiered_execution block present, the loader returns enabled=false and defaults to replay_threshold=0.5 without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-table-config.ac4",
+            "title": "For a valid config, the validator returns a map from each of the five difficulties to its tier name plus the supervisor policy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kind-metadata-field",
+        "title": "Add typed metadata.kind subject-matter field + planner emits it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ],
+          "files_scope": [
+            "src/lib/vbrief/types.ts",
+            "src/lib/cloister/prompts/planning.md"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/vbrief/__tests__/types.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/vbrief/types.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a typed `kind?: 'docs'|'api'|'backend'|'frontend'|'infra'|'test'|'refactor'|'design'|'spike'` to VBriefItemMetadata in src/lib/vbrief/types.ts (a loose `kind` bag already exists there — tighten it, do not duplicate). Update the planning prompt (src/lib/cloister/prompts/planning.md) to instruct the planner to emit `kind` per item, default 'backend' when unspecified. This is the optional byKind routing input for the resolution chain."
+        },
+        "items": [
+          {
+            "id": "kind-metadata-field.ac1",
+            "title": "VBriefItemMetadata.kind is typed to the nine-value enum and typecheck passes for an item that sets kind:'docs'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kind-metadata-field.ac2",
+            "title": "An item with no kind still validates (field optional) and downstream code defaults to 'backend'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kind-metadata-field.ac3",
+            "title": "The planning prompt renders an instruction for the planner to emit kind per item and defaults to 'backend' when unspecified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-resolution-chain",
+        "title": "Model+harness resolution chain: override -> byKind -> byDifficulty -> role default (fail-loud, no hardcoded fallback)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "route-legacy-through-chain",
+            "dispatch-model-selection",
+            "fast-track-batching"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ],
+          "files_scope": [
+            "src/lib/agents/resolve-tier.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 1. Sole owner of the new resolve-tier.ts; reads only the wave-0 tier-table config and performs no shared writes.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/resolve-tier.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/resolve-tier.ts",
+            "src/lib/agents/__tests__/resolve-tier.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/resolve-tier.ts exporting resolveTier(item, config): { tierName, model, harness } implementing the resolution order: (1) per-bead metadata.model override, (2) config byKind[item.metadata.kind], (3) byDifficulty[item.metadata.difficulty] via the tier table, (4) role default. When nothing resolves and no default is configured, throw a clear 'no tier/model configured' error — NEVER return a hardcoded model literal (no-hardcoded-model-fallbacks rule). Pure function over the tier-table config from tier-table-config; no spawning here."
+        },
+        "items": [
+          {
+            "id": "tier-resolution-chain.ac1",
+            "title": "Given an item with metadata.model set, resolveTier returns that model regardless of kind/difficulty (the override wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-resolution-chain.ac2",
+            "title": "Given no override but a byKind entry for the item's kind, resolveTier returns the byKind model and it wins over the byDifficulty model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-resolution-chain.ac3",
+            "title": "Given only difficulty, resolveTier returns the tier whose difficulties[] contains it, with that tier's model and harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-resolution-chain.ac4",
+            "title": "Given an item that resolves to nothing and no configured default, resolveTier throws a named error and returns no model literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-legacy-through-chain",
+        "title": "Route the hardcoded complexityToModel / claude-only path through the new chain, preserving disabled-mode behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ],
+          "files_scope": [
+            "src/lib/cloister/complexity.ts",
+            "src/lib/cloister/router.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__/complexity.test.ts src/lib/cloister/__tests__/router.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/cloister/complexity.ts",
+            "src/lib/cloister/router.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Redirect the hardcoded difficulty->model switch complexityToModel() (src/lib/cloister/complexity.ts:314) and its caller router.ts:48 through resolveTier so there is one resolution path. Additive/no-loss: when tiered_execution is disabled, the resolved model for each difficulty must equal today's output (trivial/simple->haiku, medium/complex->sonnet, expert->opus). Do not delete complexityToModel until parity is proven by the lock test."
+        },
+        "items": [
+          {
+            "id": "route-legacy-through-chain.ac1",
+            "title": "With tiering disabled, resolving each of the five difficulties returns exactly today's model (trivial/simple->haiku, medium/complex->sonnet, expert->opus)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-legacy-through-chain.ac2",
+            "title": "router.ts resolves its model through resolveTier and no longer contains the inline complexityToModel switch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-legacy-through-chain.ac3",
+            "title": "With tiering disabled, resolveTier returns the pre-change model for each difficulty and preserves the prior mapping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatch-model-selection",
+        "title": "Wire resolved tier (model+harness) into slot dispatch so difficulty actually selects the worker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "files_scope": [
+            "src/lib/agents/dispatch-tier.ts",
+            "src/lib/agents/spawn-prep.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 2. Edits dispatch-tier.ts + spawn-prep.ts, disjoint from its wave-2 siblings (route-legacy touches complexity/router; supervisor-verdict touches tier-supervisor/specialists).",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/dispatch-tier.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/dispatch-tier.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the chooseDispatchTier seam (src/lib/agents/dispatch-tier.ts) so that, when tiered_execution is enabled, it also yields the resolved (model, harness) from resolveTier — generalizing the binary 'in-context'|'registered-slot' into a tier assignment. Thread that model+harness into the slot spawn path (spawn-prep.ts model resolution) so a dispatched bead runs on the tier its difficulty selected. When disabled, behavior is unchanged. This is the fix for PAN-1196's 'difficulty captured and ignored'."
+        },
+        "items": [
+          {
+            "id": "dispatch-model-selection.ac1",
+            "title": "When tiered_execution is enabled, resolving a bead of difficulty=expert returns the expert tier's model+harness in the spawn params",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-model-selection.ac2",
+            "title": "When tiered_execution is disabled, chooseDispatchTier returns exactly its current 'in-context'|'registered-slot' result with no model override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-model-selection.ac3",
+            "title": "A dispatched bead's spawn params carry the resolved model and harness (not the parent default) when tiering is on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "standing-tier-lifecycle",
+        "title": "Standing tier agents: spawn+track one long-lived registered slot per tier in the plan (lazy)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "commit-feed-delivery",
+            "foreman-dispatch-standing",
+            "tier-replay-and-compaction"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ],
+          "files_scope": [
+            "src/lib/agents/standing-tiers.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 3. Sole owner of the new standing-tiers.ts; its wave-3 sibling (fast-track-batching) owns a disjoint new file (fast-track.ts).",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/standing-tiers.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/standing-tiers.ts",
+            "src/lib/agents/__tests__/standing-tiers.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/standing-tiers.ts managing the set of standing tier agents for an issue. A standing tier agent is a long-lived registered slot spawned via spawnRun(issue,'work',{slotIndex,slotItemId}) that persists across many beads (not per-bead). Provide: which tiers the plan schedule needs (from the tier table + item difficulties — the tier-run scheduling half of FR-6), lazy spawn (a tier session spawns when its first bead is <=1 run away), a registry keyed by tier name, and a dispatchBeadToTier(tierName, bead) helper (unit-testable) that routes a bead to the standing slot. Reuse slot registration/branch conventions from spawn.ts; do NOT invent a new agent kind."
+        },
+        "items": [
+          {
+            "id": "standing-tier-lifecycle.ac1",
+            "title": "Given a plan schedule, the manager returns exactly the set of tier names it contains and spawns no tier absent from the schedule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standing-tier-lifecycle.ac2",
+            "title": "A tier's standing session spawns lazily (when its first run is within one run) and is reused for subsequent beads of that tier rather than respawned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standing-tier-lifecycle.ac3",
+            "title": "dispatchBeadToTier routes a bead to the registered slot for its tier and returns that slot's agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standing-tier-lifecycle.ac4",
+            "title": "Each standing tier slot spawns as a recoverable registered agent (state file + tmux session) and the dashboard shows it under the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "commit-feed-delivery",
+        "title": "Commit feed: broadcast each commit diff to all standing tiers, ingestion-only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-7"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-feed.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-feed.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-feed.ts",
+            "src/lib/agents/__tests__/tier-feed.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-feed.ts. After each commit lands, broadcastCommit(sha, standingTiers) composes an ingestion-only feed message ('do NOT respond') containing the bead title and `git show <sha>` diff and delivers it to every standing tier agent via deliverAgentMessage (FR-7, no new transport). v1 is everyone-hears-everything: no per-tier filtering. Ingestion-only so per-event output cost is ~0. The feed for any agent must be reconstructible from git log + the standing-tier set (this is what replay consumes)."
+        },
+        "items": [
+          {
+            "id": "commit-feed-delivery.ac1",
+            "title": "broadcastCommit sends the commit's diff to every standing tier agent via deliverAgentMessage (verified on a delivery spy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-feed-delivery.ac2",
+            "title": "Each feed message marks itself ingestion-only (instructs the recipient not to respond) and produces no response turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commit-feed-delivery.ac3",
+            "title": "Given N standing tiers and one commit, broadcastCommit sends exactly N deliveries (everyone hears everything, no filtering)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-dispatch-standing",
+        "title": "Foreman protocol: dispatch each bead to its tier's standing agent and broadcast the resulting commit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "files_scope": [
+            "roles/work.md",
+            "src/lib/agents/standing-tiers.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 5. Only wave-5 editor of roles/work.md and standing-tiers.ts; sequenced before supervisor-halt-dependents (the other roles/work.md editor) via a blocks edge.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/standing-tiers.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "roles/work.md"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the 'Foreman wave-driver protocol' in roles/work.md with a tiered path (gated by tiered_execution.enabled): when on, for each ready bead the foreman resolves its tier, dispatches to that tier's standing agent (standing-tiers.dispatchBeadToTier), stages+commits the result (one bead = one commit, foreman composes), then calls tier-feed.broadcastCommit so all standing tiers stay warm. Add any small orchestration helper to standing-tiers.ts (unit-testable) that this prose invokes, so verify has teeth. Encode the invariant as prose AND helper: only one implementation agent works a bead at a time (no worktree race)."
+        },
+        "items": [
+          {
+            "id": "foreman-dispatch-standing.ac1",
+            "title": "roles/work.md contains the tiered dispatch loop (resolve tier -> dispatch to standing agent -> foreman commits -> broadcast feed), gated on tiered_execution.enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-dispatch-standing.ac2",
+            "title": "Each dispatched bead produces exactly one foreman-authored commit, preserving the one-bead-one-commit invariant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-dispatch-standing.ac3",
+            "title": "With tiered_execution disabled, roles/work.md preserves its existing serial and swarm paths and the default flow contains no edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-subscribe",
+        "title": "Standing supervisor agent: spawn + subscription policy (all | flagged | sampled)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-supervisor.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-supervisor.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-supervisor.ts",
+            "src/lib/agents/__tests__/tier-supervisor.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-supervisor.ts: spawn a standing supervisor agent (frontier model/harness from the tier table supervisor block) via spawnRun as a registered agent, and implement shouldSupervise(bead, policy): 'all' -> every commit; 'flagged' -> only requiresInspection beads; 'sampled' -> a configured rate. It never implements. Spawn/subscription only here; verdict posting is the next bead."
+        },
+        "items": [
+          {
+            "id": "supervisor-subscribe.ac1",
+            "title": "Under policy 'flagged', shouldSupervise returns true only for beads with requiresInspection=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-subscribe.ac2",
+            "title": "Under policy 'all', shouldSupervise returns true for every bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-subscribe.ac3",
+            "title": "The supervisor spawns as a registered, dashboard-discoverable agent using the tier-table supervisor model+harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-verdict-surface",
+        "title": "Supervisor reviews commit vs bead ACs and posts ack / blocking finding to the inspect-status surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-supervisor.ts",
+            "src/dashboard/server/routes/specialists.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 2. Sequenced after supervisor-subscribe on tier-supervisor.ts; its wave-2 siblings (route-legacy, dispatch-model-selection) touch disjoint files.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-supervisor.test.ts src/dashboard/server/routes/__tests__/specialists.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-supervisor.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "For each subscribed commit, deliver the diff + the bead's acceptance criteria (+ PRD FR text when metadata.traces present) to the supervisor, and land its ack or blocking finding on the EXISTING inspect-status surface (update.inspectStatus at specialists.ts:401; onInspectComplete at specialists.ts:514/527) so the foreman's existing wait-for-verdict path is reused unchanged. Preserve the existing rule that inspect failures do not change tracker status. Under tiered execution the push supervisor subsumes pull-based pan inspect."
+        },
+        "items": [
+          {
+            "id": "supervisor-verdict-surface.ac1",
+            "title": "A passing review persists an ack via the existing inspectStatus/onInspectComplete surface and saves the checkpoint (no new endpoint)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-verdict-surface.ac2",
+            "title": "A failing review records a blocking finding on the inspect-status surface and does not change tracker (Linear/GitHub) status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-verdict-surface.ac3",
+            "title": "For each subscribed commit, the supervisor receives the bead's acceptance criteria alongside the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-halt-dependents",
+        "title": "A blocking supervisor finding halts dispatch of dependent beads until a fix commit lands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-supervisor.ts",
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-supervisor.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-supervisor.ts",
+            "roles/work.md"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a unit-testable shouldHaltDispatch(verdicts, nextBead, dag) to tier-supervisor.ts: returns true when an unresolved blocking finding exists on a bead that nextBead depends on (via blocks edges). Wire it into the foreman protocol in roles/work.md: when a blocking finding lands on a dependency of the next bead, the foreman dispatches the fix to the owning tier first (new commit), then continues — mirroring today's INSPECTION BLOCKED flow."
+        },
+        "items": [
+          {
+            "id": "supervisor-halt-dependents.ac1",
+            "title": "Given an unresolved blocking finding on bead X and a next bead that depends on X, shouldHaltDispatch returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-halt-dependents.ac2",
+            "title": "Once a fix commit for X lands and is acked, shouldHaltDispatch returns false and dependent dispatch resumes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-halt-dependents.ac3",
+            "title": "A blocking finding on a bead with no dependents permits unrelated dispatch (shouldHaltDispatch returns false)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fast-track-batching",
+        "title": "Trivial fast-track: batch consecutive trivial mechanical beads into one dispatch (PAN-1311)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "PAN-1311"
+          ],
+          "files_scope": [
+            "src/lib/agents/fast-track.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/fast-track.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/fast-track.ts",
+            "src/lib/agents/__tests__/fast-track.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/fast-track.ts. groupFastTrack(beads): collect consecutive same-wave beads that are difficulty in {trivial,simple} AND scope-disjoint from siblings AND below a LOC threshold into a shared batch (fastTrackBatchKey). The 'skip slot dispatch' half already exists (chooseDispatchTier -> in-context); this adds batching so N trivial items become one dispatch instead of N. Honor files_scope to keep batches internally conflict-free."
+        },
+        "items": [
+          {
+            "id": "fast-track-batching.ac1",
+            "title": "groupFastTrack produces a batch of consecutive trivial, scope-disjoint beads that share one fastTrackBatchKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fast-track-batching.ac2",
+            "title": "groupFastTrack rejects a bead whose files_scope overlaps another in the candidate batch (no intra-batch conflicts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fast-track-batching.ac3",
+            "title": "groupFastTrack rejects any non-trivial (medium or harder) bead from a fast-track batch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fast-track-escalation",
+        "title": "Fail-open: a fast-track item that turns out non-trivial escalates to the standard tier",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "PAN-1311"
+          ],
+          "files_scope": [
+            "src/lib/agents/fast-track.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/fast-track.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/fast-track.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "In fast-track.ts, when a fast-track item is detected mid-flight to be non-trivial (verify fails in a way indicating real complexity, or the diff exceeds the LOC threshold), escalate it OUT of the fast-track batch to the standard tier with full review — fail-open, never fail-closed silently and never auto-merge it. Emit a signal the foreman acts on. Sequenced after fast-track-batching and before fast-track-automerge (the safety guard exists before auto-merge is enabled)."
+        },
+        "items": [
+          {
+            "id": "fast-track-escalation.ac1",
+            "title": "An item flagged non-trivial mid-flight exits its fast-track batch and routes to the standard tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fast-track-escalation.ac2",
+            "title": "An escalated item routes through full review and the auto-merge path refuses it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fast-track-automerge",
+        "title": "Trivial-tier typecheck-gated auto-merge, skip convoy (config-gated, off by default)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "tiered-e2e-dogfood"
+          ],
+          "traces": [
+            "PAN-1311"
+          ],
+          "files_scope": [
+            "src/lib/agents/fast-track.ts",
+            "src/lib/agents/slot-merge.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 5. Sequenced after fast-track-escalation on fast-track.ts via a blocks edge; sole writer of slot-merge.ts among concurrent beads.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/fast-track.test.ts src/lib/agents/__tests__/slot-merge.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/fast-track.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a trivial-tier merge path that, ONLY when tiered_execution.enabled AND the batch is trivial+mechanical, runs a typecheck (and lint) gate and auto-merges the batch to the feature branch without the review convoy, reusing verifyAndMergeSlot machinery (slot-merge.ts) for the mechanics. TRUST BOUNDARY (hazard H1): this must be unreachable when disabled, must never apply to medium+ beads, and a failed gate must NOT merge. Default off."
+        },
+        "items": [
+          {
+            "id": "fast-track-automerge.ac1",
+            "title": "With tiered_execution disabled, the auto-merge path refuses all items and every item routes through the normal review-then-merge flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fast-track-automerge.ac2",
+            "title": "A trivial batch that passes typecheck and lint auto-merges to the feature branch without the review convoy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fast-track-automerge.ac3",
+            "title": "A trivial batch that fails the typecheck gate is not merged and surfaces back to the foreman",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fast-track-automerge.ac4",
+            "title": "The auto-merge path rejects any batch that contains a medium-or-harder bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-replay-and-compaction",
+        "title": "Replay: respawn dead standing agent + re-deliver commit feed; threshold-triggered compaction at run boundaries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-replay.ts",
+            "src/lib/agents/slot-reconcile.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 5. Sole owner of the new tier-replay.ts; slot-reconcile.ts is not written by any concurrent bead.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-replay.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-replay.ts",
+            "src/lib/agents/__tests__/tier-replay.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-replay.ts. replay(agent): respawn a dead standing tier agent or supervisor via spawnRun and re-deliver its feed reconstructed as `git log <base>..HEAD` (everyone-hears-everything => the full commit list) as batched ingestion-only messages, reaching dispatch-ready with no human intervention; build on slot-reconcile.ts. Triggers: (a) crash/orphan detection; (b) at a tier-run boundary, if estimated context exceeds replay_threshold (default 0.5) of the model window, kill+replay as compaction. NEVER compact mid-bead. Use fake timers for any delay in the tests (fake-timers rule). The supervisor replays via the same path (its feed = its subscription policy applied to git log)."
+        },
+        "items": [
+          {
+            "id": "tier-replay-and-compaction.ac1",
+            "title": "When a standing tier agent is killed mid-issue, replay spawns a dispatch-ready session and re-sends the feed equal to git log base..HEAD in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-replay-and-compaction.ac2",
+            "title": "Replay triggers at a tier-run boundary when estimated context exceeds replay_threshold, and never triggers mid-bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-replay-and-compaction.ac3",
+            "title": "The supervisor replay spawns it through the same path and re-sends the subscription-filtered commit history",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-measurement",
+        "title": "Measurement scaffolding: stamp feed deliveries + per-tier cost rows (warm-hit fraction)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-1",
+            "NFR-3"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-metrics.ts",
+            "src/lib/agents/tier-feed.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-metrics.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/tier-metrics.ts",
+            "src/lib/agents/__tests__/tier-metrics.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-metrics.ts. Stamp every feed delivery (from tier-feed.ts) with a timestamp + token count, and compute the warm-hit fraction (delivery-to-delivery gap < 300s) per standing agent. Ensure per-registered-agent cost attribution (foreman, each tier, supervisor) is available to `pan token-spend-report` (which already attributes cost per agent id). This is the instrumentation the later live pilot reads; the pilot RUN itself is out of scope (D10). Sequenced after commit-feed-delivery (shares tier-feed.ts)."
+        },
+        "items": [
+          {
+            "id": "tier-measurement.ac1",
+            "title": "Each feed delivery records a timestamp and token count queryable per standing agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-measurement.ac2",
+            "title": "The system produces a per-agent warm-hit fraction (deliveries with gap < 300s) from the delivery log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-measurement.ac3",
+            "title": "pan token-spend-report shows distinct per-role rows for the foreman, each tier agent, and the supervisor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enablement-gate-test",
+        "title": "Enablement gate: with tiered_execution disabled, zero behavior change (parity lock test)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ],
+          "files_scope": [
+            "src/lib/agents/__tests__/tiered-execution-disabled.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tiered-execution-disabled.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/__tests__/tiered-execution-disabled.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a lock test asserting that with tiered_execution.enabled=false: resolveTier reproduces today's difficulty->model mapping; chooseDispatchTier returns its pre-change result; no standing tiers or supervisor are spawned; no auto-merge path is reachable. This is the mechanical guarantee that the whole feature ships dark. Restate the intent in the test name/comments."
+        },
+        "items": [
+          {
+            "id": "enablement-gate-test.ac1",
+            "title": "With tiering disabled, resolveTier returns the legacy difficulty->model output for all five difficulties (locked by the test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enablement-gate-test.ac2",
+            "title": "When disabled, the test verifies no standing-tier or supervisor spawns and no auto-merge branch executes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tiered-execution-docs",
+        "title": "Document tiered execution (config, tiers, supervisor, fast-track, replay) in the docs site",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8"
+          ],
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "docs/TIERED-EXECUTION.md"
+          ]
+        },
+        "narrative": {
+          "Action": "Write dev docs for tiered execution at docs/TIERED-EXECUTION.md: the tier table config shape, the resolution chain (override->kind->difficulty->default), standing warm tiers + everyone-hears-everything feed, the event-driven supervisor and its subscription policies, the trivial fast-track and its trust boundary, replay/compaction, and the off-by-default switch. Note the deferred non-goals (per-tier filtering, live pilot, remote tiers). If a Mintlify user-facing page is also wanted, mirror it under configuration/ (confirm the exact path in-repo)."
+        },
+        "items": [
+          {
+            "id": "tiered-execution-docs.ac1",
+            "title": "The doc renders a fenced config example that contains the tiered_execution keys enabled, tiers, supervisor, and replay_threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tiered-execution-docs.ac2",
+            "title": "The doc renders a Non-goals section that names per-tier commit filtering, the live cost pilot, and remote tiers as deferred",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tiered-e2e-dogfood",
+        "title": "End-to-end: a fixture plan runs through tiered execution (warm tiers + supervisor + one fast-track batch)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-1791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ],
+          "files_scope": [
+            "src/lib/agents/__tests__/tiered-execution-e2e.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 7 (terminal). Adds only a new e2e test file with no shared writes; runs after every producing bead has merged.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tiered-execution-e2e.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/__tests__/tiered-execution-e2e.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an end-to-end test over a small fixture plan (mixing trivial, medium, expert beads) with tiered_execution enabled: assert difficulty routes each bead to the right tier's standing agent; every commit is broadcast to all standing tiers; the supervisor produces a verdict per subscribed commit and a blocking finding halts dependent dispatch; a trivial batch fast-tracks; and killing+replaying a standing agent recovers it. Use delivery/spawn spies (no real models); use fake timers for any delay per the fake-timers rule."
+        },
+        "items": [
+          {
+            "id": "tiered-e2e-dogfood.ac1",
+            "title": "The e2e verifies each fixture bead routes to the standing agent of the tier its difficulty resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tiered-e2e-dogfood.ac2",
+            "title": "The e2e verifies every commit is broadcast to all standing tiers and the supervisor emits a verdict per subscribed commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tiered-e2e-dogfood.ac3",
+            "title": "The e2e verifies a blocking supervisor finding blocks dependent dispatch until a fix commit, and a killed standing agent respawns to dispatch-ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tier-table-config",
+        "to": "tier-resolution-chain",
+        "type": "blocks"
+      },
+      {
+        "from": "kind-metadata-field",
+        "to": "tier-resolution-chain",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-resolution-chain",
+        "to": "route-legacy-through-chain",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-resolution-chain",
+        "to": "dispatch-model-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-table-config",
+        "to": "dispatch-model-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-table-config",
+        "to": "standing-tier-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-model-selection",
+        "to": "standing-tier-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "standing-tier-lifecycle",
+        "to": "commit-feed-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "standing-tier-lifecycle",
+        "to": "foreman-dispatch-standing",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-feed-delivery",
+        "to": "foreman-dispatch-standing",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-model-selection",
+        "to": "foreman-dispatch-standing",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-table-config",
+        "to": "supervisor-subscribe",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-subscribe",
+        "to": "supervisor-verdict-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-verdict-surface",
+        "to": "supervisor-halt-dependents",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-dispatch-standing",
+        "to": "supervisor-halt-dependents",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-resolution-chain",
+        "to": "fast-track-batching",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-model-selection",
+        "to": "fast-track-batching",
+        "type": "blocks"
+      },
+      {
+        "from": "fast-track-batching",
+        "to": "fast-track-escalation",
+        "type": "blocks"
+      },
+      {
+        "from": "fast-track-escalation",
+        "to": "fast-track-automerge",
+        "type": "blocks"
+      },
+      {
+        "from": "standing-tier-lifecycle",
+        "to": "tier-replay-and-compaction",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-feed-delivery",
+        "to": "tier-replay-and-compaction",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-subscribe",
+        "to": "tier-replay-and-compaction",
+        "type": "blocks"
+      },
+      {
+        "from": "commit-feed-delivery",
+        "to": "tier-measurement",
+        "type": "blocks"
+      },
+      {
+        "from": "route-legacy-through-chain",
+        "to": "enablement-gate-test",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-model-selection",
+        "to": "enablement-gate-test",
+        "type": "blocks"
+      },
+      {
+        "from": "fast-track-automerge",
+        "to": "enablement-gate-test",
+        "type": "blocks"
+      },
+      {
+        "from": "foreman-dispatch-standing",
+        "to": "tiered-e2e-dogfood",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-halt-dependents",
+        "to": "tiered-e2e-dogfood",
+        "type": "blocks"
+      },
+      {
+        "from": "fast-track-automerge",
+        "to": "tiered-e2e-dogfood",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-replay-and-compaction",
+        "to": "tiered-e2e-dogfood",
+        "type": "blocks"
+      },
+      {
+        "from": "tier-measurement",
+        "to": "tiered-e2e-dogfood",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-01-PAN-1791-tiered-execution-difficulty-routed-bead-dispatch-event-driven-supervisor-review-standing-tier-agents-with-commit-feeds.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
