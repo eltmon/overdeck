@@ -1,4 +1,5 @@
 import { exec } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
@@ -8,7 +9,7 @@ import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.j
 import { reconcileSlotState, type ReconciledSlotItem, type SlotReconcileResult } from '../agents/slot-reconcile.js';
 import { listAgentStates } from '../agents/queries.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
-import { isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
+import { capturePane, isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
 import {
   applyTaskOperationToPlanFile,
   blockingParentCount,
@@ -25,10 +26,12 @@ const execAsync = promisify(exec);
 const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5_000;
 const SWARM_ADVANCE_FAILURE_THRESHOLD = 3;
 const SWARM_ADVANCE_FAILURE_COOLDOWN_MS = 60_000;
+const DEFAULT_SWARM_STALL_THRESHOLD_MS = 30 * 60 * 1000;
 
 const recentSlotMergeFires = new Map<string, number>();
 const issueAdvanceFailures = new Map<string, { count: number; cooldownUntil: number }>();
 const failedMergeBlocks = new Map<string, FailedMergeBlock>();
+const slotProgressObservations = new Map<string, SlotProgressObservation>();
 
 export type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff';
 
@@ -54,6 +57,9 @@ export interface CoordinateSwarmSlotsDeps {
   listSessionNames: () => Promise<readonly string[]>;
   isPaneDead: (sessionName: string) => Promise<boolean>;
   getPaneExitStatus: (sessionName: string) => Promise<number | null>;
+  getPaneOutputDigest: (sessionName: string) => Promise<string>;
+  getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
+  slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
     issue: { issueId: string; featureWorkspace: string },
     slotIndex: number,
@@ -83,6 +89,17 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
     const status = Number(raw);
     return Number.isFinite(status) ? status : null;
   },
+  getPaneOutputDigest: async (sessionName) => Effect.runPromise(capturePane(sessionName, 200)),
+  getBranchTipCommitTime: async (workspacePath, branch) => {
+    try {
+      const { stdout } = await execAsync(`git log -1 --format=%ct ${JSON.stringify(branch)}`, { cwd: workspacePath });
+      const seconds = Number(stdout.trim());
+      return Number.isFinite(seconds) ? seconds * 1000 : null;
+    } catch {
+      return null;
+    }
+  },
+  slotWorktreeExists: existsSync,
   verifyAndMergeSlot,
   applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
     Effect.runPromise(applyTaskOperationToPlanFile(planPath, operation, workspacePath)),
@@ -93,12 +110,25 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   spawnRun,
 };
 
-export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed';
+export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled';
+
+export interface ClassifyInFlightSlotsOptions {
+  workspacePath?: string;
+  stallThresholdMs?: number;
+  now?: number;
+}
 
 export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   lifecycle: SwarmSlotLifecycle;
   exitStatus?: number | null;
-  reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown';
+  reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
+  stalledForMs?: number;
+}
+
+interface SlotProgressObservation {
+  commitTime: number | null;
+  outputDigest: string;
+  lastProgressAt: number;
 }
 
 export async function coordinateSwarmSlots(
@@ -132,10 +162,11 @@ export async function coordinateSwarmSlots(
       actions.push(`[swarm] considered ${issueId}: swarm eligible`);
 
       const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, spec.document);
-      const classified = await classifyInFlightSlots(reconciled.inFlight, deps);
+      const classified = await classifyInFlightSlots(reconciled.inFlight, deps, { workspacePath: workspace.workspacePath });
       for (const slot of classified) {
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
       }
+      actions.push(...recordStalledSlotRecovery(issueId, classified));
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
       actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, spec.document, reconciled, readiness, deps));
@@ -173,10 +204,14 @@ export async function gcMergedSlots(
 
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>
+    & Partial<Pick<CoordinateSwarmSlotsDeps, 'getPaneOutputDigest' | 'getBranchTipCommitTime'>> = defaultDeps,
+  options: ClassifyInFlightSlotsOptions = {},
 ): Promise<ClassifiedSwarmSlot[]> {
   const sessionNames = new Set(await deps.listSessionNames());
   const classified: ClassifiedSwarmSlot[] = [];
+  const now = options.now ?? Date.now();
+  const stallThresholdMs = options.stallThresholdMs ?? swarmStallThresholdMs();
 
   for (const slot of slots) {
     if (!slot.agentId) {
@@ -191,6 +226,35 @@ export async function classifyInFlightSlots(
 
     const dead = await deps.isPaneDead(slot.agentId);
     if (!dead) {
+      const outputDigest = deps.getPaneOutputDigest
+        ? await deps.getPaneOutputDigest(slot.agentId).catch(() => '')
+        : '';
+      const commitTime = slot.branch && options.workspacePath && deps.getBranchTipCommitTime
+        ? await deps.getBranchTipCommitTime(options.workspacePath, slot.branch).catch(() => null)
+        : null;
+      const progressKey = slotProgressKey(slot);
+      const previous = slotProgressObservations.get(progressKey);
+      if (
+        !previous
+        || previous.commitTime !== commitTime
+        || previous.outputDigest !== outputDigest
+      ) {
+        slotProgressObservations.set(progressKey, { commitTime, outputDigest, lastProgressAt: now });
+        classified.push({ ...slot, lifecycle: 'running' });
+        continue;
+      }
+
+      const stalledForMs = now - previous.lastProgressAt;
+      if (stalledForMs > stallThresholdMs) {
+        classified.push({
+          ...slot,
+          lifecycle: 'stalled',
+          reason: 'no-progress-timeout',
+          stalledForMs,
+        });
+        continue;
+      }
+
       classified.push({ ...slot, lifecycle: 'running' });
       continue;
     }
@@ -210,6 +274,17 @@ export async function classifyInFlightSlots(
   }
 
   return classified;
+}
+
+function slotProgressKey(slot: ReconciledSlotItem): string {
+  return slot.agentId ?? slot.branch ?? `${slot.itemId}:${slot.slotIndex}`;
+}
+
+function swarmStallThresholdMs(): number {
+  const raw = process.env.PAN_SWARM_STALL_THRESHOLD_MS;
+  if (!raw) return DEFAULT_SWARM_STALL_THRESHOLD_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_SWARM_STALL_THRESHOLD_MS;
 }
 
 export async function mergeReadySlots(
@@ -266,6 +341,7 @@ export function resetSwarmLoopSafetyForTests(): void {
   recentSlotMergeFires.clear();
   issueAdvanceFailures.clear();
   failedMergeBlocks.clear();
+  slotProgressObservations.clear();
 }
 
 export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): void {
@@ -362,6 +438,25 @@ export async function recoverFailedMergeSlot(
   ];
 }
 
+export function recordStalledSlotRecovery(issueId: string, slots: ClassifiedSwarmSlot[]): string[] {
+  const actions: string[] = [];
+  const normalizedIssueId = issueId.toUpperCase();
+  if (failedMergeBlocks.has(normalizedIssueId)) return actions;
+
+  const stalled = slots.find(slot => slot.lifecycle === 'stalled');
+  if (!stalled) return actions;
+
+  recordFailedMergeBlock({
+    issueId: normalizedIssueId,
+    itemId: stalled.itemId,
+    slotIndex: stalled.slotIndex,
+    branch: stalled.branch,
+    note: `Slot ${stalled.slotIndex} stalled with no branch commit or pane output progress`,
+  });
+  actions.push(`[swarm] stalled slot ${stalled.slotIndex} (item ${stalled.itemId}) for ${normalizedIssueId}: recovery required`);
+  return actions;
+}
+
 function recordSlotMergeFire(branchKey: string, now = Date.now()): void {
   recentSlotMergeFires.set(branchKey, now + SLOT_MERGE_REFIRE_COOLDOWN_MS);
 }
@@ -387,7 +482,7 @@ export async function dispatchNextWave(
     | 'releaseAdvancingSlot'
     | 'applyTaskOperationToPlanFile'
     | 'spawnRun'
-  > = defaultDeps,
+  > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
@@ -413,6 +508,12 @@ export async function dispatchNextWave(
     }
 
     const slotIndex = lowestFreeSlotIndex(occupiedSlotIndexes);
+    const duplicateReason = await duplicateSpawnReason(issueId, workspacePath, item.id, slotIndex, reconciled, deps);
+    if (duplicateReason) {
+      actions.push(`[swarm] refused ${item.id} for ${issueId}: ${duplicateReason}`);
+      continue;
+    }
+
     if (!deps.tryReserveAdvancingSlot()) {
       actions.push(`[swarm] deferred ${item.id} for ${issueId}: advancing dispatch budget exhausted`);
       continue;
@@ -446,6 +547,42 @@ export async function dispatchNextWave(
   }
 
   return actions;
+}
+
+async function duplicateSpawnReason(
+  issueId: string,
+  workspacePath: string,
+  itemId: string,
+  slotIndex: number,
+  reconciled: SlotReconcileResult,
+  deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>>,
+): Promise<string | undefined> {
+  const issueLower = issueId.toLowerCase();
+  const agentId = `agent-${issueLower}-slot-${slotIndex}`;
+  const branch = `feature/${issueLower}-slot-${slotIndex}`;
+  const sessionNames = deps.listSessionNames ? await deps.listSessionNames() : [];
+  if (sessionNames.includes(agentId)) {
+    return `live ${agentId} session already exists`;
+  }
+
+  const unmergedBranch = reconciled.branches.find(slotBranch =>
+    slotBranch.slotIndex === slotIndex && slotBranch.branch === branch && !slotBranch.merged
+  );
+  if (unmergedBranch) {
+    return `unmerged ${branch} branch already exists`;
+  }
+
+  const slotWorkspacePath = `${workspacePath}-slot-${slotIndex}`;
+  if (deps.slotWorktreeExists?.(slotWorkspacePath)) {
+    return `slot worktree already exists at ${slotWorkspacePath}`;
+  }
+
+  const duplicateItem = reconciled.inFlight.find(slot => slot.itemId === itemId);
+  if (duplicateItem) {
+    return `item already in flight on slot ${duplicateItem.slotIndex}`;
+  }
+
+  return undefined;
 }
 
 function dispatchPhaseForItem(doc: VBriefDocument, item: VBriefItem): 'implementation' | 'synthesis' {
