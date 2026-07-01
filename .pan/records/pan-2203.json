@@ -11,9 +11,37 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-01T15:48:51.703Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T15:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-01T15:50:42.808Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T15:50Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-01T15:50:49.942Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-01T15:51:37.547Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T15:52Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-01T15:52:32.831Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-01T15:52:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2203\n\npan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2203 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2203.md",
@@ -133,15 +161,17 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2203",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T15:48:55.393Z",
+    "updatedAt": "2026-07-01T15:52:27.537Z",
+    "reviewNotes": "pan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
+    "lastVerifiedCommit": "bad247269256cf5119006ad6e932c45c9019bd8f",
     "reviewRequestedAt": "2026-07-01T15:48:47.488Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -337,7 +367,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.450181,
-        "pricingAsOf": "2026-07-01T15:48:55.432Z"
+        "pricingAsOf": "2026-07-01T15:52:27.583Z"
       }
     },
     "merges": [
@@ -346,7 +376,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T15:34:18.466Z",
-  "updated": "2026-07-01T15:48:55.438Z",
+  "updated": "2026-07-01T15:52:32.831Z",
   "statusOverrides": {
     "wi-11": "completed",
     "wi-11.ac1": "completed",

@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 import type { SwarmCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import { swarmCommand, swarmRecoverCommand } from '../../../../src/cli/commands/swarm.js';
+import { getFailedMergeBlock, resetSwarmLoopSafetyForTests } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 
 function makeDoc(items: VBriefDocument['plan']['items']): VBriefDocument {
   return {
@@ -122,12 +127,63 @@ describe('pan swarm command', () => {
     const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.getFailedMergeBlock).toHaveBeenCalledWith('PAN-2203');
+    expect(deps.getFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203');
     expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith(
       'PAN-2203',
       '/repo/workspaces/feature-pan-2203',
       doc,
       'retry',
     );
+  });
+
+  it('recover reads a failed slot persisted by Deacon instead of a CLI-local map', async () => {
+    resetSwarmLoopSafetyForTests();
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-recover-'));
+    try {
+      const doc = makeDoc([
+        makeEligibleItem('wi-1', 'src/a.ts'),
+        makeEligibleItem('wi-2', 'src/b.ts'),
+      ]);
+      writeIssueRecordForWorkspaceSync(workspace, 'PAN-2203', {
+        issueId: 'PAN-2203',
+        schemaVersion: 2,
+        feedback: [],
+        swarm: {
+          failedMergeBlock: {
+            issueId: 'PAN-2203',
+            itemId: 'wi-1',
+            slotIndex: 1,
+            branch: 'feature/pan-2203-slot-1',
+            note: 'persisted by Deacon',
+          },
+        },
+        pipeline: {
+          issueId: 'PAN-2203',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          mergeStatus: 'pending',
+          readyForMerge: false,
+          updatedAt: '2026-07-01T00:00:00.000Z',
+        },
+        closeOut: {
+          usage: { byStage: {}, totals: {} },
+          merges: [],
+          ranOn: 'test',
+        },
+      });
+      const deps = {
+        ...makeDeps(doc),
+        ensureWorkspace: vi.fn(async () => workspace),
+        getFailedMergeBlock,
+      };
+
+      const result = await swarmRecoverCommand('PAN-2203', '1', { action: 'retry' }, deps);
+
+      expect(result.ok).toBe(true);
+      expect(deps.recoverFailedMergeSlot).toHaveBeenCalledWith('PAN-2203', workspace, doc, 'retry');
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+      resetSwarmLoopSafetyForTests();
+    }
   });
 });

@@ -119,7 +119,8 @@ export async function swarmRecoverCommand(
     return { ok: false, actions: [] };
   }
 
-  const block = deps.getFailedMergeBlock(issue);
+  const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
+  const block = deps.getFailedMergeBlock(issue, workspacePath);
   if (!block) {
     deps.console.error(chalk.red(`No failed-merge slot is recorded for ${issue}.`));
     return { ok: false, actions: [] };
@@ -129,7 +130,6 @@ export async function swarmRecoverCommand(
     return { ok: false, actions: [] };
   }
 
-  const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
   const actions = await deps.recoverFailedMergeSlot(issue, workspacePath, loaded.doc, action);
   for (const line of actions) deps.console.log(line);
 
