@@ -1,9 +1,12 @@
 import { Effect } from 'effect';
+import { join } from 'path';
+import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
 import { reconcileSlotState, type ReconciledSlotItem, type SlotReconcileResult } from '../agents/slot-reconcile.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
 import { isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
+import { applyTaskOperationToPlanFile, type PersistedTaskOperation } from '../vbrief/dag.js';
 import { analyzeSwarmReadiness } from '../vbrief/swarm-readiness.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
 export interface CoordinateSwarmSlotsOptions {
@@ -20,6 +23,16 @@ export interface CoordinateSwarmSlotsDeps {
   listSessionNames: () => Promise<readonly string[]>;
   isPaneDead: (sessionName: string) => Promise<boolean>;
   getPaneExitStatus: (sessionName: string) => Promise<number | null>;
+  verifyAndMergeSlot: (
+    issue: { issueId: string; featureWorkspace: string },
+    slotIndex: number,
+    item: VBriefItem,
+  ) => Promise<SlotMergeResult>;
+  applyTaskOperationToPlanFile: (
+    planPath: string,
+    operation: PersistedTaskOperation,
+    workspacePath?: string,
+  ) => Promise<unknown>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -34,6 +47,9 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
     const status = Number(raw);
     return Number.isFinite(status) ? status : null;
   },
+  verifyAndMergeSlot,
+  applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
+    Effect.runPromise(applyTaskOperationToPlanFile(planPath, operation, workspacePath)),
 };
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed';
@@ -70,6 +86,7 @@ export async function coordinateSwarmSlots(
       for (const slot of classified) {
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
       }
+      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
     } catch (err) {
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -117,4 +134,40 @@ export async function classifyInFlightSlots(
   }
 
   return classified;
+}
+
+export async function mergeReadySlots(
+  issueId: string,
+  workspacePath: string,
+  doc: VBriefDocument,
+  slots: ClassifiedSwarmSlot[],
+  deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile'> = defaultDeps,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const itemsById = new Map(doc.plan.items.map(item => [item.id, item]));
+  const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+  for (const slot of slots) {
+    if (slot.lifecycle !== 'ready-to-merge') continue;
+
+    const item = itemsById.get(slot.itemId);
+    if (!item) continue;
+
+    const result = await deps.verifyAndMergeSlot({ issueId, featureWorkspace: workspacePath }, slot.slotIndex, item);
+    if (result.merged) {
+      await deps.applyTaskOperationToPlanFile(planPath, {
+        type: 'done',
+        itemId: item.id,
+        writerId: 'deacon-swarm',
+      }, workspacePath);
+      actions.push(`[swarm] merged slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+      continue;
+    }
+
+    if (result.conflicts) {
+      actions.push(`[swarm] failed-merge slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+    }
+  }
+
+  return actions;
 }
