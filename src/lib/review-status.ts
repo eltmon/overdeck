@@ -483,7 +483,12 @@ export function setReviewStatusSync(
     if (canSkipTests) {
       console.log(`[review-status] Skipping test role for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
       emitActivityEntrySync({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
-      setReviewStatusSync(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate' });
+      setReviewStatusSync(issueId, {
+        testStatus: 'passed',
+        testNotes: 'Skipped: no code changed since pre-review verification gate',
+        verificationStatus: 'passed',
+        verificationNotes: 'Pre-review verification already covered the reviewed commit',
+      });
       void emitReactiveLifecycleEvent('test.passed', issueId);
     } else {
       void emitReactiveLifecycleEvent('review.approved', issueId);

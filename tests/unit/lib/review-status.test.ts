@@ -27,7 +27,7 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityTtsSync: vi.fn(),
 }));
 
-import { setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../../../src/lib/review-status.js';
 
 describe('review status scope drift', () => {
   beforeEach(() => {
@@ -60,5 +60,26 @@ describe('review status scope drift', () => {
     expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
     const [, reviewStatus] = mockUpdateIssueRecordForIssue.mock.calls[0];
     expect(reviewStatus.scopeDrift).toEqual(scopeDrift);
+  });
+
+  it('finalizes verification when no-code-drift skips the post-review test role', () => {
+    const head = 'abc123abc123abc123abc123abc123abc123abcd';
+    setReviewStatusSync('PAN-2200', {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      verificationStatus: 'running',
+      reviewedAtCommit: head,
+      lastVerifiedCommit: head,
+    });
+
+    setReviewStatusSync('PAN-2200', { reviewStatus: 'passed' });
+
+    const status = getReviewStatusSync('PAN-2200');
+    expect(status).toMatchObject({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      readyForMerge: true,
+    });
   });
 });
