@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { messageAgent } from '../agents.js';
+import { listSlotAgents } from '../agents/slot-reconcile.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
@@ -135,7 +136,7 @@ async function deliverReviewVerdictFeedbackPromise(
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
     const doc = readWorkspacePlanBestEffort(workspacePath);
-    const agentId = resolveSlotFeedbackAgentId(issueId, opts.slotItemId, doc) ?? `agent-${issueId.toLowerCase()}`;
+    const agentId = resolveSlotFeedbackAgentId(issueId, opts.slotItemId, doc, listSlotAgents(issueId)) ?? `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
     try {
       await messageAgent(agentId, message);

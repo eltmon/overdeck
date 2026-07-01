@@ -5,10 +5,11 @@ import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
-const { mockMessageAgent, mockGetReviewStatus, mockWriteFeedbackFile } = vi.hoisted(() => ({
+const { mockMessageAgent, mockGetReviewStatus, mockWriteFeedbackFile, mockListSlotAgents } = vi.hoisted(() => ({
   mockMessageAgent: vi.fn(),
   mockGetReviewStatus: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
+  mockListSlotAgents: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -29,6 +30,10 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: mockWriteFeedbackFile,
+}));
+
+vi.mock('../../../../src/lib/agents/slot-reconcile.js', () => ({
+  listSlotAgents: mockListSlotAgents,
 }));
 
 function plan(items: VBriefItem[]): VBriefDocument {
@@ -83,6 +88,7 @@ describe('swarm verdict feedback routing', () => {
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
     }));
+    mockListSlotAgents.mockReturnValue([]);
   });
 
   it('delivers a verdict for a slot-owned item to agent-<issue>-slot-N', async () => {
@@ -133,6 +139,37 @@ describe('swarm verdict feedback routing', () => {
     );
     expect(mockMessageAgent).not.toHaveBeenCalledWith(
       'agent-pan-2203',
+      expect.any(String),
+    );
+  });
+
+  it('uses persisted slot ownership instead of plan order when routing verdict feedback', async () => {
+    const workspacePath = await writePlan(plan([
+      slotItem('wi-a'),
+      slotItem('wi-b'),
+      slotItem('wi-c'),
+    ]));
+    mockListSlotAgents.mockReturnValue([
+      { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'running', slotItemId: 'wi-c' },
+      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'running', slotItemId: 'wi-b' },
+    ]);
+
+    const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId: 'PAN-2203',
+      verdict: 'blocked',
+      notes: 'fix wi-c',
+      workspacePath,
+      slotItemId: 'wi-c',
+    }));
+
+    expect(result.agentMessageSent).toBe(true);
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-2203-slot-1',
+      expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
+    );
+    expect(mockMessageAgent).not.toHaveBeenCalledWith(
+      'agent-pan-2203-slot-3',
       expect.any(String),
     );
   });

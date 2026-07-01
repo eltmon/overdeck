@@ -137,9 +137,15 @@ export function resolveSlotFeedbackAgentId(
   issueId: string,
   slotItemId: string | undefined,
   doc: VBriefDocument | null | undefined,
+  slotOwnership: Array<{ slotIndex: number; slotItemId?: string }> = [],
 ): string | null {
   const normalizedItemId = slotItemId?.trim();
-  if (!normalizedItemId || !doc) return null;
+  if (!normalizedItemId) return null;
+
+  const persistedOwner = slotOwnership.find(slot => slot.slotItemId === normalizedItemId);
+  if (persistedOwner) return `agent-${issueId.toLowerCase()}-slot-${persistedOwner.slotIndex}`;
+
+  if (!doc) return null;
 
   const slotIndex = slotEligibleItems(doc).findIndex(item => item.id === normalizedItemId) + 1;
   if (slotIndex < 1) return null;
