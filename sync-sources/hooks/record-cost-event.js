@@ -12654,16 +12654,6 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "anthropic",
-		model: "claude-sonnet-5",
-		inputPer1k: .002,
-		outputPer1k: .01,
-		cacheReadPer1k: 2e-4,
-		cacheWrite5mPer1k: .0025,
-		cacheWrite1hPer1k: .004,
-		currency: "USD"
-	},
-	{
-		provider: "anthropic",
 		model: "claude-opus-4-6",
 		inputPer1k: .005,
 		outputPer1k: .025,
@@ -12947,7 +12937,7 @@ function calculateCostSync(usage, pricing) {
 	let inputMultiplier = 1;
 	let outputMultiplier = 1;
 	const totalInputTokens = usage.inputTokens + (usage.cacheReadTokens || 0) + (usage.cacheWriteTokens || 0);
-	if (pricing.model === "claude-sonnet-4" && totalInputTokens > 2e5) {
+	if ((pricing.model === "claude-sonnet-4" || pricing.model === "claude-sonnet-4-6") && totalInputTokens > 2e5) {
 		inputMultiplier = 2;
 		outputMultiplier = 1.5;
 	}
@@ -25653,32 +25643,6 @@ const MODEL_CAPABILITIES = {
 		],
 		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
 	},
-	"claude-sonnet-5": {
-		model: "claude-sonnet-5",
-		provider: "anthropic",
-		displayName: "Claude Sonnet 5",
-		costPer1MTokens: 6,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 96,
-			"code-review": 96,
-			debugging: 94,
-			planning: 92,
-			documentation: 94,
-			testing: 94,
-			security: 90,
-			performance: 90,
-			synthesis: 92,
-			speed: 70,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high"
-		],
-		notes: "Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; introductory pricing through 2026-08-31 is $2/M input and $10/M output, then $3/M input and $15/M output from 2026-09-01. Scores are provisional until benchmarks are verified."
-	},
 	"claude-sonnet-4-6": {
 		model: "claude-sonnet-4-6",
 		provider: "anthropic",
@@ -26586,7 +26550,7 @@ function getModelEffortLevelsSync(model) {
 //#region ../../src/lib/config-yaml/roles.ts
 const DEFAULT_WORKHORSES = {
 	expensive: "claude-opus-4-8",
-	mid: "claude-sonnet-5",
+	mid: "claude-sonnet-4-6",
 	cheap: "claude-haiku-4-5"
 };
 const DEFAULT_ROLES = {
