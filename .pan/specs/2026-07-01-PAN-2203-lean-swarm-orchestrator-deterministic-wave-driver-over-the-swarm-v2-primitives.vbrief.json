@@ -4,7 +4,7 @@
     "created": "2026-07-01T02:37:04.022Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2203: Lean swarm orchestrator: deterministic wave-driver over the swarm-v2 primitives (deferred PAN-1762 follow-up)",
-    "updated": "2026-07-01T02:44:10.005Z"
+    "updated": "2026-07-01T03:09:13.101Z"
   },
   "plan": {
     "id": "pan-2203",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8883aa29-8773-4457-b1a3-e0011a33a786",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-01T02:37:04.022Z",
-    "updated": "2026-07-01T02:44:10.005Z",
+    "updated": "2026-07-01T03:09:13.101Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2203",
@@ -37,7 +37,7 @@
     "narratives": {
       "Problem": "PAN-1762 shipped the swarm-v2 primitives (dispatch-tier, swarm-readiness, resolveRegisteredSlotSpawn, verifyAndMergeSlot, reconcileSlotState) but ZERO production callers wire them into a loop — verifyAndMergeSlot / reconcileSlotState / spawnRun({slotIndex}) have only test callers, analyzeSwarmReadiness is called only by the finalize readiness report, and there is no `pan swarm` command. Parallel intra-issue execution therefore only works if a work-agent LLM hand-executes the prose foreman protocol at roles/work.md:70-107 — fragile and unsafe unattended. The full old orchestrator (src/dashboard/server/routes/swarm.ts, 2598 lines) was deleted in 59f1e6cd4a partly for cause (no recovery when a slot's branch becomes unmergeable, PAN-1194).",
       "Proposal": "Turn the prose foreman loop into a deterministic, deacon-integrated coordination pass over the existing primitives: dispatch wave -> detect completion -> verify+merge -> advance -> recover. A new coordinateSwarmSlots() pass in src/lib/cloister/deacon-swarm.ts runs each runPatrol() tick (successor to the deleted detectMergedSwarmSlots patrol), with an optional agent.stopped reactive fast-path for near-instant advance. A thin `pan swarm <id>` CLI validates readiness and dispatches wave 0, then hands ongoing coordination to the deacon. Derive-don't-store: each tick re-derives merged/in-flight/pending from live git slot branches + tmux + the immutable main-side vBRIEF via reconcileSlotState; the only durable state is the vBRIEF item status the pipeline already owns. The deleted route is the LOGIC reference (auto-advance, cooldown, failed-merge recovery), not the revival — its stateful bloat is dropped.",
-      "NonGoals": "- Remote Fly slots (tracked in PAN-1773, Phase 2; depends on this + PAN-1676)\n- Difficulty/model routing, tier table, and supervisor feeds (PAN-1791's axis; layers on top of this loop, sequenced after)\n- Cross-issue concurrency slot manager (PAN-1666; different axis, interacts only at the shared local agent-pool ceiling)\n- Reviving the deleted stateful SwarmState.slots array or its dual continue.json/sidecar persistence (explicitly rejected by D1/NFR-1)\n- Any new HTTP route or dashboard-server endpoint for swarm coordination (deacon-integrated by D2)\n- Direct mutation of the main-side vBRIEF spec (forbidden by the PAN-1124 single-spec-on-main invariant)"
+      "NonGoals": "- Remote Fly slots (tracked in PAN-1773, Phase 2; depends on this + PAN-1676)\n- Difficulty/model routing, tier table, and supervisor feeds (PAN-1791's axis; layers on top of this loop, sequenced after)\n- Cross-issue concurrency slot manager (PAN-1666; different axis, interacts only at the shared local agent-pool ceiling)\n- Reviving the deleted stateful SwarmState.slots array or its dual continue.json/sidecar persistence (explicitly rejected by D1/NFR-1)\n- Any new HTTP route or dashboard-server endpoint for swarm coordination (deacon-integrated by D2)\n- Direct mutation of the main-side vBRIEF spec (forbidden by the PAN-1124 single-spec-on-main invariant)\n- Per-slot code review gate before merge — v1 slots merge on their verify_commands passing only; the issue's single downstream PR is reviewed once on the merged result, which is load-bearing (D7). Per-unit review is deliberately out of scope for v1."
     },
     "autoDecisions": [
       {
@@ -842,12 +842,84 @@
             }
           }
         ]
+      },
+      {
+        "id": "wi-12",
+        "title": "Stalled-slot detection + duplicate-spawn guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T02:37:04.022Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2203",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-swarm-stall.test.ts passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-17",
+            "FR-18",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Completion detection must NOT rely on pane-exit alone — a wedged-but-alive slot must never hang the wave (the kimi pane-alive-but-not-progressing problem). Track per-slot last-progress (branch-tip commit time and/or pane output). When a `running` slot exceeds a configurable stall threshold with no new commit on its branch AND no pane output, classify it `stalled` and escalate to recovery (retry/handoff, reusing the wi-5 recovery path). Duplicate-spawn guard (FR-18): before any (re)spawn for an item, assert no live agent-<issue>-slot-N session AND no unmerged feature/<issue>-slot-N worktree already exist for it — never double-spawn onto a reconnecting/paused slot (two agents on one worktree corrupt the tool_use/tool_result chain). All threshold/stall tests MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() — never real setTimeout (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "wi-12.ac1",
+            "title": "Given a running slot with no new branch commit and no pane output past the stall threshold, it is marked `stalled` and escalated to recovery (verified via vi.advanceTimersByTimeAsync)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-12.ac2",
+            "title": "Given a fresh slot within the threshold, it stays `running` and is not marked stalled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-12.ac3",
+            "title": "Given a live agent-<issue>-slot-N session or an unmerged feature/<issue>-slot-N worktree already exists for an item, a (re)spawn for that item is refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
       }
     ],
     "edges": [
       {
         "from": "wi-1",
         "to": "wi-2",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2",
+        "to": "wi-12",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4",
+        "to": "wi-12",
         "type": "blocks"
       },
       {
