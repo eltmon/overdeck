@@ -57,8 +57,8 @@ describe('AgentState role persistence', () => {
     });
     const { determineModel } = await import('../agents.js');
 
-    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-6.
-    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-6');
+    // PAN-1048 R4: default workhorse:mid tracks the current Sonnet.
+    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-5');
     expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
   });
 

@@ -63,6 +63,20 @@ export interface ContinueFeedbackEntry {
   markdownBody: string;
 }
 
+/** Scope prediction drift recorded when actual changed files differ from vBRIEF metadata.files_scope. */
+export interface ScopeDriftRecord {
+  /** Files changed by the branch that did not match any declared files_scope entry. */
+  outsideDeclaredScope: string[];
+  /** Declared files_scope entries that matched no changed file. */
+  declaredScopeUntouched: string[];
+  /** The declared scope union used for comparison. */
+  declaredScope: string[];
+  /** Actual changed files compared against the declared scope. */
+  actualChangedFiles: string[];
+  /** ISO 8601 datetime when the drift comparison was recorded. */
+  recordedAt: string;
+}
+
 /** Reason a session ended or restarted. */
 export type ContinueSessionReason =
   | 'planning'
@@ -119,4 +133,6 @@ export interface ContinueState {
   sessionHistory: ContinueSessionEntry[];
   /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
   feedback?: ContinueFeedbackEntry[];
+  /** Advisory scope prediction drift recorded at pan done. */
+  scopeDrift?: ScopeDriftRecord;
 }

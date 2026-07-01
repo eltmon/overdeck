@@ -44,6 +44,9 @@ describe('loadCloisterConfig', () => {
       stage1_minutes: 20,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
     });
   });
 
@@ -62,6 +65,9 @@ describe('loadCloisterConfig', () => {
       stage1_minutes: 20,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
     });
   });
 
@@ -76,6 +82,26 @@ describe('loadCloisterConfig', () => {
       stage1_minutes: 10,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
+    });
+  });
+
+  it('deep-merges a partial flywheel stuck-remediation override', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('[stuck_remediation]\nflywheel_stage3_minutes = 30\n');
+
+    const config = loadCloisterConfigSync();
+
+    expect(config.stuck_remediation).toEqual({
+      enabled: true,
+      stage1_minutes: 20,
+      stage2_minutes: 45,
+      stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 30,
     });
   });
 

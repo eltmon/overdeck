@@ -20,12 +20,28 @@ const FAKE_AGENTS_DIR_LISTING = vi.hoisted(() => ({
   entries: [] as string[],
 }));
 
-// Keep the real normalizeAgentId / isQualifiedAgentId / resolveAgentTargetSync —
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
+const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator', 'sequencer-runner']);
+const isQualifiedAgentIdForTest = (input: string): boolean => {
+  const lower = input.toLowerCase();
+  return SINGLETON_AGENT_IDS.has(lower) || AGENT_PREFIXES.some(p => lower.startsWith(p));
+};
+const resolveAgentTargetSyncForTest = (input: string): string | null => {
+  if (isQualifiedAgentIdForTest(input)) return input.toLowerCase();
+  return /^pan-\d+$/i.test(input) ? `agent-${input.toLowerCase()}` : null;
+};
+
+// Keep the real targeting semantics for normalizeAgentId / isQualifiedAgentId / resolveAgentTargetSync —
 // the PAN-1760 regression was these commands bypassing them with a naive
 // `agent-` prefix, which made strike-/inspect- sessions unaddressable.
 vi.mock('../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../lib/agents.js')>();
-  return { ...actual, ...agentMocks };
+  return {
+    ...actual,
+    ...agentMocks,
+    isQualifiedAgentId: isQualifiedAgentIdForTest,
+    resolveAgentTargetSync: resolveAgentTargetSyncForTest,
+  };
 });
 
 vi.mock('../../../lib/tmux.js', async (importOriginal) => {

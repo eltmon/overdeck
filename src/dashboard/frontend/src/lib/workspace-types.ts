@@ -63,7 +63,18 @@ export interface WorkspaceStackHealth {
 }
 
 export interface PendingOperation {
-  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge';
+  type:
+    | 'approve'
+    | 'close'
+    | 'containerize'
+    | 'start'
+    | 'review'
+    | 'merge'
+    | 'rebuild-stack'
+    | 'start-stack'
+    | 'stop-stack'
+    | 'restart-stack'
+    | 'reap-workspace';
   issueId: string;
   startedAt: string;
   status: 'pending' | 'running' | 'completed' | 'failed';

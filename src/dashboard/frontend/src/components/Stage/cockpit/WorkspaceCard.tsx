@@ -44,7 +44,11 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
   const stackPending = pendingOperation?.status === 'running' && (
     pendingOperation.type === 'containerize' ||
     pendingOperation.type === 'start' ||
-    pendingOperation.type === 'rebuild-stack'
+    pendingOperation.type === 'rebuild-stack' ||
+    pendingOperation.type === 'start-stack' ||
+    pendingOperation.type === 'stop-stack' ||
+    pendingOperation.type === 'restart-stack' ||
+    pendingOperation.type === 'reap-workspace'
   )
 
   const wsActions = ['syncMain', 'createWorkspace']

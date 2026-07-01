@@ -23,6 +23,7 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import type { ReviewMode } from '../config-yaml.js';
 import type {
   ContinueBeadsMapping,
   ContinueDecision,
@@ -30,6 +31,7 @@ import type {
   ContinueHazard,
   ContinueResumePoint,
   ContinueSessionEntry,
+  ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -78,6 +80,8 @@ export interface PanIssuePipelineRecord {
   lastVerifiedCommit?: string;
   /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
   reviewRequestedAt?: string;
+  /** PAN-1762: advisory files_scope drift recorded at pan done. */
+  scopeDrift?: ScopeDriftRecord;
   autoMerge?: boolean;
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;
@@ -109,6 +113,8 @@ export interface PanIssueRecord {
   harness?: RuntimeName;
   /** Agent model (from state.json; PAN-1919). */
   model?: string;
+  /** Per-issue review mode override; beats project/global config. */
+  reviewMode?: ReviewMode;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
@@ -117,6 +123,7 @@ export interface PanIssueRecord {
   statusOverrides?: Record<string, string>;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
+  scopeDrift?: ScopeDriftRecord;
 
   pipeline: PanIssuePipelineRecord;
   closeOut: PanIssueCloseOutRecord;
@@ -474,6 +481,7 @@ export interface RecordContinueView {
   beadsMapping: ContinueBeadsMapping;
   sessionHistory: ContinueSessionEntry[];
   feedback: ContinueFeedbackEntry[];
+  scopeDrift?: ScopeDriftRecord;
 }
 
 export function readRecordContinueViewSync(
@@ -489,6 +497,7 @@ export function readRecordContinueViewSync(
     beadsMapping: record.beadsMapping ?? {},
     sessionHistory: record.sessionHistory ?? [],
     feedback: record.feedback ?? [],
+    scopeDrift: record.scopeDrift,
   };
 }
 
@@ -525,6 +534,18 @@ export function clearRecordFeedbackSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   record.feedback = [];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Record advisory scope prediction drift in the per-issue record (sync). */
+export function writeRecordScopeDriftSync(
+  project: ProjectConfig,
+  issueId: string,
+  scopeDrift: ScopeDriftRecord,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.scopeDrift = scopeDrift;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }

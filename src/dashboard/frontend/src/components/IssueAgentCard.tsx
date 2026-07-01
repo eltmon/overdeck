@@ -8,7 +8,10 @@ import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
 import { getHarness } from '@overdeck/contracts';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
-import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
+import {
+  BOOT_RECONCILIATION_QUERY_KEY,
+  type BootReconciliationState,
+} from './BootReconciliationModal';
 
 export interface IssueAgent {
   id: string;
@@ -241,7 +244,9 @@ export function IssueAgentCard({
   const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'ohmypi' ? 'ohmypi' : 'claude-code');
   const issueId = inferIssueId(agent);
   const now = useSharedTick();
-  const noResumeMode = queryClient.getQueryData<NoResumeMode>(NO_RESUME_QUERY_KEY);
+  const bootReconciliation = queryClient.getQueryData<BootReconciliationState>(
+    BOOT_RECONCILIATION_QUERY_KEY,
+  );
   const { data: costData } = useAgentCost(agent.id);
   const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 
@@ -451,14 +456,14 @@ export function IssueAgentCard({
       ? 'Paused'
       : agent.troubled === true
         ? `Troubled (${agent.consecutiveFailures} failure${agent.consecutiveFailures === 1 ? '' : 's'})`
-        : noResumeMode?.active === true
-          ? 'Boot --no-resume'
+        : bootReconciliation?.decision === 'pending'
+          ? 'Boot reconciliation'
           : agent.stoppedByUser === true
             ? 'Manual'
             : undefined
     : undefined;
-  const gatingTitle = gatingReason === 'Boot --no-resume' && noResumeMode?.since
-    ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, now)}`
+  const gatingTitle = gatingReason === 'Boot reconciliation' && bootReconciliation?.graceDeadline
+    ? `Boot reconciliation pending until ${new Date(bootReconciliation.graceDeadline).toLocaleString()}`
     : gatingReason;
   const isStartGated = agent.paused === true || agent.troubled === true;
   const startGateTitle = agent.paused === true

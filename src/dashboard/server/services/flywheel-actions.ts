@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import type { FlywheelStatus } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { loadConfigNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
+import { resolveHarness } from '../../../lib/harness-resolve.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
 import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/overdeck/control-settings.js';
 import { isPaneDead, killSession, sessionExists } from '../../../lib/tmux.js';
@@ -37,7 +38,7 @@ interface FlywheelGateSnapshot {
 }
 
 interface ResolvedFlywheelRoleConfig {
-  harness: 'claude-code' | 'pi' | 'codex';
+  harness: 'claude-code' | 'ohmypi' | 'codex';
   model: string;
   effort: RoleEffort;
   minAgents: number;
@@ -121,9 +122,13 @@ async function readGateSnapshot(): Promise<FlywheelGateSnapshot> {
 async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> {
   const { config } = await Effect.runPromise(loadConfigNoMigration());
   const flywheel = config.roles?.flywheel;
+  const model = resolveModel('flywheel', undefined, config);
+  // Harness is provider-default-only (PAN-1984): derive from the model's provider via the
+  // canonical resolver — never a per-role pin or a hardcoded claude-code fallback (PAN-1865).
+  const harness = await resolveHarness({ model });
   return {
-    harness: flywheel?.harness ?? 'claude-code',
-    model: resolveModel('flywheel', undefined, config),
+    harness,
+    model,
     effort: flywheel?.effort ?? 'high',
     minAgents: flywheel?.minAgents ?? 20,
     maxAgents: flywheel?.maxAgents ?? 30,

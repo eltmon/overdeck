@@ -45,16 +45,26 @@ function getCVFile(agentId: string): string {
 }
 
 /**
+ * Read an agent's CV without creating one.
+ */
+export function readAgentCVSync(agentId: string): AgentCV | null {
+  const cvFile = getCVFile(agentId);
+
+  if (!existsSync(cvFile)) return null;
+
+  try {
+    return JSON.parse(readFileSync(cvFile, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get or create an agent's CV
  */
 export function getAgentCVSync(agentId: string): AgentCV {
-  const cvFile = getCVFile(agentId);
-
-  if (existsSync(cvFile)) {
-    try {
-      return JSON.parse(readFileSync(cvFile, 'utf-8'));
-    } catch {}
-  }
+  const existing = readAgentCVSync(agentId);
+  if (existing) return existing;
 
   // Create new CV
   const cv: AgentCV = {

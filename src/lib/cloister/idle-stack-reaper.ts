@@ -5,7 +5,6 @@ import { Effect } from 'effect';
 
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listSessionNames } from '../tmux.js';
-import { getNoResumeMode } from './no-resume-mode.js';
 
 const execAsync = promisify(exec);
 
@@ -110,8 +109,6 @@ export async function reconcileIdleWorkspaceStacks(
 ): Promise<string[]> {
   // Operator kill-switch.
   if (process.env.OVERDECK_DISABLE_STACK_REAPER === '1') return [];
-  // When auto-resume is frozen to debug, leave workspaces untouched.
-  if (getNoResumeMode().active) return [];
 
   const d = { ...defaultDeps(), ...deps };
   const actions: string[] = [];

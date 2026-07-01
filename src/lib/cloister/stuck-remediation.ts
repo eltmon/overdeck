@@ -14,7 +14,7 @@ import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { describeAgentDeath } from './agent-death.js';
-import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
+import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
   clearStuckRemediationState,
   readStuckRemediationState,
@@ -187,6 +187,7 @@ async function evaluateAgent(
 //      idleMin=205 and the entire pipeline stalled).
 const FLYWHEEL_RESPAWN_WINDOW_MS = 30 * 60 * 1000;
 const FLYWHEEL_MAX_RESPAWNS = 3;
+const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
 export type FlywheelRemediationDecision =
   | { kind: 'noop' }
@@ -327,25 +328,38 @@ async function evaluateFlywheelOrchestrator(
   // PAN-2160: the terminal idle stage RELAUNCHES the wedged orchestrator (capped),
   // it never pause+troubles it. RUN-36 was parked here at idleMin=205 and the
   // whole pipeline stalled.
-  if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
+  if (idleMinutes >= config.flywheel_stage3_minutes && lastStage < 3) {
     await remediateFlywheelOrchestrator(agentId, now, actions, `wedged (idle ${idleMinutes}min)`);
     return;
   }
 
-  if (idleMinutes >= config.stage2_minutes && lastStage < 2) {
-    const message = `Stage 2: idle ${idleMinutes} min — flywheel ticks should be sub-minute. Emit a status snapshot via \`pan flywheel emit-status\` or run \`pan flywheel pause\` to hand off cleanly.`;
+  if (idleMinutes >= config.flywheel_stage2_minutes && lastStage < 2) {
+    const message = `Stage 2: idle ${idleMinutes} min — run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question, do NOT wait, and do NOT just emit a stale status or pause.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(2, now, firstStuck, stuckState));
     logAction(actions, transitionAction(2, 'FLYWHEEL', idleMinutes, 'escalated-nudge'));
     return;
   }
 
-  if (idleMinutes >= config.stage1_minutes && lastStage < 1) {
-    const message = `You appear stuck — ${idleMinutes} min since last tick. Flywheel ticks should complete in under a minute. Emit a current status via \`pan flywheel emit-status --file <path>\`, or run \`pan flywheel pause\` if you're done.`;
+  if (idleMinutes >= config.flywheel_stage1_minutes && lastStage < 1) {
+    const message = `You appear stuck — ${idleMinutes} min since your last tick. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question, do NOT wait, and do NOT just emit a stale status or pause.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck, stuckState));
     logAction(actions, transitionAction(1, 'FLYWHEEL', idleMinutes, 'poked'));
   }
+}
+
+async function reconcileActiveFlywheelWithoutRunningAgent(now: number, actions: string[]): Promise<void> {
+  if (!getFlywheelActiveRunId()) return;
+  if (isFlywheelGloballyPaused()) return;
+  if (sessionExistsSync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) return;
+
+  await remediateFlywheelOrchestrator(
+    FLYWHEEL_ORCHESTRATOR_AGENT_ID,
+    now,
+    actions,
+    `DIED (${describeAgentDeath(FLYWHEEL_ORCHESTRATOR_AGENT_ID)})`,
+  );
 }
 
 export async function checkStuckAgentRemediation(opts: StuckRemediationOptions = {}): Promise<string[]> {
@@ -354,13 +368,28 @@ export async function checkStuckAgentRemediation(opts: StuckRemediationOptions =
 
   const actions: string[] = [];
   const now = opts.now ?? Date.now();
+  const runningAgents = listRunningAgentsSync();
+  let sawFlywheelOrchestrator = false;
 
-  for (const agent of listRunningAgentsSync()) {
+  for (const agent of runningAgents) {
+    if (agent.id === FLYWHEEL_ORCHESTRATOR_AGENT_ID || agent.role === 'flywheel') {
+      sawFlywheelOrchestrator = true;
+    }
     try {
       await evaluateAgent(agent, config, now, actions);
     } catch (error) {
       const agentId = agent.id || '(unknown)';
       const message = `[deacon] stuck-remediation agent=${agentId} error=${error instanceof Error ? error.message : String(error)}`;
+      console.error(message, error);
+      logDeaconEventSync(message);
+    }
+  }
+
+  if (!sawFlywheelOrchestrator) {
+    try {
+      await reconcileActiveFlywheelWithoutRunningAgent(now, actions);
+    } catch (error) {
+      const message = `[deacon] stuck-remediation agent=${FLYWHEEL_ORCHESTRATOR_AGENT_ID} error=${error instanceof Error ? error.message : String(error)}`;
       console.error(message, error);
       logDeaconEventSync(message);
     }

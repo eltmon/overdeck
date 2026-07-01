@@ -13,6 +13,13 @@ describe('auto-resume gates', () => {
   let originalNoResume: string | undefined;
   let originalCwd: string;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
+  let bootReconciliationState: {
+    decision: 'pending' | 'resume_all' | 'hold_all' | 'per_agent' | null;
+    perAgent: Record<string, 'resume' | 'hold'>;
+    decidedAt: string | null;
+    bootId: string | null;
+    graceDeadline: string | null;
+  };
   // PAN-1665: free work slots the governor reports. High by default so the gating
   // tests below (1 candidate each) are unaffected; the cap test lowers it.
   let resumeSlotsMock: number;
@@ -33,6 +40,13 @@ describe('auto-resume gates', () => {
     delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
     resumeSlotsMock = 999;
+    bootReconciliationState = {
+      decision: null,
+      perAgent: {},
+      decidedAt: null,
+      bootId: null,
+      graceDeadline: null,
+    };
   });
 
   afterEach(() => {
@@ -44,6 +58,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/activity-logger.js');
     vi.doUnmock('../../../src/lib/persistent-logger.js');
     vi.doUnmock('../../../src/lib/database/app-settings.js');
+    vi.doUnmock('../../../src/lib/overdeck/control-settings.js');
     vi.doUnmock('../../../src/lib/database/review-status-db.js');
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/cloister/merge-agent.js');
@@ -167,6 +182,12 @@ describe('auto-resume gates', () => {
     }));
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
+    }));
+    vi.doMock('../../../src/lib/overdeck/control-settings.js', () => ({
+      isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
+      getBootReconciliationState: vi.fn(() => bootReconciliationState),
+      setBootReconciliationDecision: vi.fn(),
+      stampBootReconciliation: vi.fn(),
     }));
     vi.doMock('../../../src/lib/database/review-status-db.js', () => ({
       markWorkspaceStuck: vi.fn(),
@@ -679,10 +700,16 @@ describe('auto-resume gates', () => {
     expect(resumeAgentMock).not.toHaveBeenCalled();
   });
 
-  it('makes no-resume mode skip auto-resume and orphan recovery', async () => {
-    process.env.OVERDECK_NO_RESUME = '1';
-    const stoppedAgentId = 'agent-pan-1141-no-resume-stopped';
-    const runningAgentId = 'agent-pan-1141-no-resume-running';
+  it('makes pending boot reconciliation hold auto-resume but not orphan recovery', async () => {
+    bootReconciliationState = {
+      decision: 'pending',
+      perAgent: {},
+      decidedAt: BASE_TIME.toISOString(),
+      bootId: 'boot-test',
+      graceDeadline: new Date(BASE_TIME.getTime() + 30_000).toISOString(),
+    };
+    const stoppedAgentId = 'agent-pan-1141-boot-held-stopped';
+    const runningAgentId = 'agent-pan-1141-boot-held-running';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
     agents.saveAgentStateSync({
@@ -710,9 +737,11 @@ describe('auto-resume gates', () => {
     const recovered = await recoverOrphanedAgents('test');
 
     expect(resumed).toEqual([]);
-    expect(recovered).toEqual([]);
+    expect(recovered).toEqual([
+      `Recovered orphaned agent ${runningAgentId} (running→stopped)`,
+    ]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-    expect(agents.getAgentStateSync(runningAgentId)?.status).toBe('running');
+    expect(agents.getAgentStateSync(runningAgentId)?.status).toBe('stopped');
   });
 
   // PAN-1665: throttle so unfreezing the deacon doesn't thundering-herd the box.

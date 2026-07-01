@@ -27,12 +27,14 @@ vi.mock('../../../lib/workspace/stack-health.js', () => ({
 }))
 vi.mock('../../../lib/restart-status.js', () => ({
   readRestartStatus: vi.fn(() => Effect.succeed(null)),
+  readRestartEvents: vi.fn(() => Effect.succeed([])),
+  detectConcurrentRestartWriters: vi.fn(() => []),
 }))
 
 import { statusCommand } from '../status.js'
 import { listRunningAgentsSync } from '../../../lib/agents.js'
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js'
-import { readRestartStatus } from '../../../lib/restart-status.js'
+import { readRestartEvents, readRestartStatus } from '../../../lib/restart-status.js'
 
 describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   let logSpy: ReturnType<typeof vi.spyOn>
@@ -45,6 +47,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
     ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed(null))
+    ;(readRestartEvents as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
     ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       healthy: true,
       reasons: [],

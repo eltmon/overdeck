@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } from 'lucide-react';
+import { BootReconciliationModal } from '../components/BootReconciliationModal';
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
-import { NoResumeBanner } from '../components/NoResumeBanner';
 import { LowCostModePill } from '../components/LowCostModePill';
 import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
@@ -60,7 +60,7 @@ export function AppChrome({
 }: AppChromeProps) {
   return (
     <>
-      <NoResumeBanner />
+      <BootReconciliationModal />
 
       {/* Deacon-frozen state and stopped-agents are now compact pills in the
           app bar (PAN-1591), not persistent full-width banners. */}

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boot reconciliation — interactive mockup</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#151a21; --panel2:#1b222b; --divider:#262d38;
+    --fg:#e6edf3; --muted:#8b949e; --muted2:#6e7681;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --gray:#6e7681; --blue:#58a6ff;
+    --accent:#f0883e; --rowhover:#1d242e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 16px}
+  .controls{display:flex;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--divider);border-radius:10px;padding:10px 14px;margin-bottom:16px;flex-wrap:wrap}
+  .controls label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-right:6px}
+  .seg{display:inline-flex;border:1px solid var(--divider);border-radius:8px;overflow:hidden}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:6px 11px;font-size:12px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#1a1206;font-weight:600}
+  .seg button:not(.on):hover{background:var(--rowhover);color:var(--fg)}
+
+  /* faux dashboard behind the modal */
+  .stage{position:relative;border:1px solid var(--divider);border-radius:12px;overflow:hidden;min-height:560px;background:
+     repeating-linear-gradient(180deg,transparent 0 38px, rgba(255,255,255,.012) 38px 39px)}
+  .topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--divider);color:var(--muted);font-size:12px}
+  .topbar .brand{color:var(--fg);font-weight:700}
+  .dim{opacity:.28;pointer-events:none;padding:14px}
+  .ghrow{height:30px;border-radius:6px;background:var(--panel);margin:8px 0}
+  .ghrow.s{width:60%} .ghrow.m{width:80%}
+
+  .overlay{position:absolute;inset:0;background:rgba(5,7,10,.55);display:flex;align-items:center;justify-content:center}
+  .modal{width:560px;max-width:94%;background:var(--panel);border:1px solid var(--divider);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+  .mhead{display:flex;align-items:center;gap:10px;padding:16px 18px 10px}
+  .mhead .ic{width:18px;height:18px;color:var(--amber)}
+  .mhead h2{font-size:15px;margin:0}
+  .mbody{padding:2px 18px 6px;color:var(--muted)}
+  .mbody b{color:var(--fg)}
+
+  .countrow{display:flex;align-items:center;gap:14px;margin:14px 18px;padding:12px 14px;border:1px solid var(--divider);border-radius:10px;background:var(--panel2)}
+  .ring{position:relative;width:46px;height:46px;flex:none}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .counttxt{font-size:13px;color:var(--fg)}
+  .counttxt small{display:block;color:var(--muted2);font-size:11px;font-weight:400}
+
+  .setlist{margin:0 18px 8px;border:1px solid var(--divider);border-radius:10px;overflow:hidden}
+  .setrow{display:grid;grid-template-columns:18px 1fr auto auto;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--divider);font-size:12.5px}
+  .setrow:first-child{border-top:0}
+  .setrow .dot{width:8px;height:8px;border-radius:50%;background:var(--amber)}
+  .setrow .nm{color:var(--fg);font-weight:600}
+  .setrow .meta{color:var(--muted2);font-size:11px}
+  .setrow .disp{font-size:11px}
+  .toggle{display:inline-flex;border:1px solid var(--divider);border-radius:7px;overflow:hidden}
+  .toggle button{background:transparent;border:0;color:var(--muted);font-size:11px;padding:3px 8px;cursor:pointer}
+  .toggle button.resume.on{background:var(--green);color:#06210d;font-weight:600}
+  .toggle button.hold.on{background:var(--gray);color:#0c0f13;font-weight:600}
+
+  .mactions{display:flex;gap:10px;align-items:center;padding:14px 18px 18px;border-top:1px solid var(--divider);margin-top:6px}
+  .btn{display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid var(--divider);background:var(--panel2);color:var(--fg);cursor:pointer}
+  .btn:hover{background:var(--rowhover)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1206;font-weight:700}
+  .btn.ghost{color:var(--muted)}
+  .btn.danger{margin-left:auto;color:var(--red);border-color:#5a1f1c}
+  .btn.danger:hover{background:rgba(248,81,73,.12)}
+  .foot{padding:0 18px 16px;color:var(--muted2);font-size:11.5px}
+
+  .resolved{margin:0 18px 16px;padding:14px;border:1px solid var(--divider);border-radius:10px;background:var(--panel2);display:none}
+  .resolved.show{display:block}
+  .resolved h3{margin:0 0 8px;font-size:13px;color:var(--fg)}
+  .resolved .r{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.5px;color:var(--muted)}
+  .resolved .r b{color:var(--fg)}
+  .pill{font-size:10.5px;padding:1px 8px;border-radius:10px;border:1px solid var(--divider)}
+  .pill.on{color:var(--green);border-color:#1f5128} .pill.off{color:var(--muted2)}
+
+  /* status-panel view (Decision 5) */
+  .statuspanel{padding:18px}
+  .statuspanel h2{font-size:14px;margin:0 0 12px}
+  .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .scard{border:1px solid var(--divider);border-radius:10px;padding:12px;background:var(--panel2)}
+  .scard .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted2)}
+  .scard .v{font-size:15px;font-weight:700;margin-top:3px}
+  .scard .d{font-size:11px;color:var(--muted);margin-top:3px}
+  .v.green{color:var(--green)} .v.amber{color:var(--amber)} .v.red{color:var(--red)} .v.gray{color:var(--gray)}
+  .note{margin-top:14px;color:var(--muted2);font-size:11.5px}
+  svg{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Boot reconciliation — interactive mockup</h1>
+  <p class="sub">What the operator sees when the dashboard restarts. The countdown ticks live. Try <b>Review each</b>, then a decision. Toggle to the <b>Status panel</b> (Decision 5) to see the one-place resolved control state.</p>
+
+  <div class="controls">
+    <div><label>View</label>
+      <span class="seg" id="view">
+        <button data-v="modal" class="on">Reconciliation modal</button>
+        <button data-v="status">Status panel</button>
+      </span>
+    </div>
+    <button class="btn ghost" id="replay" style="font-size:12px;padding:5px 10px">↺ Replay countdown</button>
+  </div>
+
+  <div class="stage">
+    <div class="topbar"><span class="brand">⬡ Overdeck</span><span>Command Deck</span><span style="margin-left:auto">pan.localhost</span></div>
+
+    <!-- MODAL VIEW -->
+    <div id="modalView">
+      <div class="dim">
+        <div class="ghrow m"></div><div class="ghrow s"></div><div class="ghrow m"></div><div class="ghrow s"></div><div class="ghrow"></div>
+      </div>
+      <div class="overlay">
+        <div class="modal">
+          <div class="mhead">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>
+            <h2 id="mtitle">Dashboard restarted — 5 agents were running</h2>
+          </div>
+          <div class="mbody" id="mbody">Decide what happens to the agents that were live before the restart. Doing nothing resumes them — the safe default for a normal restart.</div>
+
+          <div class="countrow" id="countrow">
+            <div class="ring">
+              <svg width="46" height="46"><circle cx="23" cy="23" r="19" stroke="#262d38" stroke-width="4" fill="none"/><circle id="ringfg" cx="23" cy="23" r="19" stroke="#f0883e" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="119" stroke-dashoffset="0"/></svg>
+              <div class="num" id="ringnum">30</div>
+            </div>
+            <div class="counttxt" id="counttxt"><b>Auto-resuming all in 0:30</b><small>No action resumes everything. Concurrency brakes cap the rate.</small></div>
+          </div>
+
+          <div class="setlist" id="setlist"></div>
+
+          <div class="mactions" id="mactions">
+            <button class="btn primary" data-act="resume">Resume all now</button>
+            <button class="btn" data-act="hold">Keep all stopped</button>
+            <button class="btn ghost" data-act="review">Review each →</button>
+            <button class="btn danger" data-act="freeze">⛔ Freeze everything</button>
+          </div>
+
+          <div class="resolved" id="resolved"></div>
+
+          <div class="foot">NO_RESUME (env) just pre-selects “Keep all stopped” here — it no longer gates anything at runtime. <b>Freeze</b> is the real emergency stop (halts the whole patrol). The choice is saved durably, so a watchdog restart won’t revert it.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATUS PANEL VIEW -->
+    <div id="statusView" style="display:none">
+      <div class="statuspanel">
+        <h2>Control state — <span style="color:var(--muted);font-weight:400;font-size:12px">one place to answer “why isn’t X happening?” (`pan boot status`)</span></h2>
+        <div class="sgrid">
+          <div class="scard"><div class="k">Emergency stop (Freeze)</div><div class="v green">OFF</div><div class="d">Patrol running. `pan admin cloister freeze` to halt all dispatch/resume/relaunch.</div></div>
+          <div class="scard"><div class="k">Boot reconciliation</div><div class="v">Resolved · resumed 5/5</div><div class="d">Decision saved durably (survives watchdog restart).</div></div>
+          <div class="scard"><div class="k">Autonomy level</div><div class="v amber">Auto-pickup ON · UAT-merge OFF</div><div class="d">merge-train ON. dashboard Settings / `pan flywheel`.</div></div>
+          <div class="scard"><div class="k">Resource ceiling</div><div class="v">12 / 20 work agents</div><div class="d">Brakes armed. `pan admin cloister brake` to trim.</div></div>
+          <div class="scard"><div class="k">Scoped suppression</div><div class="v gray">2 paused · 1 troubled</div><div class="d">PAN-1718 troubled · PAN-2086 paused. `pan unpause` / `pan untroubled`.</div></div>
+          <div class="scard"><div class="k">Liveness recovery</div><div class="v green">Watchdog OK · flywheel RUN-37</div><div class="d">Flywheel relaunches on wedge/death (capped). PAN-2160.</div></div>
+        </div>
+        <p class="note">Every control resolves from the durable plane (SQLite), not scattered env/state files — so this panel and the boot decision can never disagree with what’s actually running.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const AGENTS=[
+  {id:'PAN-2150',role:'work',meta:'work · idle 2m · SettingsPage decomp'},
+  {id:'PAN-2152',role:'review',meta:'review · active 30s'},
+  {id:'PAN-1894',role:'plan',meta:'plan · idle 5m'},
+  {id:'MIN-846',role:'work',meta:'work · idle 1m · Fizzy sync'},
+  {id:'flywheel',role:'flywheel',meta:'orchestrator · RUN-37'},
+];
+const setlist=document.getElementById('setlist');
+let perAgent={}; // id -> 'resume'|'hold'
+let reviewMode=false;
+
+function renderSet(){
+  setlist.innerHTML=AGENTS.map(a=>{
+    const disp=perAgent[a.id]||'resume';
+    const right=reviewMode
+      ? `<span class="toggle"><button class="resume ${disp==='resume'?'on':''}" data-id="${a.id}" data-d="resume">Resume</button><button class="hold ${disp==='hold'?'on':''}" data-id="${a.id}" data-d="hold">Keep stopped</button></span>`
+      : `<span class="disp" style="color:var(--muted2)">${a.meta.split('·')[0].trim()}</span>`;
+    return `<div class="setrow"><span class="dot"></span><span class="nm">${a.id}</span><span class="meta">${a.meta}</span>${right}</div>`;
+  }).join('');
+}
+renderSet();
+
+// live countdown
+let total=30, left=30, timer=null;
+const ringfg=document.getElementById('ringfg'), ringnum=document.getElementById('ringnum'),
+      counttxt=document.getElementById('counttxt');
+const CIRC=119;
+function tick(){
+  left--;
+  if(left<=0){ left=0; resolve('resume', true); return; }
+  ringnum.textContent=left;
+  ringfg.setAttribute('stroke-dashoffset', String(CIRC*(1-left/total)));
+  counttxt.innerHTML=`<b>Auto-resuming all in 0:${String(left).padStart(2,'0')}</b><small>No action resumes everything. Concurrency brakes cap the rate.</small>`;
+}
+function startCountdown(){
+  clearInterval(timer); left=total; ringnum.textContent=left; ringfg.setAttribute('stroke-dashoffset','0');
+  document.getElementById('resolved').classList.remove('show');
+  document.getElementById('countrow').style.display='';
+  counttxt.innerHTML=`<b>Auto-resuming all in 0:30</b><small>No action resumes everything. Concurrency brakes cap the rate.</small>`;
+  timer=setInterval(tick,1000);
+}
+function stopCountdown(){ clearInterval(timer); }
+
+function resolve(kind, byTimeout){
+  stopCountdown();
+  document.getElementById('countrow').style.display='none';
+  const r=document.getElementById('resolved');
+  let html='';
+  if(kind==='resume'){
+    const n=AGENTS.length;
+    html=`<h3 style="color:var(--green)">✓ Resuming ${n}/${n} agents${byTimeout?' (grace expired)':''}</h3>
+      <div class="r">Decision saved to the durable control plane — a watchdog restart will honor it, not revert it.</div>
+      <div class="r">Brakes cap concurrency at the ceiling; the flywheel relaunches if it wedges (PAN-2160).</div>`;
+  } else if(kind==='hold'){
+    html=`<h3 style="color:var(--gray)">⏸ Keeping all 5 stopped</h3>
+      <div class="r">Agents stay stopped; tmux sessions preserved. Resume later from the stopped-agents banner or <b>pan resume --all</b>.</div>
+      <div class="r">This is the old “no-resume” outcome — now an explicit per-boot choice, not a sticky default.</div>`;
+  } else if(kind==='review'){
+    const res=AGENTS.filter(a=>(perAgent[a.id]||'resume')==='resume').length;
+    html=`<h3>Per-agent disposition</h3><div class="r">Resuming <b>${res}</b>, keeping <b>${AGENTS.length-res}</b> stopped. Adjust above, then it applies on confirm.</div>`;
+  } else if(kind==='freeze'){
+    html=`<h3 style="color:var(--red)">⛔ Frozen — everything halted</h3>
+      <div class="r">Deacon patrol suspended: no dispatch, no resume, no relaunch. The one emergency stop.</div>
+      <div class="r">Unfreeze with <b>pan admin cloister unfreeze</b> when the runaway is handled.</div>`;
+  }
+  r.innerHTML=html; r.classList.add('show');
+}
+
+document.getElementById('mactions').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  const act=b.dataset.act;
+  if(act==='review'){ reviewMode=true; renderSet(); stopCountdown();
+    document.getElementById('counttxt').innerHTML='<b>Paused — choose per agent</b><small>Auto-resume halted while you review.</small>';
+    resolve('review'); return; }
+  resolve(act, false);
+});
+setlist.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-id]'); if(!b)return;
+  perAgent[b.dataset.id]=b.dataset.d; renderSet(); resolve('review');
+});
+
+document.getElementById('view').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle('on',x===b));
+  const modal=b.dataset.v==='modal';
+  document.getElementById('modalView').style.display=modal?'':'none';
+  document.getElementById('statusView').style.display=modal?'none':'';
+  if(modal){ reviewMode=false; perAgent={}; renderSet(); startCountdown(); } else { stopCountdown(); }
+});
+document.getElementById('replay').addEventListener('click',()=>{ reviewMode=false; perAgent={}; renderSet(); startCountdown(); });
+
+startCountdown();
+</script>
+</body>
+</html>

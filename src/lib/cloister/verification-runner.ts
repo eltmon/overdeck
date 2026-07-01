@@ -242,7 +242,25 @@ function getSyncTargetBranch(
     projectConfig.workspace?.default_branch ||
     'main'
   );
-}async function runVerificationForIssuePromise(
+}
+
+/**
+ * PAN-2179: detect a "plan-only" / zombie changeset — one whose only changes are
+ * pipeline artifacts (.pan/, beads, vbrief) with no actual implementation. A work
+ * agent that never received its kickoff produces exactly this. The verification
+ * gate uses it to bounce the branch back instead of letting an empty "completion"
+ * advance to review/merge. A legit non-code change (docs, rules under
+ * sync-sources/, config) counts as content and is NOT flagged.
+ */
+export function changesetHasNoContent(changedFiles: readonly string[]): boolean {
+  const content = changedFiles
+    .map((f) => f.trim())
+    .filter(Boolean)
+    .filter((f) => !f.startsWith('.pan/') && !f.startsWith('.beads/') && !f.endsWith('.vbrief.json'));
+  return content.length === 0;
+}
+
+async function runVerificationForIssuePromise(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
@@ -566,6 +584,47 @@ function getSyncTargetBranch(
       }
 
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+    }
+
+    // PAN-2179: reject a plan-only / zombie changeset before it can reach
+    // review/merge. A work agent that never got its kickoff (or did nothing)
+    // leaves a branch whose only changes are pipeline artifacts (.pan/vbrief/beads);
+    // lint/test/build and the AC gate all pass trivially on no code, so without
+    // this guard the empty "completion" silently advances. Bounce it back.
+    try {
+      const { stdout: changedOut } = await execAsync(
+        `git diff --name-only ${changedBase}...HEAD`,
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 },
+      );
+      if (changesetHasNoContent(changedOut.split('\n'))) {
+        const newCycleCount = currentCycles + 1;
+        const failedCheck = 'empty-changeset';
+        const summary = `Branch has no implementation — only pipeline artifacts (.pan/vbrief/beads) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
+        setReviewStatusSync(issueId, {
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: summary,
+          verificationCycleCount: newCycleCount,
+          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+        });
+        if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+          await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
+        }
+        try {
+          const agentId = `agent-${issueId.toLowerCase()}`;
+          const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/vbrief/beads changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
+          await messageAgent(agentId, msg);
+          console.error(`[${logPrefix}] VERIFICATION FAILED for ${issueId}: empty-changeset (no content files vs ${changedBase})`);
+        } catch (feedbackErr: any) {
+          console.error(`[${logPrefix}] Failed to send empty-changeset feedback for ${issueId}:`, feedbackErr);
+        }
+        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      }
+    } catch (diffErr: any) {
+      // Non-fatal: if the diff can't be computed, don't block — log and proceed.
+      console.warn(`[${logPrefix}] empty-changeset guard skipped (diff failed): ${diffErr.message}`);
     }
 
     // Snapshot HEAD at verification pass time — compared with reviewedAtCommit

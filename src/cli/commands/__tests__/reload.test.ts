@@ -110,6 +110,7 @@ describe('reloadCommand', () => {
 
     await reloadCommand({});
 
+    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
     expect(killSpy).toHaveBeenCalledWith(424242, 'SIGUSR2');
     // It signals the dev supervisor to hot-restart in place — it must NOT run a
     // production restart or refuse with a non-zero exit code.
@@ -118,6 +119,48 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBeUndefined();
 
     killSpy.mockRestore();
+  });
+
+  it('refuses to signal pan dev when the restart lock is already held', async () => {
+    mocks.readDevSupervisorMarker.mockReturnValue({
+      pid: 424242,
+      dashboardPort: 3010,
+      apiPort: 3011,
+      startedAt: '2026-06-07T00:00:00.000Z',
+    });
+    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
+    mocks.readRestartLockHolder.mockReturnValue(
+      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
+    );
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+    await reloadCommand({});
+
+    expect(killSpy).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('restart in progress') }),
+    );
+    expect(process.exitCode).toBe(2);
+
+    killSpy.mockRestore();
+  });
+
+  it('refuses the detached path when the restart lock is already held', async () => {
+    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
+    mocks.readRestartLockHolder.mockReturnValue(
+      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
+    );
+
+    await reloadCommand({});
+
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('restart in progress') }),
+    );
+    expect(process.exitCode).toBe(2);
   });
 
   it('runs bun install before the build, then restartDashboard, on success', async () => {

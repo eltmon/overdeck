@@ -5,7 +5,7 @@
  * - In-memory PubSub for live streaming to WebSocket clients
  * - Monotonic, gap-free sequence numbers (SQLite AUTOINCREMENT)
  * - 7-day retention with startup compaction
- * - Dual-runtime: shared SQLite driver adapter (bun:sqlite on Bun, node:sqlite on Node)
+ * - Shared SQLite driver adapter (bun:sqlite on Bun, node:sqlite on Node)
  *
  * Usage:
  *   const store = await initEventStore();
@@ -119,12 +119,10 @@ function eventTimestampMillis(event: Omit<DomainEvent, 'sequence'>): number {
 
 // ─── Runtime-aware DB initializer ────────────────────────────────────────────
 
-declare const Bun: unknown;
-
 /**
  * Open the overdeck.db database using the appropriate driver for the runtime.
- * Under Bun: uses bun:sqlite (native, no native addons needed).
- * Under Node: uses the shared getDatabase() which applies migrations.
+ * The shared overdeck opener applies migrations and delegates runtime-specific
+ * SQLite driver selection to src/lib/database/driver.ts.
  */
 export async function openEventDb(): Promise<DbAdapter> {
   const home = getOverdeckHome();
@@ -133,20 +131,10 @@ export async function openEventDb(): Promise<DbAdapter> {
   }
   const dbPath = getOverdeckDatabasePath();
 
-  if (typeof Bun !== 'undefined') {
-    // @ts-ignore — bun:sqlite is only available in Bun runtime; guarded by typeof Bun check above
-    const { Database } = await import('bun:sqlite');
-    const db = new Database(dbPath, { create: true });
-    db.exec('PRAGMA journal_mode = WAL');
-    db.exec('PRAGMA foreign_keys = ON');
-    db.exec('PRAGMA synchronous = NORMAL');
-    return db as unknown as DbAdapter;
-  } else {
-    // Node.js: open overdeck.db through the shared overdeck opener so the
-    // hand-maintained migration owns the events table and indexes.
-    const db = getOverdeckDatabaseSync(dbPath);
-    return db as unknown as DbAdapter;
-  }
+  // Open overdeck.db through the shared overdeck opener so the hand-maintained
+  // migration owns the events table and indexes.
+  const db = getOverdeckDatabaseSync(dbPath);
+  return db as unknown as DbAdapter;
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────────

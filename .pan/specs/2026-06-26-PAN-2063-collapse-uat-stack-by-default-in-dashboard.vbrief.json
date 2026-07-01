@@ -4,17 +4,17 @@
     "created": "2026-06-26T03:26:23.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2063: Collapse UAT stack by default in dashboard",
-    "updated": "2026-06-27T17:20:21.606Z"
+    "updated": "2026-06-29T14:41:30.058Z"
   },
   "plan": {
     "id": "pan-2063",
     "title": "Collapse UAT stack by default in dashboard",
-    "status": "running",
+    "status": "completed",
     "uid": "f07dc6f4-5c2d-4a48-901b-342c7746eef2",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-06-26T03:26:23.000Z",
-    "updated": "2026-06-27T17:20:21.606Z",
+    "updated": "2026-06-29T14:41:30.058Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2063",
@@ -111,5 +111,5 @@
       "canonicalFilename": "2026-06-26-PAN-2063-collapse-uat-stack-by-default-in-dashboard.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

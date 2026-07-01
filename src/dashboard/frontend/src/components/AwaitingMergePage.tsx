@@ -412,11 +412,7 @@ export function AwaitingMergeRow({
   const isMerging = mergeStatus === 'merging' || mergeStatus === 'queued' || mergeStatus === 'verifying' || mergeMutation.isPending;
   const isFailed = mergeStatus === 'failed';
   const rebuildFailed = pendingOperation?.type === 'rebuild-stack' && pendingOperation.status === 'failed';
-  const stackPending = rebuildMutation.isPending || (pendingOperation?.status === 'running' && (
-    pendingOperation.type === 'containerize' ||
-    pendingOperation.type === 'start' ||
-    pendingOperation.type === 'rebuild-stack'
-  ));
+  const stackPending = rebuildMutation.isPending || (pendingOperation?.status === 'running' && ['containerize', 'start', 'rebuild-stack', 'start-stack', 'stop-stack', 'restart-stack', 'reap-workspace'].includes(pendingOperation.type));
   const [uatExpanded, setUatExpanded] = useState(false);
   const fetchedUatContext = useQuery({
     queryKey: ['uat-context', issueId],

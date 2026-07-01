@@ -1,0 +1,250 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-29T20:43:18.735Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2172: host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0",
+    "updated": "2026-06-29T21:18:48.261Z"
+  },
+  "plan": {
+    "id": "pan-2172",
+    "title": "host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0",
+    "status": "running",
+    "uid": "a84f7176-93ee-4580-b804-4499623d8233",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 5,
+    "created": "2026-06-29T20:43:18.735Z",
+    "updated": "2026-06-29T21:18:48.261Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2172",
+        "label": "PAN-2172",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2170",
+        "label": "PAN-2170 (forces --host)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2102",
+        "label": "PAN-2102 (large-brief kickoff silently fails)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "agents",
+      "delivery",
+      "deacon",
+      "host-mode",
+      "kickoff",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "pan start <id> --fresh --host --yes reports success and spawns a live tmux session, but the work agent never receives its kickoff and sits inert (ctx 0/out 0) indefinitely. Three verified root causes: (AC1) deliverInitialPromptWithRetry trusts deliverAgentMessage's ok:true, but the tmux fallback returns ok:true even when the paste did not land (tmux.ts:1185-1191) and the supervisor echo-confirm can fail on large briefs (PAN-2102) — there is no transcript-landing confirmation for the initial kickoff, unlike resumes. (AC2) start.ts:1373 calls spinner.succeed unconditionally and never inspects agent.kickoffDelivered; spawnAgent (agents.ts:3284-3294) records the failure but returns state silently for work agents. (AC3) a live-but-inert fresh start with kickoffDelivered===false is invisible to both nudge patrols: nudgeStalledResumeWorkAgents gates on lastResumeAt (deacon-auto-resume.ts:405) which a fresh start lacks, and nudgeIdleWorkAgentsWithOpenBeads gates on isAgentIdleForNudge which returns false when runtime.json is absent (agent-idle.ts:9-11) — a never-kicked agent never fired a hook.",
+      "Proposal": "Three independent, additive fixes — one per AC. (1) Add best-effort transcript user-record landing confirmation to deliverInitialPromptWithRetry, reusing captureTranscriptUserRecordSnapshot + waitForTranscriptUserRecordLanding already in delivery.ts; unconfirmed => {ok:false, failure:'kickoff-not-confirmed'}; confirmation only for claude-code/pi with known sessionId+workspace. (2) start.ts checks agent.kickoffDelivered===false and switches spinner.succeed -> spinner.fail + clear message + process.exitCode=1, preserving the session. (3) New deacon patrol redeliverUndeliveredKickoffs() (not gated on lastResumeAt/isAgentIdleForNudge) re-delivers initial-prompt.md to live kickoffDelivered===false work agents past a stuck threshold, and surfaces loudly (activity error + TTS + troubled) after repeated failure; wired into runPatrol().",
+      "NonGoals": "- Restoring or fixing the Docker workspace path (PAN-2170); host mode is the fallback this issue makes reliable.\n- Adding PTY-supervisor wiring to Docker workspaces.\n- Changing ctx-saturation detection (PAN-2169).\n- Refactoring nudgeStalledResumeWorkAgents or nudgeIdleWorkAgentsWithOpenBeads.\n- Auto-killing, deep-wiping, or respawning inert agents — AC3 re-delivers or surfaces, never destroys recoverable state.\n- Changing strike-role kickoff behavior (already throws + stops)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "New deacon patrol rather than extending nudgeStalledResumeWorkAgents.",
+        "rationale": "The resume nudge has two gates (lastResumeAt, isAgentIdleForNudge) that assume a prior resume and a fired hook; bolting fresh-start kickoff handling onto it would muddy a working path. A dedicated additive patrol is the no-loss, surgical choice."
+      },
+      {
+        "summary": "AC2 preserves the spawned session (no kill) and reports failure via non-zero exit.",
+        "rationale": "The live session is recoverable by AC3; killing it would defeat re-delivery. Loud report + exit code 1 satisfies 'no silent drop' without destroying recoverable state."
+      },
+      {
+        "summary": "Transcript confirmation is best-effort, claude-code/pi only.",
+        "rationale": "codex/ohmypi use file-pointer kickoff; forcing transcript confirmation there would regress their startup. Guard on harness behavior + sessionId/workspace presence and default to confirmed when not confirmable."
+      },
+      {
+        "summary": "Stuck threshold = 3 min; re-delivery cooldown = 10 min.",
+        "rationale": "3 min is comfortably past the normal ready (up to 30s) + 2-attempt delivery window so the patrol never fires mid-flight; 10 min matches the neighboring STALLED_RESUME_NUDGE_COOLDOWN_MS."
+      }
+    ],
+    "items": [
+      {
+        "id": "confirm-kickoff-landing",
+        "title": "Confirm initial-kickoff landing via transcript and report truthful failure (AC1)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T20:43:18.735Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2172",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "start-fails-loud-on-undelivered-kickoff",
+            "deacon-redeliver-undelivered-kickoff"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/delivery.ts (deliverInitialPromptWithRetry, ~:345), snapshot the workspace transcript BEFORE delivery (captureTranscriptUserRecordSnapshot), and after deliverAgentMessage returns ok, confirm a NEW user record landed (waitForTranscriptUserRecordLanding) before counting the attempt as success. On no-landing, let the existing 2-attempt loop retry; if still unconfirmed after the loop, return {ok:false, failure:'kickoff-not-confirmed'}. Confirmation is best-effort: run it only when the agent's sessionId and workspace are known AND the harness writes a confirmable transcript (claude-code/pi); for codex/ohmypi (file-pointer kickoff) skip confirmation and keep current ok-based behavior. Both helpers already exist in this file (used by deliverResumeMessageWithTranscriptConfirmation)."
+        },
+        "items": [
+          {
+            "id": "confirm-kickoff-landing.ac1",
+            "title": "Given a claude-code work agent whose tmux/supervisor delivery returns ok:true but no user record lands in the transcript, deliverInitialPromptWithRetry returns ok:false with failure 'kickoff-not-confirmed' after exhausting its attempts (covered by a unit test with a stubbed snapshot/deliver).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-kickoff-landing.ac2",
+            "title": "Given delivery whose user record DOES land in the transcript, deliverInitialPromptWithRetry returns ok:true and the caller marks kickoffDelivered=true (existing path), with no extra retry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-kickoff-landing.ac3",
+            "title": "Given a codex or ohmypi agent (file-pointer kickoff, or unknown sessionId/workspace), deliverInitialPromptWithRetry preserves current behavior: it does NOT run transcript confirmation and returns ok based on deliverAgentMessage alone (no regression — proven by a unit test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-kickoff-landing.ac4",
+            "title": "Given a transcript that already contains a pre-existing user record before delivery, deliverInitialPromptWithRetry still produces ok:false when no NEW record lands — because it captures the before-snapshot prior to the first delivery attempt (proven by a unit test with a populated pre-snapshot).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-fails-loud-on-undelivered-kickoff",
+        "title": "pan start reports failure (non-zero exit) when the kickoff was not delivered (AC2)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T20:43:18.735Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2172",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/start.ts (work-spawn branch, ~:1362-1428), after const agent = await spawnAgent(...), check if (agent.role === 'work' && agent.kickoffDelivered === false). When true: call spinner.fail(...) instead of spinner.succeed(...), print a complete operator message (the session spawned but the kickoff did not land; the agent is idle; the live session is PRESERVED; the deacon will retry within the stuck threshold or run `pan tell <id> \"…\"`), and set process.exitCode = 1. Do NOT kill the session. Leave the tracker/vBRIEF side effects (already executed in spawnAgent) intact; this bead changes only success-vs-failure reporting and the exit code."
+        },
+        "items": [
+          {
+            "id": "start-fails-loud-on-undelivered-kickoff.ac1",
+            "title": "Given spawnAgent returns a work AgentState with kickoffDelivered===false, the start command calls spinner.fail (not spinner.succeed) and sets process.exitCode=1 (proven by a unit/integration test that stubs spawnAgent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-fails-loud-on-undelivered-kickoff.ac2",
+            "title": "On an undelivered kickoff the start command renders a failure message containing the agent id, the word 'kickoff', a statement that the session is preserved, and a `pan tell` pointer — and does NOT render the 'Beads: ✓' success lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-fails-loud-on-undelivered-kickoff.ac3",
+            "title": "Given spawnAgent returns kickoffDelivered===true, the start command preserves existing success output (spinner.succeed, Agent Details, Context Loaded) and exit code 0 — no behavior change on the happy path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-fails-loud-on-undelivered-kickoff.ac4",
+            "title": "In the failure branch the start command preserves the spawned tmux session — it does not call stopAgent/kill — leaving it running for deacon recovery (a test asserts no termination call is made).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-redeliver-undelivered-kickoff",
+        "title": "Deacon re-delivers undelivered kickoffs to live work-agent sessions, or surfaces them (AC3)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-29T20:43:18.735Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2172",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add exported async patrol redeliverUndeliveredKickoffs() to src/lib/cloister/deacon-auto-resume.ts, modeled on the existing nudge patrols but NOT gated on lastResumeAt or isAgentIdleForNudge. For each running role==='work' agent that is not paused/troubled, whose issue is open (isIssueClosed false), whose tmux session is alive (sessionExists), with state.kickoffDelivered===false, and Date.now()-Date.parse(state.startedAt) > KICKOFF_REDELIVERY_THRESHOLD_MS (new const, default 3*60*1000), guarded by a per-agent cooldown file .last-kickoff-redelivery (reuse the 10-min cooldown pattern): (1) read <agentDir>/initial-prompt.md; (2) re-deliver via deliverInitialPromptWithRetry; (3) on confirmed delivery set state.kickoffDelivered=true and save; (4) after a bounded number of consecutive failed re-deliveries, emit an activity error + TTS and mark the agent troubled so it is never silently inert. Wire it into runPatrol() in src/lib/cloister/deacon.ts beside nudgeStalledResumeWorkAgents (~:2679) and re-export it from deacon.ts (~:143). Use async tmux primitives only and execAsync if shelling out; no execSync."
+        },
+        "items": [
+          {
+            "id": "deacon-redeliver-undelivered-kickoff.ac1",
+            "title": "Given a running work agent with kickoffDelivered===false, a live tmux session, an open issue, and age since startedAt > 3 min, one patrol cycle re-delivers initial-prompt.md via deliverInitialPromptWithRetry and, on confirmed delivery, sets kickoffDelivered=true (proven by a unit test with injected deps + fake timers).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-redeliver-undelivered-kickoff.ac2",
+            "title": "The patrol skips agents younger than KICKOFF_REDELIVERY_THRESHOLD_MS, paused/troubled agents, closed-issue agents, agents with no live tmux session, and agents with kickoffDelivered!==false — and respects the .last-kickoff-redelivery cooldown so it does not re-deliver twice within the cooldown window.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-redeliver-undelivered-kickoff.ac3",
+            "title": "After the bounded number of consecutive failed re-deliveries, the patrol emits an activity error event and marks the agent troubled (verified by a test asserting the troubled transition and emitted event), so a persistently un-kickable agent is surfaced rather than left inert.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-redeliver-undelivered-kickoff.ac4",
+            "title": "Each runPatrol() cycle emits the redeliverUndeliveredKickoffs action(s) into the patrol action log and deacon.ts re-exports redeliverUndeliveredKickoffs (a test stubbing the patrol deps asserts the action is emitted and the export resolves); delay-based tests use vi.useFakeTimers().",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "confirm-kickoff-landing",
+        "to": "start-fails-loud-on-undelivered-kickoff",
+        "type": "informs"
+      },
+      {
+        "from": "confirm-kickoff-landing",
+        "to": "deacon-redeliver-undelivered-kickoff",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-29-PAN-2172-host-mode-fresh-respawn-pan-start-fresh-host-never-delivers-kickoff-agent-sits-idle-at-ctx-0-out-0.vbrief.json"
+    }
+  },
+  "status": "active"
+}

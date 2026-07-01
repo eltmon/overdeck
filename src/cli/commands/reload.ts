@@ -85,31 +85,6 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
-  // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
-  // place. This applies merged/edited server code without tearing down the
-  // interactive dev session or hijacking it into detached production mode. The
-  // frontend recovers via its graceful reconnect (PAN-1580). This is also the
-  // path the flywheel uses to apply its own merged server changes.
-  {
-    const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
-    const dev = readDevSupervisorMarker();
-    if (dev) {
-      try {
-        process.kill(dev.pid, 'SIGUSR2');
-        console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
-        console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
-        await recordReloadStatus(startedAt, true, undefined);
-      } catch (err: any) {
-        const msg = `Failed to signal pan dev (pid ${dev.pid}): ${err.message}`;
-        console.error(chalk.red(msg));
-        await recordReloadStatus(startedAt, false, msg);
-        process.exitCode = 2;
-      }
-      return;
-    }
-  }
-
   const lock = await Effect.runPromise(acquireRestartLock('pan reload'));
   if (!lock) {
     const holder = await Effect.runPromise(readRestartLockHolder());
@@ -121,8 +96,41 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  const config = readPlatformConfigSync();
   try {
+    // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
+    // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
+    // place. This applies merged/edited server code without tearing down the
+    // interactive dev session or hijacking it into detached production mode. The
+    // frontend recovers via its graceful reconnect (PAN-1580). This is also the
+    // path the flywheel uses to apply its own merged server changes.
+    {
+      const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
+      const dev = readDevSupervisorMarker();
+      if (dev) {
+        try {
+          process.kill(dev.pid, 'SIGUSR2');
+        } catch (err: any) {
+          const msg = `Failed to signal pan dev (pid ${dev.pid}): ${err.message}`;
+          console.error(chalk.red(msg));
+          await recordReloadStatus(startedAt, false, msg);
+          process.exitCode = 2;
+          return;
+        }
+        console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
+        console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
+        try {
+          await recordReloadStatus(startedAt, true, undefined);
+        } catch (err: any) {
+          const msg = `Reload signaled, but failed to record reload status: ${err.message}`;
+          console.error(chalk.red(msg));
+          process.exitCode = 2;
+          return;
+        }
+        return;
+      }
+    }
+
+    const config = readPlatformConfigSync();
     if (!options.skipBuild) {
       // Install first so a merge/rebase that added a runtime dep can't produce a
       // server bundle that boot-crashes on a missing package (see runBunInstall).

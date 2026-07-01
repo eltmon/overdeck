@@ -426,52 +426,21 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         });
       }
 
-      const issueLowerRerun = canonicalIssueId.toLowerCase();
-      const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
-      const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
-      const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
-      // Review runs against the local worktree only (PAN-1676) — see the
-      // matching guard in /api/review/:issueId/trigger.
-      if (wsInfoRerun.isRemote) {
-        return jsonResponse({
-          success: false,
-          message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${canonicalIssueId}' after the agent finishes, then review.`,
-        }, { status: 409 });
-      }
-      const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
-
-      if (existingStatus.reviewedAtCommit && !forceReview) {
-        let currentHeadSha: string | undefined;
-        const headResult = yield* Effect.promise(async () => {
-          try {
-            const result = await execAsync('git rev-parse HEAD', {
-                  cwd: workspacePathRerun,
-                  encoding: 'utf-8',
-                });
-            return { ok: true as const, stdout: result.stdout };
-          } catch (error) {
-            return { ok: false as const, error };
-          }
-        });
-        if (headResult.ok) {
-          currentHeadSha = headResult.stdout.trim();
-        } else {
-          const message = headResult.error instanceof Error ? headResult.error.message : String(headResult.error);
-          console.warn(`[request-review] ${issueId}: HEAD lookup failed, falling back to full rerun: ${message}`);
-        }
-
-        if (currentHeadSha && currentHeadSha === existingStatus.reviewedAtCommit) {
-          console.log(`[request-review] REFUSED: no code drift since review passed for ${issueId} at ${currentHeadSha.slice(0, 7)}`);
+      if (forceReview && shouldTreatAsRerun(existingStatus)) {
+        const issueLowerRerun = canonicalIssueId.toLowerCase();
+        const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
+        const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+        const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
+        // Review runs against the local worktree only (PAN-1676) — see the
+        // matching guard in /api/review/:issueId/trigger.
+        if (wsInfoRerun.isRemote) {
           return jsonResponse({
             success: false,
-            noCodeDrift: true,
-            error: 'No code drift since review passed',
-            hint: 'Use ?nudge=true to re-emit lifecycle events without resetting state, or ?force=true to force a full re-review',
-          });
+            message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${canonicalIssueId}' after the agent finishes, then review.`,
+          }, { status: 409 });
         }
-      }
+        const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
 
-      if (shouldTreatAsRerun(existingStatus)) {
         if (!wsInfoRerun.isRemote) {
           yield* restoreTrackedBeadsExport(workspacePathRerun);
         }

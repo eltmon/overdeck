@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   killSessionSync: vi.fn(),
   getNoResumeMode: vi.fn(),
   getFlywheelActiveRunId: vi.fn(),
+  isFlywheelGloballyPaused: vi.fn(),
   describeAgentDeath: vi.fn(),
 }));
 
@@ -59,6 +60,9 @@ vi.mock('../config.js', () => ({
       stage1_minutes: 20,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
     },
   },
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
@@ -86,6 +90,7 @@ vi.mock('../no-resume-mode.js', () => ({
 
 vi.mock('../../overdeck/control-settings.js', () => ({
   getFlywheelActiveRunId: mocks.getFlywheelActiveRunId,
+  isFlywheelGloballyPaused: mocks.isFlywheelGloballyPaused,
 }));
 
 vi.mock('../agent-death.js', () => ({
@@ -101,6 +106,9 @@ const DEFAULT_CONFIG = {
     stage1_minutes: 20,
     stage2_minutes: 45,
     stage3_minutes: 90,
+    flywheel_stage1_minutes: 20,
+    flywheel_stage2_minutes: 24,
+    flywheel_stage3_minutes: 28,
   },
 };
 
@@ -427,6 +435,7 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     mocks.listPaneValuesSync.mockReturnValue([]);
     mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
     mocks.getFlywheelActiveRunId.mockReturnValue('RUN-8');
+    mocks.isFlywheelGloballyPaused.mockReturnValue(false);
     mocks.resumeFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
     mocks.describeAgentDeath.mockReturnValue('exit=1 at 2026-05-23T11:59:00Z');
   });
@@ -436,16 +445,35 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     vi.restoreAllMocks();
   });
 
-  it('pokes the orchestrator (stage 1) at 25 min idle with a flywheel-specific nudge', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+  it.each([16, 17])('does not fire a flywheel stage inside the healthy 1000s self-wake window at %i min idle', async (idleMinutes) => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(idleMinutes));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    const expectedAction = '[deacon] stuck-remediation stage=1 issue=FLYWHEEL idleMin=25 action=poked';
+    expect(actions).toEqual([]);
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('pokes the orchestrator (stage 1) at 20 min idle with a full-tick nudge', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(20));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    const expectedAction = '[deacon] stuck-remediation stage=1 issue=FLYWHEEL idleMin=20 action=poked';
     expect(actions).toEqual([expectedAction]);
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
-      expect.stringContaining('Flywheel ticks should complete in under a minute'),
+      expect.stringContaining('FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('ScheduleWakeup(delaySeconds:1000)'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('Do NOT ask the operator a question'),
     );
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
     expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
@@ -455,28 +483,42 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(mocks.getReviewStatusSync).not.toHaveBeenCalled();
   });
 
-  it('escalates to stage 2 nudge at 50 min idle (no resumeAgent for flywheel)', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
+  it('escalates to stage 2 nudge at 24 min idle (no resumeAgent for flywheel)', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(24));
+    mocks.readStuckRemediationState.mockReturnValue(state(1, 24));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(actions).toEqual(['[deacon] stuck-remediation stage=2 issue=FLYWHEEL idleMin=50 action=escalated-nudge']);
+    expect(actions).toEqual(['[deacon] stuck-remediation stage=2 issue=FLYWHEEL idleMin=24 action=escalated-nudge']);
     expect(mocks.messageAgent).toHaveBeenCalledWith(
       'flywheel-orchestrator',
       expect.stringContaining('Stage 2'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      expect.stringContaining('ScheduleWakeup(delaySeconds:1000)'),
     );
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
     expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
   });
 
-  it('pauses and marks troubled at stage 3 (95 min idle)', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(95));
+  it('fresh-launches a wedged orchestrator at flywheel stage 3 (28 min idle)', async () => {
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(28));
+    mocks.readStuckRemediationState.mockReturnValue(state(2, 28));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(actions).toEqual(['[deacon] stuck-remediation stage=3 issue=FLYWHEEL idleMin=95 action=paused-and-troubled']);
-    expect(mocks.pauseFlywheel).toHaveBeenCalledOnce();
-    expect(mocks.markAgentTroubled).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(actions).toEqual([
+      '[deacon] FLYWHEEL orchestrator wedged (idle 28min) — fresh-launched (relaunch 1/3)',
+    ]);
+    expect(mocks.killSessionSync).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
   });
 
   it('skips when the orchestrator is already paused (no re-pause loop)', async () => {
@@ -521,19 +563,47 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(actions[0]).toContain('fresh-launched');
   });
 
-  it('does not auto-relaunch a dead orchestrator under OVERDECK_NO_RESUME', async () => {
+  it('auto-relaunches a dead orchestrator even under OVERDECK_NO_RESUME', async () => {
     mocks.sessionExistsSync.mockReturnValue(false);
     mocks.getNoResumeMode.mockReturnValue({ active: true, since: 'x' });
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 
-    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
-    expect(actions[0]).toContain('OVERDECK_NO_RESUME=1, not auto-relaunching');
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(actions).toEqual([
+      '[deacon] FLYWHEEL orchestrator DIED (exit=1 at 2026-05-23T11:59:00Z) — fresh-launched (relaunch 1/3)',
+    ]);
+    expect(actions[0]).not.toContain('not auto-relaunching');
   });
 
   it('does not resurrect when there is no active flywheel run (operator stopped it)', async () => {
     mocks.sessionExistsSync.mockReturnValue(false);
     mocks.getFlywheelActiveRunId.mockReturnValue(null);
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(mocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
+  });
+
+  it('fresh-launches when the active run gate is set but the orchestrator is no longer listed running', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([]);
+    mocks.sessionExistsSync.mockReturnValue(false);
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(mocks.killSessionSync).toHaveBeenCalledWith('flywheel-orchestrator');
+    expect(mocks.resumeFlywheel).toHaveBeenCalledOnce();
+    expect(actions).toEqual([
+      '[deacon] FLYWHEEL orchestrator DIED (exit=1 at 2026-05-23T11:59:00Z) — fresh-launched (relaunch 1/3)',
+    ]);
+  });
+
+  it('does not resurrect a missing orchestrator while the active run is paused', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([]);
+    mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.isFlywheelGloballyPaused.mockReturnValue(true);
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
 

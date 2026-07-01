@@ -12,7 +12,7 @@ A vBRIEF plan's `plan.items[]` form a DAG via `blocks` edges. The swarm runtime 
 
 | Surface | Single-agent (default) | Swarm slot |
 |---|---|---|
-| Branch | `feature/<issue>` | `feature/<issue>/slot-<N>` |
+| Branch | `feature/<issue>` | `feature/<issue>-slot-<N>` |
 | Worktree | `workspaces/feature-<issue>/` | per-slot worktree under `workspaces/` |
 | tmux session | `agent-<issue>` | per-slot session, recorded in `SwarmSlotRuntime.sessionName` |
 | Plan visibility | Full plan | Active-slice (bounded) prompt |
@@ -271,7 +271,7 @@ plan dispatch
   │                    active-slice prompt
   └─ for each spawned slot:
         create worktree at `workspaces/feature-<issue>-slot-<N>/`
-        check out `feature/<issue>/slot-<N>` branched from `feature/<issue>`
+        check out `feature/<issue>-slot-<N>` branched from `feature/<issue>`
         applyTaskOperation(doc, { type: 'claim', itemId, expectedSequence })
         SwarmSlotRuntime.status = 'running'
         spawn agent in per-slot tmux session
@@ -279,7 +279,7 @@ plan dispatch
 slot work done
   └─ slot merges its branch into the feature branch (review/test/merge pipeline)
         └─ merge-agent: postMergeLifecycle sees sourceBranch matches
-                        ^feature/<parent>/slot-(\d+)$
+                        ^feature/<parent>-slot-(\d+)$
               └─ POST /api/swarm/slot-merged (internal-token authenticated)
                     ├─ SwarmSlotRuntime.status = 'merged' (or 'failed')
                     ├─ persist SynthesisOutput (size-capped) if provided

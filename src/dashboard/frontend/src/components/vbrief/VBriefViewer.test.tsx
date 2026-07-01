@@ -98,6 +98,60 @@ describe('VBriefViewer: missing plan', () => {
   });
 });
 
+// ─── VBriefReadinessPanel ────────────────────────────────────────────────────
+
+describe('VBriefViewer: readiness panel', () => {
+  it('renders dependency waves, overlap matrix, and conflict groups', () => {
+    render(<VBriefViewer doc={makeDoc({
+      items: [
+        {
+          id: 'task-a',
+          title: 'Task A',
+          status: 'pending',
+          metadata: {
+            difficulty: 'medium',
+            files_scope: ['src/shared.ts'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
+        },
+        {
+          id: 'task-b',
+          title: 'Task B',
+          status: 'pending',
+          metadata: {
+            difficulty: 'medium',
+            files_scope: ['src/shared.ts'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
+        },
+        {
+          id: 'task-c',
+          title: 'Task C',
+          status: 'pending',
+          metadata: {
+            difficulty: 'medium',
+            files_scope: ['src/c.ts'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
+        },
+      ],
+      edges: [{ from: 'task-a', to: 'task-c', type: 'blocks' }],
+    })} initialTab="list" />);
+
+    expect(screen.getByText('Readiness report')).toBeTruthy();
+    expect(screen.getByText('wave 0')).toBeTruthy();
+    expect(screen.getByText(': task-a, task-b')).toBeTruthy();
+    expect(screen.getByText('wave 1')).toBeTruthy();
+    expect(screen.getByText(': task-c')).toBeTruthy();
+    expect(screen.getByText('task-a / task-b')).toBeTruthy();
+    expect(screen.getAllByText(/src\/shared\.ts/).length).toBeGreaterThan(0);
+    expect(screen.getByText('task-a + task-b')).toBeTruthy();
+  });
+});
+
 // ─── VBriefViewer: tab switching ──────────────────────────────────────────────
 
 describe('VBriefViewer: tab switching', () => {

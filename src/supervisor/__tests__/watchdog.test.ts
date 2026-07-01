@@ -2,7 +2,12 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SupervisorWatchdog, type SupervisorWatchdogConfig } from '../watchdog.js';
+import {
+  SupervisorWatchdog,
+  type SpawnRestart,
+  type SupervisorWatchdogConfig,
+} from '../watchdog.js';
+import { stampBootReconciliation } from '../../lib/overdeck/control-settings.js';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testHome: string;
@@ -25,6 +30,7 @@ function makeWatchdog(overrides: Partial<{
   fetchOk: boolean;
   fetchTimeout: boolean;
   deaconStatus: unknown;
+  spawnOptions: Array<Parameters<SpawnRestart>[0]>;
   config: SupervisorWatchdogConfig;
 }> = {}): SupervisorWatchdog {
   const spawns = overrides.spawns ?? { count: 0 };
@@ -40,7 +46,8 @@ function makeWatchdog(overrides: Partial<{
     config: overrides.config ?? config,
     now: overrides.now ?? (() => Date.parse('2026-05-17T15:30:00.000Z')),
     log: (msg) => logs.push(msg),
-    spawnRestart: () => {
+    spawnRestart: (options) => {
+      overrides.spawnOptions?.push(options);
       spawns.count += 1;
       return { pid: 1000 + spawns.count, error: null };
     },
@@ -261,5 +268,18 @@ describe('SupervisorWatchdog', () => {
     expect(spawns.count).toBe(0);
     expect(watchdog.status().restartAttempts).toEqual([]);
     expect(logs).toContain('watchdog restart skipped: restart lock held');
+  });
+
+  it('passes the persisted boot id to watchdog restart spawns', async () => {
+    mkdirSync(testHome, { recursive: true });
+    stampBootReconciliation('boot-watchdog', '2026-05-17T15:30:30.000Z');
+    const spawnOptions: Array<Parameters<SpawnRestart>[0]> = [];
+
+    await makeWatchdog({ spawnOptions }).checkOnce();
+
+    expect(spawnOptions[0]).toMatchObject({
+      restartLockHeld: true,
+      bootId: 'boot-watchdog',
+    });
   });
 });

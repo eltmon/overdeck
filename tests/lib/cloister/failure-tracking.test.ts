@@ -36,6 +36,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doUnmock('../../../src/lib/activity-logger.js');
     vi.doUnmock('../../../src/lib/persistent-logger.js');
     vi.doUnmock('../../../src/lib/database/app-settings.js');
+    vi.doUnmock('../../../src/lib/overdeck/control-settings.js');
     vi.doUnmock('../../../src/lib/database/review-status-db.js');
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/tmux.js');
@@ -146,6 +147,18 @@ describe('agent failure tracking and auto-resume backoff', () => {
     }));
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
+    }));
+    vi.doMock('../../../src/lib/overdeck/control-settings.js', () => ({
+      isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
+      getBootReconciliationState: vi.fn().mockReturnValue({
+        decision: null,
+        perAgent: {},
+        decidedAt: null,
+        bootId: null,
+        graceDeadline: null,
+      }),
+      setBootReconciliationDecision: vi.fn(),
+      stampBootReconciliation: vi.fn(),
     }));
     vi.doMock('../../../src/lib/database/review-status-db.js', () => ({
       markWorkspaceStuck: vi.fn(),

@@ -318,8 +318,8 @@ export async function buildReviewerNodes(
   // convoy lanes ONLY when extended review actually runs. Otherwise any
   // agent-<id>-review-<subRole> record is a ghost from a prior convoy run and would
   // render as a dead phantom lane under the issue. Single seam shared with the spawn
-  // side: isExtendedReviewEnabled() (review-agent.ts). Flip it to revive lanes.
-  if (!isExtendedReviewEnabled()) return [];
+  // side: isExtendedReviewEnabled(issueId) (review-agent.ts).
+  if (!isExtendedReviewEnabled(opts.issueId)) return [];
 
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.overdeck', 'agents');
 

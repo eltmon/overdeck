@@ -6,7 +6,6 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
-  getNoResumeMode: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
@@ -43,10 +42,6 @@ vi.mock('../../tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
 }));
 
-vi.mock('../no-resume-mode.js', () => ({
-  getNoResumeMode: mocks.getNoResumeMode,
-}));
-
 vi.mock('../issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
 }));
@@ -64,7 +59,7 @@ describe('reconcileClosedIssueAgents', () => {
     vi.clearAllMocks();
     overdeckHome = mkdtempSync(join(tmpdir(), 'closed-issue-reaper-'));
     process.env.OVERDECK_HOME = overdeckHome;
-    mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
+    delete process.env.OVERDECK_NO_RESUME;
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.listProjectsSync.mockReturnValue([]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
@@ -77,6 +72,7 @@ describe('reconcileClosedIssueAgents', () => {
   afterEach(() => {
     rmSync(overdeckHome, { recursive: true, force: true });
     delete process.env.OVERDECK_HOME;
+    delete process.env.OVERDECK_NO_RESUME;
   });
 
   it('stops running agents whose parent issue is closed', async () => {
@@ -135,7 +131,6 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.stopAgent).toHaveBeenCalledTimes(2);
 
     vi.clearAllMocks();
-    mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
     mocks.isIssueClosed.mockResolvedValue(true);
@@ -179,21 +174,24 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.stopAgent).toHaveBeenCalledWith('strike-pan-1716');
   });
 
-  it('does not reap closed-issue agents when no-resume mode is active', async () => {
-    mocks.getNoResumeMode.mockReturnValue({ active: true, since: '2026-06-08T12:00:00.000Z' });
+  it('reaps closed-issue agents even when OVERDECK_NO_RESUME was set at boot', async () => {
+    process.env.OVERDECK_NO_RESUME = '1';
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-1613', issueId: 'PAN-1613', role: 'work', status: 'running' },
     ]));
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['inspect-pan-1613-workspace-rn3ha']));
     mocks.isIssueClosed.mockResolvedValue(true);
 
-    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([
+      'Reaped agent-pan-1613 — parent issue PAN-1613 is closed',
+      'Reaped inspect-pan-1613-workspace-rn3ha — parent issue PAN-1613 is closed',
+    ]);
 
-    expect(mocks.listRunningAgents).not.toHaveBeenCalled();
-    expect(mocks.listSessionNames).not.toHaveBeenCalled();
-    expect(mocks.isIssueClosed).not.toHaveBeenCalled();
-    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
-    expect(mocks.stopAgent).not.toHaveBeenCalled();
+    expect(mocks.listRunningAgents).toHaveBeenCalledTimes(1);
+    expect(mocks.listSessionNames).toHaveBeenCalledTimes(1);
+    expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-1613');
+    expect(mocks.stopAgent).toHaveBeenCalledWith('agent-pan-1613');
+    expect(mocks.stopAgent).toHaveBeenCalledWith('inspect-pan-1613-workspace-rn3ha');
   });
 
   it('reaps closed pure-disk residue discovered from configured project workspaces', async () => {

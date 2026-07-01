@@ -111,7 +111,6 @@ import { loadWorkspaceMetadataSync, listWorkspaceMetadataSync } from '../../../l
 import { loadConfigSync } from '../../../lib/config.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
-import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -124,6 +123,7 @@ import { stashCleanRouteLayer } from './workspaces/stash-clean.js';
 import { reviewPipelineRouteLayer } from './workspaces/review-pipeline.js';
 import { reviewControlRouteLayer } from './workspaces/review-control.js';
 import { mergeOpsRouteLayer } from './workspaces/merge-ops.js';
+import { uatStackActionRouteLayer } from './workspaces/uat-stack-actions.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -279,7 +279,19 @@ export function appendActivityOutput(id: string, line: string): void {
 // ─── Pending operations (in-memory) ──────────────────────────────────────────
 
 interface PendingOperation {
-  type: 'review' | 'merge' | 'approve' | 'start' | 'clean' | 'containerize' | 'refresh-db' | 'rebuild-stack';
+  type:
+    | 'review'
+    | 'merge'
+    | 'approve'
+    | 'start'
+    | 'clean'
+    | 'containerize'
+    | 'refresh-db'
+    | 'rebuild-stack'
+    | 'start-stack'
+    | 'stop-stack'
+    | 'restart-stack'
+    | 'reap-workspace';
   status: 'running' | 'completed' | 'failed';
   startedAt: string;
   error?: string;
@@ -1720,6 +1732,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   workspaceDataRouteLayer,
   postWorkspaceRebuildRoute,
   postWorkspaceRebuildAndStartRoute,
+  uatStackActionRouteLayer,
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   stashCleanRouteLayer,

@@ -1,11 +1,53 @@
 import { describe, it, expect } from 'vitest';
-import { orderMergeCandidates, planMergeTrain, planUatCandidate } from '../../../src/lib/flywheel-merge-order.js';
+import {
+  computePredictedConflictSignals,
+  declaredIssueFootprint,
+  orderMergeCandidates,
+  pickFromSequence,
+  planMergeTrain,
+  planUatCandidate,
+} from '../../../src/lib/flywheel-merge-order.js';
+import type { SequenceNode } from '../../../src/lib/backlog/types.js';
+import type { VBriefDocument } from '../../../src/lib/vbrief/types.js';
 
 const c = (issueId: string, footprint: number, conflictCount: number) => ({
   issueId,
   footprint,
   conflictCount,
 });
+
+function spec(issueId: string, filesScope: string[]): VBriefDocument {
+  return {
+    vBRIEFInfo: { version: '1.0', created: '2026-06-30T00:00:00Z' },
+    plan: {
+      id: issueId.toLowerCase(),
+      title: issueId,
+      status: 'proposed',
+      items: [{
+        id: 'item-1',
+        title: 'Item',
+        status: 'pending',
+        metadata: { files_scope: filesScope },
+      }],
+      edges: [],
+    },
+  };
+}
+
+function node(issue: string, rank: number): SequenceNode {
+  return {
+    issue,
+    rank,
+    size: 'S',
+    importance: 'medium',
+    score: 50,
+    condition: 'ok',
+    dependsOn: [],
+    why: `Why for ${issue}`,
+    gate: 'auto',
+    planning: 'auto',
+  };
+}
 
 describe('orderMergeCandidates (PAN-1691 conflict-aware order)', () => {
   it('orders all-disjoint candidates by issue number', () => {
@@ -56,6 +98,98 @@ describe('planMergeTrain (PAN-1691 batch/serialize plan)', () => {
 
   it('returns empty plan for no candidates', () => {
     expect(planMergeTrain([])).toEqual({ batch: [], serialize: [], order: [] });
+  });
+});
+
+describe('computePredictedConflictSignals (declared-footprint conflict signal)', () => {
+  it('counts overlapping declared footprints before branches exist', () => {
+    const signals = computePredictedConflictSignals([
+      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts', 'src/a.ts'])),
+      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts', 'src/b.ts'])),
+    ]);
+
+    expect(signals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ issueId: 'PAN-10', source: 'declared', footprint: 2, conflictCount: 1, conflictsWith: ['PAN-20'] }),
+      expect.objectContaining({ issueId: 'PAN-20', source: 'declared', footprint: 2, conflictCount: 1, conflictsWith: ['PAN-10'] }),
+    ]));
+  });
+
+  it('lets actual changed files replace a declared footprint once a branch exists', () => {
+    const signals = computePredictedConflictSignals([
+      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),
+      { issueId: 'PAN-10', source: 'actual' as const, files: ['src/actual-only.ts'] },
+      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
+    ]);
+
+    expect(signals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ issueId: 'PAN-10', source: 'actual', footprint: 1, conflictCount: 0, conflictsWith: [] }),
+      expect.objectContaining({ issueId: 'PAN-20', source: 'declared', footprint: 1, conflictCount: 0, conflictsWith: [] }),
+    ]));
+  });
+
+  it('excludes configured hotspot files from the predicted-conflict computation', () => {
+    const signals = computePredictedConflictSignals([
+      declaredIssueFootprint('PAN-10', spec('PAN-10', ['package-lock.json'])),
+      declaredIssueFootprint('PAN-20', spec('PAN-20', ['package-lock.json'])),
+    ], { hotspots: ['package-lock.json'] });
+
+    expect(signals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ issueId: 'PAN-10', footprint: 0, conflictCount: 0, conflictsWith: [] }),
+      expect.objectContaining({ issueId: 'PAN-20', footprint: 0, conflictCount: 0, conflictsWith: [] }),
+    ]));
+  });
+
+  it('is advisory only: conflict counts order candidates without dropping them', () => {
+    const signals = computePredictedConflictSignals([
+      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),
+      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
+    ]);
+
+    expect(planMergeTrain(signals).order).toEqual(['PAN-10', 'PAN-20']);
+    expect(planMergeTrain(signals).serialize).toEqual(['PAN-10', 'PAN-20']);
+  });
+});
+
+describe('pickFromSequence predicted-conflict signal', () => {
+  it('uses predicted conflicts as an advisory launch-order preference', () => {
+    const signals = computePredictedConflictSignals([
+      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),
+      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
+      declaredIssueFootprint('PAN-30', spec('PAN-30', ['src/isolated.ts'])),
+    ]);
+
+    const result = pickFromSequence([node('PAN-10', 1), node('PAN-30', 2), node('PAN-20', 3)], {
+      issueLabels: () => ['ready', 'released'],
+      isReadyOrHasPrd: () => true,
+      requireReady: true,
+      predictedConflictSignals: signals,
+    });
+
+    expect(result).toMatchObject({
+      issueId: 'PAN-30',
+      predictedConflictCount: 0,
+      predictedConflictsWith: [],
+    });
+  });
+
+  it('never gates out a pickable issue solely because it has predicted conflicts', () => {
+    const signals = computePredictedConflictSignals([
+      declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),
+      declaredIssueFootprint('PAN-20', spec('PAN-20', ['src/shared.ts'])),
+    ]);
+
+    const result = pickFromSequence([node('PAN-10', 1)], {
+      issueLabels: () => ['ready', 'released'],
+      isReadyOrHasPrd: () => true,
+      requireReady: true,
+      predictedConflictSignals: signals,
+    });
+
+    expect(result).toMatchObject({
+      issueId: 'PAN-10',
+      predictedConflictCount: 1,
+      predictedConflictsWith: ['PAN-20'],
+    });
   });
 });
 

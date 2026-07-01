@@ -137,7 +137,9 @@ describe('Cloister Configuration', () => {
       const startup = DEFAULT_CLOISTER_CONFIG.startup;
 
       expect(startup).toHaveProperty('auto_start');
+      expect(startup).toHaveProperty('reconciliation_grace_secs');
       expect(typeof startup.auto_start).toBe('boolean');
+      expect(startup.reconciliation_grace_secs).toBe(30);
     });
 
     it('should have required threshold fields', () => {

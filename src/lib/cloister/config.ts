@@ -40,6 +40,9 @@ export interface StuckRemediationConfig {
   stage1_minutes: number;
   stage2_minutes: number;
   stage3_minutes: number;
+  flywheel_stage1_minutes: number;
+  flywheel_stage2_minutes: number;
+  flywheel_stage3_minutes: number;
 }
 
 /**
@@ -82,6 +85,7 @@ export interface ConcurrencyConfig {
  */
 export interface StartupConfig {
   auto_start: boolean; // Start Cloister when dashboard starts
+  reconciliation_grace_secs: number; // Boot reconciliation grace window before default resume
 }
 
 /**
@@ -282,6 +286,7 @@ export interface CloisterConfig {
 export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   startup: {
     auto_start: true,
+    reconciliation_grace_secs: 30,
   },
   thresholds: {
     stale: 5,
@@ -300,6 +305,9 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     stage1_minutes: 20,
     stage2_minutes: 45,
     stage3_minutes: 90,
+    flywheel_stage1_minutes: 20,
+    flywheel_stage2_minutes: 24,
+    flywheel_stage3_minutes: 28,
   },
   monitoring: {
     check_interval: 60, // 1 minute
