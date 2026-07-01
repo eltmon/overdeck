@@ -1,23 +1,226 @@
 {
   "issueId": "PAN-2203",
   "schemaVersion": 2,
-  "created": "2026-07-01T02:34:39.702Z",
-  "updated": "2026-07-01T02:34:39.702Z",
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "MiniMax-M3",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "failed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T02:34:39.702Z"
+    "updatedAt": "2026-07-01T16:34:27.615Z",
+    "reviewNotes": "pan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map",
+    "verificationNotes": "Verification FAILED at lint (21787ms):\n\n.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  0.80 kB\u001b[22m \u001b[2m│ gzip:   0.37 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 432 files, total: 13.16 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3854ms\u001b[39m\n\n> @overdeck/core@0.41.1 lint:skills\n> bash scripts/lint-skills.sh\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/deacon-api-recovery.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (53%)\n  - tsdown:deps (43%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 255, in <module>\n  File \"<stdin>\", line 204, in main\n  File \"<stdin>\", line 49, in run_pan\nsubprocess.CalledProcessError: Command '['node', '/home/eltmon/Projects/overdeck/workspaces/feature-pan-2203/dist/cli/index.js', '--help']' returned non-zero exit status 1.\n",
+    "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
+    "lastVerifiedCommit": "bad247269256cf5119006ad6e932c45c9019bd8f",
+    "reviewRequestedAt": "2026-07-01T15:48:47.488Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/pan-2203.md",
+        ".pan/records/pan-2203.json",
+        ".pan/test/result.json",
+        "src/cli/commands/done.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+        "src/dashboard/server/routes/projects.ts",
+        "src/lib/agents/agent-state.ts",
+        "src/lib/agents/slot-merge.ts",
+        "src/lib/agents/slot-reconcile.ts",
+        "src/lib/agents/spawn-prep.ts",
+        "src/lib/agents/spawn.ts",
+        "src/lib/cloister/__tests__/deacon-auto-closeout.test.ts",
+        "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+        "src/lib/cloister/__tests__/deacon-stuck-skip.test.ts",
+        "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+        "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+        "src/lib/cloister/deacon-workspaces.ts",
+        "sync-sources/skills/pan-swarm/SKILL.md",
+        "tests/cli/commands/work/done.test.ts",
+        "tests/fixtures/synced-skills.txt",
+        "tests/integration/foreman-swarm.test.ts",
+        "tests/lib/cloister/auto-resume-gating.test.ts",
+        "tests/lib/cloister/failure-tracking.test.ts",
+        "tests/lib/cloister/review-convoy-liveness.test.ts",
+        "tests/lib/cloister/review-verdict-feedback.test.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts",
+        "tests/unit/lib/agents/slot-merge.test.ts",
+        "tests/unit/lib/agents/slot-reconcile.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "skills/pan-swarm/SKILL.md",
+        "src/dashboard/server/services/resource-discovery.ts"
+      ],
+      "declaredScope": [
+        "docs/SWARM.md",
+        "skills/pan-swarm/SKILL.md",
+        "src/cli/commands/swarm.ts",
+        "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/lib/cloister/deacon-swarm.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/cloister/service.ts",
+        "src/lib/cloister/test-verdict.ts",
+        "tests/unit/cli/commands/swarm.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-backoff.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-merge.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+        "tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-2203.md",
+        ".pan/records/pan-2203.json",
+        ".pan/test/result.json",
+        "docs/SWARM.md",
+        "src/cli/commands/done.ts",
+        "src/cli/commands/swarm.ts",
+        "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+        "src/dashboard/server/routes/projects.ts",
+        "src/lib/agents/agent-state.ts",
+        "src/lib/agents/slot-merge.ts",
+        "src/lib/agents/slot-reconcile.ts",
+        "src/lib/agents/spawn-prep.ts",
+        "src/lib/agents/spawn.ts",
+        "src/lib/cloister/__tests__/deacon-auto-closeout.test.ts",
+        "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+        "src/lib/cloister/__tests__/deacon-stuck-skip.test.ts",
+        "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+        "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+        "src/lib/cloister/deacon-swarm.ts",
+        "src/lib/cloister/deacon-workspaces.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/cloister/service.ts",
+        "src/lib/cloister/test-verdict.ts",
+        "sync-sources/skills/pan-swarm/SKILL.md",
+        "tests/cli/commands/work/done.test.ts",
+        "tests/fixtures/synced-skills.txt",
+        "tests/integration/foreman-swarm.test.ts",
+        "tests/lib/cloister/auto-resume-gating.test.ts",
+        "tests/lib/cloister/failure-tracking.test.ts",
+        "tests/lib/cloister/review-convoy-liveness.test.ts",
+        "tests/lib/cloister/review-verdict-feedback.test.ts",
+        "tests/unit/cli/commands/swarm.test.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts",
+        "tests/unit/lib/agents/slot-merge.test.ts",
+        "tests/unit/lib/agents/slot-reconcile.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-backoff.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-merge.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts",
+        "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+        "tests/unit/lib/cloister/service-swarm-fastpath.test.ts"
+      ],
+      "recordedAt": "2026-07-01T15:48:27.172Z"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "inspect": {
+          "custom/MiniMax-M3": {
+            "input": 267548,
+            "output": 25822,
+            "cacheRead": 1946368,
+            "cacheWrite": 0
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 498078,
+            "output": 27600,
+            "cacheRead": 3041792,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 47530,
+            "output": 1735,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 70234,
+            "output": 232853,
+            "cacheRead": 25153697,
+            "cacheWrite": 883825
+          }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 48,
+            "output": 1604,
+            "cacheRead": 637679,
+            "cacheWrite": 123632
+          }
+        }
+      },
+      "totals": {
+        "custom/MiniMax-M3": {
+          "input": 267548,
+          "output": 25822,
+          "cacheRead": 1946368,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 498078,
+          "output": 27600,
+          "cacheRead": 3041792,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 47530,
+          "output": 1735,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 70234,
+          "output": 232853,
+          "cacheRead": 25153697,
+          "cacheWrite": 883825
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 48,
+          "output": 1604,
+          "cacheRead": 637679,
+          "cacheWrite": 123632
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 29.450181,
+        "pricingAsOf": "2026-07-01T16:34:27.636Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2206"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "created": "2026-07-01T16:34:27.639Z",
+  "updated": "2026-07-01T16:34:27.639Z"
 }

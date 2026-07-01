@@ -92,6 +92,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
       workResumeSlotsAvailable: () => 999,
       resetPatrolDispatchBudget: vi.fn(),
       tryReserveAdvancingSlot: () => true,
+      releaseAdvancingSlot: vi.fn(),
       canDispatchAdvancing: () => true,
     }));
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {

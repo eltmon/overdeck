@@ -118,7 +118,7 @@ function escapeRegExp(value: string): string {
 }
 
 function getSlotWorkSessionPattern(issueLower: string): RegExp {
-  return new RegExp(`^agent-${escapeRegExp(issueLower)}-(\\d+)$`, 'i');
+  return new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`, 'i');
 }
 
 export function getSlotWorkSessionNumber(sessionId: string, issueLower: string): number | null {
