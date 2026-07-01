@@ -13,9 +13,10 @@ function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   };
 }
 
-function deps(): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> {
+function deps(): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment'> {
   return {
     runGitCommand: vi.fn(async () => undefined),
+    clearSlotAssignment: vi.fn(),
   };
 }
 
@@ -33,6 +34,12 @@ describe('deacon-swarm merged slot GC', () => {
     expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
       'git branch -D "feature/pan-2203-slot-1"',
       '/repo/workspaces/feature-pan-2203',
+    );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      1,
+      'wi-1',
     );
   });
 

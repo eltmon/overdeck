@@ -67,8 +67,17 @@ export interface PanIssueSwarmFailedMergeBlock {
   note: string;
 }
 
+export interface PanIssueSwarmSlotAssignment {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+  assignedAt?: string;
+}
+
 export interface PanIssueSwarmRecord {
   failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
+  slotAssignments?: PanIssueSwarmSlotAssignment[];
 }
 
 export interface PanIssuePipelineRecord {

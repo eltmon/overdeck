@@ -79,6 +79,8 @@ function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'app
 function recoveryDeps(): Pick<
   CoordinateSwarmSlotsDeps,
   'applyTaskOperationToPlanFile'
+  | 'recordSlotAssignment'
+  | 'clearSlotAssignment'
   | 'registeredSlotCapacityAvailable'
   | 'tryReserveAdvancingSlot'
   | 'releaseAdvancingSlot'
@@ -86,6 +88,8 @@ function recoveryDeps(): Pick<
 > {
   return {
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+    recordSlotAssignment: vi.fn(),
+    clearSlotAssignment: vi.fn(),
     registeredSlotCapacityAvailable: vi.fn(() => true),
     tryReserveAdvancingSlot: vi.fn(() => true),
     releaseAdvancingSlot: vi.fn(),

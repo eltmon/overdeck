@@ -68,6 +68,8 @@ function deps(overrides: Partial<Pick<
   | 'tryReserveAdvancingSlot'
   | 'releaseAdvancingSlot'
   | 'applyTaskOperationToPlanFile'
+  | 'recordSlotAssignment'
+  | 'clearSlotAssignment'
   | 'spawnRun'
 >> = {}): Pick<
   CoordinateSwarmSlotsDeps,
@@ -75,6 +77,8 @@ function deps(overrides: Partial<Pick<
   | 'tryReserveAdvancingSlot'
   | 'releaseAdvancingSlot'
   | 'applyTaskOperationToPlanFile'
+  | 'recordSlotAssignment'
+  | 'clearSlotAssignment'
   | 'spawnRun'
 > {
   return {
@@ -82,6 +86,8 @@ function deps(overrides: Partial<Pick<
     tryReserveAdvancingSlot: vi.fn(() => true),
     releaseAdvancingSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+    recordSlotAssignment: vi.fn(),
+    clearSlotAssignment: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
     ...overrides,
   };
@@ -108,6 +114,28 @@ describe('deacon-swarm next-wave dispatch', () => {
     ]);
 
     expect(fakeDeps.spawnRun).toHaveBeenCalledTimes(2);
+    expect(fakeDeps.recordSlotAssignment).toHaveBeenNthCalledWith(
+      1,
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      {
+        slotIndex: 1,
+        itemId: 'wi-a',
+        agentId: 'agent-pan-2203-slot-1',
+        branch: 'feature/pan-2203-slot-1',
+      },
+    );
+    expect(fakeDeps.recordSlotAssignment).toHaveBeenNthCalledWith(
+      2,
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      {
+        slotIndex: 2,
+        itemId: 'wi-b',
+        agentId: 'agent-pan-2203-slot-2',
+        branch: 'feature/pan-2203-slot-2',
+      },
+    );
     expect(fakeDeps.spawnRun).toHaveBeenNthCalledWith(1, 'PAN-2203', 'work', {
       workspace: '/repo/workspaces/feature-pan-2203',
       slotIndex: 1,
@@ -194,6 +222,12 @@ describe('deacon-swarm next-wave dispatch', () => {
         reason: 'slot dispatch failed: spawn failed',
       },
       '/repo/workspaces/feature-pan-2203',
+    );
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      1,
+      'wi-a',
     );
     expect(fakeDeps.releaseAdvancingSlot).toHaveBeenCalledTimes(1);
   });

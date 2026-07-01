@@ -66,6 +66,8 @@ function deps(): Pick<
   | 'tryReserveAdvancingSlot'
   | 'releaseAdvancingSlot'
   | 'applyTaskOperationToPlanFile'
+  | 'recordSlotAssignment'
+  | 'clearSlotAssignment'
   | 'spawnRun'
 > {
   return {
@@ -73,6 +75,8 @@ function deps(): Pick<
     tryReserveAdvancingSlot: vi.fn(() => true),
     releaseAdvancingSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+    recordSlotAssignment: vi.fn(),
+    clearSlotAssignment: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
   };
 }

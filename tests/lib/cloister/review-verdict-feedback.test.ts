@@ -36,7 +36,7 @@ vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../src/lib/agents/slot-reconcile.js', () => ({
-  listSlotAgents: vi.fn(() => []),
+  listSlotOwnership: vi.fn(() => []),
 }));
 
 describe('deliverReviewVerdictFeedback', () => {

@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
@@ -64,32 +67,39 @@ function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateS
 }
 
 describe('deacon-swarm ready-slot merge', () => {
+  let workspacePath: string;
+
   beforeEach(() => {
     resetSwarmLoopSafetyForTests();
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-merge-'));
+  });
+
+  afterEach(() => {
+    rmSync(workspacePath, { recursive: true, force: true });
   });
 
   it('marks the vBRIEF item done through the write door when a slot merges', async () => {
     const fakeDeps = deps({ merged: true, conflicts: false });
 
-    await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [readySlot()], fakeDeps))
+    await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps))
       .resolves.toEqual(['[swarm] merged slot 1 (item wi-1) for PAN-2203']);
 
     expect(fakeDeps.verifyAndMergeSlot).toHaveBeenCalledWith(
-      { issueId: 'PAN-2203', featureWorkspace: '/workspace' },
+      { issueId: 'PAN-2203', featureWorkspace: workspacePath },
       1,
       expect.objectContaining({ id: 'wi-1' }),
     );
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      '/workspace/.pan/spec.vbrief.json',
+      join(workspacePath, '.pan', 'spec.vbrief.json'),
       { type: 'done', itemId: 'wi-1', writerId: 'deacon-swarm' },
-      '/workspace',
+      workspacePath,
     );
   });
 
   it('does not write item status when verifyAndMergeSlot returns merged false', async () => {
     const fakeDeps = deps({ merged: false, conflicts: false });
 
-    await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [readySlot()], fakeDeps))
+    await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps))
       .resolves.toEqual([]);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
@@ -98,7 +108,7 @@ describe('deacon-swarm ready-slot merge', () => {
   it('emits failed-merge without marking done when the slot branch conflicts', async () => {
     const fakeDeps = deps({ merged: false, conflicts: true });
 
-    await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [readySlot()], fakeDeps))
+    await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps))
       .resolves.toEqual(['[swarm] failed-merge slot 1 (item wi-1) for PAN-2203']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();

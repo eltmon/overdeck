@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
-const { mockMessageAgent, mockGetReviewStatus, mockWriteFeedbackFile, mockListSlotAgents } = vi.hoisted(() => ({
+const { mockMessageAgent, mockGetReviewStatus, mockWriteFeedbackFile, mockListSlotOwnership } = vi.hoisted(() => ({
   mockMessageAgent: vi.fn(),
   mockGetReviewStatus: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
-  mockListSlotAgents: vi.fn(),
+  mockListSlotOwnership: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -33,7 +33,7 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/slot-reconcile.js', () => ({
-  listSlotAgents: mockListSlotAgents,
+  listSlotOwnership: mockListSlotOwnership,
 }));
 
 function plan(items: VBriefItem[]): VBriefDocument {
@@ -84,14 +84,14 @@ describe('swarm verdict feedback routing', () => {
     mockMessageAgent.mockReset();
     mockGetReviewStatus.mockReset();
     mockWriteFeedbackFile.mockReset();
-    mockListSlotAgents.mockReset();
+    mockListSlotOwnership.mockReset();
     mockGetReviewStatus.mockReturnValue({});
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
     }));
-    mockListSlotAgents.mockReturnValue([]);
+    mockListSlotOwnership.mockReturnValue([]);
   });
 
   it('delivers a verdict for a slot-owned item to agent-<issue>-slot-N', async () => {
@@ -99,8 +99,8 @@ describe('swarm verdict feedback routing', () => {
       slotItem('wi-a'),
       slotItem('wi-b'),
     ]));
-    mockListSlotAgents.mockReturnValue([
-      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'running', slotItemId: 'wi-b' },
+    mockListSlotOwnership.mockReturnValue([
+      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', itemId: 'wi-b' },
     ]);
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
@@ -124,8 +124,8 @@ describe('swarm verdict feedback routing', () => {
       slotItem('wi-a'),
       slotItem('wi-b'),
     ]));
-    mockListSlotAgents.mockReturnValue([
-      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'running', slotItemId: 'wi-b' },
+    mockListSlotOwnership.mockReturnValue([
+      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', itemId: 'wi-b' },
     ]);
     mockMessageAgent.mockImplementation(async (agentId: string) => {
       if (agentId === 'agent-pan-2203') throw new Error('parent agent missing');
@@ -158,9 +158,9 @@ describe('swarm verdict feedback routing', () => {
       slotItem('wi-b'),
       slotItem('wi-c'),
     ]));
-    mockListSlotAgents.mockReturnValue([
-      { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'running', slotItemId: 'wi-c' },
-      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'running', slotItemId: 'wi-b' },
+    mockListSlotOwnership.mockReturnValue([
+      { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', itemId: 'wi-c' },
+      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', itemId: 'wi-b' },
     ]);
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');

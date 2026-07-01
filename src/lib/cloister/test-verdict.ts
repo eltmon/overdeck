@@ -137,12 +137,12 @@ export function resolveSlotFeedbackAgentId(
   issueId: string,
   slotItemId: string | undefined,
   _doc: VBriefDocument | null | undefined,
-  slotOwnership: Array<{ slotIndex: number; slotItemId?: string }> = [],
+  slotOwnership: Array<{ slotIndex: number; slotItemId?: string; itemId?: string }> = [],
 ): string | null {
   const normalizedItemId = slotItemId?.trim();
   if (!normalizedItemId) return null;
 
-  const persistedOwner = slotOwnership.find(slot => slot.slotItemId === normalizedItemId);
+  const persistedOwner = slotOwnership.find(slot => (slot.slotItemId ?? slot.itemId) === normalizedItemId);
   if (persistedOwner) return `agent-${issueId.toLowerCase()}-slot-${persistedOwner.slotIndex}`;
 
   return null;

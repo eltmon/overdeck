@@ -78,6 +78,8 @@ export interface CoordinateSwarmSlotsDeps {
     operation: PersistedTaskOperation,
     workspacePath?: string,
   ) => Promise<unknown>;
+  recordSlotAssignment: (workspacePath: string, issueId: string, assignment: SlotAssignment) => void;
+  clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => void;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   registeredSlotCapacityAvailable: (issueId: string, selectedCount: number) => boolean;
   tryReserveAdvancingSlot: () => boolean;
@@ -112,6 +114,8 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   verifyAndMergeSlot,
   applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
     Effect.runPromise(applyTaskOperationToPlanFile(planPath, operation, workspacePath)),
+  recordSlotAssignment,
+  clearSlotAssignment,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   registeredSlotCapacityAvailable: (issueId, selectedCount) => registeredSlotCapacityAvailable(issueId, selectedCount),
   tryReserveAdvancingSlot,
@@ -139,6 +143,15 @@ interface SlotProgressObservation {
   outputDigest: string;
   lastProgressAt: number;
 }
+
+interface SlotAssignment {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+}
+
+type SlotAssignments = NonNullable<NonNullable<PanIssueRecord['swarm']>['slotAssignments']>;
 
 export async function coordinateSwarmSlots(
   opts: CoordinateSwarmSlotsOptions = {},
@@ -193,7 +206,7 @@ export async function gcMergedSlots(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment'> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
 
@@ -205,6 +218,7 @@ export async function gcMergedSlots(
 
     await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
     await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+    deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
     actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
   }
 
@@ -409,6 +423,8 @@ export async function recoverFailedMergeSlot(
   deps: Pick<
     CoordinateSwarmSlotsDeps,
     'applyTaskOperationToPlanFile'
+    | 'clearSlotAssignment'
+    | 'recordSlotAssignment'
     | 'registeredSlotCapacityAvailable'
     | 'tryReserveAdvancingSlot'
     | 'releaseAdvancingSlot'
@@ -434,6 +450,7 @@ export async function recoverFailedMergeSlot(
       reason: 'Dropped failed swarm slot after operator recovery',
     }, workspacePath);
     clearFailedMergeBlock(normalizedIssueId, workspacePath);
+    deps.clearSlotAssignment(workspacePath, normalizedIssueId, block.slotIndex, block.itemId);
     return [`[swarm] dropped failed-merge slot ${block.slotIndex} (item ${block.itemId}) for ${normalizedIssueId}`];
   }
 
@@ -553,6 +570,8 @@ export async function dispatchNextWave(
     | 'tryReserveAdvancingSlot'
     | 'releaseAdvancingSlot'
     | 'applyTaskOperationToPlanFile'
+    | 'recordSlotAssignment'
+    | 'clearSlotAssignment'
     | 'spawnRun'
   > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
 ): Promise<string[]> {
@@ -601,6 +620,12 @@ export async function dispatchNextWave(
         itemId: item.id,
         writerId: 'deacon-swarm',
       }, workspacePath);
+      deps.recordSlotAssignment(workspacePath, issueId, {
+        slotIndex,
+        itemId: item.id,
+        agentId: `agent-${issueId.toLowerCase()}-slot-${slotIndex}`,
+        branch: `feature/${issueId.toLowerCase()}-slot-${slotIndex}`,
+      });
       await deps.spawnRun(issueId, 'work', {
         workspace: workspacePath,
         slotIndex,
@@ -617,12 +642,51 @@ export async function dispatchNextWave(
         writerId: 'deacon-swarm',
         reason: `slot dispatch failed: ${error instanceof Error ? error.message : String(error)}`,
       }, workspacePath).catch(() => undefined);
+      deps.clearSlotAssignment(workspacePath, issueId, slotIndex, item.id);
       deps.releaseAdvancingSlot();
       actions.push(`[swarm] failed-dispatch ${item.id} for ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   return actions;
+}
+
+function recordSlotAssignment(workspacePath: string, issueId: string, assignment: SlotAssignment): void {
+  writeSwarmSlotAssignments(workspacePath, issueId, (existing) => [
+    ...existing.filter(slot => slot.slotIndex !== assignment.slotIndex && slot.itemId !== assignment.itemId),
+    {
+      ...assignment,
+      assignedAt: new Date().toISOString(),
+    },
+  ]);
+}
+
+function clearSlotAssignment(workspacePath: string, issueId: string, slotIndex: number, itemId?: string): void {
+  writeSwarmSlotAssignments(workspacePath, issueId, (existing) =>
+    existing.filter(slot => slot.slotIndex !== slotIndex && (itemId === undefined || slot.itemId !== itemId))
+  );
+}
+
+function writeSwarmSlotAssignments(
+  workspacePath: string,
+  issueId: string,
+  update: (existing: SlotAssignments) => SlotAssignments,
+): void {
+  const normalizedIssueId = issueId.toUpperCase();
+  const existing = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId);
+  const record = existing ?? createMinimalIssueRecord(normalizedIssueId);
+  const existingAssignments: SlotAssignments = record.swarm?.slotAssignments ?? [];
+  const slotAssignments = update(existingAssignments)
+    .filter(assignment => Number.isInteger(assignment.slotIndex) && assignment.slotIndex > 0 && assignment.itemId.trim().length > 0)
+    .sort((a, b) => a.slotIndex - b.slotIndex);
+
+  writeIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId, {
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      slotAssignments,
+    },
+  });
 }
 
 async function duplicateSpawnReason(
