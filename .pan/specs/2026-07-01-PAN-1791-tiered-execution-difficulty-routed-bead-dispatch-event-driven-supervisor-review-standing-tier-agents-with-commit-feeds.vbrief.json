@@ -1437,7 +1437,8 @@
       },
       {
         "from": "tier-table-config",
-        "to": "per-issue-tier-override"
+        "to": "per-issue-tier-override",
+        "type": "blocks"
       }
     ],
     "metadata": {
