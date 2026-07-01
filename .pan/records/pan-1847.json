@@ -578,6 +578,11 @@
       "reason": "feedback",
       "note": "[2026-07-01T15:40Z] review-agent → FAILED — seq 101",
       "timestamp": "2026-07-01T15:40:42.379Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T15:48Z] review-agent → FAILED — seq 102",
+      "timestamp": "2026-07-01T15:48:52.296Z"
     }
   ],
   "feedback": [
@@ -1287,10 +1292,17 @@
       "outcome": "failed",
       "timestamp": "2026-07-01T15:40:42Z",
       "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 102,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-01T15:48:52Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-06-16T16:16:39.356Z",
-  "updated": "2026-07-01T15:40:42.380Z",
+  "updated": "2026-07-01T15:48:52.296Z",
   "pipeline": {
     "issueId": "PAN-1847",
     "reviewStatus": "failed",
