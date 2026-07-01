@@ -91,6 +91,11 @@
       "reason": "feedback",
       "note": "[2026-07-01T15:10Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-01T15:10:16.457Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-01T15:11:50.522Z"
     }
   ],
   "feedback": [
@@ -113,14 +118,14 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2203",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T15:10:15.113Z",
-    "reviewNotes": "Out-of-scope model routing/default changes are included in the bundled cost hook",
+    "updatedAt": "2026-07-01T15:11:52.376Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (50521ms):\n\nive tmux session to running\n FAIL  |root| tests/lib/cloister/failure-tracking.test.ts > agent failure tracking and auto-resume backoff > honors 5s, 30s, and 120s backoff windows\n FAIL  |root| tests/lib/cloister/failure-tracking.test.ts > agent failure tracking and auto-resume backoff > treats lastFailureNextRetryAt equality as eligible to retry\nError: [vitest] No \"releaseAdvancingSlot\" export is defined on the \"../../../src/lib/cloister/concurrency.js\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"../../../src/lib/cloister/concurrency.js\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ src/lib/cloister/deacon-swarm.ts:109:3\n    107|   registeredSlotCapacityAvailable: (issueId, selectedCount) => registe…\n    108|   tryReserveAdvancingSlot,\n    109|   releaseAdvancingSlot,\n       |   ^\n    110|   spawnRun,\n    111| };\n ❯ src/lib/cloister/deacon.ts:36:1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/28]⎯\n\n FAIL  |root| tests/lib/cloister/review-verdict-feedback.test.ts > deliverReviewVerdictFeedback > posts synthesis to the PR, writes feedback, and messages the work agent\nError: [vitest] No \"exec\" export is defined on the \"node:child_process\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"node:child_process\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ src/lib/agents/slot-reconcile.ts:9:29\n      7| import type { AgentState } from './agent-state.js';\n      8|\n      9| const execAsync = promisify(exec);\n       |                             ^\n     10|\n     11| export type ReconciledSlotItemStatus = 'merged' | 'in_flight' | 'pendi…\n ❯ src/lib/cloister/review-verdict-feedback.ts:10:1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/28]⎯\n\n",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
@@ -263,7 +268,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.223805,
-        "pricingAsOf": "2026-07-01T15:10:15.153Z"
+        "pricingAsOf": "2026-07-01T15:11:52.397Z"
       }
     },
     "merges": [
@@ -272,5 +277,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T13:11:56.901Z",
-  "updated": "2026-07-01T15:10:16.457Z"
+  "updated": "2026-07-01T15:11:52.424Z"
 }
