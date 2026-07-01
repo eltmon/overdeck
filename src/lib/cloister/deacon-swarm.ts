@@ -12,7 +12,7 @@ export interface CoordinateSwarmSlotsDeps {
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
-  listFeatureWorkspaces,
+  listFeatureWorkspaces: () => listFeatureWorkspaces({ includeSlotWorkspaces: false }),
 };
 
 export async function coordinateSwarmSlots(

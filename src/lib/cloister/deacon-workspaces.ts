@@ -8,7 +8,12 @@ export interface FeatureWorkspace {
   projectPath: string;
 }
 
-export function listFeatureWorkspaces(): FeatureWorkspace[] {
+export interface ListFeatureWorkspacesOptions {
+  includeSlotWorkspaces?: boolean;
+}
+
+export function listFeatureWorkspaces(options: ListFeatureWorkspacesOptions = {}): FeatureWorkspace[] {
+  const includeSlotWorkspaces = options.includeSlotWorkspaces ?? true;
   const projects = listProjectsSync();
   const workspaces: FeatureWorkspace[] = [];
 
@@ -19,7 +24,8 @@ export function listFeatureWorkspaces(): FeatureWorkspace[] {
     let entries: string[];
     try {
       entries = readdirSync(workspacesRoot, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('feature-') && !/-slot-\d+$/.test(e.name))
+        .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
+        .filter(e => includeSlotWorkspaces || !/-slot-\d+$/.test(e.name))
         .map(e => e.name);
     } catch {
       continue;
