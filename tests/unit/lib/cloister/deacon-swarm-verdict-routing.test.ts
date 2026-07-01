@@ -81,7 +81,10 @@ async function writePlan(doc: VBriefDocument): Promise<string> {
 
 describe('swarm verdict feedback routing', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockMessageAgent.mockReset();
+    mockGetReviewStatus.mockReset();
+    mockWriteFeedbackFile.mockReset();
+    mockListSlotAgents.mockReset();
     mockGetReviewStatus.mockReturnValue({});
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
@@ -96,6 +99,9 @@ describe('swarm verdict feedback routing', () => {
       slotItem('wi-a'),
       slotItem('wi-b'),
     ]));
+    mockListSlotAgents.mockReturnValue([
+      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'running', slotItemId: 'wi-b' },
+    ]);
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
@@ -118,6 +124,9 @@ describe('swarm verdict feedback routing', () => {
       slotItem('wi-a'),
       slotItem('wi-b'),
     ]));
+    mockListSlotAgents.mockReturnValue([
+      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'running', slotItemId: 'wi-b' },
+    ]);
     mockMessageAgent.mockImplementation(async (agentId: string) => {
       if (agentId === 'agent-pan-2203') throw new Error('parent agent missing');
     });
@@ -166,6 +175,33 @@ describe('swarm verdict feedback routing', () => {
     expect(result.agentMessageSent).toBe(true);
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-2203-slot-1',
+      expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
+    );
+    expect(mockMessageAgent).not.toHaveBeenCalledWith(
+      'agent-pan-2203-slot-3',
+      expect.any(String),
+    );
+  });
+
+  it('does not guess a slot from plan order when persisted ownership is missing', async () => {
+    const workspacePath = await writePlan(plan([
+      slotItem('wi-a'),
+      slotItem('wi-b'),
+      slotItem('wi-c'),
+    ]));
+
+    const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId: 'PAN-2203',
+      verdict: 'blocked',
+      notes: 'fix wi-c',
+      workspacePath,
+      slotItemId: 'wi-c',
+    }));
+
+    expect(result.agentMessageSent).toBe(true);
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-2203',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
     );
     expect(mockMessageAgent).not.toHaveBeenCalledWith(

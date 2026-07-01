@@ -487,7 +487,11 @@ export async function dispatchNextWave(
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
-  const occupiedSlotIndexes = new Set(reconciled.inFlight.map(slot => slot.slotIndex));
+  const occupiedSlotIndexes = new Set([
+    ...reconciled.inFlight.map(slot => slot.slotIndex),
+    ...reconciled.branches.filter(branch => !branch.merged).map(branch => branch.slotIndex),
+    ...reconciled.agents.map(agent => agent.slotIndex),
+  ]);
   const inFlightItemIds = new Set(reconciled.inFlight.map(slot => slot.itemId));
   const selectedItemIds: string[] = [];
   const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');

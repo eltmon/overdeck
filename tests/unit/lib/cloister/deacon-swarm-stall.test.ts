@@ -196,16 +196,16 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
   });
 
-  it('refuses spawn when an unmerged slot branch or worktree already exists', async () => {
+  it('reserves unknown branch slots and refuses spawn when the next worktree already exists', async () => {
     const plan = doc([item('wi-a')]);
     const fakeDeps = dispatchDeps({
-      slotWorktreeExists: vi.fn(() => true),
+      slotWorktreeExists: vi.fn((path: string) => path === '/workspace-slot-2'),
     });
 
     await expect(dispatchNextWave('PAN-2203', '/workspace', plan, reconciled({
       branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }],
     }), analyzeSwarmReadiness(plan), fakeDeps))
-      .resolves.toEqual(['[swarm] refused wi-a for PAN-2203: unmerged feature/pan-2203-slot-1 branch already exists']);
+      .resolves.toEqual(['[swarm] refused wi-a for PAN-2203: slot worktree already exists at /workspace-slot-2']);
 
     expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();

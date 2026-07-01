@@ -34,7 +34,7 @@ function deps(branches: ReconciledSlotBranch[], agents: ReconciledSlotAgent[]) {
 }
 
 describe('reconcileSlotState', () => {
-  it('returns merged, in-flight, and pending items from slot branches, agents, and status overrides', async () => {
+  it('uses status overrides and reserves unowned branch slots without assigning them by plan order', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
       statusOverrides: { a: 'completed' },
       deps: deps(
@@ -44,20 +44,15 @@ describe('reconcileSlotState', () => {
     });
 
     expect(result.merged.map(item => item.itemId)).toEqual(['a']);
-    expect(result.inFlight).toEqual([
-      {
-        itemId: 'b',
-        slotIndex: 2,
-        status: 'in_flight',
-        branch: 'feature/pan-1762-slot-2',
-        agentId: 'agent-pan-1762-slot-2',
-      },
-    ]);
-    expect(result.pending.map(item => item.itemId)).toEqual(['c']);
+    expect(result.inFlight).toEqual([]);
+    expect(result.pending.map(item => [item.itemId, item.slotIndex])).toEqual([['b', 3], ['c', 4]]);
+    expect(result.branches).toEqual([{ slotIndex: 2, branch: 'feature/pan-1762-slot-2', merged: false }]);
+    expect(result.agents).toEqual([{ slotIndex: 2, agentId: 'agent-pan-1762-slot-2', status: 'running' }]);
   });
 
-  it('marks a slot branch already merged into the feature branch as complete', async () => {
+  it('marks an item already completed in the plan as merged without branch-order ownership', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b']), {
+      statusOverrides: { a: 'completed' },
       deps: deps(
         [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
         [],
@@ -67,9 +62,9 @@ describe('reconcileSlotState', () => {
     expect(result.merged).toEqual([
       {
         itemId: 'a',
-        slotIndex: 1,
+        slotIndex: 2,
         status: 'merged',
-        branch: 'feature/pan-1762-slot-1',
+        branch: undefined,
         agentId: undefined,
       },
     ]);

@@ -150,27 +150,17 @@ function resolveSlotItemOwnership(
   agents: ReconciledSlotAgent[],
 ): Array<{ itemId: string; slotIndex: number }> {
   const ownership = new Map<string, number>();
-  const usedSlots = new Set<number>();
+  const usedSlots = new Set([
+    ...branches.map(branch => branch.slotIndex),
+    ...agents.map(agent => agent.slotIndex),
+  ]);
 
   for (const agent of agents) {
     if (!agent.slotItemId || !slotEligibleItemIds.has(agent.slotItemId)) continue;
     ownership.set(agent.slotItemId, agent.slotIndex);
-    usedSlots.add(agent.slotIndex);
   }
 
-  const legacySlotIndexes = new Set([
-    ...branches.map(branch => branch.slotIndex),
-    ...agents.map(agent => agent.slotIndex),
-  ]);
   const slotEligibleItems = doc.plan.items.filter(item => slotEligibleItemIds.has(item.id));
-  for (const [index, item] of slotEligibleItems.entries()) {
-    if (ownership.has(item.id)) continue;
-    const legacySlotIndex = index + 1;
-    if (!legacySlotIndexes.has(legacySlotIndex) || usedSlots.has(legacySlotIndex)) continue;
-    ownership.set(item.id, legacySlotIndex);
-    usedSlots.add(legacySlotIndex);
-  }
-
   for (const item of slotEligibleItems) {
     if (ownership.has(item.id)) continue;
     ownership.set(item.id, lowestFreeSlotIndex(usedSlots));
