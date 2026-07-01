@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-01T02:34:46.098Z",
-  "updated": "2026-07-01T04:56:49.993Z",
+  "updated": "2026-07-01T05:21:05.721Z",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "pending",
@@ -104,8 +104,8 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/pan-2203.md",
