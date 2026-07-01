@@ -417,7 +417,14 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
     default:
       return null;
   }
-}async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
+}
+
+function issueIdFromSlotAgentId(agentId: string): string | null {
+  const match = /^agent-(.+)-slot-\d+$/.exec(agentId);
+  return match ? match[1]!.toUpperCase() : null;
+}
+
+async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
   // PAN-1908: reactive agent liveness — deacon handles agent.stopped and
   // agent.heartbeat_dead events instead of scanning agent directories.
   if (event.type === 'agent.stopped') {
@@ -427,9 +434,14 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
       const { handleAgentStoppedEvent, handleAgentStoppedForOrphanReviewerSessions } = await import('./deacon.js');
       const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
       handleAgentLifecycleEventForIdleStack(agentId);
+      const slotIssueId = issueIdFromSlotAgentId(agentId);
+      const swarmAdvance = slotIssueId
+        ? (await import('./deacon-swarm.js')).coordinateSwarmSlots({ issueId: slotIssueId })
+        : Promise.resolve([]);
       await Promise.all([
         handleAgentStoppedEvent(agentId),
         handleAgentStoppedForOrphanReviewerSessions(agentId),
+        swarmAdvance,
       ]);
     }
     return;
