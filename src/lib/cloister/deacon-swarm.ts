@@ -2,13 +2,17 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { join } from 'path';
+import { spawnRun } from '../agents/spawn.js';
+import type { SpawnRunOptions } from '../agents/spawn-prep.js';
 import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
 import { reconcileSlotState, type ReconciledSlotItem, type SlotReconcileResult } from '../agents/slot-reconcile.js';
+import { listAgentStates } from '../agents/queries.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
 import { isPaneDead, listPaneValues, listSessionNames as listTmuxSessionNames } from '../tmux.js';
-import { applyTaskOperationToPlanFile, type PersistedTaskOperation } from '../vbrief/dag.js';
-import { analyzeSwarmReadiness } from '../vbrief/swarm-readiness.js';
+import { applyTaskOperationToPlanFile, getDispatchableItems, type PersistedTaskOperation } from '../vbrief/dag.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import { getConcurrencyLimits, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
 const execAsync = promisify(exec);
@@ -38,6 +42,10 @@ export interface CoordinateSwarmSlotsDeps {
     workspacePath?: string,
   ) => Promise<unknown>;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
+  registeredSlotCapacityAvailable: (issueId: string, selectedCount: number) => boolean;
+  tryReserveAdvancingSlot: () => boolean;
+  releaseAdvancingSlot: () => void;
+  spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -56,6 +64,10 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
     Effect.runPromise(applyTaskOperationToPlanFile(planPath, operation, workspacePath)),
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
+  registeredSlotCapacityAvailable: (issueId, selectedCount) => registeredSlotCapacityAvailable(issueId, selectedCount),
+  tryReserveAdvancingSlot,
+  releaseAdvancingSlot,
+  spawnRun,
 };
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed';
@@ -94,6 +106,7 @@ export async function coordinateSwarmSlots(
       }
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
+      actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, spec.document, reconciled, readiness, deps));
     } catch (err) {
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -199,4 +212,109 @@ export async function mergeReadySlots(
   }
 
   return actions;
+}
+
+export async function dispatchNextWave(
+  issueId: string,
+  workspacePath: string,
+  doc: VBriefDocument,
+  reconciled: SlotReconcileResult,
+  readiness: SwarmReadinessVerdict,
+  deps: Pick<
+    CoordinateSwarmSlotsDeps,
+    'registeredSlotCapacityAvailable'
+    | 'tryReserveAdvancingSlot'
+    | 'releaseAdvancingSlot'
+    | 'applyTaskOperationToPlanFile'
+    | 'spawnRun'
+  > = defaultDeps,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
+  const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
+  const occupiedSlotIndexes = new Set(reconciled.inFlight.map(slot => slot.slotIndex));
+  const inFlightItemIds = new Set(reconciled.inFlight.map(slot => slot.itemId));
+  const selectedItemIds: string[] = [];
+  const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+  for (const item of getDispatchableItems(doc, mergedItemIds)) {
+    if (!slotEligibleIds.has(item.id)) continue;
+    if (inFlightItemIds.has(item.id)) continue;
+
+    const overlapItemId = firstOverlappingItemId(item.id, [...inFlightItemIds, ...selectedItemIds], readiness);
+    if (overlapItemId) {
+      actions.push(`[swarm] deferred ${item.id} for ${issueId}: files_scope overlaps ${overlapItemId}`);
+      continue;
+    }
+
+    if (!deps.registeredSlotCapacityAvailable(issueId, selectedItemIds.length)) {
+      actions.push(`[swarm] deferred ${item.id} for ${issueId}: registered slot cap reached`);
+      continue;
+    }
+
+    const slotIndex = lowestFreeSlotIndex(occupiedSlotIndexes);
+    if (!deps.tryReserveAdvancingSlot()) {
+      actions.push(`[swarm] deferred ${item.id} for ${issueId}: advancing dispatch budget exhausted`);
+      continue;
+    }
+
+    try {
+      await deps.applyTaskOperationToPlanFile(planPath, {
+        type: 'claim',
+        itemId: item.id,
+        writerId: 'deacon-swarm',
+      }, workspacePath);
+      await deps.spawnRun(issueId, 'work', {
+        workspace: workspacePath,
+        slotIndex,
+        slotItemId: item.id,
+      });
+      occupiedSlotIndexes.add(slotIndex);
+      selectedItemIds.push(item.id);
+      actions.push(`[swarm] dispatched slot ${slotIndex} (item ${item.id}) for ${issueId}`);
+    } catch (error) {
+      await deps.applyTaskOperationToPlanFile(planPath, {
+        type: 'unblock',
+        itemId: item.id,
+        writerId: 'deacon-swarm',
+        reason: `slot dispatch failed: ${error instanceof Error ? error.message : String(error)}`,
+      }, workspacePath).catch(() => undefined);
+      deps.releaseAdvancingSlot();
+      actions.push(`[swarm] failed-dispatch ${item.id} for ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  return actions;
+}
+
+function lowestFreeSlotIndex(occupiedSlotIndexes: Set<number>): number {
+  let slotIndex = 1;
+  while (occupiedSlotIndexes.has(slotIndex)) slotIndex++;
+  return slotIndex;
+}
+
+function firstOverlappingItemId(
+  itemId: string,
+  activeItemIds: string[],
+  readiness: SwarmReadinessVerdict,
+): string | undefined {
+  for (const activeItemId of activeItemIds) {
+    if ((readiness.overlapMatrix[itemId]?.[activeItemId]?.length ?? 0) > 0) return activeItemId;
+  }
+  return undefined;
+}
+
+function registeredSlotCapacityAvailable(issueId: string, selectedCount: number): boolean {
+  const cap = getConcurrencyLimits().maxWorkAgents;
+  const issueLower = issueId.toLowerCase();
+  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-\\d+$`);
+  const activeSlots = listAgentStates({ role: 'work' }).filter(agent =>
+    slotAgentPattern.test(agent.id)
+    && (agent.status === 'starting' || agent.status === 'running')
+  );
+  return activeSlots.length + selectedCount < cap;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
