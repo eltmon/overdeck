@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-2208",
+  "schemaVersion": 2,
+  "created": "2026-07-01T14:29:02.899Z",
+  "updated": "2026-07-01T14:29:02.899Z",
+  "pipeline": {
+    "issueId": "PAN-2208",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-01T14:29:02.899Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}
