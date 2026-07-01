@@ -3,7 +3,7 @@
     "version": "0.6",
     "created": "2026-07-01T00:40:28.622Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-1791: Tiered execution — difficulty-routed model tiers, standing warm tier agents, event-driven supervisor (folds in PAN-1196 difficulty/subject routing + PAN-1311 trivial fast-track)",
+    "description": "Plan for PAN-1791: Tiered execution \u2014 difficulty-routed model tiers, standing warm tier agents, event-driven supervisor (folds in PAN-1196 difficulty/subject routing + PAN-1311 trivial fast-track)",
     "updated": "2026-07-01T01:06:47.784Z"
   },
   "plan": {
@@ -46,7 +46,7 @@
       "foreman"
     ],
     "narratives": {
-      "Problem": "Every bead in an issue runs on the same model even though each bead is labeled with a difficulty — the label is captured and ignored (PAN-1196). There is no way to keep a spectrum of model tiers warm and route each bead to the tier its difficulty deserves, no event-driven supervisor reviewing work at commit boundaries, and trivial mechanical items pay full swarm-slot overhead (PAN-1311). Expensive-model attention is a participant, not an interrupt handler.",
+      "Problem": "Every bead in an issue runs on the same model even though each bead is labeled with a difficulty \u2014 the label is captured and ignored (PAN-1196). There is no way to keep a spectrum of model tiers warm and route each bead to the tier its difficulty deserves, no event-driven supervisor reviewing work at commit boundaries, and trivial mechanical items pay full swarm-slot overhead (PAN-1311). Expensive-model attention is a participant, not an interrupt handler.",
       "Proposal": "Build on the PAN-1762 foreman (prompt-driven wave-driver in roles/work.md + helper libs; chooseDispatchTier is its seam). (A) Generalize the claude-only, hardcoded difficulty->model routing into a configurable any-model/any-harness tier table with a resolution chain (per-bead override -> byKind -> byDifficulty -> role default), and wire it into dispatch so difficulty actually selects the working model. (B) Keep one long-lived registered slot per tier alive for the issue, warmed by a commit feed that broadcasts every commit's diff to all standing tiers (everyone hears everything). (C) Add a standing frontier supervisor subscribed to commit events that reviews each diff against the bead's acceptance criteria and posts an ack or a blocking finding on the existing inspect-status surface, halting dependent dispatch until a fix lands. (D) Fast-track trivial mechanical beads: batch them, skip the convoy, typecheck-gated auto-merge, with fail-open escalation. (E) Replay (respawn + re-deliver the commit feed from git log) doubles as crash recovery and threshold-triggered context compaction. (F) Measurement scaffolding: stamp feed deliveries and attribute cost per tier. Everything off by default (tiered_execution.enabled=false).",
       "NonGoals": "- Plan-filtered / per-tier commit relevance filtering (everyone hears everything in v1; filtering is a deferred cost optimization).\n- Running the live cost pilot or writing the tiered-vs-monolithic savings report (post-merge operational activity, not code).\n- Remote (Fly) tier agents (PAN-1676); design must not preclude them but v1 runs tiers locally.\n- Multiple models autonomously deciding to intervene (the router decides by difficulty).\n- In-session model switching (tiers are separate standing sessions; fresh-session invariant stands).\n- Replacing the convoy review pipeline at pan done (the supervisor complements it).\n- Rebuilding any deleted server-side swarm runtime (PAN-1517 removed swarmRuntime; do not resurrect it).\n- Adding a hardcoded model fallback anywhere (unset resolution must fail loud, not pick a literal)."
     },
@@ -86,7 +86,8 @@
             "dispatch-model-selection",
             "standing-tier-lifecycle",
             "supervisor-subscribe",
-            "enablement-gate-test"
+            "enablement-gate-test",
+            "per-issue-tier-override"
           ],
           "traces": [
             "FR-8"
@@ -148,6 +149,42 @@
         ]
       },
       {
+        "id": "per-issue-tier-override",
+        "title": "Per-issue tiered_execution override \u2014 issue-level opt-in/out from vBRIEF metadata, overriding the global flag",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-01T00:40:28.622Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1791",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-9"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/cloister/config.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "parallelSafeReason": "Wave 1. Extends the same tiered_execution config resolution as tier-table-config (its sole dependency); no overlap with other items' files_scope.",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/per-issue-tier-override.test.ts"
+          ],
+          "expected_outputs": [
+            "src/lib/agents/__tests__/per-issue-tier-override.test.ts"
+          ]
+        },
+        "narrative": {
+          "Action": "Add per-issue resolution to the tiered_execution config chain. An issue may set `tiered_execution: on|off` in its vBRIEF plan.metadata (mirroring how the swarm decides per-issue via the readiness analyzer, PAN-2203). Resolution order for whether an issue uses tiered-execution: per-issue override (if explicitly set) > global `tiered_execution.enabled` (default off). When the per-issue field is unset, inherit the global flag \u2014 zero change from today. Thread this resolved boolean into the tier-resolution chain so difficulty routing engages only for issues that (per-issue or globally) opted in.",
+          "Why": "An all-or-nothing global switch is too coarse. Operators need to trial tiered-execution on specific issues without flipping it on globally, and to exclude specific issues when it is global. Mirrors the swarm's already-per-issue model.",
+          "AC": "With global `tiered_execution.enabled=false` and an issue setting `tiered_execution=on`, that issue routes through the tier chain while others stay on the legacy path; with global `true` and an issue setting `tiered_execution=off`, that issue stays on the legacy path; unset inherits global. Covered by per-issue-tier-override.test.ts and asserted alongside the enablement-gate parity lock."
+        }
+      },
+      {
         "id": "kind-metadata-field",
         "title": "Add typed metadata.kind subject-matter field + planner emits it",
         "status": "pending",
@@ -177,7 +214,7 @@
           ]
         },
         "narrative": {
-          "Action": "Add a typed `kind?: 'docs'|'api'|'backend'|'frontend'|'infra'|'test'|'refactor'|'design'|'spike'` to VBriefItemMetadata in src/lib/vbrief/types.ts (a loose `kind` bag already exists there — tighten it, do not duplicate). Update the planning prompt (src/lib/cloister/prompts/planning.md) to instruct the planner to emit `kind` per item, default 'backend' when unspecified. This is the optional byKind routing input for the resolution chain."
+          "Action": "Add a typed `kind?: 'docs'|'api'|'backend'|'frontend'|'infra'|'test'|'refactor'|'design'|'spike'` to VBriefItemMetadata in src/lib/vbrief/types.ts (a loose `kind` bag already exists there \u2014 tighten it, do not duplicate). Update the planning prompt (src/lib/cloister/prompts/planning.md) to instruct the planner to emit `kind` per item, default 'backend' when unspecified. This is the optional byKind routing input for the resolution chain."
         },
         "items": [
           {
@@ -243,7 +280,7 @@
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/agents/resolve-tier.ts exporting resolveTier(item, config): { tierName, model, harness } implementing the resolution order: (1) per-bead metadata.model override, (2) config byKind[item.metadata.kind], (3) byDifficulty[item.metadata.difficulty] via the tier table, (4) role default. When nothing resolves and no default is configured, throw a clear 'no tier/model configured' error — NEVER return a hardcoded model literal (no-hardcoded-model-fallbacks rule). Pure function over the tier-table config from tier-table-config; no spawning here."
+          "Action": "Create src/lib/agents/resolve-tier.ts exporting resolveTier(item, config): { tierName, model, harness } implementing the resolution order: (1) per-bead metadata.model override, (2) config byKind[item.metadata.kind], (3) byDifficulty[item.metadata.difficulty] via the tier table, (4) role default. When nothing resolves and no default is configured, throw a clear 'no tier/model configured' error \u2014 NEVER return a hardcoded model literal (no-hardcoded-model-fallbacks rule). Pure function over the tier-table config from tier-table-config; no spawning here."
         },
         "items": [
           {
@@ -372,7 +409,7 @@
           ]
         },
         "narrative": {
-          "Action": "Extend the chooseDispatchTier seam (src/lib/agents/dispatch-tier.ts) so that, when tiered_execution is enabled, it also yields the resolved (model, harness) from resolveTier — generalizing the binary 'in-context'|'registered-slot' into a tier assignment. Thread that model+harness into the slot spawn path (spawn-prep.ts model resolution) so a dispatched bead runs on the tier its difficulty selected. When disabled, behavior is unchanged. This is the fix for PAN-1196's 'difficulty captured and ignored'."
+          "Action": "Extend the chooseDispatchTier seam (src/lib/agents/dispatch-tier.ts) so that, when tiered_execution is enabled, it also yields the resolved (model, harness) from resolveTier \u2014 generalizing the binary 'in-context'|'registered-slot' into a tier assignment. Thread that model+harness into the slot spawn path (spawn-prep.ts model resolution) so a dispatched bead runs on the tier its difficulty selected. When disabled, behavior is unchanged. This is the fix for PAN-1196's 'difficulty captured and ignored'."
         },
         "items": [
           {
@@ -438,7 +475,7 @@
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/agents/standing-tiers.ts managing the set of standing tier agents for an issue. A standing tier agent is a long-lived registered slot spawned via spawnRun(issue,'work',{slotIndex,slotItemId}) that persists across many beads (not per-bead). Provide: which tiers the plan schedule needs (from the tier table + item difficulties — the tier-run scheduling half of FR-6), lazy spawn (a tier session spawns when its first bead is <=1 run away), a registry keyed by tier name, and a dispatchBeadToTier(tierName, bead) helper (unit-testable) that routes a bead to the standing slot. Reuse slot registration/branch conventions from spawn.ts; do NOT invent a new agent kind."
+          "Action": "Create src/lib/agents/standing-tiers.ts managing the set of standing tier agents for an issue. A standing tier agent is a long-lived registered slot spawned via spawnRun(issue,'work',{slotIndex,slotItemId}) that persists across many beads (not per-bead). Provide: which tiers the plan schedule needs (from the tier table + item difficulties \u2014 the tier-run scheduling half of FR-6), lazy spawn (a tier session spawns when its first bead is <=1 run away), a registry keyed by tier name, and a dispatchBeadToTier(tierName, bead) helper (unit-testable) that routes a bead to the standing slot. Reuse slot registration/branch conventions from spawn.ts; do NOT invent a new agent kind."
         },
         "items": [
           {
@@ -747,7 +784,7 @@
           ]
         },
         "narrative": {
-          "Action": "Add a unit-testable shouldHaltDispatch(verdicts, nextBead, dag) to tier-supervisor.ts: returns true when an unresolved blocking finding exists on a bead that nextBead depends on (via blocks edges). Wire it into the foreman protocol in roles/work.md: when a blocking finding lands on a dependency of the next bead, the foreman dispatches the fix to the owning tier first (new commit), then continues — mirroring today's INSPECTION BLOCKED flow."
+          "Action": "Add a unit-testable shouldHaltDispatch(verdicts, nextBead, dag) to tier-supervisor.ts: returns true when an unresolved blocking finding exists on a bead that nextBead depends on (via blocks edges). Wire it into the foreman protocol in roles/work.md: when a blocking finding lands on a dependency of the next bead, the foreman dispatches the fix to the owning tier first (new commit), then continues \u2014 mirroring today's INSPECTION BLOCKED flow."
         },
         "items": [
           {
@@ -864,7 +901,7 @@
           ]
         },
         "narrative": {
-          "Action": "In fast-track.ts, when a fast-track item is detected mid-flight to be non-trivial (verify fails in a way indicating real complexity, or the diff exceeds the LOC threshold), escalate it OUT of the fast-track batch to the standard tier with full review — fail-open, never fail-closed silently and never auto-merge it. Emit a signal the foreman acts on. Sequenced after fast-track-batching and before fast-track-automerge (the safety guard exists before auto-merge is enabled)."
+          "Action": "In fast-track.ts, when a fast-track item is detected mid-flight to be non-trivial (verify fails in a way indicating real complexity, or the diff exceeds the LOC threshold), escalate it OUT of the fast-track batch to the standard tier with full review \u2014 fail-open, never fail-closed silently and never auto-merge it. Emit a signal the foreman acts on. Sequenced after fast-track-batching and before fast-track-automerge (the safety guard exists before auto-merge is enabled)."
         },
         "items": [
           {
@@ -1397,6 +1434,10 @@
         "from": "tier-measurement",
         "to": "tiered-e2e-dogfood",
         "type": "blocks"
+      },
+      {
+        "from": "tier-table-config",
+        "to": "per-issue-tier-override"
       }
     ],
     "metadata": {
