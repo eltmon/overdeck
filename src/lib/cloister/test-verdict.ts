@@ -20,6 +20,7 @@
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';
@@ -130,4 +131,28 @@ export function decideUnsignaledTestAction(input: {
   // the strand-surfacing path make the stuck state visible.
   if (alreadyNudged) return { action: 'none' };
   return { action: 'nudge-write' };
+}
+
+export function resolveSlotFeedbackAgentId(
+  issueId: string,
+  slotItemId: string | undefined,
+  doc: VBriefDocument | null | undefined,
+): string | null {
+  const normalizedItemId = slotItemId?.trim();
+  if (!normalizedItemId || !doc) return null;
+
+  const slotIndex = slotEligibleItems(doc).findIndex(item => item.id === normalizedItemId) + 1;
+  if (slotIndex < 1) return null;
+
+  return `agent-${issueId.toLowerCase()}-slot-${slotIndex}`;
+}
+
+function slotEligibleItems(doc: VBriefDocument): VBriefItem[] {
+  return doc.plan.items.filter(item =>
+    item.metadata?.readiness === 'ready'
+    && (item.metadata.files_scope?.length ?? 0) > 0
+    && item.metadata.files_scope_confidence !== 'low'
+    && (item.metadata.verify_commands?.length ?? 0) > 0
+    && (item.metadata.expected_outputs?.length ?? 0) > 0
+  );
 }

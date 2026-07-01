@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -10,7 +10,10 @@ import { messageAgent } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { resolveSlotFeedbackAgentId } from './test-verdict.js';
+import type { VBriefDocument } from '../vbrief/types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,6 +25,7 @@ export interface DeliverReviewVerdictFeedbackOptions {
   notes?: string;
   workspacePath?: string;
   prUrl?: string;
+  slotItemId?: string;
 }
 
 export interface DeliverReviewVerdictFeedbackResult {
@@ -81,7 +85,19 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
     { encoding: 'utf-8' },
   );
   return true;
-}async function deliverReviewVerdictFeedbackPromise(
+}
+
+function readWorkspacePlanBestEffort(workspacePath: string | undefined): VBriefDocument | null {
+  if (!workspacePath || !existsSync(workspacePath)) return null;
+  try {
+    return readWorkspacePlanSync(workspacePath)
+      ?? JSON.parse(readFileSync(join(workspacePath, PAN_DIRNAME, 'spec.vbrief.json'), 'utf-8')) as VBriefDocument;
+  } catch {
+    return null;
+  }
+}
+
+async function deliverReviewVerdictFeedbackPromise(
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Promise<DeliverReviewVerdictFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
@@ -118,7 +134,8 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
-    const agentId = `agent-${issueId.toLowerCase()}`;
+    const doc = readWorkspacePlanBestEffort(workspacePath);
+    const agentId = resolveSlotFeedbackAgentId(issueId, opts.slotItemId, doc) ?? `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
     try {
       await messageAgent(agentId, message);
