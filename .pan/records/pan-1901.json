@@ -78,15 +78,15 @@
   ],
   "feedback": [],
   "created": "2026-06-24T01:04:59.067Z",
-  "updated": "2026-07-01T14:46:57.611Z",
+  "updated": "2026-07-01T15:17:15.954Z",
   "pipeline": {
     "issueId": "PAN-1901",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-01T14:46:57.368Z",
+    "mergeStatus": "pending",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-01T15:17:15.853Z",
     "reviewNotes": "No blocking findings; union gitattributes change and guard tests reviewed and focused test passed",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "mergeNotes": "Workspace does not exist",
@@ -152,7 +152,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.788637,
-        "pricingAsOf": "2026-07-01T14:46:57.611Z"
+        "pricingAsOf": "2026-07-01T15:17:15.954Z"
       }
     },
     "merges": [
