@@ -8,13 +8,13 @@
     "issueId": "PAN-2203",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T16:28:28.604Z",
+    "updatedAt": "2026-07-01T16:34:27.615Z",
     "reviewNotes": "pan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map",
-    "verificationNotes": "Verification FAILED at test (68445ms):\n\n--global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-merge.test.ts > deacon-swarm ready-slot merge > emits failed-merge without marking done when the slot branch conflicts\nAssertionError: promise rejected \"Error: EACCES: permission denied, mkdir '… { …(4) }\" instead of resolving\n ❯ tests/unit/lib/cloister/deacon-swarm-merge.test.ts:101:92\n     99|     const fakeDeps = deps({ merged: false, conflicts: true });\n    100|\n    101|     await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [rea…\n       |                                                                                            ^\n    102|       .resolves.toEqual(['[swarm] failed-merge slot 1 (item wi-1) for …\n    103|\n\nCaused by: Error: EACCES: permission denied, mkdir '/workspace/.pan/records'\n ❯ guardedFsWrite tests/setup/no-real-home-writes.ts:49:20\n ❯ writeIssueRecordForWorkspaceSync src/lib/pan-dir/record.ts:211:5\n ❯ writeSwarmFailedMergeBlock src/lib/cloister/deacon-swarm.ts:496:3\n ❯ recordFailedMergeBlock src/lib/cloister/deacon-swarm.ts:395:22\n ❯ mergeReadySlots src/lib/cloister/deacon-swarm.ts:341:7\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nSerialized Error: { errno: -13, code: 'EACCES', syscall: 'mkdir', path: '/workspace/.pan/records' }\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
+    "verificationNotes": "Verification FAILED at lint (21787ms):\n\n.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  0.80 kB\u001b[22m \u001b[2m│ gzip:   0.37 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 432 files, total: 13.16 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3854ms\u001b[39m\n\n> @overdeck/core@0.41.1 lint:skills\n> bash scripts/lint-skills.sh\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/deacon-api-recovery.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (53%)\n  - tsdown:deps (43%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 255, in <module>\n  File \"<stdin>\", line 204, in main\n  File \"<stdin>\", line 49, in run_pan\nsubprocess.CalledProcessError: Command '['node', '/home/eltmon/Projects/overdeck/workspaces/feature-pan-2203/dist/cli/index.js', '--help']' returned non-zero exit status 1.\n",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
     "lastVerifiedCommit": "bad247269256cf5119006ad6e932c45c9019bd8f",
@@ -213,7 +213,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.450181,
-        "pricingAsOf": "2026-07-01T16:28:29.440Z"
+        "pricingAsOf": "2026-07-01T16:34:27.636Z"
       }
     },
     "merges": [
@@ -221,6 +221,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-01T16:11:58.847Z",
-  "updated": "2026-07-01T16:28:33.444Z"
+  "created": "2026-07-01T16:34:27.639Z",
+  "updated": "2026-07-01T16:34:27.639Z"
 }
