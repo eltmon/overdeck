@@ -88,6 +88,9 @@ function agentToConversation(agent: Agent): Conversation {
 }
 
 function agentOptionLabel(agent: Agent): string {
+  const slotMatch = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agent.id);
+  if (slotMatch) return `Slot ${slotMatch[1]} · ${agent.id}`;
+
   const role = agent.role ? `${agent.role[0]!.toUpperCase()}${agent.role.slice(1)}` : 'Agent';
   return `${role} · ${agent.id}`;
 }
