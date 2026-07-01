@@ -110,6 +110,7 @@ describe('foreman swarm dogfood', () => {
       slotIndex: slot!.slotIndex,
       agentId: slot!.agentId,
       status: 'running',
+      slotItemId: slot!.slotItemId,
     }));
     const discovered = await reconcileSlotState(ISSUE_ID, FEATURE_WORKSPACE, doc, {
       deps: {
