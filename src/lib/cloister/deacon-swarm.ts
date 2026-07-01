@@ -22,6 +22,12 @@ import { getConcurrencyLimits, releaseAdvancingSlot, tryReserveAdvancingSlot } f
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
 const execAsync = promisify(exec);
+const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5_000;
+const SWARM_ADVANCE_FAILURE_THRESHOLD = 3;
+const SWARM_ADVANCE_FAILURE_COOLDOWN_MS = 60_000;
+
+const recentSlotMergeFires = new Map<string, number>();
+const issueAdvanceFailures = new Map<string, { count: number; cooldownUntil: number }>();
 
 export interface CoordinateSwarmSlotsOptions {
   issueId?: string;
@@ -94,6 +100,10 @@ export async function coordinateSwarmSlots(
   for (const workspace of deps.listFeatureWorkspaces()) {
     const issueId = workspace.issueId.toUpperCase();
     if (filterIssueId && issueId !== filterIssueId) continue;
+    if (isSwarmAdvanceCoolingDown(issueId)) {
+      actions.push(`[swarm] deferred ${issueId}: advance backoff active`);
+      continue;
+    }
 
     try {
       const spec = await Effect.runPromise(findSpecByIssue(workspace.projectPath, issueId));
@@ -113,7 +123,9 @@ export async function coordinateSwarmSlots(
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
       actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, spec.document, reconciled, readiness, deps));
+      recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
+      recordSwarmAdvanceFailure(issueId);
       console.warn(`[deacon] Error coordinating swarm ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
@@ -201,6 +213,13 @@ export async function mergeReadySlots(
     const item = itemsById.get(slot.itemId);
     if (!item) continue;
 
+    const branchKey = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+    if (isSlotMergeCoolingDown(branchKey)) {
+      actions.push(`[swarm] skipped merge slot ${slot.slotIndex} (item ${item.id}) for ${issueId}: refire cooldown`);
+      continue;
+    }
+
+    recordSlotMergeFire(branchKey);
     const result = await deps.verifyAndMergeSlot({ issueId, featureWorkspace: workspacePath }, slot.slotIndex, item);
     if (result.merged) {
       await deps.applyTaskOperationToPlanFile(planPath, {
@@ -218,6 +237,44 @@ export async function mergeReadySlots(
   }
 
   return actions;
+}
+
+export function resetSwarmLoopSafetyForTests(): void {
+  recentSlotMergeFires.clear();
+  issueAdvanceFailures.clear();
+}
+
+export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): void {
+  const normalized = issueId.toUpperCase();
+  const previous = issueAdvanceFailures.get(normalized);
+  const count = (previous?.count ?? 0) + 1;
+  issueAdvanceFailures.set(normalized, {
+    count,
+    cooldownUntil: count >= SWARM_ADVANCE_FAILURE_THRESHOLD
+      ? now + SWARM_ADVANCE_FAILURE_COOLDOWN_MS
+      : previous?.cooldownUntil ?? 0,
+  });
+}
+
+export function recordSwarmAdvanceSuccess(issueId: string): void {
+  issueAdvanceFailures.delete(issueId.toUpperCase());
+}
+
+export function isSwarmAdvanceCoolingDown(issueId: string, now = Date.now()): boolean {
+  const record = issueAdvanceFailures.get(issueId.toUpperCase());
+  return record !== undefined && record.cooldownUntil > now;
+}
+
+function recordSlotMergeFire(branchKey: string, now = Date.now()): void {
+  recentSlotMergeFires.set(branchKey, now + SLOT_MERGE_REFIRE_COOLDOWN_MS);
+}
+
+function isSlotMergeCoolingDown(branchKey: string, now = Date.now()): boolean {
+  const until = recentSlotMergeFires.get(branchKey);
+  if (until === undefined) return false;
+  if (until > now) return true;
+  recentSlotMergeFires.delete(branchKey);
+  return false;
 }
 
 export async function dispatchNextWave(

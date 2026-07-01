@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { mergeReadySlots, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
 function doc(item: VBriefItem = itemFor('wi-1')): VBriefDocument {
@@ -64,6 +64,10 @@ function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateS
 }
 
 describe('deacon-swarm ready-slot merge', () => {
+  beforeEach(() => {
+    resetSwarmLoopSafetyForTests();
+  });
+
   it('marks the vBRIEF item done through the write door when a slot merges', async () => {
     const fakeDeps = deps({ merged: true, conflicts: false });
 
