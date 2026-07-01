@@ -579,13 +579,8 @@ program
   );
 
 registerSwarmCommands(program);
-
-// Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
-
-// Register test commands (pan test run, pan test list)
 registerTestCommands(program);
-
 registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)

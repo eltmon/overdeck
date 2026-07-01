@@ -21,21 +21,66 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-01T14:42:03.687Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-01T14:44:23.442Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T14:46Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-01T14:46:17.532Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T14:46Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-01T14:46:21.807Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-01T14:48:28.091Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T14:49Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-01T14:49:32.616Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-01T14:49Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-01T14:49:35.415Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-01T14:49:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2203\n\nFailed-merge cleanup fix is uncommitted; reviewed branch HEAD still leaves parent workspace mid-conflict\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2203 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-01T14:49:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2203\n\nFailed-merge cleanup fix is uncommitted; reviewed branch HEAD still leaves parent workspace mid-conflict\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2203 -m \"Fixed review issues\"`"
+    }
+  ],
   "harness": "codex",
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2203",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T14:28:18.058Z",
-    "reviewNotes": "Slot index ownership can drift after deferred dispatch, causing wrong item merge/status updates",
+    "updatedAt": "2026-07-01T14:49:32.555Z",
+    "reviewNotes": "Failed-merge cleanup fix is uncommitted; reviewed branch HEAD still leaves parent workspace mid-conflict",
     "verificationNotes": "Verification FAILED at lint (47084ms):\n\n                                \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 430 files, total: 13.13 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3680ms\u001b[39m\n\n> @overdeck/core@0.41.1 lint:skills\n> bash scripts/lint-skills.sh\n\nskill CLI lint passed\n\n> @overdeck/core@0.41.1 lint:prompts\n> bash scripts/lint-prompts.sh\n\nprompt lint passed\n\n> @overdeck/core@0.41.1 lint:file-size\n> bash scripts/lint-file-size.sh\n\n✖ src/cli/index.ts grew to 1472 lines (baseline 1469) — god files must shrink, not grow.\n✖ src/lib/cloister/service.ts grew to 2051 lines (baseline 2039) — god files must shrink, not grow.\n\nfile-size guard failed. Shrink the file, or (to intentionally accept it) regenerate the baseline:\n  REGEN: see scripts/lint-file-size.sh header / the A3 PRD\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/deacon-api-recovery.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (58%)\n  - tsdown:deps (38%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
@@ -178,7 +223,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.223805,
-        "pricingAsOf": "2026-07-01T14:28:18.092Z"
+        "pricingAsOf": "2026-07-01T14:49:32.610Z"
       }
     },
     "merges": [
@@ -187,5 +232,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T13:11:56.901Z",
-  "updated": "2026-07-01T14:42:03.687Z"
+  "updated": "2026-07-01T14:49:35.415Z"
 }

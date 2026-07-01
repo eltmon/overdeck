@@ -419,11 +419,6 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
   }
 }
 
-function issueIdFromSlotAgentId(agentId: string): string | null {
-  const match = /^agent-(.+)-slot-\d+$/.exec(agentId);
-  return match ? match[1]!.toUpperCase() : null;
-}
-
 async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
   // PAN-1908: reactive agent liveness — deacon handles agent.stopped and
   // agent.heartbeat_dead events instead of scanning agent directories.
@@ -434,25 +429,18 @@ async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike):
       const { handleAgentStoppedEvent, handleAgentStoppedForOrphanReviewerSessions } = await import('./deacon.js');
       const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
       handleAgentLifecycleEventForIdleStack(agentId);
-      const slotIssueId = issueIdFromSlotAgentId(agentId);
-      const swarmAdvance = slotIssueId
-        ? (await import('./deacon-swarm.js')).coordinateSwarmSlots({ issueId: slotIssueId })
-        : Promise.resolve([]);
+      const slotMatch = /^agent-(.+)-slot-\d+$/.exec(agentId);
       await Promise.all([
         handleAgentStoppedEvent(agentId),
         handleAgentStoppedForOrphanReviewerSessions(agentId),
-        swarmAdvance,
+        slotMatch ? (await import('./deacon-swarm.js')).coordinateSwarmSlots({ issueId: slotMatch[1]!.toUpperCase() }) : Promise.resolve([]),
       ]);
     }
     return;
   }
   if (event.type === 'agent.started') {
-    const payload = event.payload as { agentId?: string } | undefined;
-    const agentId = payload?.agentId;
-    if (agentId) {
-      const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
-      handleAgentLifecycleEventForIdleStack(agentId);
-    }
+    const agentId = (event.payload as { agentId?: string } | undefined)?.agentId;
+    if (agentId) (await import('./idle-stack-reaper.js')).handleAgentLifecycleEventForIdleStack(agentId);
     return;
   }
   if (event.type === 'agent.heartbeat_dead') {

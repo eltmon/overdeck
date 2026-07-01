@@ -91,6 +91,7 @@ export async function verifyAndMergeSlot(
   } catch (error) {
     const failed = commandFailure(error);
     evidence.mergeOutput = { stdout: failed.stdout, stderr: failed.stderr };
+    await deps.run('git merge --abort', featureWorkspace).catch(() => {});
     return {
       verified: true,
       merged: false,
