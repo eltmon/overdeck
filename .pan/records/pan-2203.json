@@ -22,23 +22,41 @@
   ],
   "feedback": [],
   "created": "2026-07-01T02:34:46.098Z",
-  "updated": "2026-07-01T03:47:26.189Z",
+  "updated": "2026-07-01T04:21:41.972Z",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T03:47:26.169Z"
+    "updatedAt": "2026-07-01T04:21:41.932Z",
+    "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect": {
+          "custom/MiniMax-M3": {
+            "input": 266342,
+            "output": 25651,
+            "cacheRead": 1862144,
+            "cacheWrite": 0
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 498078,
+            "output": 27600,
+            "cacheRead": 3041792,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 21128,
-            "output": 1274,
+            "input": 44075,
+            "output": 1436,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -53,9 +71,21 @@
         }
       },
       "totals": {
+        "custom/MiniMax-M3": {
+          "input": 266342,
+          "output": 25651,
+          "cacheRead": 1862144,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 498078,
+          "output": 27600,
+          "cacheRead": 3041792,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 21128,
-          "output": 1274,
+          "input": 44075,
+          "output": 1436,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -67,13 +97,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 24.273269,
-        "pricingAsOf": "2026-07-01T03:47:26.188Z"
+        "usd": 29.223238,
+        "pricingAsOf": "2026-07-01T04:21:41.971Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "MiniMax-M3"
 }
