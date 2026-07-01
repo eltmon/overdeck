@@ -31,7 +31,8 @@ export async function coordinateSwarmSlots(
       if (!spec) continue;
 
       const readiness = analyzeSwarmReadiness(spec.document);
-      if (!readiness.swarmEligible) continue;
+      const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
+      if (!readiness.swarmEligible || slotEligibleCount < 2) continue;
 
       actions.push(`[swarm] considered ${issueId}: swarm eligible`);
     } catch (err) {

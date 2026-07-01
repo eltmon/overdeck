@@ -53,7 +53,7 @@ function makeDoc(issueId: string, itemCount: number): VBriefDocument {
         title: `Work item ${index + 1}`,
         status: 'pending',
         metadata: {
-          readiness: itemCount > 1 ? 'ready' : 'sequential',
+          readiness: 'ready',
           files_scope: [`src/example-${index + 1}.ts`],
           files_scope_confidence: 'high',
           verify_commands: ['npm run typecheck'],
