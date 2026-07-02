@@ -102,15 +102,15 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-07-02T07:42:48.666Z",
+  "updated": "2026-07-02T08:13:38.114Z",
   "pipeline": {
     "issueId": "PAN-1866",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T07:42:48.423Z",
+    "mergeStatus": "pending",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-02T08:13:37.936Z",
     "reviewNotes": "Cycle diff reviewed; diff check, typecheck, lint, and targeted integration test pass",
     "testNotes": "PAN-1866: Backlog Sequencer implementation complete and verified.\n\nGates run:\n- npm run typecheck ✓ (tsc --noEmit + hooks)\n- npm run lint ✓ (eslint + effect-versions + permissions + state-writes + overdeck-boundaries + skills + prompts)\n- npm test ✓ (vitest: 7068 tests passed, 51 skipped; frontend: 30 tests passed)\n\nBackend verification:\n- Schema version 57 with backlog_sequence table migration ✓\n- sequencer role added to Role union (agents.ts) ✓\n- sequencer in DEFAULT_MODEL_REFS and DEFAULT_ROLES (config-yaml.ts) ✓\n- backlog.ts route with GET /api/backlog/sequence and POST /api/backlog/sequence/regenerate ✓\n- backlogRouteLayer imported and registered in makeRoutesLayer (server.ts) ✓\n\nFrontend verification:\n- BacklogSequencerPage (pages/BacklogSequencerPage.tsx) with full query integration ✓\n- BacklogDAG component using ReactFlow 11 + @dagrejs/dagre (TB layout) ✓\n- backlog Tab union, TAB_PATHS routing, Sidebar nav item, Header integration ✓\n- Node rendering with rank badge, size dims, importance color, gate/planning badges ✓\n- Filtering (importance, condition, in-pipeline, ready) implemented ✓\n\nCore implementation:\n- src/lib/backlog/types.ts - SequenceDoc, parseSequenceJson validator ✓\n- src/lib/backlog/sequence-io.ts - parseSequenceMd, writeSequenceMd ✓\n- src/lib/backlog/backlog-input.ts - collectOpenBacklog with manifest + batched accessor ✓\n- src/lib/backlog/sequencer-agent.ts - spawnSequencerAgent, buildSequencerPrompt ✓\n\nAll acceptance criteria for the MVP (on-demand passes + DAG rendering + operator controls) are met. Follow-up bead (auto-trigger cadence) is marked low-priority in the spec.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -205,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 100.59135724,
-        "pricingAsOf": "2026-07-02T07:42:48.666Z"
+        "pricingAsOf": "2026-07-02T08:13:38.114Z"
       }
     },
     "merges": [
