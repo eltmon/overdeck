@@ -4,17 +4,17 @@
     "created": "2026-07-02T17:58:40.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2151: Decompose src/dashboard/server/routes/misc.ts (1835 lines) into focused modules",
-    "updated": "2026-07-02T19:32:35.636Z"
+    "updated": "2026-07-02T19:33:02.739Z"
   },
   "plan": {
     "id": "pan-2151",
     "title": "Decompose src/dashboard/server/routes/misc.ts (1835 lines) into focused modules",
-    "status": "running",
+    "status": "approved",
     "uid": "4a37d2f5-1b10-4279-bac5-91cf1d410c4b",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-02T17:58:40.000Z",
-    "updated": "2026-07-02T19:32:35.636Z",
+    "updated": "2026-07-02T19:33:02.739Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2151",
