@@ -25,7 +25,7 @@
 1610 src/dashboard/server/services/conversation-service.ts
 1466 src/dashboard/server/services/issue-data-service.ts
 1317 src/dashboard/server/ws-rpc.ts
-86 src/lib/agents.ts
+102 src/lib/agents.ts
 7180 src/lib/cloister/deacon.ts
 1414 src/lib/cloister/merge-agent.ts
 2039 src/lib/cloister/service.ts
