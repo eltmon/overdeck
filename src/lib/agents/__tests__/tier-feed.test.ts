@@ -10,17 +10,21 @@ const TIERS = [
 
 function spies() {
   const deliveries: Array<{ agentId: string; message: string; caller?: string }> = [];
+  const metrics: Parameters<NonNullable<Parameters<typeof broadcastCommit>[0]['recordDelivery']>>[0][] = [];
   const deliver = vi.fn(async (agentId: string, message: string, caller?: string): Promise<DeliveryResult> => {
     deliveries.push({ agentId, message, caller });
     return { ok: true, path: 'supervisor' };
   });
   const gitShow = vi.fn(async () => 'commit abc123\n\ndiff --git a/foo.ts b/foo.ts\n+added line\n');
-  return { deliver, gitShow, deliveries };
+  const recordDelivery = vi.fn(async (metric: (typeof metrics)[number]) => {
+    metrics.push(metric);
+  });
+  return { deliver, gitShow, deliveries, recordDelivery, metrics };
 }
 
 describe('broadcastCommit', () => {
   it('sends the commit diff to every standing tier agent via the delivery seam', async () => {
-    const { deliver, gitShow, deliveries } = spies();
+    const { deliver, gitShow, deliveries, recordDelivery } = spies();
 
     await broadcastCommit({
       workspace: '/ws',
@@ -29,6 +33,7 @@ describe('broadcastCommit', () => {
       tiers: TIERS,
       deliver,
       gitShow,
+      recordDelivery,
     });
 
     expect(gitShow).toHaveBeenCalledWith('/ws', 'abc123');
@@ -41,7 +46,7 @@ describe('broadcastCommit', () => {
   });
 
   it('sends exactly N deliveries for N standing tiers — everyone hears everything', async () => {
-    const { deliver, gitShow } = spies();
+    const { deliver, gitShow, recordDelivery } = spies();
 
     const results = await broadcastCommit({
       workspace: '/ws',
@@ -50,6 +55,7 @@ describe('broadcastCommit', () => {
       tiers: TIERS,
       deliver,
       gitShow,
+      recordDelivery,
     });
 
     expect(deliver).toHaveBeenCalledTimes(TIERS.length);
@@ -58,7 +64,7 @@ describe('broadcastCommit', () => {
   });
 
   it('marks every feed message ingestion-only, instructing the recipient not to respond', async () => {
-    const { deliver, gitShow, deliveries } = spies();
+    const { deliver, gitShow, deliveries, recordDelivery } = spies();
 
     await broadcastCommit({
       workspace: '/ws',
@@ -67,6 +73,7 @@ describe('broadcastCommit', () => {
       tiers: TIERS,
       deliver,
       gitShow,
+      recordDelivery,
     });
 
     for (const delivery of deliveries) {
@@ -76,7 +83,7 @@ describe('broadcastCommit', () => {
   });
 
   it('keeps delivering to remaining tiers when one delivery throws', async () => {
-    const { gitShow } = spies();
+    const { gitShow, recordDelivery } = spies();
     const deliver = vi.fn(async (agentId: string): Promise<DeliveryResult> => {
       if (agentId === 'agent-pan-1-slot-2') throw new Error('session gone');
       return { ok: true, path: 'supervisor' };
@@ -89,6 +96,7 @@ describe('broadcastCommit', () => {
       tiers: TIERS,
       deliver,
       gitShow,
+      recordDelivery,
     });
 
     expect(results).toHaveLength(3);
@@ -102,5 +110,31 @@ describe('broadcastCommit', () => {
     const first = composeCommitFeedMessage('abc123', 'my bead', 'diff-body\n');
     const second = composeCommitFeedMessage('abc123', 'my bead', 'diff-body\n');
     expect(first).toBe(second);
+  });
+
+  it('records timestamped token metrics for every feed delivery', async () => {
+    const { deliver, gitShow, recordDelivery, metrics } = spies();
+
+    await broadcastCommit({
+      workspace: '/ws',
+      issueId: 'PAN-1',
+      sha: 'abc123',
+      beadTitle: 'my bead',
+      tiers: TIERS,
+      deliver,
+      gitShow,
+      recordDelivery,
+      now: () => new Date('2026-07-02T12:00:00.000Z'),
+    });
+
+    expect(recordDelivery).toHaveBeenCalledTimes(TIERS.length);
+    expect(metrics.map(metric => metric.agentId)).toEqual(TIERS.map(tier => tier.agentId));
+    for (const metric of metrics) {
+      expect(metric.ts).toBe('2026-07-02T12:00:00.000Z');
+      expect(metric.issueId).toBe('PAN-1');
+      expect(metric.sha).toBe('abc123');
+      expect(metric.tokenCount).toBeGreaterThan(0);
+      expect(metric.result.ok).toBe(true);
+    }
   });
 });

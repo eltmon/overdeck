@@ -18,6 +18,7 @@ import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
+import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export type CostEvent = typeof CostEvent.Type;
 
 export const Rollup = Schema.Struct({
   key:    Schema.String,
+  role:   Schema.optional(Schema.String),
   cost:   Schema.Number,
   tokens: Tokens,
 });
@@ -180,8 +182,8 @@ function toTokens(r: TokenRow): Tokens {
   };
 }
 
-function toRollup(key: string, r: TokenRow & { cost: number | null }): Rollup {
-  return { key, cost: r.cost ?? 0, tokens: toTokens(r) };
+function toRollup(key: string, r: TokenRow & { cost: number | null }, role?: string): Rollup {
+  return { key, ...(role ? { role } : {}), cost: r.cost ?? 0, tokens: toTokens(r) };
 }
 
 // ── CostResolver — the read door ──────────────────────────────────────────────
@@ -351,7 +353,10 @@ export const CostResolverLive = Layer.effect(
           .from(costEventsTable)
           .where(issue ? eq(costEventsTable.issueId, issue) : undefined)
           .groupBy(costEventsTable.agentId);
-        return rows.map((r) => toRollup(r.key ?? 'unattributed', r));
+        return rows.map((r) => {
+          const key = r.key ?? 'unattributed';
+          return toRollup(key, r, deriveTieredAgentCostRole(key, issue));
+        });
       });
 
     const byBackgroundSource = (hours: number) =>
