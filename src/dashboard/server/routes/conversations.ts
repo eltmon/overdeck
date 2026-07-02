@@ -692,8 +692,27 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000)
  * it. Mirrors the cross-dir lookup the non-DB specialist/agent fallback already
  * uses below.
  */
+// PAN-2220: memoize by-id lookups. The sweep below stats <sessionId>.jsonl in
+// EVERY project dir (~2,200 on this machine), and the conversation-list
+// enrichment resolves session files per row per request — for each stale-cwd
+// conversation that meant a full sweep on every list build (~1.7s of
+// event-loop-adjacent syscall storm). A found path is stable (re-verified
+// with one existsSync); a miss is re-swept after a short TTL so a transcript
+// that appears later is still discovered.
+const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
+const SESSION_FILE_MISS_TTL_MS = 60_000;
+
 async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
   if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) return null;
+  const cached = sessionFileByIdCache.get(sessionId);
+  if (cached) {
+    if (cached.path) {
+      if (existsSync(cached.path)) return cached.path;
+      sessionFileByIdCache.delete(sessionId);
+    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
+      return null;
+    }
+  }
   try {
     const claudeProjects = join(homedir(), '.claude', 'projects');
     const dirs = await readdir(claudeProjects);
@@ -715,11 +734,15 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
         }),
       );
       const found = checks.find((c): c is string => c !== null);
-      if (found) return found;
+      if (found) {
+        sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
+        return found;
+      }
     }
   } catch {
     /* ~/.claude/projects unreadable */
   }
+  sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
   return null;
 }
 
