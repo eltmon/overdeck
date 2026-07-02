@@ -42,24 +42,19 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T16:43:31.942Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-02T16:37:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2224\n\nharness=claude-code archived filter excludes legacy NULL-harness Claude rows\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2224 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-02T16:37:37Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2224\n\nharness=claude-code archived filter excludes legacy NULL-harness Claude rows\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2224 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-02T16:45:23.013Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T16:45:23.408Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2224.json",
@@ -73,7 +68,9 @@
       "src/lib/cloister/service.ts",
       "src/lib/conversations/discovered-session-file.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-      "src/lib/overdeck/infra.ts"
+      "src/lib/overdeck/infra.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -130,26 +127,28 @@
       "src/lib/overdeck/conversations.ts",
       "src/lib/overdeck/discovered-sessions.ts",
       "src/lib/overdeck/infra.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
       "tests/unit/lib/conversations/harness-metadata.test.ts"
     ],
-    "recordedAt": "2026-07-02T16:20:44.838Z"
+    "recordedAt": "2026-07-02T16:45:16.581Z"
   },
   "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T16:43:34.806Z",
+  "updated": "2026-07-02T16:45:23.408Z",
   "pipeline": {
     "issueId": "PAN-2224",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T16:43:34.703Z",
+    "updatedAt": "2026-07-02T16:45:23.183Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
     "lastVerifiedCommit": "75f5e6e4ca9cbc381625163b02d7cf10c20ec9ea",
-    "reviewRequestedAt": "2026-07-02T16:20:52.704Z",
+    "reviewRequestedAt": "2026-07-02T16:45:23.015Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2224.json",
@@ -163,7 +162,9 @@
         "src/lib/cloister/service.ts",
         "src/lib/conversations/discovered-session-file.ts",
         "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-        "src/lib/overdeck/infra.ts"
+        "src/lib/overdeck/infra.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -220,9 +221,11 @@
         "src/lib/overdeck/conversations.ts",
         "src/lib/overdeck/discovered-sessions.ts",
         "src/lib/overdeck/infra.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
         "tests/unit/lib/conversations/harness-metadata.test.ts"
       ],
-      "recordedAt": "2026-07-02T16:20:44.838Z"
+      "recordedAt": "2026-07-02T16:45:16.581Z"
     }
   },
   "closeOut": {
@@ -283,7 +286,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T16:43:34.770Z"
+        "pricingAsOf": "2026-07-02T16:45:23.284Z"
       }
     },
     "merges": [
