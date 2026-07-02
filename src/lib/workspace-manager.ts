@@ -30,18 +30,31 @@ import {
   PAN_SESSIONS_FILENAME,
 } from './pan-dir/index.js';
 import { FsError, ProcessSpawnError } from './errors.js';
+import { PRE_WORKTREE_METADATA_DIRS } from './workspace-manager/types.js';
+import type {
+  AddReposToWorkspaceOptions,
+  AddReposToWorkspaceResult,
+  DockerCleanupResult,
+  PanMigrationResult,
+  WorkspaceCreateOptions,
+  WorkspaceCreateResult,
+  WorkspaceProgress,
+  WorkspaceRemoveOptions,
+  WorkspaceRemoveResult,
+} from './workspace-manager/types.js';
+export type {
+  AddReposToWorkspaceOptions,
+  AddReposToWorkspaceResult,
+  DockerCleanupResult,
+  PanMigrationResult,
+  WorkspaceCreateOptions,
+  WorkspaceCreateResult,
+  WorkspaceProgress,
+  WorkspaceRemoveOptions,
+  WorkspaceRemoveResult,
+} from './workspace-manager/types.js';
 
 const execAsync = promisify(exec);
-const PRE_WORKTREE_METADATA_DIRS = new Set(['.pan', '.beads']);
-
-export interface PanMigrationResult {
-  /** Subdirectories migrated from .overdeck/ to .pan/ */
-  migrated: string[];
-  /** Subdirectories skipped because .pan/<subdir> already exists */
-  skipped: string[];
-  /** Errors encountered during migration */
-  errors: string[];
-}
 
 /**
  * Migrate existing .overdeck/<subdir> directories to .pan/<subdir> within a project.
@@ -261,29 +274,6 @@ export function ensurePanGitignoreSync(projectPath: string): void {
   content += missing.join('\n') + '\n';
 
   writeFileSync(gitignorePath, content, 'utf-8');
-}
-
-/** Progress event emitted during workspace creation. */
-export interface WorkspaceProgress {
-  label: string;
-  detail: string;
-  status: 'active' | 'complete' | 'error';
-}
-
-export interface WorkspaceCreateOptions {
-  projectConfig: ProjectConfig;
-  featureName: string;
-  startDocker?: boolean;
-  dryRun?: boolean;
-  /** Optional callback for streaming progress events during creation. */
-  onProgress?: (event: WorkspaceProgress) => void;
-}
-
-export interface WorkspaceCreateResult {
-  success: boolean;
-  workspacePath: string;
-  errors: string[];
-  steps: string[];
 }
 
 // Placeholder construction, compose-file sanitization, and template
@@ -1248,18 +1238,7 @@ export function preTrustDirectorySync(dirPath: string): void {
   }
 }
 
-export interface AddReposToWorkspaceOptions {
-  projectConfig: ProjectConfig;
-  featureName: string;
-  repoNames: string[];
-  dryRun?: boolean;
-}
-
-export interface AddReposToWorkspaceResult {
-  success: boolean;
-  errors: string[];
-  steps: string[];
-}async function addReposToWorkspacePromise(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
+async function addReposToWorkspacePromise(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
   const { projectConfig, featureName, repoNames, dryRun } = options;
   const result: AddReposToWorkspaceResult = {
     success: true,
@@ -1339,27 +1318,7 @@ export interface AddReposToWorkspaceResult {
   return result;
 }
 
-export interface WorkspaceRemoveOptions {
-  projectConfig: ProjectConfig;
-  featureName: string;
-  dryRun?: boolean;
-}
-
-export interface WorkspaceRemoveResult {
-  success: boolean;
-  errors: string[];
-  steps: string[];
-}
-
-/**
- * Result of Docker container cleanup for a workspace.
- */
-export interface DockerCleanupResult {
-  /** Whether compose files were found (containers may or may not have been running) */
-  containersFound: boolean;
-  /** Human-readable log of cleanup steps taken */
-  steps: string[];
-}async function getContainersReferencingWorkspacePathPromise(
+async function getContainersReferencingWorkspacePathPromise(
   workspacePath: string,
 ): Promise<string[]> {
   try {
