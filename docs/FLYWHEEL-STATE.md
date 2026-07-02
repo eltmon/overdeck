@@ -207,6 +207,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 1.5 (2026-07-02) — PAN-2217 DONE; second red-main cause struck (PAN-2218 file-size guard)
+
+- **PAN-2217 strike COMPLETE:** mock-factory fix `0e0cd31cf2` on main, test job green, `pan done --strike` handoff applied.
+- **Main still red on the LINT job:** `08796258b0` ("fix(cli): pin flywheel start to the primary worktree root", direct push by panopticon-agent[bot]) grew `src/cli/commands/flywheel.ts` to 1022 lines — over the 1000-line file-size guard. Verified locally (wc -l = 1022). Filed as **PAN-2218** (blocks-main) by the strike agent; dispatched `strike-pan-2218` (config-routed fable-5, no --model).
+- **Recurring pattern:** this is the second file-size-guard red-main on this exact file (PAN-2192 was "flywheel CLI exceeds file-size guard after harness resolver fix"). Every direct-push fix to flywheel.ts risks tripping the guard. Durable fix = decompose flywheel.ts — but the flywheel loop is TENET-10 pipeline machinery, so that decomposition is needs-handoff, not autonomous. Surfaced as a suggestion.
+
 ## RUN-53 tick 1 (2026-07-02) — RED MAIN struck (PAN-2212 direct-push mock drift) + codex auth outage again
 
 - **Main RED, 3 consecutive CI failures.** Root cause: `803bb76681` "feat(cloister): reserved swarm dispatch budget (PAN-2212)" pushed **directly to main** by panopticon-agent[bot] (no branch, no review — the PAN-2204 hazard class, second confirmed incident). It added `tryReserveSwarmSlot` to `src/lib/cloister/concurrency.ts`; 8+ test files' explicit `vi.mock` factories of that module don't return the new export → 31 tests fail. Filed **PAN-2217** (blocks-main) + struck it (`strike-pan-2217`, Fable 5). CI logs show the mock under THREE relative paths — a fix must sweep ALL `vi.mock` factories of concurrency.js repo-wide.
