@@ -49,56 +49,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2151",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T21:21:13.556Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "INSPECTION PASSED for bead workspace-he57r. shared-helpers diff moves the intended helpers into src/dashboard/server/routes/misc/shared.ts, preserves misc.ts exports via readPackageVersion re-export, changes only misc.ts and misc/shared.ts, and introduces no new execSync/sendKeys/explicit-any patterns.",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-02T23:11:02.361Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
-    "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6",
-    "reviewRequestedAt": "2026-07-02T21:07:42.551Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".pan/drafts/PAN-2151.md",
-        ".pan/records/pan-2151.json"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "eslint-any-allowlist.json",
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
-        "src/dashboard/server/routes/misc.ts",
-        "src/dashboard/server/routes/misc/deacon.ts",
-        "src/dashboard/server/routes/misc/health.ts",
-        "src/dashboard/server/routes/misc/meta.ts",
-        "src/dashboard/server/routes/misc/planning.ts",
-        "src/dashboard/server/routes/misc/project-mappings.ts",
-        "src/dashboard/server/routes/misc/shared.ts",
-        "src/dashboard/server/routes/misc/tldr.ts",
-        "src/dashboard/server/routes/misc/trackers.ts"
-      ],
-      "actualChangedFiles": [
-        ".pan/drafts/PAN-2151.md",
-        ".pan/records/pan-2151.json",
-        "eslint-any-allowlist.json",
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
-        "src/dashboard/server/routes/misc.ts",
-        "src/dashboard/server/routes/misc/deacon.ts",
-        "src/dashboard/server/routes/misc/health.ts",
-        "src/dashboard/server/routes/misc/meta.ts",
-        "src/dashboard/server/routes/misc/planning.ts",
-        "src/dashboard/server/routes/misc/project-mappings.ts",
-        "src/dashboard/server/routes/misc/shared.ts",
-        "src/dashboard/server/routes/misc/tldr.ts",
-        "src/dashboard/server/routes/misc/trackers.ts"
-      ],
-      "recordedAt": "2026-07-02T21:06:08.344Z"
-    }
+    "reviewedAtCommit": "066af8e494c54ca689f339daaddd300b36fd74f0",
+    "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6"
   },
   "closeOut": {
     "usage": {
@@ -162,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.083717,
-        "pricingAsOf": "2026-07-02T21:21:13.654Z"
+        "pricingAsOf": "2026-07-02T23:11:02.446Z"
       }
     },
     "merges": [
@@ -171,5 +131,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T21:13:43.617Z",
-  "updated": "2026-07-02T21:21:13.666Z"
+  "updated": "2026-07-02T23:11:02.452Z"
 }
