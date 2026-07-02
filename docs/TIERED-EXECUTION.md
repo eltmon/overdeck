@@ -9,40 +9,35 @@ The project config declares the tier table, the routing defaults, supervisor pol
 ```yaml
 tiered_execution:
   enabled: false
-  default_tier: standard
   tiers:
     cheap:
       model: haiku
       harness: claude-code
       difficulties: [trivial, simple]
-      kinds: [docs, test, refactor]
     standard:
       model: sonnet
       harness: claude-code
       difficulties: [medium]
-      kinds: [api, backend, frontend, infra]
     frontier:
       model: opus
       harness: claude-code
       difficulties: [complex, expert]
-      kinds: [design, spike]
   supervisor:
-    enabled: true
     model: opus
     harness: claude-code
-    subscribe: requiresInspection
+    subscribe: flagged
   replay_threshold: 0.5
 ```
 
-`enabled` must stay `false` unless the operator deliberately opts the project into tiered execution. The fallback `default_tier` must reference a configured tier; it is not a hardcoded model fallback.
+`enabled` must stay `false` unless the operator deliberately opts the project into tiered execution. The loader (`src/lib/agents/tier-table.ts`) validates the table at config load: every one of the five vBRIEF difficulties (`trivial`, `simple`, `medium`, `complex`, `expert`) must map to exactly one tier — a difficulty mapped to zero tiers or to two tiers is a named validation error. Unknown models and harnesses are rejected, and the pi+Anthropic+subscription ToS gate applies to every tier and to the supervisor. The `supervisor` block is required whenever tiers are configured. `replay_threshold` must be > 0 and <= 1; when no `tiered_execution` block is present the loader returns `enabled: false` with `replay_threshold: 0.5` and no error.
 
 ## Resolution Chain
 
 The router chooses a tier deterministically for each ready bead. Models do not race to decide whether to intervene.
 
 1. Explicit override: a per-bead or operator override wins when present.
-2. Kind routing: `metadata.kind` routes docs, API, backend, frontend, infra, test, refactor, design, and spike work to configured tier preferences.
-3. Difficulty routing: `metadata.difficulty` routes trivial/simple/medium/complex/expert beads when no kind route applies.
+2. Kind routing: the typed `metadata.kind` field (docs, api, backend, frontend, infra, test, refactor, design, spike; default `backend`) routes subject-matter work when a kind route is configured.
+3. Difficulty routing: `metadata.difficulty` routes trivial/simple/medium/complex/expert beads via the tier table's `difficulties` mapping when no kind route applies.
 4. Role default: the configured role default tier is used when neither override nor metadata routes the bead.
 
 If the chain reaches a missing tier, missing model, or missing harness, spawn must fail loudly. It must not silently fall back to a literal model ID.
@@ -57,12 +52,13 @@ Standing tier agents are long-lived sessions for the life of the issue. In v1, t
 
 The supervisor is a standing review tier, not an implementer. It wakes on commit events and reviews the diff against the bead description and acceptance criteria.
 
-Supported subscription policies:
+Supported subscription policies (`supervisor.subscribe`):
 
 - `all`: review every bead commit.
-- `requiresInspection`: review commits for beads whose metadata sets `requiresInspection: true`.
+- `flagged`: review commits for beads whose metadata sets `requiresInspection: true`.
 - `sampled`: review a configured sample of commits for cost measurement.
-- `off`: do not run event-driven supervisor review.
+
+To run without event-driven supervisor review, leave tiered execution disabled; when tiers are configured, a supervisor definition is required.
 
 Supervisor findings block the foreman before downstream beads proceed. A clean supervisor ack does not replace the normal review and test pipeline.
 
