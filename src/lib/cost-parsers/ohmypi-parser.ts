@@ -64,6 +64,20 @@ interface PiMessageEntry {
   };
 }
 
+export interface OhmypiCostEventUsage {
+  requestId: string;
+  timestamp: string;
+  sessionId: string;
+  sessionFile: string;
+  provider: string | null;
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+}
+
 interface PiGenericEntry {
   type: string;
   id: string;
@@ -93,6 +107,7 @@ interface ParseResult {
   ok: boolean;
   reason?: string;
   usage?: SessionUsage;
+  usageEvents?: OhmypiCostEventUsage[];
 }
 
 // Known top-level entry types. Anything else is logged once per session.
@@ -120,6 +135,12 @@ export function parseOhmypiSessionSync(filePath: string): SessionUsage | null {
   if (!existsSync(filePath)) return null;
   const result = parseOhmypiSessionContent(readFileSync(filePath, 'utf8'), filePath);
   return result.ok ? result.usage! : null;
+}
+
+export function parseOhmypiSessionCostEventsSync(filePath: string): OhmypiCostEventUsage[] {
+  if (!existsSync(filePath)) return [];
+  const result = parseOhmypiSessionContent(readFileSync(filePath, 'utf8'), filePath);
+  return result.ok ? result.usageEvents ?? [] : [];
 }
 
 /**
@@ -228,6 +249,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     string,
     { cost: number; inputTokens: number; outputTokens: number; messageCount: number; cacheReadTokens?: number; cacheWriteTokens?: number }
   > = {};
+  const usageEvents: OhmypiCostEventUsage[] = [];
   const modelsInOrder: string[] = [];
   let compactionCount = 0;
 
@@ -245,6 +267,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     const usage = entry.message.usage;
     if (!usage) continue;
     const model = entry.message.model || 'unknown';
+    const provider = typeof entry.message.provider === 'string' ? entry.message.provider : null;
     const input = usage.input ?? 0;
     const output = usage.output ?? 0;
     const cacheRead = usage.cacheRead ?? 0;
@@ -275,6 +298,20 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
     slot.messageCount += 1;
     slot.cacheReadTokens = (slot.cacheReadTokens ?? 0) + cacheRead;
     slot.cacheWriteTokens = (slot.cacheWriteTokens ?? 0) + cacheWrite;
+
+    usageEvents.push({
+      requestId: `ohmypi:${root.id}:${entry.id}`,
+      timestamp: entry.timestamp || root.timestamp,
+      sessionId: root.id,
+      sessionFile: filePath,
+      provider,
+      model,
+      input,
+      output,
+      cacheRead,
+      cacheWrite,
+      cost,
+    });
   }
 
   // Observability: log Pi-inline-cost vs locally-recomputed-from-cost-fields
@@ -314,6 +351,7 @@ export function parseOhmypiSessionContent(content: string, filePath = '<inline>'
       messageCount,
       modelBreakdown,
     },
+    usageEvents,
   };
 }
 
@@ -341,4 +379,12 @@ export const parseOhmypiSession = (
   Effect.try({
     try: () => parseOhmypiSessionSync(filePath),
     catch: (cause) => new FsError({ path: filePath, operation: 'parseOhmypiSession', cause }),
+  });
+
+export const parseOhmypiSessionCostEvents = (
+  filePath: string,
+): Effect.Effect<OhmypiCostEventUsage[], FsError> =>
+  Effect.try({
+    try: () => parseOhmypiSessionCostEventsSync(filePath),
+    catch: (cause) => new FsError({ path: filePath, operation: 'parseOhmypiSessionCostEvents', cause }),
   });
