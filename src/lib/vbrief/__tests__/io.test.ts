@@ -301,11 +301,20 @@ describe('tierOverrides', () => {
     return createHash('sha256').update(readFileSync(path)).digest('hex');
   }
 
-  it('round-trips tier promotions through the per-issue record', () => {
+  it('round-trips tier promotions through workspace continue.json', () => {
     writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
+    mkdirSync(join(WORKSPACE_PATH, '.pan'), { recursive: true });
+    writeFileSync(
+      join(WORKSPACE_PATH, '.pan', 'continue.json'),
+      JSON.stringify({ statusOverrides: { 'item-2': 'running' } }, null, 2),
+    );
 
     recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
     recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'blocked by supervisor');
+
+    const continueState = JSON.parse(readFileSync(join(WORKSPACE_PATH, '.pan', 'continue.json'), 'utf-8'));
+    expect(continueState.statusOverrides).toEqual({ 'item-2': 'running' });
+    expect(continueState.tierOverrides['item-1'].effectiveDifficulty).toBe('complex');
 
     const overrides = readTierOverrides(WORKSPACE_PATH);
     expect(overrides['item-1']).toMatchObject({

@@ -15,19 +15,16 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
 import {
   getProjectConfigFromWorkspacePath,
-  queueIssueRecordCommit,
   readIssueRecord,
   readIssueRecordSync,
   resolveProjectForIssue,
-  ensureIssueRecordSync,
-  writeIssueRecordSync,
   writeStatusOverrideSync,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
@@ -126,6 +123,10 @@ function projectRootFromWorkspace(workspacePath: string): string {
 
 function workspaceDraftPath(workspacePath: string): string {
   return join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+}
+
+function workspaceContinuePath(workspacePath: string): string {
+  return join(workspacePath, PAN_DIRNAME, 'continue.json');
 }
 
 export function findWorkspaceDraftPlanSync(workspacePath: string): string | null {
@@ -251,11 +252,14 @@ function readStatusOverridesSync(workspacePath: string): Record<string, string> 
 }
 
 export function readTierOverrides(workspacePath: string): TierOverridesMap {
-  const issueId = issueIdFromWorkspacePath(workspacePath);
-  if (!issueId) return {};
-  const project = resolveProjectForWorkspace(workspacePath);
-  if (!project) return {};
-  return readIssueRecordSync(project, issueId)?.tierOverrides ?? {};
+  const path = workspaceContinuePath(workspacePath);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const parsed = JSON.parse(raw) as { tierOverrides?: TierOverridesMap };
+    return parsed.tierOverrides ?? {};
+  } catch {
+    return {};
+  }
 }
 
 export function recordTierPromotion(
@@ -265,15 +269,20 @@ export function recordTierPromotion(
   to: VBriefDifficulty,
   reason: string,
 ): void {
-  const issueId = issueIdFromWorkspacePath(workspacePath);
-  if (!issueId) return;
-  const project = resolveProjectForWorkspace(workspacePath);
-  if (!project) return;
+  const path = workspaceContinuePath(workspacePath);
+  let state: Record<string, unknown> = {};
+  try {
+    state = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    state = {};
+  }
 
-  const record = readIssueRecordSync(project, issueId) ?? ensureIssueRecordSync(project, issueId);
-  const existing = record.tierOverrides?.[beadId];
+  const current = (state.tierOverrides && typeof state.tierOverrides === 'object')
+    ? state.tierOverrides as TierOverridesMap
+    : {};
+  const existing = current[beadId];
   const nextOverrides: TierOverridesMap = {
-    ...(record.tierOverrides ?? {}),
+    ...current,
     [beadId]: {
       effectiveDifficulty: to,
       promotions: (existing?.promotions ?? 0) + 1,
@@ -284,9 +293,8 @@ export function recordTierPromotion(
     },
   };
 
-  record.tierOverrides = nextOverrides;
-  const recordPath = writeIssueRecordSync(project, issueId, record);
-  queueIssueRecordCommit(project, issueId, recordPath);
+  mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
+  writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides }, null, 2), 'utf-8');
 }
 
 /**
