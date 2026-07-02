@@ -150,6 +150,7 @@
   "src/lib/vbrief/dag.ts",
   "src/lib/vbrief/io.ts",
   "src/lib/webhook-handlers.ts",
+  "src/lib/workspace-manager/create.ts",
   "src/lib/workspace-manager/migration.ts",
   "src/lib/workspace-manager/repos.ts",
   "src/lib/workspace-manager.ts",
