@@ -24,6 +24,7 @@ import {
   getDispatchableItems,
   type PersistedTaskOperation,
 } from '../vbrief/dag.js';
+import { applyStatusOverrides } from '../vbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
@@ -88,6 +89,8 @@ export interface CoordinateSwarmSlotsDeps {
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
   /** Per-issue operator hold: stuck / deaconIgnored suppress all swarm coordination (PAN-2214). */
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
+  /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
+  readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -132,6 +135,14 @@ function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'dea
     return getReviewStatusSync(issueId);
   } catch {
     return null;
+  }
+}
+
+function defaultReadStatusOverrides(workspacePath: string, issueId: string): Record<string, string> | undefined {
+  try {
+    return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.statusOverrides;
+  } catch {
+    return undefined;
   }
 }
 
@@ -194,21 +205,33 @@ export async function coordinateSwarmSlots(
       const spec = await Effect.runPromise(findSpecByIssue(workspace.projectPath, issueId));
       if (!spec) continue;
 
-      const readiness = analyzeSwarmReadiness(spec.document);
+      // Coordinate against the MERGED plan view (main spec + per-issue record
+      // statusOverrides), not the raw main spec. Item done-ness only lives in
+      // the overrides: slot merges mirror `done` there, and gc later deletes
+      // the slot branch + assignment — the only other merged-ness evidence.
+      // Reading the raw spec made completed items dispatchable again after gc
+      // (tier-table-config was re-dispatched to a fresh slot after its work
+      // had already been consolidated into the feature branch).
+      const overrides = (deps.readStatusOverrides ?? defaultReadStatusOverrides)(workspace.workspacePath, issueId);
+      const doc = overrides && Object.keys(overrides).length > 0
+        ? applyStatusOverrides(spec.document, overrides)
+        : spec.document;
+
+      const readiness = analyzeSwarmReadiness(doc);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
       if (!readiness.swarmEligible || slotEligibleCount < 2) continue;
 
       actions.push(`[swarm] considered ${issueId}: swarm eligible`);
 
-      const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, spec.document);
+      const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, doc);
       const classified = await classifyInFlightSlots(reconciled.inFlight, deps, { workspacePath: workspace.workspacePath });
       for (const slot of classified) {
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
       }
       actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
-      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
+      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
-      actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, spec.document, reconciled, readiness, deps));
+      actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
       recordSwarmAdvanceFailure(issueId);
