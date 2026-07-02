@@ -11,17 +11,17 @@
   ],
   "feedback": [],
   "created": "2026-06-30T13:44:36.595Z",
-  "updated": "2026-07-02T07:45:00.000Z",
+  "updated": "2026-07-02T07:45:07.243Z",
   "pipeline": {
     "issueId": "PAN-1791",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T07:40:16.170Z",
-    "inspectNotes": "Bead workspace-hwhq1 PASSED. Implementation landed pre-checkpoint in commit 6ceff57807 (tier-table.ts + tests + config wiring in cloister/config.ts and config-yaml schema/merge/defaults). All 4 ACs verified: total non-overlapping difficulty mapping with named errors; unknown model/harness rejected and harness-policy ToS gate applied to tiers and supervisor; absent block defaults to enabled=false replay_threshold=0.5; valid config returns difficultyToTier map + supervisor policy. pan tell skipped: agent-pan-1791 not running.",
+    "updatedAt": "2026-07-02T07:45:07.160Z",
+    "inspectNotes": "Inspection error for bead workspace-a5hus: tmux session inspect-pan-1791-workspace-a5hus exited before producing a verdict. No verdict was produced.",
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-02T07:37:41.736Z",
     "deaconIgnoredReason": "brief hold while pty-fix + swarm done-ness fix deploy; clears right after reload"
@@ -31,10 +31,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 44032,
-            "output": 32049,
-            "cacheRead": 9299680,
-            "cacheWrite": 56568
+            "input": 44034,
+            "output": 32474,
+            "cacheRead": 9799552,
+            "cacheWrite": 56830
           },
           "anthropic/claude-opus-4-8": {
             "input": 453,
@@ -45,10 +45,10 @@
         },
         "inspect-deep": {
           "anthropic/claude-fable-5": {
-            "input": 14074,
-            "output": 3173,
-            "cacheRead": 275270,
-            "cacheWrite": 78514
+            "input": 14436,
+            "output": 6337,
+            "cacheRead": 469096,
+            "cacheWrite": 85220
           },
           "openai/gpt-5.5": {
             "input": 530892,
@@ -59,8 +59,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 60720,
-            "output": 10061,
+            "input": 62533,
+            "output": 10586,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -75,19 +75,19 @@
         },
         "work": {
           "anthropic/claude-fable-5": {
-            "input": 41552,
-            "output": 39753,
-            "cacheRead": 7456996,
-            "cacheWrite": 484289
+            "input": 51647,
+            "output": 63734,
+            "cacheRead": 10353379,
+            "cacheWrite": 535385
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 99658,
-          "output": 74975,
-          "cacheRead": 17031946,
-          "cacheWrite": 619371
+          "input": 110117,
+          "output": 102545,
+          "cacheRead": 20622027,
+          "cacheWrite": 677435
         },
         "anthropic/claude-opus-4-8": {
           "input": 44689,
@@ -102,15 +102,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 60720,
-          "output": 10061,
+          "input": 62533,
+          "output": 10586,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 63.906827,
-        "pricingAsOf": "2026-07-02T07:40:16.218Z"
+        "usd": 69.705803,
+        "pricingAsOf": "2026-07-02T07:45:07.204Z"
       }
     },
     "merges": [],
@@ -130,6 +130,13 @@
   },
   "swarm": {
     "slotAssignments": [
+      {
+        "slotIndex": 22,
+        "itemId": "tier-resolution-chain",
+        "agentId": "agent-pan-1791-slot-22",
+        "branch": "feature/pan-1791-slot-22",
+        "assignedAt": "2026-07-02T07:50:00.000Z"
+      },
       {
         "slotIndex": 23,
         "itemId": "tier-table-config",
