@@ -4,7 +4,7 @@
     "created": "2026-07-02T20:35:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2222: Tiered execution v2: vigilant listeners, compaction-point re-tiering, escalation-on-trouble, senior-model inspection (Devin-Fusion-informed, config-tunable)",
-    "updated": "2026-07-02T21:19:49.605Z"
+    "updated": "2026-07-02T21:43:58.312Z"
   },
   "plan": {
     "id": "pan-2222",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c3f8a1d2-9b4e-4c7a-8e5f-2d1b6a9c4e73",
     "author": "agent:claude-fable-5",
-    "sequence": 72,
+    "sequence": 73,
     "created": "2026-07-02T20:35:00.000Z",
-    "updated": "2026-07-02T21:19:49.605Z",
+    "updated": "2026-07-02T21:43:58.312Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2222",
@@ -75,7 +75,7 @@
       {
         "id": "by-kind-config",
         "title": "Make by_kind real validated config reaching the resolution chain (WI-1)",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-07-02T20:35:00.000Z",
         "metadata": {
