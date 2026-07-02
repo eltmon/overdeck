@@ -4,17 +4,17 @@
     "created": "2026-07-02T06:24:34.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2214: Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator",
-    "updated": "2026-07-02T06:34:35.147Z"
+    "updated": "2026-07-02T06:38:07.791Z"
   },
   "plan": {
     "id": "pan-2214",
     "title": "Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator",
-    "status": "proposed",
+    "status": "running",
     "uid": "f822ed23-d7fa-44f4-a350-08462b8fbbca",
     "author": "agent:claude-fable-5",
-    "sequence": 8,
+    "sequence": 10,
     "created": "2026-07-02T06:24:34.000Z",
-    "updated": "2026-07-02T06:34:35.147Z",
+    "updated": "2026-07-02T06:38:07.791Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2214",
@@ -820,5 +820,5 @@
       "canonicalFilename": "2026-07-02-PAN-2214-swarm-needs-per-issue-freeze-stop-reset-controls-a-reconcile-safe-bounded-slot-allocator.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
