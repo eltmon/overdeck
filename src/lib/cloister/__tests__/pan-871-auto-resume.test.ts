@@ -54,9 +54,10 @@ vi.mock('../../../lib/agents.js', async () => {
   getAgentStateSync: vi.fn(),
   getAgentStateProgram: effectMock(null),
   messageAgent: vi.fn(async () => undefined),
-  saveAgentState: vi.fn(),
+  saveAgentState: effectMock(undefined),
   saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
+  deliverInitialPromptWithRetry: vi.fn(async () => ({ ok: true, path: 'supervisor' as const })),
   buildDefaultResumeContinueMessage: vi.fn((issueId: string) => `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`),
   recordAgentFailure: effectMock(null),
   recordAgentFailureProgram: effectMock(null),
@@ -252,9 +253,9 @@ vi.mock('fs', () => ({
   rmSync: vi.fn(),
 }));
 
-import { applyBootReconciliationDecision, autoResumeStoppedWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, nudgeStalledResumeWorkAgents, reconcileAgentLiveness } from '../deacon.js';
+import { applyBootReconciliationDecision, autoResumeStoppedWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, reconcileAgentLiveness } from '../deacon.js';
 import { listAgentStates } from '../../../lib/agents.js';
-import { getAgentStateSync, getAgentState, messageAgent, resumeAgent } from '../../../lib/agents.js';
+import { getAgentStateSync, getAgentState, messageAgent, resumeAgent, saveAgentState, deliverInitialPromptWithRetry, recordAgentFailure } from '../../../lib/agents.js';
 import { listAllAgentsSync } from '../../overdeck/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
@@ -263,12 +264,16 @@ import { isAgentIdleForNudge } from '../agent-idle.js';
 import { isIssueClosed } from '../issue-closed.js';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
 const mockListAgentStates = listAgentStates as any;
 const mockMessageAgent = messageAgent as any;
 const mockResumeAgent = resumeAgent as any;
+const mockSaveAgentState = saveAgentState as any;
+const mockDeliverInitialPromptWithRetry = deliverInitialPromptWithRetry as any;
+const mockRecordAgentFailure = recordAgentFailure as any;
 const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
 const mockSessionExists = sessionExists as any;
@@ -278,6 +283,8 @@ const mockExistsSync = existsSync as any;
 const mockReadFileSync = readFileSync as any;
 const mockWriteFileSync = writeFileSync as any;
 const mockCaptureTranscriptUserRecordSnapshot = captureTranscriptUserRecordSnapshot as any;
+const mockEmitActivityEntrySync = emitActivityEntrySync as any;
+const mockEmitActivityTtsSync = emitActivityTtsSync as any;
 
 // Default existsSync behaviour mirrors the module mock: no completed markers present.
 const noCompletedMarkers = (path: string) =>
@@ -318,6 +325,8 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockIsIssueClosed.mockResolvedValue(false);
     mockMessageAgent.mockResolvedValue(undefined);
     mockResumeAgent.mockResolvedValue({ success: true } as any);
+    mockDeliverInitialPromptWithRetry.mockResolvedValue({ ok: true, path: 'supervisor' });
+    mockRecordAgentFailure.mockResolvedValue(null);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
     mockExistsSync.mockImplementation(noCompletedMarkers);
     vi.mocked(listAllAgentsSync).mockReturnValue([
@@ -333,6 +342,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     if (originalNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
     else process.env.OVERDECK_NO_RESUME = originalNoResume;
   });
@@ -750,5 +760,127 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockReadFileSync.mockReturnValue(String(Date.now()));
     expect(await nudgeStalledResumeWorkAgents()).toEqual([]);
     expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('re-delivers an undelivered kickoff for an old live work agent', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T00:05:00.000Z'));
+    const state = {
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      kickoffDelivered: false,
+    };
+    mockListAgentStates.mockReturnValue([state]);
+    mockSessionExists.mockResolvedValue(true);
+    mockReadFileSync.mockReturnValue('kickoff prompt');
+
+    const actions = await redeliverUndeliveredKickoffs();
+
+    expect(actions).toEqual(['Re-delivered undelivered kickoff to agent-pan-871 (PAN-871)']);
+    expect(mockDeliverInitialPromptWithRetry).toHaveBeenCalledWith(
+      'agent-pan-871',
+      'kickoff prompt',
+      'deacon:redeliver-undelivered-kickoff',
+      undefined,
+    );
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'agent-pan-871',
+      kickoffDelivered: true,
+    }));
+    expect(mockWriteFileSync).toHaveBeenCalledWith(
+      '/tmp/test-agents/agent-pan-871/.last-kickoff-redelivery',
+      String(Date.now()),
+      'utf-8',
+    );
+  });
+
+  it('skips young, paused, closed, orphaned, already-delivered, and cooldown-gated kickoff candidates', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T00:05:00.000Z'));
+    const baseState = {
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      kickoffDelivered: false,
+    };
+
+    mockListAgentStates.mockReturnValue([{ ...baseState, startedAt: '2026-06-10T00:04:00.000Z' }]);
+    mockSessionExists.mockResolvedValue(true);
+    expect(await redeliverUndeliveredKickoffs()).toEqual([]);
+
+    mockListAgentStates.mockReturnValue([{ ...baseState, paused: true }]);
+    expect(await redeliverUndeliveredKickoffs()).toEqual([]);
+
+    mockListAgentStates.mockReturnValue([baseState]);
+    mockIsIssueClosed.mockResolvedValueOnce(true);
+    expect(await redeliverUndeliveredKickoffs()).toEqual([]);
+
+    mockSessionExists.mockResolvedValueOnce(false);
+    expect(await redeliverUndeliveredKickoffs()).toEqual([]);
+
+    mockListAgentStates.mockReturnValue([{ ...baseState, kickoffDelivered: true }]);
+    expect(await redeliverUndeliveredKickoffs()).toEqual([]);
+
+    mockListAgentStates.mockReturnValue([baseState]);
+    mockSessionExists.mockResolvedValue(true);
+    mockExistsSync.mockImplementation((path: string) => (
+      path.endsWith('/.last-kickoff-redelivery') ? true : noCompletedMarkers(path)
+    ));
+    mockReadFileSync.mockReturnValue(String(Date.now()));
+    expect(await redeliverUndeliveredKickoffs()).toEqual([]);
+    expect(mockDeliverInitialPromptWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a persistently failed kickoff re-delivery when recordAgentFailure marks troubled', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T00:05:00.000Z'));
+    const state = {
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      kickoffDelivered: false,
+    };
+    mockListAgentStates.mockReturnValue([state]);
+    mockSessionExists.mockResolvedValue(true);
+    mockReadFileSync.mockReturnValue('kickoff prompt');
+    mockDeliverInitialPromptWithRetry.mockResolvedValue({ ok: false, path: 'tmux', failure: 'kickoff-not-confirmed' });
+    mockRecordAgentFailure.mockResolvedValue({ ...state, troubled: true, consecutiveFailures: 3 });
+
+    const actions = await redeliverUndeliveredKickoffs();
+
+    expect(actions).toEqual([
+      'agent-pan-871 is troubled after repeated kickoff re-delivery failures; operator intervention is required.',
+    ]);
+    expect(mockRecordAgentFailure).toHaveBeenCalledWith(
+      'agent-pan-871',
+      'kickoff re-delivery failed for agent-pan-871: kickoff-not-confirmed',
+    );
+    expect(mockEmitActivityEntrySync).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'cloister',
+      level: 'error',
+      issueId: 'PAN-871',
+    }));
+    expect(mockEmitActivityTtsSync).toHaveBeenCalledWith(expect.objectContaining({
+      utterance: expect.stringContaining('agent-pan-871 is troubled'),
+      issueId: 'PAN-871',
+      source: 'cloister',
+      eventType: 'kickoff_redelivery_failed',
+    }));
   });
 });

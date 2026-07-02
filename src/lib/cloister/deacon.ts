@@ -34,7 +34,7 @@ import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingR
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
-import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
 // keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
@@ -143,7 +143,7 @@ export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
 export { reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 export { coordinateSwarmSlots } from './deacon-swarm.js';
-export { nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
+export { nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
@@ -2674,6 +2674,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stalledResumeActions = await nudgeStalledResumeWorkAgents();
   actions.push(...stalledResumeActions);
   for (const a of stalledResumeActions) addLog('action', a, state.patrolCycle);
+
+  const kickoffRedeliveryActions = await redeliverUndeliveredKickoffs();
+  actions.push(...kickoffRedeliveryActions);
+  for (const a of kickoffRedeliveryActions) addLog('action', a, state.patrolCycle);
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
