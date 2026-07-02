@@ -33,6 +33,7 @@ import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swa
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
+import type { SwarmInferCompletionMode } from './config.js';
 import {
   countRunningSwarmSlotsForIssue,
   getConcurrencyLimits,
@@ -42,8 +43,19 @@ import {
 } from './concurrency.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 import { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
+import {
+  classifyDoneWithoutSignal,
+  clearSwarmCompletionObservation,
+  defaultGetSlotBranchAheadCount,
+  defaultIsSlotWorktreeClean,
+  defaultSendCompletionNudge,
+  resetSwarmCompletionInferenceForTests,
+  swarmInferCompletionMode,
+} from './deacon-swarm-completion.js';
+import { gcMergedSlots } from './deacon-swarm-gc.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
+export { gcMergedSlots } from './deacon-swarm-gc.js';
 
 const execAsync = promisify(exec);
 const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5_000;
@@ -83,6 +95,9 @@ export interface CoordinateSwarmSlotsDeps {
   getAgentRuntimeState: (agentId: string) => Promise<Pick<AgentRuntimeSnapshot, 'resolution'> | null>;
   getPaneOutputDigest: (sessionName: string) => Promise<string>;
   getBranchTipCommitTime: (workspacePath: string, branch: string) => Promise<number | null>;
+  getSlotBranchAheadCount: (workspacePath: string, issueId: string, branch: string) => Promise<number>;
+  isSlotWorktreeClean: (slotWorkspacePath: string) => Promise<boolean>;
+  sendCompletionNudge: (agentId: string, issueId: string) => Promise<void>;
   slotWorktreeExists: (slotWorkspacePath: string) => boolean;
   verifyAndMergeSlot: (
     issue: { issueId: string; featureWorkspace: string },
@@ -144,6 +159,9 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
       return null;
     }
   },
+  getSlotBranchAheadCount: defaultGetSlotBranchAheadCount,
+  isSlotWorktreeClean: defaultIsSlotWorktreeClean,
+  sendCompletionNudge: defaultSendCompletionNudge,
   slotWorktreeExists: existsSync,
   verifyAndMergeSlot,
   applyTaskOperationToPlanFile: (planPath, operation, workspacePath) =>
@@ -191,6 +209,8 @@ export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stal
 
 export interface ClassifyInFlightSlotsOptions {
   workspacePath?: string;
+  issueId?: string;
+  inferCompletion?: SwarmInferCompletionMode;
   stallThresholdMs?: number;
   now?: number;
 }
@@ -200,6 +220,8 @@ export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   exitStatus?: number | null;
   reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
   stalledForMs?: number;
+  signal?: 'inferred';
+  actions?: string[];
 }
 
 interface SlotProgressObservation {
@@ -284,9 +306,14 @@ export async function coordinateSwarmSlots(
         actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
       }
 
-      const classified = await classifyInFlightSlots(reconciled.inFlight, deps, { workspacePath: workspace.workspacePath });
+      const classified = await classifyInFlightSlots(reconciled.inFlight, deps, {
+        workspacePath: workspace.workspacePath,
+        issueId,
+        inferCompletion: swarmInferCompletionMode(),
+      });
       for (const slot of classified) {
-        actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
+        actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}${slot.signal ? ` signal: ${slot.signal}` : ''}`);
+        if (slot.actions) actions.push(...slot.actions);
       }
       actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
@@ -305,66 +332,18 @@ export async function coordinateSwarmSlots(
   return actions;
 }
 
-export async function gcMergedSlots(
-  issueId: string,
-  workspacePath: string,
-  slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'>
-    & Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>> = defaultDeps,
-): Promise<string[]> {
-  const actions: string[] = [];
-  // A freshly dispatched slot branch points at the feature branch HEAD, so
-  // `--merged HEAD` classifies it as merged before the agent's first commit.
-  // Without a liveness guard, gc destroys the worktree/branch/assignment under
-  // the live agent and the item redispatches at the next index — the engine of
-  // the PAN-1791 slot-index runaway. Never gc a slot whose session is alive.
-  const sessionNames = new Set(await deps.listSessionNames());
-  const worktreeExists = deps.slotWorktreeExists ?? existsSync;
-
-  for (const slot of slots) {
-    if (slot.status !== 'merged') continue;
-
-    const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
-    if (sessionNames.has(agentId)) {
-      actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
-      continue;
-    }
-
-    const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;
-    const slotBranch = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
-
-    // Best-effort per step: a gc git failure must degrade to a logged action,
-    // never throw — a throw aborts the whole issue's coordination pass (gc,
-    // merge, AND dispatch), which error-looped every patrol cycle whenever a
-    // slot worktree was already gone or stubborn. The worktree must be gone
-    // before the branch delete is attempted (git refuses to delete a branch
-    // that is still checked out, a natural guard), and the assignment is only
-    // cleared once both are gone so a stuck slot stays visible to reconcile.
-    if (worktreeExists(slotWorkspace)) {
-      try {
-        await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
-      } catch (error) {
-        actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: worktree remove failed: ${error instanceof Error ? error.message : String(error)}`);
-        continue;
-      }
-    }
-    try {
-      await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
-    } catch (error) {
-      actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch delete failed: ${error instanceof Error ? error.message : String(error)}`);
-      continue;
-    }
-    deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
-    actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
-  }
-
-  return actions;
-}
-
 export async function classifyInFlightSlots(
   slots: ReconciledSlotItem[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'isPaneDead' | 'getPaneExitStatus'>
-    & Partial<Pick<CoordinateSwarmSlotsDeps, 'getAgentRuntimeState' | 'getPaneOutputDigest' | 'getBranchTipCommitTime'>> = defaultDeps,
+    & Partial<Pick<
+      CoordinateSwarmSlotsDeps,
+      'getAgentRuntimeState'
+      | 'getPaneOutputDigest'
+      | 'getBranchTipCommitTime'
+      | 'getSlotBranchAheadCount'
+      | 'isSlotWorktreeClean'
+      | 'sendCompletionNudge'
+    >> = defaultDeps,
   options: ClassifyInFlightSlotsOptions = {},
 ): Promise<ClassifiedSwarmSlot[]> {
   const sessionNames = new Set(await deps.listSessionNames());
@@ -405,12 +384,24 @@ export async function classifyInFlightSlots(
         || previous.outputDigest !== outputDigest
       ) {
         slotProgressObservations.set(progressKey, { commitTime, outputDigest, lastProgressAt: now });
+        clearSwarmCompletionObservation(progressKey);
         classified.push({ ...slot, lifecycle: 'running' });
         continue;
       }
 
       const stalledForMs = now - previous.lastProgressAt;
       if (stalledForMs > stallThresholdMs) {
+        const inferred = await classifyDoneWithoutSignal(slot, deps, options, {
+          commitTime,
+          outputDigest,
+          progressKey,
+          stalledForMs,
+        });
+        if (inferred) {
+          classified.push(inferred);
+          continue;
+        }
+
         classified.push({
           ...slot,
           lifecycle: 'stalled',
@@ -514,6 +505,7 @@ export function resetSwarmLoopSafetyForTests(): void {
   issueAdvanceFailures.clear();
   failedMergeBlocks.clear();
   slotProgressObservations.clear();
+  resetSwarmCompletionInferenceForTests();
 }
 
 export function recordSwarmAdvanceFailure(issueId: string, now = Date.now()): void {
