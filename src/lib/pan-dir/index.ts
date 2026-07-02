@@ -43,6 +43,7 @@ export {
 export { appendSession, readSessions } from './sessions.js'
 export { clearFeedback, readFeedback, writeFeedback } from './feedback.js'
 export {
+  checkPrdGateSync,
   deleteIssueDraft,
   getDraftPath,
   getDraftsDir,
@@ -50,8 +51,10 @@ export {
   getIssueDraftPath,
   hasIssueDraft,
   listIssueDrafts,
+  MIN_PRD_LINES,
   readIssueDraft,
   writeIssueDraft,
+  type PrdGateResult,
 } from './drafts.js'
 export { readWorkspaceContext, writeWorkspaceContext } from './context.js'
 
