@@ -33,9 +33,12 @@ export {
   findPlanSync,
   readPlanSync,
   readWorkspacePlanSync,
+  readTierOverrides,
+  recordTierPromotion,
   updateItemStatus,
   updateSubItemStatus,
 } from './io.js';
+export type { TierOverridesMap, TierOverrideState, TierOverrideHistoryEntry } from './io.js';
 
 // Effect-typed IO variants (PAN-1249)
 export {

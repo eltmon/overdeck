@@ -2,7 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { createHash } from 'crypto';
+import {
+  findPlanSync,
+  isPlanningCompleteSync,
+  isPlanningProposed,
+  readPlanSync,
+  readTierOverrides,
+  readWorkspacePlanSync,
+  recordTierPromotion,
+  updateItemStatus,
+  updateSubItemStatus,
+} from '../io.js';
 import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -62,6 +73,10 @@ function writeWorkspaceDraft(doc: VBriefDocument): string {
   const planPath = join(panDir, 'spec.vbrief.json');
   writeFileSync(planPath, JSON.stringify(doc, null, 2));
   return planPath;
+}
+
+function sha256(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 function writeRecord(statusOverrides: Record<string, string>): void {
@@ -242,6 +257,52 @@ describe('readWorkspacePlan', () => {
     const currentView = readWorkspacePlanSync(WORKSPACE_PATH)!;
 
     expect(subItemsOf(currentView.plan.items[0])).toEqual(subItemsOf(legacyView.plan.items[0]));
+  });
+});
+
+describe('tierOverrides', () => {
+  it('round-trips a recorded tier promotion through workspace continue.json', () => {
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'floundering after retry');
+
+    const overrides = readTierOverrides(WORKSPACE_PATH);
+    expect(overrides['item-1'].effectiveDifficulty).toBe('complex');
+    expect(overrides['item-1'].promotions).toBe(1);
+    expect(overrides['item-1'].history).toHaveLength(1);
+    expect(overrides['item-1'].history[0]).toMatchObject({
+      from: 'medium',
+      to: 'complex',
+      reason: 'floundering after retry',
+    });
+    expect(new Date(overrides['item-1'].history[0].at).toString()).not.toBe('Invalid Date');
+  });
+
+  it('increments promotions and appends history without dropping existing continue fields', () => {
+    mkdirSync(join(WORKSPACE_PATH, '.pan'), { recursive: true });
+    writeFileSync(
+      join(WORKSPACE_PATH, '.pan', 'continue.json'),
+      JSON.stringify({ statusOverrides: { 'item-1': 'running' } }, null, 2),
+    );
+
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'first escalation');
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'complex', 'expert', 'second escalation');
+
+    const raw = JSON.parse(readFileSync(join(WORKSPACE_PATH, '.pan', 'continue.json'), 'utf-8'));
+    expect(raw.statusOverrides).toEqual({ 'item-1': 'running' });
+    expect(raw.tierOverrides['item-1'].effectiveDifficulty).toBe('expert');
+    expect(raw.tierOverrides['item-1'].promotions).toBe(2);
+    expect(raw.tierOverrides['item-1'].history.map((entry: { reason: string }) => entry.reason)).toEqual([
+      'first escalation',
+      'second escalation',
+    ]);
+  });
+
+  it('preserves the canonical main spec byte-for-byte when recording a promotion', () => {
+    const specPath = writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
+    const before = sha256(specPath);
+
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'promote after failure');
+
+    expect(sha256(specPath)).toBe(before);
   });
 });
 
