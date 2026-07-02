@@ -1,4 +1,7 @@
+import type { RuntimeName } from '../runtimes/types.js';
 import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
+import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
+import { resolveTieredExecutionEnabled } from './tier-table.js';
 
 export type DispatchTier = 'in-context' | 'registered-slot';
 
@@ -23,4 +26,38 @@ export function chooseDispatchTier(item: Pick<VBriefItem, 'metadata'>): Dispatch
   if (independentlyDispatchable && highConfidenceScope) return 'registered-slot';
 
   return 'in-context';
+}
+
+export interface DispatchTierAssignment {
+  dispatch: DispatchTier;
+  /** Set only when tiered execution resolved a tier for this item. */
+  tierName?: string;
+  model?: string;
+  harness?: RuntimeName;
+}
+
+export interface DispatchTierAssignmentConfig extends ResolveTierConfig {
+  enabled: boolean;
+}
+
+/**
+ * Generalization of the binary dispatch lane into a tier assignment: the
+ * dispatch lane plus, when tiered execution is enabled (globally or via
+ * per-plan override), the (model, harness) resolved through the tier chain
+ * so an item's difficulty actually selects its worker.
+ *
+ * With tiered execution disabled or no config, the result is exactly
+ * chooseDispatchTier's lane with no model or harness attached.
+ */
+export function assignDispatchTier(
+  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  config?: DispatchTierAssignmentConfig,
+  planMetadata?: { [key: string]: unknown },
+): DispatchTierAssignment {
+  const dispatch = chooseDispatchTier(item);
+  if (!config || !resolveTieredExecutionEnabled(config, planMetadata)) {
+    return { dispatch };
+  }
+  const tier = resolveTier(item, config);
+  return { dispatch, tierName: tier.tierName, model: tier.model, harness: tier.harness };
 }

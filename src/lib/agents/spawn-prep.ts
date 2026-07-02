@@ -18,7 +18,10 @@ import { requireModelOverrideSync } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { type Role } from './agent-state.js';
+import { assignDispatchTier } from './dispatch-tier.js';
+import { resolveTieredExecutionEnabled } from './tier-table.js';
 import {
   buildCavemanExports,
   getProviderEnvForModel,
@@ -163,6 +166,53 @@ export function resolveRegisteredSlotSpawn(
     slotIndex,
     slotItemId,
   };
+}
+
+export interface SlotTierSpawnParams {
+  model?: string;
+  harness?: RuntimeName;
+  tierName?: string;
+}
+
+/**
+ * Tiered-execution model resolution for a registered slot spawn (PAN-1791,
+ * fixing PAN-1196's "difficulty captured and ignored"). When tiered execution
+ * is enabled for the plan, resolve the slot item's tier through
+ * assignDispatchTier and return its (model, harness) as spawn params so the
+ * dispatched bead runs on the tier its difficulty selected.
+ *
+ * Returns {} — leaving the existing model resolution untouched — when:
+ * - tiered execution is disabled (globally and per-plan), or
+ * - an explicit per-spawn model override was passed (same precedence as
+ *   determineModel: an explicit override outranks routing), or
+ * - the item carries no difficulty and no per-bead model override, in which
+ *   case the chain's role-default step IS the existing configured
+ *   role-default resolution in determineModel (nothing hardcoded here).
+ */
+export function resolveSlotTierSpawnParams(
+  baseWorkspace: string,
+  slotItemId: string,
+  explicitModel?: string,
+): SlotTierSpawnParams {
+  const tiered = loadYamlConfig().config.tieredExecution;
+  const doc = readWorkspacePlanSync(baseWorkspace);
+  const planMetadata = doc?.plan?.metadata;
+  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
+  if (explicitModel) return {};
+  if (!doc) {
+    throw new Error(
+      `Tiered execution is enabled but no vBRIEF plan is readable in ${baseWorkspace}.`,
+    );
+  }
+  const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
+  if (!item) {
+    throw new Error(
+      `Tiered execution is enabled but item '${slotItemId}' was not found in the plan for ${baseWorkspace}.`,
+    );
+  }
+  if (!item.metadata?.difficulty && !item.metadata?.model) return {};
+  const assignment = assignDispatchTier(item, tiered, planMetadata);
+  return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
 }
 
 /**
