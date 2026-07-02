@@ -956,7 +956,7 @@ describe('conversations route — DB integration', () => {
 
     createConversation({ name: 'older-archived', tmuxSession: 'conv-older', cwd: '/cwd/older', title: 'Older archived' });
     createConversation({ name: 'active-conv', tmuxSession: 'conv-active', cwd: '/cwd/active', title: 'Active' });
-    createConversation({ name: 'newer-archived', tmuxSession: 'conv-newer', cwd: '/cwd/newer', title: 'Newer archived' });
+    createConversation({ name: 'newer-archived', tmuxSession: 'conv-newer', cwd: '/cwd/newer', title: 'Newer archived', harness: 'codex' });
     archiveConversation('older-archived');
     archiveConversation('newer-archived');
     db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-22T00:00:00.000Z', 'older-archived');
@@ -970,6 +970,7 @@ describe('conversations route — DB integration', () => {
     expect(rows.map((row) => row.conversationName)).not.toContain('active-conv');
     expect(rows[0]).toMatchObject({
       source: 'managed-archived',
+      harness: 'codex',
       overdeckManaged: true,
       archivedAt: '2026-05-23T00:00:00.000Z',
     });
@@ -1034,6 +1035,23 @@ describe('conversations route — DB integration', () => {
     expect(rows.map((row) => row.conversationName)).toEqual(['matching-archived']);
   });
 
+  it('preserves and filters archived conversations by harness', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({ name: 'codex-archived', tmuxSession: 'conv-codex', cwd: '/cwd/codex', harness: 'codex' });
+    createConversation({ name: 'pi-archived', tmuxSession: 'conv-pi', cwd: '/cwd/pi', harness: 'ohmypi' });
+    archiveConversation('codex-archived');
+    archiveConversation('pi-archived');
+
+    const response = await handleArchivedConversationsList({ harness: 'codex' });
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['codex-archived']);
+    expect(rows[0]).toMatchObject({ harness: 'codex' });
+  });
+
   it('normalizes relative since values when parsing archived conversation filters', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
@@ -1041,9 +1059,10 @@ describe('conversations route — DB integration', () => {
     try {
       const { parseArchivedConversationListOptions } = await import('../conversations.js');
 
-      const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50'));
+      const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50&harness=codex'));
 
       expect(options.since).toBe('2026-05-16T12:00:00.000Z');
+      expect(options.harness).toBe('codex');
     } finally {
       vi.useRealTimers();
     }

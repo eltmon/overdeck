@@ -696,6 +696,7 @@ export interface ArchivedConversationWithEnrichment {
 }
 
 export interface ArchivedConversationListOptions {
+  harness?: RuntimeName;
   workspacePath?: string;
   primaryModel?: string;
   unmanaged?: boolean;
@@ -1023,20 +1024,6 @@ export function listArchivedConversations(): LegacyConversation[] {
   return rows.map(rowToLegacyConversation);
 }
 
-function matchesArchivedOptions(conv: ArchivedConversationWithEnrichment, options: ArchivedConversationListOptions): boolean {
-  if (options.workspacePath !== undefined && conv.cwd !== options.workspacePath) return false;
-  if (options.primaryModel !== undefined && conv.primaryModel !== options.primaryModel && conv.model !== options.primaryModel) return false;
-  if (options.issueId !== undefined && conv.issueId !== options.issueId) return false;
-  if (options.since !== undefined && (conv.lastTs ?? conv.archivedAt) < options.since) return false;
-  if (options.before !== undefined && (conv.lastTs ?? conv.archivedAt) >= options.before) return false;
-  if (options.after !== undefined && (conv.firstTs ?? conv.createdAt) < options.after) return false;
-  if (options.minCost !== undefined && (conv.estimatedCost ?? conv.totalCost) < options.minCost) return false;
-  if (options.maxCost !== undefined && (conv.estimatedCost ?? conv.totalCost) > options.maxCost) return false;
-  if (options.minMessages !== undefined && (conv.messageCount ?? 0) < options.minMessages) return false;
-  if (options.unmanaged === true) return false;
-  return true;
-}
-
 export function listArchivedConversationsWithEnrichment(options: ArchivedConversationListOptions = {}): ArchivedConversationWithEnrichment[] {
   ensureDiscoveredSessionsSchema();
   const db = overdeckDb();
@@ -1051,6 +1038,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   const messageCount = `COALESCE(ds.message_count, 0)`;
   const enrichmentLevel = `COALESCE(ds.enrichment_level, 0)`;
 
+  if (options.harness !== undefined) { conditions.push('c.harness = ?'); params.push(options.harness); }
   if (options.workspacePath !== undefined) { conditions.push('c.cwd = ?'); params.push(options.workspacePath); }
   if (options.primaryModel !== undefined) { conditions.push(`${primaryModel} = ?`); params.push(options.primaryModel); }
   if (options.issueId !== undefined) { conditions.push('c.issue_id = ?'); params.push(options.issueId); }

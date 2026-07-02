@@ -2322,6 +2322,7 @@ type ArchivedConversationResponse = {
   id: number;
   source: 'managed-archived';
   conversationName: string;
+  harness: ArchivedConversationWithEnrichment['harness'];
   jsonlPath: string | null;
   workspacePath: string;
   primaryModel: string | null;
@@ -2358,6 +2359,7 @@ function mapArchivedConversation(row: ArchivedConversationWithEnrichment): Archi
     id: row.id,
     source: 'managed-archived',
     conversationName: row.name,
+    harness: row.harness,
     jsonlPath: row.discoveredJsonlPath ?? (canUseClaudePathFallback && row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
     workspacePath: row.cwd,
     primaryModel: row.primaryModel ?? row.model,
@@ -2389,6 +2391,7 @@ function parseOptionalNumberParam(params: URLSearchParams, name: string): number
 export function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
   const options: ArchivedConversationListOptions = {};
   const workspacePath = params.get('workspacePath');
+  const harness = params.get('harness');
   const primaryModel = params.get('primaryModel');
   const since = params.get('since');
   const tag = params.get('tag');
@@ -2401,6 +2404,7 @@ export function parseArchivedConversationListOptions(params: URLSearchParams): A
   const rawOffset = parseOptionalNumberParam(params, 'offset');
 
   if (workspacePath) options.workspacePath = workspacePath;
+  if (harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex') options.harness = harness;
   if (primaryModel) options.primaryModel = primaryModel;
   if (since) options.since = parseRelativeTime(since);
   if (params.get('managed') === 'true') options.managed = true;
