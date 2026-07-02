@@ -47,6 +47,7 @@ import {
   type PanIssuePipelineRecord,
   type PanIssueUsageRecord,
 } from './record.js';
+import { withIssueRecordLock } from './record-lock.js';
 
 export type {
   PanIssueRecord,
@@ -279,21 +280,23 @@ export async function updateIssueRecordForIssue(
     const project = getProjectSync(resolved.projectKey);
     if (!project) return;
 
-    const record = await buildIssueRecord(project, issueId, { reviewStatus });
-    // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
-    // anything written to the record during that window would be erased by this
-    // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
-    // slot assignments during the runaway, then wiped item statusOverrides right
-    // after `pan done` — which made every completed item dispatchable again and
-    // re-spawned slots for finished work. Re-read both blocks synchronously
-    // immediately before writing so the freshest values survive the rebuild.
-    const fresh = readIssueRecordSync(project, issueId);
-    if (fresh?.swarm) record.swarm = fresh.swarm;
-    if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
-      record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
-    }
-    const recordPath = writeIssueRecordSync(project, issueId, record);
-    queueIssueRecordCommit(project, issueId, recordPath);
+    await withIssueRecordLock(issueId, async () => {
+      const record = await buildIssueRecord(project, issueId, { reviewStatus });
+      // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
+      // anything written to the record during that window would be erased by this
+      // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
+      // slot assignments during the runaway, then wiped item statusOverrides right
+      // after `pan done` — which made every completed item dispatchable again and
+      // re-spawned slots for finished work. Re-read both blocks synchronously
+      // immediately before writing so the freshest values survive the rebuild.
+      const fresh = readIssueRecordSync(project, issueId);
+      if (fresh?.swarm) record.swarm = fresh.swarm;
+      if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
+        record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
+      }
+      const recordPath = writeIssueRecordSync(project, issueId, record);
+      queueIssueRecordCommit(project, issueId, recordPath);
+    });
   } catch (err) {
     console.warn(`[pan-dir/records] Failed to update record for ${issueId}: ${(err as Error).message}`);
   }

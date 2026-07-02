@@ -1,5 +1,7 @@
+import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -9,12 +11,26 @@ import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import {
+  classifyInFlightSlots,
+  clearAllSlotAssignments,
+  clearFailedMergeBlock,
   coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
+  type ClassifiedSwarmSlot,
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
+import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
+import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
+import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
+import { stopAgentSync } from '../../lib/agents.js';
+import { listSessionNamesSync } from '../../lib/tmux.js';
+import { removeAgentSync } from '../../lib/overdeck/agents.js';
+
+const execAsync = promisify(exec);
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
 
@@ -43,6 +59,37 @@ export interface SwarmCommandResult {
 export interface SwarmRecoverOptions {
   action?: SwarmRecoveryAction;
 }
+
+export interface SwarmFreezeOptions {
+  reason?: string;
+}
+
+export interface SwarmHoldCommandDeps {
+  getReviewStatusSync: typeof getReviewStatusSync;
+  setDeaconIgnored: typeof setDeaconIgnored;
+  appendOperatorInterventionEvent: typeof appendOperatorInterventionEvent;
+  console: ConsoleLike;
+}
+
+const defaultHoldDeps: SwarmHoldCommandDeps = {
+  getReviewStatusSync,
+  setDeaconIgnored,
+  appendOperatorInterventionEvent,
+  console,
+};
+
+export interface SwarmStopCommandDeps extends SwarmHoldCommandDeps {
+  listSlotAgents: typeof listSlotAgents;
+  listSessionNamesSync: () => string[];
+  stopAgentSync: (agentId: string) => void;
+}
+
+const defaultStopDeps: SwarmStopCommandDeps = {
+  ...defaultHoldDeps,
+  listSlotAgents,
+  listSessionNamesSync,
+  stopAgentSync,
+};
 
 const defaultDeps: SwarmCommandDeps = {
   resolveProjectFromIssueSync,
@@ -75,11 +122,13 @@ export async function swarmCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
-  // Single dispatch door (PAN-2214): route through the same full coordination
-  // pass the Deacon runs — real slot reconciliation, the statusOverrides
-  // merged-plan view, merge, and gc — instead of dispatching against a
-  // fabricated empty reconciliation. The old path re-dispatched already
-  // completed items (it saw no merged work) and raced live slots.
+  // Manual dispatch runs the IDENTICAL reconcile → classify → merge → gc →
+  // dispatch pipeline the Deacon patrol runs — including the operator-hold
+  // skip, advance backoff, failed-merge block, duplicate guards, bounded
+  // allocation, and the per-spawn freeze gate. The old path called
+  // dispatchNextWave with an EMPTY reconcile result and raced the Deacon
+  // (PAN-2214). Re-running the command is idempotent: already-dispatched
+  // work is reconciled, not re-spawned.
   const actions = await deps.coordinateSwarmSlots({ issueId: issue });
 
   if (actions.length === 0) {
@@ -87,7 +136,16 @@ export async function swarmCommand(
   } else {
     for (const action of actions) deps.console.log(action);
   }
-  deps.console.log(chalk.dim('Ongoing swarm coordination will continue in Deacon.'));
+
+  const holdSkip = actions.find(action => action.includes('operator hold'));
+  if (holdSkip) {
+    deps.console.log(chalk.yellow(
+      `${issue} is under an operator hold, so the coordinator skipped it and dispatched nothing. `
+      + `Run \`pan swarm resume ${issue}\` to lift the hold and re-enable swarm coordination.`,
+    ));
+  } else {
+    deps.console.log(chalk.dim('Ongoing swarm coordination will continue in Deacon.'));
+  }
 
   return { ok: true, actions, workspacePath };
 }
@@ -134,6 +192,433 @@ export async function swarmRecoverCommand(
   return { ok: true, actions, workspacePath };
 }
 
+export async function swarmFreezeCommand(
+  issueId: string,
+  options: SwarmFreezeOptions = {},
+  deps: SwarmHoldCommandDeps = defaultHoldDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const status = safeGetReviewStatus(issue, deps);
+  if (status?.deaconIgnored) {
+    deps.console.log(chalk.yellow(
+      `${issue} is already frozen — the Deacon is already skipping all swarm coordination for it. `
+      + `Run \`pan swarm resume ${issue}\` to lift the hold.`,
+    ));
+    return { ok: true };
+  }
+
+  deps.setDeaconIgnored(issue, true, options.reason ?? 'swarm freeze via pan swarm freeze');
+  await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm freeze' });
+  deps.console.log(chalk.green(`Froze swarm coordination for ${issue}.`));
+  deps.console.log(
+    `The Deacon will now skip all swarm coordination for ${issue} on every patrol — no slot reconciliation, `
+    + `no slot merging, no slot garbage collection, and no new slot dispatch will run for this issue until you run `
+    + `\`pan swarm resume ${issue}\`. Slot agents that are already running keep running; freeze only stops the `
+    + 'Deacon from acting on the issue.',
+  );
+  return { ok: true };
+}
+
+export async function swarmResumeCommand(
+  issueId: string,
+  deps: SwarmHoldCommandDeps = defaultHoldDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const status = safeGetReviewStatus(issue, deps);
+  if (!status?.deaconIgnored) {
+    deps.console.log(chalk.yellow(
+      `${issue} is already resumed — no swarm freeze is set, so the Deacon is coordinating it normally.`,
+    ));
+    return { ok: true };
+  }
+
+  deps.setDeaconIgnored(issue, false);
+  await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'unpause', source: 'pan swarm resume' });
+  deps.console.log(chalk.green(`Resumed swarm coordination for ${issue}.`));
+  deps.console.log(
+    `The freeze on ${issue} is lifted — the Deacon will pick this issue back up on its next patrol cycle and `
+    + 'resume slot reconciliation, merging, garbage collection, and dispatch.',
+  );
+  return { ok: true };
+}
+
+export async function swarmStopCommand(
+  issueId: string,
+  options: SwarmFreezeOptions = {},
+  deps: SwarmStopCommandDeps = defaultStopDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const issueLower = issue.toLowerCase();
+
+  // Hold FIRST so the Deacon cannot re-spawn slots while they are being stopped
+  // (the PAN-1791 incident race: operator removes slots, Deacon re-dispatches them).
+  const status = safeGetReviewStatus(issue, deps);
+  if (status?.deaconIgnored) {
+    deps.console.log(chalk.yellow(`${issue} is already frozen — keeping the existing hold in place.`));
+  } else {
+    deps.setDeaconIgnored(issue, true, options.reason ?? 'swarm stop via pan swarm stop');
+  }
+  await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm stop' });
+
+  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-\\d+$`);
+  const liveAgentIds = new Set<string>();
+  for (const sessionName of deps.listSessionNamesSync()) {
+    if (slotAgentPattern.test(sessionName)) liveAgentIds.add(sessionName);
+  }
+  for (const agent of deps.listSlotAgents(issue)) {
+    if (agent.status === 'running' || agent.status === 'starting') liveAgentIds.add(agent.agentId);
+  }
+
+  if (liveAgentIds.size === 0) {
+    deps.console.log(chalk.green(
+      `No slot agents are running for ${issue} — nothing to stop. The swarm hold is set, so the Deacon will `
+      + `skip all swarm coordination for this issue until you run \`pan swarm resume ${issue}\`.`,
+    ));
+    return { ok: true };
+  }
+
+  let failures = 0;
+  for (const agentId of [...liveAgentIds].sort()) {
+    try {
+      deps.stopAgentSync(agentId);
+      deps.console.log(`Stopped slot agent ${agentId}`);
+    } catch (error) {
+      failures += 1;
+      deps.console.error(chalk.red(
+        `Failed to stop ${agentId}: ${error instanceof Error ? error.message : String(error)}`,
+      ));
+    }
+  }
+
+  deps.console.log(chalk.green(
+    `Swarm stopped for ${issue}: ${liveAgentIds.size - failures} of ${liveAgentIds.size} slot agent(s) stopped.`,
+  ));
+  deps.console.log(
+    'All slot branches and worktrees are preserved — stopping deletes no work. The Deacon will skip all swarm '
+    + `coordination for ${issue} until you run \`pan swarm resume ${issue}\` to re-enable it.`,
+  );
+  return { ok: failures === 0 };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export interface SwarmResetOptions {
+  force?: boolean;
+  reason?: string;
+}
+
+export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
+  resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
+  runGitCommand: (command: string, cwd: string) => Promise<unknown>;
+  clearAllSlotAssignments: typeof clearAllSlotAssignments;
+  clearFailedMergeBlock: typeof clearFailedMergeBlock;
+  removeAgentSync: (agentId: string) => void;
+}
+
+const defaultResetDeps: SwarmResetCommandDeps = {
+  ...defaultStopDeps,
+  resolveProjectFromIssueSync,
+  runGitCommand: (command, cwd) => execAsync(command, { cwd }),
+  clearAllSlotAssignments,
+  clearFailedMergeBlock,
+  removeAgentSync,
+};
+
+/**
+ * Work-preserving swarm reset (PAN-2214). Stops the swarm (hold first), pushes
+ * every UNMERGED local slot branch to origin BEFORE deleting anything, removes
+ * slot worktrees and local slot branches, clears recorded slot assignments and
+ * any failed-merge block, and retires dead slot agent records. The
+ * hold stays set afterward so the Deacon cannot race the cleanup — the
+ * operator re-enables coordination with `pan swarm resume`.
+ */
+export async function swarmResetCommand(
+  issueId: string,
+  options: SwarmResetOptions = {},
+  deps: SwarmResetCommandDeps = defaultResetDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const issueLower = issue.toLowerCase();
+
+  const project = deps.resolveProjectFromIssueSync(issue);
+  if (!project) {
+    deps.console.error(chalk.red(`Could not resolve project for ${issue}.`));
+    return { ok: false };
+  }
+  const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
+
+  const stopResult = await swarmStopCommand(issue, { reason: options.reason ?? 'swarm reset via pan swarm reset' }, deps);
+  if (!stopResult.ok) {
+    deps.console.error(chalk.red(
+      `Aborting reset for ${issue}: stopping slot agents failed (see above). Nothing was deleted. `
+      + 'Stop the failing agents manually, then re-run the reset.',
+    ));
+    return { ok: false };
+  }
+
+  const branches = await listLocalSlotBranches(issue, workspacePath, deps.runGitCommand);
+  const unmerged = branches.filter(branch => !branch.merged);
+
+  // Push every unmerged branch BEFORE any deletion — never delete unpushed
+  // unmerged work silently.
+  const pushed: string[] = [];
+  for (const { branch } of unmerged) {
+    try {
+      await deps.runGitCommand(`git push origin ${JSON.stringify(branch)}`, workspacePath);
+      pushed.push(branch);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!options.force) {
+        deps.console.error(chalk.red(
+          `Aborting reset for ${issue}: pushing unmerged branch ${branch} to origin failed (${message}). `
+          + 'Nothing was deleted.',
+        ));
+        deps.console.error(
+          `Fix the push (network, auth, remote state) and re-run \`pan swarm reset ${issue}\`, or pass --force `
+          + 'to delete the branch even though origin has no backup of it.',
+        );
+        return { ok: false };
+      }
+      deps.console.log(chalk.yellow(
+        `--force: continuing even though ${branch} could not be pushed to origin (${message}) — its commits `
+        + 'will exist only in reflog after deletion.',
+      ));
+    }
+  }
+
+  // Worktrees first (a branch checked out in a worktree cannot be deleted),
+  // then local slot branches.
+  const worktrees = await listSlotWorktreePaths(workspacePath, deps.runGitCommand);
+  for (const worktreePath of worktrees) {
+    await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktreePath)}`, workspacePath);
+  }
+  for (const { branch } of branches) {
+    await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, workspacePath);
+  }
+
+  deps.clearAllSlotAssignments(workspacePath, issue);
+  deps.clearFailedMergeBlock(issue, workspacePath);
+
+  // No stale running registration may survive: mark live-status rows stopped.
+  let stoppedRows = 0;
+  for (const agent of deps.listSlotAgents(issue)) {
+    if (agent.status === 'running' || agent.status === 'starting') {
+      try {
+        deps.stopAgentSync(agent.agentId);
+        stoppedRows += 1;
+      } catch (error) {
+        deps.console.error(chalk.red(
+          `Failed to mark ${agent.agentId} stopped: ${error instanceof Error ? error.message : String(error)}`,
+        ));
+      }
+    }
+  }
+
+  const liveSessions = new Set(deps.listSessionNamesSync());
+  const retiredAgents: string[] = [];
+  const skippedLiveAgents: string[] = [];
+  for (const agent of deps.listSlotAgents(issue)) {
+    if (liveSessions.has(agent.agentId)) {
+      skippedLiveAgents.push(agent.agentId);
+      continue;
+    }
+    if (agent.status === 'running' || agent.status === 'starting') continue;
+
+    deps.removeAgentSync(agent.agentId);
+    retiredAgents.push(agent.agentId);
+  }
+
+  deps.console.log(chalk.green(`Swarm reset complete for ${issue}.`));
+  deps.console.log(
+    `Pushed to origin: ${pushed.length > 0 ? pushed.join(', ') : 'nothing (no unmerged slot branches needed a backup)'}. `
+    + `Removed ${worktrees.length} slot worktree(s) and ${branches.length} local slot branch(es). `
+    + `Cleared the recorded slot assignments and any failed-merge block`
+    + `${stoppedRows > 0 ? `, marked ${stoppedRows} lingering slot agent row(s) stopped` : ''}`
+    + `${retiredAgents.length > 0 ? `, and retired ${retiredAgents.length} dead slot agent record(s): ${retiredAgents.join(', ')}` : ', and retired no dead slot agent records'}`
+    + `${skippedLiveAgents.length > 0 ? `. Skipped live slot agent session(s): ${skippedLiveAgents.join(', ')}` : ''}.`,
+  );
+  deps.console.log(
+    `The swarm hold REMAINS SET — the Deacon still skips all swarm coordination for ${issue}, so nothing can `
+    + `re-spawn behind this cleanup. Run \`pan swarm resume ${issue}\` to re-enable coordination `
+    + `(then \`pan swarm ${issue}\` to dispatch a fresh wave immediately).`,
+  );
+  return { ok: true };
+}
+
+async function listLocalSlotBranches(
+  issueId: string,
+  workspacePath: string,
+  runGitCommand: SwarmResetCommandDeps['runGitCommand'],
+): Promise<Array<{ branch: string; merged: boolean }>> {
+  const issueLower = issueId.toLowerCase();
+  let names: string[] = [];
+  try {
+    const result = await runGitCommand(
+      `git for-each-ref --format="%(refname:short)" "refs/heads/feature/${issueLower}-slot-*"`,
+      workspacePath,
+    ) as { stdout?: unknown };
+    names = String(result?.stdout ?? '').split('\n').map(line => line.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+
+  const branches: Array<{ branch: string; merged: boolean }> = [];
+  for (const branch of names) {
+    let merged = false;
+    try {
+      const result = await runGitCommand(`git rev-list --count HEAD..${JSON.stringify(branch)}`, workspacePath) as { stdout?: unknown };
+      const aheadCount = Number(String(result?.stdout ?? '').trim());
+      // An unknown ahead-count is treated as unmerged so the branch gets
+      // pushed before deletion — the safe direction.
+      merged = Number.isFinite(aheadCount) && aheadCount === 0;
+    } catch {
+      merged = false;
+    }
+    branches.push({ branch, merged });
+  }
+  return branches;
+}
+
+async function listSlotWorktreePaths(
+  workspacePath: string,
+  runGitCommand: SwarmResetCommandDeps['runGitCommand'],
+): Promise<string[]> {
+  try {
+    const result = await runGitCommand('git worktree list --porcelain', workspacePath) as { stdout?: unknown };
+    const prefix = `worktree ${workspacePath}-slot-`;
+    return String(result?.stdout ?? '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith(prefix))
+      .map(line => line.slice('worktree '.length));
+  } catch {
+    return [];
+  }
+}
+
+function safeGetReviewStatus(
+  issueId: string,
+  deps: Pick<SwarmHoldCommandDeps, 'getReviewStatusSync'>,
+): ReturnType<typeof getReviewStatusSync> {
+  try {
+    return deps.getReviewStatusSync(issueId);
+  } catch {
+    return null;
+  }
+}
+
+export interface SwarmStatusCommandDeps {
+  resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
+  findSpecByIssue: typeof findSpecByIssue;
+  reconcileSlotState: typeof reconcileSlotState;
+  classifyInFlightSlots: (
+    slots: Parameters<typeof classifyInFlightSlots>[0],
+    workspacePath: string,
+  ) => Promise<ClassifiedSwarmSlot[]>;
+  getReviewStatusSync: typeof getReviewStatusSync;
+  listSessionNamesSync: () => string[];
+  getConcurrencyLimits: typeof getConcurrencyLimits;
+  countRunningSwarmSlotsForIssue: (issueId: string) => number;
+  console: ConsoleLike;
+}
+
+const defaultStatusDeps: SwarmStatusCommandDeps = {
+  resolveProjectFromIssueSync,
+  findSpecByIssue,
+  reconcileSlotState,
+  classifyInFlightSlots: (slots, workspacePath) => classifyInFlightSlots(slots, undefined, { workspacePath }),
+  getReviewStatusSync,
+  listSessionNamesSync,
+  getConcurrencyLimits,
+  countRunningSwarmSlotsForIssue,
+  console,
+};
+
+/**
+ * Read-only reconciled view of an issue's swarm: per-slot rows, the operator
+ * hold state, and slot capacity. Performs no writes, no git mutation, and no
+ * dispatch (PAN-2214).
+ */
+export async function swarmStatusCommand(
+  issueId: string,
+  deps: SwarmStatusCommandDeps = defaultStatusDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const issueLower = issue.toLowerCase();
+  const loaded = await loadSwarmPlan(issue, deps);
+  if (!loaded.ok) {
+    deps.console.error(chalk.red(loaded.error));
+    return { ok: false };
+  }
+
+  const workspacePath = join(loaded.project.projectPath, 'workspaces', `feature-${issueLower}`);
+  const reconciled = await deps.reconcileSlotState(issue, workspacePath, loaded.doc);
+  const classified = await deps.classifyInFlightSlots(reconciled.inFlight, workspacePath);
+  const lifecycleBySlot = new Map(classified.map(slot => [slot.slotIndex, slot.lifecycle]));
+  const branchMergedBySlot = new Map(reconciled.branches.map(branch => [branch.slotIndex, branch.merged]));
+  const liveSessions = new Set(safeListSessionNames(deps));
+
+  deps.console.log(chalk.bold(`Swarm status for ${issue}`));
+
+  const hold = safeGetReviewStatus(issue, deps);
+  if (hold?.deaconIgnored) {
+    const reason = hold.deaconIgnoredReason ? ` Reason: ${hold.deaconIgnoredReason}.` : '';
+    deps.console.log(
+      `Hold: deacon-ignored — the Deacon skips all swarm coordination (reconcile, merge, garbage collection, `
+      + `and dispatch) for this issue until you run \`pan swarm resume ${issue}\`.${reason}`,
+    );
+  } else if (hold?.stuck) {
+    const reason = hold.stuckReason ? ` Reason: ${hold.stuckReason}.` : '';
+    deps.console.log(
+      `Hold: stuck — the issue is flagged stuck, so the Deacon skips all swarm coordination for it until the `
+      + `flag is cleared.${reason}`,
+    );
+  } else {
+    deps.console.log('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
+  }
+
+  const limits = deps.getConcurrencyLimits();
+  const liveSlotCount = deps.countRunningSwarmSlotsForIssue(issue);
+  deps.console.log(
+    `Capacity: ${liveSlotCount} of ${limits.reservedSwarmSlots} swarm slots in use `
+    + '(tmux-alive slot sessions counted against the reserved swarm slot limit).',
+  );
+
+  const rows = [
+    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' })),
+    ...reconciled.inFlight.map(slot => ({ ...slot, lifecycle: lifecycleBySlot.get(slot.slotIndex) ?? 'running' })),
+  ].sort((a, b) => a.slotIndex - b.slotIndex);
+
+  if (rows.length === 0) {
+    deps.console.log('Slots: none — nothing is dispatched right now, and no merged slot state remains.');
+    return { ok: true };
+  }
+
+  deps.console.log('Slots:');
+  for (const row of rows) {
+    const branch = row.branch ?? `feature/${issueLower}-slot-${row.slotIndex}`;
+    const branchState = branchMergedBySlot.get(row.slotIndex) === undefined
+      ? 'no local branch'
+      : branchMergedBySlot.get(row.slotIndex) ? 'merged' : 'unmerged';
+    const sessionName = row.agentId ?? `agent-${issueLower}-slot-${row.slotIndex}`;
+    const sessionState = liveSessions.has(sessionName) ? 'session alive' : 'session dead';
+    deps.console.log(
+      `  slot ${row.slotIndex} · item ${row.itemId} · ${row.lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
+    );
+  }
+  return { ok: true };
+}
+
+function safeListSessionNames(deps: Pick<SwarmStatusCommandDeps, 'listSessionNamesSync'>): string[] {
+  try {
+    return deps.listSessionNamesSync();
+  } catch {
+    return [];
+  }
+}
+
 export function registerSwarmCommands(program: Command): void {
   const swarm = program
     .command('swarm <id>')
@@ -149,6 +634,50 @@ export function registerSwarmCommands(program: Command): void {
     .option('--action <action>', 'Recovery action: retry, drop, or handoff', 'retry')
     .action(async (id: string, slotIndex: string, options: SwarmRecoverOptions) => {
       const result = await swarmRecoverCommand(id, slotIndex, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('freeze <id>')
+    .description('Freeze swarm coordination for an issue: the Deacon skips it until resume')
+    .option('--reason <text>', 'Reason recorded on the hold')
+    .action(async (id: string, options: SwarmFreezeOptions) => {
+      const result = await swarmFreezeCommand(id, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('resume <id>')
+    .description('Resume swarm coordination for a frozen issue on the next Deacon patrol')
+    .action(async (id: string) => {
+      const result = await swarmResumeCommand(id);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('status <id>')
+    .description('Read-only reconciled swarm state: per-slot rows, hold state, and capacity')
+    .action(async (id: string) => {
+      const result = await swarmStatusCommand(id);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('stop <id>')
+    .description('Freeze swarm coordination, then stop all live slot agents (branches and worktrees preserved)')
+    .option('--reason <text>', 'Reason recorded on the hold')
+    .action(async (id: string, options: SwarmFreezeOptions) => {
+      const result = await swarmStopCommand(id, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('reset <id>')
+    .description('Work-preserving reset: stop slots, push unmerged slot branches to origin, remove slot worktrees/branches, retire dead slot records, clear recorded slot state (hold stays set)')
+    .option('--force', 'Continue deleting even when pushing an unmerged branch to origin fails')
+    .option('--reason <text>', 'Reason recorded on the hold')
+    .action(async (id: string, options: SwarmResetOptions) => {
+      const result = await swarmResetCommand(id, options);
       if (!result.ok) process.exitCode = 1;
     });
 }

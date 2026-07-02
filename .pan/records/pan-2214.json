@@ -1,23 +1,133 @@
 {
   "issueId": "PAN-2214",
   "schemaVersion": 2,
-  "created": "2026-07-02T06:17:57.564Z",
-  "updated": "2026-07-02T06:17:57.564Z",
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2214",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "passed",
+    "verificationStatus": "failed",
+    "inspectStatus": "passed",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T06:17:57.564Z"
+    "updatedAt": "2026-07-02T20:12:46.647Z",
+    "verificationNotes": "Acceptance criteria check FAILED \u2014 25/25 AC incomplete:\n\n### Merge origin/main into feature/pan-2214, prune duplicates per PRD landed table, re-prove gates (4/4 incomplete)\n  - [ ] Given the completed item, `git merge-base --is-ancestor origin/main HEAD` exits 0 \u2014 the branch contains all of current main with no rebase or force-push\n  - [ ] Given the merged branch, When npx vitest run executes the four previously-failing sentinel suites (deacon-swarm-synthesis, foreman-swarm, auto-resume-gating, synced-skills), Then vitest exits 0 with zero failed tests\n  - [ ] Given the merged branch, When npm run typecheck and npm run lint execute, Then both exit 0\n  - [ ] The merged deacon-swarm.ts preserves exactly one implementation each of the gc liveness guard and dispatch-eligibility gating (main's) alongside the branch's per-spawn freeze gate and bounded allocator \u2014 proven by deacon-swarm-gc, deacon-swarm-hold, and deacon-swarm-dispatch suites passing\n\n### FR-12: per-issue async mutex serializing .pan/records read-modify-write (4/4 incomplete)\n  - [ ] Given two concurrent updateIssueRecordForIssue calls for the same issue, When both resolve, Then the test's execution-order log proves the second rebuild started only after the first's write completed\n  - [ ] Given swarm.slotAssignments written via writeIssueRecordForWorkspaceSync while a rebuild is in flight, When the rebuild completes, Then the final record preserves the slot assignments (PAN-1791 wipe regression)\n  - [ ] Given concurrent updateIssueRecordForIssue calls for two different issues, Then their critical sections overlap in the order log \u2014 the mutex is per-issue, not global\n  - [ ] writeIssueRecordSync and writeIssueRecordForWorkspaceSync remain synchronous functions (no signature change), and each carries the never-split-by-await invariant comment\n\n### FR-13: done-without-signal detection in classifyInFlightSlots, gated by swarm.infer_completion (5/5 incomplete)\n  - [ ] Given infer_completion='nudge' and a live slot idle past threshold with commits ahead and a clean worktree, Then classifyInFlightSlots emits exactly one nudge action containing `pan done` and does not repeat it on the next unchanged observation\n  - [ ] Given infer_completion='auto' and the done-signature holding across a second consecutive idle expiry, Then the slot classifies ready-to-merge and the action log contains a `signal: inferred` marker\n  - [ ] Given infer_completion='off', Then classification output preserves current behavior for the same inputs (running/stalled only, no nudges, no inference)\n  - [ ] Given a dirty slot worktree OR zero commits ahead, Then no nudge fires and no inference happens regardless of mode \u2014 the slot falls back to the existing stalled classification\n  - [ ] Given the new completion-inference suite, When it runs, Then it exits 0 driving all timing through fake timers or the injected `now` option \u2014 no real-clock waits appear in the tests\n\n### FR-14: pan swarm reset retires dead slot agent records via removeAgentSync (4/4 incomplete)\n  - [ ] Given a reset where slot agents are stopped/pause-gated with no live tmux session, Then swarmResetCommand calls removeAgentSync for each and the summary output names the retired agent ids\n  - [ ] Given a slot agent whose tmux session is alive, Then reset never calls removeAgentSync for it and reports it as skipped\n  - [ ] Retirement preserves JSONL transcripts \u2014 the test asserts removal goes through the injected removeAgentSync dep and no transcript path is unlinked\n  - [ ] A second reset run with nothing left to retire exits 0 with a no-op summary (idempotent), and the pan-swarm SKILL.md documents record retirement in the same commit (lint passes)\n\n### FR-15: swarm-aware feedback target resolver replaces hardcoded agent-<issue> delivery (4/4 incomplete)\n  - [ ] Given a swarm issue with live slot agents and no whole-issue agent, When test-failure feedback is delivered, Then messageAgent receives the slot agent id (agent-<issue>-slot-N), not agent-<issue>\n  - [ ] Given opts.itemId matching a slot assignment with a live session, Then the resolver returns that specific slot agent rather than an arbitrary live slot\n  - [ ] Given no whole-issue agent and no live slot agents, Then delivery emits a needs-you operator notification carrying the undelivered reason and never returns silently\n  - [ ] Given a normal single-agent issue with agent-<issue> running, Then delivery behavior is unchanged (messageAgent receives agent-<issue>)\n\n### FR-16: state-derived verification gates never silently reset a passed review verdict (4/4 incomplete)\n  - [ ] Given reviewStatus='passed' and the vbrief-ac gate finding incomplete ACs, Then verification records verificationStatus='failed' while reviewStatus remains 'passed'\n  - [ ] Given that held-verdict case, Then a needs-you operator notification is emitted naming the vbrief-ac gate and the incomplete-AC cause\n  - [ ] Given a code-gate failure (typecheck/lint/test), Then the existing requeue behavior is preserved and the reviewStatus transition carries its reason in verificationNotes\n  - [ ] Given vbrief-ac failing while reviewStatus is not 'passed', Then no needs-you notification fires (normal retry feedback only)",
+    "mergeNotes": "Post-rebase verification failed at vbrief-ac",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2221",
+    "reviewedAtCommit": "988a85a2a51b0d83bffd802f4a2b4f257b90a00c",
+    "lastVerifiedCommit": "1d26189af071831fafe39586fdbde7dc78865806"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 5319,
+            "output": 91503,
+            "cacheRead": 94959747,
+            "cacheWrite": 1870883
+          }
+        },
+        "inspect-deep": {
+          "anthropic/claude-fable-5": {
+            "input": 13861,
+            "output": 4520,
+            "cacheRead": 382516,
+            "cacheWrite": 90407
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 69216,
+            "output": 3435,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 47821,
+            "output": 109094,
+            "cacheRead": 13035234,
+            "cacheWrite": 674657
+          }
+        },
+        "review": {
+          "anthropic/claude-fable-5": {
+            "input": 61004,
+            "output": 81328,
+            "cacheRead": 10080844,
+            "cacheWrite": 2197838
+          }
+        },
+        "work": {
+          "anthropic/claude-fable-5": {
+            "input": 56168,
+            "output": 204378,
+            "cacheRead": 67914272,
+            "cacheWrite": 785381
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 184173,
+          "output": 490823,
+          "cacheRead": 186372613,
+          "cacheWrite": 5619166
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 69216,
+          "output": 3435,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 282.995179,
+        "pricingAsOf": "2026-07-02T20:12:46.691Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2221"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-fable-5"
+  "created": "2026-07-02T20:12:46.644Z",
+  "updated": "2026-07-02T20:12:46.709Z",
+  "statusOverrides": {
+    "salvage-merge-prune": "completed",
+    "salvage-merge-prune.salvage-merge-prune.ac1": "completed",
+    "salvage-merge-prune.salvage-merge-prune.ac2": "completed",
+    "salvage-merge-prune.salvage-merge-prune.ac3": "completed",
+    "salvage-merge-prune.salvage-merge-prune.ac4": "completed",
+    "record-write-mutex": "completed",
+    "record-write-mutex.record-write-mutex.ac1": "completed",
+    "record-write-mutex.record-write-mutex.ac2": "completed",
+    "record-write-mutex.record-write-mutex.ac3": "completed",
+    "record-write-mutex.record-write-mutex.ac4": "completed",
+    "slot-completion-detection": "completed",
+    "slot-completion-detection.slot-completion-detection.ac1": "completed",
+    "slot-completion-detection.slot-completion-detection.ac2": "completed",
+    "slot-completion-detection.slot-completion-detection.ac3": "completed",
+    "slot-completion-detection.slot-completion-detection.ac4": "completed",
+    "slot-completion-detection.slot-completion-detection.ac5": "completed",
+    "swarm-reset-retire-records": "completed",
+    "swarm-reset-retire-records.swarm-reset-retire-records.ac1": "completed",
+    "swarm-reset-retire-records.swarm-reset-retire-records.ac2": "completed",
+    "swarm-reset-retire-records.swarm-reset-retire-records.ac3": "completed",
+    "swarm-reset-retire-records.swarm-reset-retire-records.ac4": "completed",
+    "swarm-feedback-routing": "completed",
+    "swarm-feedback-routing.swarm-feedback-routing.ac1": "completed",
+    "swarm-feedback-routing.swarm-feedback-routing.ac2": "completed",
+    "swarm-feedback-routing.swarm-feedback-routing.ac3": "completed",
+    "swarm-feedback-routing.swarm-feedback-routing.ac4": "completed",
+    "verdict-knockover-guard": "completed",
+    "verdict-knockover-guard.verdict-knockover-guard.ac1": "completed",
+    "verdict-knockover-guard.verdict-knockover-guard.ac2": "completed",
+    "verdict-knockover-guard.verdict-knockover-guard.ac3": "completed",
+    "verdict-knockover-guard.verdict-knockover-guard.ac4": "completed"
+  }
 }
