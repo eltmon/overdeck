@@ -1,1 +1,2 @@
 - [x] PAN-2228 — 61897aad54 — delivery door PRD: verified-per-tier contract (D1/D2), kickoff fatality via stopped+auto-resume (D3/D4), side-door migration table, no-side-door guard
+- [x] PAN-2229 — 37b065294f — evals+gate PRD: F1-F4/R1-R4 golden scenarios, lint-prompts.sh extensions, two-mode trailer gate (Prompt-Change/Eval-Run)
