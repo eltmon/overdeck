@@ -25,6 +25,7 @@ export interface TieredExecutionSupervisorConfig {
   model: ModelId | string;
   harness: RuntimeName;
   subscribe: TieredExecutionSubscription;
+  owns_inspection?: boolean;
 }
 
 export interface TieredExecutionFeedConfig {
@@ -339,6 +340,7 @@ export function validateTieredExecutionConfig(
       model: supervisorModel,
       harness: config.supervisor.harness,
       subscribe: config.supervisor.subscribe,
+      owns_inspection: config.supervisor.owns_inspection ?? false,
     },
     by_kind: byKind,
     byKind,

@@ -165,8 +165,22 @@ describe('tiered execution tier table', () => {
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       subscribe: 'flagged',
+      owns_inspection: false,
     });
     expect(result.byKind).toEqual({});
+  });
+
+  it('preserves supervisor ownership of inspection when configured', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      supervisor: {
+        model: 'claude-opus-4-8',
+        harness: 'claude-code',
+        subscribe: 'all',
+        owns_inspection: true,
+      },
+    }));
+
+    expect(result.supervisor?.owns_inspection).toBe(true);
   });
 
   it('validates by_kind item kinds and tier references', () => {
