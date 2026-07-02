@@ -7,4 +7,30 @@ Shas are backfilled on the following commit (a commit cannot contain its own sha
 - [x] PAN-2230 — committed 85bfcc6a6f — premise verified by RUNNING madge@8 on the repo: resolves .js-suffixed ESM imports fine, 116 cycles in ~7s (6 in frontend); madge exits 1 when cycles exist so the guard tolerates it; locked madge over dependency-cruiser (verified live, text-baseline convention); exact canonical cycle lines (rotation-normalized) as baseline granularity.
 - [x] PAN-2234 — committed dbc68063d7 — premise verified: PRD handling at finalize is advisory-only (lintTraceCoverage returns [] when prdText missing — a missing PRD yields FEWER warnings than a present one); pan-dir/drafts.ts already has all path helpers; gate = shared checkPrdGateSync (projectRoot upper/lower then workspace upper/lower, >=20 lines), CLI exit 4 + route 422 (PlanQualityLintError pattern); pan start --auto exemption is structural (never POSTs complete-planning — verified both call sites); NOTE brief said skills/pan-plan but real path is sync-sources/skills/pan-plan (no skills/ dir at root).
 - [x] PAN-2148 — committed 372a9397bd — PRD supersedes the issue body's barrel-split approach per orchestrator decision (noted in the PRD header); full no-loss audit: 29 routes + 9 exported symbol clusters enumerated with door assignments; only ONE production importer of routes/issues.js (reconstruct-cache.ts dynamic import) so no shims, repoint everything; getGitHubLocalPaths() boilerplate duplicated 10x -> one helper; overdeck/issues.ts doors (IssuesResolver/IssueWriter) already exist as skeleton (375 lines); PAN-2234 interaction called out (prdGate moves with the handler in WI-4).
-- [x] PAN-2147 — committed (this commit; sha backfilled next) — 39-route no-loss audit; start-agent handler is ~1,094 lines with ZERO internal section comments so the PRD locks an explicit cut-at-yield*-boundary split rule (D4) with a reported-checkpoint; transport validators (HttpServerRequest-shaped) stay in the route file so specialists.ts import is untouched; overdeck/agents.ts (1,075, baselined) must NOT grow — new agent-*.ts door modules only; dashboard-continue-readers.test.ts git-grep ACs pinned to routes/agents.ts must be repointed with meaning preserved.
+- [x] PAN-2147 — committed 0686dfd20a — 39-route no-loss audit; start-agent handler is ~1,094 lines with ZERO internal section comments so the PRD locks an explicit cut-at-yield*-boundary split rule (D4) with a reported-checkpoint; transport validators (HttpServerRequest-shaped) stay in the route file so specialists.ts import is untouched; overdeck/agents.ts (1,075, baselined) must NOT grow — new agent-*.ts door modules only; dashboard-continue-readers.test.ts git-grep ACs pinned to routes/agents.ts must be repointed with meaning preserved.
+- [x] PAN-2149 — committed 1b070415d7 — the file is ~580 lines of free functions (reactive dispatch, pure-move seam) + a ~1,350-line CloisterService CLASS; pure moves can't relocate methods touching privates, so the PRD locks a host-object delegation pattern (call-site object literal with closures — never widen private to public); exactly ONE introspection test pins the startup-recovery block (review-agent.test.ts 'Re-dispatched recovery review' regex) — named for repointing; all other 10 test importers survive via the barrel.
+- [x] PAN-2232 — committed d9d1818c22 — easiest of the batch: file is 100% free functions (no class), six clean pure-move seams; ZERO tests introspect it (all references are .js imports, barrel-covered — verified grep for 'cloister/specialists.ts' in tests/ is empty); loadRegistry/saveRegistry locked to move together (single-write-surface shape).
+- [x] PAN-2233 — committed 9b0575f98f — all free functions, four seams; postMergeLifecycle locked to move VERBATIM as one block with the Docker step (AC-3 greps for it in the new module); in-flight guard lives in routes/specialists.ts + in-flight-guard.ts, NOT this file — decomposition must not touch either (AC-4 asserts no diff); pan-444 test's 'introspection' is only a doc-comment mention (verified); tests/setup.ts mentions merge-agent — flagged for re-verify.
+- [x] PAN-2190 — committed (this commit; sha backfilled next) — triggerMerge alone is ~784 lines (40% of the file) and is the authoritative post-rebase quality gate; engine relocates VERBATIM to src/lib/cloister/merge-trigger.ts (overdeck/merge.ts is baselined at 1,001 and can't grow); barrel kept because flywheel + auto-merge-executor import triggerMerge DYNAMICALLY by path; one introspection test (review-agent.test.ts approve-route regex) repointed with the approve-body move; approve-push.test.ts stubs merge-ops's module-scope imports — mock list must follow the code.
+
+## Scope update (2026-07-02, orchestrator): Batch 4 reassigned
+
+A second PRD writer now owns Batch 4 (PAN-2228, PAN-2229). This writer's final scope was
+Batches 1-3 (10 PRDs), all committed and pushed above.
+
+- PAN-2228 — a complete PRD had already been committed here before the rescope arrived; it
+  is WITHDRAWN by the revert in this commit but remains recoverable in git history at
+  `eac867d92b` (full evidence-typed-delivery design + the verified PAN-2179 causal chain:
+  tmux tier's unverified ok:true x3, recordKickoffDeliveryFailure setting status='running'
+  for the deacon redelivery patrol, isPaneDead unused in kickoff, supervisor tier sound,
+  zero delivery.ts unit tests). The Batch 4 writer may salvage freely: `git show eac867d92b`.
+- PAN-2229 — a complete draft was authored but never committed; withdrawn per rescope.
+  Key verified findings for the Batch 4 writer: review SYNTHESIS is now deterministic code
+  (PAN-1864, synthesizeReviewFromReports + 6 tests), so the issue's second example should
+  target the PRODUCER side (reviewer sub-role prompts keeping the ### !/⊗ blocker grammar
+  the parser consumes); scripts/lint-prompts.sh already exists in the lint chain as the
+  natural home for deterministic load-bearing-clause checks; guarded paths should cover
+  BOTH roles/*.md and src/lib/cloister/prompts/*.md (11 runtime prompts); evals policy per
+  evals/README.md keeps model-calling evals out of blocking CI.
+
+Batch 3 (PAN-2149, PAN-2232, PAN-2233, PAN-2190) is complete and pushed. This writer is done.
