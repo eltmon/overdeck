@@ -686,16 +686,11 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     const { resolveProjectFromIssueSync } = await import('./projects.js');
     const resolved = resolveProjectFromIssueSync(issueId);
     const workspace = resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined;
-    const notes = status.testNotes;
-    let feedbackPath: string | undefined;
+    const notes = status.testNotes; let feedbackPath: string | undefined;
     try {
       const { writeFeedbackFile } = await import('./cloister/feedback-writer.js');
       const r = await Effect.runPromise(writeFeedbackFile({
-        issueId,
-        workspacePath: workspace,
-        specialist: 'test-agent',
-        outcome: 'failed',
-        summary: `Tests FAILED for ${issueId}`,
+        issueId, workspacePath: workspace, specialist: 'test-agent', outcome: 'failed', summary: `Tests FAILED for ${issueId}`,
         markdownBody: `# Test failure\n\n${notes ?? 'The test gate reported failures. See .pan/test/result.json and re-run the project test suite.'}\n\n## Required\nFix the failing tests, commit and push, then re-run \`pan done ${issueId}\`.`,
       }));
       if (r.success) feedbackPath = r.filePath;
@@ -709,10 +704,7 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
       await messageAgent(target.agentId, message);
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
     } else {
-      surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-        specialist: 'test-agent',
-        feedbackPath,
-      });
+      surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
     }
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);

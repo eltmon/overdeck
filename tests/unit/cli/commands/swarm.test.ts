@@ -582,6 +582,7 @@ describe('pan swarm reset (PAN-2214)', () => {
     worktreeSlotPaths?: string[];
     pushFailsFor?: string[];
     slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
+    liveSessions?: string[];
     status?: { deaconIgnored?: boolean } | null;
   } = {}): SwarmResetCommandDeps & { gitCalls: string[] } {
     const gitCalls: string[] = [];
@@ -591,8 +592,9 @@ describe('pan swarm reset (PAN-2214)', () => {
       setDeaconIgnored: vi.fn(),
       appendOperatorInterventionEvent: vi.fn(async () => undefined),
       listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as never),
-      listSessionNamesSync: vi.fn(() => [] as string[]),
+      listSessionNamesSync: vi.fn(() => options.liveSessions ?? []),
       stopAgentSync: vi.fn(),
+      removeAgentSync: vi.fn(),
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
@@ -698,6 +700,52 @@ describe('pan swarm reset (PAN-2214)', () => {
     expect(deps.stopAgentSync).not.toHaveBeenCalledWith('agent-pan-2203-slot-2');
   });
 
+  it('retires stopped slot agent records with no live tmux session', async () => {
+    const deps = makeResetDeps({
+      slotAgents: [
+        { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'stopped' },
+        { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'failed' },
+      ],
+    });
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-2');
+    expect(loggedText(deps)).toContain('retired 2 dead slot agent record(s): agent-pan-2203-slot-1, agent-pan-2203-slot-2');
+  });
+
+  it('does not retire slot agents with live tmux sessions and reports them as skipped', async () => {
+    const deps = makeResetDeps({
+      slotAgents: [
+        { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'stopped' },
+        { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'stopped' },
+      ],
+      liveSessions: ['agent-pan-2203-slot-2'],
+    });
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.removeAgentSync).not.toHaveBeenCalledWith('agent-pan-2203-slot-2');
+    expect(loggedText(deps)).toContain('Skipped live slot agent session(s): agent-pan-2203-slot-2');
+  });
+
+  it('retires through removeAgentSync only so JSONL transcript paths are untouched', async () => {
+    const deps = makeResetDeps({
+      slotAgents: [
+        { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'stopped' },
+      ],
+    });
+
+    await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.gitCalls.some(call => call.includes('.jsonl'))).toBe(false);
+  });
+
   it('preserves the hold and names pan swarm resume as the re-enable step', async () => {
     const deps = makeResetDeps({ slotBranches: {} });
 
@@ -715,6 +763,8 @@ describe('pan swarm reset (PAN-2214)', () => {
     await expect(swarmResetCommand('PAN-2203', {}, clean)).resolves.toEqual({ ok: true });
     expect(clean.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
     expect(clean.gitCalls.some(cmd => cmd.startsWith('git branch -D'))).toBe(false);
+    expect(clean.removeAgentSync).not.toHaveBeenCalled();
+    expect(loggedText(clean)).toContain('retired no dead slot agent records');
 
     const merged = makeResetDeps({ slotBranches: { 'feature/pan-2203-slot-1': '0' } });
     await expect(swarmResetCommand('PAN-2203', {}, merged)).resolves.toEqual({ ok: true });

@@ -28,6 +28,7 @@ import { appendOperatorInterventionEvent } from '../../lib/operator-intervention
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
+import { removeAgentSync } from '../../lib/overdeck/agents.js';
 
 const execAsync = promisify(exec);
 
@@ -313,6 +314,7 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
+  removeAgentSync: (agentId: string) => void;
 }
 
 const defaultResetDeps: SwarmResetCommandDeps = {
@@ -321,13 +323,14 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   clearAllSlotAssignments,
   clearFailedMergeBlock,
+  removeAgentSync,
 };
 
 /**
  * Work-preserving swarm reset (PAN-2214). Stops the swarm (hold first), pushes
  * every UNMERGED local slot branch to origin BEFORE deleting anything, removes
  * slot worktrees and local slot branches, clears recorded slot assignments and
- * any failed-merge block, and marks lingering slot agent rows stopped. The
+ * any failed-merge block, and retires dead slot agent records. The
  * hold stays set afterward so the Deacon cannot race the cleanup — the
  * operator re-enables coordination with `pan swarm resume`.
  */
@@ -398,7 +401,7 @@ export async function swarmResetCommand(
   deps.clearAllSlotAssignments(workspacePath, issue);
   deps.clearFailedMergeBlock(issue, workspacePath);
 
-  // No stale registration may survive: mark lingering slot agent rows stopped.
+  // No stale running registration may survive: mark live-status rows stopped.
   let stoppedRows = 0;
   for (const agent of deps.listSlotAgents(issue)) {
     if (agent.status === 'running' || agent.status === 'starting') {
@@ -413,12 +416,28 @@ export async function swarmResetCommand(
     }
   }
 
+  const liveSessions = new Set(deps.listSessionNamesSync());
+  const retiredAgents: string[] = [];
+  const skippedLiveAgents: string[] = [];
+  for (const agent of deps.listSlotAgents(issue)) {
+    if (liveSessions.has(agent.agentId)) {
+      skippedLiveAgents.push(agent.agentId);
+      continue;
+    }
+    if (agent.status === 'running' || agent.status === 'starting') continue;
+
+    deps.removeAgentSync(agent.agentId);
+    retiredAgents.push(agent.agentId);
+  }
+
   deps.console.log(chalk.green(`Swarm reset complete for ${issue}.`));
   deps.console.log(
     `Pushed to origin: ${pushed.length > 0 ? pushed.join(', ') : 'nothing (no unmerged slot branches needed a backup)'}. `
     + `Removed ${worktrees.length} slot worktree(s) and ${branches.length} local slot branch(es). `
     + `Cleared the recorded slot assignments and any failed-merge block`
-    + `${stoppedRows > 0 ? `, and marked ${stoppedRows} lingering slot agent row(s) stopped` : ''}.`,
+    + `${stoppedRows > 0 ? `, marked ${stoppedRows} lingering slot agent row(s) stopped` : ''}`
+    + `${retiredAgents.length > 0 ? `, and retired ${retiredAgents.length} dead slot agent record(s): ${retiredAgents.join(', ')}` : ', and retired no dead slot agent records'}`
+    + `${skippedLiveAgents.length > 0 ? `. Skipped live slot agent session(s): ${skippedLiveAgents.join(', ')}` : ''}.`,
   );
   deps.console.log(
     `The swarm hold REMAINS SET — the Deacon still skips all swarm coordination for ${issue}, so nothing can `
@@ -654,7 +673,7 @@ export function registerSwarmCommands(program: Command): void {
 
   swarm
     .command('reset <id>')
-    .description('Work-preserving reset: stop slots, push unmerged slot branches to origin, remove slot worktrees/branches, clear recorded slot state (hold stays set)')
+    .description('Work-preserving reset: stop slots, push unmerged slot branches to origin, remove slot worktrees/branches, retire dead slot records, clear recorded slot state (hold stays set)')
     .option('--force', 'Continue deleting even when pushing an unmerged branch to origin fails')
     .option('--reason <text>', 'Reason recorded on the hold')
     .action(async (id: string, options: SwarmResetOptions) => {
