@@ -5,32 +5,7 @@
     {
       "reason": "resume",
       "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T18:55:33.782Z"
-    },
-    {
-      "timestamp": "2026-07-02T18:56:58.308Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T18:56:58.739Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T18:59:40.098Z"
-    },
-    {
-      "timestamp": "2026-07-02T19:18:51.565Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T19:18:52.021Z"
+      "timestamp": "2026-07-02T19:21:37.005Z"
     }
   ],
   "feedback": [],
@@ -81,14 +56,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T19:18:58.424Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-02T19:30:54.481Z",
+    "reviewNotes": "Approved: extraction verified, focused gates pass, no blockers",
+    "testNotes": "Required gates completed after failed/incomplete test verdict: npm run typecheck PASS; npm run lint PASS; npm test PASS with root Vitest 797 files passed / 7935 tests passed / 52 skipped and frontend action tests 3 files passed / 32 tests passed. Browser UAT not required for this non-UI refactor.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "lastVerifiedCommit": "ec890510c2689bc91a5a64c0e4c5d5bc91733a5b",
+    "reviewedAtCommit": "2337d65cfbc5acfac2b4c36552849b2e72ef01a1",
+    "lastVerifiedCommit": "2337d65cfbc5acfac2b4c36552849b2e72ef01a1",
     "reviewRequestedAt": "2026-07-02T19:18:51.566Z"
   },
   "closeOut": {
@@ -96,8 +75,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 35391,
-            "output": 2663,
+            "input": 36393,
+            "output": 2762,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -121,8 +100,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 35391,
-          "output": 2663,
+          "input": 36393,
+          "output": 2762,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -141,7 +120,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.48002,
-        "pricingAsOf": "2026-07-02T19:18:58.462Z"
+        "pricingAsOf": "2026-07-02T19:30:54.513Z"
       }
     },
     "merges": [
@@ -149,6 +128,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-02T18:46:34.199Z",
-  "updated": "2026-07-02T19:18:58.463Z"
+  "created": "2026-07-02T19:21:23.803Z",
+  "updated": "2026-07-02T19:30:54.596Z"
 }
