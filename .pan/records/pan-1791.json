@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-30T13:44:36.595Z",
-  "updated": "2026-07-02T07:20:00.000Z",
+  "updated": "2026-07-02T07:45:00.000Z",
   "pipeline": {
     "issueId": "PAN-1791",
     "reviewStatus": "pending",
@@ -20,30 +20,36 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T06:03:15.958Z",
-    "inspectNotes": "Spec fidelity passed: tiered_execution config shape/defaults, total non-overlapping difficulty mapping, unknown model/harness rejection, ToS policy validation, and config-yaml/default cloister integration match bead workspace-ilmqn. Constraint compliance passed: reviewed CLAUDE.md and PAN-1791 PRD; no prohibited patterns found.",
+    "updatedAt": "2026-07-02T07:40:16.170Z",
+    "inspectNotes": "Bead workspace-hwhq1 PASSED. Implementation landed pre-checkpoint in commit 6ceff57807 (tier-table.ts + tests + config wiring in cloister/config.ts and config-yaml schema/merge/defaults). All 4 ACs verified: total non-overlapping difficulty mapping with named errors; unknown model/harness rejected and harness-policy ToS gate applied to tiers and supervisor; absent block defaults to enabled=false replay_threshold=0.5; valid config returns difficultyToTier map + supervisor policy. pan tell skipped: agent-pan-1791 not running.",
     "deaconIgnored": true,
-    "deaconIgnoredAt": "2026-07-02T06:03:15.957Z",
-    "deaconIgnoredReason": "swarm runaway rescue (conv 259): hold all swarm coordination until operator decides disposition; PAN-2214"
+    "deaconIgnoredAt": "2026-07-02T07:37:41.736Z",
+    "deaconIgnoredReason": "brief hold while pty-fix + swarm done-ness fix deploy; clears right after reload"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 41736,
-            "output": 13107,
-            "cacheRead": 1303139,
-            "cacheWrite": 33566
+            "input": 44032,
+            "output": 32049,
+            "cacheRead": 9299680,
+            "cacheWrite": 56568
           },
           "anthropic/claude-opus-4-8": {
-            "input": 135,
-            "output": 6069,
-            "cacheRead": 329291,
-            "cacheWrite": 14113
+            "input": 453,
+            "output": 14762,
+            "cacheRead": 3458106,
+            "cacheWrite": 26779
           }
         },
         "inspect-deep": {
+          "anthropic/claude-fable-5": {
+            "input": 14074,
+            "output": 3173,
+            "cacheRead": 275270,
+            "cacheWrite": 78514
+          },
           "openai/gpt-5.5": {
             "input": 530892,
             "output": 31381,
@@ -53,8 +59,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 57051,
-            "output": 9437,
+            "input": 60720,
+            "output": 10061,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -66,20 +72,28 @@
             "cacheRead": 24281974,
             "cacheWrite": 922652
           }
+        },
+        "work": {
+          "anthropic/claude-fable-5": {
+            "input": 41552,
+            "output": 39753,
+            "cacheRead": 7456996,
+            "cacheWrite": 484289
+          }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 41736,
-          "output": 13107,
-          "cacheRead": 1303139,
-          "cacheWrite": 33566
+          "input": 99658,
+          "output": 74975,
+          "cacheRead": 17031946,
+          "cacheWrite": 619371
         },
         "anthropic/claude-opus-4-8": {
-          "input": 44371,
-          "output": 271700,
-          "cacheRead": 24611265,
-          "cacheWrite": 936765
+          "input": 44689,
+          "output": 280393,
+          "cacheRead": 27740080,
+          "cacheWrite": 949431
         },
         "openai/gpt-5.5": {
           "input": 530892,
@@ -88,50 +102,40 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 57051,
-          "output": 9437,
+          "input": 60720,
+          "output": 10061,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.320333,
-        "pricingAsOf": "2026-07-02T06:03:15.978Z"
+        "usd": 63.906827,
+        "pricingAsOf": "2026-07-02T07:40:16.218Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "statusOverrides": {
-    "tier-table-config": "running",
-    "kind-metadata-field": "running",
-    "tiered-execution-docs": "running",
-    "tier-resolution-chain": "running"
+    "tier-table-config": "completed",
+    "kind-metadata-field": "completed",
+    "tiered-execution-docs": "completed",
+    "tier-resolution-chain": "running",
+    "tier-table-config.ac1": "completed",
+    "tier-table-config.ac2": "completed",
+    "tier-table-config.ac3": "completed",
+    "tier-table-config.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [
       {
-        "slotIndex": 2,
-        "itemId": "kind-metadata-field",
-        "agentId": "agent-pan-1791-slot-2",
-        "branch": "feature/pan-1791-slot-2",
-        "assignedAt": "2026-07-02T07:20:00.000Z"
-      },
-      {
-        "slotIndex": 3,
-        "itemId": "tiered-execution-docs",
-        "agentId": "agent-pan-1791-slot-3",
-        "branch": "feature/pan-1791-slot-3",
-        "assignedAt": "2026-07-02T07:20:00.000Z"
-      },
-      {
-        "slotIndex": 6,
+        "slotIndex": 23,
         "itemId": "tier-table-config",
-        "agentId": "agent-pan-1791-slot-6",
-        "branch": "feature/pan-1791-slot-6",
-        "assignedAt": "2026-07-02T07:20:00.000Z"
+        "agentId": "agent-pan-1791-slot-23",
+        "branch": "feature/pan-1791-slot-23",
+        "assignedAt": "2026-07-02T07:32:57.442Z"
       }
     ]
   }
