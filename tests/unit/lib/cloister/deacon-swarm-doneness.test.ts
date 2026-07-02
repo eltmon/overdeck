@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
+  findProjectByPathSync: () => null,
+  getProjectSwarmHotspots: () => [],
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -119,5 +121,44 @@ describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () =
     const actions = await coordinateSwarmSlots();
 
     expect(actions).toContain('[swarm] considered PAN-901: swarm eligible');
+  });
+});
+
+describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eligible', () => {
+  it('gcs a merged slot for an all-completed plan instead of skipping the pass', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-902');
+    mkdirSync(workspacePath, { recursive: true });
+    writeSpec(projectPath, 'PAN-902', makeDoc('PAN-902', 2));
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    // Real git repo so reconcile sees a merged slot branch (tip == HEAD).
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: workspacePath, stdio: 'ignore' });
+    git('init', '-b', 'feature/pan-902');
+    git('config', 'user.email', 't@t');
+    git('config', 'user.name', 't');
+    git('commit', '--allow-empty', '-m', 'base');
+    git('branch', 'feature/pan-902-slot-1');
+
+    const recordsDir = join(workspacePath, '.pan', 'records');
+    mkdirSync(recordsDir, { recursive: true });
+    writeFileSync(join(recordsDir, 'pan-902.json'), JSON.stringify({
+      issueId: 'PAN-902',
+      schemaVersion: 1,
+      statusOverrides: { 'wi-1': 'completed', 'wi-2': 'completed' },
+      swarm: {
+        slotAssignments: [
+          { slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-902-slot-1', branch: 'feature/pan-902-slot-1', assignedAt: '2026-07-02T00:00:00.000Z' },
+        ],
+      },
+    }, null, 2));
+
+    const actions = await coordinateSwarmSlots();
+
+    expect(actions).toContain('[swarm] considered PAN-902: endgame (merge/cleanup only)');
+    expect(actions).toContain('[swarm] gc slot 1 (item wi-1) for PAN-902');
+    expect(actions).not.toContain('[swarm] considered PAN-902: swarm eligible');
   });
 });
