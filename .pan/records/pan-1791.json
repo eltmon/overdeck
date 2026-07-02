@@ -4,20 +4,42 @@
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
+  "statusOverrides": {
+    "tier-table-config": "completed",
+    "per-issue-tier-override": "completed",
+    "kind-metadata-field": "completed",
+    "tier-resolution-chain": "completed",
+    "route-legacy-through-chain": "completed",
+    "dispatch-model-selection": "completed",
+    "standing-tier-lifecycle": "completed",
+    "commit-feed-delivery": "completed",
+    "foreman-dispatch-standing": "completed",
+    "supervisor-subscribe": "completed",
+    "supervisor-verdict-surface": "completed",
+    "supervisor-halt-dependents": "completed",
+    "fast-track-batching": "completed",
+    "fast-track-escalation": "completed",
+    "fast-track-automerge": "completed",
+    "tier-replay-and-compaction": "completed",
+    "tier-measurement": "completed",
+    "enablement-gate-test": "completed",
+    "tiered-execution-docs": "completed",
+    "tiered-e2e-dogfood": "completed"
+  },
   "pipeline": {
     "issueId": "PAN-1791",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T13:31:12.998Z",
+    "updatedAt": "2026-07-02T13:40:03.623Z",
     "reviewNotes": "No blocking findings at 85808ba8; non-blocking replay follow-ups remain",
     "testNotes": "Workspace verified before repo commands: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1791 on branch feature/pan-1791. Read .pan/continue.json, .pan/spec.vbrief.json, .pan/records/pan-1791.json, AGENTS.md, package.json; bd show PAN-1791 found no Beads issue. UAT not required: acceptance/issue notes target library/config/routing/supervisor/server behavior, not browser/dashboard UI workflows. Gates: npm run typecheck PASS; npm run lint PASS; npm test sandbox run failed with EPERM on spawn/listen, rerun escalated PASS: root Vitest 796 files passed/7915 tests passed/52 skipped, frontend issue-action tests 3 files passed/32 tests passed.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "verificationNotes": "Acceptance criteria check FAILED \u2014 58/58 AC incomplete:\n\n### Tier table config section + validation (generalizes complexity_routing) + supervisor policy, off by default (4/4 incomplete)\n  - [ ] Given a config where a difficulty maps to zero or to two tiers, loading rejects it with a named validation error identifying the offending difficulty\n  - [ ] Given a tier with an unknown model or harness, loading rejects it, and a pi+Anthropic+subscription tier is rejected by the existing ToS gate\n  - [ ] With no tiered_execution block present, the loader returns enabled=false and defaults to replay_threshold=0.5 without error\n  - [ ] For a valid config, the validator returns a map from each of the five difficulties to its tier name plus the supervisor policy\n\n### Add typed metadata.kind subject-matter field + planner emits it (3/3 incomplete)\n  - [ ] VBriefItemMetadata.kind is typed to the nine-value enum and typecheck passes for an item that sets kind:'docs'\n  - [ ] An item with no kind still validates (field optional) and downstream code defaults to 'backend'\n  - [ ] The planning prompt renders an instruction for the planner to emit kind per item and defaults to 'backend' when unspecified\n\n### Model+harness resolution chain: override -> byKind -> byDifficulty -> role default (fail-loud, no hardcoded fallback) (4/4 incomplete)\n  - [ ] Given an item with metadata.model set, resolveTier returns that model regardless of kind/difficulty (the override wins)\n  - [ ] Given no override but a byKind entry for the item's kind, resolveTier returns the byKind model and it wins over the byDifficulty model\n  - [ ] Given only difficulty, resolveTier returns the tier whose difficulties[] contains it, with that tier's model and harness\n  - [ ] Given an item that resolves to nothing and no configured default, resolveTier throws a named error and returns no model literal\n\n### Route the hardcoded complexityToModel / claude-only path through the new chain, preserving disabled-mode behavior (3/3 incomplete)\n  - [ ] With tiering disabled, resolving each of the five difficulties returns exactly today's model (trivial/simple->haiku, medium/complex->sonnet, expert->opus)\n  - [ ] router.ts resolves its model through resolveTier and no longer contains the inline complexityToModel switch\n  - [ ] With tiering disabled, resolveTier returns the pre-change model for each difficulty and preserves the prior mapping\n\n### Wire resolved tier (model+harness) into slot dispatch so difficulty actually selects the worker (3/3 incomplete)\n  - [ ] When tiered_execution is enabled, resolving a bead of difficulty=expert returns the expert tier's model+harness in the spawn params\n  - [ ] When tiered_execution is disabled, chooseDispatchTier returns exactly its current 'in-context'|'registered-slot' result with no model override\n  - [ ] A dispatched bead's spawn params carry the resolved model and harness (not the parent default) when tiering is on\n\n### Standing tier agents: spawn+track one long-lived registered slot per tier in the plan (lazy) (4/4 incomplete)\n  - [ ] Given a plan schedule, the manager returns exactly the set of tier names it contains and spawns no tier absent from the schedule\n  - [ ] A tier's standing session spawns lazily (when its first run is within one run) and is reused for subsequent beads of that tier rather than respawned\n  - [ ] dispatchBeadToTier routes a bead to the registered slot for its tier and returns that slot's agent id\n  - [ ] Each standing tier slot spawns as a recoverable registered agent (state file + tmux session) and the dashboard shows it under the issue\n\n### Commit feed: broadcast each commit diff to all standing tiers, ingestion-only (3/3 incomplete)\n  - [ ] broadcastCommit sends the commit's diff to every standing tier agent via deliverAgentMessage (verified on a delivery spy)\n  - [ ] Each feed message marks itself ingestion-only (instructs the recipient not to respond) and produces no response turn\n  - [ ] Given N standing tiers and one commit, broadcastCommit sends exactly N deliveries (everyone hears everything, no filtering)\n\n### Foreman protocol: dispatch each bead to its tier's standing agent and broadcast the resulting commit (3/3 incomplete)\n  - [ ] roles/work.md contains the tiered dispatch loop (resolve tier -> dispatch to standing agent -> foreman commits -> broadcast feed), gated on tiered_execution.enabled\n  - [ ] Each dispatched bead produces exactly one foreman-authored commit, preserving the one-bead-one-commit invariant\n  - [ ] With tiered_execution disabled, roles/work.md preserves its existing serial and swarm paths and the default flow contains no edits\n\n### Standing supervisor agent: spawn + subscription policy (all | flagged | sampled) (3/3 incomplete)\n  - [ ] Under policy 'flagged', shouldSupervise returns true only for beads with requiresInspection=true\n  - [ ] Under policy 'all', shouldSupervise returns true for every bead\n  - [ ] The supervisor spawns as a registered, dashboard-discoverable agent using the tier-table supervisor model+harness\n\n### Supervisor reviews commit vs bead ACs and posts ack / blocking finding to the inspect-status surface (3/3 incomplete)\n  - [ ] A passing review persists an ack via the existing inspectStatus/onInspectComplete surface and saves the checkpoint (no new endpoint)\n  - [ ] A failing review records a blocking finding on the inspect-status surface and does not change tracker (Linear/GitHub) status\n  - [ ] For each subscribed commit, the supervisor receives the bead's acceptance criteria alongside the diff\n\n### A blocking supervisor finding halts dispatch of dependent beads until a fix commit lands (3/3 incomplete)\n  - [ ] Given an unresolved blocking finding on bead X and a next bead that depends on X, shouldHaltDispatch returns true\n  - [ ] Once a fix commit for X lands and is acked, shouldHaltDispatch returns false and dependent dispatch resumes\n  - [ ] A blocking finding on a bead with no dependents permits unrelated dispatch (shouldHaltDispatch returns false)\n\n### Trivial fast-track: batch consecutive trivial mechanical beads into one dispatch (PAN-1311) (3/3 incomplete)\n  - [ ] groupFastTrack produces a batch of consecutive trivial, scope-disjoint beads that share one fastTrackBatchKey\n  - [ ] groupFastTrack rejects a bead whose files_scope overlaps another in the candidate batch (no intra-batch conflicts)\n  - [ ] groupFastTrack rejects any non-trivial (medium or harder) bead from a fast-track batch\n\n### Fail-open: a fast-track item that turns out non-trivial escalates to the standard tier (2/2 incomplete)\n  - [ ] An item flagged non-trivial mid-flight exits its fast-track batch and routes to the standard tier\n  - [ ] An escalated item routes through full review and the auto-merge path refuses it\n\n### Trivial-tier typecheck-gated auto-merge, skip convoy (config-gated, off by default) (4/4 incomplete)\n  - [ ] With tiered_execution disabled, the auto-merge path refuses all items and every item routes through the normal review-then-merge flow\n  - [ ] A trivial batch that passes typecheck and lint auto-merges to the feature branch without the review convoy\n  - [ ] A trivial batch that fails the typecheck gate is not merged and surfaces back to the foreman\n  - [ ] The auto-merge path rejects any batch that contains a medium-or-harder bead\n\n### Replay: respawn dead standing agent + re-deliver commit feed; threshold-triggered compaction at run boundaries (3/3 incomplete)\n  - [ ] When a standing tier agent is killed mid-issue, replay spawns a dispatch-ready session and re-sends the feed equal to git log base..HEAD in order\n  - [ ] Replay triggers at a tier-run boundary when estimated context exceeds replay_threshold, and never triggers mid-bead\n  - [ ] The supervisor replay spawns it through the same path and re-sends the subscription-filtered commit history\n\n### Measurement scaffolding: stamp feed deliveries + per-tier cost rows (warm-hit fraction) (3/3 incomplete)\n  - [ ] Each feed delivery records a timestamp and token count queryable per standing agent\n  - [ ] The system produces a per-agent warm-hit fraction (deliveries with gap < 300s) from the delivery log\n  - [ ] pan token-spend-report shows distinct per-role rows for the foreman, each tier agent, and the supervisor\n\n### Enablement gate: with tiered_execution disabled, zero behavior change (parity lock test) (2/2 incomplete)\n  - [ ] With tiering disabled, resolveTier returns the legacy difficulty->model output for all five difficulties (locked by the test)\n  - [ ] When disabled, the test verifies no standing-tier or supervisor spawns and no auto-merge branch executes\n\n### Document tiered execution (config, tiers, supervisor, fast-track, replay) in the docs site (2/2 incomplete)\n  - [ ] The doc renders a fenced config example that contains the tiered_execution keys enabled, tiers, supervisor, and replay_threshold\n  - [ ] The doc renders a Non-goals section that names per-tier commit filtering, the live cost pilot, and remote tiers as deferred\n\n### End-to-end: a fixture plan runs through tiered execution (warm tiers + supervisor + one fast-track batch) (3/3 incomplete)\n  - [ ] The e2e verifies each fixture bead routes to the standing agent of the tier its difficulty resolves\n  - [ ] The e2e verifies every commit is broadcast to all standing tiers and the supervisor emits a verdict per subscribed commit\n  - [ ] The e2e verifies a blocking supervisor finding blocks dependent dispatch until a fix commit, and a killed standing agent respawns to dispatch-ready",
+    "mergeNotes": "Post-rebase verification failed at vbrief-ac",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2223",
-    "reviewedAtCommit": "85808ba802487823bc044b6d8f0da67edec601cb",
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-02T13:21:07.104Z",
     "deaconIgnoredReason": "all 20 items merged; awaiting final test verdict + operator merge; swarm dispatch must stay off"
@@ -27,10 +49,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 110539,
-            "output": 114188,
-            "cacheRead": 99867278,
-            "cacheWrite": 360330
+            "input": 110680,
+            "output": 126694,
+            "cacheRead": 101053338,
+            "cacheWrite": 373623
           },
           "anthropic/claude-opus-4-8": {
             "input": 453,
@@ -63,8 +85,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 80852,
-            "output": 13440,
+            "input": 81347,
+            "output": 13589,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -88,10 +110,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 286362,
-          "output": 381711,
-          "cacheRead": 151857043,
-          "cacheWrite": 2141700
+          "input": 286503,
+          "output": 394217,
+          "cacheRead": 153043103,
+          "cacheWrite": 2154993
         },
         "anthropic/claude-opus-4-8": {
           "input": 44689,
@@ -106,15 +128,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 80852,
-          "output": 13440,
+          "input": 81347,
+          "output": 13589,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 234.964953,
-        "pricingAsOf": "2026-07-02T13:31:13.064Z"
+        "usd": 236.943887,
+        "pricingAsOf": "2026-07-02T13:40:03.672Z"
       }
     },
     "merges": [
@@ -125,28 +147,6 @@
   "swarm": {
     "slotAssignments": []
   },
-  "created": "2026-07-02T13:23:12.639Z",
-  "updated": "2026-07-02T13:31:13.067Z",
-  "statusOverrides": {
-    "tier-table-config": "completed",
-    "per-issue-tier-override": "completed",
-    "kind-metadata-field": "completed",
-    "tier-resolution-chain": "completed",
-    "route-legacy-through-chain": "completed",
-    "dispatch-model-selection": "completed",
-    "standing-tier-lifecycle": "completed",
-    "commit-feed-delivery": "completed",
-    "foreman-dispatch-standing": "completed",
-    "supervisor-subscribe": "completed",
-    "supervisor-verdict-surface": "completed",
-    "supervisor-halt-dependents": "completed",
-    "fast-track-batching": "completed",
-    "fast-track-escalation": "completed",
-    "fast-track-automerge": "completed",
-    "tier-replay-and-compaction": "completed",
-    "tier-measurement": "completed",
-    "enablement-gate-test": "completed",
-    "tiered-execution-docs": "completed",
-    "tiered-e2e-dogfood": "completed"
-  }
+  "created": "2026-07-02T13:40:03.128Z",
+  "updated": "2026-07-02T13:40:03.673Z"
 }
