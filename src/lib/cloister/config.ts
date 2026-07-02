@@ -11,6 +11,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
 
 const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
@@ -271,6 +272,7 @@ export interface CloisterConfig {
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
+  tiered_execution?: TieredExecutionConfig;
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
@@ -362,6 +364,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // now flows through resolveHarness(), which consults explicit, role,
       // providerHarnesses, and built-in provider defaults in order.
     },
+  },
+  tiered_execution: {
+    enabled: false,
+    tiers: {},
+    supervisor: undefined,
+    replay_threshold: 0.5,
   },
   handoffs: {
     auto_triggers: {
