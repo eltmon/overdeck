@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { gcMergedSlots, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import type { ReconciledSlotItem } from '../../../../src/lib/agents/slot-reconcile.js';
+import { gcMergedSlots, gcOrphanedSlots, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
+import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
 
 function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   return {
@@ -145,5 +145,150 @@ describe('deacon-swarm merged slot GC', () => {
       '[swarm] gc deferred slot 1 (item wi-1) for PAN-2203: branch delete failed: branch is checked out',
     ]);
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+});
+
+describe('deacon-swarm orphaned slot GC', () => {
+  const workspacePath = '/repo/workspaces/feature-pan-2203';
+
+  function reconciled(overrides: Partial<SlotReconcileResult> = {}): SlotReconcileResult {
+    return {
+      issueId: 'PAN-2203',
+      merged: [],
+      inFlight: [],
+      pending: [],
+      branches: [],
+      agents: [],
+      ...overrides,
+    };
+  }
+
+  function orphanDeps(options: {
+    worktreeSlotIndexes?: number[];
+    aheadCountByBranch?: Record<string, string>;
+    sessionNames?: string[];
+    slotAssignments?: Array<{ slotIndex: number; itemId: string }>;
+  } = {}): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'listSessionNames' | 'listSlotAssignments'> {
+    return {
+      runGitCommand: vi.fn(async (command: string) => {
+        if (command === 'git worktree list --porcelain') {
+          const lines = [`worktree ${workspacePath}`, ''];
+          for (const slotIndex of options.worktreeSlotIndexes ?? []) {
+            lines.push(`worktree ${workspacePath}-slot-${slotIndex}`, '');
+          }
+          return { stdout: lines.join('\n') };
+        }
+        for (const [branch, count] of Object.entries(options.aheadCountByBranch ?? {})) {
+          if (command === `git rev-list --count HEAD..${JSON.stringify(branch)}`) return { stdout: `${count}\n` };
+        }
+        return undefined;
+      }),
+      listSessionNames: vi.fn(async () => options.sessionNames ?? []),
+      listSlotAssignments: vi.fn(() => options.slotAssignments ?? []),
+    };
+  }
+
+  it('removes an orphaned slot worktree and branch with zero commits ahead', async () => {
+    const fakeDeps = orphanDeps({
+      worktreeSlotIndexes: [2],
+      aheadCountByBranch: { 'feature/pan-2203-slot-2': '0' },
+    });
+
+    await expect(gcOrphanedSlots('PAN-2203', workspacePath, reconciled({
+      branches: [{ slotIndex: 2, branch: 'feature/pan-2203-slot-2', merged: false }],
+    }), fakeDeps)).resolves.toEqual(['[swarm] gc-orphan slot 2 for PAN-2203']);
+
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      `git worktree remove --force "${workspacePath}-slot-2"`,
+      workspacePath,
+    );
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      'git branch -D "feature/pan-2203-slot-2"',
+      workspacePath,
+    );
+  });
+
+  it('preserves an orphaned branch with unmerged commits and points at pan swarm reset', async () => {
+    const fakeDeps = orphanDeps({
+      worktreeSlotIndexes: [2],
+      aheadCountByBranch: { 'feature/pan-2203-slot-2': '3' },
+    });
+
+    const actions = await gcOrphanedSlots('PAN-2203', workspacePath, reconciled({
+      branches: [{ slotIndex: 2, branch: 'feature/pan-2203-slot-2', merged: false }],
+    }), fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('feature/pan-2203-slot-2');
+    expect(actions[0]).toContain('3 unmerged commit(s)');
+    expect(actions[0]).toContain('pan swarm reset PAN-2203');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+  });
+
+  it('preserves an orphaned branch report-only when the ahead count cannot be determined', async () => {
+    const fakeDeps = orphanDeps({ worktreeSlotIndexes: [2] });
+    vi.mocked(fakeDeps.runGitCommand).mockImplementation(async (command: string) => {
+      if (command === 'git worktree list --porcelain') {
+        return { stdout: `worktree ${workspacePath}\n\nworktree ${workspacePath}-slot-2\n` };
+      }
+      if (command.startsWith('git rev-list')) throw new Error('unknown revision');
+      return undefined;
+    });
+
+    const actions = await gcOrphanedSlots('PAN-2203', workspacePath, reconciled({
+      branches: [{ slotIndex: 2, branch: 'feature/pan-2203-slot-2', merged: false }],
+    }), fakeDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('pan swarm reset PAN-2203');
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+  });
+
+  it('removes an orphaned worktree that has no local branch left', async () => {
+    const fakeDeps = orphanDeps({ worktreeSlotIndexes: [4] });
+
+    await expect(gcOrphanedSlots('PAN-2203', workspacePath, reconciled(), fakeDeps))
+      .resolves.toEqual(['[swarm] gc-orphan slot 4 for PAN-2203']);
+
+    expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
+      `git worktree remove --force "${workspacePath}-slot-4"`,
+      workspacePath,
+    );
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('branch -D'))).toBe(false);
+  });
+
+  it('sends zero deletion commands for slots with a live agent session or a slotAssignments entry', async () => {
+    const fakeDeps = orphanDeps({
+      worktreeSlotIndexes: [1, 3],
+      sessionNames: ['agent-pan-2203-slot-1'],
+      slotAssignments: [{ slotIndex: 3, itemId: 'wi-3' }],
+    });
+
+    await expect(gcOrphanedSlots('PAN-2203', workspacePath, reconciled({
+      branches: [
+        { slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false },
+        { slotIndex: 3, branch: 'feature/pan-2203-slot-3', merged: false },
+      ],
+    }), fakeDeps)).resolves.toEqual([]);
+
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
+  });
+
+  it('skips slots handled by merged-slot GC in the same cycle', async () => {
+    const fakeDeps = orphanDeps({
+      aheadCountByBranch: { 'feature/pan-2203-slot-5': '0' },
+    });
+
+    await expect(gcOrphanedSlots('PAN-2203', workspacePath, reconciled({
+      merged: [slot({ itemId: 'wi-5', slotIndex: 5, status: 'merged', branch: 'feature/pan-2203-slot-5' })],
+      branches: [{ slotIndex: 5, branch: 'feature/pan-2203-slot-5', merged: true }],
+    }), fakeDeps)).resolves.toEqual([]);
+
+    const commands = vi.mocked(fakeDeps.runGitCommand).mock.calls.map(([command]) => command);
+    expect(commands.some(command => command.includes('worktree remove') || command.includes('branch -D'))).toBe(false);
   });
 });

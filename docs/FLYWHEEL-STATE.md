@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 4 (2026-07-02) — RED MAIN #3 (service.ts ratchet, PAN-1935 strike push) — strikes skip lint
+
+- **Main RED again:** PAN-1935's strike commit `1f9c0041f7` grew `src/lib/cloister/service.ts` 2057→2077 (+20 ohmypi cost-reconcile lines), tripping the god-file ratchet on the **lint** job. The strike verified typecheck + focused vitest but **never ran `npm run lint`** — third file-size red-main of the run (PAN-2218 flywheel.ts, PAN-2192 family). Filed **PAN-2238** (blocks-main) with an extraction-only fix spec (move the +20 lines out; do NOT regen baseline; TENET-10 = touch nothing else in service.ts); dispatched `strike-pan-2238` (booted, working).
+- **LESSON (systemic):** the strike role's mandatory pre-push verification omits lint. Every guard the strike doesn't run is a red-main class waiting. Interim fix = add `npm run lint` to the strike role verification; durable fix = PAN-2204 (no unreviewed direct-to-main pushes). Surfaced both.
+- **PAN-2154 ready:** review=passed test=passed (PR #2236) → UAT bundle now 3 (PAN-2154, MIN-831, MIN-846). Operator ships.
+- **codex auth paradox:** `pan pi-auth status` → "openai-codex: not logged in", yet gpt-5.5 sessions run fine (strike-pan-1935 completed 16-min run; strike-pan-2238 + pan-2181 review live). The status command may read a stale/different credential store than omp actually uses — do NOT treat its output as ground truth for holding gpt-5.5 pickup; verify with a live session instead.
+- **Swap nearly full: 7.6/8 GB** (RAM fine, 20/64). Likely behind historical mid-build process kills (RUN-39 dist wipe). Surfaced urgent to operator.
+- PAN-1935's full `npm test` in-workspace failed on sandbox EPERM/EROFS (environment, not code) — it noted this durably on the issue; orthogonal.
+- Backlog pickup HELD while main is red (new PRs would queue behind the red gate).
+
 ## RUN-53 tick 3 (2026-07-02) — MAIN GREEN; both red-main issues closed; PAN-2234 strike aborted → needs-handoff
 
 - **Main GREEN** (all recent runs success through `9dd2c6a422`). Both red-main issues **CLOSED with verification comments**: PAN-2217 (mock drift, `0e0cd31cf2`) and PAN-2218 (file-size trim, `b2a90b7516`, 960 lines).

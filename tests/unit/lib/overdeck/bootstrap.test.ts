@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Duration, Effect, Layer, Stream } from 'effect';
+import { Duration, Effect, Layer } from 'effect';
 
 import { createOverdeckDatabase } from '../../../../scripts/create-overdeck-db.js';
 import {
@@ -26,6 +26,7 @@ import { AgentsDomainLayer } from '../../../../src/lib/overdeck/agents.js';
 import { IssuesResolverLive } from '../../../../src/lib/overdeck/issues.js';
 import {
   Observability,
+  type ObservabilityServiceShape,
   ObservabilityRpcGroup,
   GetSnapshotRpc,
   SubscribeDomainEventsRpc,
@@ -137,11 +138,7 @@ describe('overdeck bootstrap layer', () => {
           // via bus.stream, call resolvers, and update the SubscriptionRef.
           yield* bus.emit({ type: 'issue.advanced', payload: { issueId: 'PAN-1', from: 'todo', to: 'planning' } });
 
-          // Allow the background mapEffect fiber to receive the event from the queue
-          // and complete its async resolver queries before we read the snapshot.
-          yield* Effect.sleep(Duration.millis(100));
-
-          const after = yield* observability.getSnapshot;
+          const after = yield* waitForSnapshotSequence(observability, 1);
           return { before, after };
         }),
       ).pipe(Effect.provide(makeBootstrapTestLayer(dbPath))),
@@ -178,3 +175,17 @@ describe('overdeck bootstrap layer', () => {
     expect(ReplayEventsRpc).toBeDefined();
   });
 });
+
+function waitForSnapshotSequence(
+  observability: ObservabilityServiceShape,
+  minSequence: number,
+) {
+  return Effect.gen(function* () {
+    let snapshot = yield* observability.getSnapshot;
+    for (let attempt = 0; attempt < 20 && snapshot.sequence < minSequence; attempt++) {
+      yield* Effect.sleep(Duration.millis(10));
+      snapshot = yield* observability.getSnapshot;
+    }
+    return snapshot;
+  });
+}

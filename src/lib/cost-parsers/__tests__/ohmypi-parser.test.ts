@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'path'
-import { parseOhmypiSessionSync, parseOhmypiSessionContent } from '../ohmypi-parser.js'
+import { parseOhmypiSessionCostEventsSync, parseOhmypiSessionSync, parseOhmypiSessionContent } from '../ohmypi-parser.js'
 
 const FIXTURES = join(__dirname, 'fixtures', 'ohmypi')
 
@@ -21,6 +21,20 @@ describe('parseOhmypiSession (PAN-1989)', () => {
     expect(result!.modelBreakdown).toBeDefined()
     const keys = Object.keys(result!.modelBreakdown ?? {})
     expect(keys.length).toBeGreaterThan(0)
+  })
+
+  it('exposes one stable cost event per assistant usage message', () => {
+    const events = parseOhmypiSessionCostEventsSync(join(FIXTURES, 'rpc-toolcall.jsonl'))
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      requestId: 'ohmypi:019ef4f8-6317-7000-9277-81d3e9dd941e:56f1fdfa',
+      sessionId: '019ef4f8-6317-7000-9277-81d3e9dd941e',
+      provider: 'zai',
+      model: 'glm-4.5-flash',
+      input: 51444,
+      output: 39,
+      cost: 0,
+    })
   })
 
   it('AC1: cache tokens (cacheRead, cacheWrite) are captured in totals and per-model breakdown', () => {

@@ -85,6 +85,7 @@ function recoveryDeps(): Pick<
   | 'tryReserveSwarmSlot'
   | 'releaseSwarmSlot'
   | 'spawnRun'
+  | 'shouldDispatch'
 > {
   return {
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
@@ -94,6 +95,7 @@ function recoveryDeps(): Pick<
     tryReserveSwarmSlot: vi.fn(() => true),
     releaseSwarmSlot: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
+    shouldDispatch: vi.fn(() => true),
   };
 }
 

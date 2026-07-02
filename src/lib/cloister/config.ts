@@ -88,6 +88,12 @@ export interface ConcurrencyConfig {
   exempt_operator_started?: boolean;
 }
 
+export type SwarmInferCompletionMode = 'off' | 'nudge' | 'auto';
+
+export interface SwarmConfig {
+  infer_completion: SwarmInferCompletionMode;
+}
+
 /**
  * Startup configuration
  */
@@ -276,6 +282,7 @@ export interface CloisterConfig {
   stuck_remediation?: StuckRemediationConfig;
   monitoring: MonitoringConfig;
   concurrency?: ConcurrencyConfig;
+  swarm?: SwarmConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
@@ -327,6 +334,9 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     reserved_advancing_slots: 3,
     reserved_swarm_slots: 3,
     exempt_operator_started: true,
+  },
+  swarm: {
+    infer_completion: 'nudge',
   },
   notifications: {
     slack_webhook: undefined,
