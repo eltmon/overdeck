@@ -1,4 +1,6 @@
+import type { RuntimeName } from '../runtimes/types.js';
 import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
+import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
 
 export type DispatchTier = 'in-context' | 'registered-slot';
 
@@ -23,4 +25,32 @@ export function chooseDispatchTier(item: Pick<VBriefItem, 'metadata'>): Dispatch
   if (independentlyDispatchable && highConfidenceScope) return 'registered-slot';
 
   return 'in-context';
+}
+
+/**
+ * Tiered-execution generalization of the dispatch decision (PAN-1791).
+ * The binary in-context/registered-slot choice stays; when tiered execution
+ * is enabled for the issue, the assignment also carries the (tierName,
+ * model, harness) resolved by the resolution chain so dispatch spawns the
+ * worker difficulty selected — the fix for PAN-1196's "difficulty captured
+ * and ignored". When disabled, the result is exactly chooseDispatchTier's
+ * with no model override.
+ */
+export interface TierAssignment {
+  dispatch: DispatchTier;
+  tierName?: string;
+  model?: string;
+  harness?: RuntimeName;
+}
+
+export type TierAssignmentConfig = ResolveTierConfig & { enabled: boolean };
+
+export function chooseTierAssignment(
+  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  tiering?: TierAssignmentConfig,
+): TierAssignment {
+  const dispatch = chooseDispatchTier(item);
+  if (!tiering?.enabled) return { dispatch };
+  const resolved = resolveTier(item, tiering);
+  return { dispatch, tierName: resolved.tierName, model: resolved.model, harness: resolved.harness };
 }
