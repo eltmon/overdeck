@@ -137,6 +137,18 @@ describe('tiered execution tier table', () => {
     expect(config.tieredExecution.enabled).toBe(false);
     expect(config.tieredExecution.replay_threshold).toBe(0.5);
     expect(config.tieredExecution.difficultyToTier).toEqual({});
+    expect(config.tieredExecution.feed).toEqual({
+      callouts: 'off',
+      exclude: [],
+      exclude_subjects: [],
+      max_diff_bytes: null,
+    });
+    expect(config.tieredExecution.escalation).toEqual({
+      enabled: false,
+      retries_at_tier: 0,
+      max_promotions: 0,
+      flounder_budget_minutes: {},
+    });
   });
 
   it('returns difficulty-to-tier map and supervisor policy for a valid config', () => {
@@ -172,5 +184,53 @@ describe('tiered execution tier table', () => {
     expect(() => validateTieredExecutionConfig(validConfig({
       by_kind: { design: 'missing' },
     }))).toThrow("tiered_execution.by_kind.design references unknown tier 'missing'");
+  });
+
+  it('validates fully populated feed and escalation blocks', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      feed: {
+        callouts: 'corroborate',
+        exclude: ['bun.lock'],
+        exclude_subjects: ['chore(beads):'],
+        max_diff_bytes: 128_000,
+      },
+      escalation: {
+        enabled: true,
+        retries_at_tier: 2,
+        max_promotions: 3,
+        flounder_budget_minutes: { simple: 30, complex: 90 },
+      },
+    }));
+
+    expect(result.feed).toEqual({
+      callouts: 'corroborate',
+      exclude: ['bun.lock'],
+      exclude_subjects: ['chore(beads):'],
+      max_diff_bytes: 128_000,
+    });
+    expect(result.escalation).toEqual({
+      enabled: true,
+      retries_at_tier: 2,
+      max_promotions: 3,
+      flounder_budget_minutes: { simple: 30, complex: 90 },
+    });
+  });
+
+  it('rejects invalid feed and escalation fields with named config errors', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      feed: { callouts: 'loud' as never },
+    }))).toThrow('tiered_execution.feed.callouts');
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      feed: { max_diff_bytes: 0 },
+    }))).toThrow('tiered_execution.feed.max_diff_bytes');
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      escalation: { flounder_budget_minutes: { unknown: 10 } as never },
+    }))).toThrow("tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty 'unknown'");
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      escalation: { retries_at_tier: -1 },
+    }))).toThrow('tiered_execution.escalation.retries_at_tier');
   });
 });
