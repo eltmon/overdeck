@@ -328,6 +328,12 @@ export class SupervisorWatchdog {
       await lock.release();
     }
 
+    // PAN-2219: a restart gives the new server a fresh patrol-grace window.
+    // Without this the pre-restart staleness clock carried over, so each new
+    // boot was killed before boot reconciliation + its first patrol could
+    // complete — restart churn until maxRestarts/gaveUp.
+    this.state.patrolUnhealthySince = null;
+
     await Effect.runPromise(writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
       trigger: 'watchdog',

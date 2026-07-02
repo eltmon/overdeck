@@ -218,21 +218,33 @@ function normalizeForEchoMatch(value: string): string {
  * Claude Code collapses large pastes into a `[Pasted text #N +M lines]`
  * placeholder — the raw text never echoes. Treat the placeholder appearing in
  * output observed since this delivery began as confirmation that the paste
- * landed.
+ * landed. Matched against `normalizeForEchoMatch` output (box chars + ALL
+ * whitespace removed), because the TUI renders the placeholder inside a
+ * bordered composer whose box-draw glyphs and mid-word wrap break a literal
+ * `"[Pasted text "` match — the miss that wedged every large swarm-dispatch
+ * kickoff (7k-char prompts) with "input echo confirmation failed".
  */
-const PASTE_PLACEHOLDER_RE = /\[Pasted text #?\d*/;
+const PASTE_PLACEHOLDER_NORMALIZED_RE = /\[Pastedtext#?\d*/;
 
-function confirmationPrefix(content: string): string {
+export function confirmationPrefix(content: string): string {
   const lines = content.split('\n');
   const verifyLine = ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
   return normalizeForEchoMatch(verifyLine).slice(0, INPUT_ECHO_CONFIRM_PREFIX_CHARS);
 }
 
+/**
+ * Pure confirmation predicate: the delivered content is considered echoed once
+ * the composer shows either its trailing-line prefix or a collapsed paste
+ * placeholder. Exported for unit testing against captured PTY output.
+ */
+export function isEchoConfirmed(rawOutput: string, prefix: string): boolean {
+  if (prefix.length === 0) return true;
+  const normalized = normalizeForEchoMatch(rawOutput);
+  return normalized.includes(prefix) || PASTE_PLACEHOLDER_NORMALIZED_RE.test(normalized);
+}
+
 async function waitForPtyEcho(readOutput: () => string, prefix: string): Promise<boolean> {
-  const confirmed = (): boolean => {
-    const raw = readOutput();
-    return normalizeForEchoMatch(raw).includes(prefix) || PASTE_PLACEHOLDER_RE.test(stripAnsi(raw));
-  };
+  const confirmed = (): boolean => isEchoConfirmed(readOutput(), prefix);
   const deadline = Date.now() + INPUT_ECHO_CONFIRM_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (confirmed()) return true;

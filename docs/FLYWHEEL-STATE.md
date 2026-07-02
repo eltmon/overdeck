@@ -201,6 +201,37 @@ live in **Substrate fixes** above; RUN-32/34/35 are kept verbatim below.)
 
 Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file holds only cross-run **durable** memory; per-tick logs were redundant with the run reports and were compacted out on 2026-06-29 (was 373KB / 3253 lines).
 
+## RUN-53 operator directives (2026-07-02, standing)
+
+- **NEVER pass `--model` to pan commands.** Config now routes every role to `claude-fable-5` (workhorse aliases changed). This SUPERSEDES the RUN-39 "re-route reviews to Sonnet via `--model claude-sonnet-4-6`" playbook — a codex auth outage no longer requires (or permits) a model override; restart with the bare command and let config route. Tick-1's three Sonnet-override restarts were re-issued without `--model` (CLI resumed the existing sessions; a fresh respawn on the config model would need an operator kill first).
+- **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
+- **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
+
+## RUN-53 tick 2 (2026-07-02) — trim landed; NO_RESUME boot is the redispatch root cause
+
+- **PAN-2218 trim LANDED** (`b2a90b7516` extracts flywheel start helpers to src/lib; flywheel.ts 1022→960). CI in_progress on it at tick end — conclusion check carried to tick 3 (short wakeup).
+- **All three restarted reviews cleared pending:** PAN-2154 + PAN-2156 recorded verdicts; PAN-2172 advanced to test with its work agent actively resolving PR #2182's merge conflict (fable-5 test agent live alongside — config routing confirmed working).
+- **NO_RESUME finding (verified, /proc/4043895/environ):** the host dashboard runs with `OVERDECK_NO_RESUME=1` — deacon patrols fire (log advancing) but orphan-recovery/auto-resume are OFF. THIS is why dead review/test agents (e.g. agent-pan-2150-test) never redispatch and why dozens of agents show "Boot --no-resume" gates. The known env-defeats-config trap. Surfaced to operator (resume-enabled restart is their call); flywheel drives stuck items via `pan review restart` meanwhile.
+- **Three `dist/dashboard/server.js` processes in host ps is NOT a deacon duel:** two have cwd `/workspaces/overdeck` = workspace-container peers (legit, deacon-disabled); only the host pid binds 3011. Check `readlink /proc/<pid>/cwd` before diagnosing a duel.
+- **Watchdog restart at 07:15 reported failure ("pan restart exited 1") but the server it spawned IS up and serving** — likely the <120s health-timeout false-fail class. Surfaced.
+- codex OAuth still logged out (re-checked). MIN-831/MIN-846 still UAT-gated.
+
+## RUN-53 tick 1.5 (2026-07-02) — PAN-2217 DONE; second red-main cause struck (PAN-2218 file-size guard)
+
+- **PAN-2217 strike COMPLETE:** mock-factory fix `0e0cd31cf2` on main, test job green, `pan done --strike` handoff applied.
+- **Main still red on the LINT job:** `08796258b0` ("fix(cli): pin flywheel start to the primary worktree root", direct push by panopticon-agent[bot]) grew `src/cli/commands/flywheel.ts` to 1022 lines — over the 1000-line file-size guard. Verified locally (wc -l = 1022). Filed as **PAN-2218** (blocks-main) by the strike agent; dispatched `strike-pan-2218` (config-routed fable-5, no --model).
+- **Recurring pattern:** this is the second file-size-guard red-main on this exact file (PAN-2192 was "flywheel CLI exceeds file-size guard after harness resolver fix"). Every direct-push fix to flywheel.ts risks tripping the guard. Durable fix = decompose flywheel.ts — but the flywheel loop is TENET-10 pipeline machinery, so that decomposition is needs-handoff, not autonomous. Surfaced as a suggestion.
+
+## RUN-53 tick 1 (2026-07-02) — RED MAIN struck (PAN-2212 direct-push mock drift) + codex auth outage again
+
+- **Main RED, 3 consecutive CI failures.** Root cause: `803bb76681` "feat(cloister): reserved swarm dispatch budget (PAN-2212)" pushed **directly to main** by panopticon-agent[bot] (no branch, no review — the PAN-2204 hazard class, second confirmed incident). It added `tryReserveSwarmSlot` to `src/lib/cloister/concurrency.ts`; 8+ test files' explicit `vi.mock` factories of that module don't return the new export → 31 tests fail. Filed **PAN-2217** (blocks-main) + struck it (`strike-pan-2217`, Fable 5). CI logs show the mock under THREE relative paths — a fix must sweep ALL `vi.mock` factories of concurrency.js repo-wide.
+- **PAN-2181 (PR #2183) "failing checks" merge-blocker is pure red-main inheritance** — identical mock-drift error on its rebased branch. No action on the PR itself; drains after PAN-2217 + re-run.
+- **codex/gpt-5.5 OAuth logged out AGAIN** (`pan pi-auth status` → not logged in; same as RUN-39). agent-pan-2172-review dead mid-session ("refresh token revoked"); agent-pan-2154-review / agent-pan-2156-review / agent-pan-2150-test sessions gone. Applied RUN-39 playbook: `pan review restart <id> --model claude-sonnet-4-6` for 2172/2154/2156 (all spawned OK; 2172 needed one retry after a transient Bad Gateway). Held gpt-5.5 work pickup; surfaced `pan ohmypi-auth login` (operator-only) in openQuestions.
+- **TENET-10 objections filed:** PAN-2145 (routes/conversations.ts), PAN-2147 (routes/agents.ts), PAN-2148 (routes/issues.ts), PAN-2149 (cloister/service.ts) — all four needsPlanning items are pipeline-runtime decompositions (verified: start-agent/spawnAgent/deliverAgentMessage hits in each). Labeled `needs-handoff` + objection comments, PAN-2189 precedent. Planning floor: nothing safe to plan this tick.
+- **PAN-2214 swarm live on the same code the strike touches** (parent + slot-1 healthy Fable 5; slot-2 = kickoff zombie ctx0%/$0, PAN-2172-bug class — watching for deacon re-delivery per RUN-39 tick-3 lesson before escalating). Its `chore(state)` commits keep landing on main; strike told to rebase before push.
+- MIN-831 + MIN-846 review+test passed — UAT-gated, surfaced to operator. UAT candidate endpoint returns null PAN-side (expected on red main).
+- Primary-worktree dirty files (conversation-lifecycle.ts, conversations.ts) predate this run — not flywheel's, left untouched.
+
 ## RUN-39 tick 2 (2026-06-29) — PAN-2155 drained; kickoff-delivery bugs gate the rest
 
 - **PAN-2155 MERGED** (commit 9bebbf24, auto-merge fired 20:14Z) → `pan close --force` → terminal. Cohort now 13/15 terminal.
