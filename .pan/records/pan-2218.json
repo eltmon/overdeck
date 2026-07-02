@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-2218",
+  "schemaVersion": 2,
+  "created": "2026-07-02T07:06:01.917Z",
+  "updated": "2026-07-02T07:06:01.917Z",
+  "pipeline": {
+    "issueId": "PAN-2218",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T07:06:01.917Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-fable-5"
+}
