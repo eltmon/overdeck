@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
-import type { SwarmCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmRecoverCommand } from '../../../../src/cli/commands/swarm.js';
+import type { SwarmCommandDeps, SwarmHoldCommandDeps } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResumeCommand } from '../../../../src/cli/commands/swarm.js';
 import { getFailedMergeBlock, resetSwarmLoopSafetyForTests } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 
@@ -179,5 +179,77 @@ describe('pan swarm command', () => {
       rmSync(workspace, { recursive: true, force: true });
       resetSwarmLoopSafetyForTests();
     }
+  });
+});
+
+describe('pan swarm freeze / resume (PAN-2214)', () => {
+  function makeHoldDeps(status: { deaconIgnored?: boolean } | null): SwarmHoldCommandDeps {
+    return {
+      getReviewStatusSync: vi.fn(() => status as ReturnType<SwarmHoldCommandDeps['getReviewStatusSync']>),
+      setDeaconIgnored: vi.fn(),
+      appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      console: { log: vi.fn(), error: vi.fn() },
+    };
+  }
+
+  it('freeze persists deaconIgnored with the default reason and explains the hold', async () => {
+    const deps = makeHoldDeps(null);
+
+    const result = await swarmFreezeCommand('pan-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'swarm freeze via pan swarm freeze');
+    expect(deps.appendOperatorInterventionEvent).toHaveBeenCalledWith({
+      issueId: 'PAN-2203',
+      kind: 'pause',
+      source: 'pan swarm freeze',
+    });
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('skip all swarm coordination for PAN-2203'));
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
+  });
+
+  it('freeze records a custom --reason', async () => {
+    const deps = makeHoldDeps(null);
+
+    await swarmFreezeCommand('PAN-2203', { reason: 'investigating slot churn' }, deps);
+
+    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'investigating slot churn');
+  });
+
+  it('freezing an already-frozen issue is an idempotent no-op with an already notice', async () => {
+    const deps = makeHoldDeps({ deaconIgnored: true });
+
+    const result = await swarmFreezeCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already frozen'));
+  });
+
+  it('resume clears deaconIgnored and points at the next patrol cycle', async () => {
+    const deps = makeHoldDeps({ deaconIgnored: true });
+
+    const result = await swarmResumeCommand('pan-2203', deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', false);
+    expect(deps.appendOperatorInterventionEvent).toHaveBeenCalledWith({
+      issueId: 'PAN-2203',
+      kind: 'unpause',
+      source: 'pan swarm resume',
+    });
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('next patrol'));
+  });
+
+  it('resuming an unfrozen issue is an idempotent no-op with an already-resumed notice', async () => {
+    const deps = makeHoldDeps(null);
+
+    const result = await swarmResumeCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already resumed'));
   });
 });
