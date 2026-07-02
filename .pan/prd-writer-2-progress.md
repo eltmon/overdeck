@@ -3,3 +3,4 @@
 - [x] PAN-1983 — 658965aac7 — ground-truthed: ONE live prod path left (overdeck/backlog.ts re-export → panopticon.db); PRD = backlog door migration + legacy-import operator checkpoint + boundary-gate hole fix
 - [x] PAN-1984 — 7836f40fff — 36-file bucketed test audit (A delete/B repoint/C swap/D judgment), deletion ordering, contents-allowlist guard; depends on PAN-1983
 - [x] PAN-2008 — e54b779e9f — read-door guard PRD: lint-store-access.sh (state.json + raw-handle rules), 4 repoints + 4 allowlists ground-truthed, boundaries check-4 bit-rot fix
+- [x] PAN-2145 — b1a559b64a — route-thinning PRD per PAN-2148 exemplar: 34-route no-loss table, 5 door modules, main.ts inversion fix; PAN-2156 NOT merged (gating condition in §8.1)
