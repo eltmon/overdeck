@@ -111,11 +111,13 @@ export async function swarmCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
-  // Single dispatch door (PAN-2214): route through the same full coordination
-  // pass the Deacon runs — real slot reconciliation, the statusOverrides
-  // merged-plan view, merge, and gc — instead of dispatching against a
-  // fabricated empty reconciliation. The old path re-dispatched already
-  // completed items (it saw no merged work) and raced live slots.
+  // Manual dispatch runs the IDENTICAL reconcile → classify → merge → gc →
+  // dispatch pipeline the Deacon patrol runs — including the operator-hold
+  // skip, advance backoff, failed-merge block, duplicate guards, bounded
+  // allocation, and the per-spawn freeze gate. The old path called
+  // dispatchNextWave with an EMPTY reconcile result and raced the Deacon
+  // (PAN-2214). Re-running the command is idempotent: already-dispatched
+  // work is reconciled, not re-spawned.
   const actions = await deps.coordinateSwarmSlots({ issueId: issue });
 
   if (actions.length === 0) {
@@ -123,7 +125,16 @@ export async function swarmCommand(
   } else {
     for (const action of actions) deps.console.log(action);
   }
-  deps.console.log(chalk.dim('Ongoing swarm coordination will continue in Deacon.'));
+
+  const holdSkip = actions.find(action => action.includes('operator hold'));
+  if (holdSkip) {
+    deps.console.log(chalk.yellow(
+      `${issue} is under an operator hold, so the coordinator skipped it and dispatched nothing. `
+      + `Run \`pan swarm resume ${issue}\` to lift the hold and re-enable swarm coordination.`,
+    ));
+  } else {
+    deps.console.log(chalk.dim('Ongoing swarm coordination will continue in Deacon.'));
+  }
 
   return { ok: true, actions, workspacePath };
 }

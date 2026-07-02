@@ -17,7 +17,9 @@ pan swarm PAN-2203
 
 If the plan is not swarm eligible, stop and report the printed reason. Do not manually spawn slot agents.
 
-When `pan swarm PAN-2203` succeeds, it ensures the issue workspace exists, dispatches the first wave of slot agents, and leaves ongoing merge, garbage collection, and next-wave dispatch to Deacon.
+When `pan swarm PAN-2203` succeeds, it ensures the issue workspace exists, then runs the same coordination pass the Deacon patrol runs — reconcile live slot state, merge ready slots, garbage-collect merged slots, and dispatch the next wave — and leaves ongoing coordination to Deacon.
+
+Re-running `pan swarm PAN-2203` is idempotent: the coordination pass reconciles already-dispatched work (live sessions, unmerged slot branches, recorded assignments) and spawns nothing new for it, so a second back-to-back run does not duplicate slots or race the Deacon. If the issue is under an operator hold (`pan swarm freeze` / `pan swarm stop`), the command dispatches nothing and points at `pan swarm resume`.
 
 ## Recover a Failed Slot
 
