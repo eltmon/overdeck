@@ -11,11 +11,12 @@ import { readdir, readFile, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
-import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
+import { calculateCostSync, getPricingSync } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { parseCodexConversationMessages } from './codex-conversation-parser.js';
+import { providerFromModel } from './conversation/provider.js';
 import {
   MAX_FALLBACK_BYTES,
   MAX_READ_BYTES,
@@ -38,14 +39,6 @@ export type {
 } from './conversation/types.js';
 
 type ModelCapability = (typeof MODEL_CAPABILITIES)[keyof typeof MODEL_CAPABILITIES];
-
-/** Detect AI provider from model name */
-function providerFromModel(model: string): AIProvider {
-  if (model.includes('gpt')) return 'openai';
-  if (model.includes('gemini')) return 'google';
-  if (model.includes('kimi') || model.toLowerCase().startsWith('minimax')) return 'custom';
-  return 'anthropic';
-}
 
 // ─── CWD encoding ─────────────────────────────────────────────────────────────
 
