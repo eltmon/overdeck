@@ -50,18 +50,18 @@
   "pipeline": {
     "issueId": "PAN-2151",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-02T21:17:51.039Z",
-    "reviewNotes": "No blocking findings; pure route relocation preserves misc barrel exports/importers and keeps every misc submodule under 1000 lines.",
-    "testNotes": "Verified on feature/pan-2151 at 602788bda3e5a99f261f3c17ecb487348fa13139: npm run typecheck PASS; npm run lint PASS; npx vitest run --configLoader runner PASS (801 files passed, 7998 tests passed, 52 skipped). UAT not required: backend route-module refactor only, no browser UI behavior change.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T21:20:24.214Z",
+    "reviewNotes": "No blocking findings; pure route relocation preserves misc barrel exports/importers and keeps every misc submodule under 1000 lines. Baseline drift with main resolved by carrying origin/main issues.ts baseline and PAN-2151 misc.ts=64.",
+    "testNotes": "Verified on feature/pan-2151 after baseline drift fix: npm run typecheck PASS; npm run lint PASS; bash scripts/lint-file-size.sh PASS after carrying origin/main issues.ts=4083 and PAN-2151 misc.ts=64; npx vitest run --configLoader runner PASS (801 files passed, 7998 tests passed, 52 skipped). UAT not required: backend route-module refactor only.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "INSPECTION PASSED for bead workspace-he57r. shared-helpers diff moves the intended helpers into src/dashboard/server/routes/misc/shared.ts, preserves misc.ts exports via readPackageVersion re-export, changes only misc.ts and misc/shared.ts, and introduces no new execSync/sendKeys/explicit-any patterns.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
-    "reviewedAtCommit": "602788bda3e5a99f261f3c17ecb487348fa13139",
+    "reviewedAtCommit": "c13e5862150b27332709946c6f71e8da3c5e9714",
     "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6",
     "reviewRequestedAt": "2026-07-02T21:07:42.551Z",
     "scopeDrift": {
@@ -165,7 +165,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.083717,
-        "pricingAsOf": "2026-07-02T21:17:51.077Z"
+        "pricingAsOf": "2026-07-02T21:20:24.243Z"
       }
     },
     "merges": [
@@ -174,5 +174,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T21:13:43.617Z",
-  "updated": "2026-07-02T21:17:51.181Z"
+  "updated": "2026-07-02T21:20:24.246Z"
 }
