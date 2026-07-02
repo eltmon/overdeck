@@ -1,5 +1,7 @@
+import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -10,6 +12,8 @@ import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbr
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import {
   classifyInFlightSlots,
+  clearAllSlotAssignments,
+  clearFailedMergeBlock,
   coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
@@ -24,6 +28,8 @@ import { appendOperatorInterventionEvent } from '../../lib/operator-intervention
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
+
+const execAsync = promisify(exec);
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
 
@@ -297,6 +303,182 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export interface SwarmResetOptions {
+  force?: boolean;
+  reason?: string;
+}
+
+export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
+  resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
+  runGitCommand: (command: string, cwd: string) => Promise<unknown>;
+  clearAllSlotAssignments: typeof clearAllSlotAssignments;
+  clearFailedMergeBlock: typeof clearFailedMergeBlock;
+}
+
+const defaultResetDeps: SwarmResetCommandDeps = {
+  ...defaultStopDeps,
+  resolveProjectFromIssueSync,
+  runGitCommand: (command, cwd) => execAsync(command, { cwd }),
+  clearAllSlotAssignments,
+  clearFailedMergeBlock,
+};
+
+/**
+ * Work-preserving swarm reset (PAN-2214). Stops the swarm (hold first), pushes
+ * every UNMERGED local slot branch to origin BEFORE deleting anything, removes
+ * slot worktrees and local slot branches, clears recorded slot assignments and
+ * any failed-merge block, and marks lingering slot agent rows stopped. The
+ * hold stays set afterward so the Deacon cannot race the cleanup — the
+ * operator re-enables coordination with `pan swarm resume`.
+ */
+export async function swarmResetCommand(
+  issueId: string,
+  options: SwarmResetOptions = {},
+  deps: SwarmResetCommandDeps = defaultResetDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const issueLower = issue.toLowerCase();
+
+  const project = deps.resolveProjectFromIssueSync(issue);
+  if (!project) {
+    deps.console.error(chalk.red(`Could not resolve project for ${issue}.`));
+    return { ok: false };
+  }
+  const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
+
+  const stopResult = await swarmStopCommand(issue, { reason: options.reason ?? 'swarm reset via pan swarm reset' }, deps);
+  if (!stopResult.ok) {
+    deps.console.error(chalk.red(
+      `Aborting reset for ${issue}: stopping slot agents failed (see above). Nothing was deleted. `
+      + 'Stop the failing agents manually, then re-run the reset.',
+    ));
+    return { ok: false };
+  }
+
+  const branches = await listLocalSlotBranches(issue, workspacePath, deps.runGitCommand);
+  const unmerged = branches.filter(branch => !branch.merged);
+
+  // Push every unmerged branch BEFORE any deletion — never delete unpushed
+  // unmerged work silently.
+  const pushed: string[] = [];
+  for (const { branch } of unmerged) {
+    try {
+      await deps.runGitCommand(`git push origin ${JSON.stringify(branch)}`, workspacePath);
+      pushed.push(branch);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!options.force) {
+        deps.console.error(chalk.red(
+          `Aborting reset for ${issue}: pushing unmerged branch ${branch} to origin failed (${message}). `
+          + 'Nothing was deleted.',
+        ));
+        deps.console.error(
+          `Fix the push (network, auth, remote state) and re-run \`pan swarm reset ${issue}\`, or pass --force `
+          + 'to delete the branch even though origin has no backup of it.',
+        );
+        return { ok: false };
+      }
+      deps.console.log(chalk.yellow(
+        `--force: continuing even though ${branch} could not be pushed to origin (${message}) — its commits `
+        + 'will exist only in reflog after deletion.',
+      ));
+    }
+  }
+
+  // Worktrees first (a branch checked out in a worktree cannot be deleted),
+  // then local slot branches.
+  const worktrees = await listSlotWorktreePaths(workspacePath, deps.runGitCommand);
+  for (const worktreePath of worktrees) {
+    await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(worktreePath)}`, workspacePath);
+  }
+  for (const { branch } of branches) {
+    await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, workspacePath);
+  }
+
+  deps.clearAllSlotAssignments(workspacePath, issue);
+  deps.clearFailedMergeBlock(issue, workspacePath);
+
+  // No stale registration may survive: mark lingering slot agent rows stopped.
+  let stoppedRows = 0;
+  for (const agent of deps.listSlotAgents(issue)) {
+    if (agent.status === 'running' || agent.status === 'starting') {
+      try {
+        deps.stopAgentSync(agent.agentId);
+        stoppedRows += 1;
+      } catch (error) {
+        deps.console.error(chalk.red(
+          `Failed to mark ${agent.agentId} stopped: ${error instanceof Error ? error.message : String(error)}`,
+        ));
+      }
+    }
+  }
+
+  deps.console.log(chalk.green(`Swarm reset complete for ${issue}.`));
+  deps.console.log(
+    `Pushed to origin: ${pushed.length > 0 ? pushed.join(', ') : 'nothing (no unmerged slot branches needed a backup)'}. `
+    + `Removed ${worktrees.length} slot worktree(s) and ${branches.length} local slot branch(es). `
+    + `Cleared the recorded slot assignments and any failed-merge block`
+    + `${stoppedRows > 0 ? `, and marked ${stoppedRows} lingering slot agent row(s) stopped` : ''}.`,
+  );
+  deps.console.log(
+    `The swarm hold REMAINS SET — the Deacon still skips all swarm coordination for ${issue}, so nothing can `
+    + `re-spawn behind this cleanup. Run \`pan swarm resume ${issue}\` to re-enable coordination `
+    + `(then \`pan swarm ${issue}\` to dispatch a fresh wave immediately).`,
+  );
+  return { ok: true };
+}
+
+async function listLocalSlotBranches(
+  issueId: string,
+  workspacePath: string,
+  runGitCommand: SwarmResetCommandDeps['runGitCommand'],
+): Promise<Array<{ branch: string; merged: boolean }>> {
+  const issueLower = issueId.toLowerCase();
+  let names: string[] = [];
+  try {
+    const result = await runGitCommand(
+      `git for-each-ref --format="%(refname:short)" "refs/heads/feature/${issueLower}-slot-*"`,
+      workspacePath,
+    ) as { stdout?: unknown };
+    names = String(result?.stdout ?? '').split('\n').map(line => line.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+
+  const branches: Array<{ branch: string; merged: boolean }> = [];
+  for (const branch of names) {
+    let merged = false;
+    try {
+      const result = await runGitCommand(`git rev-list --count HEAD..${JSON.stringify(branch)}`, workspacePath) as { stdout?: unknown };
+      const aheadCount = Number(String(result?.stdout ?? '').trim());
+      // An unknown ahead-count is treated as unmerged so the branch gets
+      // pushed before deletion — the safe direction.
+      merged = Number.isFinite(aheadCount) && aheadCount === 0;
+    } catch {
+      merged = false;
+    }
+    branches.push({ branch, merged });
+  }
+  return branches;
+}
+
+async function listSlotWorktreePaths(
+  workspacePath: string,
+  runGitCommand: SwarmResetCommandDeps['runGitCommand'],
+): Promise<string[]> {
+  try {
+    const result = await runGitCommand('git worktree list --porcelain', workspacePath) as { stdout?: unknown };
+    const prefix = `worktree ${workspacePath}-slot-`;
+    return String(result?.stdout ?? '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith(prefix))
+      .map(line => line.slice('worktree '.length));
+  } catch {
+    return [];
+  }
+}
+
 function safeGetReviewStatus(
   issueId: string,
   deps: Pick<SwarmHoldCommandDeps, 'getReviewStatusSync'>,
@@ -467,6 +649,16 @@ export function registerSwarmCommands(program: Command): void {
     .option('--reason <text>', 'Reason recorded on the hold')
     .action(async (id: string, options: SwarmFreezeOptions) => {
       const result = await swarmStopCommand(id, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('reset <id>')
+    .description('Work-preserving reset: stop slots, push unmerged slot branches to origin, remove slot worktrees/branches, clear recorded slot state (hold stays set)')
+    .option('--force', 'Continue deleting even when pushing an unmerged branch to origin fails')
+    .option('--reason <text>', 'Reason recorded on the hold')
+    .action(async (id: string, options: SwarmResetOptions) => {
+      const result = await swarmResetCommand(id, options);
       if (!result.ok) process.exitCode = 1;
     });
 }

@@ -41,6 +41,18 @@ pan swarm recover PAN-2203 1 --action retry
 
 Use `--action retry` to unblock and redispatch the failed item, `--action drop` to mark the item done after operator review, or `--action handoff` to keep the failed slot blocked for manual resolution.
 
+## Reset a Swarm (Work-Preserving)
+
+Run:
+
+```bash
+pan swarm reset PAN-2203
+```
+
+Reset stops the swarm (hold first, so the Deacon cannot re-spawn slots mid-cleanup), pushes every unmerged local slot branch to origin BEFORE deleting anything, removes all slot worktrees and local slot branches, clears the recorded slot assignments and any failed-merge block, and marks lingering slot agent rows stopped. If pushing an unmerged branch fails, the reset aborts with nothing deleted — pass `--force` only when you accept losing the origin backup. Use `--reason <text>` to record why on the hold.
+
+After a reset the hold remains set: run `pan swarm resume PAN-2203` to re-enable coordination, then `pan swarm PAN-2203` to dispatch a fresh wave. Re-running reset on an already-clean issue succeeds and does nothing.
+
 ## Freeze and Resume Coordination
 
 Run:

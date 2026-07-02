@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
-import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
+import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmResetCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
 import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
@@ -573,5 +573,152 @@ describe('pan swarm status (PAN-2214)', () => {
       'reconcileSlotState',
       'resolveProjectFromIssueSync',
     ]);
+  });
+});
+
+describe('pan swarm reset (PAN-2214)', () => {
+  function makeResetDeps(options: {
+    slotBranches?: Record<string, string>; // branch → ahead count stdout
+    worktreeSlotPaths?: string[];
+    pushFailsFor?: string[];
+    slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
+    status?: { deaconIgnored?: boolean } | null;
+  } = {}): SwarmResetCommandDeps & { gitCalls: string[] } {
+    const gitCalls: string[] = [];
+    const branches = options.slotBranches ?? {};
+    const deps = {
+      getReviewStatusSync: vi.fn(() => (options.status ?? null) as never),
+      setDeaconIgnored: vi.fn(),
+      appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as never),
+      listSessionNamesSync: vi.fn(() => [] as string[]),
+      stopAgentSync: vi.fn(),
+      resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
+      clearAllSlotAssignments: vi.fn(),
+      clearFailedMergeBlock: vi.fn(),
+      runGitCommand: vi.fn(async (command: string) => {
+        gitCalls.push(command);
+        if (command.startsWith('git for-each-ref')) {
+          return { stdout: `${Object.keys(branches).join('\n')}\n` };
+        }
+        if (command.startsWith('git rev-list --count HEAD..')) {
+          for (const [branch, count] of Object.entries(branches)) {
+            if (command === `git rev-list --count HEAD..${JSON.stringify(branch)}`) return { stdout: `${count}\n` };
+          }
+          return { stdout: '0\n' };
+        }
+        if (command === 'git worktree list --porcelain') {
+          const lines = ['worktree /repo/workspaces/feature-pan-2203'];
+          for (const path of options.worktreeSlotPaths ?? []) lines.push(`worktree ${path}`);
+          return { stdout: `${lines.join('\n')}\n` };
+        }
+        if (command.startsWith('git push origin ')) {
+          for (const failing of options.pushFailsFor ?? []) {
+            if (command === `git push origin ${JSON.stringify(failing)}`) throw new Error('remote rejected');
+          }
+          return { stdout: '' };
+        }
+        return { stdout: '' };
+      }),
+      console: { log: vi.fn(), error: vi.fn() },
+    };
+    return Object.assign(deps as unknown as SwarmResetCommandDeps, { gitCalls });
+  }
+
+  function loggedText(deps: SwarmResetCommandDeps): string {
+    return [
+      ...vi.mocked(deps.console.log).mock.calls,
+      ...vi.mocked(deps.console.error).mock.calls,
+    ].map(call => call.join(' ')).join('\n');
+  }
+
+  it('pushes an unmerged slot branch to origin BEFORE any deletion', async () => {
+    const deps = makeResetDeps({
+      slotBranches: { 'feature/pan-2203-slot-1': '2' },
+      worktreeSlotPaths: ['/repo/workspaces/feature-pan-2203-slot-1'],
+    });
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    const pushIndex = deps.gitCalls.findIndex(cmd => cmd === 'git push origin "feature/pan-2203-slot-1"');
+    const removeIndex = deps.gitCalls.findIndex(cmd => cmd.startsWith('git worktree remove'));
+    const deleteIndex = deps.gitCalls.findIndex(cmd => cmd.startsWith('git branch -D'));
+    expect(pushIndex).toBeGreaterThanOrEqual(0);
+    expect(removeIndex).toBeGreaterThan(pushIndex);
+    expect(deleteIndex).toBeGreaterThan(pushIndex);
+  });
+
+  it('a push failure without --force aborts with the branch named and deletes nothing', async () => {
+    const deps = makeResetDeps({
+      slotBranches: { 'feature/pan-2203-slot-1': '2' },
+      worktreeSlotPaths: ['/repo/workspaces/feature-pan-2203-slot-1'],
+      pushFailsFor: ['feature/pan-2203-slot-1'],
+    });
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(false);
+    expect(loggedText(deps)).toContain('feature/pan-2203-slot-1');
+    expect(loggedText(deps)).toContain('Nothing was deleted');
+    expect(deps.gitCalls.some(cmd => cmd.startsWith('git worktree remove'))).toBe(false);
+    expect(deps.gitCalls.some(cmd => cmd.startsWith('git branch -D'))).toBe(false);
+    expect(deps.clearAllSlotAssignments).not.toHaveBeenCalled();
+  });
+
+  it('--force continues past a push failure and still deletes', async () => {
+    const deps = makeResetDeps({
+      slotBranches: { 'feature/pan-2203-slot-1': '2' },
+      pushFailsFor: ['feature/pan-2203-slot-1'],
+    });
+
+    const result = await swarmResetCommand('PAN-2203', { force: true }, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.gitCalls.some(cmd => cmd === 'git branch -D "feature/pan-2203-slot-1"')).toBe(true);
+  });
+
+  it('clears slot assignments, the failed-merge block, and stops lingering slot agent rows', async () => {
+    const deps = makeResetDeps({
+      slotBranches: { 'feature/pan-2203-slot-1': '0' },
+      slotAgents: [
+        { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'running' },
+        { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', status: 'stopped' },
+      ],
+    });
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.clearAllSlotAssignments).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203');
+    expect(deps.clearFailedMergeBlock).toHaveBeenCalledWith('PAN-2203', '/repo/workspaces/feature-pan-2203');
+    // The running row is stopped twice at most (once via stop's enumeration, once via the
+    // final sweep) — the essential guarantee is it is stopped and the stopped row is not touched.
+    expect(deps.stopAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.stopAgentSync).not.toHaveBeenCalledWith('agent-pan-2203-slot-2');
+  });
+
+  it('preserves the hold and names pan swarm resume as the re-enable step', async () => {
+    const deps = makeResetDeps({ slotBranches: {} });
+
+    const result = await swarmResetCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, expect.any(String));
+    expect(deps.setDeaconIgnored).not.toHaveBeenCalledWith('PAN-2203', false);
+    expect(loggedText(deps)).toContain('hold REMAINS SET');
+    expect(loggedText(deps)).toContain('pan swarm resume PAN-2203');
+  });
+
+  it('is idempotent on a clean issue and deletes merged branches without pushing', async () => {
+    const clean = makeResetDeps({ slotBranches: {}, worktreeSlotPaths: [] });
+    await expect(swarmResetCommand('PAN-2203', {}, clean)).resolves.toEqual({ ok: true });
+    expect(clean.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
+    expect(clean.gitCalls.some(cmd => cmd.startsWith('git branch -D'))).toBe(false);
+
+    const merged = makeResetDeps({ slotBranches: { 'feature/pan-2203-slot-1': '0' } });
+    await expect(swarmResetCommand('PAN-2203', {}, merged)).resolves.toEqual({ ok: true });
+    expect(merged.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
+    expect(merged.gitCalls.some(cmd => cmd === 'git branch -D "feature/pan-2203-slot-1"')).toBe(true);
   });
 });
