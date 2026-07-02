@@ -30,6 +30,7 @@ import { buildCorrelationMapSync } from './correlator.js';
 import { getModelCapabilitySync } from '../model-capabilities.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
+import { parsePiSessionMetadata } from './harness-metadata.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,12 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
   const parseJsonlEff = opts.parseJsonl ?? parseSessionJsonl;
   const parseJsonl = (path: string) => Effect.runPromise(parseJsonlEff(path));
+  const parseMetadata = (file: DiscoveredFile) => {
+    if (file.harness === 'pi' || file.harness === 'ohmypi') {
+      return parsePiSessionMetadata(file.jsonlPath);
+    }
+    return parseJsonl(file.jsonlPath);
+  };
 
   // 1. Discover JSONL candidates
   const discoveryEncodings = targetEncodingsForMode(opts);
@@ -87,14 +94,15 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const resolver = new HashResolver(opts.watchDirs ?? []);
 
   if (opts.dryRun) {
-    for (const { jsonlPath, harness } of filteredFiles) {
-      if (harness !== 'claude-code') {
+    for (const file of filteredFiles) {
+      const { jsonlPath, harness } = file;
+      if (harness === 'codex') {
         result.skipped++;
         continue;
       }
       if (opts.mode === 'targeted') {
         try {
-          const meta = await parseJsonl(jsonlPath);
+          const meta = await parseMetadata(file);
           const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
           if (resolved.warning) result.warnings!.push(resolved.warning);
           if (!workspaceUnderAnyDir(resolved.workspacePath, opts.dirs ?? [])) continue;
@@ -137,8 +145,9 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   let sessionsFound = 0;
 
   // 7. Build tasks
-  const tasks = filteredFiles.map(({ jsonlPath, harness }) => async () => {
-    if (harness !== 'claude-code') {
+  const tasks = filteredFiles.map((file) => async () => {
+    const { jsonlPath, harness } = file;
+    if (harness === 'codex') {
       result.skipped++;
       dirsProcessed++;
       await opts.onProgress?.({
@@ -185,7 +194,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
         }
         upsertDiscoveredSession({
           jsonlPath,
-          harness: 'claude-code',
+          harness,
           sessionId: existing.sessionId,
           workspacePath: existing.workspacePath,
           workspaceHash: existing.workspaceHash,
@@ -222,7 +231,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
     // Parse, resolve, and upsert — wrap so one bad file can't leave progress incomplete.
     try {
-      const meta = await parseJsonl(jsonlPath);
+      const meta = await parseMetadata(file);
 
       // Resolve workspace path
       const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
@@ -248,7 +257,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
       const wasExisting = !!existing;
       upsertDiscoveredSession({
         jsonlPath,
-        harness: 'claude-code',
+        harness,
         sessionId: meta.sessionId,
         workspacePath: resolved.workspacePath,
         workspaceHash: resolved.workspaceHash,
