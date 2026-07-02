@@ -29,6 +29,11 @@
       "timestamp": "2026-07-02T21:07:42.548Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T21:10:31.608Z"
     }
   ],
   "feedback": [],
@@ -71,18 +76,19 @@
     "recordedAt": "2026-07-02T21:06:08.344Z"
   },
   "created": "2026-06-30T01:25:47.990Z",
-  "updated": "2026-07-02T21:08:15.444Z",
+  "updated": "2026-07-02T21:10:35.615Z",
   "pipeline": {
     "issueId": "PAN-2151",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T21:08:15.350Z",
+    "updatedAt": "2026-07-02T21:10:35.575Z",
     "inspectNotes": "INSPECTION PASSED for bead workspace-he57r. shared-helpers diff moves the intended helpers into src/dashboard/server/routes/misc/shared.ts, preserves misc.ts exports via readPackageVersion re-export, changes only misc.ts and misc/shared.ts, and introduces no new execSync/sendKeys/explicit-any patterns.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
+    "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6",
     "reviewRequestedAt": "2026-07-02T21:07:42.551Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -185,7 +191,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.083717,
-        "pricingAsOf": "2026-07-02T21:08:15.441Z"
+        "pricingAsOf": "2026-07-02T21:10:35.614Z"
       }
     },
     "merges": [
