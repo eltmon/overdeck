@@ -11,9 +11,11 @@ export const TIERED_EXECUTION_DIFFICULTIES: readonly VBriefDifficulty[] = ['triv
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
 export const TIERED_EXECUTION_ITEM_KINDS: readonly VBriefItemKind[] = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
 export const TIERED_EXECUTION_CALLOUT_POLICIES = ['off', 'notify', 'corroborate'] as const;
+export const TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES = ['off', 'on'] as const;
 
 export type TieredExecutionSubscription = typeof TIERED_EXECUTION_SUBSCRIPTIONS[number];
 export type TieredExecutionCalloutPolicy = typeof TIERED_EXECUTION_CALLOUT_POLICIES[number];
+export type TieredExecutionCompactionReroutePolicy = typeof TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES[number];
 
 export interface TierDefinition {
   model: ModelId | string;
@@ -63,6 +65,7 @@ export interface TieredExecutionConfig {
   by_kind?: Partial<Record<VBriefItemKind, string>>;
   feed?: TieredExecutionFeedConfig;
   escalation?: TieredEscalationConfig;
+  compaction_reroute?: TieredExecutionCompactionReroutePolicy;
   replay_threshold: number;
 }
 
@@ -71,6 +74,7 @@ export interface ValidatedTieredExecutionConfig extends TieredExecutionConfig {
   byKind: Partial<Record<VBriefItemKind, string>>;
   feed: ValidatedTieredExecutionFeedConfig;
   escalation: ValidatedEscalationConfig;
+  compaction_reroute: TieredExecutionCompactionReroutePolicy;
 }
 
 export interface TieredExecutionValidationContext {
@@ -102,6 +106,7 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
     max_promotions: 0,
     flounder_budget_minutes: {},
   },
+  compaction_reroute: 'off',
   replay_threshold: 0.5,
   difficultyToTier: {},
 };
@@ -149,6 +154,10 @@ function isCalloutPolicy(value: string): value is TieredExecutionCalloutPolicy {
   return (TIERED_EXECUTION_CALLOUT_POLICIES as readonly string[]).includes(value);
 }
 
+function isCompactionReroutePolicy(value: string): value is TieredExecutionCompactionReroutePolicy {
+  return (TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES as readonly string[]).includes(value);
+}
+
 function knownModelIds(): Set<string> {
   const ids = new Set<string>();
   for (const provider of Object.values(PROVIDERS)) {
@@ -193,6 +202,7 @@ export function normalizeTieredExecutionConfig(config?: Partial<TieredExecutionC
     by_kind: config?.by_kind ?? {},
     feed: config?.feed,
     escalation: config?.escalation,
+    compaction_reroute: config?.compaction_reroute ?? 'off',
     replay_threshold: config?.replay_threshold ?? 0.5,
   };
 }
@@ -262,12 +272,16 @@ export function validateTieredExecutionConfig(
   const config = normalizeTieredExecutionConfig(rawConfig);
   const feed = validateFeedConfig(config.feed);
   const escalation = validateEscalationConfig(config.escalation);
+  if (!isCompactionReroutePolicy(config.compaction_reroute ?? 'off')) {
+    throw new TieredExecutionConfigError(`tiered_execution.compaction_reroute must be one of ${TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES.join(', ')}`);
+  }
+  const compactionReroute = config.compaction_reroute ?? 'off';
   const shouldValidateTierTable = config.enabled
     || Object.keys(config.tiers).length > 0
     || Object.keys(config.by_kind ?? {}).length > 0
     || config.supervisor !== undefined;
   if (!shouldValidateTierTable) {
-    return { ...DEFAULT_TIERED_EXECUTION_CONFIG, feed, escalation };
+    return { ...DEFAULT_TIERED_EXECUTION_CONFIG, feed, escalation, compaction_reroute: compactionReroute };
   }
 
   if (typeof config.replay_threshold !== 'number' || config.replay_threshold <= 0 || config.replay_threshold > 1) {
@@ -346,6 +360,7 @@ export function validateTieredExecutionConfig(
     byKind,
     feed,
     escalation,
+    compaction_reroute: compactionReroute,
     replay_threshold: config.replay_threshold,
     difficultyToTier,
   };

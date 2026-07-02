@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import type { TierOverridesMap } from '../vbrief/io.js';
 import { getModelCapabilitySync, hasModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { AgentState } from './agent-state.js';
 import type { DeliveryResult } from './delivery.js';
@@ -11,6 +12,8 @@ import { spawnRun } from './spawn.js';
 import type { SpawnRunOptions } from './spawn-prep.js';
 import { listSlotOwnership } from './slot-reconcile.js';
 import type { InFlightBead } from './standing-tiers.js';
+import { computeTierRunSchedule, tiersNeededForSchedule } from './standing-tiers.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
 import {
   composeCommitFeedMessage,
   renderCommitFeedDiff,
@@ -25,7 +28,7 @@ import {
   supervisorAgentId as defaultSupervisorAgentId,
   SUPERVISOR_SUB_ROLE,
 } from './tier-supervisor.js';
-import type { TieredExecutionSupervisorConfig, ValidatedTieredExecutionFeedConfig } from './tier-table.js';
+import type { TieredExecutionSupervisorConfig, ValidatedTieredExecutionConfig, ValidatedTieredExecutionFeedConfig } from './tier-table.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from './tier-table.js';
 import { stopAgent } from './termination.js';
 
@@ -49,6 +52,13 @@ export interface ReplayResult {
   deliveries: ReplayDelivery[];
 }
 
+export interface ReplayRerouteContext {
+  doc: VBriefDocument;
+  config: ValidatedTieredExecutionConfig;
+  statusOverrides?: Record<string, string>;
+  tierOverrides?: TierOverridesMap;
+}
+
 export interface ReplayTargetBase {
   issueId: string;
   workspace: string;
@@ -65,6 +75,8 @@ export interface ReplayTargetBase {
   feedConfig?: ValidatedTieredExecutionFeedConfig;
   /** Dashboard API base URL used when replaying callout-enabled tier feed messages. */
   apiUrl?: string;
+  /** Optional current scheduling state used only when compaction_reroute is on. */
+  reroute?: ReplayRerouteContext;
 }
 
 export interface ReplayStandingTierTarget extends ReplayTargetBase {
@@ -147,10 +159,20 @@ export async function replayStandingAgent(
  * is dead; replay respawns and reconstructs the feed without human input.
  */
 export async function replayCrashedStandingAgent(
+  target: ReplayStandingTierTarget & { reroute: ReplayRerouteContext },
+  options?: TierReplayOptions,
+): Promise<ReplayResult | null>;
+export async function replayCrashedStandingAgent(
+  target: ReplayTarget,
+  options?: TierReplayOptions,
+): Promise<ReplayResult>;
+export async function replayCrashedStandingAgent(
   target: ReplayTarget,
   options: TierReplayOptions = {},
-): Promise<ReplayResult> {
-  return replayStandingAgent(target, options);
+): Promise<ReplayResult | null> {
+  const rerouted = resolveReroutedReplayTarget(target);
+  if (!rerouted) return null;
+  return replayStandingAgent(rerouted, options);
 }
 
 /**
@@ -163,10 +185,15 @@ export async function compactAtTierRunBoundary(
 ): Promise<ReplayResult | null> {
   if (!shouldReplayCompactAtTierRunBoundary(options.compaction)) return null;
   const deps = replayDeps(options.deps);
-  if (options.target.agentId) {
-    await deps.stop(options.target.agentId);
+  const rerouted = resolveReroutedReplayTarget(options.target);
+  if (!rerouted) {
+    if (options.target.agentId) await deps.stop(options.target.agentId);
+    return null;
   }
-  return replayStandingAgent(options.target, { deps });
+  if (rerouted.agentId) {
+    await deps.stop(rerouted.agentId);
+  }
+  return replayStandingAgent(rerouted, { deps });
 }
 
 export function shouldReplayCompactAtTierRunBoundary(input: TierRunCompactionInput): boolean {
@@ -202,8 +229,42 @@ async function spawnReplayTarget(target: ReplayTarget, deps: Required<TierReplay
     slotIndex: slot.slotIndex,
     slotItemId: slot.slotItemId,
     prompt: target.prompt,
+    ...currentTierSpawnOverride(target),
   };
   return deps.spawn(target.issueId, 'work', spawnOptions);
+}
+
+function resolveReroutedReplayTarget(target: ReplayTarget): ReplayTarget | null {
+  if (target.kind !== 'tier') return target;
+  const reroute = target.reroute;
+  if (!reroute || reroute.config.compaction_reroute === 'off') return target;
+
+  const scheduleDoc = remainingScheduleDocument(reroute);
+  const schedule = computeTierRunSchedule(scheduleDoc, reroute.config);
+  if (!tiersNeededForSchedule(schedule).includes(target.tierName)) return null;
+  return target;
+}
+
+function remainingScheduleDocument(reroute: ReplayRerouteContext): VBriefDocument {
+  const statusOverrides = reroute.statusOverrides ?? {};
+  const tierOverrides = reroute.tierOverrides ?? {};
+  return {
+    ...reroute.doc,
+    plan: {
+      ...reroute.doc.plan,
+      items: reroute.doc.plan.items
+        .filter((item) => (statusOverrides[item.id] ?? item.status) !== 'completed')
+        .map((item) => applyEffectiveDifficulty(item, tierOverrides)),
+    },
+  };
+}
+
+function currentTierSpawnOverride(target: ReplayStandingTierTarget): Pick<SpawnRunOptions, 'model' | 'harness'> {
+  const reroute = target.reroute;
+  if (!reroute || reroute.config.compaction_reroute === 'off') return {};
+  const tier = reroute.config.tiers[target.tierName];
+  if (!tier) return {};
+  return { model: tier.model, harness: tier.harness };
 }
 
 function resolveReplaySlot(

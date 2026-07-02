@@ -8,7 +8,7 @@ import {
   shouldReplayCompactAtTierRunBoundary,
 } from '../tier-replay.js';
 import { broadcastCommit } from '../tier-feed.js';
-import type { ValidatedTieredExecutionFeedConfig } from '../tier-table.js';
+import { validateTieredExecutionConfig, type ValidatedTieredExecutionConfig, type ValidatedTieredExecutionFeedConfig } from '../tier-table.js';
 import type { TieredExecutionSupervisorConfig } from '../tier-table.js';
 
 function item(id: string, title = id, requiresInspection = false): VBriefItem {
@@ -28,6 +28,15 @@ function item(id: string, title = id, requiresInspection = false): VBriefItem {
   };
 }
 
+function tierItem(id: string, difficulty: NonNullable<VBriefItem['metadata']>['difficulty'], status: VBriefItem['status'] = 'pending'): VBriefItem {
+  return {
+    id,
+    title: id,
+    status,
+    metadata: { difficulty },
+  };
+}
+
 function doc(items: VBriefItem[]): VBriefDocument {
   return {
     vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
@@ -42,7 +51,8 @@ function deps() {
     issueId,
     workspace: '/ws',
     role,
-    model: 'claude-sonnet-5',
+    model: String(options.model ?? 'claude-sonnet-5'),
+    harness: String(options.harness ?? 'claude-code'),
     status: 'running',
     startedAt: '2026-07-02T00:00:00Z',
   } as AgentState));
@@ -66,6 +76,23 @@ function feedConfig(overrides: Partial<ValidatedTieredExecutionFeedConfig> = {})
     exclude: [],
     exclude_subjects: [],
     max_diff_bytes: null,
+    ...overrides,
+  };
+}
+
+function tierConfig(overrides: Partial<ValidatedTieredExecutionConfig> = {}): ValidatedTieredExecutionConfig {
+  return {
+    ...validateTieredExecutionConfig({
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex'] },
+        frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['expert'] },
+      },
+      supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+      compaction_reroute: 'on',
+    }),
     ...overrides,
   };
 }
@@ -255,5 +282,120 @@ describe('tier replay', () => {
     expect(replaySeams.deliveries).toHaveLength(1);
     expect(replaySeams.deliveries[0].message).toBe(liveDeliveries[0].message);
     expect(replaySeams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
+  });
+
+  it('decommissions a tier during compaction and crash replay when reroute removes it from the remaining schedule', async () => {
+    const seams = deps();
+    const target = {
+      kind: 'tier' as const,
+      issueId: 'PAN-1791',
+      workspace: '/ws',
+      base: 'main',
+      agentId: 'agent-pan-1791-slot-27',
+      tierName: 'standard',
+      slotIndex: 27,
+      slotItemId: 'bead-a',
+      reroute: {
+        doc: doc([tierItem('bead-a', 'simple')]),
+        config: tierConfig(),
+      },
+    };
+
+    await expect(compactAtTierRunBoundary({
+      target,
+      compaction: {
+        atRunBoundary: true,
+        estimatedContextTokens: 60,
+        modelContextWindow: 100,
+        replayThreshold: 0.5,
+      },
+      deps: seams,
+    })).resolves.toBeNull();
+    expect(seams.stop).toHaveBeenCalledWith('agent-pan-1791-slot-27');
+    expect(seams.spawn).not.toHaveBeenCalled();
+
+    const crashSeams = deps();
+    await expect(replayCrashedStandingAgent(target, { deps: crashSeams })).resolves.toBeNull();
+    expect(crashSeams.spawn).not.toHaveBeenCalled();
+  });
+
+  it('respawns with the tier model and harness from the current config when reroute is on', async () => {
+    const seams = deps();
+    const config = tierConfig({
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        standard: { model: 'gpt-5.5', harness: 'codex', difficulties: ['medium', 'complex'] },
+        frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['expert'] },
+      },
+      difficultyToTier: {
+        trivial: 'cheap',
+        simple: 'cheap',
+        medium: 'standard',
+        complex: 'standard',
+        expert: 'frontier',
+      },
+    });
+
+    const replay = await replayCrashedStandingAgent({
+      kind: 'tier',
+      issueId: 'PAN-1791',
+      workspace: '/ws',
+      base: 'main',
+      tierName: 'standard',
+      slotIndex: 27,
+      slotItemId: 'bead-a',
+      reroute: {
+        doc: doc([tierItem('bead-a', 'medium')]),
+        config,
+      },
+    }, { deps: seams });
+
+    expect(replay?.agent.model).toBe('gpt-5.5');
+    expect(replay?.agent.harness).toBe('codex');
+    expect(seams.spawn).toHaveBeenCalledWith('PAN-1791', 'work', {
+      slotIndex: 27,
+      slotItemId: 'bead-a',
+      prompt: undefined,
+      model: 'gpt-5.5',
+      harness: 'codex',
+    });
+  });
+
+  it('uses tierOverrides effective difficulty when recomputing remaining reroute schedule', async () => {
+    const withoutOverride = deps();
+    const target = {
+      kind: 'tier' as const,
+      issueId: 'PAN-1791',
+      workspace: '/ws',
+      base: 'main',
+      tierName: 'standard',
+      slotIndex: 27,
+      slotItemId: 'bead-a',
+      reroute: {
+        doc: doc([tierItem('bead-a', 'simple')]),
+        config: tierConfig(),
+      },
+    };
+
+    await expect(replayCrashedStandingAgent(target, { deps: withoutOverride })).resolves.toBeNull();
+    expect(withoutOverride.spawn).not.toHaveBeenCalled();
+
+    const withOverride = deps();
+    const replay = await replayCrashedStandingAgent({
+      ...target,
+      reroute: {
+        ...target.reroute,
+        tierOverrides: {
+          'bead-a': {
+            effectiveDifficulty: 'medium',
+            promotions: 1,
+            history: [{ at: '2026-07-02T00:00:00.000Z', from: 'simple', to: 'medium', reason: 'test' }],
+          },
+        },
+      },
+    }, { deps: withOverride });
+
+    expect(replay).not.toBeNull();
+    expect(withOverride.spawn).toHaveBeenCalledTimes(1);
   });
 });

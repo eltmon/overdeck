@@ -149,6 +149,7 @@ describe('tiered execution tier table', () => {
       max_promotions: 0,
       flounder_budget_minutes: {},
     });
+    expect(config.tieredExecution.compaction_reroute).toBe('off');
   });
 
   it('returns difficulty-to-tier map and supervisor policy for a valid config', () => {
@@ -246,5 +247,9 @@ describe('tiered execution tier table', () => {
     expect(() => validateTieredExecutionConfig(validConfig({
       escalation: { retries_at_tier: -1 },
     }))).toThrow('tiered_execution.escalation.retries_at_tier');
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      compaction_reroute: 'sometimes' as never,
+    }))).toThrow('tiered_execution.compaction_reroute');
   });
 });
