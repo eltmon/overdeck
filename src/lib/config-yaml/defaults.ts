@@ -110,6 +110,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     cheapMode: true,
     features: defaultBackgroundAiFeatures(),
   },
+  tieredExecution: {
+    enabled: false,
+    tiers: {},
+    replay_threshold: 0.5,
+  },
   compliance: {
     mode: 'advisory',
   },

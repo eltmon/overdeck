@@ -4,6 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { validateTieredExecutionConfig, type TieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -106,6 +107,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
       features: { ...DEFAULT_CONFIG.backgroundAi.features },
     },
+    tieredExecution: {
+      enabled: DEFAULT_CONFIG.tieredExecution.enabled,
+      tiers: { ...DEFAULT_CONFIG.tieredExecution.tiers },
+      replay_threshold: DEFAULT_CONFIG.tieredExecution.replay_threshold,
+    },
     compliance: {
       mode: DEFAULT_CONFIG.compliance.mode,
     },
@@ -187,6 +193,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
+        if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+        if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
       } else if (providers.anthropic !== undefined) {
         explicitlyDisabled.add('anthropic');
         result.enabledProviders.delete('anthropic');
@@ -560,6 +568,19 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
+    if (config.tiered_execution) {
+      const currentTieredExecution: TieredExecutionConfig = result.tieredExecution;
+      const mergedTieredExecution: TieredExecutionConfig = {
+        enabled: config.tiered_execution.enabled ?? result.tieredExecution.enabled,
+        tiers: config.tiered_execution.tiers
+          ? { ...currentTieredExecution.tiers, ...config.tiered_execution.tiers }
+          : currentTieredExecution.tiers,
+        supervisor: config.tiered_execution.supervisor ?? currentTieredExecution.supervisor,
+        replay_threshold: config.tiered_execution.replay_threshold ?? result.tieredExecution.replay_threshold,
+      };
+      result.tieredExecution = mergedTieredExecution as typeof result.tieredExecution;
+    }
+
     if (config.resources) {
       if (typeof config.resources.memory_warn_gb === 'number') {
         result.resources.memoryWarnGb = config.resources.memory_warn_gb;
@@ -626,6 +647,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   }
 
   validateRoleModelRefs(result);
+  result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, result.providerAuth);
 
   return { config: result, explicitlyDisabled };
 }

@@ -5,6 +5,7 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
+import type { ResolvedTieredExecutionConfig, TieredExecutionConfig } from '../agents/tier-table.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -452,6 +453,9 @@ export interface YamlConfig {
   /** Background AI feature toggles + low-cost master switch (PAN-1583) */
   background_ai?: BackgroundAiConfig;
 
+  /** Difficulty-routed tier table for standing work agents. Disabled by default. */
+  tiered_execution?: Partial<TieredExecutionConfig>;
+
   /** Memory-first compliance audit configuration */
   compliance?: ComplianceConfig;
 
@@ -739,6 +743,9 @@ export interface NormalizedConfig {
     /** Per-feature enablement, consulted by `isBackgroundFeatureEnabled`. */
     features: Record<BackgroundAiFeature, boolean>;
   };
+
+  /** Difficulty-routed tier table for standing work agents. */
+  tieredExecution: ResolvedTieredExecutionConfig;
 
   /** Memory-first compliance audit configuration */
   compliance: NormalizedComplianceConfig;
