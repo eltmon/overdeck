@@ -4,7 +4,7 @@
     "created": "2026-07-02T06:24:34.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2214: Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator",
-    "updated": "2026-07-02T06:31:35.411Z"
+    "updated": "2026-07-02T06:34:35.147Z"
   },
   "plan": {
     "id": "pan-2214",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f822ed23-d7fa-44f4-a350-08462b8fbbca",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 8,
     "created": "2026-07-02T06:24:34.000Z",
-    "updated": "2026-07-02T06:31:35.411Z",
+    "updated": "2026-07-02T06:34:35.147Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2214",
@@ -110,7 +110,9 @@
             "FR-1",
             "NFR-1",
             "NFR-4"
-          ]
+          ],
+          "statusReason": "slot dispatch failed: Beads database was temporarily locked while checking PAN-2214 after 3 attempts; re-run shortly.",
+          "statusUpdatedAt": "2026-07-02T06:34:35.147Z"
         },
         "narrative": {
           "Action": "In src/cli/commands/swarm.ts registerSwarmCommands (line ~139), add `swarm freeze <id> [--reason <text>]` and `swarm resume <id>`. freeze calls setDeaconIgnored(issueId, true, reason ?? 'swarm freeze via pan swarm freeze') from src/lib/review-status.ts:984 and prints a standalone-message confirmation explaining that the Deacon will skip all swarm coordination (reconcile/merge/gc/dispatch) for this issue until `pan swarm resume`. resume calls setDeaconIgnored(issueId, false) and prints that coordination will pick up on the next patrol. Both idempotent: freezing a frozen issue and resuming an unfrozen issue succeed with an 'already' notice. Append an operator-intervention event (appendOperatorInterventionEvent, as pause.ts:37 does). Update sync-sources/skills/pan-swarm/SKILL.md with the new subcommands in the same commit."
@@ -354,7 +356,7 @@
       {
         "id": "pause-swarm-guidance",
         "title": "`pan pause <id>` on a swarm issue exits with guidance naming `pan swarm stop`",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-07-02T06:24:34.000Z",
         "metadata": {
