@@ -448,7 +448,14 @@ export async function mergeReadySlots(
         note: `Slot branch ${slot.branch ?? slot.slotIndex} did not merge cleanly`,
       }, workspacePath);
       actions.push(`[swarm] failed-merge slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+      continue;
     }
+
+    // Verification failure (merged result fails typecheck/tests) previously
+    // fell through with no action at all — the slot silently re-verified on
+    // every pass with nobody told why. Surface the failure so the operator
+    // or recovery machinery can act on it.
+    actions.push(`[swarm] verify-failed slot ${slot.slotIndex} (item ${item.id}) for ${issueId}: ${result.failure ?? 'verification failed'}`);
   }
 
   return actions;
