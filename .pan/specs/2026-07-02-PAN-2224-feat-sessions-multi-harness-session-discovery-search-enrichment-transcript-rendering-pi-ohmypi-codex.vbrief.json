@@ -1,0 +1,867 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-02T14:25:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2224: feat(sessions): multi-harness session discovery, search, enrichment + transcript rendering (pi/ohmypi/codex)",
+    "updated": "2026-07-02T14:32:11.015Z"
+  },
+  "plan": {
+    "id": "pan-2224",
+    "title": "feat(sessions): multi-harness session discovery, search, enrichment + transcript rendering (pi/ohmypi/codex)",
+    "status": "proposed",
+    "uid": "ebb53cd6-3d96-4393-82bf-d4494dd21ffe",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-02T14:25:00.000Z",
+    "updated": "2026-07-02T14:32:11.015Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2224",
+        "label": "PAN-2224",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-2224.md",
+        "label": "PRD (glossary, verified refs, decisions D-1..D-11, work items WI-1..WI-8)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "sessions",
+      "discovery",
+      "multi-harness",
+      "pi",
+      "ohmypi",
+      "codex",
+      "enrichment",
+      "fts"
+    ],
+    "narratives": {
+      "Problem": "The Sessions page's discovery/search/enrichment pipeline is Claude Code only: the scanner walks only ~/.claude/projects/, parsing assumes Claude JSONL, FTS/enrichment/embeddings inherit the gap, archived pi/codex/ohmypi rows expose a fabricated Claude jsonlPath, and transcript resolution for managed pi/codex conversations dies after agent-dir cleanup because there is no discovered-sessions fallback. All 6,861 discovered_sessions rows are Claude Code while archived conversations span four harnesses.",
+      "Proposal": "Follow the PRD at .pan/drafts/pan-2224.md exactly. Add a harness column to discovered_sessions (v57→v58 migration, backfill 'claude-code'); generalize discovery into per-harness sources in a new src/lib/conversations/harness-discovery.ts (claude projects dir, ~/.pi/agent/sessions, ~/.omp/agent/sessions, ~/.codex/sessions, per-agent dirs); add pi-v3 and codex nested-payload metadata parsers in a new src/lib/conversations/harness-metadata.ts returning the existing SessionMetadata shape; correlate non-Claude files to managed conversations by conversation_files.locator instead of Claude path reconstruction; make enrichment excerpts harness-dispatched so FTS covers all harnesses (embeddings need no change); fix the archived jsonlPath Claude-only fallback and add a discovered-sessions fallback to resolveSessionFile; surface harness as a facet + badge on today's Sessions surface (sessions-feed.ts has NOT landed). Transcript RENDERING already works for all harnesses via the harness-dispatched messages endpoint — only resolution/fallback is in scope.",
+      "NonGoals": "- Sessions page layout/UX redesign (PAN-1917; only the harness facet/badge touches UI here)\n- New transcript renderers (rendering already works via the harness-dispatched messages endpoint; only resolution/fallback changes)\n- Devcontainer/remote (Fly) session roots — host-local dirs only\n- Changes to the frozen legacy data-layer twins (PAN-1983/PAN-1984)\n- Cost-event ledger backfill for ad-hoc sessions (discovery records token-estimated cost only)\n- New CLI verbs (existing scan trigger covers all harnesses, per D-10)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "D-11 resolved: PAN-1917's unified feed (src/lib/overdeck/sessions-feed.ts) has NOT landed in this workspace, so the harness facet/badge bead targets today's surface: DiscoveredSessionSnapshot contracts, buildFilterSql, routes/discovered-sessions.ts params, FacetPanel.tsx, SessionTable.tsx (both under src/dashboard/frontend/src/components/conversations/).",
+        "rationale": "Verified by file absence in this worktree at planning time; the PRD's D-11 prescribed exactly this branch when the feed is absent."
+      },
+      {
+        "summary": "D-6 codex-cwd implementation checkpoint resolved during planning: a real rollout under ~/.codex/sessions/ begins with {\"type\":\"session_meta\",\"payload\":{\"id\":\"<uuid>\",\"cwd\":\"/abs/path\",...}} — workspacePath comes from payload.cwd of the session_meta line, session id from payload.id, thread id from the filename suffix. The agent-dir/agents-table fallback remains for rollouts missing session_meta.",
+        "rationale": "Inspected /home/eltmon/.codex/sessions/2026/06/17/rollout-2026-06-17T03-44-34-019ed48a-....jsonl directly; removing the checkpoint eliminates a judgment call from the work role."
+      },
+      {
+        "summary": "Deliver as one issue (one vBRIEF), decomposed into 11 beads: baseline measurement, harness column, discovery sources, pi parser, codex parser, locator correlation, enrichment excerpts, jsonlPath guard, transcript fallback, harness facet/badge UI, and the closing scan re-measurement.",
+        "rationale": "The issue body mandates delivery as one complete feature per repo policy; the PRD's WI-3 splits cleanly into two independently testable parser beads and WI-6/WI-8 into independent halves, maximizing reviewability without partial delivery."
+      },
+      {
+        "summary": "requiresInspection limited to the two foundation beads: the schema/contracts column (cross-cutting schema) and the discovery-source architecture (interface every later bead consumes). All parser/UI/fix beads surface defects immediately via fixture tests or typecheck.",
+        "rationale": "Matches the inspection rubric: only these two beads' internal shape is load-bearing for downstream beads; the rest are leaves or mechanically verifiable."
+      },
+      {
+        "summary": "Scan-timing measurements are recorded both as a comment on PAN-2224 and appended to .pan/drafts/pan-2224.md under a '## Scan timing' heading.",
+        "rationale": "The issue AC requires before/after measurement; recording in the PRD draft keeps the evidence in-repo where review can verify it."
+      }
+    ],
+    "items": [
+      {
+        "id": "scan-baseline",
+        "title": "Measure baseline system-scan time on the live Claude-only corpus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-2224.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -A5 '## Scan timing' .pan/drafts/pan-2224.md"
+          ],
+          "expected_outputs": [
+            "PRD draft contains a '## Scan timing' section with a dated baseline duration for a system scan of the ~6.9k-file corpus"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ],
+          "acJustification": "Measurement-only bead; two criteria fully cover it."
+        },
+        "narrative": {
+          "Action": "BEFORE any scanner changes land, time a full `system` scan of the live ~6.9k-session Claude corpus. Trigger it via the existing scan surface (POST /api/discovered-sessions/scan with mode 'system' against the local dashboard, or the scanConversations RPC — see src/dashboard/server/routes/discovered-sessions.ts). Record the wall-clock duration (run twice, report both) in two places: append a '## Scan timing' section with a 'Baseline (pre-PAN-2224)' entry to .pan/drafts/pan-2224.md, and post the same numbers as a comment on GitHub issue 2224 (gh issue comment 2224). This bead changes no source code."
+        },
+        "items": [
+          {
+            "id": "scan-baseline.ac1",
+            "title": "Given the unmodified scanner, when a system scan runs on the live corpus, the measured duration is recorded under '## Scan timing' in .pan/drafts/pan-2224.md with a date and run count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scan-baseline.ac2",
+            "title": "A comment on GitHub issue 2224 contains the same baseline numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-column",
+        "title": "Add harness column to discovered_sessions: schema v58, data layer, contracts, snapshot/REST",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "discovery-sources",
+            "pi-metadata-parser",
+            "codex-metadata-parser",
+            "enrichment-excerpts",
+            "harness-facet-ui"
+          ],
+          "files_scope": [
+            "src/lib/database/schema.ts",
+            "src/lib/overdeck/discovered-sessions.ts",
+            "packages/contracts/src/types.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/routes/discovered-sessions.ts",
+            "src/dashboard/server/__tests__/event-store-discovered-sessions-schema.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/event-store-discovered-sessions-schema.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "schema test file passes including new harness-column and backfill assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly. (1) In initDiscoveredSessionsSchema (src/lib/database/schema.ts:66) add `harness TEXT` to the CREATE TABLE. (2) Bump SCHEMA_VERSION 57→58 (schema.ts:24) and add to runMigrations (near schema.ts:739) the idempotent migration: `if (currentVersion < 58) { try { db.exec('ALTER TABLE discovered_sessions ADD COLUMN harness TEXT'); } catch { /* already exists */ } db.exec(\"UPDATE discovered_sessions SET harness = 'claude-code' WHERE harness IS NULL\"); }` — copy the try/catch ALTER pattern from the v33 migration (schema.ts:1216-1218). (3) Add `harness: string` to UpsertDiscoveredSessionOpts (src/lib/overdeck/discovered-sessions.ts:382-403) and thread it through the upsert SQL and rowToSession. Existing scanner call sites pass 'claude-code' for now (per-harness values arrive in later beads). (4) Contracts: add optional `harness` to DiscoveredSessionSnapshot (packages/contracts/src/types.ts:628-659); map it in toDiscoveredSessionSnapshot (src/dashboard/server/ws-rpc.ts:418) and the REST response schema (src/dashboard/server/routes/discovered-sessions.ts:116-146). Rebuild contracts after editing (cd packages/contracts && npm run build). Do NOT touch the frozen legacy data-layer twins."
+        },
+        "items": [
+          {
+            "id": "harness-column.ac1",
+            "title": "Given a DB at schema v57, when migrations run, discovered_sessions gains a harness column and every pre-existing row reads harness='claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-column.ac2",
+            "title": "Given an upsert with harness set, when the row is read back through the data layer, rowToSession returns the same harness value (round-trip test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-column.ac3",
+            "title": "Given a row with harness set, DiscoveredSessionSnapshot and the REST list response return the harness field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-column.ac4",
+            "title": "Given an already-migrated DB, when migrations re-run, the idempotent ALTER exits without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "discovery-sources",
+        "title": "Per-harness discovery sources module + scanner integration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pi-metadata-parser",
+            "codex-metadata-parser",
+            "locator-correlation",
+            "scan-verify"
+          ],
+          "files_scope": [
+            "src/lib/conversations/harness-discovery.ts",
+            "src/lib/conversations/scanner.ts",
+            "src/lib/conversations/__tests__/scanner.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/conversations/__tests__/scanner.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "scanner tests pass including new per-harness enumeration fixtures and the unchanged-Claude-enumeration regression guard"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Deliberately serialized: blocked on the harness-column schema bead and the scan-baseline measurement; restructures scanner.ts that the parser and correlation beads then modify.",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly, per D-1/D-3. Create src/lib/conversations/harness-discovery.ts exporting `DiscoverySource = { harness, roots: () => string[], collect: (root) => Promise<DiscoveredFile[]> }` and `DiscoveredFile = { jsonlPath, projectDir, harness }`. Sources: claude-code (extract the existing ~/.claude/projects walk from discoverJsonlFiles, scanner.ts:107-134, verbatim); pi (~/.pi/agent/sessions); ohmypi (~/.omp/agent/sessions — same encoded-cwd/<timestamp>_<session-id>.jsonl layout); codex (~/.codex/sessions, recursive YYYY/MM/DD walk — mirror walkForThread in src/lib/runtimes/codex.ts:109-132); agent-dirs (iterate ~/.overdeck/agents/*/: `sessions/` → pi-family tagged per D-1 (agent's recorded harness where knowable, else ohmypi), agent-dir-root `*_*.jsonl` pi work-agent files (PAN-1908), `codex-home/sessions/` → codex). Missing roots are skipped silently. discoverJsonlFiles concatenates all sources; targeted/watched modes filter after resolution exactly as today; ScanOptions keeps its external shape. All FS access via fs/promises — zero sync FS calls (scanner.ts:12 doctrine). Files from non-Claude sources are tagged but may be skipped by scan() until the parser beads land — gate metadata parsing on the harness tag so this bead is independently mergeable with Claude behavior byte-identical."
+        },
+        "items": [
+          {
+            "id": "discovery-sources.ac1",
+            "title": "Given tmp-dir fixture trees for all four harness roots plus agent dirs, when discovery runs, every fixture file is enumerated with the correct harness tag (claude-code/pi/ohmypi/codex per D-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-sources.ac2",
+            "title": "Given only Claude fixtures, when discovery runs, enumeration output is identical to the pre-change scanner (regression guard test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-sources.ac3",
+            "title": "Given a machine missing some harness roots, when discovery runs, missing roots are skipped silently and the scan completes without warnings for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-sources.ac4",
+            "title": "harness-discovery.ts contains no synchronous fs calls (fs/promises only) and scanner.ts orchestration keeps its ScanOptions shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-metadata-parser",
+        "title": "Pi v3 metadata parser (pi + ohmypi) wired into scan dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/harness-metadata.ts",
+            "src/lib/conversations/scanner.ts",
+            "tests/unit/lib/conversations/harness-metadata.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/conversations/harness-metadata.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-metadata tests pass: pi fixture yields correct SessionMetadata on every field plus a malformed-line tolerance case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the pi half of PRD WI-3, per D-4. Create src/lib/conversations/harness-metadata.ts exporting `parsePiSessionMetadata(path): Promise<SessionMetadata>` (SessionMetadata shape: src/lib/conversations/jsonl-async.ts:28-42) using a streaming line reader (pattern: jsonl-async.ts:104). Session id + cwd from the first line `{ type: 'session', version: 3, id, timestamp, cwd }`; message count from `type:'message'` lines; first/last timestamps from line timestamps; per-call usage summed from input/output/cacheRead/cacheWrite (field logic: src/lib/cost-parsers/pi-parser.ts:38-51); tools from toolCall blocks inside message content; models from model_change events (provider/modelId lines — verified in a real ~/.pi session). estimatedCost: reuse the exact mechanism scanner.ts:298-318 uses for Claude (tokens + getModelCapabilitySync). In scan() (scanner.ts:274, `const meta = await parseJsonl(jsonlPath);`), dispatch on the DiscoveredFile harness tag: pi/ohmypi → parsePiSessionMetadata; claude-code path untouched. Upsert passes the file's harness. Fixtures: a Pi v3 session including a toolCall and a model_change; a malformed-line case that is tolerated (skipped, not thrown)."
+        },
+        "items": [
+          {
+            "id": "pi-metadata-parser.ac1",
+            "title": "Given a Pi v3 fixture with a toolCall and model_change, when parsed, SessionMetadata returns correct sessionId, cwd, messageCount, first/last timestamps, models, token in/out, tools, and estimated cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-metadata-parser.ac2",
+            "title": "Given a fixture containing a malformed JSONL line, when parsed, the parser skips it and still returns metadata for the valid lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-metadata-parser.ac3",
+            "title": "Given a scan over a pi/ohmypi fixture tree, when it completes, discovered_sessions rows persist with harness set and the parsed metadata populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-metadata-parser",
+        "title": "Codex rollout metadata parser (nested-payload schema) wired into scan dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/harness-metadata.ts",
+            "src/lib/conversations/scanner.ts",
+            "tests/unit/lib/conversations/harness-metadata.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/conversations/harness-metadata.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-metadata tests pass: codex rollout fixture yields correct SessionMetadata including token_count usage and function_call tools"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the codex half of PRD WI-3, per D-4 and the resolved D-6. Add `parseCodexSessionMetadata(path): Promise<SessionMetadata>` to src/lib/conversations/harness-metadata.ts using the NESTED-PAYLOAD rollout schema (parsed today by src/dashboard/server/services/codex-conversation-parser.ts:123-152) — NEVER extractCodexTranscript (src/lib/session-format-converter.ts:138), which is a flat seed-file schema only. First line is `{ type: 'session_meta', payload: { id, timestamp, cwd, ... } }` (verified on a real rollout): session id = payload.id (cross-check thread id from the filename suffix `-<threadId>.jsonl`, matching src/lib/runtimes/codex.ts:127); workspacePath = payload.cwd. Message count from event_msg payload.type user_message/agent_message; usage from token_count events' total_token_usage (field logic: src/lib/cost-parsers/codex-parser.ts:25-38, tolerating flat vs nested CLI variants); tools from response_item function_call names. estimatedCost: same scanner mechanism as Claude (scanner.ts:298-318). Wire the codex branch into the scan() harness dispatch. Fixtures: a rollout including session_meta, user_message, agent_message, token_count, and a function_call; a malformed-line tolerance case."
+        },
+        "items": [
+          {
+            "id": "codex-metadata-parser.ac1",
+            "title": "Given a nested-payload rollout fixture, when parsed, SessionMetadata returns sessionId from session_meta payload.id, cwd from payload.cwd, correct message count, usage from total_token_usage, and function_call tool names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-metadata-parser.ac2",
+            "title": "Given a fixture with a malformed line, when parsed, the parser skips it and returns metadata from the valid lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-metadata-parser.ac3",
+            "title": "Given a scan over a codex sessions fixture tree (YYYY/MM/DD layout), when it completes, discovered_sessions rows persist with harness='codex' and parsed metadata populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "locator-correlation",
+        "title": "Locator-based managed-conversation correlation + non-Claude workspace resolution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/correlator.ts",
+            "src/lib/conversations/scanner.ts",
+            "src/lib/conversations/__tests__/correlator.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/conversations/__tests__/correlator.test.ts src/lib/conversations/__tests__/scanner.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "correlator + scanner tests pass including managed-ohmypi correlation and codex workspace-fallback cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4, per D-5/D-6. In buildCorrelationMapSync (src/lib/conversations/correlator.ts:27): alongside the existing Claude candidate-path branch (correlator.ts:51 — leave untouched), build a Map<locator, {name, issueId}> from the same query's conversation_files rows and match non-Claude files by their parsed sessionId, setting overdeckManaged and panIssueId. In the scanner resolution step (scanner.ts:277): for non-Claude files skip HashResolver (it is Claude-path-shaped); workspacePath = the pi first-line cwd for pi-family, payload.cwd from session_meta for codex (already parsed in the metadata beads); if a codex rollout lacks session_meta, resolve via the owning agent dir → agents-table workspace, else leave workspacePath null (column is nullable). Create src/lib/conversations/__tests__/correlator.test.ts (none exists today). Tests: a managed ohmypi fixture correlates (overdeckManaged=1, panIssueId set); an ad-hoc pi fixture stays unmanaged; the codex agent-dir workspace fallback is covered."
+        },
+        "items": [
+          {
+            "id": "locator-correlation.ac1",
+            "title": "Given a managed ohmypi session whose locator exists in conversation_files, when scanned, its discovered row persists overdeckManaged=1 and the correct panIssueId without any Claude path reconstruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "locator-correlation.ac2",
+            "title": "Given an ad-hoc pi session with no matching locator, when scanned, the row persists as unmanaged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "locator-correlation.ac3",
+            "title": "Given a codex rollout without session_meta owned by a known agent dir, when scanned, workspacePath resolves via the agents table; with no owner it defaults to null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "locator-correlation.ac4",
+            "title": "The existing Claude correlation branch produces unchanged results for Claude fixtures (branch untouched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-excerpts",
+        "title": "Harness-dispatched enrichment excerpt builders (pi + codex)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/enrichment/enrich-session.ts",
+            "src/lib/conversations/__tests__/enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/conversations/__tests__/enrichment.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "enrichment tests pass including non-empty pi/codex excerpts and the byte-identical Claude excerpt regression guard"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5, per D-7. In src/lib/conversations/enrichment/enrich-session.ts, make buildConversationExcerpt (line ~186) dispatch on the session row's harness (available since the harness-column bead): buildPiExcerpt (role/content from the `message` object of type:'message' lines; summarize toolCall names + truncated args; include toolResult snippets) and buildCodexExcerpt (user_message/agent_message payload text; function_call names from response_item lines) — both returning the same excerpt-string shape the enrichment prompt already consumes. NO FTS changes: enriched pi/codex rows enter sessions_fts via the existing replaceFtsRow path (src/lib/overdeck/discovered-sessions.ts:422-436). NO embedding changes: buildEmbeddingText embeds enriched metadata only (src/lib/conversations/embeddings/index.ts:90-100). Tests: pi and codex fixture lines produce non-empty excerpts containing the user text and tool names; the Claude excerpt output is byte-identical to before (regression guard)."
+        },
+        "items": [
+          {
+            "id": "enrichment-excerpts.ac1",
+            "title": "Given pi fixture lines, when the excerpt builder runs for a harness='ohmypi' row, it produces a non-empty excerpt containing the user message text and toolCall names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-excerpts.ac2",
+            "title": "Given codex rollout fixture lines, when the excerpt builder runs for a harness='codex' row, it produces a non-empty excerpt containing user/agent message text and function_call names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-excerpts.ac3",
+            "title": "Given Claude fixture lines, the excerpt output is byte-identical to the pre-change builder (regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-excerpts.ac4",
+            "title": "Given an enriched pi or codex row, when FTS search runs on its summary terms, sessions_fts returns the row via the unchanged replaceFtsRow path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jsonlpath-fix",
+        "title": "Archived-row jsonlPath: construct the Claude fallback path only for claude-code rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/conversations.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__ --silent"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "route tests pass including the new archived-ohmypi jsonlPath assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 step 1, per D-8. In mapArchivedConversation (src/dashboard/server/routes/conversations.ts:2371) change `jsonlPath: row.discoveredJsonlPath ?? (row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null)` to guard the fabricated fallback on harness: `jsonlPath: row.discoveredJsonlPath ?? (row.harness === 'claude-code' && row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null)`. listArchivedConversationsWithEnrichment (src/lib/overdeck/conversations.ts:1039) already joins on locator; verify it selects c.harness and thread it through the row type if not yet exposed. This bead is independent of the discovery pipeline and may land first. Tests: an archived ohmypi row maps jsonlPath=null pre-scan and the real discovered path post-scan (never a ~/.claude/projects path); an archived claude-code row keeps today's fallback behavior."
+        },
+        "items": [
+          {
+            "id": "jsonlpath-fix.ac1",
+            "title": "Given an archived ohmypi/codex conversation with no discovered row, when the archived list is fetched, jsonlPath returns null (never a fabricated ~/.claude/projects path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonlpath-fix.ac2",
+            "title": "Given an archived non-Claude conversation whose session was discovered, when the archived list is fetched, jsonlPath returns the real discovered path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonlpath-fix.ac3",
+            "title": "Given an archived claude-code conversation, jsonlPath preserves today's sessionFilePath fallback behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-fallback",
+        "title": "resolveSessionFile: discovered-sessions fallback by locator after harness-specific resolution fails",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "src/lib/overdeck/discovered-sessions.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__ --silent"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "route tests pass including the agent-dir-removed pi transcript fallback case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 step 2, per D-9. In resolveSessionFile (src/dashboard/server/routes/conversations.ts:749), after the existing harness-specific branches (ohmypi → resolvePiSessionPath, codex → resolveCodexRolloutPath, Claude launcher-pinned session id; lines 757-786) all fail, add a final fallback: look up discovered_sessions.jsonl_path by the conversation's locator (conversation_files.locator) through the existing data layer (add a small read helper to src/lib/overdeck/discovered-sessions.ts if one does not exist — one read via the existing door, no new direct SQLite access), and verify the file still exists (fs/promises access) before returning it. The messages endpoint's harness-dispatched parsing (getCachedMessages, conversations.ts:450) is unchanged — rendering already works; only resolution gains the fallback. Test: the messages endpoint serves a pi transcript whose agent dir was removed but whose file was discovered into discovered_sessions."
+        },
+        "items": [
+          {
+            "id": "transcript-fallback.ac1",
+            "title": "Given a managed pi conversation whose agent dir was removed but whose session file exists and was discovered, when GET /api/conversations/:name/messages is called, it returns the parsed transcript via the discovered-sessions fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-fallback.ac2",
+            "title": "Given the discovered path no longer exists on disk, the fallback rejects it and resolution returns the same not-found result as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-fallback.ac3",
+            "title": "Given a conversation resolvable by the existing harness-specific branches, resolution returns the same path as before (fallback only fires on failure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-facet-ui",
+        "title": "Harness facet chips + table badge on the Sessions page (server-side filter through REST/RPC)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "src/lib/overdeck/discovered-sessions.ts",
+            "src/dashboard/server/routes/discovered-sessions.ts",
+            "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+            "src/dashboard/frontend/src/components/conversations/SessionTable.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/conversations --silent"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "RTL tests pass: harness facet chips render with counts and the badge shows for non-claude rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7 on today's surface (D-11 resolved: sessions-feed.ts has NOT landed). Backend: add harness to ConversationFilter in contracts (packages/contracts/src/types.ts) and to buildFilterSql in src/lib/overdeck/discovered-sessions.ts (WHERE harness = ? when set); accept the param in routes/discovered-sessions.ts; include harness counts in whatever facet-count query feeds FacetPanel. Rebuild contracts after editing. Frontend: add a 'Harness' facet group to src/dashboard/frontend/src/components/conversations/FacetPanel.tsx (chips with counts, matching existing facet-group markup); add a harness badge column to SessionTable.tsx for non-claude rows — squared badge per the pan-style-guide skill (no pill radius, no decorative color; monospace label like 'codex'/'ohmypi'). Filtering must be server-side (the param narrows the SQL, not a client-side filter). RTL tests for both components."
+        },
+        "items": [
+          {
+            "id": "harness-facet-ui.ac1",
+            "title": "Given rows across multiple harnesses, when a harness facet chip is selected, the list request carries the harness param and the server returns only matching rows (SQL-narrowed, not client-filtered)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-facet-ui.ac2",
+            "title": "FacetPanel renders a Harness group with per-harness counts when non-claude rows exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-facet-ui.ac3",
+            "title": "SessionTable renders a squared harness badge for non-claude rows, styled per the dashboard style guide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scan-verify",
+        "title": "Re-measure scan time with all harness roots; verify Claude path within noise of baseline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T14:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-2224.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -A12 '## Scan timing' .pan/drafts/pan-2224.md"
+          ],
+          "expected_outputs": [
+            "PRD draft's '## Scan timing' section contains both baseline and post-change timings with a stated within-noise verdict for the Claude-only path"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ],
+          "acJustification": "Measurement-only closing bead; two criteria fully cover it."
+        },
+        "narrative": {
+          "Action": "After the discovery/parser/correlation beads land: re-run the same system-scan timing procedure as the scan-baseline bead (same trigger, run twice) with all harness roots present. Record post-change timings under the existing '## Scan timing' section in .pan/drafts/pan-2224.md and post them as a comment on GitHub issue 2224 alongside the baseline. The Claude-only portion must be within noise of the baseline (compare a run with only the Claude root populated if total time is dominated by new roots — new roots adding time is expected and acceptable; only the Claude path must not regress). State the verdict explicitly."
+        },
+        "items": [
+          {
+            "id": "scan-verify.ac1",
+            "title": "The '## Scan timing' section in .pan/drafts/pan-2224.md and a comment on GitHub issue 2224 each contains the post-change timings alongside the baseline numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scan-verify.ac2",
+            "title": "The comparison contains an explicit verdict that Claude-only scan time is within noise of the baseline, with the measurement method described",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "scan-baseline",
+        "to": "discovery-sources",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-column",
+        "to": "discovery-sources",
+        "type": "blocks"
+      },
+      {
+        "from": "discovery-sources",
+        "to": "pi-metadata-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "discovery-sources",
+        "to": "codex-metadata-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-metadata-parser",
+        "to": "codex-metadata-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "discovery-sources",
+        "to": "locator-correlation",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-metadata-parser",
+        "to": "locator-correlation",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-metadata-parser",
+        "to": "locator-correlation",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-metadata-parser",
+        "to": "enrichment-excerpts",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-metadata-parser",
+        "to": "enrichment-excerpts",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-metadata-parser",
+        "to": "transcript-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-column",
+        "to": "transcript-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-column",
+        "to": "harness-facet-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "jsonlpath-fix",
+        "to": "transcript-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-fallback",
+        "to": "harness-facet-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "scan-baseline",
+        "to": "scan-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "locator-correlation",
+        "to": "scan-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment-excerpts",
+        "to": "scan-verify",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-02-PAN-2224-feat-sessions-multi-harness-session-discovery-search-enrichment-transcript-rendering-pi-ohmypi-codex.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
