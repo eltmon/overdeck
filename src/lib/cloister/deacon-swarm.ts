@@ -28,6 +28,7 @@ import { applyStatusOverrides } from '../vbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
 import { getConcurrencyLimits, releaseSwarmSlot, tryReserveSwarmSlot } from './concurrency.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
@@ -91,6 +92,12 @@ export interface CoordinateSwarmSlotsDeps {
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
   /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
   readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
+  /**
+   * Re-evaluated immediately before EVERY slot spawn: global freeze + per-issue hold.
+   * The cycle-start checks alone let an in-flight wave keep dispatching after a freeze
+   * activates mid-patrol (PAN-2214 slot-20 regression).
+   */
+  shouldDispatch?: (issueId: string) => boolean;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -128,6 +135,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   releaseSwarmSlot,
   spawnRun,
   getIssueHold: defaultGetIssueHold,
+  shouldDispatch: defaultShouldDispatch,
 };
 
 function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null {
@@ -144,6 +152,12 @@ function defaultReadStatusOverrides(workspacePath: string, issueId: string): Rec
   } catch {
     return undefined;
   }
+}
+
+function defaultShouldDispatch(issueId: string): boolean {
+  if (isDeaconGloballyPausedSync()) return false;
+  const hold = defaultGetIssueHold(issueId);
+  return !(hold?.stuck || hold?.deaconIgnored);
 }
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled';
@@ -531,6 +545,7 @@ export async function recoverFailedMergeSlot(
     | 'tryReserveSwarmSlot'
     | 'releaseSwarmSlot'
     | 'spawnRun'
+    | 'shouldDispatch'
   > = defaultDeps,
 ): Promise<string[]> {
   const normalizedIssueId = issueId.toUpperCase();
@@ -675,6 +690,7 @@ export async function dispatchNextWave(
     | 'recordSlotAssignment'
     | 'clearSlotAssignment'
     | 'spawnRun'
+    | 'shouldDispatch'
   > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
@@ -728,6 +744,20 @@ export async function dispatchNextWave(
         agentId: `agent-${issueId.toLowerCase()}-slot-${slotIndex}`,
         branch: `feature/${issueId.toLowerCase()}-slot-${slotIndex}`,
       });
+      // Freeze/hold can activate mid-wave; the cycle-start gate has already passed
+      // by then, so re-check before every spawn (PAN-2214 slot-20 regression).
+      if (!(deps.shouldDispatch ?? defaultShouldDispatch)(issueId)) {
+        await deps.applyTaskOperationToPlanFile(planPath, {
+          type: 'unblock',
+          itemId: item.id,
+          writerId: 'deacon-swarm',
+          reason: 'dispatch halted: freeze/hold active',
+        }, workspacePath).catch(() => undefined);
+        deps.clearSlotAssignment(workspacePath, issueId, slotIndex, item.id);
+        deps.releaseSwarmSlot();
+        actions.push(`[swarm] dispatch-halted ${item.id}: freeze/hold active`);
+        continue;
+      }
       await deps.spawnRun(issueId, 'work', {
         workspace: workspacePath,
         slotIndex,
