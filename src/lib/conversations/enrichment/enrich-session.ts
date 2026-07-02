@@ -29,6 +29,7 @@ import { FsError } from '../../errors.js';
 import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
 import type { ModelId } from '../../settings.js';
+import type { DiscoveredSession } from '../../overdeck/discovered-sessions.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ const L3_MAX_LINES = 5_000;
 const L3_MAX_BYTES = 2_000_000;
 
 type SampledLine = { index: number; line: string };
+type ExcerptOptions = { fullTranscript?: boolean };
 
 function boundedLine(line: string): string {
   return line.length > MAX_JSONL_LINE_CHARS ? line.slice(0, MAX_JSONL_LINE_CHARS) : line;
@@ -180,10 +182,10 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier, options:
 }
 
 /**
- * Parse JSONL lines into a human-readable conversation excerpt for the prompt.
- * Extracts role + text content from each line.
+ * Parse Claude Code JSONL lines into a human-readable conversation excerpt for
+ * the prompt. Extracts role + text content from each line.
  */
-function buildConversationExcerpt(lines: string[], options: { fullTranscript?: boolean } = {}): string {
+function buildClaudeConversationExcerpt(lines: string[], options: ExcerptOptions = {}): string {
   const parts: string[] = [];
   const limitText = (text: string) => options.fullTranscript ? text : text.slice(0, 500);
 
@@ -218,6 +220,128 @@ function buildConversationExcerpt(lines: string[], options: { fullTranscript?: b
     }
   }
   return parts.join('\n');
+}
+
+function truncateText(text: string, options: ExcerptOptions, max = 500): string {
+  return options.fullTranscript ? text : text.slice(0, max);
+}
+
+function stringifyExcerptValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildPiExcerpt(lines: string[], options: ExcerptOptions = {}): string {
+  const parts: string[] = [];
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as {
+        type?: string;
+        message?: {
+          role?: string;
+          content?: unknown;
+          toolName?: string;
+        };
+      };
+      if (entry.type !== 'message' || !entry.message) continue;
+      const role = entry.message.role ?? 'unknown';
+      const content = entry.message.content;
+      const blocks = Array.isArray(content) ? content : [content];
+      const texts: string[] = [];
+
+      for (const rawBlock of blocks) {
+        if (typeof rawBlock === 'string') {
+          texts.push(redactSensitiveText(rawBlock));
+          continue;
+        }
+        if (!rawBlock || typeof rawBlock !== 'object') continue;
+        const block = rawBlock as { type?: string; text?: string; name?: string; arguments?: unknown };
+        if (block.type === 'text' && typeof block.text === 'string') {
+          texts.push(redactSensitiveText(block.text));
+        } else if (block.type === 'toolCall') {
+          const name = block.name ?? entry.message.toolName ?? 'tool';
+          const args = truncateText(redactSensitiveText(stringifyExcerptValue(block.arguments)), options, 200);
+          texts.push(args ? `[toolCall:${name} ${args}]` : `[toolCall:${name}]`);
+        }
+      }
+
+      if (role === 'toolResult' && texts.length > 0) {
+        const name = entry.message.toolName ?? 'tool';
+        texts.unshift(`[toolResult:${name}]`);
+      }
+
+      const text = truncateText(texts.filter(Boolean).join(' '), options);
+      if (text) parts.push(`[${role}]: ${text}`);
+    } catch {
+      // skip malformed lines
+    }
+  }
+
+  return parts.join('\n');
+}
+
+function buildCodexExcerpt(lines: string[], options: ExcerptOptions = {}): string {
+  const parts: string[] = [];
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as {
+        type?: string;
+        payload?: {
+          type?: string;
+          message?: unknown;
+          name?: unknown;
+          input?: unknown;
+          arguments?: unknown;
+        };
+      };
+      const payload = entry.payload;
+      if (!payload || typeof payload !== 'object') continue;
+
+      if (entry.type === 'event_msg' && (payload.type === 'user_message' || payload.type === 'agent_message')) {
+        const rawText = typeof payload.message === 'string' ? payload.message : '';
+        const text = truncateText(redactSensitiveText(rawText.trim()), options);
+        if (text) parts.push(`[${payload.type === 'user_message' ? 'user' : 'assistant'}]: ${text}`);
+        continue;
+      }
+
+      if (entry.type === 'response_item' && (payload.type === 'function_call' || payload.type === 'custom_tool_call')) {
+        const name = typeof payload.name === 'string' ? payload.name : 'tool';
+        const args = truncateText(redactSensitiveText(stringifyExcerptValue(payload.arguments ?? payload.input)), options, 200);
+        parts.push(args ? `[tool_call:${name} ${args}]` : `[tool_call:${name}]`);
+      }
+    } catch {
+      // skip malformed lines
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Parse JSONL lines into a human-readable conversation excerpt for the prompt.
+ * Dispatches by discovered session harness. Claude Code remains the default
+ * parser so legacy rows and missing harness values keep byte-identical output.
+ */
+function buildConversationExcerpt(
+  lines: string[],
+  options: ExcerptOptions & { session?: Pick<DiscoveredSession, 'harness'> | null } = {},
+): string {
+  switch (options.session?.harness) {
+    case 'pi':
+    case 'ohmypi':
+      return buildPiExcerpt(lines, options);
+    case 'codex':
+      return buildCodexExcerpt(lines, options);
+    default:
+      return buildClaudeConversationExcerpt(lines, options);
+  }
 }
 
 // ─── Prompt builders ──────────────────────────────────────────────────────────
@@ -380,8 +504,10 @@ export async function callClaudeApi(
       return { sessionId, tier, model, error: 'No readable messages in JSONL' };
     }
 
+    const existing = getDiscoveredSessionById(sessionId);
+
     // Build conversation excerpt
-    const excerpt = buildConversationExcerpt(lines, { fullTranscript: opts.fullTranscript });
+    const excerpt = buildConversationExcerpt(lines, { fullTranscript: opts.fullTranscript, session: existing });
     if (!excerpt.trim()) {
       return { sessionId, tier, model, error: 'No text content extractable from JSONL' };
     }
@@ -407,7 +533,6 @@ export async function callClaudeApi(
       });
     }
 
-    const existing = getDiscoveredSessionById(sessionId);
     const preserveQuickSummary = tier === 2 && existing?.enrichmentLevel === 1 && Boolean(existing.summary);
 
     // Persist to DB (syncFts is called inside updateEnrichment)
