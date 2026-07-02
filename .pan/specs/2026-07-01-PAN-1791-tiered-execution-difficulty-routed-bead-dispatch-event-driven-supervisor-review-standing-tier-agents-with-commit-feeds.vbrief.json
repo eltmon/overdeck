@@ -270,6 +270,19 @@
           "files_scope_confidence": "high",
           "readiness": "ready",
           "parallelSafeReason": "Wave 1. Sole owner of the new resolve-tier.ts; reads only the wave-0 tier-table config and performs no shared writes.",
+          "synthesisContext": {
+            "parents": {
+              "tier-table-config": "Parent output defines src/lib/agents/tier-table.ts with TierDefinition, TieredExecutionConfig, ValidatedTieredExecutionConfig, DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, and validateTieredExecutionConfig(). Validation normalizes model ids, checks harness names, applies harness policy/ToS to tiers and supervisor, requires configured tiers to cover each difficulty exactly once, and exposes difficultyToTier as the resolver's difficulty lookup. Disabled/no-block config returns enabled=false, tiers={}, replay_threshold=0.5, difficultyToTier={}.",
+              "kind-metadata-field": "Parent output defines VBriefItemKind as docs|api|backend|frontend|infra|test|refactor|design|spike, DEFAULT_VBRIEF_ITEM_KIND='backend', and resolveVBriefItemKind(metadata) in src/lib/vbrief/types.ts. Planning prompt now requires metadata.kind on every plan item and says to default unclear or mixed categories to backend."
+            },
+            "implementationNotes": [
+              "resolveTier should be a pure function with no spawning or I/O.",
+              "Use the validated tier-table shape rather than revalidating model, harness, or difficulty coverage.",
+              "byKind entries should point to configured tier names and should win over difficultyToTier.",
+              "metadata.model override wins for model selection, but the implementation still needs an explicit harness source from byKind, difficultyToTier, or roleDefault.",
+              "If no path resolves and roleDefault is absent, throw a named error containing 'no tier/model configured' and do not include or return any hardcoded fallback model literal."
+            ]
+          },
           "verify_commands": [
             "npm run typecheck",
             "npx vitest run src/lib/agents/__tests__/resolve-tier.test.ts"
