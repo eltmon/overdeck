@@ -82,8 +82,8 @@ function recoveryDeps(): Pick<
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
   | 'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'spawnRun'
 > {
   return {
@@ -91,8 +91,8 @@ function recoveryDeps(): Pick<
     recordSlotAssignment: vi.fn(),
     clearSlotAssignment: vi.fn(),
     registeredSlotCapacityAvailable: vi.fn(() => true),
-    tryReserveAdvancingSlot: vi.fn(() => true),
-    releaseAdvancingSlot: vi.fn(),
+    tryReserveSwarmSlot: vi.fn(() => true),
+    releaseSwarmSlot: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
   };
 }

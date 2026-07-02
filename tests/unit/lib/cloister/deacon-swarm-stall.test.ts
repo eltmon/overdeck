@@ -80,8 +80,8 @@ function classifyDeps(output = 'same pane output'): Pick<
 function dispatchDeps(overrides: Partial<Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
   | 'spawnRun'
   | 'listSessionNames'
@@ -89,8 +89,8 @@ function dispatchDeps(overrides: Partial<Pick<
 >> = {}): Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
   | 'spawnRun'
   | 'listSessionNames'
@@ -98,8 +98,8 @@ function dispatchDeps(overrides: Partial<Pick<
 > {
   return {
     registeredSlotCapacityAvailable: vi.fn(() => true),
-    tryReserveAdvancingSlot: vi.fn(() => true),
-    releaseAdvancingSlot: vi.fn(),
+    tryReserveSwarmSlot: vi.fn(() => true),
+    releaseSwarmSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
     spawnRun: vi.fn(async () => undefined),
     listSessionNames: vi.fn(async () => []),

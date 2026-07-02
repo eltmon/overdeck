@@ -26,7 +26,7 @@ import {
 } from '../vbrief/dag.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
-import { getConcurrencyLimits, releaseAdvancingSlot, tryReserveAdvancingSlot } from './concurrency.js';
+import { getConcurrencyLimits, releaseSwarmSlot, tryReserveSwarmSlot } from './concurrency.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
 const execAsync = promisify(exec);
@@ -82,8 +82,8 @@ export interface CoordinateSwarmSlotsDeps {
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => void;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   registeredSlotCapacityAvailable: (issueId: string, selectedCount: number) => boolean;
-  tryReserveAdvancingSlot: () => boolean;
-  releaseAdvancingSlot: () => void;
+  tryReserveSwarmSlot: () => boolean;
+  releaseSwarmSlot: () => void;
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
 }
 
@@ -118,8 +118,8 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   clearSlotAssignment,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   registeredSlotCapacityAvailable: (issueId, selectedCount) => registeredSlotCapacityAvailable(issueId, selectedCount),
-  tryReserveAdvancingSlot,
-  releaseAdvancingSlot,
+  tryReserveSwarmSlot,
+  releaseSwarmSlot,
   spawnRun,
 };
 
@@ -426,8 +426,8 @@ export async function recoverFailedMergeSlot(
     | 'clearSlotAssignment'
     | 'recordSlotAssignment'
     | 'registeredSlotCapacityAvailable'
-    | 'tryReserveAdvancingSlot'
-    | 'releaseAdvancingSlot'
+    | 'tryReserveSwarmSlot'
+    | 'releaseSwarmSlot'
     | 'spawnRun'
   > = defaultDeps,
 ): Promise<string[]> {
@@ -567,8 +567,8 @@ export async function dispatchNextWave(
   deps: Pick<
     CoordinateSwarmSlotsDeps,
     'registeredSlotCapacityAvailable'
-    | 'tryReserveAdvancingSlot'
-    | 'releaseAdvancingSlot'
+    | 'tryReserveSwarmSlot'
+    | 'releaseSwarmSlot'
     | 'applyTaskOperationToPlanFile'
     | 'recordSlotAssignment'
     | 'clearSlotAssignment'
@@ -609,8 +609,8 @@ export async function dispatchNextWave(
       continue;
     }
 
-    if (!deps.tryReserveAdvancingSlot()) {
-      actions.push(`[swarm] deferred ${item.id} for ${issueId}: advancing dispatch budget exhausted`);
+    if (!deps.tryReserveSwarmSlot()) {
+      actions.push(`[swarm] deferred ${item.id} for ${issueId}: swarm dispatch budget exhausted`);
       continue;
     }
 
@@ -643,7 +643,7 @@ export async function dispatchNextWave(
         reason: `slot dispatch failed: ${error instanceof Error ? error.message : String(error)}`,
       }, workspacePath).catch(() => undefined);
       deps.clearSlotAssignment(workspacePath, issueId, slotIndex, item.id);
-      deps.releaseAdvancingSlot();
+      deps.releaseSwarmSlot();
       actions.push(`[swarm] failed-dispatch ${item.id} for ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

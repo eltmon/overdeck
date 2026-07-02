@@ -65,8 +65,8 @@ function mergedSlot(itemId: string, slotIndex = 1): ReconciledSlotItem {
 function deps(overrides: Partial<Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
@@ -74,8 +74,8 @@ function deps(overrides: Partial<Pick<
 >> = {}): Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
@@ -83,8 +83,8 @@ function deps(overrides: Partial<Pick<
 > {
   return {
     registeredSlotCapacityAvailable: vi.fn(() => true),
-    tryReserveAdvancingSlot: vi.fn(() => true),
-    releaseAdvancingSlot: vi.fn(),
+    tryReserveSwarmSlot: vi.fn(() => true),
+    releaseSwarmSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
     recordSlotAssignment: vi.fn(),
     clearSlotAssignment: vi.fn(),
@@ -186,7 +186,7 @@ describe('deacon-swarm next-wave dispatch', () => {
     )).resolves.toEqual(['[swarm] deferred wi-a for PAN-2203: registered slot cap reached']);
 
     expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
-    expect(fakeDeps.tryReserveAdvancingSlot).not.toHaveBeenCalled();
+    expect(fakeDeps.tryReserveSwarmSlot).not.toHaveBeenCalled();
   });
 
   it('releases the item claim and advancing-slot budget when spawnRun throws', async () => {
@@ -229,6 +229,6 @@ describe('deacon-swarm next-wave dispatch', () => {
       1,
       'wi-a',
     );
-    expect(fakeDeps.releaseAdvancingSlot).toHaveBeenCalledTimes(1);
+    expect(fakeDeps.releaseSwarmSlot).toHaveBeenCalledTimes(1);
   });
 });

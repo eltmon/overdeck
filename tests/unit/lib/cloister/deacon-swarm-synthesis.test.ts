@@ -63,8 +63,8 @@ function reconciled(): SlotReconcileResult {
 function deps(): Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
@@ -72,8 +72,8 @@ function deps(): Pick<
 > {
   return {
     registeredSlotCapacityAvailable: vi.fn(() => true),
-    tryReserveAdvancingSlot: vi.fn(() => true),
-    releaseAdvancingSlot: vi.fn(),
+    tryReserveSwarmSlot: vi.fn(() => true),
+    releaseSwarmSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
     recordSlotAssignment: vi.fn(),
     clearSlotAssignment: vi.fn(),

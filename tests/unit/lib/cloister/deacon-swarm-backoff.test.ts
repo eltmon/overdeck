@@ -80,15 +80,15 @@ function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'app
 function dispatchDeps(): Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
-  | 'tryReserveAdvancingSlot'
-  | 'releaseAdvancingSlot'
+  | 'tryReserveSwarmSlot'
+  | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
   | 'spawnRun'
 > {
   return {
     registeredSlotCapacityAvailable: vi.fn(() => true),
-    tryReserveAdvancingSlot: vi.fn(() => true),
-    releaseAdvancingSlot: vi.fn(),
+    tryReserveSwarmSlot: vi.fn(() => true),
+    releaseSwarmSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
     spawnRun: vi.fn(async () => undefined),
   };
