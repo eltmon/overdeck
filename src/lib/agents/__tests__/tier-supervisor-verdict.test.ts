@@ -11,12 +11,14 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { VBriefItem } from '../../vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../../vbrief/types.js';
 import {
   buildSupervisorReviewMessage,
   deliverCommitForReview,
   extractAcceptanceCriteria,
   extractTracedFrText,
+  shouldHaltDispatch,
+  type SupervisorVerdict,
   type SupervisorReviewEvent,
 } from '../tier-supervisor.js';
 
@@ -77,6 +79,38 @@ function makeEvent(overrides: Partial<SupervisorReviewEvent> = {}): SupervisorRe
   };
 }
 
+function makeDag(): VBriefDocument {
+  return {
+    vBRIEFInfo: {
+      version: '0.6.0',
+      created: '2026-07-02T00:00:00Z',
+    },
+    plan: {
+      id: 'PAN-9999',
+      title: 'Test plan',
+      status: 'approved',
+      items: [
+        { id: 'foundation', title: 'Foundation', status: 'completed' },
+        { id: 'dependent', title: 'Dependent', status: 'pending' },
+        { id: 'unrelated', title: 'Unrelated', status: 'pending' },
+        { id: 'leaf', title: 'Leaf', status: 'pending' },
+      ],
+      edges: [
+        { from: 'foundation', to: 'dependent', type: 'blocks' },
+        { from: 'dependent', to: 'leaf', type: 'blocks' },
+      ],
+    },
+  };
+}
+
+function verdict(overrides: Partial<SupervisorVerdict>): SupervisorVerdict {
+  return {
+    beadId: 'foundation',
+    status: 'failed',
+    ...overrides,
+  };
+}
+
 describe('extractAcceptanceCriteria', () => {
   it('returns only acceptance_criterion child titles, in order', () => {
     expect(extractAcceptanceCriteria(makeItem())).toEqual([
@@ -96,6 +130,51 @@ describe('extractAcceptanceCriteria', () => {
 
   it('returns empty for an item without children', () => {
     expect(extractAcceptanceCriteria(makeItem({ items: undefined }))).toEqual([]);
+  });
+});
+
+describe('shouldHaltDispatch', () => {
+  it('returns true when an unresolved blocking finding exists on a dependency (ac1)', () => {
+    expect(
+      shouldHaltDispatch(
+        [verdict({ beadId: 'foundation', status: 'failed' })],
+        { id: 'dependent' },
+        makeDag(),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false once a fix commit for the dependency is acked (ac2)', () => {
+    expect(
+      shouldHaltDispatch(
+        [
+          verdict({ beadId: 'foundation', status: 'failed' }),
+          verdict({ beadId: 'foundation', status: 'passed' }),
+        ],
+        { id: 'dependent' },
+        makeDag(),
+      ),
+    ).toBe(false);
+  });
+
+  it('permits unrelated dispatch when the blocked bead is not a dependency (ac3)', () => {
+    expect(
+      shouldHaltDispatch(
+        [verdict({ beadId: 'foundation', status: 'blocked' })],
+        { id: 'unrelated' },
+        makeDag(),
+      ),
+    ).toBe(false);
+  });
+
+  it('halts on transitive dependencies through blocks edges', () => {
+    expect(
+      shouldHaltDispatch(
+        [verdict({ beadId: 'foundation', status: 'failed' })],
+        { id: 'leaf' },
+        makeDag(),
+      ),
+    ).toBe(true);
   });
 });
 
