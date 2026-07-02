@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { dispatchNextWave, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { dispatchNextWave, registeredSlotCapacityAvailable, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { countRunningSwarmSlotsForIssue } from '../../../../src/lib/cloister/concurrency.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
 import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
@@ -230,5 +231,74 @@ describe('deacon-swarm next-wave dispatch', () => {
       'wi-a',
     );
     expect(fakeDeps.releaseSwarmSlot).toHaveBeenCalledTimes(1);
+  });
+});
+
+type RunningAgentRow = Parameters<typeof countRunningSwarmSlotsForIssue>[1] extends (infer R)[] | undefined ? R : never;
+
+function agentRow(id: string, tmuxActive: boolean): RunningAgentRow {
+  return { id, role: 'work', status: 'running', tmuxActive } as unknown as RunningAgentRow;
+}
+
+describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regression)', () => {
+  const limits = { reservedSwarmSlots: 3 };
+
+  it('stale running rows with dead tmux sessions do not consume capacity', () => {
+    const stale = [
+      agentRow('agent-pan-1791-slot-5', false),
+      agentRow('agent-pan-1791-slot-6', false),
+      agentRow('agent-pan-1791-slot-7', false),
+    ];
+
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', stale);
+
+    expect(live).toBe(0);
+    expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, limits)).toBe(true);
+  });
+
+  it('K tmux-alive slots against reservedSwarmSlots=K exhausts capacity; K-1 leaves room', () => {
+    const alive = [
+      agentRow('agent-pan-1791-slot-1', true),
+      agentRow('agent-pan-1791-slot-2', true),
+      agentRow('agent-pan-1791-slot-3', true),
+    ];
+
+    expect(registeredSlotCapacityAvailable(
+      'PAN-1791', 0, countRunningSwarmSlotsForIssue('PAN-1791', alive), limits,
+    )).toBe(false);
+    expect(registeredSlotCapacityAvailable(
+      'PAN-1791', 0, countRunningSwarmSlotsForIssue('PAN-1791', alive.slice(0, 2)), limits,
+    )).toBe(true);
+  });
+
+  it('other issues\' live slots and same-wave selections count correctly', () => {
+    const alive = [
+      agentRow('agent-pan-1791-slot-1', true),
+      agentRow('agent-pan-9999-slot-1', true),
+    ];
+
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', alive);
+
+    expect(live).toBe(1);
+    expect(registeredSlotCapacityAvailable('PAN-1791', 1, live, limits)).toBe(true);
+    expect(registeredSlotCapacityAvailable('PAN-1791', 2, live, limits)).toBe(false);
+  });
+
+  it('capacity respects reservedSwarmSlots only — raising maxWorkAgents changes nothing', () => {
+    const alive = [
+      agentRow('agent-pan-1791-slot-1', true),
+      agentRow('agent-pan-1791-slot-2', true),
+    ];
+    const live = countRunningSwarmSlotsForIssue('PAN-1791', alive);
+    const base = {
+      maxWorkAgents: 4,
+      reservedAdvancingSlots: 2,
+      reservedSwarmSlots: 2,
+      totalCeiling: 6,
+      exemptOperatorStarted: true,
+    };
+
+    expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, base)).toBe(false);
+    expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, { ...base, maxWorkAgents: 40, totalCeiling: 42 })).toBe(false);
   });
 });

@@ -9,7 +9,6 @@ import { spawnRun } from '../agents/spawn.js';
 import type { SpawnRunOptions } from '../agents/spawn-prep.js';
 import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
 import { reconcileSlotState, type ReconciledSlotItem, type SlotReconcileResult } from '../agents/slot-reconcile.js';
-import { listAgentStates } from '../agents/queries.js';
 import {
   readIssueRecordForWorkspaceSync,
   writeIssueRecordForWorkspaceSync,
@@ -29,7 +28,13 @@ import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swa
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
-import { getConcurrencyLimits, releaseSwarmSlot, tryReserveSwarmSlot } from './concurrency.js';
+import {
+  countRunningSwarmSlotsForIssue,
+  getConcurrencyLimits,
+  releaseSwarmSlot,
+  tryReserveSwarmSlot,
+  type ConcurrencyLimits,
+} from './concurrency.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
 const execAsync = promisify(exec);
@@ -914,17 +919,17 @@ function firstOverlappingItemId(
   return undefined;
 }
 
-function registeredSlotCapacityAvailable(issueId: string, selectedCount: number): boolean {
-  const cap = getConcurrencyLimits().maxWorkAgents;
-  const issueLower = issueId.toLowerCase();
-  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-\\d+$`);
-  const activeSlots = listAgentStates({ role: 'work' }).filter(agent =>
-    slotAgentPattern.test(agent.id)
-    && (agent.status === 'starting' || agent.status === 'running')
-  );
-  return activeSlots.length + selectedCount < cap;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Whether the issue may register another slot. Counts only tmux-ALIVE slot
+ * sessions (stale agents-table rows blocked all dispatch at zero live slots
+ * after a reset), capped by the same swarm reserve tryReserveSwarmSlot
+ * enforces — never maxWorkAgents (PAN-2214).
+ */
+export function registeredSlotCapacityAvailable(
+  issueId: string,
+  selectedCount: number,
+  liveSlotCount: number = countRunningSwarmSlotsForIssue(issueId),
+  limits: Pick<ConcurrencyLimits, 'reservedSwarmSlots'> = getConcurrencyLimits(),
+): boolean {
+  return liveSlotCount + selectedCount < limits.reservedSwarmSlots;
 }
