@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-2234",
+  "schemaVersion": 2,
+  "created": "2026-07-02T20:03:24.602Z",
+  "updated": "2026-07-02T20:03:24.602Z",
+  "pipeline": {
+    "issueId": "PAN-2234",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T20:03:24.602Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "ohmypi",
+  "model": "glm-5.2"
+}
