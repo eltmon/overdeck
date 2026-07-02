@@ -21,12 +21,13 @@ import {
   getDiscoveredSessionByJsonlPath,
   upsertDiscoveredSession,
 } from '../overdeck/discovered-sessions.js';
+import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
 import { Effect } from 'effect';
 import { runWithPool } from './work-pool.js';
-import { buildCorrelationMapSync } from './correlator.js';
+import { buildCorrelationMapSync, buildLocatorCorrelationMapSync, mergeCorrelation, type CorrelationResult } from './correlator.js';
 import { getModelCapabilitySync } from '../model-capabilities.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
@@ -76,6 +77,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
   const parseJsonlEff = opts.parseJsonl ?? parseSessionJsonl;
   const parseJsonl = (path: string) => Effect.runPromise(parseJsonlEff(path));
+  const resolver = new HashResolver(opts.watchDirs ?? []);
   const parseMetadata = (file: DiscoveredFile) => {
     if (file.harness === 'pi' || file.harness === 'ohmypi') {
       return parsePiSessionMetadata(file.jsonlPath);
@@ -84,6 +86,18 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
       return parseCodexSessionMetadata(file.jsonlPath);
     }
     return parseJsonl(file.jsonlPath);
+  };
+  const resolveWorkspace = async (file: DiscoveredFile, cwdFromFirstMessage: string | null) => {
+    if (file.harness === 'claude-code') {
+      return resolver.resolve(file.jsonlPath, cwdFromFirstMessage);
+    }
+    if (cwdFromFirstMessage) {
+      return { workspacePath: cwdFromFirstMessage, workspaceHash: null as string | null, warning: null as string | null };
+    }
+    if (file.harness === 'codex') {
+      return { workspacePath: resolveCodexAgentWorkspace(file.jsonlPath), workspaceHash: null as string | null, warning: null as string | null };
+    }
+    return { workspacePath: null as string | null, workspaceHash: null as string | null, warning: null as string | null };
   };
 
   // 1. Discover JSONL candidates
@@ -94,7 +108,6 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
   // 2. Filter by mode
   const filteredFiles = filterByMode(allFiles, opts);
-  const resolver = new HashResolver(opts.watchDirs ?? []);
 
   if (opts.dryRun) {
     for (const file of filteredFiles) {
@@ -102,7 +115,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
       if (opts.mode === 'targeted') {
         try {
           const meta = await parseMetadata(file);
-          const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
+          const resolved = await resolveWorkspace(file, meta.cwdFromFirstMessage);
           if (resolved.warning) result.warnings!.push(resolved.warning);
           if (!workspaceUnderAnyDir(resolved.workspacePath, opts.dirs ?? [])) continue;
         } catch {
@@ -133,6 +146,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   // 3. Build correlation map (Overdeck-managed detection)
   const allPaths = filteredFiles.map((f) => f.jsonlPath);
   const correlationMap = buildCorrelationMapSync(allPaths);
+  const locatorCorrelationMap = buildLocatorCorrelationMapSync();
 
   // 4. Determine parallelism from system-probe
   const caps = await Effect.runPromise(getSystemCapabilities(opts.maxParallel));
@@ -158,13 +172,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     }
 
     const fileMtime = new Date(stat.mtimeMs).toISOString();
-    const correlation = correlationMap.get(jsonlPath) ?? {
-      overdeckManaged: false,
-      panIssueId: null,
-      panAgentId: null,
-      actualCost: null,
-      costEventCount: 0,
-    };
+    const baseCorrelation = correlationMap.get(jsonlPath);
+    const correlation = combineCorrelation(baseCorrelation, harness === 'claude-code' ? null : existing?.sessionId, locatorCorrelationMap);
     if (
       existing &&
       existing.fileSize === stat.size &&
@@ -219,9 +228,10 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     // Parse, resolve, and upsert — wrap so one bad file can't leave progress incomplete.
     try {
       const meta = await parseMetadata(file);
+      const effectiveCorrelation = combineCorrelation(correlationMap.get(jsonlPath), harness === 'claude-code' ? null : meta.sessionId, locatorCorrelationMap);
 
       // Resolve workspace path
-      const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
+      const resolved = await resolveWorkspace(file, meta.cwdFromFirstMessage);
       if (resolved.warning) result.warnings!.push(resolved.warning);
       if (opts.mode === 'targeted' && !workspaceUnderAnyDir(resolved.workspacePath, opts.dirs ?? [])) {
         dirsProcessed++;
@@ -236,8 +246,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
       // Estimate cost from token counts using model-capabilities pricing
       const estimatedCost = estimateCost(meta.primaryModel, meta.tokenInput, meta.tokenOutput);
-      if (correlation.actualCost != null) {
-        validateEstimatedCost(jsonlPath, estimatedCost, correlation.actualCost, result.warnings!);
+      if (effectiveCorrelation.actualCost != null) {
+        validateEstimatedCost(jsonlPath, estimatedCost, effectiveCorrelation.actualCost, result.warnings!);
       }
 
       // Upsert into DB
@@ -258,9 +268,9 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
         estimatedCost,
         toolsUsed: meta.toolsUsed,
         filesTouched: meta.filesTouched,
-        overdeckManaged: correlation.overdeckManaged,
-        panIssueId: correlation.panIssueId,
-        panAgentId: correlation.panAgentId,
+        overdeckManaged: effectiveCorrelation.overdeckManaged,
+        panIssueId: effectiveCorrelation.panIssueId,
+        panAgentId: effectiveCorrelation.panAgentId,
         fileSize: stat.size,
         fileMtime,
       });
@@ -294,6 +304,38 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   result.durationMs = Date.now() - startTs;
   if (result.warnings?.length === 0) delete result.warnings;
   return result;
+}
+
+function emptyCorrelation(): CorrelationResult {
+  return {
+    overdeckManaged: false,
+    panIssueId: null,
+    panAgentId: null,
+    actualCost: null,
+    costEventCount: 0,
+  };
+}
+
+function combineCorrelation(
+  base: CorrelationResult | undefined,
+  sessionId: string | null | undefined,
+  locatorCorrelationMap: ReadonlyMap<string, CorrelationResult>,
+): CorrelationResult {
+  const fallback = base ?? emptyCorrelation();
+  if (!sessionId) return fallback;
+  const byLocator = locatorCorrelationMap.get(sessionId);
+  return byLocator ? mergeCorrelation(fallback, byLocator) : fallback;
+}
+
+function resolveCodexAgentWorkspace(jsonlPath: string): string | null {
+  const normalized = jsonlPath.replace(/\\/g, '/');
+  const match = normalized.match(/\/\.overdeck\/agents\/([^/]+)\//);
+  const agentId = match?.[1];
+  if (!agentId) return null;
+  const row = getOverdeckDatabaseSync()
+    .prepare(`SELECT workspace FROM agents WHERE id = ?`)
+    .get(agentId) as { workspace: string | null } | undefined;
+  return row?.workspace ?? null;
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────────

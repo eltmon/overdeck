@@ -26,6 +26,7 @@ export interface CorrelationResult {
  */
 export function buildCorrelationMapSync(
   jsonlPaths: string[],
+  sessionIdsByPath: ReadonlyMap<string, string | null | undefined> = new Map(),
 ): Map<string, CorrelationResult> {
   const db = getOverdeckDatabaseSync();
   const map = new Map<string, CorrelationResult>();
@@ -46,6 +47,8 @@ export function buildCorrelationMapSync(
     issue_id: string | null;
   }>;
 
+  const locatorMap = buildLocatorCorrelationMapFromRows(rows);
+
   for (const row of rows) {
     const candidatePaths = new Set<string>();
     if (row.claude_session_id) candidatePaths.add(sessionFilePath(row.cwd, row.claude_session_id));
@@ -62,6 +65,14 @@ export function buildCorrelationMapSync(
         });
       }
     }
+  }
+
+  for (const [path, sessionId] of sessionIdsByPath) {
+    if (!sessionId || !pathSet.has(path)) continue;
+    const locatorCorrelation = locatorMap.get(sessionId);
+    if (!locatorCorrelation) continue;
+    const existing = map.get(path);
+    map.set(path, mergeCorrelation(existing, locatorCorrelation));
   }
 
   const pathsBySessionId = new Map<string, string[]>();
@@ -109,6 +120,50 @@ export function buildCorrelationMapSync(
   }
 
   return map;
+}
+
+export function buildLocatorCorrelationMapSync(): Map<string, CorrelationResult> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db
+    .prepare(
+      `SELECT c.name, cf.locator, c.issue_id
+       FROM conversations c
+       JOIN conversation_files cf ON cf.conversation_id = c.id
+       WHERE cf.locator IS NOT NULL`,
+    )
+    .all() as Array<{ name: string; locator: string | null; issue_id: string | null }>;
+  return buildLocatorCorrelationMapFromRows(rows);
+}
+
+function buildLocatorCorrelationMapFromRows(
+  rows: Array<{ name: string; locator?: string | null; claude_session_id?: string | null; issue_id: string | null }>,
+): Map<string, CorrelationResult> {
+  const map = new Map<string, CorrelationResult>();
+  for (const row of rows) {
+    const locator = row.locator ?? row.claude_session_id;
+    if (!locator) continue;
+    map.set(locator, {
+      overdeckManaged: true,
+      panIssueId: row.issue_id,
+      panAgentId: row.name,
+      actualCost: null,
+      costEventCount: 0,
+    });
+  }
+  return map;
+}
+
+export function mergeCorrelation(
+  base: CorrelationResult | undefined,
+  override: CorrelationResult,
+): CorrelationResult {
+  return {
+    overdeckManaged: base?.overdeckManaged === true || override.overdeckManaged,
+    panIssueId: base?.panIssueId ?? override.panIssueId,
+    panAgentId: base?.panAgentId ?? override.panAgentId,
+    actualCost: base?.actualCost ?? override.actualCost,
+    costEventCount: base?.costEventCount ?? override.costEventCount,
+  };
 }
 
 // ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
