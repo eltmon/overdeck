@@ -17,6 +17,8 @@
 
 import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
 
 import {
   buildConvoyPrompt,
@@ -157,6 +159,54 @@ beforeEach(() => {
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
 });
+
+const REVIEW_MODE_WORKSPACE = '/tmp/pan-review-mode';
+const REVIEW_AGENT_DEFAULT_WORKSPACE = '/tmp/pan-review-agent-default';
+const REVIEW_AGENT_SUBROLE_WORKSPACE = '/tmp/pan-review-agent-subrole';
+const REVIEW_AGENT_RUN_ID = 'agent-pan-1059-review-abcdef12';
+
+function minimalReviewContextManifest(manifestPath: string) {
+  return {
+    runId: REVIEW_AGENT_RUN_ID,
+    issueId: 'PAN-1059',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    branch: 'feature/pan-1059',
+    headSha: 'abcdef12',
+    diff: { stat: 'src/example.ts | 1 +', truncated: true },
+    changedFiles: [
+      {
+        path: 'src/example.ts',
+        status: 'M',
+        additions: 1,
+        deletions: 0,
+        riskScore: 3,
+      },
+    ],
+    largeChangeset: { fileCount: 1, changedLines: 1, isLarge: false },
+    acceptanceCriteria: ['Preserve review prompt wiring'],
+    nonGoals: [],
+    traces: [],
+    policyNotes: [],
+    stubUiFindings: [],
+    manifestPath,
+  };
+}
+
+function prepareWorkspace(path: string): void {
+  rmSync(path, { recursive: true, force: true });
+  mkdirSync(path, { recursive: true });
+}
+
+function writeReviewManifest(workspace: string): string {
+  const manifestPath = `${workspace}/.pan/review/${REVIEW_AGENT_RUN_ID}/context.json`;
+  mkdirSync(dirname(manifestPath), { recursive: true });
+  writeFileSync(
+    manifestPath,
+    JSON.stringify(minimalReviewContextManifest(manifestPath), null, 2),
+    'utf-8',
+  );
+  return manifestPath;
+}
 
 describe('review mode resolution', () => {
   it('defaults to quick when neither the issue record nor config sets review mode', () => {
@@ -411,12 +461,13 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
 describe('spawnReviewRoleForIssue review mode fan-out', () => {
   const reviewOpts = {
     issueId: 'PAN-1982',
-    workspace: '/tmp/pan-review-mode',
+    workspace: REVIEW_MODE_WORKSPACE,
     branch: 'feature/pan-1982',
     force: true,
   };
 
   beforeEach(() => {
+    prepareWorkspace(REVIEW_MODE_WORKSPACE);
     mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
       id: options.subRole
         ? `agent-${issueId.toLowerCase()}-review-${options.subRole}`
@@ -761,6 +812,10 @@ describe('convoy orchestration', () => {
     mockGetAgentState.mockReturnValue(null);
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
     mockGetAgentState.mockReturnValue(null);
+    prepareWorkspace(REVIEW_AGENT_DEFAULT_WORKSPACE);
+    prepareWorkspace(REVIEW_AGENT_SUBROLE_WORKSPACE);
+    writeReviewManifest(REVIEW_AGENT_DEFAULT_WORKSPACE);
+    writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE);
   });
 
   it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
@@ -785,16 +840,18 @@ describe('convoy orchestration', () => {
   });
 
   it('uses run-scoped output paths by default', async () => {
+    const manifestPath = writeReviewManifest(REVIEW_AGENT_DEFAULT_WORKSPACE);
+
     const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
-      workspace: '/tmp/pan-review-agent-default',
+      workspace: REVIEW_AGENT_DEFAULT_WORKSPACE,
       subRole: 'security',
-      runId: 'agent-pan-1059-review-abcdef12',
-      contextManifestPath: '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/context.json',
+      runId: REVIEW_AGENT_RUN_ID,
+      contextManifestPath: manifestPath,
     }));
 
     expect(result.success).toBe(true);
-    const expectedOutput = '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/security.md';
+    const expectedOutput = `${REVIEW_AGENT_DEFAULT_WORKSPACE}/.pan/review/${REVIEW_AGENT_RUN_ID}/security.md`;
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
       allowHost: false,
       reviewOutputPath: expectedOutput,
@@ -805,13 +862,15 @@ describe('convoy orchestration', () => {
   });
 
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
+    const manifestPath = writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE);
+
     const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
-      workspace: '/workspace',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
-      runId: 'agent-pan-1059-review-abcdef12',
+      runId: REVIEW_AGENT_RUN_ID,
       outputPath: '/tmp/pan-review-agent-test-security.md',
-      contextManifestPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/context.json',
+      contextManifestPath: manifestPath,
     }));
 
     expect(result).toMatchObject({
@@ -819,7 +878,7 @@ describe('convoy orchestration', () => {
       sessionId: 'agent-pan-1059-review-security',
     });
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
-      workspace: '/workspace',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       model: 'configured-reviewer-model',
       allowHost: false,
@@ -828,7 +887,7 @@ describe('convoy orchestration', () => {
     expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-pan-1059-review-security',
       reviewSubRole: 'security',
-      reviewRunId: 'agent-pan-1059-review-abcdef12',
+      reviewRunId: REVIEW_AGENT_RUN_ID,
       reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
       reviewSynthesisAgentId: 'agent-pan-1059-review',
       reviewDeadlineAt: expect.any(String),
