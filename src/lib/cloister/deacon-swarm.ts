@@ -219,11 +219,24 @@ export async function coordinateSwarmSlots(
 
       const readiness = analyzeSwarmReadiness(doc);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
-      if (!readiness.swarmEligible || slotEligibleCount < 2) continue;
-
-      actions.push(`[swarm] considered ${issueId}: swarm eligible`);
+      // Eligibility gates DISPATCH only. Reconcile/merge/gc must still run for
+      // an issue with live slot state, or the endgame starves: once fewer than
+      // two dispatchable items remain, the old early-continue skipped the whole
+      // pass and the final slots of every swarm could never merge (observed
+      // live on PAN-1791 with two finished slots waiting).
+      const dispatchEligible = readiness.swarmEligible && slotEligibleCount >= 2;
+      if (dispatchEligible) {
+        actions.push(`[swarm] considered ${issueId}: swarm eligible`);
+      }
 
       const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, doc);
+      if (!dispatchEligible) {
+        const hasSlotState = reconciled.merged.length > 0 || reconciled.inFlight.length > 0
+          || reconciled.branches.length > 0 || reconciled.agents.length > 0;
+        if (!hasSlotState) continue;
+        actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
+      }
+
       const classified = await classifyInFlightSlots(reconciled.inFlight, deps, { workspacePath: workspace.workspacePath });
       for (const slot of classified) {
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
@@ -231,7 +244,9 @@ export async function coordinateSwarmSlots(
       actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
       actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
-      actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
+      if (dispatchEligible) {
+        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
+      }
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
       recordSwarmAdvanceFailure(issueId);
@@ -433,7 +448,14 @@ export async function mergeReadySlots(
         note: `Slot branch ${slot.branch ?? slot.slotIndex} did not merge cleanly`,
       }, workspacePath);
       actions.push(`[swarm] failed-merge slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+      continue;
     }
+
+    // Verification failure (merged result fails typecheck/tests) previously
+    // fell through with no action at all — the slot silently re-verified on
+    // every pass with nobody told why. Surface the failure so the operator
+    // or recovery machinery can act on it.
+    actions.push(`[swarm] verify-failed slot ${slot.slotIndex} (item ${item.id}) for ${issueId}: ${result.failure ?? 'verification failed'}`);
   }
 
   return actions;
