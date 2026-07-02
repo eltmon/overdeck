@@ -4,17 +4,17 @@
     "created": "2026-06-30T01:30:39Z",
     "author": "overdeck/plan",
     "description": "Plan for PAN-2153: Decompose src/dashboard/server/routes/specialists.ts (1753 lines) into focused modules",
-    "updated": "2026-07-02T19:29:18.028Z"
+    "updated": "2026-06-30T01:43:13.450Z"
   },
   "plan": {
     "id": "pan-2153",
     "title": "Decompose src/dashboard/server/routes/specialists.ts (1753 lines) into focused modules",
-    "status": "running",
+    "status": "proposed",
     "uid": "c6560fcb-cce9-4562-80e1-a9348d39b30e",
     "author": "agent:opus",
-    "sequence": 4,
+    "sequence": 2,
     "created": "2026-06-30T01:30:39Z",
-    "updated": "2026-07-02T19:29:18.028Z",
+    "updated": "2026-07-02T19:45:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2153",
@@ -71,6 +71,23 @@
             "FR-1",
             "FR-3",
             "NFR-1"
+          ],
+          "kind": "refactor",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/specialists/shared.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size guard + A1 ratchet included)",
+            "full vitest suite reports 0 failed"
           ]
         },
         "narrative": {
@@ -120,6 +137,24 @@
             "FR-4",
             "NFR-1",
             "NFR-2"
+          ],
+          "kind": "refactor",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/specialists/legacy-routes.ts",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size guard + A1 ratchet included)",
+            "full vitest suite reports 0 failed"
           ]
         },
         "narrative": {
@@ -170,6 +205,24 @@
             "FR-5",
             "NFR-1",
             "NFR-2"
+          ],
+          "kind": "refactor",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/specialists/project-routes.ts",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size guard + A1 ratchet included)",
+            "full vitest suite reports 0 failed"
           ]
         },
         "narrative": {
@@ -227,5 +280,5 @@
       "canonicalFilename": "2026-06-30-PAN-2153-decompose-src-dashboard-server-routes-specialists-ts-1753-lines-into-focused-modules.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "proposed"
 }
