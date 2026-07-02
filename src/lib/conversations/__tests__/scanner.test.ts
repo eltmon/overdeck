@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
 import { parseSessionJsonl } from '../jsonl-async.js';
 import { scan, validateEstimatedCost } from '../scanner.js';
+import { discoverJsonlFiles, type DiscoveredFile } from '../harness-discovery.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
 import { findDiscoveredSessions } from '../../overdeck/discovered-sessions.js';
 import { insertCostEventSync } from '../../overdeck/cost-sync.js';
@@ -84,6 +85,73 @@ describe('work-pool', () => {
 });
 
 describe('scanner', () => {
+  it('discovers fixture files across all harness roots with harness tags', async () => {
+    const claude = join(fakeClaudeDir, '-home-user-Projects-myapp', 'claude.jsonl');
+    const pi = join(odb.home, '.pi', 'agent', 'sessions', '-home-user-Projects-pi', '20260702_pi-session.jsonl');
+    const ohmypi = join(odb.home, '.omp', 'agent', 'sessions', '-home-user-Projects-omp', '20260702_omp-session.jsonl');
+    const codex = join(odb.home, '.codex', 'sessions', '2026', '07', '02', 'rollout-2026-07-02T00-00-00-000Z-codex-thread.jsonl');
+    const agentPi = join(odb.home, '.overdeck', 'agents', 'agent-pi', 'sessions', '-home-user-Projects-agent-pi', '20260702_agent-pi.jsonl');
+    const agentOmp = join(odb.home, '.overdeck', 'agents', 'agent-omp', 'session_omp-root.jsonl');
+    const agentCodex = join(odb.home, '.overdeck', 'agents', 'agent-codex', 'codex-home', 'sessions', '2026', '07', '02', 'rollout-2026-07-02T00-00-00-000Z-agent-codex.jsonl');
+
+    for (const file of [claude, pi, ohmypi, codex, agentPi, agentOmp, agentCodex]) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, SESSION_JSONL, 'utf8');
+    }
+    writeFileSync(join(odb.home, '.overdeck', 'agents', 'agent-pi', 'state.json'), JSON.stringify({ harness: 'pi' }), 'utf8');
+    writeFileSync(join(odb.home, '.overdeck', 'agents', 'agent-omp', 'state.json'), JSON.stringify({ harness: 'ohmypi' }), 'utf8');
+    writeFileSync(join(odb.home, '.overdeck', 'agents', 'agent-codex', 'state.json'), JSON.stringify({ harness: 'codex' }), 'utf8');
+
+    const files = await discoverJsonlFiles([]);
+    const byPath = new Map(files.map((file) => [file.jsonlPath, file.harness]));
+
+    expect(byPath.get(claude)).toBe('claude-code');
+    expect(byPath.get(pi)).toBe('pi');
+    expect(byPath.get(ohmypi)).toBe('ohmypi');
+    expect(byPath.get(codex)).toBe('codex');
+    expect(byPath.get(agentPi)).toBe('pi');
+    expect(byPath.get(agentOmp)).toBe('ohmypi');
+    expect(byPath.get(agentCodex)).toBe('codex');
+    expect(files.find((file) => file.jsonlPath === pi)?.projectDir).toBe(join(odb.home, '.pi', 'agent', 'sessions', '-home-user-Projects-pi'));
+    expect(files.find((file) => file.jsonlPath === ohmypi)?.projectDir).toBe(join(odb.home, '.omp', 'agent', 'sessions', '-home-user-Projects-omp'));
+    expect(files.find((file) => file.jsonlPath === agentPi)?.projectDir).toBe(join(odb.home, '.overdeck', 'agents', 'agent-pi', 'sessions', '-home-user-Projects-agent-pi'));
+  });
+
+  it('keeps Claude-only enumeration identical to the pre-change scanner projection', async () => {
+    const topLevel = join(fakeClaudeDir, '-home-user-Projects-myapp', 'claude-top.jsonl');
+    const nested = join(fakeClaudeDir, '-home-user-Projects-myapp', 'session-uuid-001', 'subagents', 'claude-nested.jsonl');
+    const other = join(fakeClaudeDir, '-home-user-Projects-otherapp', 'claude-other.jsonl');
+    for (const file of [topLevel, nested, other]) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, SESSION_JSONL, 'utf8');
+    }
+
+    const files = (await discoverJsonlFiles([])).map(claudeProjection).sort(byPath);
+
+    expect(files).toEqual([
+      { projectDir: join(fakeClaudeDir, '-home-user-Projects-myapp'), jsonlPath: topLevel },
+      { projectDir: join(fakeClaudeDir, '-home-user-Projects-myapp'), jsonlPath: nested },
+      { projectDir: join(fakeClaudeDir, '-home-user-Projects-otherapp'), jsonlPath: other },
+    ].sort(byPath));
+  });
+
+  it('skips missing harness roots silently', async () => {
+    process.env.HOME = join(odb.home, 'missing-home');
+
+    const warnings: string[] = [];
+    const files = await discoverJsonlFiles(warnings);
+
+    expect(files).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('harness discovery uses fs/promises rather than synchronous fs calls', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/conversations/harness-discovery.ts'), 'utf8');
+
+    expect(source).not.toMatch(/\b(?:existsSync|readdirSync|readFileSync|statSync)\b/);
+    expect(source).toContain("import { promises as fs } from 'fs'");
+  });
+
   it('system mode discovers JSONL files in ~/.claude/projects', async () => {
     // Write two session files
     const p1 = join(fakeClaudeDir, '-home-user-Projects-myapp', 'sess1.jsonl');
@@ -330,3 +398,12 @@ describe('scanner', () => {
     );
   });
 });
+
+function claudeProjection(file: DiscoveredFile): { projectDir: string; jsonlPath: string } {
+  expect(file.harness).toBe('claude-code');
+  return { projectDir: file.projectDir, jsonlPath: file.jsonlPath };
+}
+
+function byPath(a: { jsonlPath: string }, b: { jsonlPath: string }): number {
+  return a.jsonlPath.localeCompare(b.jsonlPath);
+}
