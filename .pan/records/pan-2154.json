@@ -1,6 +1,18 @@
 {
   "issueId": "PAN-2154",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior and full npx vitest run --configLoader runner passed.",
+      "recordedAt": "2026-07-02T19:19:29.216Z"
+    },
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior and full npx vitest run --configLoader runner passed.",
+      "recordedAt": "2026-07-02T19:20:01.936Z"
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,37 +39,43 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T19:09:29.519Z"
+    },
+    {
+      "timestamp": "2026-07-02T19:21:31.819Z",
+      "reason": "end",
+      "note": "Completed workspace-manager decomposition. Full gates passed: npm run typecheck, npm run lint, npx vitest run --configLoader runner. Test gate waiver rationale: pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior."
     }
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:28.481Z",
-  "updated": "2026-07-02T19:20:01.937Z",
+  "updated": "2026-07-02T19:21:51.935Z",
   "pipeline": {
     "issueId": "PAN-2154",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:35:16.702Z",
-    "inspectNotes": "Spec fidelity passed for workspace-zjh9e: the diff extracts the nine public interfaces and PRE_WORKTREE_METADATA_DIRS into src/lib/workspace-manager/types.ts, re-exports only the interfaces from the barrel, and leaves PRE_WORKTREE_METADATA_DIRS off the public barrel surface. Constraint check passed: no call-site or test files were edited, no new any or execSync appeared in the new types module, and the scoped diff is pure relocation/wiring."
+    "updatedAt": "2026-07-02T19:21:51.870Z",
+    "inspectNotes": "Spec fidelity passed for workspace-zjh9e: the diff extracts the nine public interfaces and PRE_WORKTREE_METADATA_DIRS into src/lib/workspace-manager/types.ts, re-exports only the interfaces from the barrel, and leaves PRE_WORKTREE_METADATA_DIRS off the public barrel surface. Constraint check passed: no call-site or test files were edited, no new any or execSync appeared in the new types module, and the scoped diff is pure relocation/wiring.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2236"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 298564,
-            "output": 15572,
-            "cacheRead": 1835520,
+            "input": 299674,
+            "output": 16052,
+            "cacheRead": 1994240,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 43370,
-            "output": 6034,
+            "input": 45321,
+            "output": 6517,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -81,14 +99,14 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 298564,
-          "output": 15572,
-          "cacheRead": 1835520,
+          "input": 299674,
+          "output": 16052,
+          "cacheRead": 1994240,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 43370,
-          "output": 6034,
+          "input": 45321,
+          "output": 6517,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -106,11 +124,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 16.925156,
-        "pricingAsOf": "2026-07-02T18:35:17.561Z"
+        "usd": 17.024466,
+        "pricingAsOf": "2026-07-02T19:21:51.917Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2236"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -156,17 +176,5 @@
     "wi-1-types.ac2": "completed",
     "wi-1-types.ac3": "completed",
     "wi-1-types.ac4": "completed"
-  },
-  "decisions": [
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: Pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior and full npx vitest run --configLoader runner passed.",
-      "recordedAt": "2026-07-02T19:19:29.216Z"
-    },
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: Pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior and full npx vitest run --configLoader runner passed.",
-      "recordedAt": "2026-07-02T19:20:01.936Z"
-    }
-  ]
+  }
 }
