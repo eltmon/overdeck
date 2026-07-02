@@ -17,6 +17,9 @@ import {
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
+import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
+import { stopAgentSync } from '../../lib/agents.js';
+import { listSessionNamesSync } from '../../lib/tmux.js';
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
 
@@ -62,6 +65,19 @@ const defaultHoldDeps: SwarmHoldCommandDeps = {
   setDeaconIgnored,
   appendOperatorInterventionEvent,
   console,
+};
+
+export interface SwarmStopCommandDeps extends SwarmHoldCommandDeps {
+  listSlotAgents: typeof listSlotAgents;
+  listSessionNamesSync: () => string[];
+  stopAgentSync: (agentId: string) => void;
+}
+
+const defaultStopDeps: SwarmStopCommandDeps = {
+  ...defaultHoldDeps,
+  listSlotAgents,
+  listSessionNamesSync,
+  stopAgentSync,
 };
 
 const defaultDeps: SwarmCommandDeps = {
@@ -204,6 +220,68 @@ export async function swarmResumeCommand(
   return { ok: true };
 }
 
+export async function swarmStopCommand(
+  issueId: string,
+  options: SwarmFreezeOptions = {},
+  deps: SwarmStopCommandDeps = defaultStopDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const issueLower = issue.toLowerCase();
+
+  // Hold FIRST so the Deacon cannot re-spawn slots while they are being stopped
+  // (the PAN-1791 incident race: operator removes slots, Deacon re-dispatches them).
+  const status = safeGetReviewStatus(issue, deps);
+  if (status?.deaconIgnored) {
+    deps.console.log(chalk.yellow(`${issue} is already frozen — keeping the existing hold in place.`));
+  } else {
+    deps.setDeaconIgnored(issue, true, options.reason ?? 'swarm stop via pan swarm stop');
+  }
+  await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm stop' });
+
+  const slotAgentPattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-\\d+$`);
+  const liveAgentIds = new Set<string>();
+  for (const sessionName of deps.listSessionNamesSync()) {
+    if (slotAgentPattern.test(sessionName)) liveAgentIds.add(sessionName);
+  }
+  for (const agent of deps.listSlotAgents(issue)) {
+    if (agent.status === 'running' || agent.status === 'starting') liveAgentIds.add(agent.agentId);
+  }
+
+  if (liveAgentIds.size === 0) {
+    deps.console.log(chalk.green(
+      `No slot agents are running for ${issue} — nothing to stop. The swarm hold is set, so the Deacon will `
+      + `skip all swarm coordination for this issue until you run \`pan swarm resume ${issue}\`.`,
+    ));
+    return { ok: true };
+  }
+
+  let failures = 0;
+  for (const agentId of [...liveAgentIds].sort()) {
+    try {
+      deps.stopAgentSync(agentId);
+      deps.console.log(`Stopped slot agent ${agentId}`);
+    } catch (error) {
+      failures += 1;
+      deps.console.error(chalk.red(
+        `Failed to stop ${agentId}: ${error instanceof Error ? error.message : String(error)}`,
+      ));
+    }
+  }
+
+  deps.console.log(chalk.green(
+    `Swarm stopped for ${issue}: ${liveAgentIds.size - failures} of ${liveAgentIds.size} slot agent(s) stopped.`,
+  ));
+  deps.console.log(
+    'All slot branches and worktrees are preserved — stopping deletes no work. The Deacon will skip all swarm '
+    + `coordination for ${issue} until you run \`pan swarm resume ${issue}\` to re-enable it.`,
+  );
+  return { ok: failures === 0 };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function safeGetReviewStatus(
   issueId: string,
   deps: Pick<SwarmHoldCommandDeps, 'getReviewStatusSync'>,
@@ -247,6 +325,15 @@ export function registerSwarmCommands(program: Command): void {
     .description('Resume swarm coordination for a frozen issue on the next Deacon patrol')
     .action(async (id: string) => {
       const result = await swarmResumeCommand(id);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('stop <id>')
+    .description('Freeze swarm coordination, then stop all live slot agents (branches and worktrees preserved)')
+    .option('--reason <text>', 'Reason recorded on the hold')
+    .action(async (id: string, options: SwarmFreezeOptions) => {
+      const result = await swarmStopCommand(id, options);
       if (!result.ok) process.exitCode = 1;
     });
 }

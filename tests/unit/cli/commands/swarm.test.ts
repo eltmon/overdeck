@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
-import type { SwarmCommandDeps, SwarmHoldCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResumeCommand } from '../../../../src/cli/commands/swarm.js';
+import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResumeCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
 import { getFailedMergeBlock, resetSwarmLoopSafetyForTests } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 
@@ -251,5 +251,99 @@ describe('pan swarm freeze / resume (PAN-2214)', () => {
     expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
     expect(deps.appendOperatorInterventionEvent).not.toHaveBeenCalled();
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('already resumed'));
+  });
+});
+
+describe('pan swarm stop (PAN-2214)', () => {
+  function makeStopDeps(options: {
+    status?: { deaconIgnored?: boolean } | null;
+    sessionNames?: string[];
+    slotAgents?: Array<{ slotIndex: number; agentId: string; status: string }>;
+  } = {}): SwarmStopCommandDeps & { runGitCommand: ReturnType<typeof vi.fn> } {
+    return {
+      getReviewStatusSync: vi.fn(() => (options.status ?? null) as ReturnType<SwarmStopCommandDeps['getReviewStatusSync']>),
+      setDeaconIgnored: vi.fn(),
+      appendOperatorInterventionEvent: vi.fn(async () => undefined),
+      listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as ReturnType<SwarmStopCommandDeps['listSlotAgents']>),
+      listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
+      stopAgentSync: vi.fn(),
+      runGitCommand: vi.fn(),
+      console: { log: vi.fn(), error: vi.fn() },
+    };
+  }
+
+  it('sets the hold BEFORE any stop call and stops every live slot agent', async () => {
+    const deps = makeStopDeps({
+      sessionNames: ['agent-pan-2203-slot-1', 'agent-pan-2203-slot-2', 'agent-pan-9999-slot-1', 'conv-foo'],
+      slotAgents: [{ slotIndex: 3, agentId: 'agent-pan-2203-slot-3', status: 'running' }],
+    });
+
+    const result = await swarmStopCommand('pan-2203', { reason: 'runaway dispatch' }, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'runaway dispatch');
+    const stopTargets = vi.mocked(deps.stopAgentSync).mock.calls.map(([agentId]) => agentId);
+    expect(stopTargets).toEqual([
+      'agent-pan-2203-slot-1',
+      'agent-pan-2203-slot-2',
+      'agent-pan-2203-slot-3',
+    ]);
+    const holdOrder = vi.mocked(deps.setDeaconIgnored).mock.invocationCallOrder[0];
+    for (const stopOrder of vi.mocked(deps.stopAgentSync).mock.invocationCallOrder) {
+      expect(holdOrder).toBeLessThan(stopOrder);
+    }
+  });
+
+  it('with zero live slots it exits ok, sets the hold, and reports nothing was running', async () => {
+    const deps = makeStopDeps({
+      slotAgents: [{ slotIndex: 4, agentId: 'agent-pan-2203-slot-4', status: 'stopped' }],
+    });
+
+    const result = await swarmStopCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).toHaveBeenCalledWith('PAN-2203', true, 'swarm stop via pan swarm stop');
+    expect(deps.stopAgentSync).not.toHaveBeenCalled();
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('nothing to stop'));
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('pan swarm resume PAN-2203'));
+  });
+
+  it('keeps an existing freeze in place instead of re-setting it', async () => {
+    const deps = makeStopDeps({
+      status: { deaconIgnored: true },
+      sessionNames: ['agent-pan-2203-slot-1'],
+    });
+
+    const result = await swarmStopCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.setDeaconIgnored).not.toHaveBeenCalled();
+    expect(deps.stopAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+  });
+
+  it('preserves slot branches and worktrees: no git deletion commands are issued', async () => {
+    const deps = makeStopDeps({
+      sessionNames: ['agent-pan-2203-slot-1', 'agent-pan-2203-slot-2'],
+    });
+
+    await swarmStopCommand('PAN-2203', {}, deps);
+
+    expect(deps.runGitCommand).not.toHaveBeenCalled();
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('branches and worktrees are preserved'));
+  });
+
+  it('reports per-slot stop failures and exits nonzero', async () => {
+    const deps = makeStopDeps({
+      sessionNames: ['agent-pan-2203-slot-1', 'agent-pan-2203-slot-2'],
+    });
+    vi.mocked(deps.stopAgentSync).mockImplementation((agentId: string) => {
+      if (agentId.endsWith('slot-2')) throw new Error('tmux kill failed');
+    });
+
+    const result = await swarmStopCommand('PAN-2203', {}, deps);
+
+    expect(result.ok).toBe(false);
+    expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('agent-pan-2203-slot-2'));
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('1 of 2 slot agent(s) stopped'));
   });
 });
