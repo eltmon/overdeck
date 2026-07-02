@@ -22,24 +22,14 @@
       "reason": "feedback",
       "note": "[2026-07-02T16:23Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-02T16:23:32.546Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-02T16:23:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2224\n\nArchived conversations ignore and drop the harness filter/response field\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2224 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-02T16:23:32Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2224\n\nArchived conversations ignore and drop the harness filter/response field\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2224 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T16:35:03.257Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2224.json",
@@ -115,7 +105,7 @@
     "recordedAt": "2026-07-02T16:20:44.838Z"
   },
   "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T16:24:09.846Z",
+  "updated": "2026-07-02T16:35:07.123Z",
   "pipeline": {
     "issueId": "PAN-2224",
     "reviewStatus": "reviewing",
@@ -124,11 +114,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T16:24:09.799Z",
-    "reviewNotes": "Archived conversations ignore and drop the harness filter/response field",
+    "updatedAt": "2026-07-02T16:35:07.074Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
-    "lastVerifiedCommit": "0c6e1d732a3ebdebf5f79e53df569d9790cad840",
+    "lastVerifiedCommit": "169d16a90eddd879882eb6fa66433068f2b04180",
     "reviewRequestedAt": "2026-07-02T16:20:52.704Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -263,7 +253,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T16:24:09.819Z"
+        "pricingAsOf": "2026-07-02T16:35:07.121Z"
       }
     },
     "merges": [
