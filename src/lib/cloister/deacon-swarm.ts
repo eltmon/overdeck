@@ -8,7 +8,12 @@ import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 import { spawnRun } from '../agents/spawn.js';
 import type { SpawnRunOptions } from '../agents/spawn-prep.js';
 import { verifyAndMergeSlot, type SlotMergeResult } from '../agents/slot-merge.js';
-import { reconcileSlotState, type ReconciledSlotItem, type SlotReconcileResult } from '../agents/slot-reconcile.js';
+import {
+  listSlotAssignments as listDurableSlotAssignments,
+  reconcileSlotState,
+  type ReconciledSlotItem,
+  type SlotReconcileResult,
+} from '../agents/slot-reconcile.js';
 import {
   readIssueRecordForWorkspaceSync,
   writeIssueRecordForWorkspaceSync,
@@ -103,6 +108,14 @@ export interface CoordinateSwarmSlotsDeps {
    * activates mid-patrol (PAN-2214 slot-20 regression).
    */
   shouldDispatch?: (issueId: string) => boolean;
+  /**
+   * Inclusive upper bound for slot index allocation — the swarm reserve.
+   * Unbounded allocation climbed slot-5..slot-20 under an inconsistent
+   * registry (PAN-2214).
+   */
+  getMaxSlotIndex?: () => number;
+  /** Durable slot assignments from the issue record; they survive registry resets (PAN-2214). */
+  listSlotAssignments?: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -141,7 +154,13 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   spawnRun,
   getIssueHold: defaultGetIssueHold,
   shouldDispatch: defaultShouldDispatch,
+  getMaxSlotIndex: defaultGetMaxSlotIndex,
+  listSlotAssignments: listDurableSlotAssignments,
 };
+
+function defaultGetMaxSlotIndex(): number {
+  return Math.max(1, getConcurrencyLimits().reservedSwarmSlots);
+}
 
 function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null {
   try {
@@ -551,6 +570,8 @@ export async function recoverFailedMergeSlot(
     | 'releaseSwarmSlot'
     | 'spawnRun'
     | 'shouldDispatch'
+    | 'getMaxSlotIndex'
+    | 'listSlotAssignments'
   > = defaultDeps,
 ): Promise<string[]> {
   const normalizedIssueId = issueId.toUpperCase();
@@ -696,16 +717,34 @@ export async function dispatchNextWave(
     | 'clearSlotAssignment'
     | 'spawnRun'
     | 'shouldDispatch'
+    | 'getMaxSlotIndex'
+    | 'listSlotAssignments'
   > & Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
+  const maxSlotIndex = Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)()));
   const occupiedSlotIndexes = new Set([
     ...reconciled.inFlight.map(slot => slot.slotIndex),
-    ...reconciled.branches.filter(branch => !branch.merged).map(branch => branch.slotIndex),
+    // ALL local slot branches — merged or not — hold their index until gc
+    // deletes the branch; reusing a merged-branch index would respawn onto a
+    // stale branch (PAN-2214).
+    ...reconciled.branches.map(branch => branch.slotIndex),
     ...reconciled.agents.map(agent => agent.slotIndex),
+    // Durable slot assignments from the issue record survive registry resets.
+    ...(deps.listSlotAssignments ?? listDurableSlotAssignments)(issueId, workspacePath).map(assignment => assignment.slotIndex),
   ]);
+  // Orphaned on-disk slot worktrees — no assignment, agent, or branch entry —
+  // still occupy their index (PAN-2213).
+  if (deps.slotWorktreeExists) {
+    for (let index = 1; index <= maxSlotIndex; index++) {
+      if (!occupiedSlotIndexes.has(index) && deps.slotWorktreeExists(`${workspacePath}-slot-${index}`)) {
+        occupiedSlotIndexes.add(index);
+      }
+    }
+  }
+  const sessionNames = deps.listSessionNames ? await deps.listSessionNames() : [];
   const inFlightItemIds = new Set(reconciled.inFlight.map(slot => slot.itemId));
   const selectedItemIds: string[] = [];
   const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
@@ -725,11 +764,28 @@ export async function dispatchNextWave(
       continue;
     }
 
-    const slotIndex = lowestFreeSlotIndex(occupiedSlotIndexes);
-    const duplicateReason = await duplicateSpawnReason(issueId, workspacePath, item.id, slotIndex, reconciled, deps);
-    if (duplicateReason) {
-      actions.push(`[swarm] refused ${item.id} for ${issueId}: ${duplicateReason}`);
-      continue;
+    let slotIndex: number | null = null;
+    for (;;) {
+      const candidate = allocateSlotIndex(occupiedSlotIndexes, maxSlotIndex);
+      if (candidate === null) break;
+      const conflict = slotIndexConflictReason(issueId, workspacePath, candidate, sessionNames, reconciled, deps);
+      if (!conflict) {
+        slotIndex = candidate;
+        break;
+      }
+      // An index-level conflict the registry missed (live session, unmerged
+      // branch, orphaned worktree) means the index is occupied — advance to
+      // the next free index instead of refusing the item (PAN-2213).
+      occupiedSlotIndexes.add(candidate);
+      actions.push(`[swarm] slot ${candidate} occupied for ${issueId}: ${conflict} — advancing`);
+    }
+    if (slotIndex === null) {
+      const occupying = [...occupiedSlotIndexes].filter(index => index >= 1 && index <= maxSlotIndex).sort((a, b) => a - b);
+      actions.push(
+        `[swarm] deferred ${item.id} for ${issueId}: all slot indexes 1..${maxSlotIndex} are occupied (slots ${occupying.join(', ')})`
+        + ` — run \`pan swarm reset ${issueId}\` if these slots are orphans`,
+      );
+      break;
     }
 
     if (!deps.tryReserveSwarmSlot()) {
@@ -826,18 +882,17 @@ function writeSwarmSlotAssignments(
   });
 }
 
-async function duplicateSpawnReason(
+function slotIndexConflictReason(
   issueId: string,
   workspacePath: string,
-  itemId: string,
   slotIndex: number,
+  sessionNames: readonly string[],
   reconciled: SlotReconcileResult,
-  deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'listSessionNames' | 'slotWorktreeExists'>>,
-): Promise<string | undefined> {
+  deps: Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>>,
+): string | undefined {
   const issueLower = issueId.toLowerCase();
   const agentId = `agent-${issueLower}-slot-${slotIndex}`;
   const branch = `feature/${issueLower}-slot-${slotIndex}`;
-  const sessionNames = deps.listSessionNames ? await deps.listSessionNames() : [];
   if (sessionNames.includes(agentId)) {
     return `live ${agentId} session already exists`;
   }
@@ -852,11 +907,6 @@ async function duplicateSpawnReason(
   const slotWorkspacePath = `${workspacePath}-slot-${slotIndex}`;
   if (deps.slotWorktreeExists?.(slotWorkspacePath)) {
     return `slot worktree already exists at ${slotWorkspacePath}`;
-  }
-
-  const duplicateItem = reconciled.inFlight.find(slot => slot.itemId === itemId);
-  if (duplicateItem) {
-    return `item already in flight on slot ${duplicateItem.slotIndex}`;
   }
 
   return undefined;
@@ -902,10 +952,17 @@ function synthesisContextForItem(item: VBriefItem): string | undefined {
   return typeof raw === 'string' && raw.trim().length > 0 ? raw : undefined;
 }
 
-function lowestFreeSlotIndex(occupiedSlotIndexes: Set<number>): number {
-  let slotIndex = 1;
-  while (occupiedSlotIndexes.has(slotIndex)) slotIndex++;
-  return slotIndex;
+/**
+ * Lowest free slot index within the bound, derived purely from the occupied
+ * set. Returns null — never an index above the bound — when indexes 1..bound
+ * are all occupied (PAN-2214: unbounded allocation climbed slot-5..slot-20).
+ */
+export function allocateSlotIndex(occupiedSlotIndexes: ReadonlySet<number>, bound: number): number | null {
+  const maxIndex = Math.max(1, Math.floor(bound));
+  for (let slotIndex = 1; slotIndex <= maxIndex; slotIndex++) {
+    if (!occupiedSlotIndexes.has(slotIndex)) return slotIndex;
+  }
+  return null;
 }
 
 function firstOverlappingItemId(

@@ -77,31 +77,32 @@ function classifyDeps(output = 'same pane output'): Pick<
   };
 }
 
-function dispatchDeps(overrides: Partial<Pick<
+type StallDispatchDeps = Pick<
   CoordinateSwarmSlotsDeps,
   'registeredSlotCapacityAvailable'
   | 'tryReserveSwarmSlot'
   | 'releaseSwarmSlot'
   | 'applyTaskOperationToPlanFile'
+  | 'recordSlotAssignment'
+  | 'clearSlotAssignment'
   | 'spawnRun'
+  | 'getMaxSlotIndex'
+  | 'listSlotAssignments'
   | 'listSessionNames'
   | 'slotWorktreeExists'
->> = {}): Pick<
-  CoordinateSwarmSlotsDeps,
-  'registeredSlotCapacityAvailable'
-  | 'tryReserveSwarmSlot'
-  | 'releaseSwarmSlot'
-  | 'applyTaskOperationToPlanFile'
-  | 'spawnRun'
-  | 'listSessionNames'
-  | 'slotWorktreeExists'
-> {
+>;
+
+function dispatchDeps(overrides: Partial<StallDispatchDeps> = {}): StallDispatchDeps {
   return {
     registeredSlotCapacityAvailable: vi.fn(() => true),
     tryReserveSwarmSlot: vi.fn(() => true),
     releaseSwarmSlot: vi.fn(),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+    recordSlotAssignment: vi.fn(),
+    clearSlotAssignment: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
+    getMaxSlotIndex: vi.fn(() => 4),
+    listSlotAssignments: vi.fn(() => []),
     listSessionNames: vi.fn(async () => []),
     slotWorktreeExists: vi.fn(() => false),
     ...overrides,
@@ -183,20 +184,22 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     ]);
   });
 
-  it('refuses spawn when a live slot session already exists', async () => {
+  it('advances past a live slot session the registry missed and spawns on the next index (PAN-2213)', async () => {
     const plan = doc([item('wi-a')]);
     const fakeDeps = dispatchDeps({
       listSessionNames: vi.fn(async () => ['agent-pan-2203-slot-1']),
     });
 
     await expect(dispatchNextWave('PAN-2203', '/workspace', plan, reconciled(), analyzeSwarmReadiness(plan), fakeDeps))
-      .resolves.toEqual(['[swarm] refused wi-a for PAN-2203: live agent-pan-2203-slot-1 session already exists']);
+      .resolves.toEqual([
+        '[swarm] slot 1 occupied for PAN-2203: live agent-pan-2203-slot-1 session already exists — advancing',
+        '[swarm] dispatched implementation slot 2 (item wi-a) for PAN-2203',
+      ]);
 
-    expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
-    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 2 }));
   });
 
-  it('reserves unknown branch slots and refuses spawn when the next worktree already exists', async () => {
+  it('reserves unknown branch and worktree slots, spawning on the next free index (PAN-2213)', async () => {
     const plan = doc([item('wi-a')]);
     const fakeDeps = dispatchDeps({
       slotWorktreeExists: vi.fn((path: string) => path === '/workspace-slot-2'),
@@ -205,9 +208,8 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     await expect(dispatchNextWave('PAN-2203', '/workspace', plan, reconciled({
       branches: [{ slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: false }],
     }), analyzeSwarmReadiness(plan), fakeDeps))
-      .resolves.toEqual(['[swarm] refused wi-a for PAN-2203: slot worktree already exists at /workspace-slot-2']);
+      .resolves.toEqual(['[swarm] dispatched implementation slot 3 (item wi-a) for PAN-2203']);
 
-    expect(fakeDeps.spawnRun).not.toHaveBeenCalled();
-    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({ slotIndex: 3 }));
   });
 });

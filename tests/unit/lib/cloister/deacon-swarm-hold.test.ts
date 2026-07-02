@@ -164,6 +164,8 @@ type DispatchDeps = Pick<
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
   | 'spawnRun'
+  | 'getMaxSlotIndex'
+  | 'listSlotAssignments'
 >;
 
 function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
@@ -175,6 +177,8 @@ function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
     recordSlotAssignment: vi.fn(),
     clearSlotAssignment: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
+    getMaxSlotIndex: vi.fn(() => 5),
+    listSlotAssignments: vi.fn(() => []),
     ...overrides,
   };
 }
