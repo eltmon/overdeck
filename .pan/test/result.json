@@ -1,1 +1,0 @@
-{"status":"passed","notes":"Retried required gates in /home/eltmon/Projects/overdeck/workspaces/feature-pan-2156 after stale test-role failure: npm run typecheck PASS, npm run lint PASS, npx vitest run --configLoader runner PASS with 797 files passed / 7926 tests passed / 52 skipped. No browser UAT required for this behavior-preserving service refactor."}
