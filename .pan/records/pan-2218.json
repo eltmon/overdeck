@@ -1,19 +1,55 @@
 {
   "issueId": "PAN-2218",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-07-02T07:06:01.917Z",
-  "updated": "2026-07-02T07:06:01.917Z",
+  "updated": "2026-07-02T07:16:07.034Z",
   "pipeline": {
     "issueId": "PAN-2218",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T07:06:01.917Z"
+    "updatedAt": "2026-07-02T07:16:06.946Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 135,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "strike": {
+          "anthropic/claude-fable-5": {
+            "input": 15361,
+            "output": 15494,
+            "cacheRead": 3736768,
+            "cacheWrite": 105835
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 135,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 15361,
+          "output": 15494,
+          "cacheRead": 3736768,
+          "cacheWrite": 105835
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 5.988021,
+        "pricingAsOf": "2026-07-02T07:16:07.033Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
