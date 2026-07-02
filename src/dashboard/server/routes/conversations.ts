@@ -113,6 +113,7 @@ import {
   type ControlCommand,
   type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
+import { getDiscoveredSessionBySessionId } from '../../../lib/overdeck/discovered-sessions.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
  * module default when config is unavailable. */
@@ -746,7 +747,7 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
   return null;
 }
 
-async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // Pi writes its own JSONL transcript under the per-agent dir using a per-run
   // timestamped filename (not into ~/.claude/projects/<dir>/<id>.jsonl). Pi
   // *conversations* write into the agent's `sessions/` subdir, but Pi *work and
@@ -790,8 +791,12 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
     // not found (e.g. a live conversation before its first turn writes the file),
     // return the deterministic path so the live-session banner logic is preserved.
     const found = await findClaudeSessionFileById(sessionId);
-    return found ?? deterministic;
+    if (found) return found;
+    const discovered = await resolveDiscoveredSessionFile(conv);
+    return discovered ?? deterministic;
   }
+  const discovered = await resolveDiscoveredSessionFile(conv);
+  if (discovered) return discovered;
   // Neither the launcher nor the conversation record yields a session id. For a
   // live conversation this must never happen — scream so it gets attention
   // instead of silently rendering a wrong/empty transcript. The /messages route
@@ -802,6 +807,19 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
       `pinned in launcher.sh and no recorded claudeSessionId. The transcript panel cannot be trusted.`,
   );
   return null;
+}
+
+async function resolveDiscoveredSessionFile(conv: Conversation): Promise<string | null> {
+  const locator = conv.claudeSessionId;
+  if (!locator) return null;
+  const discovered = getDiscoveredSessionBySessionId(locator);
+  if (!discovered?.jsonlPath) return null;
+  try {
+    await stat(discovered.jsonlPath);
+    return discovered.jsonlPath;
+  } catch {
+    return null;
+  }
 }
 
 /**

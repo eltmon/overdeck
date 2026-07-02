@@ -351,6 +351,14 @@ export function getDiscoveredSessionByJsonlPath(jsonlPath: string): DiscoveredSe
   return row ? rowToSession(row) : null;
 }
 
+export function getDiscoveredSessionBySessionId(sessionId: string): DiscoveredSession | null {
+  const db = overdeckDb();
+  const row = db.prepare(
+    `SELECT * FROM discovered_sessions WHERE session_id = ? ORDER BY scanned_at DESC, id DESC LIMIT 1`,
+  ).get(sessionId) as Record<string, unknown> | undefined;
+  return row ? rowToSession(row) : null;
+}
+
 export function findDiscoveredSessionIds(filter: ConversationFilter = {}): number[] {
   const db = overdeckDb();
   const { where, params } = buildFilterSql(filter);
