@@ -223,12 +223,24 @@ export async function gcMergedSlots(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
+  // A freshly dispatched slot branch points at the feature branch HEAD, so
+  // `--merged HEAD` classifies it as merged before the agent's first commit.
+  // Without a liveness guard, gc destroys the worktree/branch/assignment under
+  // the live agent and the item redispatches at the next index — the engine of
+  // the PAN-1791 slot-index runaway. Never gc a slot whose session is alive.
+  const sessionNames = new Set(await deps.listSessionNames());
 
   for (const slot of slots) {
     if (slot.status !== 'merged') continue;
+
+    const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+    if (sessionNames.has(agentId)) {
+      actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
+      continue;
+    }
 
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;
     const slotBranch = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;

@@ -13,10 +13,11 @@ function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   };
 }
 
-function deps(): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment'> {
+function deps(sessionNames: string[] = []): Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'> {
   return {
     runGitCommand: vi.fn(async () => undefined),
     clearSlotAssignment: vi.fn(),
+    listSessionNames: vi.fn(async () => sessionNames),
   };
 }
 
@@ -64,6 +65,40 @@ describe('deacon-swarm merged slot GC', () => {
     expect(fakeDeps.runGitCommand).toHaveBeenCalledWith(
       'git branch -D "feature/pan-2203-slot-1"',
       '/repo/workspaces/feature-pan-2203',
+    );
+  });
+
+  it('never destroys a slot whose agent session is alive (fresh branch misdetected as merged)', async () => {
+    const fakeDeps = deps(['agent-pan-2203-slot-1']);
+
+    await expect(gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps))
+      .resolves.toEqual(['[swarm] gc skipped slot 1 (item wi-1) for PAN-2203: agent session alive']);
+
+    expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+  });
+
+  it('guards by conventional agent id when reconcile lost the agentId', async () => {
+    const fakeDeps = deps(['agent-pan-2203-slot-4']);
+
+    await expect(gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [
+      slot({ slotIndex: 4, itemId: 'wi-4', branch: 'feature/pan-2203-slot-4', agentId: undefined }),
+    ], fakeDeps)).resolves.toEqual(['[swarm] gc skipped slot 4 (item wi-4) for PAN-2203: agent session alive']);
+
+    expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
+  });
+
+  it('still gcs a merged slot whose session has ended', async () => {
+    const fakeDeps = deps(['agent-pan-2203-slot-9']);
+
+    await expect(gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [slot()], fakeDeps))
+      .resolves.toEqual(['[swarm] gc slot 1 (item wi-1) for PAN-2203']);
+
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalledWith(
+      '/repo/workspaces/feature-pan-2203',
+      'PAN-2203',
+      1,
+      'wi-1',
     );
   });
 });
