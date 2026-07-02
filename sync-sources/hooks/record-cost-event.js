@@ -27237,8 +27237,11 @@ function mergeConfigs(...configs) {
 			const legacyKeys = config.api_keys || {};
 			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
 			applyProviderHarness(result, "anthropic", anthropic.harness);
-			if (anthropic.enabled) result.enabledProviders.add("anthropic");
-			else if (providers.anthropic !== void 0) {
+			if (anthropic.enabled) {
+				result.enabledProviders.add("anthropic");
+				if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+				if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
+			} else if (providers.anthropic !== void 0) {
 				explicitlyDisabled.add("anthropic");
 				result.enabledProviders.delete("anthropic");
 			}
