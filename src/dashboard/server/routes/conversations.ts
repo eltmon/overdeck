@@ -113,7 +113,7 @@ import {
   type ControlCommand,
   type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
-import { getDiscoveredSessionBySessionId } from '../../../lib/overdeck/discovered-sessions.js';
+import { resolveDiscoveredSessionFile } from '../../../lib/conversations/discovered-session-file.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
  * module default when config is unavailable. */
@@ -748,38 +748,22 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
 }
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
-  // Pi writes its own JSONL transcript under the per-agent dir using a per-run
-  // timestamped filename (not into ~/.claude/projects/<dir>/<id>.jsonl). Pi
-  // *conversations* write into the agent's `sessions/` subdir, but Pi *work and
-  // review* agents write into the agent-dir ROOT (PAN-1908) — so we must check
-  // both. resolvePiSessionPath is the canonical resolver shared with the non-DB
-  // specialist fallback below; it checks both locations and skips the
-  // cost-events.jsonl / activity.jsonl sidecars.
+  // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
+  // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
     const piPath = await resolvePiSessionPath(conv.tmuxSession);
-    // If the ohmypi path resolves, use it. If not, fall through to the claude-code
-    // path — the harness field may be stale (agent was re-run under claude-code
-    // after the conversation record was created with harness='ohmypi').
+    // Fall through if the harness is stale from an earlier ohmypi run.
     if (piPath) return piPath;
   }
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
-  // The thread-id stored in codex-thread-id is the session identifier.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
     const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
     if (codexPath) return codexPath;
     // Fall through if codex path not found — same stale-harness recovery.
   }
-  // claude-code: the launcher pins `--session-id <id>` (or `--resume <id>`) — the
-  // EXACT session the live tmux pane runs. Resolving from that pinned id makes the
-  // Conversation tab match the Terminal tab by construction. We deliberately do
-  // NOT guess via a JSONL-mtime "freshest" heuristic: a conversation accumulates
-  // many session ids in its agent dir's sessions.json (transient relaunches,
-  // sub-sessions), and a compaction summary write-back to an OLD session's file
-  // bumps its mtime ahead of the live one — so the heuristic renders the wrong
-  // transcript while the terminal shows the right one (the reported mismatch bug).
-  // conv.claudeSessionId (the conversation_files-recorded canonical id, resolved at
-  // the read door) is the secondary for ended conversations whose launcher has been
-  // cleaned up — NOT a fall back to the old mtime heuristic.
+  // claude-code: prefer the launcher's pinned live session id, then the recorded
+  // canonical id. Do not guess from JSONL mtime; compaction can make old files
+  // newer than the terminal's current transcript.
   const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
   const sessionId = pinned ?? conv.claudeSessionId;
   if (sessionId) {
@@ -792,10 +776,10 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
     // return the deterministic path so the live-session banner logic is preserved.
     const found = await findClaudeSessionFileById(sessionId);
     if (found) return found;
-    const discovered = await resolveDiscoveredSessionFile(conv);
+    const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
     return discovered ?? deterministic;
   }
-  const discovered = await resolveDiscoveredSessionFile(conv);
+  const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
   if (discovered) return discovered;
   // Neither the launcher nor the conversation record yields a session id. For a
   // live conversation this must never happen — scream so it gets attention
@@ -807,19 +791,6 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
       `pinned in launcher.sh and no recorded claudeSessionId. The transcript panel cannot be trusted.`,
   );
   return null;
-}
-
-async function resolveDiscoveredSessionFile(conv: Conversation): Promise<string | null> {
-  const locator = conv.claudeSessionId;
-  if (!locator) return null;
-  const discovered = getDiscoveredSessionBySessionId(locator);
-  if (!discovered?.jsonlPath) return null;
-  try {
-    await stat(discovered.jsonlPath);
-    return discovered.jsonlPath;
-  } catch {
-    return null;
-  }
 }
 
 /**

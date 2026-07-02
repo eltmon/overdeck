@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T15:30:04.563Z",
+  "updated": "2026-07-02T20:30:08.887Z",
   "pipeline": {
     "issueId": "PAN-2224",
     "reviewStatus": "pending",
@@ -20,8 +20,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T15:30:04.529Z",
-    "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently."
+    "updatedAt": "2026-07-02T20:30:08.759Z",
+    "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2226"
   },
   "closeOut": {
     "usage": {
@@ -36,16 +37,16 @@
         },
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 953245,
-            "output": 41390,
-            "cacheRead": 4626432,
+            "input": 1089597,
+            "output": 69334,
+            "cacheRead": 5452288,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 24029,
-            "output": 444,
+            "input": 31176,
+            "output": 1841,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -67,32 +68,43 @@
           "cacheWrite": 172617
         },
         "openai/gpt-5.5": {
-          "input": 953245,
-          "output": 41390,
-          "cacheRead": 4626432,
+          "input": 1089597,
+          "output": 69334,
+          "cacheRead": 5452288,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 24029,
-          "output": 444,
+          "input": 31176,
+          "output": 1841,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.445008,
-        "pricingAsOf": "2026-07-02T15:30:04.562Z"
+        "usd": 19.378016,
+        "pricingAsOf": "2026-07-02T20:30:08.873Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2226"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
-    "scan-baseline": "pending"
+    "scan-baseline": "pending",
+    "harness-column": "running"
   },
   "swarm": {
-    "slotAssignments": []
+    "slotAssignments": [
+      {
+        "slotIndex": 2,
+        "itemId": "harness-column",
+        "agentId": "agent-pan-2224-slot-2",
+        "branch": "feature/pan-2224-slot-2",
+        "assignedAt": "2026-07-02T20:29:34.465Z"
+      }
+    ]
   }
 }

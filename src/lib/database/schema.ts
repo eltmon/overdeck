@@ -1,19 +1,9 @@
 /**
- * Overdeck Database Schema
- *
- * Defines the unified schema for panopticon.db.
- * All persistent application state lives here.
- *
- * PAN-1249: Schema migration steps still use raw try/catch because each
- * `ALTER TABLE` / `CREATE INDEX` may legitimately fail on a database that
- * already has the column/index, and the cleanest way to detect that is to
- * catch SQLite's "duplicate column"/"index exists" error. Collapsing those
- * into typed errors would be a semantic change, not a migration. The
- * DatabaseError tagged error is available via ./index.js for any future
- * non-migration code paths in this file. Full conversion to
- * @effect/sql-sqlite-bun is deferred to PAN-447.
+ * Overdeck database schema for panopticon.db.
+ * PAN-1249: migration steps still use raw try/catch because ALTER TABLE /
+ * CREATE INDEX may legitimately fail on duplicate columns/indexes; typed
+ * errors for non-migration paths remain deferred to PAN-447.
  */
-
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { SqliteDatabase } from './driver.js';
@@ -1649,8 +1639,8 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     `);
   }
 
-  // v57 → v58: record which harness produced each discovered session (PAN-2224)
-  if (currentVersion < 58) {
+  // v57 -> v58: record the harness that produced each discovered session.
+  if (currentVersion < 58 && db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'discovered_sessions'`).get()) {
     try { db.exec(`ALTER TABLE discovered_sessions ADD COLUMN harness TEXT`); } catch { /* already exists */ }
     db.exec(`UPDATE discovered_sessions SET harness = 'claude-code' WHERE harness IS NULL`);
   }
