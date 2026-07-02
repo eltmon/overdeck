@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 3 (2026-07-02) — MAIN GREEN; both red-main issues closed; PAN-2234 strike aborted → needs-handoff
+
+- **Main GREEN** (all recent runs success through `9dd2c6a422`). Both red-main issues **CLOSED with verification comments**: PAN-2217 (mock drift, `0e0cd31cf2`) and PAN-2218 (file-size trim, `b2a90b7516`, 960 lines).
+- **PAN-2172 (PR #2182) MERGED by the operator directly on GitHub (18:40, green).** Direct-forge merges strand `postMergeLifecycle`: issue still `in-progress`, record verdicts still pending, no verifying-on-main handoff. Surfaced close-out to operator. REUSABLE: an operator GitHub-UI merge under require_uat_before_merge leaves the runtime record stale — check `mergedBy` before diagnosing a pipeline wedge.
+- **PAN-2181 (PR #2183) now green + MERGEABLE/CLEAN** — the red-main inheritance cleared without a branch re-push. But its review had been dead since 06-29 under the NO_RESUME gate; restarted bare (`pan review restart PAN-2181`), convoy live.
+- **strike PAN-2234 ABORTED (correctly): full-pipeline-needed** — 392-line PRD, 4 work items / ~9 files, and it modifies the complete-planning promotion route (the plan-promotion door) = TENET-10 pipeline machinery. Labeled `needs-handoff` + objection comment; PRD ready at `.pan/drafts/PAN-2234.md`. Nothing implemented/pushed by the strike. LESSON: vet strike targets against BOTH size (strike = small isolated diff) AND TENET-10 before dispatch — a PRD-backed multi-subsystem feature is never strike-shaped.
+- **strike-pan-1935 is a LIVE gpt-5.5 session actively working** (resolving cost.ts rebase conflicts from the pi→ohmypi rename) — codex auth may have been restored by the operator; re-verify with `pan pi-auth status` next tick before changing the held-pickup posture.
+- PAN-2150 CLOSED (no redispatch needed). Cohort live: PAN-2151/2154 work, PAN-2156/2224/2181 review, PAN-2153 planning, PAN-1935 strike, PAN-2214 review+test (hands-off). Swap jumped to 5.7/8 GB (RAM 27.5/64) — noted for operator.
+
 ## RUN-53 tick 2 (2026-07-02) — trim landed; NO_RESUME boot is the redispatch root cause
 
 - **PAN-2218 trim LANDED** (`b2a90b7516` extracts flywheel start helpers to src/lib; flywheel.ts 1022→960). CI in_progress on it at tick end — conclusion check carried to tick 3 (short wakeup).
