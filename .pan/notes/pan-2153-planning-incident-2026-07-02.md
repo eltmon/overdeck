@@ -50,6 +50,32 @@ issue the briefing flagged as blocked). Likely the auto-commit chokes on it; thi
 also plausibly explains why the project-level continue mirror for pan-2153
 (`.pan/continues/pan-2153.vbrief.json`) never appeared on main.
 
+## Bug 5 — first `bd create` after bead-clear deterministically exceeds the 30s floor under bd contention (evening re-finalize, 22:00–22:16 UTC)
+
+Two consecutive `pan plan finalize` runs (22:02, 22:07 UTC) failed identically:
+`[beads] Cleared N existing beads` succeeded, then bead 1/3 hit
+`Failed to create "...": timed out after 30s`, title-based recovery found nothing,
+and beads 2/3 + 3/3 created fine — leaving a partial set (2 of 3 beads) with the
+`extract-shared -> extract-legacy-routes` dependency edge missing. The failure is
+NOT content-specific (all three beads have similar ~2.7KB descriptions) — bead 1
+pays a cold-start/contention cost the warm follow-ups don't. Concurrent load at the
+time: other agents running whole-DB `bd list --limit 0` scans (~19% CPU each).
+
+The adaptive timeout in `src/lib/vbrief/beads.ts` (`resolveBdTimeout`) floors at
+30s when the `bd ping --json` probe fails or reports low latency — the probe does
+not predict create-under-contention cost. Worse, the failed run leaves the issue
+in a corrupted intermediate state (cleared-then-partial beads).
+
+**Workaround that worked:** `OVERDECK_BD_TIMEOUT_MS=180000 pan plan finalize`
+(22:13 UTC) — all 3 beads created, spec set to proposed. Fix shape: don't floor
+the operational timeout at 30s for the FIRST create after a clear (or retry the
+first create once with the ceiling), and make bead materialization transactional
+so a timeout can't leave a partial set.
+
+Also reconfirmed tonight: Bug 3 (CLI `complete-planning timed out after 90s` while
+the server handler landed the spec + 3 beads at 22:16:59Z) and Bug 2-adjacent
+duplicate pairs (`CALLED for PAN-2222 (skipKill=false)` twice in adjacent log lines).
+
 ## Environment notes
 
 - Dashboard restarted 5x via systemd-user SIGTERM during the window; one restart
