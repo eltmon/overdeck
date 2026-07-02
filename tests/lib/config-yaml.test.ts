@@ -207,6 +207,94 @@ api_keys:
       );
     });
 
+    it('defaults tiered execution off when the block is absent', () => {
+      const { config } = mergeConfigs({});
+
+      expect(config.tieredExecution.enabled).toBe(false);
+      expect(config.tieredExecution.replay_threshold).toBe(0.5);
+      expect(config.tieredExecution.tiers).toEqual({});
+    });
+
+    it('loads and validates a complete tiered execution block', () => {
+      const { config } = mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          replay_threshold: 0.75,
+          tiers: {
+            cheap: {
+              model: 'claude-haiku-4-5',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple'],
+            },
+            standard: {
+              model: 'claude-sonnet-4-6',
+              harness: 'claude-code',
+              difficulties: ['medium', 'complex'],
+            },
+            premium: {
+              model: 'claude-opus-4-7',
+              harness: 'claude-code',
+              difficulties: ['expert'],
+            },
+          },
+          supervisor: {
+            model: 'claude-opus-4-7',
+            harness: 'claude-code',
+            subscribe: 'sampled',
+          },
+        },
+      });
+
+      expect(config.tieredExecution.enabled).toBe(true);
+      expect(config.tieredExecution.replay_threshold).toBe(0.75);
+      expect('difficultyToTier' in config.tieredExecution ? config.tieredExecution.difficultyToTier : undefined).toEqual({
+        trivial: 'cheap',
+        simple: 'cheap',
+        medium: 'standard',
+        complex: 'standard',
+        expert: 'premium',
+      });
+      expect(config.tieredExecution.supervisor).toEqual({
+        model: 'claude-opus-4-7',
+        harness: 'claude-code',
+        subscribe: 'sampled',
+      });
+    });
+
+    it('rejects tiered execution blocks with unknown models, unknown harnesses, or blocked policy', () => {
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          tiers: {
+            cheap: { model: 'not-a-model', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] },
+          },
+          supervisor: { model: 'claude-opus-4-7', harness: 'claude-code', subscribe: 'all' },
+        },
+      })).toThrow('tiered_execution.tiers.cheap.model unknown model: not-a-model');
+
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'bad' as never, difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] },
+          },
+          supervisor: { model: 'claude-opus-4-7', harness: 'claude-code', subscribe: 'all' },
+        },
+      })).toThrow('tiered_execution.tiers.cheap.harness must be claude-code, ohmypi, codex');
+
+      expect(() => mergeConfigs({
+        models: {
+          providers: {
+            anthropic: { enabled: true, auth: 'subscription' },
+          },
+        },
+        tiered_execution: {
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'ohmypi', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] },
+          },
+          supervisor: { model: 'claude-opus-4-7', harness: 'claude-code', subscribe: 'all' },
+        },
+      })).toThrow('ohmypi cannot run Anthropic models when authenticated via Claude Code subscription');
+    });
+
     it('normalizes low-cost registry classification config', () => {
       expect(mergeConfigs().config.registry.classification).toEqual({
         enabled: true,
