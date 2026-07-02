@@ -33,6 +33,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
+import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 
 import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -42,7 +43,7 @@ import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlanSync, readPlan } from '../../../lib/vbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../../../lib/vbrief/quality-lint.js';
 import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
-import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
+import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
@@ -110,8 +111,20 @@ export interface CompletePlanningAutoSpawnResult {
   workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'spawn-failed';
 }
 
-type CompletePlanningPhase = 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
+type CompletePlanningPhase = 'prdGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+const completePlanningGuard = createInFlightGuard();
+
+export function beginCompletePlanningLease(issueId: string): { started: boolean; release: () => void } {
+  const key = issueId.toLowerCase();
+  let release!: () => void;
+  const lease = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = completePlanningGuard.run(key, () => lease);
+  return { started, release: started ? release : () => undefined };
+}
 
 function emitCompletePlanningPhase(
   issueId: string,
@@ -1294,6 +1307,10 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // `pan plan finalize`. An explicit body value always wins.
     const bodyAutoSpawn = (body as any)?.autoSpawn;
     const autoSpawn = resolveAutoSpawnOnFinalize(bodyAutoSpawn, id);
+    // PRD-first gate bypass (PAN-2234): `--no-prd` from `pan plan finalize` /
+    // `pan plan done` propagates here as body.noPrd. The dashboard Done button
+    // never sets it, so a manual Done still requires a qualifying PRD draft.
+    const noPrd = (body as any)?.noPrd === true;
     // The origin gate guards the cross-process CLI caller, which sets autoSpawn
     // explicitly in the body and carries a trusted Origin. A flag-derived
     // autoSpawn comes from the same dashboard finalize request the operator
@@ -1306,10 +1323,21 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     }
     const sessionName = `planning-${id.toLowerCase()}`;
     const issueLower = id.toLowerCase();
+    const completePlanningLease = beginCompletePlanningLease(id);
+    if (!completePlanningLease.started) {
+      console.log(`[complete-planning] ${id} already has an in-flight finalize; returning in-flight status`);
+      return jsonResponse({
+        success: true,
+        issueId: id,
+        inFlight: true,
+        message: 'Planning completion is already in progress for this issue',
+      }, { status: 202 });
+    }
 
-    console.log(autoSpawn
-      ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
-      : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
+    try {
+      console.log(autoSpawn
+        ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
+        : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
 
     // A planning agent waiting for an operator answer is NOT done. Real callers
     // are pan plan finalize, pan plan done, the PlanDialog Done button, and the
@@ -1377,6 +1405,20 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
     if (workspacePath) {
+      // PRD-first gate (PAN-2234): refuse promotion without a non-trivial PRD
+      // draft. Runs before the vBRIEF quality-lint pre-check so a missing PRD
+      // short-circuits before any spec read. noPrd bypass is loud (phase event).
+      if (noPrd) {
+        emitCompletePlanningPhase(id, 'prdGate', 'skipped', 'noPrd bypass requested');
+      } else {
+        const prdGate = checkPrdGateSync({ projectRoot: projectPath || null, workspacePath, issueId: id });
+        if (!prdGate.ok) {
+          emitCompletePlanningPhase(id, 'prdGate', 'failure', prdGate.reason ?? 'missing', { prdGate });
+          return jsonResponse({ error: `PRD-first gate: no PRD draft for ${id.toUpperCase()}`, prdGate }, { status: 422 });
+        }
+        emitCompletePlanningPhase(id, 'prdGate', 'success', `found ${prdGate.path} (${prdGate.lineCount} lines)`);
+      }
+
       const workspacePlanPath = yield* Effect.promise(async () =>
         (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath))) ?? (await Effect.runPromise(findPlan(workspacePath)))
       );
@@ -1563,19 +1605,22 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
     });
 
-    return jsonResponse({
-      success: true,
-      issueId: id,
-      newState,
-      gitPushed,
-      ...(beadsWarning ? { beadsWarning } : {}),
-      ...(autoSpawnResult ?? {}),
-      message: autoSpawnResult?.workAgentSpawned
-        ? 'Planning complete and work agent spawn requested'
-        : gitPushed
-          ? 'Planning complete and pushed to git - ready for execution'
-          : 'Planning complete - ready for execution',
-    });
+      return jsonResponse({
+        success: true,
+        issueId: id,
+        newState,
+        gitPushed,
+        ...(beadsWarning ? { beadsWarning } : {}),
+        ...(autoSpawnResult ?? {}),
+        message: autoSpawnResult?.workAgentSpawned
+          ? 'Planning complete and work agent spawn requested'
+          : gitPushed
+            ? 'Planning complete and pushed to git - ready for execution'
+            : 'Planning complete - ready for execution',
+      });
+    } finally {
+      completePlanningLease.release();
+    }
   })),
 );
 
