@@ -42,6 +42,14 @@ describe('resolveTier', () => {
     expect(resolved).toEqual({ tierName: 'cheap', model: 'claude-haiku-4-5', harness: 'claude-code' });
   });
 
+  it('defaults omitted kind to backend before byKind routing', () => {
+    const resolved = resolveTier(
+      { id: 'item-backend', title: 't', metadata: { difficulty: 'expert' } },
+      { ...CONFIG, byKind: { backend: 'standard' } },
+    );
+    expect(resolved).toEqual({ tierName: 'standard', model: 'claude-sonnet-4-6', harness: 'claude-code' });
+  });
+
   it('routes by difficulty to the tier whose difficulties contain it', () => {
     const resolved = resolveTier(
       { id: 'item-3', title: 't', metadata: { difficulty: 'medium' } },

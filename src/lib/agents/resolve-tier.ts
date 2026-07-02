@@ -1,5 +1,5 @@
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefDifficulty, VBriefItem, VBriefItemKind } from '../vbrief/types.js';
+import { resolveVBriefItemKind, type VBriefDifficulty, type VBriefItem, type VBriefItemKind } from '../vbrief/types.js';
 import type { TierDefinition } from './tier-table.js';
 
 /**
@@ -81,8 +81,8 @@ function resolveBaseTier(
   item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
   config: ResolveTierConfig,
 ): ResolvedTier | undefined {
-  const kind = item.metadata?.kind;
-  const kindTierName = kind ? config.byKind?.[kind] : undefined;
+  const kind = resolveVBriefItemKind(item.metadata);
+  const kindTierName = config.byKind?.[kind];
   if (kindTierName) {
     return lookupTier(config, kindTierName, `byKind['${kind}']`, item);
   }
