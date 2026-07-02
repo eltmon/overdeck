@@ -87,6 +87,30 @@ This was the final allowed verification attempt. The work agent is paused so it 
 An operator needs to inspect ${issueId}, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically.`;
 }
 
+function setStateDerivedVerificationFailure(
+  issueId: string,
+  failedCheck: string,
+  summary: string,
+  cycleCount: number,
+  currentStatus: ReturnType<typeof getReviewStatusSync> | null | undefined,
+): void {
+  setReviewStatusSync(issueId, {
+    verificationStatus: 'failed',
+    verificationNotes: summary,
+    verificationCycleCount: cycleCount,
+    verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+  });
+
+  if (currentStatus?.reviewStatus !== 'passed') return;
+
+  markWorkspaceStuck(issueId, 'state_derived_verification_hold', {
+    failedCheck,
+    summary,
+    reviewStatus: currentStatus.reviewStatus,
+  });
+  console.warn(`[verification-runner] ${issueId} review is passed but held by state-derived gate ${failedCheck}: ${summary}`);
+}
+
 async function escalateVerificationStuck(
   issueId: string,
   failedCheck: string,
@@ -517,13 +541,7 @@ async function runVerificationForIssuePromise(
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
         const summary = `vBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'pending',
-          verificationStatus: 'failed',
-          verificationNotes: summary,
-          verificationCycleCount: newCycleCount,
-          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-        });
+        setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
         if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
@@ -570,13 +588,7 @@ async function runVerificationForIssuePromise(
         .join('\n\n');
       const summary = `Acceptance criteria check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} AC incomplete:\n\n${incompleteList}`;
 
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        verificationStatus: 'failed',
-        verificationNotes: summary,
-        verificationCycleCount: newCycleCount,
-        verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-      });
+      setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
       if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
