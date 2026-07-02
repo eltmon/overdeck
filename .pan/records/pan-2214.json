@@ -1,21 +1,95 @@
 {
   "issueId": "PAN-2214",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-07-02T06:17:57.564Z",
-  "updated": "2026-07-02T06:17:57.564Z",
+  "updated": "2026-07-02T19:42:41.269Z",
   "pipeline": {
     "issueId": "PAN-2214",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T06:17:57.564Z"
+    "updatedAt": "2026-07-02T19:42:40.412Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2221",
+    "lastVerifiedCommit": "1d26189af071831fafe39586fdbde7dc78865806"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 4884,
+            "output": 86440,
+            "cacheRead": 82363669,
+            "cacheWrite": 1862887
+          }
+        },
+        "inspect-deep": {
+          "anthropic/claude-fable-5": {
+            "input": 13861,
+            "output": 4520,
+            "cacheRead": 382516,
+            "cacheWrite": 90407
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 69216,
+            "output": 3435,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 47821,
+            "output": 109094,
+            "cacheRead": 13035234,
+            "cacheWrite": 674657
+          }
+        },
+        "review": {
+          "anthropic/claude-fable-5": {
+            "input": 61004,
+            "output": 81328,
+            "cacheRead": 10080844,
+            "cacheWrite": 2197838
+          }
+        },
+        "work": {
+          "anthropic/claude-fable-5": {
+            "input": 56168,
+            "output": 204378,
+            "cacheRead": 67914272,
+            "cacheWrite": 785381
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 183738,
+          "output": 485760,
+          "cacheRead": 173776535,
+          "cacheWrite": 5611170
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 69216,
+          "output": 3435,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 270.041648,
+        "pricingAsOf": "2026-07-02T19:42:40.783Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2221"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
