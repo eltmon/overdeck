@@ -23,28 +23,44 @@
   ],
   "feedback": [],
   "created": "2026-06-30T01:25:48.391Z",
-  "updated": "2026-07-02T21:54:30.647Z",
+  "updated": "2026-07-02T23:40:05.697Z",
   "pipeline": {
     "issueId": "PAN-2153",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T19:29:10.616Z"
+    "updatedAt": "2026-07-02T23:40:05.622Z",
+    "inspectNotes": "workspace-zou59: spec fidelity passed; helper/foundation block moved into src/dashboard/server/routes/specialists/shared.ts, required symbols exported, barrel re-exports preserved, import depth correct, and no CLAUDE/PRD constraints violated."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 100802,
+            "output": 15657,
+            "cacheRead": 1481216,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 29987,
-            "output": 3755,
+            "input": 98249,
+            "output": 5557,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 40786,
+            "output": 81148,
+            "cacheRead": 23881513,
+            "cacheWrite": 547274
+          },
           "anthropic/claude-opus-4-8": {
             "input": 39061,
             "output": 140583,
@@ -54,11 +70,23 @@
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 100802,
+          "output": 15657,
+          "cacheRead": 1481216,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 29987,
-          "output": 3755,
+          "input": 98249,
+          "output": 5557,
           "cacheRead": 0,
           "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 40786,
+          "output": 81148,
+          "cacheRead": 23881513,
+          "cacheWrite": 547274
         },
         "anthropic/claude-opus-4-8": {
           "input": 39061,
@@ -68,13 +96,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 14.326999,
-        "pricingAsOf": "2026-07-02T19:29:10.634Z"
+        "usd": 51.22906,
+        "pricingAsOf": "2026-07-02T23:40:05.671Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "gpt-5.5"
 }
