@@ -56,8 +56,8 @@ import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import { getClaudePermissionFlagsStringSync } from '../../../lib/claude-permissions.js';
-import { listProjectsSync, resolveProjectFromIssueSync, findProjectByTeamSync, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
-import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
+import { listProjectsSync, findProjectByTeamSync, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
+import { getLinearApiKey, getRallyConfig } from '../services/tracker-config.js';
 import {
   getLinearApiKey as getLinearApiKeyShared,
   getGitHubConfig as getGitHubConfigShared,
@@ -66,7 +66,6 @@ import {
 import { loadConfigSync as loadYamlConfig, isTldrEnabledSync, resolveModel } from '../../../lib/config-yaml.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealth, determineHealthStatus } from '../../lib/health-filtering.js';
-import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { findPlan, readPlan } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
@@ -84,124 +83,27 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.j
 import { getAgentStateFilePath } from '../../../lib/agents.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 import { bootReconciliationRouteLayer } from './boot-reconciliation.js';
+import {
+  getGitHubLocalPaths,
+  getOverdeckVersion,
+  getProjectMappings,
+  getProjectPath,
+  isGitHubIssue,
+  overdeckDevMode,
+  type ProjectMapping,
+  readJsonBody,
+  saveProjectMappings,
+} from './misc/shared.js';
+
+export { readPackageVersion } from './misc/shared.js';
 
 const execAsync = promisify(exec);
-
-// ─── Package version ──────────────────────────────────────────────────────────
-
-export async function readPackageVersion(): Promise<string> {
-  // Walk up from the running script to find the nearest package.json.
-  // Works for both source (src/dashboard/server/routes/) and bundled (dist/dashboard/) layouts.
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 8; i++) {
-    const candidate = join(dir, 'package.json');
-    try {
-      return JSON.parse(await readFile(candidate, 'utf-8')).version;
-    } catch { /* try parent */ }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return '0.0.0';
-}
-
-// Lazy-initialized to avoid top-level await (which would make misc.ts an async ESM module,
-// risking ERR_REQUIRE_ASYNC_MODULE for any module that require()-chains through here).
-let _overdeckVersion: string | null = null;
-async function getOverdeckVersion(): Promise<string> {
-  if (_overdeckVersion === null) {
-    _overdeckVersion = await readPackageVersion();
-  }
-  return _overdeckVersion;
-}
-
-// Dev mode: true when running from the repo checkout (src/ directory exists)
-const overdeckDevMode: boolean = (() => {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 8; i++) {
-    if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
-      return true;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return false;
-})();
 
 // ─── IssueDataService singleton (for cache-status) ───────────────────────────
 
 function getIssueDataService(): IssueDataService {
   const { getSharedIssueService } = require('../services/issue-service-singleton.js');
   return getSharedIssueService();
-}
-
-// ─── Project mappings helpers ─────────────────────────────────────────────────
-
-const PROJECT_MAPPINGS_FILE = join(homedir(), '.overdeck', 'project-mappings.json');
-
-interface ProjectMapping {
-  linearProjectId: string;
-  linearProjectName: string;
-  linearPrefix: string;
-  localPath: string;
-}
-
-async function getProjectMappings(): Promise<ProjectMapping[]> {
-  try {
-    const content = await readFile(PROJECT_MAPPINGS_FILE, 'utf-8');
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
-}
-
-async function saveProjectMappings(mappings: ProjectMapping[]): Promise<void> {
-  const dir = join(homedir(), '.overdeck');
-  await mkdir(dir, { recursive: true });
-  await writeFile(PROJECT_MAPPINGS_FILE, JSON.stringify(mappings, null, 2));
-}
-
-// ─── Project path helper ──────────────────────────────────────────────────────
-
-async function getProjectPath(issuePrefix?: string): Promise<string> {
-  if (issuePrefix) {
-    const issueId = `${issuePrefix}-1`;
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (resolved) return resolved.projectPath;
-    const mappings = await getProjectMappings();
-    const mapping = mappings.find(m => m.linearPrefix === issuePrefix);
-    if (mapping) return mapping.localPath;
-  }
-  return homedir();
-}
-
-// ─── GitHub issue helper ──────────────────────────────────────────────────────
-
-function isGitHubIssue(issueId: string): {
-  isGitHub: boolean;
-  owner?: string;
-  repo?: string;
-  number?: number;
-} {
-  const resolved = resolveGitHubIssueShared(issueId);
-  if (resolved.isGitHub) {
-    return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
-  }
-  return { isGitHub: false };
-}
-
-function getGitHubLocalPaths(): Record<string, string> {
-  const ghConfig = getGitHubConfig();
-  if (!ghConfig) return {};
-  const out: Record<string, string> = {};
-  for (const r of ghConfig.repos) {
-    const localPath = (r as { localPath?: unknown }).localPath;
-    if (typeof localPath === 'string') {
-      out[`${r.owner}/${r.repo}`] = localPath;
-    }
-  }
-  return out;
 }
 
 // ─── Pending confirmations store ─────────────────────────────────────────────
@@ -308,18 +210,6 @@ async function getIndexStats(
     return {};
   }
 }
-
-// ─── Shared body reader ───────────────────────────────────────────────────────
-
-const readJsonBody = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const text = yield* request.text;
-  try {
-    return text ? (JSON.parse(text) as unknown) : {};
-  } catch {
-    return {} as unknown;
-  }
-});
 
 // ─── Route: POST /api/trackers/refresh ───────────────────────────────────────
 
