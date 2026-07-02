@@ -11,6 +11,8 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG, normalizeTieredExecutionConfig, validateTieredExecutionConfig } from '../agents/tier-table.js';
 
 const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
@@ -278,6 +280,7 @@ export interface CloisterConfig {
   retention?: RetentionConfig;
   close_out?: CloseOutConfig;
   orphanProposedReconciler?: OrphanProposedReconcilerConfig;
+  tiered_execution?: TieredExecutionConfig;
 }
 
 /**
@@ -412,6 +415,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     enabled: true,
     minAttemptIntervalMs: 5 * 60 * 1000,
   },
+  tiered_execution: {
+    ...DEFAULT_TIERED_EXECUTION_CONFIG,
+    supervisor: { ...DEFAULT_TIERED_EXECUTION_CONFIG.supervisor },
+  },
 };
 
 /**
@@ -473,6 +480,9 @@ export function loadCloisterConfigSync(): CloisterConfig {
 
       // Deep merge with defaults
       config = deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
+      config.tiered_execution = parsed.tiered_execution !== undefined
+        ? validateTieredExecutionConfig(config.tiered_execution)
+        : normalizeTieredExecutionConfig(config.tiered_execution);
     } catch (error) {
       console.error('Failed to load Cloister config:', error);
       console.error('Using default configuration');
@@ -582,6 +592,9 @@ export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | Co
         try {
           const parsed = parse(content) as unknown as Partial<CloisterConfig>;
           config = deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
+          config.tiered_execution = parsed.tiered_execution !== undefined
+            ? validateTieredExecutionConfig(config.tiered_execution)
+            : normalizeTieredExecutionConfig(config.tiered_execution);
         } catch (error) {
           console.error('Failed to parse Cloister config:', error);
           console.error('Using default configuration');

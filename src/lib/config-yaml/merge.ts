@@ -5,6 +5,7 @@ import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { DEFAULT_CONFIG } from './defaults.js';
+import { normalizeTieredExecutionConfig, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
   cloneDocsConfig,
@@ -124,6 +125,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     rtk: {
       enabled: DEFAULT_CONFIG.rtk.enabled,
     },
+    tieredExecution: {
+      ...DEFAULT_CONFIG.tieredExecution,
+      tiers: { ...DEFAULT_CONFIG.tieredExecution.tiers },
+      supervisor: { ...DEFAULT_CONFIG.tieredExecution.supervisor },
+    },
     docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
     conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
     tts: {
@@ -176,6 +182,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   const validConfigs = configs.filter((c): c is YamlConfig => c !== null);
 
   // Merge in reverse order (lowest precedence first)
+  let sawTieredExecutionConfig = false;
   for (const config of validConfigs.reverse()) {
     // Merge providers
     if (config.models?.providers) {
@@ -187,6 +194,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
+        if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+        if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
       } else if (providers.anthropic !== undefined) {
         explicitlyDisabled.add('anthropic');
         result.enabledProviders.delete('anthropic');
@@ -525,6 +534,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge TLDR configuration
     mergeTldrConfig(result.tldr, config);
 
+    if (config.tiered_execution !== undefined) {
+      sawTieredExecutionConfig = true;
+      result.tieredExecution = normalizeTieredExecutionConfig(config.tiered_execution);
+    }
+
     // Merge docs RAG configuration
     mergeDocsConfig(result.docs, config);
 
@@ -626,6 +640,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   }
 
   validateRoleModelRefs(result);
+  if (sawTieredExecutionConfig) {
+    result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, {
+      providerAuth: result.providerAuth,
+    });
+  }
 
   return { config: result, explicitlyDisabled };
 }

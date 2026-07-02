@@ -194,6 +194,112 @@ api_keys:
       ).toBe(false);
     });
 
+    it('defaults tiered execution off when the block is omitted', () => {
+      expect(mergeConfigs().config.tieredExecution).toMatchObject({
+        enabled: false,
+        replay_threshold: 0.5,
+        tiers: {},
+        supervisor: {
+          model: '',
+          harness: 'claude-code',
+          subscribe: 'flagged',
+        },
+      });
+    });
+
+    it('loads and validates tiered execution config', () => {
+      const { config } = mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            cheap: {
+              model: 'claude-haiku-4-5',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple'],
+            },
+            standard: {
+              model: 'claude-sonnet-4-6',
+              harness: 'claude-code',
+              difficulties: ['medium', 'complex'],
+            },
+            premium: {
+              model: 'claude-opus-4-6',
+              harness: 'claude-code',
+              difficulties: ['expert'],
+            },
+          },
+          supervisor: {
+            model: 'claude-sonnet-4-6',
+            harness: 'claude-code',
+            subscribe: 'all',
+          },
+        },
+      });
+
+      expect(config.tieredExecution).toMatchObject({
+        enabled: true,
+        replay_threshold: 0.5,
+        difficultyToTier: {
+          trivial: 'cheap',
+          simple: 'cheap',
+          medium: 'standard',
+          complex: 'standard',
+          expert: 'premium',
+        },
+        supervisor: {
+          model: 'claude-sonnet-4-6',
+          harness: 'claude-code',
+          subscribe: 'all',
+        },
+      });
+    });
+
+    it('rejects invalid tiered execution config while merging config.yaml', () => {
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          tiers: {
+            cheap: {
+              model: 'not-a-model',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple'],
+            },
+          },
+        },
+      })).toThrow('tiered_execution.tiers.cheap.model is unknown: not-a-model');
+
+      expect(() => mergeConfigs({
+        models: {
+          providers: {
+            anthropic: { enabled: true, auth: 'subscription' },
+          },
+        },
+        tiered_execution: {
+          tiers: {
+            cheap: {
+              model: 'claude-haiku-4-5',
+              harness: 'ohmypi',
+              difficulties: ['trivial', 'simple'],
+            },
+            standard: {
+              model: 'claude-sonnet-4-6',
+              harness: 'claude-code',
+              difficulties: ['medium', 'complex'],
+            },
+            premium: {
+              model: 'claude-opus-4-6',
+              harness: 'claude-code',
+              difficulties: ['expert'],
+            },
+          },
+          supervisor: {
+            model: 'claude-sonnet-4-6',
+            harness: 'claude-code',
+            subscribe: 'flagged',
+          },
+        },
+      })).toThrow('ohmypi cannot run Anthropic models');
+    });
+
     it('normalizes compliance mode with advisory as the default', () => {
       expect(mergeConfigs().config.compliance.mode).toBe('advisory');
       expect(mergeConfigs({ compliance: { mode: 'off' } }).config.compliance.mode).toBe('off');

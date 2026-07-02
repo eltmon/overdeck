@@ -5,6 +5,11 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
+import type {
+  TieredExecutionConfig,
+  TieredExecutionConfigInput,
+  ValidatedTieredExecutionConfig,
+} from '../agents/tier-table.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -478,6 +483,9 @@ export interface YamlConfig {
     tldr?: TldrConfig;
   };
 
+  /** Difficulty-routed tier table for standing work agents and supervisor review. */
+  tiered_execution?: TieredExecutionConfigInput;
+
   /** TTS configuration */
   tts?: TtsDaemonConfig & {
     summarizer?: TtsSummarizerConfig;
@@ -791,6 +799,9 @@ export interface NormalizedConfig {
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */
   remote?: NormalizedRemoteConfig;
+
+  /** Difficulty-routed tier table, default-off when omitted. */
+  tieredExecution: TieredExecutionConfig | ValidatedTieredExecutionConfig;
 }
 
 /**
