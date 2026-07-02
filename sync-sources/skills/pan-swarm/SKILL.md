@@ -28,3 +28,16 @@ pan swarm recover PAN-2203 1 --action retry
 ```
 
 Use `--action retry` to unblock and redispatch the failed item, `--action drop` to mark the item done after operator review, or `--action handoff` to keep the failed slot blocked for manual resolution.
+
+## Freeze and Resume Coordination
+
+Run:
+
+```bash
+pan swarm freeze PAN-2203 --reason "investigating slot churn"
+pan swarm resume PAN-2203
+```
+
+`pan swarm freeze` places a per-issue operator hold: the Deacon skips all swarm coordination for the issue — no slot reconciliation, merging, garbage collection, or new dispatch — until the hold is lifted. Slot agents that are already running keep running. `--reason <text>` records why the hold was placed.
+
+`pan swarm resume` lifts the hold; coordination picks the issue back up on the next Deacon patrol cycle. Both commands are idempotent: freezing an already-frozen issue or resuming an unfrozen issue succeeds with an "already" notice.

@@ -15,6 +15,8 @@ import {
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
+import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
 
@@ -43,6 +45,24 @@ export interface SwarmCommandResult {
 export interface SwarmRecoverOptions {
   action?: SwarmRecoveryAction;
 }
+
+export interface SwarmFreezeOptions {
+  reason?: string;
+}
+
+export interface SwarmHoldCommandDeps {
+  getReviewStatusSync: typeof getReviewStatusSync;
+  setDeaconIgnored: typeof setDeaconIgnored;
+  appendOperatorInterventionEvent: typeof appendOperatorInterventionEvent;
+  console: ConsoleLike;
+}
+
+const defaultHoldDeps: SwarmHoldCommandDeps = {
+  getReviewStatusSync,
+  setDeaconIgnored,
+  appendOperatorInterventionEvent,
+  console,
+};
 
 const defaultDeps: SwarmCommandDeps = {
   resolveProjectFromIssueSync,
@@ -136,6 +156,67 @@ export async function swarmRecoverCommand(
   return { ok: true, actions, workspacePath };
 }
 
+export async function swarmFreezeCommand(
+  issueId: string,
+  options: SwarmFreezeOptions = {},
+  deps: SwarmHoldCommandDeps = defaultHoldDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const status = safeGetReviewStatus(issue, deps);
+  if (status?.deaconIgnored) {
+    deps.console.log(chalk.yellow(
+      `${issue} is already frozen — the Deacon is already skipping all swarm coordination for it. `
+      + `Run \`pan swarm resume ${issue}\` to lift the hold.`,
+    ));
+    return { ok: true };
+  }
+
+  deps.setDeaconIgnored(issue, true, options.reason ?? 'swarm freeze via pan swarm freeze');
+  await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'pause', source: 'pan swarm freeze' });
+  deps.console.log(chalk.green(`Froze swarm coordination for ${issue}.`));
+  deps.console.log(
+    `The Deacon will now skip all swarm coordination for ${issue} on every patrol — no slot reconciliation, `
+    + `no slot merging, no slot garbage collection, and no new slot dispatch will run for this issue until you run `
+    + `\`pan swarm resume ${issue}\`. Slot agents that are already running keep running; freeze only stops the `
+    + 'Deacon from acting on the issue.',
+  );
+  return { ok: true };
+}
+
+export async function swarmResumeCommand(
+  issueId: string,
+  deps: SwarmHoldCommandDeps = defaultHoldDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const status = safeGetReviewStatus(issue, deps);
+  if (!status?.deaconIgnored) {
+    deps.console.log(chalk.yellow(
+      `${issue} is already resumed — no swarm freeze is set, so the Deacon is coordinating it normally.`,
+    ));
+    return { ok: true };
+  }
+
+  deps.setDeaconIgnored(issue, false);
+  await deps.appendOperatorInterventionEvent({ issueId: issue, kind: 'unpause', source: 'pan swarm resume' });
+  deps.console.log(chalk.green(`Resumed swarm coordination for ${issue}.`));
+  deps.console.log(
+    `The freeze on ${issue} is lifted — the Deacon will pick this issue back up on its next patrol cycle and `
+    + 'resume slot reconciliation, merging, garbage collection, and dispatch.',
+  );
+  return { ok: true };
+}
+
+function safeGetReviewStatus(
+  issueId: string,
+  deps: Pick<SwarmHoldCommandDeps, 'getReviewStatusSync'>,
+): ReturnType<typeof getReviewStatusSync> {
+  try {
+    return deps.getReviewStatusSync(issueId);
+  } catch {
+    return null;
+  }
+}
+
 export function registerSwarmCommands(program: Command): void {
   const swarm = program
     .command('swarm <id>')
@@ -151,6 +232,23 @@ export function registerSwarmCommands(program: Command): void {
     .option('--action <action>', 'Recovery action: retry, drop, or handoff', 'retry')
     .action(async (id: string, slotIndex: string, options: SwarmRecoverOptions) => {
       const result = await swarmRecoverCommand(id, slotIndex, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('freeze <id>')
+    .description('Freeze swarm coordination for an issue: the Deacon skips it until resume')
+    .option('--reason <text>', 'Reason recorded on the hold')
+    .action(async (id: string, options: SwarmFreezeOptions) => {
+      const result = await swarmFreezeCommand(id, options);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('resume <id>')
+    .description('Resume swarm coordination for a frozen issue on the next Deacon patrol')
+    .action(async (id: string) => {
+      const result = await swarmResumeCommand(id);
       if (!result.ok) process.exitCode = 1;
     });
 }
