@@ -153,6 +153,7 @@
   "src/lib/workspace-manager/create.ts",
   "src/lib/workspace-manager/docker.ts",
   "src/lib/workspace-manager/migration.ts",
+  "src/lib/workspace-manager/remove.ts",
   "src/lib/workspace-manager/repos.ts",
   "src/lib/workspace-manager.ts",
   "src/lib/workspace/devcontainer-renderer.ts",
