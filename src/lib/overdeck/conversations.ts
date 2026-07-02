@@ -673,6 +673,7 @@ export interface ArchivedConversationWithEnrichment {
   issueId: string | null;
   createdAt: string;
   claudeSessionId: string | null;
+  harness: RuntimeName | null;
   title: string | null;
   totalCost: number;
   archivedAt: string;
@@ -1099,6 +1100,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
       c.cwd,
       c.issue_id,
       c.created_at,
+      c.harness,
       (
         SELECT cf.locator FROM conversation_files cf
         WHERE cf.conversation_id = c.id
@@ -1138,7 +1140,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
 
   type RawRow = {
     legacy_id: number; uuid: string; name: string; cwd: string; issue_id: string | null;
-    created_at: number; claude_session_id: string | null; title: string | null;
+    created_at: number; harness: string | null; claude_session_id: string | null; title: string | null;
     total_cost: number | null; archived_at: number | null; model: string | null;
     discovered_jsonl_path: string | null; discovered_workspace_path: string | null;
     message_count: number | null; first_ts: number | null; last_ts: number | null;
@@ -1157,6 +1159,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
     issueId: r.issue_id ?? null,
     createdAt: toIso(r.created_at) ?? new Date(0).toISOString(),
     claudeSessionId: r.claude_session_id ?? null,
+    harness: normalizeHarness(r.harness),
     title: r.title ?? null,
     totalCost: r.total_cost ?? 0,
     archivedAt: toIso(r.archived_at) ?? toIso(r.created_at) ?? new Date(0).toISOString(),
