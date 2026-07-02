@@ -1,22 +1,47 @@
 {
   "issueId": "PAN-2172",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-30T20:17:55.813Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-30T22:12:50.201Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-01T00:11:24.410Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T05:41:58.092Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-07-02T06:59:05.072Z"
+    }
+  ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "pipeline": {
     "issueId": "PAN-2172",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T22:05:28.874Z",
-    "inspectNotes": "Spec fidelity: delivery.ts snapshots the transcript confirmation target immediately before each deliver attempt, then waits for a new user record before returning success. Constraint compliance: no prohibited patterns or architecture violations in the scoped diff.",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2182",
-    "reviewedAtCommit": "9cada3852642c7717ac045eff1c3d0fca2c3e9a9",
-    "reviewRequestedAt": "2026-06-29T22:00:01.226Z"
+    "updatedAt": "2026-07-02T07:07:31.689Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2182"
   },
   "closeOut": {
     "usage": {
@@ -31,8 +56,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 28678,
-            "output": 1853,
+            "input": 31084,
+            "output": 2321,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -45,12 +70,28 @@
             "cacheWrite": 660969
           }
         },
+        "review": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 485,
+            "output": 9931,
+            "cacheRead": 841510,
+            "cacheWrite": 173797
+          }
+        },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 42,
-            "output": 1061,
-            "cacheRead": 544911,
-            "cacheWrite": 118535
+            "input": 1702,
+            "output": 4212,
+            "cacheRead": 2131058,
+            "cacheWrite": 251672
+          }
+        },
+        "work": {
+          "anthropic/claude-fable-5": {
+            "input": 13769,
+            "output": 379,
+            "cacheRead": 15833,
+            "cacheWrite": 56169
           }
         }
       },
@@ -62,8 +103,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 28678,
-          "output": 1853,
+          "input": 31084,
+          "output": 2321,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -73,16 +114,28 @@
           "cacheRead": 11218047,
           "cacheWrite": 660969
         },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 485,
+          "output": 9931,
+          "cacheRead": 841510,
+          "cacheWrite": 173797
+        },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 42,
-          "output": 1061,
-          "cacheRead": 544911,
-          "cacheWrite": 118535
+          "input": 1702,
+          "output": 4212,
+          "cacheRead": 2131058,
+          "cacheWrite": 251672
+        },
+        "anthropic/claude-fable-5": {
+          "input": 13769,
+          "output": 379,
+          "cacheRead": 15833,
+          "cacheWrite": 56169
         }
       },
       "costAtCloseOut": {
-        "usd": 21.306388,
-        "pricingAsOf": "2026-06-29T22:05:29.074Z"
+        "usd": 23.578037,
+        "pricingAsOf": "2026-07-02T07:07:31.722Z"
       }
     },
     "merges": [
@@ -90,13 +143,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-06-29T22:02:42.176Z",
-  "updated": "2026-06-29T22:05:29.316Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-29T22:05:29.295Z"
-    }
-  ]
+  "created": "2026-06-29T22:09:34.377Z",
+  "updated": "2026-07-02T07:07:31.788Z"
 }
