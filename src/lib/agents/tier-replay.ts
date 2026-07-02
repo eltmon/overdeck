@@ -14,6 +14,7 @@ import type { InFlightBead } from './standing-tiers.js';
 import {
   composeCommitFeedMessage,
   renderCommitFeedDiff,
+  resolveFeedApiUrl,
   shouldSkipFeedSubject,
 } from './tier-feed.js';
 import {
@@ -62,6 +63,8 @@ export interface ReplayTargetBase {
   prompt?: string;
   /** Feed filtering/rendering config. Defaults preserve today's raw git-show behavior. */
   feedConfig?: ValidatedTieredExecutionFeedConfig;
+  /** Dashboard API base URL used when replaying callout-enabled tier feed messages. */
+  apiUrl?: string;
 }
 
 export interface ReplayStandingTierTarget extends ReplayTargetBase {
@@ -133,7 +136,7 @@ export async function replayStandingAgent(
     deps,
   );
   const deliveries = target.kind === 'tier'
-    ? await replayTierFeed(agent.id, commits, deps)
+    ? await replayTierFeed(agent.id, target, commits, deps)
     : await replaySupervisorFeed(agent.id, target, commits, deps);
 
   return { agent, commits, deliveries };
@@ -225,12 +228,28 @@ function resolveReplaySlot(
 
 async function replayTierFeed(
   agentId: string,
+  target: ReplayStandingTierTarget,
   commits: ReplayCommit[],
   deps: Required<TierReplayDeps>,
 ): Promise<ReplayDelivery[]> {
   const deliveries: ReplayDelivery[] = [];
+  const feedConfig = target.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed;
+  const includeCallout = feedConfig.callouts !== 'off';
+  const apiUrl = target.apiUrl ?? resolveFeedApiUrl();
   for (const commit of commits) {
-    const message = composeCommitFeedMessage(commit.sha, commit.subject, commit.diff);
+    const message = composeCommitFeedMessage(
+      commit.sha,
+      commit.subject,
+      commit.diff,
+      includeCallout
+        ? {
+          apiUrl,
+          issueId: target.issueId,
+          tierName: target.tierName,
+          agentId,
+        }
+        : undefined,
+    );
     deliveries.push({
       sha: commit.sha,
       result: await deps.deliver(agentId, message, 'tier-replay:tier'),

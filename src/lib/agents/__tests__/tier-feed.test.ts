@@ -127,6 +127,50 @@ describe('broadcastCommit', () => {
     expect(first).toBe(second);
   });
 
+  it('preserves the pre-callout feed message byte-for-byte when callouts are off', () => {
+    expect(composeCommitFeedMessage('abc123', 'my bead', 'diff-body\n')).toBe([
+      '# Commit feed (ingestion-only): abc123',
+      '',
+      'Bead: my bead',
+      '',
+      'This is an ingestion-only feed delivery. Read the diff below to stay',
+      'current with work landing on this issue. Do NOT respond to this message,',
+      'do NOT take any action, and do NOT produce output — wait for your next',
+      'dispatch.',
+      '',
+      '```diff',
+      'diff-body',
+      '```',
+    ].join('\n'));
+  });
+
+  it('adds the call-out clause for notify policy deliveries', async () => {
+    const { deliver, gitShow, deliveries, recordDelivery } = spies();
+
+    await broadcastCommit({
+      workspace: '/ws',
+      issueId: 'PAN-1',
+      apiUrl: 'http://api.test',
+      sha: 'abc123',
+      beadTitle: 'my bead',
+      tiers: [TIERS[0]],
+      feedConfig: feedConfig({ callouts: 'notify' }),
+      deliver,
+      gitShow,
+      recordDelivery,
+    });
+
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0].message).toMatch(/at\s+most one call-out/);
+    expect(deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
+    expect(deliveries[0].message).toContain(
+      'Do not fix it yourself. Do not edit files. A call-out is a flag, not a task.',
+    );
+    expect(deliveries[0].message).toContain(
+      `"issueId":"PAN-1","sha":"abc123","tierName":"cheap","agentId":"agent-pan-1-slot-1"`,
+    );
+  });
+
   it('records timestamped token metrics for every feed delivery', async () => {
     const { deliver, gitShow, recordDelivery, metrics } = spies();
 

@@ -38,6 +38,8 @@ export interface BroadcastCommitOptions {
   tiers: Array<Pick<StandingTierAgent, 'tierName' | 'agentId'>>;
   /** Issue id for delivery metrics. */
   issueId?: string;
+  /** Dashboard API base URL used in the listener call-out curl snippet. */
+  apiUrl?: string;
   /** Feed filtering/rendering config. Defaults preserve today's raw git-show behavior. */
   feedConfig?: ValidatedTieredExecutionFeedConfig;
   /** Injectable delivery seam for tests. Defaults to deliverAgentMessage. */
@@ -60,6 +62,13 @@ export interface BroadcastDelivery {
 
 export interface RenderCommitFeedDiffDeps {
   gitShow?: (workspace: string, sha: string, args: string[]) => Promise<string>;
+}
+
+export interface CommitFeedCalloutContext {
+  apiUrl: string;
+  issueId: string;
+  tierName: string;
+  agentId: string;
 }
 
 async function runGitShow(workspace: string, sha: string, args: string[] = []): Promise<string> {
@@ -101,25 +110,63 @@ export async function renderCommitFeedDiff(
   ].join('\n');
 }
 
+export function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return env.OVERDECK_DASHBOARD_URL
+    ?? env.DASHBOARD_URL
+    ?? `http://localhost:${env.API_PORT ?? env.PORT ?? '3011'}`;
+}
+
 /**
  * Compose the ingestion-only feed message for one commit. Deterministic over
  * (sha, beadTitle, diff) so replay reconstructs byte-identical messages.
  */
-export function composeCommitFeedMessage(sha: string, beadTitle: string, diff: string): string {
-  return [
+export function composeCommitFeedMessage(
+  sha: string,
+  beadTitle: string,
+  diff: string,
+  callout?: CommitFeedCalloutContext,
+): string {
+  const lines = [
     `# Commit feed (ingestion-only): ${sha}`,
     '',
     `Bead: ${beadTitle}`,
     '',
-    'This is an ingestion-only feed delivery. Read the diff below to stay',
-    'current with work landing on this issue. Do NOT respond to this message,',
-    'do NOT take any action, and do NOT produce output — wait for your next',
-    'dispatch.',
-    '',
-    '```diff',
-    diff.trimEnd(),
-    '```',
-  ].join('\n');
+  ];
+
+  if (callout) {
+    const body = JSON.stringify({
+      issueId: callout.issueId,
+      sha,
+      tierName: callout.tierName,
+      agentId: callout.agentId,
+      claim: '<one sentence: what is wrong and where>',
+    });
+    lines.push(
+      'This is an ingestion-only feed delivery. Read the diff below to stay',
+      'current with work landing on this issue. By default: do NOT respond, do',
+      'NOT take any action, do NOT produce output — wait for your next dispatch.',
+      '',
+      'ONE exception. If you believe this commit is WRONG — it misreads the bead\'s',
+      'spec, hollows out a test, or breaks a stated invariant — you may raise at',
+      'most one call-out, then return to silence:',
+      '',
+      `  curl -X POST ${callout.apiUrl}/api/tiered/callouts \\`,
+      '    -H "Content-Type: application/json" \\',
+      `    -d '${body}'`,
+      '',
+      'Do not fix it yourself. Do not edit files. A call-out is a flag, not a task.',
+    );
+  } else {
+    lines.push(
+      'This is an ingestion-only feed delivery. Read the diff below to stay',
+      'current with work landing on this issue. Do NOT respond to this message,',
+      'do NOT take any action, and do NOT produce output — wait for your next',
+      'dispatch.',
+    );
+  }
+
+  lines.push('', '```diff', diff.trimEnd(), '```');
+  return lines.join('\n');
 }
 
 /**
@@ -141,11 +188,22 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
   const now = options.now ?? (() => new Date());
 
   const diff = await renderDiff(options.workspace, options.sha, feedConfig);
-  const message = composeCommitFeedMessage(options.sha, options.beadTitle, diff);
-  const tokenCount = estimateFeedDeliveryTokens(message);
+  const baseMessage = composeCommitFeedMessage(options.sha, options.beadTitle, diff);
+  const baseTokenCount = estimateFeedDeliveryTokens(baseMessage);
+  const includeCallout = feedConfig.callouts !== 'off' && options.issueId !== undefined;
+  const apiUrl = options.apiUrl ?? resolveFeedApiUrl();
 
   const deliveries: BroadcastDelivery[] = [];
   for (const tier of options.tiers) {
+    const message = includeCallout
+      ? composeCommitFeedMessage(options.sha, options.beadTitle, diff, {
+        apiUrl,
+        issueId: options.issueId!,
+        tierName: tier.tierName,
+        agentId: tier.agentId,
+      })
+      : baseMessage;
+    const tokenCount = includeCallout ? estimateFeedDeliveryTokens(message) : baseTokenCount;
     let result: DeliveryResult;
     try {
       result = await deliver(tier.agentId, message, 'tier-feed:broadcastCommit');

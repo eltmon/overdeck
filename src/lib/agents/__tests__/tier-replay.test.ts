@@ -211,13 +211,15 @@ describe('tier replay', () => {
   });
 
   it('uses the same feed renderer and subject skip for live and replay messages', async () => {
-    const config = feedConfig({ exclude_subjects: ['chore(beads):'] });
+    const config = feedConfig({ callouts: 'notify', exclude_subjects: ['chore(beads):'] });
     const liveDeliveries: Array<{ message: string }> = [];
     const replaySeams = deps();
     const renderDiff = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/src/x.ts b/src/x.ts\n+${sha}\n`);
 
     await broadcastCommit({
       workspace: '/ws',
+      issueId: 'PAN-1791',
+      apiUrl: 'http://api.test',
       sha: '1111111111111111111111111111111111111111',
       beadTitle: 'bead-a first commit',
       commitSubject: 'bead-a first commit',
@@ -245,11 +247,13 @@ describe('tier replay', () => {
       tierName: 'standard',
       slotIndex: 27,
       slotItemId: 'bead-a',
+      apiUrl: 'http://api.test',
       feedConfig: config,
     }, { deps: replaySeams });
 
     expect(replay.commits.map(commit => commit.sha)).toEqual(['1111111111111111111111111111111111111111']);
     expect(replaySeams.deliveries).toHaveLength(1);
     expect(replaySeams.deliveries[0].message).toBe(liveDeliveries[0].message);
+    expect(replaySeams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
   });
 });
