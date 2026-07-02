@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 2 (2026-07-02) — trim landed; NO_RESUME boot is the redispatch root cause
+
+- **PAN-2218 trim LANDED** (`b2a90b7516` extracts flywheel start helpers to src/lib; flywheel.ts 1022→960). CI in_progress on it at tick end — conclusion check carried to tick 3 (short wakeup).
+- **All three restarted reviews cleared pending:** PAN-2154 + PAN-2156 recorded verdicts; PAN-2172 advanced to test with its work agent actively resolving PR #2182's merge conflict (fable-5 test agent live alongside — config routing confirmed working).
+- **NO_RESUME finding (verified, /proc/4043895/environ):** the host dashboard runs with `OVERDECK_NO_RESUME=1` — deacon patrols fire (log advancing) but orphan-recovery/auto-resume are OFF. THIS is why dead review/test agents (e.g. agent-pan-2150-test) never redispatch and why dozens of agents show "Boot --no-resume" gates. The known env-defeats-config trap. Surfaced to operator (resume-enabled restart is their call); flywheel drives stuck items via `pan review restart` meanwhile.
+- **Three `dist/dashboard/server.js` processes in host ps is NOT a deacon duel:** two have cwd `/workspaces/overdeck` = workspace-container peers (legit, deacon-disabled); only the host pid binds 3011. Check `readlink /proc/<pid>/cwd` before diagnosing a duel.
+- **Watchdog restart at 07:15 reported failure ("pan restart exited 1") but the server it spawned IS up and serving** — likely the <120s health-timeout false-fail class. Surfaced.
+- codex OAuth still logged out (re-checked). MIN-831/MIN-846 still UAT-gated.
+
 ## RUN-53 tick 1.5 (2026-07-02) — PAN-2217 DONE; second red-main cause struck (PAN-2218 file-size guard)
 
 - **PAN-2217 strike COMPLETE:** mock-factory fix `0e0cd31cf2` on main, test job green, `pan done --strike` handoff applied.
