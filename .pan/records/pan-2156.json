@@ -16,11 +16,16 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-07-02T18:24:54.669Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-07-02T18:26:36.930Z"
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "finalize-baseline": "completed",
     "finalize-baseline.ac1": "completed",
@@ -66,17 +71,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:25:55.007Z",
+    "updatedAt": "2026-07-02T18:26:36.749Z",
     "reviewNotes": "Pure barrel decomposition of conversation-service.ts: all 16 public symbols present, 9 submodules each under 1000 lines, no logic changes, DAG acyclic, async-only I/O confirmed",
     "testNotes": "Retried required gates in /home/eltmon/Projects/overdeck/workspaces/feature-pan-2156 after stale test-role failure: npm run typecheck PASS, npm run lint PASS, npx vitest run --configLoader runner PASS with 797 files passed / 7926 tests passed / 52 skipped. No browser UAT required for this behavior-preserving service refactor.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "reviewedAtCommit": "16265ad3279c94fef0be98ba7d735f8b25d57301",
     "lastVerifiedCommit": "007b11585a73111b32980894a9182ee9ddbc509a",
     "reviewRequestedAt": "2026-07-02T18:05:48.217Z"
   },
@@ -130,7 +134,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.295503,
-        "pricingAsOf": "2026-07-02T18:25:55.042Z"
+        "pricingAsOf": "2026-07-02T18:26:36.850Z"
       }
     },
     "merges": [
@@ -139,5 +143,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T18:09:19.879Z",
-  "updated": "2026-07-02T18:25:55.051Z"
+  "updated": "2026-07-02T18:26:36.930Z"
 }
