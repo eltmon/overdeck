@@ -4,17 +4,17 @@
     "created": "2026-07-02T14:25:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2224: feat(sessions): multi-harness session discovery, search, enrichment + transcript rendering (pi/ohmypi/codex)",
-    "updated": "2026-07-02T14:33:18.743Z"
+    "updated": "2026-07-02T14:55:58.742Z"
   },
   "plan": {
     "id": "pan-2224",
     "title": "feat(sessions): multi-harness session discovery, search, enrichment + transcript rendering (pi/ohmypi/codex)",
-    "status": "proposed",
+    "status": "running",
     "uid": "ebb53cd6-3d96-4393-82bf-d4494dd21ffe",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 6,
     "created": "2026-07-02T14:25:00.000Z",
-    "updated": "2026-07-02T14:33:18.743Z",
+    "updated": "2026-07-02T14:55:58.742Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2224",
@@ -865,5 +865,5 @@
       "canonicalFilename": "2026-07-02-PAN-2224-feat-sessions-multi-harness-session-discovery-search-enrichment-transcript-rendering-pi-ohmypi-codex.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
