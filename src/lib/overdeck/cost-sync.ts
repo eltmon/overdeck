@@ -8,6 +8,7 @@
  */
 import type { CostEvent } from '../costs/events.js';
 import { getOverdeckDatabaseSync } from './infra.js';
+import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
 /**
  * Query total memory-extraction cost in USD for an issue within a time window.
@@ -480,6 +481,7 @@ export function getBackgroundCostBySourceSync(hours = 24): Record<string, number
  */
 export interface AgentRollup {
   agentId: string;
+  role: string;
   totalCost: number;
   calls: number;
   totalTokens: number;
@@ -516,6 +518,7 @@ export function getAgentRollup(issueId?: string): AgentRollup[] {
     .filter((r) => r.agent_id != null)
     .map((r) => ({
       agentId: r.agent_id as string,
+      role: deriveTieredAgentCostRole(r.agent_id as string, issueId),
       totalCost: r.total_cost ?? 0,
       calls: r.calls ?? 0,
       totalTokens: r.total_tokens ?? 0,
