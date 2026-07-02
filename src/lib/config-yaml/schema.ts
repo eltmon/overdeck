@@ -5,6 +5,7 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
+import type { TieredExecutionConfigInput, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -489,6 +490,9 @@ export interface YamlConfig {
   /** Role-specific model and harness configuration. */
   roles?: RolesConfig;
 
+  /** Difficulty-routed tier table for standing work agents and supervisor review. */
+  tiered_execution?: TieredExecutionConfigInput;
+
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
 
@@ -644,6 +648,7 @@ export interface NormalizedConfig {
 
   /** API keys by provider */
   apiKeys: {
+    anthropic?: string;
     openai?: string;
     voyage?: string;
     google?: string;
@@ -673,6 +678,9 @@ export interface NormalizedConfig {
 
   /** Optional role model/harness configuration. */
   roles?: RolesConfig;
+
+  /** Difficulty-routed tier table for standing work agents and supervisor review. */
+  tieredExecution: ValidatedTieredExecutionConfig;
 
   /** Per-work-type overrides */
   overrides: Partial<Record<string, ModelId>>;

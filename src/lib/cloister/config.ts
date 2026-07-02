@@ -9,6 +9,8 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { parse, stringify } from '@iarna/toml';
 import { join } from 'path';
 import { Effect } from 'effect';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
 
@@ -271,6 +273,7 @@ export interface CloisterConfig {
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
+  tiered_execution?: TieredExecutionConfig;
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
@@ -362,6 +365,9 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // now flows through resolveHarness(), which consults explicit, role,
       // providerHarnesses, and built-in provider defaults in order.
     },
+  },
+  tiered_execution: {
+    ...DEFAULT_TIERED_EXECUTION_CONFIG,
   },
   handoffs: {
     auto_triggers: {

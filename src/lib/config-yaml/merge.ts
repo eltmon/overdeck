@@ -3,6 +3,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
+import { mergeTieredExecutionConfig, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
@@ -91,6 +92,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
+    tieredExecution: {
+      ...DEFAULT_CONFIG.tieredExecution,
+      tiers: { ...DEFAULT_CONFIG.tieredExecution.tiers },
+      difficultyToTier: { ...DEFAULT_CONFIG.tieredExecution.difficultyToTier },
+    },
     memory: {
       extraction: {
         ...DEFAULT_CONFIG.memory.extraction,
@@ -187,6 +193,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
+        if (anthropic.api_key) {
+          result.apiKeys.anthropic = resolveEnvVar(anthropic.api_key);
+        }
+        if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+        if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
       } else if (providers.anthropic !== undefined) {
         explicitlyDisabled.add('anthropic');
         result.enabledProviders.delete('anthropic');
@@ -417,6 +428,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge role/workhorse model configuration
     mergeRoleConfig(result, config);
 
+    // Merge difficulty-routed tier table configuration. Validation runs after
+    // all configs have merged so provider auth policy sees effective settings.
+    result.tieredExecution = {
+      ...mergeTieredExecutionConfig(result.tieredExecution, config.tiered_execution),
+      difficultyToTier: { ...result.tieredExecution.difficultyToTier },
+    };
+
     // Merge legacy API keys (for backward compatibility)
     // Only enable providers that weren't explicitly disabled in models.providers
     if (config.api_keys) {
@@ -626,6 +644,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   }
 
   validateRoleModelRefs(result);
+  result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, result.providerAuth);
 
   return { config: result, explicitlyDisabled };
 }

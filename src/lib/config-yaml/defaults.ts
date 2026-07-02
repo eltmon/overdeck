@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { homedir } from 'os';
+import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { defaultBackgroundAiFeatures } from '../background-ai/registry.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import type { NormalizedConfig } from './schema.js';
@@ -30,6 +31,10 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   openrouterFavorites: [],
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
+  tieredExecution: {
+    ...DEFAULT_TIERED_EXECUTION_CONFIG,
+    difficultyToTier: {},
+  },
   overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
