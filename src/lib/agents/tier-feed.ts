@@ -17,6 +17,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { deliverAgentMessage, type DeliveryResult } from './delivery.js';
 import type { StandingTierAgent } from './standing-tiers.js';
+import { estimateFeedDeliveryTokens, recordTierFeedDelivery } from './tier-metrics.js';
 
 const execAsync = promisify(exec);
 
@@ -29,10 +30,16 @@ export interface BroadcastCommitOptions {
   beadTitle: string;
   /** The standing tier agents to deliver to — every one of them hears it. */
   tiers: Array<Pick<StandingTierAgent, 'tierName' | 'agentId'>>;
+  /** Issue id for delivery metrics. */
+  issueId?: string;
   /** Injectable delivery seam for tests. Defaults to deliverAgentMessage. */
   deliver?: (agentId: string, message: string, caller?: string) => Promise<DeliveryResult>;
   /** Injectable `git show` runner for tests. Defaults to running git in the workspace. */
   gitShow?: (workspace: string, sha: string) => Promise<string>;
+  /** Injectable metric recorder for tests. Defaults to the tier metrics JSONL log. */
+  recordDelivery?: typeof recordTierFeedDelivery;
+  /** Injectable clock for deterministic delivery metric tests. */
+  now?: () => Date;
 }
 
 export interface BroadcastDelivery {
@@ -78,9 +85,12 @@ export function composeCommitFeedMessage(sha: string, beadTitle: string, diff: s
 export async function broadcastCommit(options: BroadcastCommitOptions): Promise<BroadcastDelivery[]> {
   const gitShow = options.gitShow ?? runGitShow;
   const deliver = options.deliver ?? deliverAgentMessage;
+  const recordDelivery = options.recordDelivery ?? recordTierFeedDelivery;
+  const now = options.now ?? (() => new Date());
 
   const diff = await gitShow(options.workspace, options.sha);
   const message = composeCommitFeedMessage(options.sha, options.beadTitle, diff);
+  const tokenCount = estimateFeedDeliveryTokens(message);
 
   const deliveries: BroadcastDelivery[] = [];
   for (const tier of options.tiers) {
@@ -94,6 +104,16 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
         failure: err instanceof Error ? err.message : String(err),
       };
     }
+    await recordDelivery({
+      ts: now().toISOString(),
+      issueId: options.issueId,
+      sha: options.sha,
+      beadTitle: options.beadTitle,
+      tierName: tier.tierName,
+      agentId: tier.agentId,
+      tokenCount,
+      result,
+    });
     deliveries.push({ tierName: tier.tierName, agentId: tier.agentId, result });
   }
   return deliveries;

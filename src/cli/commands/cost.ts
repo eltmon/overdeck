@@ -22,7 +22,7 @@ import {
   summarizeCostsSync,
 } from '../../lib/cost.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
-import { getCostForIssueAggregateSync, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
+import { getAgentRollup, getCostForIssueAggregateSync, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
 
 /**
  * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
@@ -93,6 +93,18 @@ export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggreg
     for (const [stage, stats] of reviewStages) {
       const label = stage === 'review' ? 'synthesis' : stage.slice('review.'.length);
       lines.push(`  ${label}: ${formatCostSync(stats.cost)} (${stats.calls} call${stats.calls === 1 ? '' : 's'})`);
+    }
+    lines.push('');
+  }
+
+  const agentRows = getAgentRollup(issueId);
+  if (agentRows.length > 0) {
+    lines.push(chalk.bold('By Agent'));
+    for (const row of agentRows) {
+      const label = row.role === 'other'
+        ? row.agentId
+        : `${row.role} ${chalk.dim(row.agentId)}`;
+      lines.push(`  ${label}: ${formatCostSync(row.totalCost)} (${row.calls} call${row.calls === 1 ? '' : 's'})`);
     }
     lines.push('');
   }
