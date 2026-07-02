@@ -98,6 +98,21 @@ describe('tiered execution tier table', () => {
     }))).toThrow("tiered_execution.tiers.cheap.harness 'bad-harness' is unknown");
   });
 
+  it('accepts slash-form OpenRouter model ids as dynamic provider ids', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      tiers: {
+        cheap: {
+          model: 'openai/gpt-4o',
+          harness: 'ohmypi',
+          difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+        },
+      },
+    }));
+
+    expect(result.tiers.cheap.model).toBe('openai/gpt-4o');
+    expect(result.difficultyToTier.expert).toBe('cheap');
+  });
+
   it('rejects Anthropic subscription auth on ohmypi through the harness policy gate', () => {
     expect(() => validateTieredExecutionConfig(validConfig({
       tiers: {
@@ -106,6 +121,18 @@ describe('tiered execution tier table', () => {
           harness: 'ohmypi',
           difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
         },
+      },
+    }), {
+      providerAuth: { anthropic: 'subscription' },
+    })).toThrow('ohmypi cannot run Anthropic models');
+  });
+
+  it('applies the harness policy gate to supervisor definitions', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      supervisor: {
+        model: 'claude-opus-4-8',
+        harness: 'ohmypi',
+        subscribe: 'all',
       },
     }), {
       providerAuth: { anthropic: 'subscription' },
@@ -137,6 +164,31 @@ describe('tiered execution tier table', () => {
     expect(config.tieredExecution.enabled).toBe(false);
     expect(config.tieredExecution.replay_threshold).toBe(0.5);
     expect(config.tieredExecution.difficultyToTier).toEqual({});
+  });
+
+  it('merges layered config without erasing lower-precedence tier tables', () => {
+    const { config } = mergeConfigs(
+      {
+        tiered_execution: {
+          enabled: false,
+          replay_threshold: 0.75,
+        },
+      },
+      {
+        tiered_execution: validConfig({ enabled: true }),
+      },
+    );
+
+    expect(config.tieredExecution.enabled).toBe(false);
+    expect(config.tieredExecution.replay_threshold).toBe(0.75);
+    expect(config.tieredExecution.difficultyToTier).toEqual({
+      trivial: 'cheap',
+      simple: 'cheap',
+      medium: 'standard',
+      complex: 'standard',
+      expert: 'frontier',
+    });
+    expect(config.tieredExecution.supervisor?.subscribe).toBe('flagged');
   });
 
   it('returns difficulty-to-tier map and supervisor policy for a valid config', () => {

@@ -134,6 +134,22 @@ export function normalizeTieredExecutionConfig(config?: Partial<TieredExecutionC
   };
 }
 
+export function mergeTieredExecutionConfig(
+  base: Partial<TieredExecutionConfig> | undefined,
+  override: Partial<TieredExecutionConfig>,
+): TieredExecutionConfig {
+  const normalizedBase = normalizeTieredExecutionConfig(base);
+  return {
+    enabled: override.enabled ?? normalizedBase.enabled,
+    tiers: {
+      ...normalizedBase.tiers,
+      ...(override.tiers ?? {}),
+    },
+    supervisor: override.supervisor ?? normalizedBase.supervisor,
+    replay_threshold: override.replay_threshold ?? normalizedBase.replay_threshold,
+  };
+}
+
 export function validateTieredExecutionConfig(
   rawConfig?: Partial<TieredExecutionConfig>,
   context: TieredExecutionValidationContext = {},
