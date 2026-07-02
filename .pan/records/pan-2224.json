@@ -2,7 +2,7 @@
   "issueId": "PAN-2224",
   "schemaVersion": 2,
   "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T14:22:02.024Z",
+  "updated": "2026-07-02T14:33:18.744Z",
   "pipeline": {
     "issueId": "PAN-2224",
     "reviewStatus": "pending",
@@ -27,5 +27,11 @@
       "note": "Planning session started for PAN-2224: feat(sessions): multi-harness session discovery, search, enrichment + transcript rendering (pi/ohmypi/codex)",
       "timestamp": "2026-07-02T14:22:01.150Z"
     }
-  ]
+  ],
+  "statusOverrides": {
+    "scan-baseline": "pending"
+  },
+  "swarm": {
+    "slotAssignments": []
+  }
 }
