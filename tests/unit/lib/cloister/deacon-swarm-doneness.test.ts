@@ -162,3 +162,37 @@ describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eli
     expect(actions).not.toContain('[swarm] considered PAN-902: swarm eligible');
   });
 });
+
+describe('swarm tail dispatch: an in-progress swarm may finish its last item', () => {
+  it('keeps dispatch eligible with one remaining item when completed overrides exist', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-904'), { recursive: true });
+    writeSpec(projectPath, 'PAN-904', makeDoc('PAN-904', 2));
+    // wi-1 done via a prior swarm wave; only wi-2 remains -> slotEligibleCount 1.
+    const recordsDir = join(projectPath, 'workspaces', 'feature-pan-904', '.pan', 'records');
+    mkdirSync(recordsDir, { recursive: true });
+    writeFileSync(join(recordsDir, 'pan-904.json'), JSON.stringify({
+      issueId: 'PAN-904',
+      schemaVersion: 1,
+      statusOverrides: { 'wi-1': 'completed' },
+    }, null, 2));
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    const actions = await coordinateSwarmSlots();
+
+    expect(actions).toContain('[swarm] considered PAN-904: swarm eligible');
+  });
+
+  it('still refuses to START a swarm for a plan with a single eligible item', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-905'), { recursive: true });
+    writeSpec(projectPath, 'PAN-905', makeDoc('PAN-905', 1));
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    const actions = await coordinateSwarmSlots();
+
+    expect(actions).not.toContain('[swarm] considered PAN-905: swarm eligible');
+  });
+});
