@@ -3,14 +3,15 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-02T06:49:55.068Z",
-  "updated": "2026-07-02T07:03:08.840Z",
+  "updated": "2026-07-02T07:04:41.013Z",
   "pipeline": {
     "issueId": "PAN-2217",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T07:03:08.806Z"
+    "updatedAt": "2026-07-02T07:04:40.992Z",
+    "testNotes": "Skipped: issue is already merged"
   },
   "closeOut": {
     "usage": {
@@ -25,10 +26,10 @@
         },
         "strike": {
           "anthropic/claude-fable-5": {
-            "input": 15822,
-            "output": 16788,
-            "cacheRead": 3073150,
-            "cacheWrite": 106318
+            "input": 20189,
+            "output": 18915,
+            "cacheRead": 3861197,
+            "cacheWrite": 227690
           }
         }
       },
@@ -40,15 +41,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 15822,
-          "output": 16788,
-          "cacheRead": 3073150,
-          "cacheWrite": 106318
+          "input": 20189,
+          "output": 18915,
+          "cacheRead": 3861197,
+          "cacheWrite": 227690
         }
       },
       "costAtCloseOut": {
-        "usd": 5.399751,
-        "pricingAsOf": "2026-07-02T07:03:08.840Z"
+        "usd": 7.85497,
+        "pricingAsOf": "2026-07-02T07:04:41.013Z"
       }
     },
     "merges": [],
