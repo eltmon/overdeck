@@ -49,20 +49,27 @@
   },
   "pipeline": {
     "issueId": "PAN-2151",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-02T23:11:02.361Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T23:12:33.303Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
-    "reviewedAtCommit": "066af8e494c54ca689f339daaddd300b36fd74f0",
     "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 4,
+            "output": 808,
+            "cacheRead": 777165,
+            "cacheWrite": 1290
+          }
+        },
         "inspect": {
           "openai/gpt-5.5": {
             "input": 244654,
@@ -95,6 +102,12 @@
         }
       },
       "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 19010,
+          "output": 39300,
+          "cacheRead": 6652968,
+          "cacheWrite": 162355
+        },
         "openai/gpt-5.5": {
           "input": 244654,
           "output": 12016,
@@ -107,12 +120,6 @@
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "anthropic/claude-fable-5": {
-          "input": 19006,
-          "output": 38492,
-          "cacheRead": 5875803,
-          "cacheWrite": 161065
-        },
         "anthropic/claude-opus-4-8": {
           "input": 31895,
           "output": 117076,
@@ -121,8 +128,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 22.083717,
-        "pricingAsOf": "2026-07-02T23:11:02.446Z"
+        "usd": 22.917448,
+        "pricingAsOf": "2026-07-02T23:12:33.339Z"
       }
     },
     "merges": [
@@ -131,5 +138,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T21:13:43.617Z",
-  "updated": "2026-07-02T23:11:02.452Z"
+  "updated": "2026-07-02T23:12:33.346Z"
 }
