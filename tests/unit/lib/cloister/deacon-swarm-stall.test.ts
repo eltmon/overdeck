@@ -86,6 +86,7 @@ type StallDispatchDeps = Pick<
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
   | 'spawnRun'
+  | 'shouldDispatch'
   | 'getMaxSlotIndex'
   | 'listSlotAssignments'
   | 'listSessionNames'
@@ -101,6 +102,7 @@ function dispatchDeps(overrides: Partial<StallDispatchDeps> = {}): StallDispatch
     recordSlotAssignment: vi.fn(),
     clearSlotAssignment: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
+    shouldDispatch: vi.fn(() => true),
     getMaxSlotIndex: vi.fn(() => 4),
     listSlotAssignments: vi.fn(() => []),
     listSessionNames: vi.fn(async () => []),
