@@ -9,7 +9,7 @@ import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import {
-  dispatchNextWave,
+  coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
   type SwarmRecoveryAction,
@@ -28,7 +28,7 @@ export interface SwarmCommandDeps {
   findSpecByIssue: typeof findSpecByIssue;
   analyzeSwarmReadiness: typeof analyzeSwarmReadiness;
   ensureWorkspace: (issueId: string, project: ResolvedProjectLike) => Promise<string>;
-  dispatchNextWave: typeof dispatchNextWave;
+  coordinateSwarmSlots: typeof coordinateSwarmSlots;
   getFailedMergeBlock: typeof getFailedMergeBlock;
   recoverFailedMergeSlot: typeof recoverFailedMergeSlot;
   console: ConsoleLike;
@@ -49,7 +49,7 @@ const defaultDeps: SwarmCommandDeps = {
   findSpecByIssue,
   analyzeSwarmReadiness,
   ensureWorkspace: ensureFeatureWorkspace,
-  dispatchNextWave,
+  coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
   console,
@@ -75,14 +75,12 @@ export async function swarmCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
-  const actions = await deps.dispatchNextWave(issue, workspacePath, loaded.doc, {
-    issueId: issue,
-    merged: [],
-    inFlight: [],
-    pending: [],
-    branches: [],
-    agents: [],
-  }, readiness);
+  // Single dispatch door (PAN-2214): route through the same full coordination
+  // pass the Deacon runs — real slot reconciliation, the statusOverrides
+  // merged-plan view, merge, and gc — instead of dispatching against a
+  // fabricated empty reconciliation. The old path re-dispatched already
+  // completed items (it saw no merged work) and raced live slots.
+  const actions = await deps.coordinateSwarmSlots({ issueId: issue });
 
   if (actions.length === 0) {
     deps.console.log(chalk.yellow(`No swarm slots dispatched for ${issue}.`));
