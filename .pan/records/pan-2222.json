@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-02T20:24:18.891Z",
-  "updated": "2026-07-02T21:38:02.618Z",
+  "updated": "2026-07-02T21:42:09.622Z",
   "pipeline": {
     "issueId": "PAN-2222",
     "reviewStatus": "pending",
@@ -20,21 +20,19 @@
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T21:37:38.739Z",
+    "updatedAt": "2026-07-02T21:42:09.603Z",
     "inspectNotes": "Inspection error for bead workspace-kq8fx: tmux session inspect-pan-2222-workspace-kq8fx exited before producing a verdict. No verdict was produced.",
-    "deaconIgnored": true,
-    "deaconIgnoredAt": "2026-07-02T21:37:10.488Z",
-    "deaconIgnoredReason": "swarm dispatched mid-planning and raced bead materialization; hold until planning completes and the PAN-2214 build deploys"
+    "deaconIgnored": false
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 8933,
-            "output": 4442,
-            "cacheRead": 7384796,
-            "cacheWrite": 13008
+            "input": 8939,
+            "output": 5415,
+            "cacheRead": 10178889,
+            "cacheWrite": 16013
           }
         },
         "inspect": {
@@ -64,10 +62,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 27989,
-          "output": 68675,
-          "cacheRead": 18013928,
-          "cacheWrite": 366693
+          "input": 27995,
+          "output": 69648,
+          "cacheRead": 20808021,
+          "cacheWrite": 369698
         },
         "openai/gpt-5.5": {
           "input": 394273,
@@ -83,8 +81,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 28.872861,
-        "pricingAsOf": "2026-07-02T21:37:38.768Z"
+        "usd": 31.753227,
+        "pricingAsOf": "2026-07-02T21:42:09.621Z"
       }
     },
     "merges": [],
