@@ -1,0 +1,123 @@
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { mkdtemp, rm } from 'fs/promises';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import { applyStatusOverrides } from '../../../../src/lib/vbrief/io.js';
+import { getDispatchableItems } from '../../../../src/lib/vbrief/dag.js';
+
+const mocks = vi.hoisted(() => ({
+  listProjectsSync: vi.fn(),
+  getReviewStatusSync: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/projects.js', () => ({
+  listProjectsSync: mocks.listProjectsSync,
+}));
+
+vi.mock('../../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: mocks.getReviewStatusSync,
+}));
+
+let tempRoot: string;
+
+beforeEach(async () => {
+  tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-doneness-'));
+  mocks.listProjectsSync.mockReset();
+  mocks.getReviewStatusSync.mockReset();
+  mocks.getReviewStatusSync.mockReturnValue(null);
+});
+
+afterEach(async () => {
+  await rm(tempRoot, { recursive: true, force: true });
+});
+
+function makeDoc(issueId: string, itemCount: number): VBriefDocument {
+  const now = '2026-07-02T00:00:00.000Z';
+  return {
+    vBRIEFInfo: {
+      version: '0.6',
+      created: now,
+      author: 'test',
+      description: `Plan for ${issueId}`,
+    },
+    plan: {
+      id: issueId.toLowerCase(),
+      title: `Plan for ${issueId}`,
+      status: 'active',
+      created: now,
+      updated: now,
+      items: Array.from({ length: itemCount }, (_, index) => ({
+        id: `wi-${index + 1}`,
+        title: `Work item ${index + 1}`,
+        status: 'pending',
+        metadata: {
+          readiness: 'ready',
+          files_scope: [`src/example-${index + 1}.ts`],
+          files_scope_confidence: 'high',
+          verify_commands: ['npm run typecheck'],
+          expected_outputs: ['typecheck completes without errors'],
+        },
+      })),
+      edges: [],
+    },
+  };
+}
+
+function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): void {
+  const specsDir = join(projectPath, '.pan', 'specs');
+  mkdirSync(specsDir, { recursive: true });
+  writeFileSync(join(specsDir, `2026-07-02-${issueId}-test.vbrief.json`), JSON.stringify({
+    ...doc,
+    status: 'active',
+  }, null, 2));
+}
+
+describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () => {
+  it('pure mechanism: a completed override removes the item from dispatchable set', () => {
+    const doc = makeDoc('PAN-900', 3);
+    const merged = applyStatusOverrides(doc, { 'wi-1': 'completed' });
+
+    const dispatchable = getDispatchableItems(merged, new Set()).map(item => item.id);
+    expect(dispatchable).toEqual(['wi-2', 'wi-3']);
+    // The overlay must not mutate the source document.
+    expect(doc.plan.items[0].status).toBe('pending');
+  });
+
+  function writeRecordOverrides(projectPath: string, issueLower: string, overrides: Record<string, string>): void {
+    const recordsDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.pan', 'records');
+    mkdirSync(recordsDir, { recursive: true });
+    writeFileSync(join(recordsDir, `${issueLower}.json`), JSON.stringify({
+      issueId: issueLower.toUpperCase(),
+      schemaVersion: 1,
+      statusOverrides: overrides,
+    }, null, 2));
+  }
+
+  it('coordinator skips an issue whose only remaining items are override-completed', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-900'), { recursive: true });
+    writeSpec(projectPath, 'PAN-900', makeDoc('PAN-900', 2));
+    writeRecordOverrides(projectPath, 'pan-900', { 'wi-1': 'completed', 'wi-2': 'completed' });
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    const actions = await coordinateSwarmSlots();
+
+    expect(actions).not.toContain('[swarm] considered PAN-900: swarm eligible');
+  });
+
+  it('coordinator still considers an issue with remaining dispatchable items', async () => {
+    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const projectPath = join(tempRoot, 'project');
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-901'), { recursive: true });
+    writeSpec(projectPath, 'PAN-901', makeDoc('PAN-901', 3));
+    writeRecordOverrides(projectPath, 'pan-901', { 'wi-1': 'completed' });
+    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
+
+    const actions = await coordinateSwarmSlots();
+
+    expect(actions).toContain('[swarm] considered PAN-901: swarm eligible');
+  });
+});

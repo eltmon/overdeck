@@ -40,6 +40,7 @@ import {
   queueIssueRecordCommit,
   RECORD_SCHEMA_VERSION,
   readIssueRecord,
+  readIssueRecordSync,
   writeIssueRecordSync,
   type PanIssueRecord,
   type PanIssueCloseOutRecord,
@@ -279,6 +280,13 @@ export async function updateIssueRecordForIssue(
     if (!project) return;
 
     const record = await buildIssueRecord(project, issueId, { reviewStatus });
+    // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
+    // a swarm slot assignment written during that window would be erased by this
+    // whole-record write (lost update — wiped slot ownership during the PAN-1791
+    // runaway). Re-read the swarm block synchronously immediately before writing
+    // so the freshest assignments always survive the rebuild.
+    const fresh = readIssueRecordSync(project, issueId);
+    if (fresh?.swarm) record.swarm = fresh.swarm;
     const recordPath = writeIssueRecordSync(project, issueId, record);
     queueIssueRecordCommit(project, issueId, recordPath);
   } catch (err) {

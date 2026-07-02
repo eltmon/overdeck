@@ -125,6 +125,8 @@ describe('auto-resume gates', () => {
       resetPatrolDispatchBudget: vi.fn(),
       tryReserveAdvancingSlot: () => true,
       releaseAdvancingSlot: vi.fn(),
+      tryReserveSwarmSlot: () => true,
+      releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
     }));
     vi.doMock('../../../src/lib/review-status.js', () => ({
