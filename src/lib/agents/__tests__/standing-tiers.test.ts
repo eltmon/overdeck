@@ -161,6 +161,34 @@ describe('StandingTierManager', () => {
     });
   });
 
+  it('enforces the single-implementer invariant: a second dispatch before completeBead throws', async () => {
+    const { spawn } = fakeSpawn();
+    const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn });
+
+    const agentId = await manager.dispatchBeadExclusive('cheap', { id: 'a' });
+    expect(manager.getInFlightBead()).toEqual({ beadId: 'a', tierName: 'cheap', agentId });
+
+    await expect(manager.dispatchBeadExclusive('cheap', { id: 'b' })).rejects.toThrow(
+      'only one implementation agent works a bead at a time',
+    );
+    await expect(manager.dispatchBeadExclusive('standard', { id: 'c' })).rejects.toThrow(StandingTierError);
+
+    manager.completeBead('a');
+    expect(manager.getInFlightBead()).toBeUndefined();
+    await expect(manager.dispatchBeadExclusive('cheap', { id: 'b' })).resolves.toBe(agentId);
+  });
+
+  it('rejects completing a bead that is not the in-flight bead', async () => {
+    const { spawn } = fakeSpawn();
+    const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn });
+
+    expect(() => manager.completeBead('a')).toThrow(StandingTierError);
+
+    await manager.dispatchBeadExclusive('cheap', { id: 'a' });
+    expect(() => manager.completeBead('b')).toThrow(StandingTierError);
+    manager.completeBead('a');
+  });
+
   it('allocates distinct slot indexes per tier starting at firstSlotIndex', async () => {
     const { spawn, calls } = fakeSpawn();
     const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn, firstSlotIndex: 3 });
