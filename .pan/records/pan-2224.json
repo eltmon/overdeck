@@ -63,20 +63,12 @@
     "issueId": "PAN-2224",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T20:27:58.996Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-02T20:23:57.803Z"
-      }
-    ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
-    "lastVerifiedCommit": "bb9d20b3e48918da35eb6336cd31b9efe3485760"
+    "updatedAt": "2026-07-02T20:37:09.936Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2226"
   },
   "closeOut": {
     "usage": {
@@ -99,8 +91,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 28885,
-            "output": 1432,
+            "input": 31176,
+            "output": 1841,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -128,15 +120,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 28885,
-          "output": 1432,
+          "input": 31176,
+          "output": 1841,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T20:27:59.114Z"
+        "pricingAsOf": "2026-07-02T20:37:09.970Z"
       }
     },
     "merges": [
@@ -148,5 +140,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-02T16:48:03.302Z",
-  "updated": "2026-07-02T20:27:59.166Z"
+  "updated": "2026-07-02T20:37:09.972Z"
 }
