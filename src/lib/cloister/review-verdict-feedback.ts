@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -7,14 +7,11 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { messageAgent } from '../agents.js';
-import { listSlotOwnership } from '../agents/slot-reconcile.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { writeFeedbackFile } from './feedback-writer.js';
-import { resolveSlotFeedbackAgentId } from './test-verdict.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -88,16 +85,6 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
   return true;
 }
 
-function readWorkspacePlanBestEffort(workspacePath: string | undefined): VBriefDocument | null {
-  if (!workspacePath || !existsSync(workspacePath)) return null;
-  try {
-    return readWorkspacePlanSync(workspacePath)
-      ?? JSON.parse(readFileSync(join(workspacePath, PAN_DIRNAME, 'spec.vbrief.json'), 'utf-8')) as VBriefDocument;
-  } catch {
-    return null;
-  }
-}
-
 async function deliverReviewVerdictFeedbackPromise(
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Promise<DeliverReviewVerdictFeedbackResult> {
@@ -135,15 +122,21 @@ async function deliverReviewVerdictFeedbackPromise(
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
-    const doc = readWorkspacePlanBestEffort(workspacePath);
-    const slotOwnership = workspacePath ? listSlotOwnership(issueId, workspacePath) : [];
-    const agentId = resolveSlotFeedbackAgentId(issueId, opts.slotItemId, doc, slotOwnership) ?? `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
-    try {
-      await messageAgent(agentId, message);
-      agentMessageSent = true;
-    } catch (err) {
-      console.log(`[review-verdict-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+    const target = await resolveIssueFeedbackTarget(issueId, { itemId: opts.slotItemId });
+    if ('agentId' in target) {
+      try {
+        await messageAgent(target.agentId, message);
+        agentMessageSent = true;
+      } catch (err) {
+        console.log(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+        specialist: 'review-agent',
+        feedbackPath: fileResult.filePath,
+        slotItemId: opts.slotItemId,
+      });
     }
   } else if (!fileResult.success) {
     console.error(`[review-verdict-feedback] Failed to write feedback file for ${issueId}: ${fileResult.error}`);

@@ -5,11 +5,20 @@ import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
-const { mockMessageAgent, mockGetReviewStatus, mockWriteFeedbackFile, mockListSlotOwnership } = vi.hoisted(() => ({
+const {
+  mockMessageAgent,
+  mockGetReviewStatus,
+  mockWriteFeedbackFile,
+  mockListSlotOwnership,
+  mockResolveIssueFeedbackTarget,
+  mockSurfaceIssueFeedbackNeedsYou,
+} = vi.hoisted(() => ({
   mockMessageAgent: vi.fn(),
   mockGetReviewStatus: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
   mockListSlotOwnership: vi.fn(),
+  mockResolveIssueFeedbackTarget: vi.fn(),
+  mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -34,6 +43,11 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
 
 vi.mock('../../../../src/lib/agents/slot-reconcile.js', () => ({
   listSlotOwnership: mockListSlotOwnership,
+}));
+
+vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
+  resolveIssueFeedbackTarget: mockResolveIssueFeedbackTarget,
+  surfaceIssueFeedbackNeedsYou: mockSurfaceIssueFeedbackNeedsYou,
 }));
 
 function plan(items: VBriefItem[]): VBriefDocument {
@@ -92,16 +106,16 @@ describe('swarm verdict feedback routing', () => {
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
     }));
     mockListSlotOwnership.mockReturnValue([]);
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203' });
+    mockSurfaceIssueFeedbackNeedsYou.mockReset();
   });
 
-  it('delivers a verdict for a slot-owned item to agent-<issue>-slot-N', async () => {
+  it('delivers a verdict to the swarm-aware resolved target', async () => {
     const workspacePath = await writePlan(plan([
       slotItem('wi-a'),
       slotItem('wi-b'),
     ]));
-    mockListSlotOwnership.mockReturnValue([
-      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', itemId: 'wi-b' },
-    ]);
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203-slot-2' });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
@@ -113,6 +127,7 @@ describe('swarm verdict feedback routing', () => {
     }));
 
     expect(result.agentMessageSent).toBe(true);
+    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', { itemId: 'wi-b' });
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-2203-slot-2',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
@@ -124,9 +139,7 @@ describe('swarm verdict feedback routing', () => {
       slotItem('wi-a'),
       slotItem('wi-b'),
     ]));
-    mockListSlotOwnership.mockReturnValue([
-      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', itemId: 'wi-b' },
-    ]);
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203-slot-2' });
     mockMessageAgent.mockImplementation(async (agentId: string) => {
       if (agentId === 'agent-pan-2203') throw new Error('parent agent missing');
     });
@@ -152,16 +165,13 @@ describe('swarm verdict feedback routing', () => {
     );
   });
 
-  it('uses persisted slot ownership instead of plan order when routing verdict feedback', async () => {
+  it('passes the slot item id into the shared resolver instead of guessing plan order', async () => {
     const workspacePath = await writePlan(plan([
       slotItem('wi-a'),
       slotItem('wi-b'),
       slotItem('wi-c'),
     ]));
-    mockListSlotOwnership.mockReturnValue([
-      { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', itemId: 'wi-c' },
-      { slotIndex: 2, agentId: 'agent-pan-2203-slot-2', itemId: 'wi-b' },
-    ]);
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203-slot-1' });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
@@ -173,6 +183,7 @@ describe('swarm verdict feedback routing', () => {
     }));
 
     expect(result.agentMessageSent).toBe(true);
+    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2203', { itemId: 'wi-c' });
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-2203-slot-1',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
@@ -183,12 +194,16 @@ describe('swarm verdict feedback routing', () => {
     );
   });
 
-  it('does not guess a slot from plan order when persisted ownership is missing', async () => {
+  it('surfaces needs-you instead of falling back silently when no target is resolved', async () => {
     const workspacePath = await writePlan(plan([
       slotItem('wi-a'),
       slotItem('wi-b'),
       slotItem('wi-c'),
     ]));
+    mockResolveIssueFeedbackTarget.mockResolvedValue({
+      needsYou: true,
+      reason: 'No live feedback target for PAN-2203 for item wi-c',
+    });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
@@ -199,14 +214,12 @@ describe('swarm verdict feedback routing', () => {
       slotItemId: 'wi-c',
     }));
 
-    expect(result.agentMessageSent).toBe(true);
-    expect(mockMessageAgent).toHaveBeenCalledWith(
-      'agent-pan-2203',
-      expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
-    );
-    expect(mockMessageAgent).not.toHaveBeenCalledWith(
-      'agent-pan-2203-slot-3',
-      expect.any(String),
-    );
+    expect(result.agentMessageSent).toBe(false);
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith('PAN-2203', 'No live feedback target for PAN-2203 for item wi-c', {
+      specialist: 'review-agent',
+      feedbackPath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+      slotItemId: 'wi-c',
+    });
   });
 });
