@@ -26,14 +26,15 @@
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:22.598Z",
-  "updated": "2026-07-02T15:24:01.037Z",
+  "updated": "2026-07-02T17:05:48.670Z",
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T06:59:56.353Z",
-    "reviewNotes": "Implementation absent — branch has only the planning commit; conversation-service.ts is still 1609 lines and conversation/ does not exist"
+    "updatedAt": "2026-07-02T17:05:48.645Z"
   },
   "closeOut": {
     "usage": {
@@ -85,12 +86,12 @@
       },
       "costAtCloseOut": {
         "usd": 11.125949,
-        "pricingAsOf": "2026-07-02T06:59:56.397Z"
+        "pricingAsOf": "2026-07-02T17:05:48.669Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
