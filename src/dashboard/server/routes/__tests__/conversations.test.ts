@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 /**
  * Tests for conversations route helpers.
  *
@@ -189,6 +190,22 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
 function decodeTextResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
+}
+
+async function getConversationMessages(name: string) {
+  const { conversationsRouteLayer } = await import('../conversations.js');
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/conversations/${name}/messages`, {
+    method: 'GET',
+    headers: { Origin: 'http://localhost:3011' },
+  }));
+
+  return Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(conversationsRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
+      ),
+    ),
+  );
 }
 
 async function readPendingControlCommand(agentId: string): Promise<Record<string, unknown>> {
@@ -1192,6 +1209,67 @@ describe('conversations route — DB integration', () => {
     });
   });
 
+  it('serves pi messages through discovered_sessions when the agent dir transcript is gone', async () => {
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const sessionFile = join(TEST_HOME, '.overdeck', 'agents', 'agent-cleaned-up', 'sessions', '-cwd-pi', '20260702_pi-fallback-session.jsonl');
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, piSessionFixture('pi-fallback-session', '/cwd/pi-fallback'), 'utf8');
+
+    createConversation({
+      name: 'pi-fallback',
+      tmuxSession: 'conv-pi-fallback',
+      cwd: '/cwd/pi-fallback',
+      claudeSessionId: 'pi-fallback-session',
+      harness: 'ohmypi',
+      model: 'anthropic/claude-sonnet-4-6',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: sessionFile,
+      harness: 'ohmypi',
+      sessionId: 'pi-fallback-session',
+      workspacePath: '/cwd/pi-fallback',
+      messageCount: 2,
+      primaryModel: 'anthropic/claude-sonnet-4-6',
+    });
+
+    const response = await getConversationMessages('pi-fallback');
+    const body = decodeJsonResponse(response) as { messages?: Array<{ role: string; text: string }>; workLog?: Array<{ label?: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.messages?.map((message) => message.text)).toEqual(['Please read the file', 'I will read it.']);
+    expect(body.workLog?.some((entry) => entry.label === 'Read')).toBe(true);
+  });
+
+  it('ignores a discovered_sessions fallback path that no longer exists', async () => {
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const missingFile = join(TEST_HOME, 'missing', 'pi-session.jsonl');
+
+    createConversation({
+      name: 'pi-missing-discovered',
+      tmuxSession: 'conv-pi-missing-discovered',
+      cwd: '/cwd/pi-missing',
+      claudeSessionId: 'pi-missing-session',
+      harness: 'ohmypi',
+      model: 'anthropic/claude-sonnet-4-6',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: missingFile,
+      harness: 'ohmypi',
+      sessionId: 'pi-missing-session',
+      workspacePath: '/cwd/pi-missing',
+      messageCount: 2,
+      primaryModel: 'anthropic/claude-sonnet-4-6',
+    });
+
+    const response = await getConversationMessages('pi-missing-discovered');
+    const body = decodeJsonResponse(response) as { messages?: unknown[]; workLog?: unknown[]; streaming?: boolean };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ messages: [], workLog: [], streaming: false });
+  });
+
   it('excludes non-archived conversations from the archived list', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { handleArchivedConversationsList } = await import('../conversations.js');
@@ -1525,3 +1603,55 @@ describe('transformMessageForHarness (PAN-1535)', () => {
     expect(out).not.toContain(`@${path}`);
   });
 });
+
+function piSessionFixture(sessionId: string, cwd: string): string {
+  return [
+    {
+      type: 'session',
+      version: 3,
+      id: sessionId,
+      timestamp: '2026-07-02T10:00:00.000Z',
+      cwd,
+    },
+    {
+      type: 'message',
+      id: 'msg-user',
+      parentId: null,
+      timestamp: '2026-07-02T10:00:01.000Z',
+      message: {
+        role: 'user',
+        content: [{ type: 'text', text: 'Please read the file' }],
+      },
+    },
+    {
+      type: 'message',
+      id: 'msg-assistant',
+      parentId: 'msg-user',
+      timestamp: '2026-07-02T10:00:02.000Z',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'I will read it.' },
+          {
+            type: 'toolCall',
+            id: 'tool-1',
+            name: 'Read',
+            arguments: { file_path: `${cwd}/src/index.ts` },
+          },
+        ],
+      },
+    },
+    {
+      type: 'message',
+      id: 'msg-tool',
+      parentId: 'msg-assistant',
+      timestamp: '2026-07-02T10:00:03.000Z',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'tool-1',
+        toolName: 'Read',
+        content: [{ type: 'text', text: 'file contents' }],
+      },
+    },
+  ].map((line) => JSON.stringify(line)).join('\n') + '\n';
+}
