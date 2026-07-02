@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2156",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T19:21:37.005Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T19:31:35.919Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-02T19:35:04.908Z"
-    }
-  ],
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
@@ -66,16 +49,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T19:35:09.116Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed test failures",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-02T19:51:02.523Z",
+    "reviewNotes": "Approved: extraction verified, focused gates pass, no blockers",
+    "testNotes": "Required full root Vitest gate rerun outside sandbox after EPERM failure: npx vitest run --configLoader runner PASS with 797 files passed / 7935 tests passed / 52 skipped. Prior test-agent notes already recorded typecheck, lint, file-size, and structural checks as passing. Browser UAT not required for this backend behavior-preserving refactor.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "reviewedAtCommit": "f96ae08cb910b3d94124f60f0c8dcd5723ef5e4b",
+    "reviewedAtCommit": "dc708ff5f05fde2b9301e3d82fd10a0b82116fbc",
     "lastVerifiedCommit": "f96ae08cb910b3d94124f60f0c8dcd5723ef5e4b",
     "reviewRequestedAt": "2026-07-02T19:18:51.566Z"
   },
@@ -129,7 +113,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.48002,
-        "pricingAsOf": "2026-07-02T19:35:09.133Z"
+        "pricingAsOf": "2026-07-02T19:51:02.566Z"
       }
     },
     "merges": [
@@ -137,6 +121,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-02T19:21:23.803Z",
-  "updated": "2026-07-02T19:35:09.197Z"
+  "created": "2026-07-02T19:43:33.248Z",
+  "updated": "2026-07-02T19:51:02.652Z"
 }
