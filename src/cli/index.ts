@@ -425,11 +425,13 @@ planCmd
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
+  .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planFinalizeCommand);
 
 planCmd
   .command('done <id>')
   .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
 // Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
