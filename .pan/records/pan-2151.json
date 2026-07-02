@@ -76,18 +76,22 @@
     "recordedAt": "2026-07-02T21:06:08.344Z"
   },
   "created": "2026-06-30T01:25:47.990Z",
-  "updated": "2026-07-02T21:10:35.615Z",
+  "updated": "2026-07-02T21:11:29.929Z",
   "pipeline": {
     "issueId": "PAN-2151",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T21:10:35.575Z",
+    "updatedAt": "2026-07-02T21:11:29.782Z",
+    "reviewNotes": "No blocking findings; pure relocation preserves routes, exports, importers, and size/any ratchets.",
+    "testNotes": "Workspace verified before repo commands: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1791 on branch feature/pan-1791. Read .pan/continue.json, .pan/spec.vbrief.json, .pan/records/pan-1791.json, AGENTS.md, package.json; bd show PAN-1791 found no Beads issue. UAT not required: acceptance/issue notes target library/config/routing/supervisor/server behavior, not browser/dashboard UI workflows. Gates: npm run typecheck PASS; npm run lint PASS; npm test sandbox run failed with EPERM on spawn/listen, rerun escalated PASS: root Vitest 796 files passed/7915 tests passed/52 skipped, frontend issue-action tests 3 files passed/32 tests passed.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "INSPECTION PASSED for bead workspace-he57r. shared-helpers diff moves the intended helpers into src/dashboard/server/routes/misc/shared.ts, preserves misc.ts exports via readPackageVersion re-export, changes only misc.ts and misc/shared.ts, and introduces no new execSync/sendKeys/explicit-any patterns.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
+    "reviewedAtCommit": "1a75ee030b0d3623c640b2124fb510d2b4bac645",
     "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6",
     "reviewRequestedAt": "2026-07-02T21:07:42.551Z",
     "scopeDrift": {
@@ -142,8 +146,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 77605,
-            "output": 5383,
+            "input": 78607,
+            "output": 5552,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -171,8 +175,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 77605,
-          "output": 5383,
+          "input": 78607,
+          "output": 5552,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -191,7 +195,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.083717,
-        "pricingAsOf": "2026-07-02T21:10:35.614Z"
+        "pricingAsOf": "2026-07-02T21:11:29.883Z"
       }
     },
     "merges": [
