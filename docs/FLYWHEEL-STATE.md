@@ -201,6 +201,16 @@ live in **Substrate fixes** above; RUN-32/34/35 are kept verbatim below.)
 
 Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file holds only cross-run **durable** memory; per-tick logs were redundant with the run reports and were compacted out on 2026-06-29 (was 373KB / 3253 lines).
 
+## RUN-53 tick 1 (2026-07-02) — RED MAIN struck (PAN-2212 direct-push mock drift) + codex auth outage again
+
+- **Main RED, 3 consecutive CI failures.** Root cause: `803bb76681` "feat(cloister): reserved swarm dispatch budget (PAN-2212)" pushed **directly to main** by panopticon-agent[bot] (no branch, no review — the PAN-2204 hazard class, second confirmed incident). It added `tryReserveSwarmSlot` to `src/lib/cloister/concurrency.ts`; 8+ test files' explicit `vi.mock` factories of that module don't return the new export → 31 tests fail. Filed **PAN-2217** (blocks-main) + struck it (`strike-pan-2217`, Fable 5). CI logs show the mock under THREE relative paths — a fix must sweep ALL `vi.mock` factories of concurrency.js repo-wide.
+- **PAN-2181 (PR #2183) "failing checks" merge-blocker is pure red-main inheritance** — identical mock-drift error on its rebased branch. No action on the PR itself; drains after PAN-2217 + re-run.
+- **codex/gpt-5.5 OAuth logged out AGAIN** (`pan pi-auth status` → not logged in; same as RUN-39). agent-pan-2172-review dead mid-session ("refresh token revoked"); agent-pan-2154-review / agent-pan-2156-review / agent-pan-2150-test sessions gone. Applied RUN-39 playbook: `pan review restart <id> --model claude-sonnet-4-6` for 2172/2154/2156 (all spawned OK; 2172 needed one retry after a transient Bad Gateway). Held gpt-5.5 work pickup; surfaced `pan ohmypi-auth login` (operator-only) in openQuestions.
+- **TENET-10 objections filed:** PAN-2145 (routes/conversations.ts), PAN-2147 (routes/agents.ts), PAN-2148 (routes/issues.ts), PAN-2149 (cloister/service.ts) — all four needsPlanning items are pipeline-runtime decompositions (verified: start-agent/spawnAgent/deliverAgentMessage hits in each). Labeled `needs-handoff` + objection comments, PAN-2189 precedent. Planning floor: nothing safe to plan this tick.
+- **PAN-2214 swarm live on the same code the strike touches** (parent + slot-1 healthy Fable 5; slot-2 = kickoff zombie ctx0%/$0, PAN-2172-bug class — watching for deacon re-delivery per RUN-39 tick-3 lesson before escalating). Its `chore(state)` commits keep landing on main; strike told to rebase before push.
+- MIN-831 + MIN-846 review+test passed — UAT-gated, surfaced to operator. UAT candidate endpoint returns null PAN-side (expected on red main).
+- Primary-worktree dirty files (conversation-lifecycle.ts, conversations.ts) predate this run — not flywheel's, left untouched.
+
 ## RUN-39 tick 2 (2026-06-29) — PAN-2155 drained; kickoff-delivery bugs gate the rest
 
 - **PAN-2155 MERGED** (commit 9bebbf24, auto-merge fired 20:14Z) → `pan close --force` → terminal. Cohort now 13/15 terminal.
