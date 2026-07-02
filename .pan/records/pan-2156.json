@@ -1,45 +1,6 @@
 {
   "issueId": "PAN-2156",
   "schemaVersion": 2,
-  "decisions": [
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: Refactor-only extraction with no behavior change; existing coverage for parser/activity/watch/gate/context usage remains in src/dashboard/server/services/__tests__/conversation-service.test.ts at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9, and retry gates passed: npm run typecheck, npm run lint, npx vitest run --configLoader runner with 797 files / 7926 tests.",
-      "recordedAt": "2026-07-02T18:26:42.056Z"
-    }
-  ],
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "claude-sonnet-4-6",
-      "timestamp": "2026-07-02T18:19:29.746Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "claude-sonnet-4-6",
-      "timestamp": "2026-07-02T18:23:01.195Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "claude-sonnet-4-6",
-      "timestamp": "2026-07-02T18:24:54.669Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "claude-sonnet-4-6",
-      "timestamp": "2026-07-02T18:26:36.930Z"
-    },
-    {
-      "timestamp": "2026-07-02T18:26:54.533Z",
-      "reason": "end",
-      "note": "Test gate waived: Refactor-only extraction with no behavior change; existing coverage for parser/activity/watch/gate/context usage remains in src/dashboard/server/services/__tests__/conversation-service.test.ts at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9, and retry gates passed: npm run typecheck, npm run lint, npx vitest run --configLoader runner with 797 files / 7926 tests."
-    },
-    {
-      "reason": "resume",
-      "agentModel": "claude-sonnet-4-6",
-      "timestamp": "2026-07-02T18:26:56.440Z"
-    }
-  ],
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
@@ -88,15 +49,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "failed",
+    "testStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:27:14.861Z",
-    "reviewNotes": "Pure barrel decomposition of conversation-service.ts: all 16 public symbols present, 9 submodules each under 1000 lines, no logic changes, DAG acyclic, async-only I/O confirmed",
+    "updatedAt": "2026-07-02T18:35:49.798Z",
+    "reviewNotes": "Verification failed at test",
     "testNotes": "Retried required gates in /home/eltmon/Projects/overdeck/workspaces/feature-pan-2156 after stale test-role failure: npm run typecheck PASS, npm run lint PASS, npx vitest run --configLoader runner PASS with 797 files passed / 7926 tests passed / 52 skipped. No browser UAT required for this behavior-preserving service refactor.",
+    "verificationNotes": "Verification FAILED at test (55165ms):\n\nwrapModuleLoad (node:internal/modules/cjs/loader:237:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v22.22.0\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/cli/commands/__tests__/done.test.ts > pan done CLI options > rejects --test-waived without a reason (AC4)\nAssertionError: expected [Function] to throw error matching /error: option '--test-waived <reason…/i but got 'Command failed: node /home/eltmon/Pro…'\n\n- Expected:\n/error: option '--test-waived <reason>' argument missing/i\n\n+ Received:\n\"Command failed: node /home/eltmon/Projects/overdeck/workspaces/feature-pan-2156/dist/cli/index.js done PAN-1501 --test-waived\nnode:internal/modules/cjs/loader:1386\n  throw err;\n  ^\n\nError: Cannot find module '/home/eltmon/Projects/overdeck/workspaces/feature-pan-2156/dist/cli/index.js'\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)\n    at Function._load (node:internal/modules/cjs/loader:1192:37)\n    at TracingChannel.traceSync (node:diagnostics_channel:328:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v22.22.0\n\"\n\n ❯ src/cli/commands/__tests__/done.test.ts:45:84\n     43|\n     44|   it('rejects --test-waived without a reason (AC4)', async () => {\n     45|     await expect(execFileAsync('node', [CLI, 'done', 'PAN-1501', '--te…\n       |                                                                                    ^\n     46|       /error: option '--test-waived <reason>' argument missing/i,\n     47|     );\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
+    "reviewedAtCommit": "a8d1325572feffb842f6abe3ddf9ada075e5ea1d",
     "lastVerifiedCommit": "007b11585a73111b32980894a9182ee9ddbc509a",
     "reviewRequestedAt": "2026-07-02T18:26:54.535Z"
   },
@@ -121,10 +84,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 50,
-            "output": 23039,
-            "cacheRead": 3290110,
-            "cacheWrite": 780315
+            "input": 55,
+            "output": 24752,
+            "cacheRead": 3600043,
+            "cacheWrite": 908108
           }
         }
       },
@@ -142,15 +105,15 @@
           "cacheWrite": 407273
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 50,
-          "output": 23039,
-          "cacheRead": 3290110,
-          "cacheWrite": 780315
+          "input": 55,
+          "output": 24752,
+          "cacheRead": 3600043,
+          "cacheWrite": 908108
         }
       },
       "costAtCloseOut": {
-        "usd": 14.882107,
-        "pricingAsOf": "2026-07-02T18:27:14.926Z"
+        "usd": 15.48002,
+        "pricingAsOf": "2026-07-02T18:35:49.841Z"
       }
     },
     "merges": [
@@ -158,6 +121,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-02T18:09:19.879Z",
-  "updated": "2026-07-02T18:27:15.574Z"
+  "created": "2026-07-02T18:30:56.182Z",
+  "updated": "2026-07-02T18:35:49.842Z"
 }
