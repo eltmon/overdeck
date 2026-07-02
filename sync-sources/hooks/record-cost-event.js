@@ -12654,6 +12654,16 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "anthropic",
+		model: "claude-sonnet-5",
+		inputPer1k: .002,
+		outputPer1k: .01,
+		cacheReadPer1k: 2e-4,
+		cacheWrite5mPer1k: .0025,
+		cacheWrite1hPer1k: .004,
+		currency: "USD"
+	},
+	{
+		provider: "anthropic",
 		model: "claude-opus-4-6",
 		inputPer1k: .005,
 		outputPer1k: .025,
@@ -12937,7 +12947,7 @@ function calculateCostSync(usage, pricing) {
 	let inputMultiplier = 1;
 	let outputMultiplier = 1;
 	const totalInputTokens = usage.inputTokens + (usage.cacheReadTokens || 0) + (usage.cacheWriteTokens || 0);
-	if ((pricing.model === "claude-sonnet-4" || pricing.model === "claude-sonnet-4-6") && totalInputTokens > 2e5) {
+	if (pricing.model === "claude-sonnet-4" && totalInputTokens > 2e5) {
 		inputMultiplier = 2;
 		outputMultiplier = 1.5;
 	}
@@ -25643,6 +25653,32 @@ const MODEL_CAPABILITIES = {
 		],
 		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
 	},
+	"claude-sonnet-5": {
+		model: "claude-sonnet-5",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 5",
+		costPer1MTokens: 6,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 96,
+			"code-review": 96,
+			debugging: 94,
+			planning: 92,
+			documentation: 94,
+			testing: 94,
+			security: 90,
+			performance: 90,
+			synthesis: 92,
+			speed: 70,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high"
+		],
+		notes: "Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; introductory pricing through 2026-08-31 is $2/M input and $10/M output, then $3/M input and $15/M output from 2026-09-01. Scores are provisional until benchmarks are verified."
+	},
 	"claude-sonnet-4-6": {
 		model: "claude-sonnet-4-6",
 		provider: "anthropic",
@@ -26550,7 +26586,7 @@ function getModelEffortLevelsSync(model) {
 //#region ../../src/lib/config-yaml/roles.ts
 const DEFAULT_WORKHORSES = {
 	expensive: "claude-opus-4-8",
-	mid: "claude-sonnet-4-6",
+	mid: "claude-sonnet-5",
 	cheap: "claude-haiku-4-5"
 };
 const DEFAULT_ROLES = {
@@ -26758,6 +26794,508 @@ function defaultBackgroundAiFeatures() {
 	return out;
 }
 //#endregion
+//#region ../../src/lib/openai-compatible-proxy.ts
+const HOST = "127.0.0.1";
+const PORT = 12436;
+TaggedError("OpenAICompatibleProxyError");
+function getOpenAICompatibleProxyBaseUrl(provider) {
+	return `http://${HOST}:${PORT}/${provider}`;
+}
+//#endregion
+//#region ../../src/lib/providers.ts
+const PROVIDERS = {
+	anthropic: {
+		name: "anthropic",
+		displayName: "Anthropic",
+		compatibility: "direct",
+		defaultHarness: "claude-code",
+		models: [
+			"claude-fable-5",
+			"claude-opus-4-8",
+			"claude-opus-4-7",
+			"claude-opus-4-6",
+			"claude-sonnet-5",
+			"claude-sonnet-4-6",
+			"claude-sonnet-4-5",
+			"claude-haiku-4-5"
+		],
+		tested: true,
+		description: "Native Claude API"
+	},
+	kimi: {
+		name: "kimi",
+		displayName: "Kimi (Moonshot AI)",
+		compatibility: "direct",
+		defaultHarness: "claude-code",
+		models: [
+			"kimi-k2.7-code",
+			"kimi-k2.6",
+			"kimi-k2.5",
+			"kimi-k2",
+			"K2.6-code-preview"
+		],
+		tierModels: {
+			opus: "kimi-k2.6",
+			sonnet: "kimi-k2.5",
+			haiku: "kimi-k2"
+		},
+		tested: true,
+		description: "Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot."
+	},
+	openai: {
+		name: "openai",
+		displayName: "OpenAI",
+		compatibility: "direct",
+		defaultHarness: "codex",
+		models: [
+			"gpt-5.5",
+			"gpt-5.4",
+			"gpt-5.4-mini",
+			"gpt-5.3-codex",
+			"gpt-5.3-codex-spark",
+			"gpt-5.2"
+		],
+		tierModels: {
+			opus: "gpt-5.5",
+			sonnet: "gpt-5.4",
+			haiku: "gpt-5.4-mini"
+		},
+		tested: true,
+		description: "Route through the local CLIProxyAPI Anthropic-compatible sidecar using Codex/ChatGPT subscription auth."
+	},
+	google: {
+		name: "google",
+		displayName: "Google (Gemini)",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		models: [
+			"gemini-3.1-pro-preview",
+			"gemini-3-flash-preview",
+			"gemini-3.1-flash-lite-preview"
+		],
+		tierModels: {
+			opus: "gemini-3.1-pro-preview",
+			sonnet: "gemini-3-flash-preview",
+			haiku: "gemini-3.1-flash-lite-preview"
+		},
+		tested: true,
+		description: "Route via local CLIProxyAPI Gemini backend using GOOGLE_API_KEY"
+	},
+	minimax: {
+		name: "minimax",
+		displayName: "MiniMax",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://api.minimax.io/anthropic",
+		authType: "static",
+		models: [
+			"minimax-m2.7",
+			"minimax-m2.7-highspeed",
+			"MiniMax-M3"
+		],
+		haikuModel: "minimax-m2.7-highspeed",
+		tierModels: {
+			opus: "MiniMax-M3",
+			sonnet: "minimax-m2.7",
+			haiku: "minimax-m2.7-highspeed"
+		},
+		tested: true,
+		description: "Route directly to MiniMax Anthropic-compatible endpoint using MINIMAX_API_KEY."
+	},
+	zai: {
+		name: "zai",
+		displayName: "Z.AI",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://api.z.ai/api/anthropic",
+		authType: "static",
+		models: [
+			"glm-5.2",
+			"glm-5.1",
+			"glm-4.7",
+			"glm-4.7-flash"
+		],
+		haikuModel: "glm-4.7-flash",
+		tierModels: {
+			opus: "glm-5.2",
+			sonnet: "glm-4.7",
+			haiku: "glm-4.7-flash"
+		},
+		tested: true,
+		description: "Route directly to Z.AI Anthropic-compatible endpoint using ZHIPU_API_KEY."
+	},
+	mimo: {
+		name: "mimo",
+		displayName: "Xiaomi MiMo",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://token-plan-sgp.xiaomimimo.com/anthropic",
+		authType: "static",
+		models: ["mimo-v2.5-pro", "mimo-v2.5"],
+		haikuModel: "mimo-v2.5",
+		tierModels: {
+			opus: "mimo-v2.5-pro",
+			sonnet: "mimo-v2.5-pro",
+			haiku: "mimo-v2.5"
+		},
+		tested: true,
+		description: "Route directly to Xiaomi MiMo Anthropic-compatible endpoint using MIMO_API_KEY."
+	},
+	openrouter: {
+		name: "openrouter",
+		displayName: "OpenRouter",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://openrouter.ai/api/v1",
+		authType: "static",
+		models: [],
+		tested: true,
+		description: "Route directly to OpenRouter Anthropic-compatible endpoint; slash-containing model IDs pass through unchanged."
+	},
+	nous: {
+		name: "nous",
+		displayName: "Nous Portal",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: getOpenAICompatibleProxyBaseUrl("nous"),
+		authType: "static",
+		models: ["qwen/qwen3.6-plus"],
+		haikuModel: "qwen/qwen3.6-plus",
+		tierModels: {
+			opus: "qwen/qwen3.6-plus",
+			sonnet: "qwen/qwen3.6-plus",
+			haiku: "qwen/qwen3.6-plus"
+		},
+		tested: true,
+		description: "Route Nous Portal OpenAI-compatible models through Overdeck's local Anthropic-compatible adapter using NOUS_API_KEY."
+	},
+	dashscope: {
+		name: "dashscope",
+		displayName: "Alibaba DashScope",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: getOpenAICompatibleProxyBaseUrl("dashscope"),
+		authType: "static",
+		models: [
+			"qwen3-max",
+			"qwen3-coder-plus",
+			"qwen3-plus",
+			"qwen3.7-max"
+		],
+		haikuModel: "qwen3-plus",
+		tierModels: {
+			opus: "qwen3-max",
+			sonnet: "qwen3-coder-plus",
+			haiku: "qwen3-plus"
+		},
+		tested: false,
+		description: "Route Alibaba DashScope Qwen models through Overdeck's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1)."
+	},
+	xai: {
+		name: "xai",
+		displayName: "xAI (Grok)",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://api.x.ai/v1",
+		authType: "static",
+		models: ["grok-build-0.1"],
+		tierModels: {
+			opus: "grok-build-0.1",
+			sonnet: "grok-build-0.1",
+			haiku: "grok-build-0.1"
+		},
+		tested: false,
+		description: "Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out)."
+	},
+	groq: {
+		name: "groq",
+		displayName: "Groq",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		authType: "static",
+		models: [
+			"llama-3.3-70b-versatile",
+			"llama-3.1-8b-instant",
+			"qwen-qwq-32b",
+			"gemma2-9b-it"
+		],
+		haikuModel: "llama-3.1-8b-instant",
+		tierModels: {
+			opus: "llama-3.3-70b-versatile",
+			sonnet: "llama-3.3-70b-versatile",
+			haiku: "llama-3.1-8b-instant"
+		},
+		tested: false,
+		description: "Route via omp using GROQ_API_KEY. Ultra-low-latency inference on open-weight models."
+	},
+	cerebras: {
+		name: "cerebras",
+		displayName: "Cerebras",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		authType: "static",
+		models: [
+			"llama3.3-70b",
+			"llama3.1-70b",
+			"llama3.1-8b"
+		],
+		haikuModel: "llama3.1-8b",
+		tierModels: {
+			opus: "llama3.3-70b",
+			sonnet: "llama3.1-70b",
+			haiku: "llama3.1-8b"
+		},
+		tested: false,
+		description: "Route via omp using CEREBRAS_API_KEY. Hardware-accelerated inference on Cerebras wafer-scale chips."
+	},
+	mistral: {
+		name: "mistral",
+		displayName: "Mistral AI",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		authType: "static",
+		models: [
+			"mistral-large-latest",
+			"mistral-small-latest",
+			"codestral-latest"
+		],
+		haikuModel: "mistral-small-latest",
+		tierModels: {
+			opus: "mistral-large-latest",
+			sonnet: "mistral-large-latest",
+			haiku: "mistral-small-latest"
+		},
+		tested: false,
+		description: "Route via omp using MISTRAL_API_KEY."
+	}
+};
+/**
+* Get provider for a given model ID
+*/
+function getProviderForModelSync(modelId) {
+	if (["qwen/qwen3.6-plus"].includes(modelId)) return PROVIDERS.nous;
+	if ([
+		"qwen3-max",
+		"qwen3-coder-plus",
+		"qwen3-plus",
+		"qwen3.7-max"
+	].includes(modelId)) return PROVIDERS.dashscope;
+	if (modelId.includes("/")) return PROVIDERS.openrouter;
+	if ([
+		"claude-fable-5",
+		"claude-opus-4-8",
+		"claude-opus-4-7",
+		"claude-opus-4-6",
+		"claude-sonnet-5",
+		"claude-sonnet-4-6",
+		"claude-sonnet-4-5",
+		"claude-haiku-4-5"
+	].includes(modelId)) return PROVIDERS.anthropic;
+	if ([
+		"gpt-5.5",
+		"gpt-5.4",
+		"gpt-5.4-mini",
+		"gpt-5.3-codex",
+		"gpt-5.3-codex-spark",
+		"gpt-5.2",
+		"gpt-5.5-pro",
+		"gpt-5.4-pro",
+		"o3",
+		"o4-mini",
+		"o3-deep-research",
+		"gpt-4o",
+		"gpt-4o-mini"
+	].includes(modelId)) return PROVIDERS.openai;
+	if ([
+		"gemini-3.1-pro-preview",
+		"gemini-3.1-flash-lite-preview",
+		"gemini-3-pro-preview",
+		"gemini-3-flash-preview",
+		"gemini-2.5-pro",
+		"gemini-2.5-flash"
+	].includes(modelId)) return PROVIDERS.google;
+	if ([
+		"minimax-m2.7",
+		"minimax-m2.7-highspeed",
+		"MiniMax-M3"
+	].includes(modelId)) return PROVIDERS.minimax;
+	if ([
+		"kimi-k2.7-code",
+		"kimi-k2.6",
+		"kimi-k2.5",
+		"kimi-k2",
+		"K2.6-code-preview"
+	].includes(modelId)) return PROVIDERS.kimi;
+	if (["grok-build-0.1"].includes(modelId)) return PROVIDERS.xai;
+	if ([
+		"glm-5.2",
+		"glm-5.1",
+		"glm-4.7",
+		"glm-4.7-flash"
+	].includes(modelId)) return PROVIDERS.zai;
+	if (["mimo-v2.5-pro", "mimo-v2.5"].includes(modelId)) return PROVIDERS.mimo;
+	if ([
+		"llama-3.3-70b-versatile",
+		"llama-3.1-8b-instant",
+		"qwen-qwq-32b",
+		"gemma2-9b-it"
+	].includes(modelId)) return PROVIDERS.groq;
+	if ([
+		"llama3.3-70b",
+		"llama3.1-70b",
+		"llama3.1-8b"
+	].includes(modelId)) return PROVIDERS.cerebras;
+	if ([
+		"mistral-large-latest",
+		"mistral-small-latest",
+		"codestral-latest"
+	].includes(modelId)) return PROVIDERS.mistral;
+	return PROVIDERS.anthropic;
+}
+//#endregion
+//#region ../../src/lib/harness-policy.ts
+const ALLOWED = { allowed: true };
+const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK = {
+	allowed: false,
+	reason: "ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi."
+};
+const GPT_5_5_API_KEY_BLOCK = {
+	allowed: false,
+	reason: "GPT-5.5 needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."
+};
+/** Models that are gated to ChatGPT subscription auth only (no API-key path). */
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(["gpt-5.5"]);
+/**
+* Check whether a (model, authMode) pair is allowed, independent of harness.
+* Use this in pickers to lock model options that the current auth setup can't reach.
+*/
+function canUseModelWithAuthSync(model, authMode) {
+	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return GPT_5_5_API_KEY_BLOCK;
+	return ALLOWED;
+}
+function canUseHarnessSync(harness, model, authMode) {
+	const modelAuth = canUseModelWithAuthSync(model, authMode);
+	if (!modelAuth.allowed) return modelAuth;
+	if (harness === "claude-code") return ALLOWED;
+	if (harness === "codex") return ALLOWED;
+	if (harness === "ohmypi") {
+		if (getProviderForModelSync(model).name === "anthropic" && authMode === "subscription") return OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK;
+		return ALLOWED;
+	}
+	return ALLOWED;
+}
+//#endregion
+//#region ../../src/lib/agents/tier-table.ts
+const TIERED_EXECUTION_DIFFICULTIES = [
+	"trivial",
+	"simple",
+	"medium",
+	"complex",
+	"expert"
+];
+const TIERED_EXECUTION_SUBSCRIPTIONS = [
+	"all",
+	"flagged",
+	"sampled"
+];
+var TieredExecutionConfigError = class extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "TieredExecutionConfigError";
+	}
+};
+const DEFAULT_TIERED_EXECUTION_CONFIG = {
+	enabled: false,
+	tiers: {},
+	supervisor: void 0,
+	replay_threshold: .5,
+	difficultyToTier: {}
+};
+function isRuntimeName(value) {
+	return value === "claude-code" || value === "ohmypi" || value === "codex";
+}
+function isDifficulty(value) {
+	return TIERED_EXECUTION_DIFFICULTIES.includes(value);
+}
+function isSubscription(value) {
+	return TIERED_EXECUTION_SUBSCRIPTIONS.includes(value);
+}
+function knownModelIds() {
+	const ids = /* @__PURE__ */ new Set();
+	for (const provider of Object.values(PROVIDERS)) for (const model of provider.models) ids.add(model);
+	return ids;
+}
+function validateHarness(harness, path) {
+	if (!isRuntimeName(harness)) throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, or codex`);
+}
+function validateModel(model, path) {
+	const resolved = resolveModelIdSync(model);
+	if (!knownModelIds().has(resolved) && !resolved.includes("/")) throw new TieredExecutionConfigError(`${path}.model '${model}' is unknown`);
+	return resolved;
+}
+function validateModelHarnessPolicy(model, harness, path, context) {
+	const provider = getProviderForModelSync(model);
+	const authMode = context.providerAuth?.[provider.name];
+	const decision = canUseHarnessSync(harness, model, authMode);
+	if (!decision.allowed) throw new TieredExecutionConfigError(`${path} is not allowed: ${decision.reason ?? "harness policy rejected this model/harness/auth combination"}`);
+}
+function normalizeTieredExecutionConfig(config) {
+	return {
+		enabled: config?.enabled ?? false,
+		tiers: config?.tiers ?? {},
+		supervisor: config?.supervisor,
+		replay_threshold: config?.replay_threshold ?? .5
+	};
+}
+function validateTieredExecutionConfig(rawConfig, context = {}) {
+	const config = normalizeTieredExecutionConfig(rawConfig);
+	if (!(config.enabled || Object.keys(config.tiers).length > 0 || config.supervisor !== void 0)) return { ...DEFAULT_TIERED_EXECUTION_CONFIG };
+	if (typeof config.replay_threshold !== "number" || config.replay_threshold <= 0 || config.replay_threshold > 1) throw new TieredExecutionConfigError("tiered_execution.replay_threshold must be a number > 0 and <= 1");
+	const difficultyOwners = {};
+	const normalizedTiers = {};
+	for (const [tierName, tier] of Object.entries(config.tiers)) {
+		const path = `tiered_execution.tiers.${tierName}`;
+		validateHarness(tier.harness, path);
+		const model = validateModel(tier.model, path);
+		validateModelHarnessPolicy(model, tier.harness, path, context);
+		if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) throw new TieredExecutionConfigError(`${path}.difficulties must contain at least one difficulty`);
+		const difficulties = [];
+		for (const difficulty of tier.difficulties) {
+			if (!isDifficulty(difficulty)) throw new TieredExecutionConfigError(`${path}.difficulties contains unknown difficulty '${difficulty}'`);
+			difficulties.push(difficulty);
+			difficultyOwners[difficulty] = [...difficultyOwners[difficulty] ?? [], tierName];
+		}
+		normalizedTiers[tierName] = {
+			model,
+			harness: tier.harness,
+			difficulties
+		};
+	}
+	const difficultyToTier = {};
+	for (const difficulty of TIERED_EXECUTION_DIFFICULTIES) {
+		const owners = difficultyOwners[difficulty] ?? [];
+		if (owners.length === 0) throw new TieredExecutionConfigError(`tiered_execution difficulty '${difficulty}' is not mapped to any tier`);
+		if (owners.length > 1) throw new TieredExecutionConfigError(`tiered_execution difficulty '${difficulty}' is mapped to multiple tiers: ${owners.join(", ")}`);
+		difficultyToTier[difficulty] = owners[0];
+	}
+	if (!config.supervisor) throw new TieredExecutionConfigError("tiered_execution.supervisor is required when tiered execution tiers are configured");
+	validateHarness(config.supervisor.harness, "tiered_execution.supervisor");
+	const supervisorModel = validateModel(config.supervisor.model, "tiered_execution.supervisor");
+	validateModelHarnessPolicy(supervisorModel, config.supervisor.harness, "tiered_execution.supervisor", context);
+	if (!isSubscription(config.supervisor.subscribe)) throw new TieredExecutionConfigError(`tiered_execution.supervisor.subscribe must be one of ${TIERED_EXECUTION_SUBSCRIPTIONS.join(", ")}`);
+	return {
+		enabled: config.enabled,
+		tiers: normalizedTiers,
+		supervisor: {
+			model: supervisorModel,
+			harness: config.supervisor.harness,
+			subscribe: config.supervisor.subscribe
+		},
+		replay_threshold: config.replay_threshold,
+		difficultyToTier
+	};
+}
+//#endregion
 //#region ../../src/lib/config-yaml/defaults.ts
 const DEFAULT_DOCS_TRIGGER_REGEXES = [
 	"pan",
@@ -26782,6 +27320,7 @@ const DEFAULT_CONFIG = {
 	openrouterFavorites: [],
 	workhorses: { ...DEFAULT_WORKHORSES },
 	roles: cloneRoles(DEFAULT_ROLES),
+	tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
 	overrides: {},
 	geminiThinkingLevel: 3,
 	trackerKeys: {},
@@ -27127,6 +27666,7 @@ function mergeConfigs(...configs) {
 		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
 		workhorses: { ...DEFAULT_WORKHORSES },
 		roles: cloneRoles(DEFAULT_ROLES),
+		tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
 		memory: {
 			extraction: {
 				...DEFAULT_CONFIG.memory.extraction,
@@ -27201,8 +27741,11 @@ function mergeConfigs(...configs) {
 			const legacyKeys = config.api_keys || {};
 			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
 			applyProviderHarness(result, "anthropic", anthropic.harness);
-			if (anthropic.enabled) result.enabledProviders.add("anthropic");
-			else if (providers.anthropic !== void 0) {
+			if (anthropic.enabled) {
+				result.enabledProviders.add("anthropic");
+				if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+				if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
+			} else if (providers.anthropic !== void 0) {
 				explicitlyDisabled.add("anthropic");
 				result.enabledProviders.delete("anthropic");
 			}
@@ -27316,6 +27859,7 @@ function mergeConfigs(...configs) {
 		}
 		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
 		mergeRoleConfig(result, config);
+		if (config.tiered_execution) result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, { providerAuth: result.providerAuth });
 		if (config.api_keys) {
 			if (config.api_keys.openai) {
 				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
@@ -27412,6 +27956,7 @@ function mergeConfigs(...configs) {
 		}
 	}
 	validateRoleModelRefs(result);
+	result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, { providerAuth: result.providerAuth });
 	return {
 		config: result,
 		explicitlyDisabled
@@ -30125,6 +30670,15 @@ function runOverdeckMigrationSync(db) {
 		if (trimmed) db.exec(trimmed);
 	}
 }
+/**
+* Idempotent index top-ups for databases created before the index existed in
+* the init migration (the migration only runs on a fresh database). PAN-2220:
+* the conversation ledger-cost query joins cost_events on session_id; without
+* this index SQLite builds an automatic index on every query (~76ms → 7ms).
+*/
+function ensureRuntimeIndexesSync(db) {
+	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
+}
 function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;
 	if (overdeckDbSync) {
@@ -30138,6 +30692,7 @@ function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	db.pragma("foreign_keys = ON");
 	db.pragma("synchronous = NORMAL");
 	runOverdeckMigrationSync(db);
+	ensureRuntimeIndexesSync(db);
 	overdeckDbSync = {
 		path: dbPath,
 		db

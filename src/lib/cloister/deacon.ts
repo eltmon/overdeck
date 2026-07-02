@@ -32,8 +32,10 @@ import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
-import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { listFeatureWorkspaces } from './deacon-workspaces.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
 // keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
 // Deferred review re-dispatch for, Deferred post-review re-dispatch for.
@@ -139,7 +141,8 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 /** Re-exported for symmetry with the additive pattern in the rest of src/lib. */
 export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
-export { reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+export { reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+export { coordinateSwarmSlots } from './deacon-swarm.js';
 export { nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
@@ -875,34 +878,6 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
-function listFeatureWorkspaces(): Array<{ issueId: string; workspacePath: string }> {
-  const projects = listProjectsSync();
-  const workspaces: Array<{ issueId: string; workspacePath: string }> = [];
-
-  for (const { config: projectConfig } of projects) {
-    const workspacesRoot = join(projectConfig.path, 'workspaces');
-    if (!existsSync(workspacesRoot)) continue;
-
-    let entries: string[];
-    try {
-      entries = readdirSync(workspacesRoot, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
-        .map(e => e.name);
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      workspaces.push({
-        issueId: entry.replace(/^feature-/, '').toUpperCase(),
-        workspacePath: join(workspacesRoot, entry),
-      });
-    }
-  }
-
-  return workspaces;
-}
-
 export async function cleanupAbandonedFeedback(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -2086,7 +2061,8 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
       const resolution = runtimeState.resolution;
       const count = runtimeState.resolutionCount || 0;
-      const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+      const slotAgentMatch = /^agent-(.+)-slot-\d+$/.exec(agent.id);
+      const issueId = (agent.issueId || slotAgentMatch?.[1] || agent.id.replace('agent-', '')).toUpperCase();
 
       // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
       // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
@@ -2101,6 +2077,20 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       }
 
       if (resolution === 'done' && count >= 1) {
+        if (slotAgentMatch) {
+          console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: coordinating swarm slot merge instead of issue-level review`);
+          const swarmActions = await coordinateSwarmSlots({ issueId });
+          saveAgentRuntimeState(agent.id, {
+            resolution: 'completed',
+            resolutionCount: count + 1,
+            resolutionUpdatedAt: new Date().toISOString(),
+          });
+          actions.push(`Deacon routed completed slot ${agent.id} (${issueId}) to swarm coordination`);
+          actions.push(...swarmActions);
+          addLog('action', `Routed completed slot ${agent.id} (${issueId}) to swarm coordination`, undefined);
+          continue;
+        }
+
         // PAN-534: lowered from >= 2 to >= 1. A single done signal is sufficient
         // evidence. The old threshold deadlocked when review failed and reset to
         // pending — the agent never re-signaled done, so count stayed at 1 forever.
@@ -2572,6 +2562,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const state = loadState();
   state.patrolCycle++;
   state.lastPatrol = new Date().toISOString();
+  // PAN-2219: persist the heartbeat at cycle START, not only at cycle end.
+  // getDeaconStatus() reads state from disk, so a multi-minute patrol cycle
+  // was invisible to the supervisor watchdog, which killed healthy servers
+  // mid-patrol ("deacon patrol heartbeat stale" restart churn).
+  saveState(state);
 
   // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];
@@ -2900,6 +2895,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-2203: deterministic swarm coordination. This pass derives active
+  // swarms from workspaces + vBRIEF readiness; later beads fill in merge,
+  // dispatch, recovery, and cooldown behavior.
+  const swarmActions = await coordinateSwarmSlots();
+  actions.push(...swarmActions);
+  for (const a of swarmActions) addLog('action', a, state.patrolCycle);
+
   // Reconcile stale merge status: detect branches merged to main outside the dashboard
   const staleMergeActions = await reconcileStaleMergeStatus();
   actions.push(...staleMergeActions);
@@ -2939,6 +2941,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const staleMergeBlockerActions = await reconcileStaleMergeBlockers();
   actions.push(...staleMergeBlockerActions);
   for (const a of staleMergeBlockerActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-2198: re-derive readyForMerge for the no-blocker "stuck after review" strand
+  // (review+test+verify passed, no blocker, but readyForMerge stuck false) so it
+  // converges on the deacon tick instead of only on the server-restart repair sweep.
+  const stuckReadyActions = reconcileStuckReadyForMerge();
+  actions.push(...stuckReadyActions);
+  for (const a of stuckReadyActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and

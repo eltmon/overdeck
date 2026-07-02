@@ -15,8 +15,9 @@
  *
  * Overdeck extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
+ *   - metadata.kind: docs | api | backend | frontend | infra | test | refactor | design | spike
  *   - metadata.issueLabel: issue ID for beads label filtering
- *   - metadata.kind: "acceptance_criterion" on child items
+ *   - child metadata.kind: "acceptance_criterion" on child items
  */
 
 export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
@@ -27,6 +28,14 @@ export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | '
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+
+export type VBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
+
+export const DEFAULT_VBRIEF_ITEM_KIND: VBriefItemKind = 'backend';
+
+export type FilesScopeConfidence = 'high' | 'medium' | 'low';
+
+export type ItemReadiness = 'ready' | 'sequential' | 'needs_refinement';
 
 export interface VBriefReference {
   uri: string;
@@ -48,6 +57,22 @@ export interface VBriefSubItem {
   };
 }
 
+export interface VBriefItemMetadata {
+  difficulty?: VBriefDifficulty;
+  kind?: VBriefItemKind;
+  issueLabel?: string;
+  phase?: number;
+  /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
+  files_scope?: string[];
+  files_scope_confidence?: FilesScopeConfidence;
+  verify_commands?: string[];
+  expected_outputs?: string[];
+  readiness?: ItemReadiness;
+  /** True when this item has >1 blocking parent (DAG convergence point). Auto-derived by planner. */
+  requiresSynthesis?: boolean;
+  [key: string]: unknown;
+}
+
 export interface VBriefItem {
   id: string;
   title: string;
@@ -63,16 +88,7 @@ export interface VBriefItem {
   endDate?: string;
   /** RFC 3339 date-time (e.g., "2025-10-01T00:00:00Z"). NOT plain date. */
   dueDate?: string;
-  metadata?: {
-    difficulty?: VBriefDifficulty;
-    issueLabel?: string;
-    phase?: number;
-    /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
-    files_scope?: string[];
-    /** True when this item has >1 blocking parent (DAG convergence point). Auto-derived by planner. */
-    requiresSynthesis?: boolean;
-    [key: string]: unknown;
-  };
+  metadata?: VBriefItemMetadata;
   narrative?: {
     Action?: string;
     [key: string]: string | undefined;
@@ -154,6 +170,10 @@ export interface VBriefDocument {
 
 export function subItemsOf(item: VBriefItem): VBriefSubItem[] {
   return item.items ?? item.subItems ?? [];
+}
+
+export function resolveVBriefItemKind(metadata?: Pick<VBriefItemMetadata, 'kind'>): VBriefItemKind {
+  return metadata?.kind ?? DEFAULT_VBRIEF_ITEM_KIND;
 }
 
 /**

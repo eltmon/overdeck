@@ -18,7 +18,10 @@ import { requireModelOverrideSync } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { type Role } from './agent-state.js';
+import { assignDispatchTier, type TierAssignment } from './dispatch-tier.js';
+import { resolveTieredExecutionEnabled } from './tier-table.js';
 import {
   buildCavemanExports,
   getProviderEnvForModel,
@@ -80,10 +83,15 @@ export interface SpawnOptions {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Explicit work type ID (overrides phase-based detection)
 
-  // PAN-1517: swarm slot fields removed (slotId, swarmItemId). Parallelism
-  // is now in-context via subagents (see roles/work.md), not via slot agents.
-  // `allowHost` (workspace-isolation override) stays — it predates the swarm
-  // runtime and is used by review/test/ship agents independently.
+  /**
+   * Optional registered slot agent id. Omitted for the default one-work-agent
+   * path; set only by spawnRun when launching a per-item slot.
+   */
+  agentId?: string;
+  /** Registered swarm slot index for per-item work-agent spawning. */
+  slotIndex?: number;
+  /** vBRIEF item id assigned to the registered swarm slot. */
+  slotItemId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
@@ -116,6 +124,118 @@ export interface SpawnRunOptions {
   effort?: RoleEffort;
   resumeSessionId?: string;
   flywheelRunId?: string;
+  /** 1-based registered slot index for per-item work-agent spawning. */
+  slotIndex?: number;
+  /** vBRIEF item id assigned to this registered slot. Required with slotIndex. */
+  slotItemId?: string;
+  /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
+  maxRegisteredSlots?: number;
+}
+
+export interface RegisteredSlotSpawn {
+  agentId: string;
+  branch: string;
+  workspace: string;
+  slotIndex: number;
+  slotItemId: string;
+}
+
+/**
+ * Thread a tiered-execution tier assignment into spawn options (PAN-1791).
+ * When the assignment resolved a tier, its model+harness replace the parent
+ * defaults so the dispatched bead runs on the tier its difficulty selected.
+ * With no assignment (tiering disabled), the options pass through unchanged.
+ */
+export function applyTierAssignment<T extends Pick<SpawnRunOptions, 'model' | 'harness'>>(
+  options: T,
+  assignment?: TierAssignment,
+): T {
+  if (!assignment?.model) return options;
+  return {
+    ...options,
+    model: assignment.model,
+    harness: assignment.harness ?? options.harness,
+  };
+}
+
+export function resolveRegisteredSlotSpawn(
+  issueId: string,
+  baseWorkspace: string,
+  options: Pick<SpawnRunOptions, 'slotIndex' | 'slotItemId'>,
+): RegisteredSlotSpawn | null {
+  const { slotIndex, slotItemId: slotItemIdRaw } = options;
+  if (slotIndex === undefined && slotItemIdRaw === undefined) return null;
+  if (slotIndex === undefined || slotItemIdRaw === undefined) {
+    throw new Error('Registered slot spawn requires both slotIndex and slotItemId.');
+  }
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) {
+    throw new Error(`Registered slot index must be a positive integer; got ${slotIndex}.`);
+  }
+  const slotItemId = slotItemIdRaw.trim();
+  if (!slotItemId) {
+    throw new Error('Registered slot spawn requires a non-empty slotItemId.');
+  }
+
+  const issueLower = issueId.toLowerCase();
+  return {
+    agentId: `agent-${issueLower}-slot-${slotIndex}`,
+    branch: `feature/${issueLower}-slot-${slotIndex}`,
+    workspace: `${baseWorkspace}-slot-${slotIndex}`,
+    slotIndex,
+    slotItemId,
+  };
+}
+
+export interface SlotTierSpawnParams {
+  model?: string;
+  harness?: RuntimeName;
+  tierName?: string;
+}
+
+/**
+ * Tiered-execution model resolution for a registered slot spawn (PAN-1791,
+ * fixing PAN-1196's "difficulty captured and ignored"). When tiered execution
+ * is enabled for the plan, resolve the slot item's tier through
+ * assignDispatchTier and return its (model, harness) as spawn params so the
+ * dispatched bead runs on the tier its difficulty selected.
+ *
+ * Returns {} — leaving the existing model resolution untouched — when:
+ * - tiered execution is disabled (globally and per-plan), or
+ * - an explicit per-spawn model override was passed (same precedence as
+ *   determineModel: an explicit override outranks routing), or
+ * - the item carries no difficulty and no per-bead model override, in which
+ *   case the chain's role-default step IS the existing configured
+ *   role-default resolution in determineModel (nothing hardcoded here).
+ */
+export function resolveSlotTierSpawnParams(
+  baseWorkspace: string,
+  slotItemId: string,
+  explicitModel?: string,
+): SlotTierSpawnParams {
+  const tiered = loadYamlConfig().config.tieredExecution;
+  // No tiered-execution config at all means the feature is off — the
+  // enablement-gate contract (zero behavior change when unconfigured).
+  // A plan-level `tiered_execution: on` override cannot enable tiering
+  // without a tier table to resolve against.
+  if (!tiered) return {};
+  const doc = readWorkspacePlanSync(baseWorkspace);
+  const planMetadata = doc?.plan?.metadata;
+  if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
+  if (explicitModel) return {};
+  if (!doc) {
+    throw new Error(
+      `Tiered execution is enabled but no vBRIEF plan is readable in ${baseWorkspace}.`,
+    );
+  }
+  const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
+  if (!item) {
+    throw new Error(
+      `Tiered execution is enabled but item '${slotItemId}' was not found in the plan for ${baseWorkspace}.`,
+    );
+  }
+  if (!item.metadata?.difficulty && !item.metadata?.model) return {};
+  const assignment = assignDispatchTier(item, tiered, planMetadata);
+  return { model: assignment.model, harness: assignment.harness, tierName: assignment.tierName };
 }
 
 /**

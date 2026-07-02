@@ -86,8 +86,8 @@
       },
       "costAtCloseOut": {
         "usd": 11.125949,
-        "pricingAsOf": "2026-07-02T17:05:48.669Z"
-      }
+      "pricingAsOf": "2026-07-02T17:05:48.669Z"
+    }
     },
     "merges": [],
     "ranOn": "eltmon-z790"

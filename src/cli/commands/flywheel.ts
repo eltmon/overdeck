@@ -1,7 +1,7 @@
 import { exec, spawn } from 'node:child_process';
-import { readFile, realpath, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Schema } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
@@ -20,6 +20,7 @@ import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } fro
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { stopAgent } from '../../lib/agents.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
+import { resolveHarness } from '../../lib/harness-resolve.js';
 import {
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
@@ -33,7 +34,9 @@ import {
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
+import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -205,7 +208,6 @@ export async function flywheelConfigCommand(options: ConfigOptions = {}): Promis
   }
 }
 
-const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONFIG_KEYS = [
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
@@ -213,52 +215,20 @@ const FLYWHEEL_CONFIG_KEYS = [
 
 type FlywheelConfigKey = typeof FLYWHEEL_CONFIG_KEYS[number];
 
-function isInsideRoot(projectRoot: string, candidate: string): boolean {
-  const relativePath = relative(projectRoot, candidate);
-  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
-}
-
-export function resolveFlywheelStartBriefPath(cwd: string, requestedPath?: string): { absolutePath: string; displayPath: string } {
-  const rawPath = requestedPath?.trim() || DEFAULT_BRIEF_PATH;
-  if (rawPath.includes('\0')) throw new Error('Brief path is invalid');
-
-  const root = resolve(cwd);
-  const absolutePath = isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath);
-  if (!isInsideRoot(root, absolutePath)) throw new Error('Brief path must stay inside the project root');
-
-  const normalizedRoot = root.endsWith(sep) ? root : `${root}${sep}`;
-  const displayPath = absolutePath === root ? '.' : relative(root, absolutePath);
-  return { absolutePath, displayPath: absolutePath.startsWith(normalizedRoot) ? displayPath : absolutePath };
-}
-
-async function assertExistingPathInsideRoot(projectRoot: string, candidate: string): Promise<void> {
-  const [realRoot, realCandidate] = await Promise.all([realpath(projectRoot), realpath(candidate)]);
-  if (!isInsideRoot(realRoot, realCandidate)) throw new Error('Brief path must stay inside the project root');
-}
-
-export async function requireFlywheelBrief(cwd: string, requestedPath?: string): Promise<{ absolutePath: string; displayPath: string }> {
-  const resolved = resolveFlywheelStartBriefPath(cwd, requestedPath);
-  try {
-    await assertExistingPathInsideRoot(cwd, resolved.absolutePath);
-    await readFile(resolved.absolutePath, 'utf8');
-    return resolved;
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-    if (code === 'ENOENT') throw new Error(`Flywheel brief not found: ${resolved.displayPath}`);
-    throw error;
-  }
-}
-
 function mb(bytes: number): number {
   return Math.round(bytes / 1024 / 1024);
 }
 
-function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
+async function resolveFlywheelRoleConfig(): Promise<ResolvedFlywheelRoleConfig> {
   const { config } = loadConfigSync();
   const flywheel = config.roles?.flywheel;
+  const model = resolveModel('flywheel', undefined, config);
+  // PAN-1984/PAN-1865: derive the harness from the model provider; never pin
+  // flywheel to claude-code or a hardcoded fallback.
+  const harness = await resolveHarness({ model });
   return {
-    harness: flywheel?.harness ?? 'claude-code',
-    model: resolveModel('flywheel', undefined, config),
+    harness,
+    model,
     effort: flywheel?.effort ?? 'high',
     minAgents: flywheel?.minAgents ?? 20,
     maxAgents: flywheel?.maxAgents ?? 30,
@@ -351,7 +321,7 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
 }
 
 export async function startFlywheelRun(options: StartOptions = {}): Promise<StartFlywheelRunResult> {
-  const cwd = options.cwd ?? process.cwd();
+  const cwd = options.cwd ?? await resolvePrimaryWorktreeRoot(process.cwd());
   const brief = await requireFlywheelBrief(cwd, options.brief);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
@@ -362,7 +332,7 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
   });
-  const roleConfig = resolveFlywheelRoleConfig();
+  const roleConfig = await resolveFlywheelRoleConfig();
   const agent = await spawnFlywheel({
     runId,
     briefPath: brief.absolutePath,
@@ -757,7 +727,7 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
     throw new Error(`Flywheel run ${before.activeRunId} is missing launch metadata; cannot resume safely`);
   }
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
-  const roleConfig = resolveFlywheelRoleConfig();
+  const roleConfig = await resolveFlywheelRoleConfig();
   await resumeFlywheel({
     workspace: launch.workspace,
     briefPath: brief.absolutePath,
@@ -794,10 +764,7 @@ function clearFlywheelRunGate(runId: string): void {
   }
 }
 
-// Gracefully stop the Flywheel orchestrator: kill any live session, write the
-// per-run report, commit any FLYWHEEL-STATE.md changes, and clear the active-run
-// gate. Idempotent: a no-op when nothing is running and nothing is left to
-// report.
+// Stop the orchestrator, write the report, commit state changes, and clear the gate.
 export async function flywheelStopCommand(): Promise<void> {
   try {
     const sessionAlive = await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
@@ -824,10 +791,8 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
   try {
     const cwd = options.cwd ?? process.cwd();
 
-    // Writing report.md finalizes the run (clears the active-run gate and
-    // makes deriveRunStatus → 'complete'). Refuse if the orchestrator session
-    // is still alive, since that would silently terminate a live run. The
-    // orchestrator's own end-of-run call passes --force to bypass this guard.
+    // Writing report.md finalizes the run. Refuse while the orchestrator is alive;
+    // its own end-of-run call passes --force to bypass this guard.
     if (!options.force && await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) {
       console.error('Refusing to write report — flywheel orchestrator session is still alive.');
       console.error('This command finalizes the run (writes report.md and clears the active-run gate).');
@@ -850,10 +815,7 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     const runReport = formatFlywheelStateReport(status, mergeQueue);
     await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
 
-    // PAN-1245: the gate must clear once report.md is written, even if the
-    // commit phase fails (non-git cwd, no FLYWHEEL-STATE.md changes, hook
-    // failure). Otherwise a partial report leaves the gate stuck and the
-    // next `pan flywheel start` is blocked.
+    // PAN-1245: clear the gate after writing report.md even if commit fails.
     try {
       const stateChanged = await isFlywheelStateDirty(cwd);
       if (stateChanged) {
@@ -915,10 +877,7 @@ export async function flywheelReportOpenCommand(options: ReportOpenOptions = {})
   }
 }
 
-// Discard the current flywheel run without writing a report (PAN-1245). Used
-// when a run is stuck post-reboot, or when the user wants a clean slate
-// without ceremony. Stops the orchestrator if attached, writes aborted.json,
-// clears the gate. Idempotent: a no-op when nothing is active.
+// Discard the current run without writing a report (PAN-1245).
 export async function flywheelAbortCommand(): Promise<void> {
   try {
     const candidate = getFlywheelActiveRunId();
@@ -939,6 +898,7 @@ export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
     .description('Flywheel orchestrator lifecycle and status helpers');
+  registerFlywheelSurfaceCommands(program);
 
   flywheel
     .command('start')

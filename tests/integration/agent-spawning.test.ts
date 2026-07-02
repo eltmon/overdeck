@@ -24,7 +24,9 @@ import {
   getAgentStateSync,
   resumeAgent,
   restartAgent,
+  saveAgentStateSync,
   type SpawnOptions,
+  type AgentState,
   getAgentDir,
 } from '../../src/lib/agents.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
@@ -33,6 +35,7 @@ import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
 import { resetHarnessResolveCachesForTests } from '../../src/lib/harness-resolve.js';
+import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
 
 const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
@@ -442,6 +445,79 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   }
 
   describe('work role (spawnAgent)', () => {
+    function writeRunningSlotAgent(agentId: string, issueId: string): void {
+      const workspace = join(testOverdeckHome, `${agentId}-workspace`);
+      mkdirSync(workspace, { recursive: true });
+      saveAgentStateSync({
+        id: agentId,
+        issueId,
+        workspace,
+        harness: 'claude-code',
+        role: 'work',
+        model: DEFAULT_WORKHORSES.mid,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+      } satisfies AgentState);
+    }
+
+    function writeWorkspacePlan(workspace: string, doc: VBriefDocument): void {
+      const panDir = join(workspace, '.pan');
+      mkdirSync(panDir, { recursive: true });
+      writeFileSync(join(panDir, 'spec.vbrief.json'), JSON.stringify(doc, null, 2));
+    }
+
+    function slotPromptPlan(): VBriefDocument {
+      return {
+        vBRIEFInfo: {
+          version: '1.0',
+          created: '2026-06-30T00:00:00Z',
+          description: 'Plan for PAN-1762 registered slot prompt coverage',
+        },
+        plan: {
+          id: 'pan-1762',
+          title: 'Registered slot prompt coverage',
+          status: 'active',
+          sequence: 4,
+          narratives: {
+            Problem: 'Registered slots must receive bounded item-specific context.',
+            Constraint: 'Do not let a slot work on the whole issue.',
+          },
+          items: [
+            {
+              id: 'slot-prompt-item',
+              title: 'Build the item-specific slot prompt',
+              status: 'pending',
+              narrative: { Action: 'Wire spawnRun to deliver the active slice for this one item.' },
+              metadata: {
+                difficulty: 'medium',
+                phase: 1,
+                files_scope: ['src/lib/agents/spawn.ts'],
+                files_scope_confidence: 'high',
+                readiness: 'ready',
+                verify_commands: ['npm test -- slot prompt'],
+                expected_outputs: ['slot prompt includes target item'],
+              },
+              subItems: [
+                {
+                  id: 'slot-prompt-item.ac1',
+                  title: 'The slot initial prompt names slot-prompt-item',
+                  status: 'pending',
+                  metadata: { kind: 'acceptance_criterion' },
+                },
+              ],
+            },
+            {
+              id: 'dependent-item',
+              title: 'Dependent item',
+              status: 'pending',
+              metadata: { phase: 2 },
+            },
+          ],
+          edges: [{ from: 'slot-prompt-item', to: 'dependent-item', type: 'blocks' }],
+        },
+      };
+    }
+
     it('writes role: "work" to AgentState and resolves the work model from roles config', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-1',
@@ -479,6 +555,44 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect((reloaded as unknown as { phase?: string }).phase).toBeUndefined();
       expect((reloaded as unknown as { workType?: string }).workType).toBeUndefined();
       expect((reloaded as unknown as { agentType?: string }).agentType).toBeUndefined();
+    });
+
+    it('counts active registered slot agents against the per-issue slot cap', async () => {
+      writeRunningSlotAgent('agent-pan-1762-slot-1', 'PAN-1762');
+      writeRunningSlotAgent('agent-pan-1762-slot-2', 'PAN-1762');
+
+      await expect(spawnRun('PAN-1762', 'work', {
+        workspace: testWorkspace,
+        slotIndex: 3,
+        slotItemId: 'third-item',
+        maxRegisteredSlots: 2,
+      })).rejects.toThrow('Registered slot cap reached for PAN-1762: 2/2 active slot agents.');
+    });
+
+    it('delivers an item-specific active-slice prompt to registered slot agents', async () => {
+      const workspace = join(testOverdeckHome, 'workspaces', 'feature-pan-1762');
+      const slotWorkspace = `${workspace}-slot-1`;
+      mkdirSync(slotWorkspace, { recursive: true });
+      writeWorkspacePlan(workspace, slotPromptPlan());
+
+      const state = await spawnRun('PAN-1762', 'work', {
+        workspace,
+        slotIndex: 1,
+        slotItemId: 'slot-prompt-item',
+        prompt: 'Foreman says stay within src/lib/agents/spawn.ts.',
+      });
+
+      const prompt = readFileSync(join(getAgentDir(state.id), 'initial-prompt.md'), 'utf8');
+      expect(state.id).toBe('agent-pan-1762-slot-1');
+      expect(state.workspace).toBe(slotWorkspace);
+      expect(prompt).toContain('# Registered Slot Assignment: slot-prompt-item');
+      expect(prompt).toContain('Agent: agent-pan-1762-slot-1');
+      expect(prompt).toContain('Branch: feature/pan-1762-slot-1');
+      expect(prompt).toContain('## Target Item');
+      expect(prompt).toContain('- slot-prompt-item: Build the item-specific slot prompt [pending]');
+      expect(prompt).toContain('The slot initial prompt names slot-prompt-item');
+      expect(prompt).toContain('## Additional Foreman Instructions');
+      expect(prompt).toContain('Foreman says stay within src/lib/agents/spawn.ts.');
     });
 
     it('marks kickoffDelivered true after a ready work-agent kickoff is delivered', async () => {

@@ -14,21 +14,34 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-l
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import * as NodePath from '@effect/platform-node/NodePath';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
+import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
 import {
   appendSessionEntrySync,
   getProjectConfigFromWorkspacePath,
   readRecordContinueViewSync,
   resolveProjectForIssue,
   writeRecordDecisionsSync,
+  writeRecordScopeDriftSync,
 } from '../../lib/pan-dir/record.js';
 import type { MergeSet } from '../../lib/merge-set.js';
+import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { compileGlob } from '../../lib/vbrief/dag.js';
+import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
+import type { VBriefDocument } from '../../lib/vbrief/types.js';
+
+const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+);
 
 interface DoneOptions {
   comment?: string;
@@ -44,8 +57,51 @@ interface DoneOptions {
   strike?: boolean;
 }
 
+interface SlotCompletionContext {
+  agentId: string;
+  agentState: AgentState | null;
+  slotIndex: number;
+  slotItemId?: string;
+  workspacePath: string | null;
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
+  const match = /^agent-([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
+  if (!match) return null;
+  const slotIndex = Number(match[2]);
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) return null;
+  return {
+    issueId: match[1].toUpperCase(),
+    agentId: `agent-${match[1].toLowerCase()}-slot-${slotIndex}`,
+    slotIndex,
+  };
+}
+
+function parseSlotIndexFromAgentId(agentId: string): number | null {
+  const match = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agentId);
+  if (!match) return null;
+  const slotIndex = Number(match[1]);
+  return Number.isInteger(slotIndex) && slotIndex >= 1 ? slotIndex : null;
+}
+
+function parseSlotWorkspacePath(issueId: string, workspacePath: string): { slotIndex: number } | null {
+  const escapedIssue = issueId.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`(?:^|/)feature-${escapedIssue}-slot-(\\d+)/?$`).exec(workspacePath);
+  if (!match) return null;
+  const slotIndex = Number(match[1]);
+  return Number.isInteger(slotIndex) && slotIndex >= 1 ? { slotIndex } : null;
+}
+
+function isSlotAgentState(agentState: AgentState | null): agentState is AgentState {
+  return !!agentState && (
+    typeof agentState.slotIndex === 'number' ||
+    /^agent-[a-z]+-\d+-slot-\d+$/i.test(agentState.id) ||
+    /-slot-\d+\/?$/.test(agentState.workspace)
+  );
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
@@ -185,6 +241,65 @@ export function augmentCommentWithWaiver(comment: string | undefined, waiverReas
   return `${comment}\n\n${waiverText}`;
 }
 
+function pathMatchesDeclaredScope(filePath: string, declaredScope: string[]): boolean {
+  return declaredScope.some((pattern) => {
+    const compiled = compileGlob(pattern);
+    return compiled.regex.test(filePath) || compiled.exactDirectory === filePath;
+  });
+}
+
+function declaredScopeMatchesChangedFile(pattern: string, actualChangedFiles: string[]): boolean {
+  const compiled = compileGlob(pattern);
+  return actualChangedFiles.some((filePath) => compiled.regex.test(filePath) || compiled.exactDirectory === filePath);
+}
+
+export function declaredScopeUnion(doc: VBriefDocument): string[] {
+  return Array.from(
+    new Set(
+      doc.plan.items.flatMap((item) => item.metadata?.files_scope ?? []),
+    ),
+  ).sort();
+}
+
+export function computeScopeDrift(
+  doc: VBriefDocument,
+  actualChangedFiles: Iterable<string>,
+  recordedAt: string,
+): ScopeDriftRecord | null {
+  const declaredScope = declaredScopeUnion(doc);
+  if (declaredScope.length === 0) return null;
+
+  const actual = Array.from(new Set(actualChangedFiles)).sort();
+  return {
+    outsideDeclaredScope: actual.filter((filePath) => !pathMatchesDeclaredScope(filePath, declaredScope)),
+    declaredScopeUntouched: declaredScope.filter((pattern) => !declaredScopeMatchesChangedFile(pattern, actual)),
+    declaredScope,
+    actualChangedFiles: actual,
+    recordedAt,
+  };
+}
+
+async function recordScopeDriftForDone(
+  issueId: string,
+  workspacePath: string,
+): Promise<ScopeDriftRecord | undefined> {
+  try {
+    const plan = readWorkspacePlanSync(workspacePath);
+    if (!plan) return undefined;
+    const actualChangedFiles = await Effect.runPromise(
+      changedFilesVsMain('HEAD', workspacePath, 'origin/main').pipe(Effect.provide(childProcessLayer)),
+    );
+    const drift = computeScopeDrift(plan, actualChangedFiles, new Date().toISOString());
+    if (!drift) return undefined;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    writeRecordScopeDriftSync(project, issueId, drift);
+    return drift;
+  } catch (err: any) {
+    console.warn(`[pan done] Failed to record scope drift for ${issueId} (non-fatal): ${err?.message ?? err}`);
+    return undefined;
+  }
+}
+
 async function isMergeSetMergedIntoTargets(
   workspacePath: string,
   mergeSet: MergeSet | null | undefined,
@@ -253,6 +368,13 @@ async function resolveDoneWorkspace(
     return { agentState, workspacePath: agentWorkspace };
   }
 
+  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
+  if (cwdSlot) {
+    const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
+    const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
+    return { agentState: slotAgentState, workspacePath: process.cwd() };
+  }
+
   const resolved = resolveProjectFromIssueSync(issueId);
   const workspacePath = resolved
     ? findWorkspacePath(resolved.projectPath, issueId.toLowerCase())
@@ -261,10 +383,95 @@ async function resolveDoneWorkspace(
   return { agentState, workspacePath };
 }
 
+async function resolveSlotCompletionContext(
+  issueId: string,
+  agentId: string,
+  slotInput: { agentId: string; slotIndex: number } | null,
+): Promise<SlotCompletionContext | null> {
+  const { getAgentStateSync } = await import('../../lib/agents.js');
+
+  if (slotInput) {
+    const agentState = getAgentStateSync(slotInput.agentId) ?? null;
+    return {
+      agentId: slotInput.agentId,
+      agentState,
+      slotIndex: slotInput.slotIndex,
+      slotItemId: agentState?.slotItemId,
+      workspacePath: agentState?.workspace ?? null,
+    };
+  }
+
+  const agentState = getAgentStateSync(agentId) ?? null;
+  if (isSlotAgentState(agentState)) {
+    const slotIndex =
+      agentState.slotIndex ??
+      parseSlotIndexFromAgentId(agentState.id) ??
+      parseSlotWorkspacePath(issueId, agentState.workspace)?.slotIndex;
+    if (!slotIndex) return null;
+    return {
+      agentId: agentState.id,
+      agentState,
+      slotIndex,
+      slotItemId: agentState.slotItemId,
+      workspacePath: agentState.workspace,
+    };
+  }
+
+  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
+  if (!cwdSlot) return null;
+
+  const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
+  const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
+  return {
+    agentId: slotAgentId,
+    agentState: slotAgentState,
+    slotIndex: cwdSlot.slotIndex,
+    slotItemId: slotAgentState?.slotItemId,
+    workspacePath: slotAgentState?.workspace ?? process.cwd(),
+  };
+}
+
+async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
+  const now = new Date().toISOString();
+  const { saveAgentStateSync } = await import('../../lib/agents.js');
+
+  if (slot.agentState) {
+    slot.agentState.status = 'stopped';
+    slot.agentState.stoppedByUser = true;
+    slot.agentState.lastActivity = now;
+    saveAgentStateSync(slot.agentState);
+  }
+
+  saveAgentRuntimeState(slot.agentId, {
+    state: 'idle',
+    resolution: 'completed',
+    resolutionCount: 1,
+    resolutionUpdatedAt: now,
+    lastActivity: now,
+  });
+
+  emitActivityEntrySync({
+    source: 'work-agent',
+    level: 'info',
+    issueId,
+    message: `${slot.agentId} slot work complete — awaiting swarm verification and merge`,
+  });
+
+  console.log(chalk.green(`✓ Slot ${slot.slotIndex} work complete for ${issueId}`));
+  if (slot.slotItemId) {
+    console.log(chalk.dim(`  Item: ${slot.slotItemId}`));
+  }
+  if (comment) {
+    console.log(chalk.dim(`  Comment: ${comment}`));
+  }
+  console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
-  const issueId = resolveIssueIdSync(id);
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  const slotInput = parseSlotAgentId(id);
+  const issueId = slotInput?.issueId ?? resolveIssueIdSync(id);
+  const agentId = slotInput?.agentId ?? `agent-${issueId.toLowerCase()}`;
 
   // Strike-agent shape: the strike already merged to main and verified there,
   // so there is no review pipeline to dispatch. Run the same post-merge
@@ -300,6 +507,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       message: `Strike ${issueId} post-merge handoff completed${options.comment ? `: ${options.comment}` : ''}`,
     });
     console.log(chalk.green(`✓ Strike ${issueId} handed off to verifying-on-main (review pipeline skipped)`));
+    return;
+  }
+
+  const slotCompletion = await resolveSlotCompletionContext(issueId, agentId, slotInput);
+  if (slotCompletion) {
+    await completeSlotWork(issueId, slotCompletion, options.comment);
     return;
   }
 
@@ -520,6 +733,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);
     }
 
+    const scopeDrift = await recordScopeDriftForDone(issueId, workspacePath);
+
     spinner.text = 'Creating review artifacts...';
     const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
     const { setReviewStatusSync } = await import('../../lib/review-status.js');
@@ -630,6 +845,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       verificationCycleCount: 0,
       autoRequeueCount: 0,
       reviewRequestedAt: new Date().toISOString(),
+      scopeDrift,
     });
 
     await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));

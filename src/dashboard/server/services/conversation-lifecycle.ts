@@ -24,7 +24,7 @@ import {
   createConversation,
   getConversationByClaudeSessionId,
   getConversationByName,
-  listActiveConversations,
+  listConversations,
   markConversationEnded,
   markConversationRunning,
   setClearedToConvId,
@@ -53,6 +53,12 @@ const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship']);
 // Tmux session prefixes that are NOT specialist agents and must be left alone
 // by the backfill pass even if they happen to be missing a row.
 const NON_AGENT_PREFIXES = ['conv-', 'inspect-', 'planning-'];
+
+// PAN-2215: per-boot memo of JSONL transcripts definitively proven NOT to be
+// /clear orphans. Bounded by the number of transcript files on disk (a few
+// thousand paths), and correct forever: the /clear sentinel is written in a
+// transcript's first lines at creation, so a definitive negative never flips.
+const notOrphanJsonlPaths = new Set<string>();
 
 function behaviorForHarness(harness: string | null | undefined) {
   return getHarnessBehavior(harness as HarnessName | null | undefined);
@@ -118,7 +124,12 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
  */
 export async function pollConversations(): Promise<void> {
   try {
-    const conversations = listActiveConversations();
+    // Deliberately fetch ALL non-archived rows, not just active ones: the
+    // resurrect check below (PAN-1972) must see 'ended' rows whose tmux session
+    // and harness are still alive so it can flip them back to active. Ended
+    // rows whose session is genuinely gone are skipped in O(1) further down
+    // (PAN-2215) — they must never be re-marked, re-cleaned, or re-scanned.
+    const conversations = listConversations();
     if (conversations.length === 0) return;
 
     const aliveSessions = new Set(await Effect.runPromise(listSessionNames()));
@@ -151,6 +162,11 @@ export async function pollConversations(): Promise<void> {
         }
         continue;
       }
+      // PAN-2215: an ended row whose session is gone is already in its terminal
+      // state — nothing to mark and nothing to clean up. Without this skip the
+      // patrol re-marked and re-cleaned every dead conversation on every tick,
+      // pegging the event loop and spamming the log.
+      if (conv.status === 'ended') continue;
       // Re-validate at mark time, not poll-start time. A resume can land
       // between the snapshot above and here (kill → spawn → ready), making the
       // verdict stale: marking then flips a just-revived conversation to
@@ -193,7 +209,9 @@ export async function pollConversations(): Promise<void> {
 
     // PAN-1458: detect Claude Code /clear orphans and link them to their parent.
     // Reuses the conversations list already fetched above — do not re-query.
-    await detectOrphanedClaudeCodeSessions(conversations);
+    // Active rows only (PAN-2215): ended conversations must not widen the cwd
+    // scan set, and parent attribution is defined over active convs.
+    await detectOrphanedClaudeCodeSessions(conversations.filter((c) => c.status === 'active'));
   } catch (err: unknown) {
     // Don't crash the server on poll errors
     console.error('[conversation-lifecycle] Poll error:', err);
@@ -306,14 +324,23 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
     for (const filename of entries) {
       if (!filename.endsWith('.jsonl')) continue;
       const sessionId = filename.slice(0, -'.jsonl'.length);
+      const jsonlPath = join(projectDir, filename);
+
+      // PAN-2215: a transcript already proven not to be a /clear orphan can
+      // never become one (the sentinel lives in the first 5 lines, written at
+      // session creation). Skip before the DB lookup and the file open so
+      // historical transcripts cost one scan per boot, not one per 10s tick.
+      if (notOrphanJsonlPaths.has(jsonlPath)) continue;
 
       // Already linked to a conversation (either as a primary session or via a previous
       // orphan-detect pass that adopted it).
       if (getConversationByClaudeSessionId(sessionId)) continue;
 
-      const jsonlPath = join(projectDir, filename);
-      const firstClearTs = await readFirstClearTimestamp(jsonlPath);
-      if (firstClearTs === null) continue; // not a /clear orphan
+      const { clearTs: firstClearTs, definitive } = await readFirstClearTimestamp(jsonlPath);
+      if (firstClearTs === null) {
+        if (definitive) notOrphanJsonlPaths.add(jsonlPath);
+        continue; // not a /clear orphan
+      }
 
       // Parent attribution: among active convs in this cwd, pick the one whose
       // own JSONL's mtime is the highest value strictly less than firstClearTs.
@@ -395,8 +422,14 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
  *
  * Uses a streaming line reader bounded at 5 lines so a multi-megabyte snapshot
  * line at the head of the file doesn't load the whole transcript into memory.
+ *
+ * `definitive` is true when a null verdict can never change: the full 5-line
+ * window was scanned (proven by seeing a 6th line). A shorter file may still
+ * be growing, so its null verdict is provisional and must not be cached.
  */
-async function readFirstClearTimestamp(jsonlPath: string): Promise<number | null> {
+async function readFirstClearTimestamp(
+  jsonlPath: string,
+): Promise<{ clearTs: number | null; definitive: boolean }> {
   const stream = createReadStream(jsonlPath, { encoding: 'utf-8' });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   let lineCount = 0;
@@ -420,13 +453,13 @@ async function readFirstClearTimestamp(jsonlPath: string): Promise<number | null
       if (typeof ts !== 'string') continue;
       const ms = new Date(ts).getTime();
       if (Number.isNaN(ms)) continue;
-      return ms;
+      return { clearTs: ms, definitive: true };
     }
   } finally {
     rl.close();
     stream.destroy();
   }
-  return null;
+  return { clearTs: null, definitive: lineCount > 5 };
 }
 
 /**

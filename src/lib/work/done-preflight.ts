@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'fs';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
@@ -37,7 +37,19 @@ function isTimeout(error: unknown): boolean {
 }
 
 async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadRecord[] | null> {
-  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+  // Workspaces share main's beads DB via `.beads/redirect`; the workspace-local
+  // issues.jsonl is a frozen snapshot from workspace-creation time and does NOT
+  // reflect bead closes made against the redirected DB. Follow the redirect so the
+  // completion gate reads the live bead ledger, not a stale snapshot (PAN-2195:
+  // a stale snapshot produced false "open beads" / "unchecked ACs" and blocked
+  // `pan done` for completed work after a replan).
+  const beadsDir = join(workspacePath, '.beads');
+  let jsonlPath = join(beadsDir, 'issues.jsonl');
+  const redirectPath = join(beadsDir, 'redirect');
+  if (existsSync(redirectPath)) {
+    const target = (await readFile(redirectPath, 'utf-8')).trim();
+    if (target) jsonlPath = join(resolve(workspacePath, target), 'issues.jsonl');
+  }
   if (!existsSync(jsonlPath)) return null;
 
   const label = issueId.toLowerCase();
