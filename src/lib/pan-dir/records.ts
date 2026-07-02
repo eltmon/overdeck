@@ -281,12 +281,17 @@ export async function updateIssueRecordForIssue(
 
     const record = await buildIssueRecord(project, issueId, { reviewStatus });
     // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
-    // a swarm slot assignment written during that window would be erased by this
-    // whole-record write (lost update — wiped slot ownership during the PAN-1791
-    // runaway). Re-read the swarm block synchronously immediately before writing
-    // so the freshest assignments always survive the rebuild.
+    // anything written to the record during that window would be erased by this
+    // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
+    // slot assignments during the runaway, then wiped item statusOverrides right
+    // after `pan done` — which made every completed item dispatchable again and
+    // re-spawned slots for finished work. Re-read both blocks synchronously
+    // immediately before writing so the freshest values survive the rebuild.
     const fresh = readIssueRecordSync(project, issueId);
     if (fresh?.swarm) record.swarm = fresh.swarm;
+    if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
+      record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
+    }
     const recordPath = writeIssueRecordSync(project, issueId, record);
     queueIssueRecordCommit(project, issueId, recordPath);
   } catch (err) {
