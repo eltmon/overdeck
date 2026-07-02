@@ -4,16 +4,16 @@
     "created": "2026-06-29T21:46:59.204Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2181: extend boot-reconciliation grace default to 120s and restyle BootReconciliationModal to theme tokens (light/dark).",
-    "updated": "2026-06-29T21:50:36.005Z"
+    "updated": "2026-06-29T22:35:03.009Z"
   },
   "plan": {
     "id": "pan-2181",
     "title": "Boot-reconciliation grace countdown: extend to 2 min + restyle modal to style-guide tokens (light/dark)",
-    "status": "proposed",
+    "status": "running",
     "uid": "220512c9-ae9e-4f81-bf4a-c267fd1bef46",
     "author": "agent:claude-opus-4-8",
     "created": "2026-06-29T21:46:59.204Z",
-    "updated": "2026-06-29T21:50:36.005Z",
+    "updated": "2026-06-29T22:35:03.009Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2181",
@@ -178,7 +178,7 @@
       ],
       "canonicalFilename": "2026-06-29-PAN-2181-boot-reconciliation-grace-countdown-extend-to-2-min-restyle-modal-to-style-guide-tokens-light-dark.vbrief.json"
     },
-    "sequence": 2
+    "sequence": 4
   },
-  "status": "proposed"
+  "status": "active"
 }

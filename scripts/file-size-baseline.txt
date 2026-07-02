@@ -31,14 +31,14 @@
 2039 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts
 3012 src/lib/config-yaml.ts
-1194 src/lib/conversations/smart-compaction.ts
+1195 src/lib/conversations/smart-compaction.ts
 1650 src/lib/database/schema.ts
-1270 src/lib/model-capabilities.ts
+1295 src/lib/model-capabilities.ts
 1075 src/lib/overdeck/agents.ts
 1526 src/lib/overdeck/conversations.ts
 1050 src/lib/overdeck/memory.ts
 1001 src/lib/overdeck/merge.ts
-1062 src/lib/review-status.ts
+1067 src/lib/review-status.ts
 1488 src/lib/settings-api.ts
 1205 src/lib/sync.ts
 1258 src/lib/tmux.ts

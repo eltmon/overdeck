@@ -37,7 +37,12 @@ function makeDoc(issueId: string): VBriefDocument {
           title: 'Promote spec',
           status: 'pending',
           narrative: { Action: 'Promote the finalized spec into the project planning directory' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.pan/spec.vbrief.json'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
           subItems: [
             {
               id: 'item-1.ac1',
@@ -58,7 +63,12 @@ function makeDoc(issueId: string): VBriefDocument {
           title: 'Create beads',
           status: 'pending',
           narrative: { Action: 'Materialize one bead task for each finalized plan item' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.beads/issues.jsonl'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
           subItems: [
             {
               id: 'item-2.ac1',

@@ -72,6 +72,7 @@ pan-start
 pan-status
 pan-stop-all-agents
 pan-subagent-creator
+pan-swarm
 pan-sync
 pan-sync-main
 pan-tell

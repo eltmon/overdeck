@@ -1,0 +1,60 @@
+{
+  "issueId": "PAN-2217",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-02T06:49:55.068Z",
+  "updated": "2026-07-02T07:04:41.013Z",
+  "pipeline": {
+    "issueId": "PAN-2217",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T07:04:40.992Z",
+    "testNotes": "Skipped: issue is already merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 164,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "strike": {
+          "anthropic/claude-fable-5": {
+            "input": 20189,
+            "output": 18915,
+            "cacheRead": 3861197,
+            "cacheWrite": 227690
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 164,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 20189,
+          "output": 18915,
+          "cacheRead": 3861197,
+          "cacheWrite": 227690
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.85497,
+        "pricingAsOf": "2026-07-02T07:04:41.013Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-fable-5"
+}

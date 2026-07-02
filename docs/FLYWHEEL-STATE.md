@@ -201,6 +201,28 @@ live in **Substrate fixes** above; RUN-32/34/35 are kept verbatim below.)
 
 Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file holds only cross-run **durable** memory; per-tick logs were redundant with the run reports and were compacted out on 2026-06-29 (was 373KB / 3253 lines).
 
+## RUN-53 operator directives (2026-07-02, standing)
+
+- **NEVER pass `--model` to pan commands.** Config now routes every role to `claude-fable-5` (workhorse aliases changed). This SUPERSEDES the RUN-39 "re-route reviews to Sonnet via `--model claude-sonnet-4-6`" playbook — a codex auth outage no longer requires (or permits) a model override; restart with the bare command and let config route. Tick-1's three Sonnet-override restarts were re-issued without `--model` (CLI resumed the existing sessions; a fresh respawn on the config model would need an operator kill first).
+- **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
+- **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
+
+## RUN-53 tick 1.5 (2026-07-02) — PAN-2217 DONE; second red-main cause struck (PAN-2218 file-size guard)
+
+- **PAN-2217 strike COMPLETE:** mock-factory fix `0e0cd31cf2` on main, test job green, `pan done --strike` handoff applied.
+- **Main still red on the LINT job:** `08796258b0` ("fix(cli): pin flywheel start to the primary worktree root", direct push by panopticon-agent[bot]) grew `src/cli/commands/flywheel.ts` to 1022 lines — over the 1000-line file-size guard. Verified locally (wc -l = 1022). Filed as **PAN-2218** (blocks-main) by the strike agent; dispatched `strike-pan-2218` (config-routed fable-5, no --model).
+- **Recurring pattern:** this is the second file-size-guard red-main on this exact file (PAN-2192 was "flywheel CLI exceeds file-size guard after harness resolver fix"). Every direct-push fix to flywheel.ts risks tripping the guard. Durable fix = decompose flywheel.ts — but the flywheel loop is TENET-10 pipeline machinery, so that decomposition is needs-handoff, not autonomous. Surfaced as a suggestion.
+
+## RUN-53 tick 1 (2026-07-02) — RED MAIN struck (PAN-2212 direct-push mock drift) + codex auth outage again
+
+- **Main RED, 3 consecutive CI failures.** Root cause: `803bb76681` "feat(cloister): reserved swarm dispatch budget (PAN-2212)" pushed **directly to main** by panopticon-agent[bot] (no branch, no review — the PAN-2204 hazard class, second confirmed incident). It added `tryReserveSwarmSlot` to `src/lib/cloister/concurrency.ts`; 8+ test files' explicit `vi.mock` factories of that module don't return the new export → 31 tests fail. Filed **PAN-2217** (blocks-main) + struck it (`strike-pan-2217`, Fable 5). CI logs show the mock under THREE relative paths — a fix must sweep ALL `vi.mock` factories of concurrency.js repo-wide.
+- **PAN-2181 (PR #2183) "failing checks" merge-blocker is pure red-main inheritance** — identical mock-drift error on its rebased branch. No action on the PR itself; drains after PAN-2217 + re-run.
+- **codex/gpt-5.5 OAuth logged out AGAIN** (`pan pi-auth status` → not logged in; same as RUN-39). agent-pan-2172-review dead mid-session ("refresh token revoked"); agent-pan-2154-review / agent-pan-2156-review / agent-pan-2150-test sessions gone. Applied RUN-39 playbook: `pan review restart <id> --model claude-sonnet-4-6` for 2172/2154/2156 (all spawned OK; 2172 needed one retry after a transient Bad Gateway). Held gpt-5.5 work pickup; surfaced `pan ohmypi-auth login` (operator-only) in openQuestions.
+- **TENET-10 objections filed:** PAN-2145 (routes/conversations.ts), PAN-2147 (routes/agents.ts), PAN-2148 (routes/issues.ts), PAN-2149 (cloister/service.ts) — all four needsPlanning items are pipeline-runtime decompositions (verified: start-agent/spawnAgent/deliverAgentMessage hits in each). Labeled `needs-handoff` + objection comments, PAN-2189 precedent. Planning floor: nothing safe to plan this tick.
+- **PAN-2214 swarm live on the same code the strike touches** (parent + slot-1 healthy Fable 5; slot-2 = kickoff zombie ctx0%/$0, PAN-2172-bug class — watching for deacon re-delivery per RUN-39 tick-3 lesson before escalating). Its `chore(state)` commits keep landing on main; strike told to rebase before push.
+- MIN-831 + MIN-846 review+test passed — UAT-gated, surfaced to operator. UAT candidate endpoint returns null PAN-side (expected on red main).
+- Primary-worktree dirty files (conversation-lifecycle.ts, conversations.ts) predate this run — not flywheel's, left untouched.
+
 ## RUN-39 tick 2 (2026-06-29) — PAN-2155 drained; kickoff-delivery bugs gate the rest
 
 - **PAN-2155 MERGED** (commit 9bebbf24, auto-merge fired 20:14Z) → `pan close --force` → terminal. Cohort now 13/15 terminal.
@@ -239,3 +261,26 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **GitHub GraphQL rate limit hit 0** mid-tick (reset ~21:55Z). The auto-merge schedule endpoint internally calls `gh pr view`, so it failed with a rate-limit error that LOOKED like a substrate bug but was quota exhaustion. Retried after reset -> PAN-1718 scheduled (id 8, fires 22:01:32Z). Back off gh polling when remaining is low.
 - **PAN-2054 bug is live.** `pan review pending --ready` listed PAN-2152 (merged commit 2a41e2ecbd) and PAN-1884 (2f83da8df1) as ready-for-merge even though both are merged + closed-out. Instance of PAN-2054 (close-out not terminal: closed-out issues reappear). PAN-2054 itself is closed-out but the bug persists; consider reopen. Do NOT schedule merges on these stale entries.
 - PAN-1718 reached ready-for-merge (review+test passed) and is scheduled to merge. PAN-2172 work agent still implementing (single 35m+ turn; watch for wedge). agent-pan-2086 unchanged zombie.
+
+## RUN-39 tick 7 (2026-06-29) — PAN-1718 stale-mergeability treadmill (PAN-2108 gap)
+
+- pan CLI healthy (no re-break). Main green (cf58ac2cba).
+- **PAN-1718 scheduled merge (22:01Z) did NOT land.** PR #2103 has ALL checks green (build/lint/test/smoke SUCCESS) but GitHub flipped it to CONFLICTING/DIRTY after main moved (my tick-6 push + state commits). The auto-merge engine read DIRTY and dropped it; re-schedule rejects "PR is not mergeable (state=dirty)".
+  - KEY: `git merge-tree --write-tree origin/main origin/feature/pan-1718` merges CLEAN (exit 0). So git says no real conflict; GitHub's mergeability is stale/lagging (likely a both-modified pipeline state file like .beads/issues.jsonl or .pan/records/pan-1718.json that git's ort auto-resolves but GitHub flags). Differing files are the PR's own code (reload.ts/status.ts/restart-status.ts/supervisor.ts) + state files.
+  - To clear it, the feature branch needs a re-push (rebase onto latest main) to force GitHub to recompute. The work agent (idle since 20:49, status=running) should do it via `pan done`, but it has no signal that main moved and the flywheel has no legal lever to re-trigger it (cannot pan tell/resume; pan start refuses 'running').
+  - This is exactly the **PAN-2108** gap (flywheel-safe rolling re-rebase: auto-rebase ready PRs when main moves). Without it, any ready PR can get stuck stale-DIRTY whenever main advances faster than the merge window.
+  - DISPOSITION: carry PAN-1718, re-check next tick. If GitHub recomputes to MERGEABLE, re-schedule and it drains. If it stays stuck across ticks, prioritize PAN-2108.
+- REUSABLE: when a ready PR won't merge with mergeable=CONFLICTING but `git merge-tree --write-tree` exits 0, it's stale GitHub mergeability, not a real conflict. Fix is a branch re-push; the systemic fix is PAN-2108.
+- PAN-2172 work progressing (35m then 8m turns, through beads). PAN-2086 unchanged zombie.
+
+## RUN-39 ticks 8–12 (2026-06-29) — PAN-1718 DRAINED + codex/gpt-5.5 auth outage
+
+- **PAN-1718 (PR #2103) MERGED 23:30:43Z.** The "stale-mergeability treadmill" was a TWO-layer block:
+  1. GitHub's stale `CONFLICTING/DIRTY` flag after main advanced (branch fell 29 behind). Confirmed FALSE conflict via `git merge-tree --write-tree` (exit 0, no markers). Cleared with `pan sync-main PAN-1718` + `git push` → GitHub recomputed `MERGEABLE+CLEAN`.
+  2. The sync (new head) correctly auto-re-spawned review — but that review agent died because **codex/gpt-5.5 OAuth was logged out** (`pan pi-auth status` → not logged in; every gpt-5.5 agent hit "refresh token already used"). So review_status stuck `reviewing`, ready_for_merge never set.
+  - Fix for layer 2: `pan review restart PAN-1718 --model claude-sonnet-4-6` — re-routed the review off dead gpt-5.5 onto Sonnet (native Anthropic → claude-code, no codex dep). Review passed → test passed → ready_for_merge=1 → `POST /api/flywheel/auto-merge/schedule` (id 9) → merged with full postMergeLifecycle (labels merged+verifying-on-main, agents paused).
+- **REUSABLE:** a "ready PR won't merge" can be TWO independent failures stacked — (a) stale GitHub mergeability (fix: re-push; verify false via merge-tree) AND (b) a dead/auth-broken reviewer leaving review_status non-passed. Check BOTH the forge mergeability AND the runtime review_status before concluding.
+- **codex/gpt-5.5 OAuth outage (operator-only fix: `pan ohmypi-auth login`).** While logged out, all gpt-5.5 work/review/test agents die instantly. Flywheel response: re-route cheap contextless steps (a single review) to Sonnet to make progress; HOLD new gpt-5.5 work pickup and context-heavy work agents rather than wholesale-downgrade the run (gpt-5.5 is the preferred work model).
+- **PAN-2172 (PR #2182) HELD:** verification_status=FAILED (real typecheck/lint/test failure) + its work agent is auth-dead. Needs codex re-auth so the context-holding work agent can fix it — NOT a clean re-route (re-review would review broken code; a fresh claude work agent would lose context). Waiting on re-auth.
+- **PAN-2086 zombie killed** (kimi, idle 13h, 34% ctx, unanswered resume prompt) — slot freed, workspace preserved.
+- **Backlog ranking is poisoned with CLOSED issues** — the "MUST start PAN-2150" target and #6/#11/#12 (PAN-1982/1510/1506) are all CLOSED/released; #7/#8 (PAN-806/1864) are objection/parked. Instance of stale ranking + PAN-2054 close-out-non-terminal. Did NOT start any. Once codex is back, PAN-2143 (stale merge-blockers never re-evaluated) is the first systemic pick — it's the durable fix for the layer-1 treadmill above.

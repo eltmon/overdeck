@@ -110,6 +110,11 @@ export interface AgentState {
 
   /** Inspect sub-role for inspect-* agents (PAN-1834). */
   inspectSubRole?: string;
+
+  /** Registered swarm slot index for per-item work agents. */
+  slotIndex?: number;
+  /** vBRIEF item id explicitly assigned to this registered swarm slot. */
+  slotItemId?: string;
 }
 
 const toAgentFsError = (operation: string, path: string, cause: unknown): FsError =>
@@ -219,6 +224,8 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
     inspectSubRole: raw.inspectSubRole,
+    slotIndex: raw.slotIndex,
+    slotItemId: raw.slotItemId,
   };
 }
 

@@ -179,6 +179,7 @@ This is a REVIEW pass — re-rank the full backlog on demand. A prior sequence.m
 ## Ranking rules (all passes)
 
 - Rank by IMPACT toward shipping, not raw priority signal. GitHub priority and issue age are inputs, not determinants.
+- Substrate-hardening first: an issue labeled \`substrate-improvement\`, \`architecture\`, or \`v1.0-required\` is at least \`high\` importance (\`critical\` if it unblocks the pipeline or other substrate work) and ranks ahead of routine feature work of equal impact — a stable substrate is the prerequisite for everything else (vision.mdx). When a substrate epic ranks high, lift its CHILDREN's ranks together (the children are what get picked). Do not rank such an issue \`low\` just because it reads as cleanup.
 - NEVER re-rank in-pipeline issues (inPipeline: true in the manifest). Pin them at their rank; leave gate=auto (do NOT set gate=ready — gate is operator-only).
 - Assign condition to every issue: ok / needs-refinement / stale.
 - Every node's why field must be ≤ 140 characters (displayed in the ranked table).

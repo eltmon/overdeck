@@ -207,6 +207,21 @@ A well-sized bead has all of these properties:
 
 If the user ever asks "should this be one bead or many?", the answer is almost always "many" unless you can point to a specific reason the work is genuinely indivisible (e.g. a single atomic rename that touches N call sites in one commit).
 
+### Swarm Contract — Tracer-Bullet Slices and Dispatch Metadata
+
+Author every implementation item as a **vertical tracer-bullet slice**: a small end-to-end change that can be verified independently from user-facing or system-observable behavior. Reject horizontal layer-slices such as "all the DB work", "all the API work", or "all the UI work"; split those into vertical items that each carry their own data, API, UI, docs, and tests as needed.
+
+Prefer splitting a large issue into independently shippable sibling issues over one mega-vBRIEF when the slices can each pass review, test, and UAT on their own. Sibling issues parallelize through the flywheel with full per-unit review/test/UAT; one mega-vBRIEF should be reserved for genuinely inseparable work.
+
+Every item MUST declare these metadata fields:
+- `files_scope: string[]` — concrete files or narrow globs the item is expected to touch. Do not use broad repo-wide globs such as `**/*`, `src/**/*`, or `*.ts`.
+- `files_scope_confidence: "high" | "medium" | "low"` — confidence that `files_scope` is accurate.
+- `readiness: "ready" | "sequential" | "needs_refinement"` — `ready` means independently dispatchable, `sequential` means deliberately serialized despite clear scope, and `needs_refinement` means the item is not dispatch-ready and must be split or clarified before work starts.
+
+For every slot-eligible item, also declare:
+- `verify_commands: string[]` — commands a slot can run before merging, scoped as tightly as the item allows.
+- `expected_outputs: string[]` — observable evidence those commands must produce, such as a named test file passing or typecheck completing without errors.
+
 ### Difficulty Estimation
 
 For each sub-task, estimate difficulty using this rubric:
@@ -315,6 +330,11 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
           "issueLabel": "{{ISSUE_ID_LOWER}}",
           "requiresInspection": false,
           "inspectionDepth": "fast",
+          "files_scope": ["src/path/to/file.ts"],
+          "files_scope_confidence": "high",
+          "verify_commands": ["npm run typecheck"],
+          "expected_outputs": ["typecheck completes without errors"],
+          "readiness": "ready",
           "traces": ["FR-1", "NFR-2"]
         },
         "narrative": { "Action": "<what needs to be done>" },
@@ -350,8 +370,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
   "handles errors", "is implemented", "TBD"-style placeholders, docs-only criteria.
 - 2–5 ACs per item; if an item genuinely needs fewer/more, set metadata.acJustification.
 - `narratives.NonGoals` MUST list everything discovery established as out of scope ("none" if genuinely nothing). Review enforces these as must-not constraints.
-- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, `metadata.inspectionDepth`, and optional `metadata.traces: string[]` are Overdeck extensions to the vBRIEF spec
+- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, `metadata.inspectionDepth`, `metadata.files_scope`, `metadata.files_scope_confidence`, `metadata.verify_commands`, `metadata.expected_outputs`, `metadata.readiness`, and optional `metadata.traces: string[]` are Overdeck extensions to the vBRIEF spec
 - Use `metadata.traces` to preserve FR-N/NFR-N requirement IDs from the PRD draft on the plan items that satisfy them.
+- `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness` are REQUIRED on every plan item. Use `readiness: "ready"` only for independently dispatchable tracer-bullet slices, `readiness: "sequential"` for deliberate serialization, and `readiness: "needs_refinement"` when the item must be split or clarified before work.
+- `metadata.verify_commands` and `metadata.expected_outputs` are REQUIRED on every slot-eligible item. Commands must be concrete and expected outputs must name the evidence the worker should see.
 - `metadata.requiresInspection` is REQUIRED on every plan item — see the "Inspection Requirement" section above for the decision criteria. Default to `false` unless the bead lays a foundation other beads depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.
 - `metadata.inspectionDepth` defaults to `"fast"` when omitted. Set it to `"deep"` only when `requiresInspection` is true and the bead needs a stronger architecture/safety review.
 - Edge types: `blocks` (hard dependency), `informs` (soft), `invalidates`, `suggests`

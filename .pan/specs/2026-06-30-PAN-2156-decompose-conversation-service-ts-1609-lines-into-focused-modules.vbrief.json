@@ -1,0 +1,589 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-30T01:29:47.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2156: behavior-preserving decomposition of src/dashboard/server/services/conversation-service.ts (1609 lines) into nine submodules under src/dashboard/server/services/conversation/, each <1000 lines, leaving conversation-service.ts as a thin curated re-export barrel.",
+    "updated": "2026-06-30T01:33:43.058Z"
+  },
+  "plan": {
+    "id": "PAN-2156",
+    "title": "Decompose conversation-service.ts (1609 lines) into focused modules",
+    "status": "proposed",
+    "uid": "pan-2156",
+    "author": "agent:claude-opus-4-8",
+    "created": "2026-06-30T01:29:47.000Z",
+    "updated": "2026-06-30T01:33:43.058Z",
+    "references": [
+      {
+        "type": "issue",
+        "url": "https://github.com/eltmon/overdeck/issues/2156"
+      },
+      {
+        "type": "prd",
+        "path": ".pan/drafts/PAN-2156.md"
+      }
+    ],
+    "tags": [
+      "codebase-health",
+      "refactor",
+      "substrate-improvement"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/server/services/conversation-service.ts is 1609 lines, over the 1000-line file-size ceiling (pinned at 1610 in scripts/file-size-baseline.txt). It bundles nine concerns: shared type shapes, provider detection, message-text filtering, session-file discovery, the core incremental JSONL parser (parseConversationMessages ~656 lines), compact-boundary scanning, context-window usage computation, activity summarization, and live file watching.",
+      "Approach": "Pure relocation into a sibling directory src/dashboard/server/services/conversation/, leaving conversation-service.ts as a thin CURATED re-export barrel that preserves the EXACT current public surface (16 symbols: 11 functions + 5 interfaces). No logic edits, no renamed exports, zero call-site changes. Extraction is leaf-first so each new module imports only already-extracted siblings (or stdlib/external libs), never the barrel — avoiding runtime import cycles. Each seam is one bead, committed separately, with typecheck + lint + the FULL vitest suite green before commit. Verified facts: the file has ZERO explicit `any` (no eslint-any-allowlist edits needed); deacon-context-overflow.test.ts mocks the barrel PATH (vi.mock) so preserving the barrel keeps it green with no edit; the pi/ohmypi/codex parsers import `type { ParseResult }` from the barrel (a pre-existing type-only cycle, erased at runtime) and keep resolving via the barrel; LatestAssistantUsage is referenced by ParseResult/ParseState so it lives in types.ts; watchConversation does NOT call discoverSessionFile (so watch has no dependency on session-files). The existing src/dashboard/server/services/__tests__/conversation-service.test.ts exercises the parser, context usage, activity summary, watch, gate, and discovery through the barrel and is the primary behavior-preservation oracle.",
+      "Risks": "(1) Relative-import depth: new files are one directory deeper, so every `../../../lib/...` becomes `../../../../lib/...` and `./sibling.js` becomes `../sibling.js`. The compiler catches mistakes — run typecheck after each move. (2) Barrel must use CURATED re-exports (not `export *`) so internal symbols (JsonlEntry, MAX_READ_BYTES, providerFromModel, the text filters, the context-usage helpers) do NOT leak onto the public surface. (3) ModelCapability is a `typeof MODEL_CAPABILITIES[...]` value import — keep it a value import, not type-only."
+    },
+    "autoDecisions": [
+      {
+        "decision": "Submodule directory name",
+        "choice": "src/dashboard/server/services/conversation/",
+        "rationale": "Issue asks for a sibling directory; 'conversation/' co-locates the split next to the barrel."
+      },
+      {
+        "decision": "Granularity",
+        "choice": "One module per cohesive concern = nine submodules + one finalize bead",
+        "rationale": "Each seam stays small and individually verifiable with full gates, per the issue's after-each-seam requirement."
+      },
+      {
+        "decision": "Barrel re-export style",
+        "choice": "Curated `export { ... }` / `export type { ... }`, not `export *`",
+        "rationale": "Preserves the exact 16-symbol public surface and keeps internal-shared symbols off it."
+      },
+      {
+        "decision": "parseFromLastCompactBoundary placement",
+        "choice": "conversation/parser.ts",
+        "rationale": "It is a parse entry point that calls parseConversationMessages; grouping the three parse functions keeps the parser cohesive. It imports findLastCompactBoundary from compact-boundary.ts."
+      },
+      {
+        "decision": "LatestAssistantUsage + JSONL types + MAX_* placement",
+        "choice": "conversation/types.ts",
+        "rationale": "Referenced across modules (ParseResult/ParseState/parser/context-usage); a shared leaf types module avoids cycles."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-types",
+        "title": "Extract conversation/types.ts (shared shapes)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/types.ts. Move these declarations OUT of conversation-service.ts into it: ParseResult (lines 35-82), ParseState (84-104), ConversationActivitySummary (106-119), LatestAssistantUsage (1364-1378), and the internal JSONL/limit symbols JsonlUsage (191-196), JsonlEntry (198-214), ContentBlock (216-233), MAX_READ_BYTES + MAX_FALLBACK_BYTES (188-189). `export` each of them from types.ts (the 4 internal ones must be exported so sibling modules can import them, but they stay OFF the barrel's public surface). types.ts imports only `import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts'`. In the barrel, delete those declarations and add a CURATED re-export (NOT `export *`, to preserve the exact public surface): `export type { ParseResult, ParseState, ConversationActivitySummary, LatestAssistantUsage } from './conversation/types.js';`. The barrel's still-present functions import the types/limits they use from './conversation/types.js'. NOTE: ModelCapability (line 23) does NOT move here — it stays with context-usage (see extract-context-usage). After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-types.ac1",
+            "title": "creates src/dashboard/server/services/conversation/types.ts (<1000 lines), which exports ParseResult, ParseState, ConversationActivitySummary, LatestAssistantUsage, JsonlUsage, JsonlEntry, ContentBlock, MAX_READ_BYTES, MAX_FALLBACK_BYTES.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-types.ac2",
+            "title": "the barrel re-exports exactly the 4 public types via `export type { ... }` and contains no public export of JsonlEntry/JsonlUsage/ContentBlock/MAX_*.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-types.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0; no external importer or test is edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-provider",
+        "title": "Extract conversation/provider.ts (providerFromModel)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/provider.ts. Move providerFromModel (lines 26-33) into it and `export` it. It needs `import { type AIProvider } from '../../../../lib/cost.js';`. This symbol is NOT exported today — keep it OFF the barrel's public surface (do not re-export it). The parser will import it from './provider.js' in a later seam; for now the barrel's parser code imports it from './conversation/provider.js'. After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-provider.ac1",
+            "title": "creates conversation/provider.ts (<1000 lines), which exports providerFromModel.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-provider.ac2",
+            "title": "the barrel contains no public export of providerFromModel (it stays internal, matching today).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-provider.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-message-filters",
+        "title": "Extract conversation/message-filters.ts (text filters)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/message-filters.ts. Move isSystemInjection (235-242), unwrapChannelMessage (243-247), renderableUserText (248-258) into it and `export` each. These are pure string helpers with no external imports. Keep them OFF the barrel's public surface (not exported today). The parser imports them from './message-filters.js' in a later seam. After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-message-filters.ac1",
+            "title": "creates conversation/message-filters.ts (<1000 lines), which exports isSystemInjection, unwrapChannelMessage, renderableUserText.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-message-filters.ac2",
+            "title": "the barrel contains no public export of any of the three filter functions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-message-filters.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-session-files",
+        "title": "Extract conversation/session-files.ts (discovery)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/session-files.ts. Move encodeCwdToProjectDir (121-124), claudeProjectDir (126-140), snapshotSessionFiles (142-156), discoverSessionFile (158-186). Imports: `readdir, stat from 'node:fs/promises'`, `homedir from 'node:os'`, `join from 'node:path'`, `encodeClaudeProjectDir from '../../../../lib/paths.js'`. `export` snapshotSessionFiles and discoverSessionFile (PUBLIC); encodeCwdToProjectDir/claudeProjectDir stay internal. Barrel adds `export { snapshotSessionFiles, discoverSessionFile } from './conversation/session-files.js';`. This module is independent (no other in-file function calls it). After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-session-files.ac1",
+            "title": "creates conversation/session-files.ts (<1000 lines), which exports snapshotSessionFiles and discoverSessionFile.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-session-files.ac2",
+            "title": "the barrel re-exports snapshotSessionFiles and discoverSessionFile so an existing import resolves unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-session-files.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-compact-boundary",
+        "title": "Extract conversation/compact-boundary.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/compact-boundary.ts. Move COMPACT_OFFSET_CACHE_MAX + compactOffsetCache (1079-1080), setCompactOffsetCache (1082-1096), findLastCompactBoundary (1098-1276). `export` findLastCompactBoundary (PUBLIC); the cache + setter stay internal. It imports MAX_READ_BYTES (and any JSONL types it uses) from './types.js' and reads files via 'node:fs/promises' (open/stat). Barrel adds `export { findLastCompactBoundary } from './conversation/compact-boundary.js';`. After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-compact-boundary.ac1",
+            "title": "creates conversation/compact-boundary.ts (<1000 lines), which exports findLastCompactBoundary.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-compact-boundary.ac2",
+            "title": "the barrel re-exports findLastCompactBoundary so an existing import resolves unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-compact-boundary.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-parser",
+        "title": "Extract conversation/parser.ts (core JSONL parser)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/parser.ts. Move the three parse entry points: parseConversationMessages (260-915), parseEntireConversation (916-983), parseFromLastCompactBoundary (1430-1464). `export` all three (PUBLIC). Imports: from './types.js' (ParseResult, ParseState, JsonlEntry, JsonlUsage, ContentBlock, MAX_READ_BYTES, MAX_FALLBACK_BYTES, LatestAssistantUsage as needed); './provider.js' (providerFromModel); './message-filters.js' (isSystemInjection, unwrapChannelMessage, renderableUserText); './compact-boundary.js' (findLastCompactBoundary — parseFromLastCompactBoundary calls it); '../codex-conversation-parser.js', '../pi-conversation-parser.js', '../ohmypi-conversation-parser.js', '../format-tool-input.js'; '../../../../lib/cost.js', '../../../../lib/model-capabilities.js', '../../../../lib/runtimes/behavior.js'; 'node:fs/promises' (readFile/open/stat); '@overdeck/contracts'. Add imports until typecheck is green. Barrel adds `export { parseConversationMessages, parseEntireConversation, parseFromLastCompactBoundary } from './conversation/parser.js';`. This is the largest module (~790 lines) — confirm `wc -l` < 1000. After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-parser.ac1",
+            "title": "creates conversation/parser.ts (`wc -l` < 1000), which exports parseConversationMessages, parseEntireConversation, parseFromLastCompactBoundary.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-parser.ac2",
+            "title": "conversation/parser.ts contains the three parse entry points and stays under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-parser.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0 (conversation-service.test.ts and agents-conversation.test.ts included).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-context-usage",
+        "title": "Extract conversation/context-usage.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/context-usage.ts. Move ModelCapability (23), resolveContextCapability (1278-1287), buildContextUsage (1288-1342), contextUsageFromParseResult (1343-1351), computeContextUsage (1352-1363), readLatestAssistantUsage (1380-1428). `export` contextUsageFromParseResult and computeContextUsage (PUBLIC); the rest internal. Imports: from './types.js' (ParseResult, ParseState, LatestAssistantUsage, JsonlEntry, JsonlUsage); './compact-boundary.js' (findLastCompactBoundary — computeContextUsage calls it); '../../../../lib/model-capabilities.js' (MODEL_CAPABILITIES value import for ModelCapability typeof, plus resolveModelIdSync as needed); '../../../../lib/cost.js' as needed; '@overdeck/contracts' (ContextUsage); 'node:fs/promises' (open/stat for readLatestAssistantUsage). Barrel adds `export { contextUsageFromParseResult, computeContextUsage } from './conversation/context-usage.js';`. After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-context-usage.ac1",
+            "title": "creates conversation/context-usage.ts (<1000 lines), which exports contextUsageFromParseResult and computeContextUsage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-context-usage.ac2",
+            "title": "ModelCapability stays a value `typeof MODEL_CAPABILITIES[...]` import (not type-only) and typecheck exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-context-usage.ac3",
+            "title": "ModelCapability resolves via a value `typeof MODEL_CAPABILITIES[...]` import and typecheck passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-context-usage.ac4",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-activity-summary",
+        "title": "Extract conversation/activity-summary.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/activity-summary.ts. Move WORKING_STALENESS_MS, ACTIVITY_SUMMARY_CACHE_MAX, activitySummaryCache (985-989), summarizeConversationActivity (991-1077). `export` summarizeConversationActivity (PUBLIC); caches internal. Imports: from './types.js' (ConversationActivitySummary, ParseResult as needed); './parser.js' (parseFromLastCompactBoundary — summarizeConversationActivity calls it); '../codex-conversation-parser.js', '../pi-conversation-parser.js', '../ohmypi-conversation-parser.js' (parseCodex/Pi/Ohmypi + isPi/isOhmypiSessionFile); '../../../../lib/runtimes/behavior.js' (getHarnessBehavior); 'node:fs/promises' (stat). Barrel adds `export { summarizeConversationActivity } from './conversation/activity-summary.js';`. After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-activity-summary.ac1",
+            "title": "creates conversation/activity-summary.ts (<1000 lines), which exports summarizeConversationActivity.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-activity-summary.ac2",
+            "title": "conversation/activity-summary.ts contains the activity caches and summarizeConversationActivity and stays under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-activity-summary.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-watch",
+        "title": "Extract conversation/watch.ts; barrel becomes pure re-export",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/watch.ts. Move gateSnapshotEmission (1466-1484), ConversationWatchHandle (1486-1494), watchConversation (1496-1609). `export` all three (PUBLIC: two functions + the ConversationWatchHandle type). Imports: from './types.js' (ParseResult, ParseState); './parser.js' (parseConversationMessages); 'node:fs/promises' (watch). Barrel adds `export { gateSnapshotEmission, watchConversation } from './conversation/watch.js';` and `export type { ConversationWatchHandle } from './conversation/watch.js';`. After this move the barrel contains ONLY import/export statements — delete every now-unused file-level import from the barrel so lint is clean. Verify the barrel re-exports the full public surface (snapshotSessionFiles, discoverSessionFile, parseConversationMessages, parseEntireConversation, summarizeConversationActivity, findLastCompactBoundary, contextUsageFromParseResult, computeContextUsage, parseFromLastCompactBoundary, gateSnapshotEmission, watchConversation, ParseResult, ParseState, ConversationActivitySummary, LatestAssistantUsage, ConversationWatchHandle). After this seam run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed), then commit this bead alone. New files live in src/dashboard/server/services/conversation/ — one level deeper than the original, so EVERY relative import gains one `../`: `../../../lib/...` becomes `../../../../lib/...`, and sibling services `./codex-conversation-parser.js` becomes `../codex-conversation-parser.js`. `@overdeck/contracts` is a package import (unchanged). The TypeScript compiler is the oracle: move the block, then add imports until typecheck is green. Do NOT edit any external importer or test — they resolve through the barrel."
+        },
+        "items": [
+          {
+            "id": "extract-watch.ac1",
+            "title": "creates conversation/watch.ts (<1000 lines), which exports gateSnapshotEmission, watchConversation, ConversationWatchHandle.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-watch.ac2",
+            "title": "conversation/watch.ts contains gateSnapshotEmission, watchConversation and ConversationWatchHandle and stays under 1000 lines; conversation-service.ts now contains only import/export statements and re-exports all 16 public symbols.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-watch.ac3",
+            "title": "npm run typecheck, npm run lint, and the full vitest suite each exits 0; no external importer or test is edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finalize-baseline",
+        "title": "Drop file-size baseline entry; final full verification",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:29:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2156",
+          "requiresInspection": false,
+          "traces": [
+            "FR-5",
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Remove the line `1610 src/dashboard/server/services/conversation-service.ts` from scripts/file-size-baseline.txt (the barrel is now far under the 1000-line ceiling, so the guard's no-baseline ceiling path applies and must pass). Then run `bash scripts/lint-file-size.sh` (must print the pass line), `wc -l src/dashboard/server/services/conversation/*.ts` (every file <=1000), and the full gate suite `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` (0 failed) one final time. Confirm `git grep -n \"from '.*conversation-service\" src` shows only the barrel path still imported (no importer was repointed). Commit this bead."
+        },
+        "items": [
+          {
+            "id": "finalize-baseline.ac1",
+            "title": "scripts/file-size-baseline.txt contains no conversation-service.ts entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-baseline.ac2",
+            "title": "bash scripts/lint-file-size.sh passes, and every conversation/*.ts submodule contains 1000 lines or fewer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-baseline.ac3",
+            "title": "every conversation/*.ts submodule is <=1000 lines, and npm run typecheck, npm run lint, and the full vitest suite each exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-types",
+        "to": "extract-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-provider",
+        "to": "extract-message-filters",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-message-filters",
+        "to": "extract-session-files",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-session-files",
+        "to": "extract-compact-boundary",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-compact-boundary",
+        "to": "extract-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-parser",
+        "to": "extract-context-usage",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-context-usage",
+        "to": "extract-activity-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-activity-summary",
+        "to": "extract-watch",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-watch",
+        "to": "finalize-baseline",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "issueId": "PAN-2156",
+      "acceptanceCriteria": [
+        "AC1: conversation-service.ts is a thin re-export barrel (only import/export statements), materially smaller than 1609 lines, and re-exports all 16 current public symbols so every existing importer and test resolves unchanged.",
+        "AC2: src/dashboard/server/services/conversation/ contains nine cohesive submodules, each <=1000 lines.",
+        "AC3: Behavior-preserving — pure moves + re-exports, no renamed exports, no logic edits; no diff to any external importer or test.",
+        "AC4: After every seam, npm run typecheck && npm run lint && npx vitest run --configLoader runner are green (0 failed).",
+        "AC5: scripts/file-size-baseline.txt no longer pins conversation-service.ts and bash scripts/lint-file-size.sh passes.",
+        "AC6: No new explicit `any` (A1 ratchet); eslint-any-allowlist.json untouched."
+      ],
+      "canonicalFilename": ""
+    },
+    "sequence": 1
+  },
+  "status": "proposed"
+}

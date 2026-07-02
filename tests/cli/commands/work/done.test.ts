@@ -148,6 +148,8 @@ vi.mock('../../../../src/lib/bd-mutex.js', () => ({
 beforeEach(() => {
   mockGetReviewStatus.mockReset();
   mockGetReviewStatus.mockReturnValue(null);
+  mockSaveAgentState.mockClear();
+  mockSaveAgentRuntimeState.mockClear();
   mockSetReviewStatus.mockClear();
   mockResolveProjectFromIssue.mockReset();
   mockResolveProjectFromIssue.mockReturnValue(null);
@@ -162,6 +164,21 @@ function makeAgentState(workspace: string) {
     workspace,
     status: 'running',
     lastActivity: new Date().toISOString(),
+  };
+}
+
+function makeSlotAgentState(workspace: string) {
+  return {
+    id: 'agent-pan-714-slot-2',
+    issueId: 'PAN-714',
+    workspace,
+    status: 'running',
+    role: 'work',
+    model: 'test-model',
+    startedAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+    slotIndex: 2,
+    slotItemId: 'workspace-slot-item',
   };
 }
 
@@ -217,6 +234,10 @@ describe('doneCommand --force bypass', () => {
     mockGetAgentState.mockReset();
     mockShouldSkipTrackerUpdate.mockReset();
     mockUpdateShadowState.mockReset();
+    mockSaveAgentState.mockClear();
+    mockSaveAgentRuntimeState.mockClear();
+    mockSetReviewStatus.mockClear();
+    mockCreateReviewArtifactsForIssue.mockClear();
     mockCreateReviewArtifactsForIssue.mockResolvedValue({ artifacts: [], mergeSet: null });
     mockEnsureMergeSetForIssue.mockReturnValue(null);
 
@@ -293,6 +314,10 @@ describe('doneCommand shadow mode', () => {
     mockGetAgentState.mockReset();
     mockShouldSkipTrackerUpdate.mockReset();
     mockUpdateShadowState.mockReset();
+    mockSaveAgentState.mockClear();
+    mockSaveAgentRuntimeState.mockClear();
+    mockSetReviewStatus.mockClear();
+    mockCreateReviewArtifactsForIssue.mockClear();
     mockCreateReviewArtifactsForIssue.mockResolvedValue({ artifacts: [], mergeSet: null });
     mockEnsureMergeSetForIssue.mockReturnValue(null);
 
@@ -370,6 +395,67 @@ describe('doneCommand shadow mode', () => {
     expect(mockFindWorkspacePath).toHaveBeenCalledWith(projectPath, 'pan-714');
     expect(mockCreateReviewArtifactsForIssue).toHaveBeenCalledWith('PAN-714', workspacePath);
     expect(mockUpdateShadowState).toHaveBeenCalledWith('PAN-714', 'in_review', 'pan done');
+  });
+});
+
+describe('doneCommand swarm slot completion', () => {
+  let tempDir: string;
+  let originalCwd: string;
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockExecFn.mockReset();
+    mockGetAgentState.mockReset();
+    mockShouldSkipTrackerUpdate.mockReset();
+    mockUpdateShadowState.mockReset();
+    mockCreateReviewArtifactsForIssue.mockResolvedValue({ artifacts: [], mergeSet: null });
+    mockEnsureMergeSetForIssue.mockReturnValue(null);
+
+    originalCwd = process.cwd();
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-done-slot-'));
+    mkdirSync(join(tempDir, 'workspaces', 'feature-pan-714-slot-2'), { recursive: true });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ status: 200, ok: true, json: async () => ({ success: true }) })));
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.unstubAllGlobals();
+    rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('does not trigger issue-level review when a slot workspace runs pan done for the parent issue', async () => {
+    const slotWorkspace = join(tempDir, 'workspaces', 'feature-pan-714-slot-2');
+    const slotState = makeSlotAgentState(slotWorkspace);
+    process.chdir(slotWorkspace);
+    mockGetAgentState.mockImplementation((agentId: string) => {
+      if (agentId === 'agent-pan-714-slot-2') return slotState;
+      return null;
+    });
+    mockShouldSkipTrackerUpdate.mockClear();
+    mockUpdateShadowState.mockClear();
+    mockCreateReviewArtifactsForIssue.mockClear();
+    mockSetReviewStatus.mockClear();
+    vi.mocked(globalThis.fetch).mockClear();
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714', { comment: 'slot complete' });
+
+    expect(mockShouldSkipTrackerUpdate).not.toHaveBeenCalled();
+    expect(mockUpdateShadowState).not.toHaveBeenCalled();
+    expect(mockCreateReviewArtifactsForIssue).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'agent-pan-714-slot-2',
+      status: 'stopped',
+      stoppedByUser: true,
+      slotItemId: 'workspace-slot-item',
+    }));
+    expect(mockSaveAgentRuntimeState).toHaveBeenCalledWith('agent-pan-714-slot-2', expect.objectContaining({
+      state: 'idle',
+      resolution: 'completed',
+    }));
   });
 });
 

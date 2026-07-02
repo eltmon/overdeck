@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { readlinkSync } from 'fs';
 import { listSessionsSync } from '../../lib/tmux.js';
-import { listActiveConversations } from '../../lib/overdeck/conversations.js';
+import { listConversations } from '../../lib/overdeck/conversations.js';
 
 interface ResourcesOptions {
   json?: boolean;
@@ -149,7 +149,8 @@ function detectRole(parentCmd: string, cwd: string): string {
 
 function categorizeProcesses(processes: ClaudeProcess[]): void {
   const tmuxSessions = listSessionsSync();
-  const conversations = listActiveConversations();
+  // Active rows only — ended conversations must not claim live tmux sessions.
+  const conversations = listConversations().filter((c) => c.status === 'active');
   const convTmuxNames = new Set(conversations.map(c => c.tmuxSession));
 
   for (const proc of processes) {
