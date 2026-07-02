@@ -3,6 +3,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { Role } from '../agents.js';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 
@@ -489,6 +490,9 @@ export interface YamlConfig {
   /** Role-specific model and harness configuration. */
   roles?: RolesConfig;
 
+  /** Tiered bead execution policy. Disabled by default. */
+  tiered_execution?: Partial<TieredExecutionConfig>;
+
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
 
@@ -673,6 +677,9 @@ export interface NormalizedConfig {
 
   /** Optional role model/harness configuration. */
   roles?: RolesConfig;
+
+  /** Normalized tiered bead execution policy. */
+  tieredExecution: TieredExecutionConfig;
 
   /** Per-work-type overrides */
   overrides: Partial<Record<string, ModelId>>;

@@ -4,6 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { normalizeTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -91,6 +92,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
+    tieredExecution: {
+      ...DEFAULT_CONFIG.tieredExecution,
+      tiers: { ...DEFAULT_CONFIG.tieredExecution.tiers },
+      ...(DEFAULT_CONFIG.tieredExecution.supervisor ? { supervisor: { ...DEFAULT_CONFIG.tieredExecution.supervisor } } : {}),
+    },
     memory: {
       extraction: {
         ...DEFAULT_CONFIG.memory.extraction,
@@ -187,6 +193,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
+        if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+        if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
       } else if (providers.anthropic !== undefined) {
         explicitlyDisabled.add('anthropic');
         result.enabledProviders.delete('anthropic');
@@ -416,6 +424,18 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge role/workhorse model configuration
     mergeRoleConfig(result, config);
+
+    if (config.tiered_execution !== undefined) {
+      result.tieredExecution = normalizeTieredExecutionConfig(
+        {
+          ...result.tieredExecution,
+          ...config.tiered_execution,
+          tiers: config.tiered_execution.tiers ?? result.tieredExecution.tiers,
+          supervisor: config.tiered_execution.supervisor ?? result.tieredExecution.supervisor,
+        },
+        { providerAuth: result.providerAuth },
+      );
+    }
 
     // Merge legacy API keys (for backward compatibility)
     // Only enable providers that weren't explicitly disabled in models.providers
