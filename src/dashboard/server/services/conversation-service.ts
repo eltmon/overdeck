@@ -16,6 +16,7 @@ import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capab
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { parseCodexConversationMessages } from './codex-conversation-parser.js';
+import { renderableUserText } from './conversation/message-filters.js';
 import { providerFromModel } from './conversation/provider.js';
 import {
   MAX_FALLBACK_BYTES,
@@ -112,32 +113,6 @@ export async function discoverSessionFile(
 }
 
 // ─── JSONL parsing ────────────────────────────────────────────────────────────
-
-/**
- * Returns true for Claude Code internal injections that should not appear as user messages:
- *   - XML-tagged system context (<system-reminder>, <command-name>, etc.)
- *   - Skill file content injections ("Base directory for this skill: ...")
- *   - Compaction summary injections ("This session is being continued...")
- *   - Memory/hook injections ("Human:" prefix blocks, etc.)
- */
-function isSystemInjection(text: string): boolean {
-  if (text.startsWith('<')) return true;
-  if (text.startsWith('Base directory for this skill:')) return true;
-  if (text.startsWith('This session is being continued from a previous conversation')) return true;
-  if (text.startsWith('Human:') && text.includes('\n\nAssistant:')) return true;
-  return false;
-}
-
-function unwrapChannelMessage(text: string): string | null {
-  const match = text.match(/^<channel\b[^>]*>\n?([\s\S]*?)\n?<\/channel>$/);
-  return match ? match[1] : null;
-}
-
-function renderableUserText(text: string): string | null {
-  const channelText = unwrapChannelMessage(text);
-  if (channelText !== null) return channelText;
-  return isSystemInjection(text) ? null : text;
-}
 
 /**
  * Parse JSONL session file from a byte offset.
