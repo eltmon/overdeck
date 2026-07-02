@@ -7,6 +7,8 @@ import {
   replayCrashedStandingAgent,
   shouldReplayCompactAtTierRunBoundary,
 } from '../tier-replay.js';
+import { broadcastCommit } from '../tier-feed.js';
+import type { ValidatedTieredExecutionFeedConfig } from '../tier-table.js';
 import type { TieredExecutionSupervisorConfig } from '../tier-table.js';
 
 function item(id: string, title = id, requiresInspection = false): VBriefItem {
@@ -54,7 +56,18 @@ function deps() {
     { sha: '2222222222222222222222222222222222222222', subject: 'bead-b second commit' },
   ]);
   const gitShow = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/file.ts b/file.ts\n+${sha}\n`);
-  return { spawn, deliver, stop, gitLog, gitShow, deliveries };
+  const renderDiff = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/file.ts b/file.ts\n+${sha}\n`);
+  return { spawn, deliver, stop, gitLog, gitShow, renderDiff, deliveries };
+}
+
+function feedConfig(overrides: Partial<ValidatedTieredExecutionFeedConfig> = {}): ValidatedTieredExecutionFeedConfig {
+  return {
+    callouts: 'off',
+    exclude: [],
+    exclude_subjects: [],
+    max_diff_bytes: null,
+    ...overrides,
+  };
 }
 
 describe('tier replay', () => {
@@ -195,5 +208,48 @@ describe('tier replay', () => {
     expect(seams.deliveries[0].message).toContain('SUPERVISOR REVIEW REQUEST');
     expect(seams.deliveries[0].message).toContain('Bead: bead-a');
     expect(seams.deliveries[0].message).not.toContain('bead-b acceptance');
+  });
+
+  it('uses the same feed renderer and subject skip for live and replay messages', async () => {
+    const config = feedConfig({ exclude_subjects: ['chore(beads):'] });
+    const liveDeliveries: Array<{ message: string }> = [];
+    const replaySeams = deps();
+    const renderDiff = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/src/x.ts b/src/x.ts\n+${sha}\n`);
+
+    await broadcastCommit({
+      workspace: '/ws',
+      sha: '1111111111111111111111111111111111111111',
+      beadTitle: 'bead-a first commit',
+      commitSubject: 'bead-a first commit',
+      tiers: [{ tierName: 'standard', agentId: 'agent-pan-1791-slot-27' }],
+      feedConfig: config,
+      renderDiff,
+      deliver: vi.fn(async (_agentId: string, message: string): Promise<DeliveryResult> => {
+        liveDeliveries.push({ message });
+        return { ok: true, path: 'tmux' };
+      }),
+      recordDelivery: vi.fn(async () => undefined),
+    });
+
+    replaySeams.gitLog.mockResolvedValue([
+      { sha: 'skip111111111111111111111111111111111111', subject: 'chore(beads): close bead' },
+      { sha: '1111111111111111111111111111111111111111', subject: 'bead-a first commit' },
+    ]);
+    replaySeams.renderDiff = renderDiff;
+
+    const replay = await replayCrashedStandingAgent({
+      kind: 'tier',
+      issueId: 'PAN-1791',
+      workspace: '/ws',
+      base: 'main',
+      tierName: 'standard',
+      slotIndex: 27,
+      slotItemId: 'bead-a',
+      feedConfig: config,
+    }, { deps: replaySeams });
+
+    expect(replay.commits.map(commit => commit.sha)).toEqual(['1111111111111111111111111111111111111111']);
+    expect(replaySeams.deliveries).toHaveLength(1);
+    expect(replaySeams.deliveries[0].message).toBe(liveDeliveries[0].message);
   });
 });

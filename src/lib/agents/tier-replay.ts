@@ -11,7 +11,11 @@ import { spawnRun } from './spawn.js';
 import type { SpawnRunOptions } from './spawn-prep.js';
 import { listSlotOwnership } from './slot-reconcile.js';
 import type { InFlightBead } from './standing-tiers.js';
-import { composeCommitFeedMessage } from './tier-feed.js';
+import {
+  composeCommitFeedMessage,
+  renderCommitFeedDiff,
+  shouldSkipFeedSubject,
+} from './tier-feed.js';
 import {
   buildSupervisorReviewMessage,
   extractAcceptanceCriteria,
@@ -20,7 +24,8 @@ import {
   supervisorAgentId as defaultSupervisorAgentId,
   SUPERVISOR_SUB_ROLE,
 } from './tier-supervisor.js';
-import type { TieredExecutionSupervisorConfig } from './tier-table.js';
+import type { TieredExecutionSupervisorConfig, ValidatedTieredExecutionFeedConfig } from './tier-table.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG } from './tier-table.js';
 import { stopAgent } from './termination.js';
 
 const execFileAsync = promisify(execFile);
@@ -55,6 +60,8 @@ export interface ReplayTargetBase {
   agentId?: string;
   /** Optional prompt for the fresh standing session. */
   prompt?: string;
+  /** Feed filtering/rendering config. Defaults preserve today's raw git-show behavior. */
+  feedConfig?: ValidatedTieredExecutionFeedConfig;
 }
 
 export interface ReplayStandingTierTarget extends ReplayTargetBase {
@@ -84,6 +91,7 @@ export interface TierReplayDeps {
   stop?: typeof stopAgent;
   gitLog?: (workspace: string, base: string) => Promise<Array<{ sha: string; subject: string }>>;
   gitShow?: (workspace: string, sha: string) => Promise<string>;
+  renderDiff?: (workspace: string, sha: string, feedConfig: ValidatedTieredExecutionFeedConfig) => Promise<string>;
   listSlotOwnership?: typeof listSlotOwnership;
 }
 
@@ -118,7 +126,12 @@ export async function replayStandingAgent(
 ): Promise<ReplayResult> {
   const deps = replayDeps(options.deps);
   const agent = await spawnReplayTarget(target, deps);
-  const commits = await loadReplayCommits(target.workspace, target.base, deps);
+  const commits = await loadReplayCommits(
+    target.workspace,
+    target.base,
+    target.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed,
+    deps,
+  );
   const deliveries = target.kind === 'tier'
     ? await replayTierFeed(agent.id, commits, deps)
     : await replaySupervisorFeed(agent.id, target, commits, deps);
@@ -268,14 +281,16 @@ function findReplayItem(doc: VBriefDocument, commit: Pick<ReplayCommit, 'subject
 async function loadReplayCommits(
   workspace: string,
   base: string,
+  feedConfig: ValidatedTieredExecutionFeedConfig,
   deps: Required<TierReplayDeps>,
 ): Promise<ReplayCommit[]> {
   const entries = await deps.gitLog(workspace, base);
   const commits: ReplayCommit[] = [];
   for (const entry of entries) {
+    if (shouldSkipFeedSubject(entry.subject, feedConfig)) continue;
     commits.push({
       ...entry,
-      diff: await deps.gitShow(workspace, entry.sha),
+      diff: await deps.renderDiff(workspace, entry.sha, feedConfig),
     });
   }
   return commits;
@@ -312,6 +327,10 @@ function replayDeps(deps: TierReplayDeps = {}): Required<TierReplayDeps> {
     stop: deps.stop ?? stopAgent,
     gitLog: deps.gitLog ?? runGitLog,
     gitShow: deps.gitShow ?? runGitShow,
+    renderDiff: deps.renderDiff
+      ?? (deps.gitShow
+        ? (workspace, sha) => deps.gitShow!(workspace, sha)
+        : renderCommitFeedDiff),
     listSlotOwnership: deps.listSlotOwnership ?? listSlotOwnership,
   };
 }
