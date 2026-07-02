@@ -28,10 +28,10 @@ only when its predecessor lands.
 
 | # | Issue | Target | Status |
 |---|---|---|---|
-| 1 | PAN-2156 | `services/conversation-service.ts` (1,609) → modules | spec `proposed`; **dispatching now** |
-| 2 | PAN-2154 | `lib/workspace-manager.ts` (1,736) → modules | spec `proposed`; queued |
+| 1 | PAN-2156 | `services/conversation-service.ts` (1,609) → modules | **in review — PR #2235** (work done 2026-07-02) |
+| 2 | PAN-2154 | `lib/workspace-manager.ts` (1,736) → modules | **in progress — work agent active** (4+ seams committed) |
 | 3 | PAN-2153 | `routes/specialists.ts` (1,753) → modules | spec `proposed`; queued |
-| 4 | PAN-2151 | `routes/misc.ts` (1,832) → modules | planned in workspace but **spec never promoted to main** (finalize silent-skip class) — re-run finalize before dispatch |
+| 4 | PAN-2151 | `routes/misc.ts` (1,832) → modules | re-planned 2026-07-02 (orphan-AUQ transcript archived, fresh fable-5 auto-plan); spec promoted, ready to dispatch |
 
 ## Phase 1 — guardrails first (protect the campaign from itself)
 
@@ -40,10 +40,10 @@ peripheral, safe for autonomous pipeline flow once planned.
 
 | # | Issue | What | PRD |
 |---|---|---|---|
-| 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | needed |
-| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | needed |
-| 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | needed |
-| 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | needed |
+| 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **written — on main** |
+| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | **written — on main** |
+| 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | **written — on main** |
+| 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **written — on main** |
 
 ## Phase 2 — route thinning (the three biggest god files, done right)
 
@@ -56,9 +56,9 @@ line-count metric while keeping the module shallow — the workspaces split prov
 
 | # | Issue | Target | Notes |
 |---|---|---|---|
-| 9 | PAN-2148 | `routes/issues.ts` (4,065) | PRD needed (rewrite from inline barrel-split body) |
-| 10 | PAN-2147 | `routes/agents.ts` (4,071) | PRD needed (same) |
-| 11 | PAN-2145 | `routes/conversations.ts` (5,316 — grew +418 while gated) | PRD **deferred** until PAN-2156 lands (routes call conversation-service; seams move) |
+| 9 | PAN-2148 | `routes/issues.ts` (4,065) | **PRD written — on main** |
+| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **PRD written — on main** |
+| 11 | PAN-2145 | `routes/conversations.ts` (5,316 — grew +418 while gated) | **PRD written — on main** (verify `## Re-verify at execution` against post-2156 main before dispatch) |
 
 ## Phase 3 — cloister core (pipeline machinery; supervised, sequenced, never batched)
 
@@ -67,30 +67,29 @@ time, full suite before merge, verify against origin HEAD.
 
 | # | Issue | Target | Notes |
 |---|---|---|---|
-| 12 | PAN-2149 | `cloister/service.ts` (2,057, regrowing — reddened main 07-02) | PRD needed |
-| 13 | PAN-2232 | `cloister/specialists.ts` (1,749) | PRD needed |
-| 14 | PAN-2233 | `cloister/merge-agent.ts` (1,414) — in-flight-guard test must stay green | PRD needed |
-| 15 | PAN-2190 | `routes/workspaces/merge-ops.ts` (1,925 — created by the workspaces split) | PRD needed |
+| 12 | PAN-2149 | `cloister/service.ts` (2,057, regrowing — reddened main 07-02) | **PRD written — on main** |
+| 13 | PAN-2232 | `cloister/specialists.ts` (1,749) | **PRD written — on main** |
+| 14 | PAN-2233 | `cloister/merge-agent.ts` (1,414) — in-flight-guard test must stay green | **PRD written — on main** |
+| 15 | PAN-2190 | `routes/workspaces/merge-ops.ts` (1,925 — created by the workspaces split) | **PRD written — on main** |
 | 16 | PAN-2189 | `cloister/deacon.ts` (3,403) | PRD **deferred** until 12–15 land (deacon imports shift with each) |
 
 ## Phase 4 — deep foundations (the highest-leverage, least line-county work)
 
 | # | Issue | What | Notes |
 |---|---|---|---|
-| 17 | PAN-2228 | Delivery door: one transport primitive, loud failure semantics (zombie-kickoff class) | PRD needed |
-| 18 | PAN-2229 | Prompt-regression protection: evals over `roles/*.md` + CI diff gate (soul-degradation class) | PRD needed |
-| 19 | PAN-1983 / PAN-1984 | Legacy `panopticon.db` module + test teardown (dual-DB coexistence) | existing issues; partial progress recorded on both |
+| 17 | PAN-2228 | Delivery door: one transport primitive, loud failure semantics (zombie-kickoff class) | **PRD written — on main** |
+| 18 | PAN-2229 | Prompt-regression protection: evals over `roles/*.md` + CI diff gate (soul-degradation class) | **PRD written — on main** |
+| 19 | PAN-1983 / PAN-1984 | Legacy `panopticon.db` module + test teardown (dual-DB coexistence) | **PRDs written — on main**; partial progress recorded on both issues |
 | 20 | PAN-1936 / PAN-2008 | Read-door consolidation + store-access CI guard | largely *absorbed by Phase 2 PRDs*; close or re-scope after Phase 2 |
 
 ## Related in-pipeline items being shepherded alongside (not queue members)
 
-- PAN-2150 — merged & goal met (SettingsPage 646 lines) but reopened 2026-07-01 without
-  comment; needs an operator/orchestrator disposition.
+- PAN-2150 — RE-CLOSED 2026-07-02 with goal-met evidence (all Settings modules < 1,000 lines).
 - `strike/pan-1935` — implemented cost-recording fix stranded off-main; land or re-strike.
 - `feature-pan-1864` workspace/branch — planning-only residue for a now-closed issue; clean up.
 
 ## PRD skip list (deliberately not written ahead)
 
-- PAN-2145 (until PAN-2156 lands) and PAN-2189 (until Phase 3 items 12–15 land) — their
+- PAN-2189 only (until Phase 3 items 12–15 land) — PAN-2145 was written 2026-07-02 with re-verify guards. Its
   target files' seams depend on predecessors; an early PRD would be guesswork against a
   future codebase. All other PRDs are writable now with grep anchors + re-verify sections.
