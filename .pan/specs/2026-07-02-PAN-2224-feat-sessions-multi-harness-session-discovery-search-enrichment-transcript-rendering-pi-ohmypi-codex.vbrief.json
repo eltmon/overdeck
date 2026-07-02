@@ -4,7 +4,7 @@
     "created": "2026-07-02T14:25:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2224: feat(sessions): multi-harness session discovery, search, enrichment + transcript rendering (pi/ohmypi/codex)",
-    "updated": "2026-07-02T14:32:11.015Z"
+    "updated": "2026-07-02T14:33:18.743Z"
   },
   "plan": {
     "id": "pan-2224",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ebb53cd6-3d96-4393-82bf-d4494dd21ffe",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-02T14:25:00.000Z",
-    "updated": "2026-07-02T14:32:11.015Z",
+    "updated": "2026-07-02T14:33:18.743Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2224",
@@ -91,7 +91,9 @@
           "traces": [
             "NFR-1"
           ],
-          "acJustification": "Measurement-only bead; two criteria fully cover it."
+          "acJustification": "Measurement-only bead; two criteria fully cover it.",
+          "statusReason": "slot dispatch failed: ",
+          "statusUpdatedAt": "2026-07-02T14:33:18.743Z"
         },
         "narrative": {
           "Action": "BEFORE any scanner changes land, time a full `system` scan of the live ~6.9k-session Claude corpus. Trigger it via the existing scan surface (POST /api/discovered-sessions/scan with mode 'system' against the local dashboard, or the scanConversations RPC — see src/dashboard/server/routes/discovered-sessions.ts). Record the wall-clock duration (run twice, report both) in two places: append a '## Scan timing' section with a 'Baseline (pre-PAN-2224)' entry to .pan/drafts/pan-2224.md, and post the same numbers as a comment on GitHub issue 2224 (gh issue comment 2224). This bead changes no source code."
