@@ -191,6 +191,23 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
  * with status:'starting' before the tmux session attaches, so filtering on
  * tmuxActive would race-spawn a second run.
  */
+/**
+ * Grace window for `starting` states without a tmux session yet. The
+ * start-planning route deliberately writes state.json BEFORE the lifecycle
+ * transition (PAN-1048) so this guard can see the planner coming — but the
+ * tmux session is only created after the transition. Treating any
+ * starting-without-session as dead (the original S1 unstick heuristic)
+ * re-opened the PAN-1048 race and spawned a duplicate `agent-<issue>-plan`
+ * twin on EVERY `pan plan` (PAN-2159, 100% repro). A fresh `starting` state
+ * is a startup in progress; only a stale one is a crashed spawn to unstick.
+ */
+const STARTING_WITHOUT_SESSION_GRACE_MS = 120_000;
+
+function isFreshStarting(state: { startedAt?: string }): boolean {
+  const startedAt = Date.parse(state.startedAt ?? '');
+  return Number.isFinite(startedAt) && Date.now() - startedAt < STARTING_WITHOUT_SESSION_GRACE_MS;
+}
+
 async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: string): Promise<boolean> {
   const issueLower = issueId.toLowerCase();
 
@@ -201,10 +218,10 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
     const legacyId = `planning-${issueLower}`;
     const legacyState = await Effect.runPromise(getAgentState(legacyId));
     if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
-      // S1: if stuck at 'starting' with no live tmux session, treat as not-alive
-      // so the next retry can spawn a fresh run without being blocked.
+      // S1 (age-aware): only a STALE 'starting' state with no live tmux
+      // session is a crashed spawn; a fresh one is mid-startup (PAN-2159).
       if (legacyState.status === 'starting' && !(await Effect.runPromise(sessionExists(legacyId)))) {
-        return false;
+        return isFreshStarting(legacyState);
       }
       return true;
     }
@@ -219,9 +236,10 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
 
   const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
 
-  // S1: treat a 'starting' state with no live tmux session as not-alive.
+  // S1 (age-aware): only a STALE 'starting' state with no live tmux session
+  // is a crashed spawn; a fresh one is mid-startup (PAN-2159).
   if (stateRole === role && state.status === 'starting' && !(await Effect.runPromise(sessionExists(candidateId)))) {
-    return false;
+    return isFreshStarting(state);
   }
 
   const aliveByStatus = stateRole === role && state.status !== 'stopped' && state.status !== 'error';

@@ -4,16 +4,16 @@
     "created": "2026-06-30T01:29:47.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2156: behavior-preserving decomposition of src/dashboard/server/services/conversation-service.ts (1609 lines) into nine submodules under src/dashboard/server/services/conversation/, each <1000 lines, leaving conversation-service.ts as a thin curated re-export barrel.",
-    "updated": "2026-06-30T01:33:43.058Z"
+    "updated": "2026-07-02T17:05:55.859Z"
   },
   "plan": {
     "id": "PAN-2156",
     "title": "Decompose conversation-service.ts (1609 lines) into focused modules",
-    "status": "proposed",
+    "status": "running",
     "uid": "pan-2156",
     "author": "agent:claude-opus-4-8",
     "created": "2026-06-30T01:29:47.000Z",
-    "updated": "2026-06-30T01:33:43.058Z",
+    "updated": "2026-07-02T17:05:55.859Z",
     "references": [
       {
         "type": "issue",
@@ -583,7 +583,7 @@
       ],
       "canonicalFilename": ""
     },
-    "sequence": 1
+    "sequence": 3
   },
-  "status": "proposed"
+  "status": "active"
 }

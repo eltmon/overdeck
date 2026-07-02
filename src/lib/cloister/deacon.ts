@@ -2562,6 +2562,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const state = loadState();
   state.patrolCycle++;
   state.lastPatrol = new Date().toISOString();
+  // PAN-2219: persist the heartbeat at cycle START, not only at cycle end.
+  // getDeaconStatus() reads state from disk, so a multi-minute patrol cycle
+  // was invisible to the supervisor watchdog, which killed healthy servers
+  // mid-patrol ("deacon patrol heartbeat stale" restart churn).
+  saveState(state);
 
   // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];

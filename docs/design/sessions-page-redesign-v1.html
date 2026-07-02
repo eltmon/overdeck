@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sessions — redesign mockup (PAN-1917)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens: copied from src/dashboard/frontend/src/index.css (light + dark) ── */
+:root {
+  color-scheme: light;
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --background: #ffffff;
+  --foreground: #1f2937;
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+  --primary: oklch(0.488 0.217 264);
+  --primary-foreground: #ffffff;
+  --secondary: color-mix(in srgb, black 4%, transparent);
+  --accent: color-mix(in srgb, black 4%, transparent);
+  --muted: color-mix(in srgb, black 4%, transparent);
+  --muted-foreground: #6b7280;
+  --border: color-mix(in srgb, black 8%, transparent);
+  --input: color-mix(in srgb, black 10%, transparent);
+  --destructive: #ef4444;
+  --destructive-foreground: #b91c1c;
+  --info: #3b82f6;
+  --info-foreground: #1d4ed8;
+  --success: #10b981;
+  --success-foreground: #047857;
+  --warning: #f59e0b;
+  --warning-foreground: #b45309;
+  --signal-review: #a855f7;
+  --signal-review-foreground: #7e22ce;
+  --signal-cost: #06b6d4;
+  --signal-cost-foreground: #0e7490;
+  --card-2: color-mix(in srgb, black 2.5%, var(--card));
+}
+.dark {
+  color-scheme: dark;
+  --background: #080b10;
+  --foreground: #e5e7eb;
+  --card: #0c1018;
+  --card-foreground: #e5e7eb;
+  --primary: oklch(0.588 0.217 264);
+  --primary-foreground: #ffffff;
+  --secondary: color-mix(in srgb, white 6%, transparent);
+  --accent: color-mix(in srgb, white 8%, transparent);
+  --muted: color-mix(in srgb, white 4%, transparent);
+  --muted-foreground: #9ca3af;
+  --border: color-mix(in srgb, white 6%, transparent);
+  --input: color-mix(in srgb, white 8%, transparent);
+  --destructive: #f87171;
+  --destructive-foreground: #fca5a5;
+  --info: #3b82f6;
+  --info-foreground: #60a5fa;
+  --success: #10b981;
+  --success-foreground: #34d399;
+  --warning: #f59e0b;
+  --warning-foreground: #fbbf24;
+  --signal-review: #a855f7;
+  --signal-review-foreground: #c084fc;
+  --signal-cost: #06b6d4;
+  --signal-cost-foreground: #22d3ee;
+  --card-2: color-mix(in srgb, white 2.5%, var(--card));
+}
+
+/* ── Base ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "DM Sans", sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  background: var(--background);
+  color: var(--foreground);
+  overflow: hidden;
+}
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input { font: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+
+.page { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Header ── */
+.header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.header h1 { font-size: 14px; font-weight: 500; }
+.stats { color: var(--muted-foreground); font-size: 12px; display: flex; gap: 10px; }
+.stats .cost { color: var(--signal-cost-foreground); }
+.spacer { flex: 1; }
+.search {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--muted); border: 1px solid var(--input);
+  border-radius: var(--radius-sm); padding: 5px 9px; width: 300px;
+  color: var(--muted-foreground);
+}
+.search input { border: 0; outline: 0; background: transparent; color: var(--foreground); width: 100%; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 5px 10px; color: var(--muted-foreground); background: transparent;
+}
+.btn:hover { background: var(--accent); color: var(--foreground); }
+.btn.active { border-color: color-mix(in srgb, var(--primary) 40%, transparent); color: var(--primary); }
+.btn.primary { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+.theme-note { font-size: 11px; color: var(--muted-foreground); }
+
+/* ── Filter chips ── */
+.chips { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px;
+  padding: 0 7px; border-radius: var(--radius-sm); font-size: 11px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent);
+  color: var(--foreground);
+}
+.chip .x { color: var(--muted-foreground); }
+.chips .label { color: var(--muted-foreground); font-size: 11px; }
+
+/* ── Body ── */
+.body { display: flex; flex: 1; min-height: 0; }
+
+/* ── Facets ── */
+.facets { width: 200px; border-right: 1px solid var(--border); overflow-y: auto; padding: 10px 12px; flex-shrink: 0; }
+.facet-group { margin-bottom: 14px; }
+.facet-group h3 { font-size: 11px; font-weight: 500; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.facet { display: flex; align-items: center; gap: 6px; padding: 2.5px 0; color: var(--muted-foreground); cursor: pointer; font-weight: 400; }
+.facet:hover { color: var(--foreground); }
+.facet.on { color: var(--foreground); }
+.facet .count { margin-left: auto; font-size: 11px; }
+.facet input { accent-color: var(--primary); }
+.seg { display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.seg button { flex: 1; padding: 4px 0; font-size: 11px; color: var(--muted-foreground); }
+.seg button.on { background: var(--accent); color: var(--foreground); }
+
+/* ── Session list ── */
+.list { width: 460px; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.list-scroll { overflow-y: auto; flex: 1; }
+.row {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 12px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.row:hover { background: var(--accent); }
+.row.selected { background: var(--accent); box-shadow: inset 2px 0 0 var(--primary); }
+.row .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .sub { display: block; color: var(--muted-foreground); font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .meta { display: flex; align-items: center; gap: 10px; color: var(--muted-foreground); font-size: 11px; flex-shrink: 0; }
+.row .model { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 6px;
+  border-radius: var(--radius-sm); font-size: 10.5px; flex-shrink: 0;
+  background: var(--muted); border: 1px solid var(--border); color: var(--muted-foreground);
+}
+.load-more { padding: 9px 12px; text-align: center; color: var(--muted-foreground); font-size: 11px; }
+
+/* ── Detail ── */
+.detail { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--card); }
+.detail-header { border-bottom: 1px solid var(--border); padding: 10px 16px; flex-shrink: 0; }
+.detail-title-row { display: flex; align-items: center; gap: 8px; }
+.detail-title-row h2 { font-size: 13.5px; font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { color: var(--muted-foreground); padding: 3px 6px; border-radius: var(--radius-sm); font-size: 11px; }
+.icon-btn:hover { background: var(--accent); color: var(--foreground); }
+.meta-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px 18px;
+  margin-top: 10px; font-size: 11.5px;
+}
+.meta-grid .cell .k { color: var(--muted-foreground); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+.meta-grid .cell .v { margin-top: 1px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-extra { margin-top: 10px; font-size: 11.5px; font-weight: 400; color: var(--muted-foreground); display: grid; gap: 4px; }
+.meta-extra b { font-weight: 500; color: var(--foreground); }
+.actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.actions .cta { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 32%, transparent); }
+.actions .grow { flex: 1; }
+.deeplink { color: var(--muted-foreground); font-size: 11px; }
+
+/* ── Transcript ── */
+.transcript { flex: 1; overflow-y: auto; padding: 14px 18px; background: var(--card-2); }
+.turn { max-width: 760px; margin: 0 auto 12px; }
+.turn .who { font-size: 10.5px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+.turn .bubble { border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 12px; font-weight: 400; line-height: 1.5; background: var(--card); }
+.turn.user .bubble { background: var(--accent); }
+.toolgroup {
+  max-width: 760px; margin: 0 auto 12px; color: var(--muted-foreground);
+  font-size: 11.5px; font-weight: 400; padding: 5px 12px;
+  border-left: 2px solid var(--border); cursor: pointer;
+}
+.toolgroup:hover { color: var(--foreground); }
+.notice {
+  max-width: 560px; margin: 40px auto; text-align: center; color: var(--muted-foreground);
+  border: 1px dashed var(--border); border-radius: var(--radius); padding: 24px; font-weight: 400;
+}
+.notice b { font-weight: 500; color: var(--foreground); display: block; margin-bottom: 6px; }
+.collapsed .meta-grid, .collapsed .meta-extra { display: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Sessions</h1>
+    <div class="stats num">
+      <span>6,861 sessions</span><span>·</span><span>40 archived</span><span>·</span><span class="cost">$412.83 total</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="search">⌕<input placeholder="Search sessions… (⏎ keyword, ⇧⏎ semantic)"></div>
+    <button class="btn" id="semanticBtn" onclick="this.classList.toggle('active')">Semantic</button>
+    <button class="btn active">Filters</button>
+    <button class="btn">Scan</button>
+    <span class="theme-note">mockup-only:</span>
+    <button class="btn" onclick="document.documentElement.classList.toggle('dark'); this.textContent = document.documentElement.classList.contains('dark') ? 'Light mode' : 'Dark mode'">Light mode</button>
+  </div>
+
+  <!-- Active filter chips -->
+  <div class="chips">
+    <span class="label">Filters:</span>
+    <span class="chip">workspace: overdeck <span class="x">✕</span></span>
+    <span class="chip">last 7 days <span class="x">✕</span></span>
+  </div>
+
+  <div class="body">
+
+    <!-- Facet sidebar -->
+    <div class="facets">
+      <div class="facet-group">
+        <h3>Source</h3>
+        <div class="seg">
+          <button class="on">All</button><button>Discovered</button><button>Archived</button>
+        </div>
+      </div>
+      <div class="facet-group">
+        <h3>Harness</h3>
+        <label class="facet"><input type="checkbox"> claude-code <span class="count num">6,712</span></label>
+        <label class="facet"><input type="checkbox"> ohmypi <span class="count num">96</span></label>
+        <label class="facet"><input type="checkbox"> codex <span class="count num">53</span></label>
+      </div>
+      <div class="facet-group">
+        <h3>Time</h3>
+        <label class="facet"><input type="checkbox" checked> last 7 days <span class="count num">412</span></label>
+        <label class="facet"><input type="checkbox"> last 30 days <span class="count num">1,904</span></label>
+        <label class="facet"><input type="checkbox"> older <span class="count num">4,545</span></label>
+      </div>
+      <div class="facet-group">
+        <h3>Model</h3>
+        <label class="facet"><input type="checkbox"> <span class="mono">claude-fable-5</span> <span class="count num">1,282</span></label>
+        <label class="facet"><input type="checkbox"> <span class="mono">opus-4-8</span> <span class="count num">2,411</span></label>
+        <label class="facet"><input type="checkbox"> <span class="mono">gpt-5.5</span> <span class="count num">531</span></label>
+        <label class="facet"><input type="checkbox"> <span class="mono">kimi-k2.7</span> <span class="count num">88</span></label>
+      </div>
+      <div class="facet-group">
+        <h3>Tags</h3>
+        <label class="facet"><input type="checkbox"> debugging <span class="count num">203</span></label>
+        <label class="facet"><input type="checkbox"> planning <span class="count num">117</span></label>
+        <label class="facet"><input type="checkbox"> refactor <span class="count num">64</span></label>
+      </div>
+      <div class="facet-group">
+        <h3>Cost</h3>
+        <label class="facet"><input type="checkbox"> &lt; $0.10 <span class="count num">3,020</span></label>
+        <label class="facet"><input type="checkbox"> $0.10 – 1 <span class="count num">2,514</span></label>
+        <label class="facet"><input type="checkbox"> $1 – 10 <span class="count num">1,101</span></label>
+        <label class="facet"><input type="checkbox"> &gt; $10 <span class="count num">226</span></label>
+      </div>
+      <div class="facet-group">
+        <h3>Enrichment</h3>
+        <label class="facet"><input type="checkbox"> not enriched <span class="count num">5,733</span></label>
+        <label class="facet"><input type="checkbox"> L1 <span class="count num">802</span></label>
+        <label class="facet"><input type="checkbox"> L2 <span class="count num">297</span></label>
+        <label class="facet"><input type="checkbox"> L3 <span class="count num">29</span></label>
+      </div>
+    </div>
+
+    <!-- Session list -->
+    <div class="list">
+      <div class="list-scroll" id="rows"></div>
+      <div class="load-more">Scrolling loads more · 412 of 6,861 in current filter</div>
+    </div>
+
+    <!-- Detail -->
+    <div class="detail" id="detail"></div>
+
+  </div>
+</div>
+
+<script>
+const sessions = [
+  {
+    key: 'managed-archived:87', title: 'Grant autonomous fix permission',
+    sub: 'Dashboard performance investigation — event-loop starvation, N+1 costs',
+    badges: ['Archived · PAN-2219'], harness: 'claude-code', model: 'claude-fable-5',
+    msgs: 214, cost: '$6.41', when: '2h ago',
+    conv: '20260702-3615', workspace: '~/Projects/overdeck',
+    tokens: '1.2M in / 84k out', span: 'Jul 2, 08:12 → 14:03', enrich: 'L2',
+    jsonl: '~/.claude/projects/-home-eltmon-Projects-overdeck/a3c59eaa…jsonl',
+    kind: 'managed', deeplink: '/sessions?session=managed-archived:87',
+    transcript: [
+      { role: 'user', text: 'Performance of the dashboard is abysmal. We currently have a lot of stuff going on so now is a good time for you to investigate and identify why it is so bad.' },
+      { role: 'tools', text: '▸ 14 tool calls — Bash, Read, Grep' },
+      { role: 'assistant', text: 'Found four compounding causes: the lifecycle patrol grinds the event loop every tick, specs re-parse on every poll, costs endpoint N+1s per issue, and the watchdog restarts busy-but-alive servers. Details below…' },
+      { role: 'user', text: 'Ok you can fix them yourselves directly please' },
+      { role: 'tools', text: '▸ 31 tool calls — Edit, Bash, Write' },
+      { role: 'assistant', text: 'All four fixes landed and verified: patrol batched, spec cache keyed by mtime, costs aggregated in one query, watchdog now checks liveness before restart. Typecheck, lint, and tests green.' },
+    ],
+  },
+  {
+    key: 'discovered:4123', title: 'Ad-hoc: vitest OOM flake hunt',
+    sub: 'Retry-After tests holding real timers across workers',
+    badges: [], harness: 'claude-code', model: 'opus-4-8',
+    msgs: 58, cost: '$0.92', when: 'yesterday',
+    conv: null, workspace: '~/Projects/overdeck',
+    tokens: '310k in / 22k out', span: 'Jul 1, 21:40 → 22:15', enrich: 'L1',
+    jsonl: '~/.claude/projects/-home-eltmon-Projects-overdeck/8842fa01…jsonl',
+    kind: 'adhoc', deeplink: '/sessions?session=discovered:4123',
+    transcript: [
+      { role: 'user', text: 'Why does the retry suite OOM when parallelized?' },
+      { role: 'tools', text: '▸ 6 tool calls — Read, Grep' },
+      { role: 'assistant', text: 'The retry tests use real setTimeout with retry-after: 2 — each attempt keeps the test context alive for seconds, and across workers that pins enough fetch mocks to OOM. Switch to vi.useFakeTimers() + advanceTimersByTimeAsync.' },
+    ],
+  },
+  {
+    key: 'managed-archived:91', title: 'PAN-2108 flywheel death recovery',
+    sub: 'Self-heal on omp exit; record exit-status',
+    badges: ['Archived · PAN-2108'], harness: 'ohmypi', model: 'kimi-k2.7',
+    msgs: 121, cost: '$1.87', when: '3d ago',
+    conv: '20260628-4410', workspace: '~/Projects/overdeck',
+    tokens: '840k in / 51k out', span: 'Jun 28, 10:02 → 13:47', enrich: 'L1',
+    jsonl: '~/.overdeck/agents/agent-pan-2108/sessions/…/1782600123_ab41.jsonl',
+    kind: 'managed', deeplink: '/sessions?session=managed-archived:91',
+    transcript: [
+      { role: 'user', text: 'Flywheel died when omp exited — add self-healing.' },
+      { role: 'tools', text: '▸ 9 tool calls — Read, Edit, Bash' },
+      { role: 'assistant', text: 'Added an exit-status recorder and a respawn path guarded by the freeze gate. Flywheel now survives omp death and records why it went down.' },
+    ],
+  },
+  {
+    key: 'discovered:5210', title: 'Codex rollout: contracts build fix',
+    sub: 'gpt-5.5 ad-hoc run — file no longer on disk',
+    badges: [], harness: 'codex', model: 'gpt-5.5',
+    msgs: 34, cost: '$0.31', when: 'Jun 24',
+    conv: null, workspace: '~/Projects/overdeck',
+    tokens: '120k in / 9k out', span: 'Jun 24, 16:05 → 16:26', enrich: 'not enriched',
+    jsonl: '~/.codex/sessions/2026/06/24/rollout-9f2a…-t81.jsonl',
+    kind: 'gone', deeplink: '/sessions?session=discovered:5210',
+    transcript: null,
+  },
+];
+
+function badgeHtml(s) {
+  const b = s.badges.map(t => `<span class="badge">${t}</span>`).join('');
+  const h = s.harness !== 'claude-code' ? `<span class="badge">${s.harness}</span>` : '';
+  return b + h;
+}
+
+function renderRows(selKey) {
+  document.getElementById('rows').innerHTML = sessions.map(s => `
+    <button class="row ${s.key === selKey ? 'selected' : ''}" onclick="select('${s.key}')">
+      <span class="title">${s.title}<span class="sub">${s.sub}</span></span>
+      ${badgeHtml(s)}
+      <span class="meta">
+        <span class="mono model">${s.model}</span>
+        <span class="num">${s.msgs}</span>
+        <span class="num">${s.cost}</span>
+        <span>${s.when}</span>
+      </span>
+    </button>`).join('');
+}
+
+function transcriptHtml(s) {
+  if (s.kind === 'gone') {
+    return `<div class="notice"><b>Transcript file no longer on disk</b>
+      The JSONL for this session (<span class="mono">${s.jsonl}</span>) was removed after it was scanned.
+      Metadata and search remain available.</div>`;
+  }
+  return s.transcript.map(t =>
+    t.role === 'tools'
+      ? `<div class="toolgroup">${t.text}</div>`
+      : `<div class="turn ${t.role}"><div class="who">${t.role === 'user' ? 'You' : 'Assistant'}</div><div class="bubble">${t.text}</div></div>`
+  ).join('');
+}
+
+function select(key) {
+  const s = sessions.find(x => x.key === key);
+  renderRows(key);
+  const managed = s.kind === 'managed';
+  document.getElementById('detail').innerHTML = `
+    <div class="detail-header" id="dh">
+      <div class="detail-title-row">
+        <h2>${s.title}</h2>
+        ${badgeHtml(s)}
+        <span class="deeplink mono">${s.deeplink}</span>
+        <button class="icon-btn" onclick="document.getElementById('dh').classList.toggle('collapsed')">▾ details</button>
+      </div>
+      <div class="meta-grid">
+        <div class="cell"><div class="k">Workspace</div><div class="v mono">${s.workspace}</div></div>
+        <div class="cell"><div class="k">Model</div><div class="v mono">${s.model}</div></div>
+        <div class="cell"><div class="k">Messages · Tokens</div><div class="v num">${s.msgs} · ${s.tokens}</div></div>
+        <div class="cell"><div class="k">Cost</div><div class="v num">${s.cost}</div></div>
+        <div class="cell"><div class="k">Active</div><div class="v num">${s.span}</div></div>
+        <div class="cell"><div class="k">Enrichment</div><div class="v">${s.enrich}</div></div>
+        <div class="cell"><div class="k">Conversation</div><div class="v mono">${s.conv ?? '— (ad-hoc session)'}</div></div>
+        <div class="cell"><div class="k">Harness</div><div class="v mono">${s.harness}</div></div>
+      </div>
+      <div class="meta-extra">
+        <span><b>Summary</b> — ${s.sub}.</span>
+        <span><b>JSONL</b> — <span class="mono">${s.jsonl}</span></span>
+      </div>
+      <div class="actions">
+        <button class="btn">Enrich L1</button>
+        <button class="btn">Enrich L2</button>
+        <button class="btn">Enrich L3</button>
+        <button class="btn">Embed</button>
+        ${s.badges.length ? '<button class="btn">Unarchive</button>' : ''}
+        <span class="grow"></span>
+        ${managed ? '<button class="btn cta">Open in Command Deck</button>' : ''}
+      </div>
+    </div>
+    <div class="transcript">${transcriptHtml(s)}</div>`;
+}
+
+select('managed-archived:87');
+</script>
+</body>
+</html>

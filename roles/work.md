@@ -83,6 +83,17 @@ You remain the durable work agent for the issue. The foreman path is not a reviv
 6. Dispatch `registered-slot` items with `spawnRun(issue, 'work', { slotIndex, slotItemId })`. The slot runs in its own worktree on `feature/<issue>-slot-<n>` and registers as `agent-<issue>-slot-<n>`.
 7. Do not advance a dependent wave until every blocking parent is merged, completed serially, or intentionally cancelled.
 
+### Tiered dispatch (gated: `tiered_execution.enabled`)
+
+With `tiered_execution` disabled — the default — this subsection is inert: use the wave loop above exactly as written. When it resolves enabled for the plan (global config or `plan.metadata.tiered_execution: "on"`, via `resolveTieredExecutionEnabled` in `src/lib/agents/tier-table.ts`), replace wave-loop steps 4–6 with the tiered path below. Reconcile, wave ordering, convergence synthesis, and failure handling are unchanged.
+
+1. Compute the tier-run schedule once with `computeTierRunSchedule(doc, config)` from `src/lib/agents/standing-tiers.ts` and construct a `StandingTierManager` over it. Before starting a run, call `ensureStandingTiersForRun(currentRunIndex)` — a tier's standing session spawns lazily when its first run is ≤1 run away, and is reused across all its beads.
+2. Before dispatching each ready bead, call `shouldHaltDispatch(verdicts, bead, doc)` from `src/lib/agents/tier-supervisor.ts` using the supervisor verdicts collected from the inspect-status surface. If it returns true, a blocking supervisor finding is unresolved on a dependency of this bead. Do not dispatch the dependent bead yet.
+3. When dispatch is halted by a supervisor finding, send the fix to the tier that owns the blocked dependency first. The fix must land as a new one-bead commit, then the standing supervisor must ack that fix commit on the inspect-status surface. After the ack, re-check `shouldHaltDispatch`; only resume dependent dispatch when it returns false. This mirrors the serial `INSPECTION BLOCKED` flow.
+4. For each ready bead that is not halted, dispatch to its tier's standing agent with `manager.dispatchBeadToTier(tierName, bead)`. The helper enforces the single-implementer invariant: **only one worker agent implements a bead at a time** — standing tiers share your worktree, so a second in-flight bead would race the tree. A second dispatch before `completeBead` throws.
+5. When the standing agent reports the bead done, you stage and commit — `git add` the bead's files and compose the commit yourself. One bead = one foreman-authored commit, same invariant as the serial path.
+6. After the commit lands, call `broadcastCommit` from `src/lib/agents/tier-feed.ts` with the sha, the bead title, and the full standing-tier set, so every standing tier ingests the diff and stays warm. Then call `manager.completeBead(bead.id)` and continue with the next ready bead.
+
 ### Verify then merge
 
 Registered slots never merge directly into the feature branch. When a slot reports completion:

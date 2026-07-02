@@ -100,7 +100,7 @@ describe('deacon-swarm ready-slot merge', () => {
     const fakeDeps = deps({ merged: false, conflicts: false });
 
     await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps))
-      .resolves.toEqual([]);
+      .resolves.toEqual(['[swarm] verify-failed slot 1 (item wi-1) for PAN-2203: verification failed']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
   });
@@ -112,5 +112,34 @@ describe('deacon-swarm ready-slot merge', () => {
       .resolves.toEqual(['[swarm] failed-merge slot 1 (item wi-1) for PAN-2203']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('verify-failed surfacing', () => {
+  it('reports a verification failure as an action instead of dropping the slot silently', async () => {
+    const { mergeReadySlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
+    const doc = {
+      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      plan: {
+        id: 'pan-903', title: 't', status: 'active',
+        items: [{ id: 'wi-1', title: 'item', status: 'pending' }],
+        edges: [],
+      },
+    };
+    const deps = {
+      verifyAndMergeSlot: async () => ({
+        verified: false, merged: false, conflicts: false,
+        evidence: {}, failure: 'typecheck failed on merged result',
+      }),
+      applyTaskOperationToPlanFile: async () => undefined,
+    };
+
+    const actions = await mergeReadySlots('PAN-903', '/repo/workspaces/feature-pan-903', doc as never, [
+      { itemId: 'wi-1', slotIndex: 5, status: 'in_flight', lifecycle: 'ready-to-merge', branch: 'feature/pan-903-slot-5', agentId: 'agent-pan-903-slot-5' },
+    ] as never, deps as never);
+
+    expect(actions).toEqual([
+      '[swarm] verify-failed slot 5 (item wi-1) for PAN-903: typecheck failed on merged result',
+    ]);
   });
 });

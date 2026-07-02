@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-07-02T06:39:01.097Z",
+  "updated": "2026-07-02T16:25:12.746Z",
   "pipeline": {
     "issueId": "PAN-2152",
     "reviewStatus": "passed",
@@ -29,7 +29,7 @@
     "verificationStatus": "running",
     "mergeStatus": "failed",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T06:39:01.025Z",
+    "updatedAt": "2026-07-02T16:25:12.582Z",
     "reviewNotes": "No blocking findings; workspace command extraction is behavior-preserving",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "mergeNotes": "Workspace does not exist",
@@ -72,7 +72,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.780116,
-        "pricingAsOf": "2026-07-02T06:39:01.096Z"
+        "pricingAsOf": "2026-07-02T16:25:12.746Z"
       }
     },
     "merges": [

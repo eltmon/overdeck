@@ -1,20 +1,20 @@
 {
   "vBRIEFInfo": {
     "version": "0.6",
-    "created": "2026-07-02T06:24:34.000Z",
+    "created": "2026-07-02T13:58:57Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2214: Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator",
-    "updated": "2026-07-02T06:38:07.791Z"
+    "description": "Plan for PAN-2214: Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator (re-plan: PR #2221 salvage + incident-driven FR-12..FR-16)",
+    "updated": "2026-07-02T14:10:25.493Z"
   },
   "plan": {
     "id": "pan-2214",
-    "title": "Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator",
+    "title": "Swarm per-issue controls: salvage PR #2221 onto current main + record-write mutex, completion inference, record retirement, swarm feedback routing, verdict knock-over guard",
     "status": "running",
-    "uid": "f822ed23-d7fa-44f4-a350-08462b8fbbca",
+    "uid": "57aa9775-6aea-4735-99c4-751488dfc06c",
     "author": "agent:claude-fable-5",
-    "sequence": 10,
-    "created": "2026-07-02T06:24:34.000Z",
-    "updated": "2026-07-02T06:38:07.791Z",
+    "sequence": 12,
+    "created": "2026-07-02T13:58:57Z",
+    "updated": "2026-07-02T14:10:25.493Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2214",
@@ -22,685 +22,150 @@
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/overdeck/issues/2213",
-        "label": "PAN-2213 (subsumed: orphaned-slot allocator + gc)",
-        "type": "issue"
+        "uri": "https://github.com/eltmon/overdeck/pull/2221",
+        "label": "PR #2221 (salvage starting material)",
+        "type": "pr"
       },
       {
-        "uri": "https://github.com/eltmon/overdeck/issues/2203",
-        "label": "PAN-2203 (swarm engine this hardens)",
-        "type": "issue"
+        "uri": ".pan/drafts/pan-2214.md",
+        "label": "PRD (refreshed on main f57e65d1a9)",
+        "type": "doc"
       }
     ],
     "tags": [
       "swarm",
       "deacon",
+      "cloister",
       "cli",
       "reliability"
     ],
     "narratives": {
-      "Problem": "The PAN-2203 swarm has no per-issue operational controls and its slot allocation is not reconcile-safe. Exercising it on PAN-1791: the Deacon re-spawned slots faster than an operator could remove them; slot indexes climbed without bound (slot-5..slot-20) because occupied-index derivation misses orphaned worktrees and the duplicate guard refuses instead of advancing; after a full clean, registeredSlotCapacityAvailable blocked ALL dispatch at zero live slots because it counts stale agents-table rows capped by maxWorkAgents instead of tmux-alive sessions capped by the swarm reserve; gcMergedSlots destroyed a live slot-17 (zero-commit branch is merged-by-ancestry, no liveness guard); slot-20 dispatched mid-patrol during a global freeze (gate checked once at cycle start); and manual `pan swarm <id>` dispatches with an EMPTY reconcile result, racing the Deacon.",
-      "Proposal": "Two tracks. (1) Controls: `pan swarm freeze|stop|reset|resume|status <id>` built on the existing per-issue hold flags (setDeaconIgnored write door) that coordinateSwarmSlots already honors since cd7553b8e8; reset is work-preserving (push unmerged slot branches to origin before local deletion); `pan pause` on a swarm issue gives actionable guidance. (2) Allocation correctness: bounded reconcile-safe slot index allocation derived from durable state including on-disk orphans, capped by the PAN-2212 swarm reserve; capacity check counts tmux-alive sessions; gc gains a liveness guard plus a reporting-only path for orphans with unmerged commits; freeze/hold re-checked before every spawn; manual dispatch routed through the same coordinateSwarmSlots door.",
-      "NonGoals": "- No dashboard UI for swarm controls (CLI only; UI can follow as a separate issue)\n- No cross-process dispatch lock/lease between CLI and Deacon — idempotent single-door dispatch makes concurrent coordination converge; duplicate guards refuse repeats\n- No change to global `pan admin cloister freeze` semantics beyond re-checking it before each slot spawn\n- Never auto-delete a slot branch carrying unmerged commits: reset pushes to origin first (or aborts without --force); orphan gc only reports such branches\n- No remote (Fly.io) slot support — swarm slots remain local tmux sessions\n- No new `pan unpause` swarm semantics; pause/unpause remain single-agent commands\n- No changes to verifyAndMergeSlot merge/verify behavior beyond the gc liveness guard"
+      "Problem": "PR #2221 delivered the original 11 beads (FR-1..FR-11: pan swarm freeze/resume/stop/reset/status, bounded reconcile-safe allocator, tmux-alive cap, gc guards, mid-cycle freeze re-check, manual-dispatch single door) but the verification gate exhausted its attempts on 3 deacon-swarm-synthesis test failures that are ALREADY FIXED at branch HEAD 859c9422e4. Meanwhile main moved 7 commits ahead (PAN-1791 tiered-execution merge d0f2ae1434 + PRD refresh f57e65d1a9), and a day of live swarm incidents added five new requirements (FR-12..FR-16): record lost-update wipes, silent slot completions, pause-gated agent husks, swarm feedback delivery failures, and a review verdict knocked to pending by a state-only gate.",
+      "Proposal": "Salvage, then extend. Item 1 merges origin/main into feature/pan-2214 (merge, never rebase — the branch is pushed) resolving conflicts per the PRD 'Already landed' table, and re-proves the four previously-failing suites plus full gates. Items 2-6 implement FR-12..FR-16 on the merged branch: a per-issue in-process record-write mutex (src/lib/pan-dir), done-without-signal detection in classifyInFlightSlots gated by swarm.infer_completion (default nudge), slot agent-record retirement in pan swarm reset via removeAgentSync, a shared swarm-aware feedback-target resolver replacing the hardcoded agent-<issue> delivery, and a verdict knock-over guard so state-derived gates never reset a passed review silently.",
+      "NonGoals": "- Do NOT re-implement anything in the PRD 'Already landed on main' table (gc liveness guard, dispatch-eligibility gating, merged plan view, coordinateSwarmSlots CLI routing, record-rebuild freshness re-reads, emitAgentEvent token, verdict-POST resilience)\n- Do NOT rebase or force-push feature/pan-2214 — merge only; history rewriting on the pushed PR branch is forbidden\n- No cross-process record locking (in-process per-issue mutex only; PRD scopes this explicitly)\n- No auto-merge of inferred completions by default — 'auto' mode must be an explicit config opt-in; default is 'nudge'\n- Do NOT delete or modify JSONL session transcripts anywhere (FR-14 retires DB rows + state dirs only)\n- No changes to the global Deacon freeze semantics beyond what PR #2221 already delivered (mid-cycle re-check is done)\n- No dashboard/frontend UI work — CLI and server-side lifecycle only\n- Do NOT convert the sync record-writer doors (writeIssueRecordSync, writeIssueRecordForWorkspaceSync) to async"
     },
     "autoDecisions": [
       {
-        "summary": "Controls reuse the existing stuck/deaconIgnored hold flags via the setDeaconIgnored write door instead of a new hold plane.",
-        "rationale": "coordinateSwarmSlots already honors these flags on both patrol and reactive paths (interim fix cd7553b8e8, tests in deacon-swarm-hold.test.ts); single source of truth rule forbids a parallel hold store."
+        "summary": "Re-plan contains only remaining work: the 11 completed PR #2221 beads are not re-created as items.",
+        "rationale": "They are implemented, committed, and locally green on feature/pan-2214; re-creating them would force redundant re-verification of finished work and confuse bead-based progress tracking."
       },
       {
-        "summary": "Command taxonomy: freeze (hold only), stop (hold + kill slots), reset (stop + clean slot state, hold stays set), resume (clear hold), status (read-only reconciled view).",
-        "rationale": "Matches the issue's asks 1:1 while keeping each verb one idempotent action; reset leaving the hold set prevents the Deacon racing the cleanup — the exact spiral from the incident."
+        "summary": "Salvage via git merge of origin/main into the branch, never rebase.",
+        "rationale": "PR #2221 is pushed; rebase/force-push is a forbidden one-way door per repo rules. Merge preserves history and the PRD salvage directive only requires building on current main."
       },
       {
-        "summary": "pan swarm reset is work-preserving: push unmerged slot branches to origin before deleting local worktrees/branches; abort on push failure unless --force.",
-        "rationale": "The PAN-1791 rescue recovered two dangling commits after hand-deletion; the no-loss principle makes silent deletion of unmerged work unacceptable."
+        "summary": "FR-12 mutex is in-process, per-issue, wrapping the async rebuild window in updateIssueRecordForIssue; sync writer doors stay sync.",
+        "rationale": "Both observed lost-update wipes came from the async buildIssueRecord read-modify-write window (records.ts:273-297); sync writers are atomic per event-loop turn, and converting them to async would break their callers. Cross-process locking is explicitly out of scope in the PRD."
       },
       {
-        "summary": "Slot index bound = getConcurrencyLimits().reservedSwarmSlots; occupied set additionally derives from on-disk slot worktrees and slotAssignments; duplicate-refusal advances to the next free index within the bound.",
-        "rationale": "The reserve is already the swarm's dispatch budget (PAN-2212), so indexes can never legitimately exceed it; deriving occupancy from durable state fixes both over-spawn (climbing) and PAN-2213's refuse-instead-of-skip."
+        "summary": "swarm.infer_completion defaults to 'nudge'; inferred ready-to-merge requires explicit 'auto'.",
+        "rationale": "PRD names the default; nudging is reversible and safe, while auto-merging inferred completions without opt-in could merge unfinished work."
       },
       {
-        "summary": "registeredSlotCapacityAvailable counts tmux-alive slot sessions capped by reservedSwarmSlots, replacing agents-table status rows capped by maxWorkAgents. No re-registration command is added.",
-        "rationale": "tmux is the liveness oracle (PAN-1908); deriving capacity from liveness makes the cap self-healing after any reset, which satisfies the issue's 'automatic re-registration' requirement without new state."
+        "summary": "FR-16 rule: the vbrief-ac gate (state-derived) never resets reviewStatus from 'passed'; only code gates (typecheck/lint/test) may requeue review, always with a recorded reason + needs-you surface.",
+        "rationale": "AC completeness derives from spec/statusOverrides state, not reviewable code — the PRD states 'a .pan/records restore is not reviewable code'. Resetting a human-relevant verdict silently was the incident."
       },
       {
-        "summary": "pan pause <id> on a swarm issue exits with guidance naming pan swarm stop <id> rather than delegating.",
-        "rationale": "pause/unpause encode single-agent resumable semantics that do not map onto multi-slot swarms; explicit guidance avoids surprising multi-agent side effects from a familiar command."
+        "summary": "Single inspection gate on the salvage-merge item (fast depth); all other items requiresInspection: false.",
+        "rationale": "Every later item builds on the merged+pruned branch, so a wrong merge resolution would force redoing all five — the classic foundation criterion. The FR items are leaves whose defects surface at tests/review."
       },
       {
-        "summary": "PAN-2213 is subsumed by the allocator and orphan-gc beads; it should be closed as duplicate when this ships, not worked separately.",
-        "rationale": "Both fixes live in the same functions (dispatchNextWave occupancy + reconcile gc); parallel pipelines would conflict in deacon-swarm.ts."
-      },
-      {
-        "summary": "Cross-process CLI-vs-Deacon dispatch locking is out of scope.",
-        "rationale": "Routing manual dispatch through coordinateSwarmSlots makes both dispatchers derive identical decisions from durable state; duplicate guards refuse repeats, so the race is benign. A lease adds state and failure modes for marginal benefit."
+        "summary": "FR-14 uses removeAgentSync (overdeck/agents.ts:834) as the only retirement door.",
+        "rationale": "It is the canonical remove path already used by review-agent cleanup (removes DB row + state dir, never JSONL transcripts), honoring the single-write-door tenet."
       }
     ],
     "items": [
       {
-        "id": "swarm-freeze-resume",
-        "title": "Add `pan swarm freeze <id>` and `pan swarm resume <id>` per-issue hold commands",
+        "id": "salvage-merge-prune",
+        "title": "Merge origin/main into feature/pan-2214, prune duplicates per PRD landed table, re-prove gates",
         "status": "pending",
         "priority": "high",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/cli/commands/swarm.ts",
-            "sync-sources/skills/pan-swarm/SKILL.md",
-            "tests/unit/cli/commands/swarm.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
-            "npm run typecheck",
-            "bash scripts/lint-skills.sh"
-          ],
-          "expected_outputs": [
-            "swarm.test.ts passes including new freeze/resume cases",
-            "typecheck completes without errors",
-            "lint-skills reports no drift for pan-swarm"
-          ],
-          "readiness": "ready",
-          "traces": [
-            "FR-1",
-            "NFR-1",
-            "NFR-4"
-          ],
-          "statusReason": "slot dispatch failed: Beads database was temporarily locked while checking PAN-2214 after 3 attempts; re-run shortly.",
-          "statusUpdatedAt": "2026-07-02T06:34:35.147Z"
-        },
-        "narrative": {
-          "Action": "In src/cli/commands/swarm.ts registerSwarmCommands (line ~139), add `swarm freeze <id> [--reason <text>]` and `swarm resume <id>`. freeze calls setDeaconIgnored(issueId, true, reason ?? 'swarm freeze via pan swarm freeze') from src/lib/review-status.ts:984 and prints a standalone-message confirmation explaining that the Deacon will skip all swarm coordination (reconcile/merge/gc/dispatch) for this issue until `pan swarm resume`. resume calls setDeaconIgnored(issueId, false) and prints that coordination will pick up on the next patrol. Both idempotent: freezing a frozen issue and resuming an unfrozen issue succeed with an 'already' notice. Append an operator-intervention event (appendOperatorInterventionEvent, as pause.ts:37 does). Update sync-sources/skills/pan-swarm/SKILL.md with the new subcommands in the same commit."
-        },
-        "items": [
-          {
-            "id": "swarm-freeze-resume.ac1",
-            "title": "Given an unfrozen issue, `pan swarm freeze PAN-X` persists deaconIgnored=true with the reason via setDeaconIgnored and exits 0 with a message stating the Deacon skips this issue's swarm until resume",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-freeze-resume.ac2",
-            "title": "`pan swarm resume PAN-X` clears deaconIgnored and exits 0; running it when the issue is not frozen exits 0 with an 'already resumed' notice (idempotent)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-freeze-resume.ac3",
-            "title": "With deaconIgnored set by the new command, coordinateSwarmSlots emits the existing '[swarm] skipped <issue>: deacon-ignored — operator hold' action and dispatches nothing (asserted via the deacon-swarm-hold test harness)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-freeze-resume.ac4",
-            "title": "scripts/lint-skills.sh passes with the updated pan-swarm SKILL.md documenting freeze/resume",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "swarm-stop",
-        "title": "Add `pan swarm stop <id>`: freeze plus stop all live slot agents",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/cli/commands/swarm.ts",
-            "sync-sources/skills/pan-swarm/SKILL.md",
-            "tests/unit/cli/commands/swarm.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
-            "npm run typecheck",
-            "bash scripts/lint-skills.sh"
-          ],
-          "expected_outputs": [
-            "swarm.test.ts passes including stop cases (kills live slots, idempotent on none)",
-            "typecheck completes without errors",
-            "lint-skills reports no drift"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-2",
-            "NFR-1",
-            "NFR-4"
-          ]
-        },
-        "narrative": {
-          "Action": "Add `swarm stop <id> [--reason <text>]` to src/cli/commands/swarm.ts. Sequence: (1) set the hold exactly as `swarm freeze` does — hold FIRST so the Deacon cannot re-spawn while slots die (the incident's race); (2) enumerate this issue's slot agents via listSlotAgents(issueId) from src/lib/agents/slot-reconcile.ts:127 plus live tmux sessions matching agent-<issue-lower>-slot-N; (3) stop each via stopAgentSync (src/lib/agents.js) so agents-table status is updated, not just tmux-killed; (4) print per-slot results and a summary defining that branches/worktrees are preserved and `pan swarm resume` re-enables coordination. Idempotent: zero live slots exits 0 with 'nothing running; hold set'. Record an operator-intervention event. Update the pan-swarm skill."
-        },
-        "items": [
-          {
-            "id": "swarm-stop.ac1",
-            "title": "Given live slot sessions, `pan swarm stop PAN-X` sets deaconIgnored BEFORE any stop call (assertable via injected deps call order) and stops every agent-pan-x-slot-N via stopAgentSync",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-stop.ac2",
-            "title": "With zero live slots, `pan swarm stop PAN-X` exits 0, sets the hold, and prints that nothing was running (idempotent)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-stop.ac3",
-            "title": "stop preserves slot branches and worktrees: the command issues no git branch -D / worktree remove calls (asserted via injected deps)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "swarm-reset",
-        "title": "Add work-preserving `pan swarm reset <id>` that cleans all slot state",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-07-02T06:24:34.000Z",
+        "created": "2026-07-02T13:58:57Z",
         "metadata": {
           "difficulty": "complex",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/cli/commands/swarm.ts",
-            "src/lib/cloister/deacon-swarm.ts",
-            "sync-sources/skills/pan-swarm/SKILL.md",
-            "tests/unit/cli/commands/swarm.test.ts"
-          ],
-          "files_scope_confidence": "medium",
-          "verify_commands": [
-            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
-            "npm run typecheck",
-            "bash scripts/lint-skills.sh"
-          ],
-          "expected_outputs": [
-            "swarm.test.ts passes including reset cases (push-before-delete ordering, --force path, abort on push failure)",
-            "typecheck completes without errors",
-            "lint-skills reports no drift"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-3",
-            "NFR-1",
-            "NFR-2",
-            "NFR-4"
-          ]
-        },
-        "narrative": {
-          "Action": "Add `swarm reset <id> [--force] [--reason <text>]` to src/cli/commands/swarm.ts. Sequence: (1) run the swarm-stop sequence (hold first, stop live slots); (2) for every local feature/<issue>-slot-N branch NOT merged to the feature branch HEAD: `git push origin <branch>` from the feature workspace; if any push fails, ABORT the reset with the failing branch named unless --force was passed (never delete unpushed unmerged work silently); (3) `git worktree remove --force` each <workspace>-slot-N worktree, then delete local slot branches; (4) clear record.swarm.slotAssignments (write the record via the existing writeSwarmSlotAssignments path in deacon-swarm.ts — export a clearAllSlotAssignments(workspacePath, issueId) helper there) and clear the failed-merge block via clearFailedMergeBlock(issueId, workspacePath) (deacon-swarm.ts:429); (5) mark any remaining agent-<issue>-slot-N agents-table rows stopped so no stale registration survives; (6) print a summary: what was pushed, removed, cleared, and that the hold REMAINS SET — the operator runs `pan swarm resume <id>` (or `pan swarm <id>`) to restart dispatch cleanly. All git calls async (execAsync). Idempotent: re-running on a clean issue exits 0. Update the pan-swarm skill."
-        },
-        "items": [
-          {
-            "id": "swarm-reset.ac1",
-            "title": "For an unmerged slot branch, reset pushes it to origin BEFORE any local branch/worktree deletion (call-order asserted via injected deps); a push failure without --force aborts with the branch named and deletes nothing",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-reset.ac2",
-            "title": "Given a completed reset, it persists an empty record.swarm.slotAssignments, deletes the failed-merge block, and marks every agent-<issue>-slot-N row stopped (none remains starting/running)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-reset.ac3",
-            "title": "Reset preserves the per-issue hold (deaconIgnored stays true afterward) and prints `pan swarm resume <id>` as the re-enable step",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-reset.ac4",
-            "title": "Re-running reset on an already-clean issue exits 0 without error (idempotent); merged slot branches are deleted without an origin push",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "swarm-status",
-        "title": "Add read-only `pan swarm status <id>` reconciled state view",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/cli/commands/swarm.ts",
-            "sync-sources/skills/pan-swarm/SKILL.md",
-            "tests/unit/cli/commands/swarm.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
-            "npm run typecheck",
-            "bash scripts/lint-skills.sh"
-          ],
-          "expected_outputs": [
-            "swarm.test.ts passes including status rendering cases",
-            "typecheck completes without errors",
-            "lint-skills reports no drift"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-4",
-            "NFR-4"
-          ]
-        },
-        "narrative": {
-          "Action": "Add `swarm status <id>` to src/cli/commands/swarm.ts. It loads the plan (loadSwarmPlan), runs reconcileSlotState (src/lib/agents/slot-reconcile.ts:62) plus classifyInFlightSlots, and prints: per-slot rows (index, itemId, lifecycle, branch merged/unmerged, agent session alive/dead), the hold state (stuck/deaconIgnored with reasons), and capacity (tmux-alive slot count vs reservedSwarmSlots). Every term is self-explanatory inline per the operator-message rule (e.g. 'hold: deacon-ignored — the Deacon skips this issue until pan swarm resume'). Read-only: no writes, no dispatch. Update the pan-swarm skill."
-        },
-        "items": [
-          {
-            "id": "swarm-status.ac1",
-            "title": "status renders one row per reconciled slot showing index, item, lifecycle, branch merged-state, and session liveness from injected deps",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-status.ac2",
-            "title": "Given an active hold, status prints the hold reason and the resume command; given no hold, it prints that coordination is active",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "swarm-status.ac3",
-            "title": "status sends zero calls to injected record-write, git-mutation, and spawn deps (read-only guarantee asserted in tests)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "pause-swarm-guidance",
-        "title": "`pan pause <id>` on a swarm issue exits with guidance naming `pan swarm stop`",
-        "status": "running",
-        "priority": "medium",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/cli/commands/pause.ts",
-            "tests/unit/cli/commands/pause.test.ts"
-          ],
-          "files_scope_confidence": "medium",
-          "verify_commands": [
-            "npx vitest run tests/unit/cli/commands/pause.test.ts",
-            "npm run typecheck"
-          ],
-          "expected_outputs": [
-            "pause.test.ts passes including the swarm-issue guidance case",
-            "typecheck completes without errors"
-          ],
-          "readiness": "ready",
-          "traces": [
-            "FR-5"
-          ]
-        },
-        "narrative": {
-          "Action": "In src/cli/commands/pause.ts pauseCommand, when resolveAgentTargetSync/getAgentStateSync finds no single agent for the id, check for swarm slot agents (listSlotAgents from src/lib/agents/slot-reconcile.ts, or a live-session match on agent-<issue-lower>-slot-N). If any exist, replace the bare 'Agent agent-<id> not found' failure with a complete-sentence message: this issue runs a swarm of N slot agents; a swarm has no single agent to pause; run `pan swarm stop <id>` to hold coordination and stop all slots, or `pan swarm freeze <id>` to hold without stopping. Exit non-zero (the pause did not happen). Create tests/unit/cli/commands/pause.test.ts if absent."
-        },
-        "items": [
-          {
-            "id": "pause-swarm-guidance.ac1",
-            "title": "Given slot agents exist for PAN-X and no single agent resolves, `pan pause PAN-X` exits non-zero and its stderr names both `pan swarm stop PAN-X` and `pan swarm freeze PAN-X` with one-line explanations",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "pause-swarm-guidance.ac2",
-            "title": "Given a normal single-agent issue, pause behavior is unchanged: it pauses and stops the agent exactly as before (regression case)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "bounded-slot-allocator",
-        "title": "Bounded, durable-state-derived slot index allocation in dispatchNextWave",
-        "status": "pending",
-        "priority": "urgent",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "complex",
+          "kind": "refactor",
           "issueLabel": "pan-2214",
           "requiresInspection": true,
-          "inspectionDepth": "deep",
+          "inspectionDepth": "fast",
           "foundationFor": [
-            "orphaned-slot-gc",
-            "manual-dispatch-single-door"
+            "record-write-mutex",
+            "slot-completion-detection",
+            "swarm-reset-retire-records",
+            "swarm-feedback-routing",
+            "verdict-knockover-guard"
           ],
           "files_scope": [
             "src/lib/cloister/deacon-swarm.ts",
-            "src/lib/agents/slot-reconcile.ts",
-            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
-            "npx vitest run tests/unit/lib/cloister",
-            "npm run typecheck"
-          ],
-          "expected_outputs": [
-            "deacon-swarm-dispatch.test.ts passes including bound, orphan-occupancy, and advance-on-refusal cases",
-            "all cloister unit suites pass",
-            "typecheck completes without errors"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-6"
-          ]
-        },
-        "narrative": {
-          "Action": "Replace the allocation logic around dispatchNextWave (src/lib/cloister/deacon-swarm.ts:578-668) so slot indexes are bounded and derived purely from durable state. (1) Extend the occupied set (currently lines 598-602: inFlight + unmerged branches + agents) to ALSO include: slotAssignments from the issue record (listSlotAssignments, slot-reconcile.ts:146), on-disk slot worktrees (probe <workspacePath>-slot-N existence via the existing slotWorktreeExists dep for indexes 1..bound), and ALL local slot branches regardless of merged state. (2) Introduce the bound: maxSlotIndex = getConcurrencyLimits().reservedSwarmSlots (min 1); lowestFreeSlotIndex must never return an index above it — extract an allocateSlotIndex(occupied, bound) pure function returning number | null. (3) When duplicateSpawnReason refuses an index, advance to the next free index within the bound instead of skipping the item (loop, not defer) — fixes PAN-2213(b). (4) When no index within the bound is free, push a deferral action that names the occupying slots and suggests `pan swarm reset <issue>` if they are orphans. The reconciled occupied-index derivation must be identical on the patrol and reactive (service.ts:436) paths — it already is, since both call coordinateSwarmSlots; keep it that way by putting the logic inside dispatchNextWave, not the callers."
-        },
-        "items": [
-          {
-            "id": "bounded-slot-allocator.ac1",
-            "title": "allocateSlotIndex returns the lowest free index and returns null (never a value above the bound) when indexes 1..reservedSwarmSlots are all occupied — property asserted across occupied-set permutations",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "bounded-slot-allocator.ac2",
-            "title": "Given an orphaned slot worktree on disk (no assignment, no agent, no branch entry), dispatch marks its index occupied and spawns on the NEXT free index instead of refusing (regression for PAN-2213's slot-2 refusal)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "bounded-slot-allocator.ac3",
-            "title": "With the bound at N, a dispatch wave never spawns or assigns any slot index above N even when the registry is empty or inconsistent (regression for the slot-5..slot-20 climb)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "bounded-slot-allocator.ac4",
-            "title": "When all bounded indexes are occupied, the wave emits a deferral action naming the occupying slot indexes and dispatches nothing",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "slot-cap-liveness",
-        "title": "registeredSlotCapacityAvailable counts tmux-alive sessions capped by the swarm reserve",
-        "status": "pending",
-        "priority": "urgent",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon-swarm-orphan-gc.ts",
+            "src/cli/commands/swarm.ts",
+            "src/cli/commands/pause.ts",
             "src/lib/cloister/concurrency.ts",
-            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
-            "npm run typecheck"
-          ],
-          "expected_outputs": [
-            "dispatch tests pass including stale-row and zero-live-slot capacity cases",
-            "typecheck completes without errors"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-7"
-          ]
-        },
-        "narrative": {
-          "Action": "Rewrite registeredSlotCapacityAvailable (src/lib/cloister/deacon-swarm.ts:802-811). Current bug: it counts listAgentStates({role:'work'}) rows in starting|running matching agent-<issue>-slot-N and caps by maxWorkAgents — stale DB rows with dead tmux block dispatch forever ('registered slot cap reached' at zero live slots), and the cap constant disagrees with the PAN-2212 reserve that tryReserveSwarmSlot enforces. New behavior: count only tmux-ALIVE slot sessions for the issue (reuse the tmuxActive filtering pattern of countRunningSwarmSlots, src/lib/cloister/concurrency.ts:109-113 — via listRunningAgentsSync or an injected session list) and cap by getConcurrencyLimits().reservedSwarmSlots. Keep the (issueId, selectedCount) signature and dep-injection seam so dispatch tests stay mockable. Export any shared per-issue liveness counter from concurrency.ts rather than duplicating the regex."
-        },
-        "items": [
-          {
-            "id": "slot-cap-liveness.ac1",
-            "title": "Given N stale agents-table rows in running status whose tmux sessions are dead, registeredSlotCapacityAvailable returns true (capacity available) — regression for cap-reached-at-zero-live-slots",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "slot-cap-liveness.ac2",
-            "title": "With reservedSwarmSlots=K and K tmux-alive slot sessions, the function returns false; with K-1 alive and selectedCount=0 it returns true",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "slot-cap-liveness.ac3",
-            "title": "Given raised maxWorkAgents with reservedSwarmSlots unchanged, the function returns the same capacity verdict — capacity respects reservedSwarmSlots only (asserted via config injection)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "gc-live-slot-guard",
-        "title": "gcMergedSlots never removes a slot whose agent session is alive",
-        "status": "pending",
-        "priority": "urgent",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/lib/cloister/deacon-swarm.ts",
-            "tests/unit/lib/cloister/deacon-swarm-gc.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
-            "npm run typecheck"
-          ],
-          "expected_outputs": [
-            "gc tests pass including the live-session skip (slot-17 regression)",
-            "typecheck completes without errors"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-8"
-          ]
-        },
-        "narrative": {
-          "Action": "Guard gcMergedSlots (src/lib/cloister/deacon-swarm.ts:222-243). Root cause of the slot-17 incident: reconcile marks a slot 'merged' from `git branch --merged HEAD` (slot-reconcile.ts:113-125), and a freshly-created slot branch with ZERO commits ahead is merged-by-ancestry — gc then ran `git worktree remove --force` + `git branch -D` under a live agent. Fix: before gc'ing a slot, check whether the tmux session agent-<issue-lower>-slot-<N> is alive (add a listSessionNames/sessionExists dep to gcMergedSlots's dep pick, defaulting to the module's existing listSessionNames); if alive, skip with an action line '[swarm] gc-skipped slot N: agent session alive'. Coordinate with mergeReadySlots ordering — a genuinely completed slot is merged first and its session reaped before gc sees it, so the guard only defers gc by one patrol in the worst case."
-        },
-        "items": [
-          {
-            "id": "gc-live-slot-guard.ac1",
-            "title": "Given a slot classified merged whose agent tmux session is alive, gcMergedSlots issues NO git worktree remove / branch -D calls for it and emits a gc-skipped action (slot-17 regression)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "gc-live-slot-guard.ac2",
-            "title": "Given a merged slot with a dead/absent session, gc still removes the worktree, deletes the branch, and clears the assignment (existing behavior preserved)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "orphaned-slot-gc",
-        "title": "Reconcile GC for truly-orphaned slot worktrees; report-only when unmerged commits exist",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/lib/cloister/deacon-swarm.ts",
-            "tests/unit/lib/cloister/deacon-swarm-gc.test.ts"
+            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+            "tests/integration/foreman-swarm.test.ts",
+            "sync-sources/skills/pan-swarm/SKILL.md"
           ],
           "files_scope_confidence": "medium",
           "verify_commands": [
-            "npx vitest run tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
-            "npm run typecheck"
+            "git merge-base --is-ancestor origin/main HEAD && echo MAIN-ANCESTOR-OK",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts tests/integration/foreman-swarm.test.ts tests/lib/cloister/auto-resume-gating.test.ts tests/fixtures/synced-skills.test.ts",
+            "npx vitest run tests/unit/lib/cloister tests/unit/cli/commands/swarm.test.ts tests/unit/cli/commands/pause.test.ts",
+            "npm run typecheck",
+            "npm run lint"
           ],
           "expected_outputs": [
-            "gc tests pass including orphan-removal and orphan-report cases",
-            "typecheck completes without errors"
+            "MAIN-ANCESTOR-OK printed (origin/main is an ancestor of HEAD)",
+            "All four sentinel suites pass (they pass at pre-merge HEAD 859c9422e4 and must still pass post-merge)",
+            "Full cloister + swarm/pause CLI suites pass",
+            "typecheck and lint complete without errors"
           ],
           "readiness": "sequential",
           "traces": [
-            "FR-9"
-          ]
-        },
-        "narrative": {
-          "Action": "Add gcOrphanedSlots(issueId, workspacePath, reconciled, deps) to src/lib/cloister/deacon-swarm.ts, called from coordinateSwarmSlots after gcMergedSlots. An orphan = a slot index with an on-disk worktree or local slot branch but NO slotAssignments entry AND NO live agent session. If the orphan's branch has zero commits ahead of the feature branch HEAD (git rev-list --count HEAD..<branch> == 0), remove the worktree and delete the branch, emitting '[swarm] gc-orphan slot N'. If it HAS unmerged commits, emit a report action naming the branch and suggesting `pan swarm reset <issue>` (which pushes to origin) — never delete it. This completes the PAN-2213(c) reconcile GC. All git invocations via the async runGitCommand dep."
-        },
-        "items": [
-          {
-            "id": "orphaned-slot-gc.ac1",
-            "title": "An orphaned slot worktree+branch with zero commits ahead is removed by the coordinator and a gc-orphan action is emitted",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "orphaned-slot-gc.ac2",
-            "title": "An orphaned branch WITH unmerged commits is preserved: no deletion commands issued, and the emitted action names the branch and `pan swarm reset`",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "orphaned-slot-gc.ac3",
-            "title": "Given a slot with a live agent session or a slotAssignments entry, gcOrphanedSlots sends zero deletion commands for it and preserves its worktree and branch",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "mid-cycle-freeze-gate",
-        "title": "Re-check global freeze and per-issue hold before every slot spawn",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-07-02T06:24:34.000Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-2214",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/lib/cloister/deacon-swarm.ts",
-            "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
-            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run tests/unit/lib/cloister/deacon-swarm-hold.test.ts tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
-            "npm run typecheck"
-          ],
-          "expected_outputs": [
-            "hold + dispatch tests pass including the mid-cycle freeze case (slot-20 regression)",
-            "typecheck completes without errors"
-          ],
-          "readiness": "sequential",
-          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
             "FR-10"
           ]
         },
         "narrative": {
-          "Action": "The global freeze is checked once at patrol-cycle start (src/lib/cloister/deacon.ts:2573) and the per-issue hold once at the top of coordinateSwarmSlots's workspace loop (deacon-swarm.ts:178-182) — slot-20 spawned mid-patrol during a freeze because an in-flight cycle keeps dispatching. Fix: add a shouldDispatch gate dep to CoordinateSwarmSlotsDeps (default: () => !isDeaconGloballyPausedSync() && !holdActive(issueId), reusing defaultGetIssueHold) and evaluate it inside dispatchNextWave immediately before EACH deps.spawnRun call, and likewise in recoverFailedMergeSlot before its spawnRun (deacon-swarm.ts:435). On refusal, release the reserved swarm slot, unclaim the item (the existing failed-dispatch unwind at lines 655-664 shows the pattern), and emit '[swarm] dispatch-halted <item>: freeze/hold active'. Extend deacon-swarm-hold.test.ts (cd7553b8e8's suite) — do not weaken existing cases."
+          "Action": "Run `git fetch origin && git merge origin/main` on feature/pan-2214 (7 commits behind: PAN-1791 tiered-execution merge d0f2ae1434 with ~4.7k insertions across 49 files including src/lib/vbrief/types.ts, config-yaml, router, and tests/integration/foreman-swarm.test.ts; plus PRD refresh f57e65d1a9 and state batches). NEVER rebase or force-push — merge only. Resolve conflicts by the PRD 'Already landed on main' table: keep MAIN's gc liveness guard, gc git-failure degradation, dispatch-eligibility gating, final-item tail-starvation dispatch, merged-plan view, and coordinateSwarmSlots CLI routing; keep THIS BRANCH's per-spawn freeze/hold re-check with claim unwind, bounded durable-state allocator with advance-on-conflict, gcOrphanedSlots, tmux-alive capacity check, and the pan swarm freeze/resume/stop/reset/status CLI surface. After the merge, delete any branch-side code that duplicates a main-side implementation of the same behavior (one implementation per behavior). Re-run the four suites that failed in the previous verification cycle (deacon-swarm-synthesis, foreman-swarm, auto-resume-gating, synced-skills — all pass at pre-merge HEAD; a post-merge failure means a wrong conflict resolution, not a new bug) plus the full cloister/CLI suites, typecheck, and lint. Commit the merge; push."
         },
         "items": [
           {
-            "id": "mid-cycle-freeze-gate.ac1",
-            "title": "When the global freeze activates after a wave starts, subsequent spawnRun calls in the SAME wave are refused: spawnRun receives zero further calls and dispatch-halted actions are emitted (slot-20 regression)",
+            "id": "salvage-merge-prune.ac1",
+            "title": "Given the completed item, `git merge-base --is-ancestor origin/main HEAD` exits 0 — the branch contains all of current main with no rebase or force-push",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "mid-cycle-freeze-gate.ac2",
-            "title": "A hold set mid-wave likewise halts remaining spawns for that issue, and the halted item's claim is unwound (plan file unblock + slot assignment cleared + swarm slot released)",
+            "id": "salvage-merge-prune.ac2",
+            "title": "Given the merged branch, When npx vitest run executes the four previously-failing sentinel suites (deacon-swarm-synthesis, foreman-swarm, auto-resume-gating, synced-skills), Then vitest exits 0 with zero failed tests",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "mid-cycle-freeze-gate.ac3",
-            "title": "recoverFailedMergeSlot refuses its respawn under freeze/hold with the same halted action (no spawnRun call)",
+            "id": "salvage-merge-prune.ac3",
+            "title": "Given the merged branch, When npm run typecheck and npm run lint execute, Then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "salvage-merge-prune.ac4",
+            "title": "The merged deacon-swarm.ts preserves exactly one implementation each of the gc liveness guard and dispatch-eligibility gating (main's) alongside the branch's per-spawn freeze gate and bounded allocator — proven by deacon-swarm-gc, deacon-swarm-hold, and deacon-swarm-dispatch suites passing",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -709,63 +174,365 @@
         ]
       },
       {
-        "id": "manual-dispatch-single-door",
-        "title": "`pan swarm <id>` dispatches through coordinateSwarmSlots with real reconcile",
+        "id": "record-write-mutex",
+        "title": "FR-12: per-issue async mutex serializing .pan/records read-modify-write",
         "status": "pending",
         "priority": "high",
-        "created": "2026-07-02T06:24:34.000Z",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record-lock.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/records-backfill.ts",
+            "src/lib/pan-dir/__tests__/record-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-lock.test.ts passes, including the concurrent-rebuild-preserves-swarm-and-statusOverrides regression",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only src/lib/pan-dir (record lock + rebuild flow) — zero file overlap with the cloister/CLI items in the same wave.",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/pan-dir/record-lock.ts exporting `withIssueRecordLock(issueId, fn)` — a per-issue async mutex (Map of issueId to promise chain; entries cleaned up when the chain drains). In src/lib/pan-dir/records.ts, wrap the body of updateIssueRecordForIssue (line ~273: buildIssueRecord → fresh re-read → writeIssueRecordSync → queueIssueRecordCommit) in withIssueRecordLock so two concurrent rebuilds for the same issue serialize and the freshness re-read (added after the PAN-1791 wipes) cannot itself go stale between read and write. Keep the existing swarm/statusOverrides re-read logic — the mutex closes the window the re-read only narrows. Do NOT convert writeIssueRecordSync / writeIssueRecordForWorkspaceSync (src/lib/pan-dir/record.ts:190,212) to async — their callers depend on sync semantics and a sync function is atomic per event-loop turn; instead add a doc comment on both stating the invariant: sync writers must never be split by an await; async read-modify-write flows must go through withIssueRecordLock. Route the records-backfill rebuild (src/lib/pan-dir/records-backfill.ts:164 region) through the same lock. Tests: (1) two concurrent updateIssueRecordForIssue calls for one issue execute strictly serially (execution-order log assertion); (2) a writeIssueRecordForWorkspaceSync writing swarm.slotAssignments between a concurrent rebuild's read and write survives into the final record; (3) locks are per-issue — concurrent updates for different issues overlap (no global serialization). Simulate async gaps with resolved promises/microtasks or fake timers — no real delays."
+        },
+        "items": [
+          {
+            "id": "record-write-mutex.ac1",
+            "title": "Given two concurrent updateIssueRecordForIssue calls for the same issue, When both resolve, Then the test's execution-order log proves the second rebuild started only after the first's write completed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-write-mutex.ac2",
+            "title": "Given swarm.slotAssignments written via writeIssueRecordForWorkspaceSync while a rebuild is in flight, When the rebuild completes, Then the final record preserves the slot assignments (PAN-1791 wipe regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-write-mutex.ac3",
+            "title": "Given concurrent updateIssueRecordForIssue calls for two different issues, Then their critical sections overlap in the order log — the mutex is per-issue, not global",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-write-mutex.ac4",
+            "title": "writeIssueRecordSync and writeIssueRecordForWorkspaceSync remain synchronous functions (no signature change), and each carries the never-split-by-await invariant comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "slot-completion-detection",
+        "title": "FR-13: done-without-signal detection in classifyInFlightSlots, gated by swarm.infer_completion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/config.ts",
+            "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-completion.test.ts tests/unit/lib/cloister/deacon-swarm-stall.test.ts tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "New completion-inference suite passes covering nudge/auto/off modes and the dirty-tree and zero-commits negative cases",
+            "Existing stall and dispatch suites still pass (no regression in stalled/running classification)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Confined to classifyInFlightSlots + cloister config + its own test files; no same-wave item touches deacon-swarm.ts (the salvage item is in the prior wave).",
+          "traces": [
+            "FR-13",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend classifyInFlightSlots (src/lib/cloister/deacon-swarm.ts:364) — which already tracks per-slot progress via slotProgressObservations (pane output digest + branch tip commit time) and classifies 'stalled' past swarmStallThresholdMs (deacon-swarm.ts:448, env PAN_SWARM_STALL_THRESHOLD_MS) — to detect done-without-signal: a LIVE slot session whose progress is idle past the threshold AND whose slot branch has at least one commit ahead of the issue branch AND whose slot worktree is clean. Add an injectable dep for the clean-worktree check (git status --porcelain in the slot worktree, async exec only — no execSync) alongside the existing getBranchTipCommitTime pattern. Behavior by config swarm.infer_completion ('off'|'nudge'|'auto', default 'nudge'; read via cloister config in src/lib/cloister/config.ts with env override PAN_SWARM_INFER_COMPLETION following the stall-threshold pattern): 'off' — current behavior (running/stalled only); 'nudge' — on first idle expiry meeting the done-signature, emit ONE nudge action delivering the exact completion command (`pan done <ISSUE>` with the real issue id) to the slot session, recorded so it never repeats for the same unchanged observation; 'auto' — additionally, on a SECOND consecutive idle expiry with the done-signature still holding, classify the slot 'ready-to-merge' and append a `signal: inferred` marker to the coordination action log. Slots with a dirty worktree or zero commits ahead are never nudged or inferred (they classify stalled as today). All timing tests use vi.useFakeTimers() or the existing options.now injection — never real waits."
+        },
+        "items": [
+          {
+            "id": "slot-completion-detection.ac1",
+            "title": "Given infer_completion='nudge' and a live slot idle past threshold with commits ahead and a clean worktree, Then classifyInFlightSlots emits exactly one nudge action containing `pan done` and does not repeat it on the next unchanged observation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac2",
+            "title": "Given infer_completion='auto' and the done-signature holding across a second consecutive idle expiry, Then the slot classifies ready-to-merge and the action log contains a `signal: inferred` marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac3",
+            "title": "Given infer_completion='off', Then classification output preserves current behavior for the same inputs (running/stalled only, no nudges, no inference)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac4",
+            "title": "Given a dirty slot worktree OR zero commits ahead, Then no nudge fires and no inference happens regardless of mode — the slot falls back to the existing stalled classification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac5",
+            "title": "Given the new completion-inference suite, When it runs, Then it exits 0 driving all timing through fake timers or the injected `now` option — no real-clock waits appear in the tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-reset-retire-records",
+        "title": "FR-14: pan swarm reset retires dead slot agent records via removeAgentSync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T13:58:57Z",
         "metadata": {
           "difficulty": "medium",
+          "kind": "backend",
           "issueLabel": "pan-2214",
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "files_scope": [
             "src/cli/commands/swarm.ts",
-            "src/lib/cloister/deacon-swarm.ts",
             "sync-sources/skills/pan-swarm/SKILL.md",
             "tests/unit/cli/commands/swarm.test.ts"
           ],
           "files_scope_confidence": "high",
           "verify_commands": [
             "npx vitest run tests/unit/cli/commands/swarm.test.ts",
-            "npm run typecheck",
-            "bash scripts/lint-skills.sh"
+            "npm run lint",
+            "npm run typecheck"
           ],
           "expected_outputs": [
-            "swarm.test.ts passes including reconcile-before-dispatch and hold-refusal cases",
-            "typecheck completes without errors",
-            "lint-skills reports no drift"
+            "swarm.test.ts passes including the new retirement cases (retires dead slot agents, spares live ones, transcript survives)",
+            "lint passes — scripts/lint-skills.sh accepts the updated pan-swarm SKILL.md in the same commit",
+            "typecheck completes without errors"
           ],
-          "readiness": "sequential",
+          "readiness": "ready",
           "traces": [
-            "FR-11",
+            "FR-14",
             "NFR-1",
             "NFR-4"
           ]
         },
         "narrative": {
-          "Action": "swarmCommand (src/cli/commands/swarm.ts:58-95) currently calls dispatchNextWave with a hard-coded EMPTY SlotReconcileResult (lines 78-85) — no reconcile, no hold/freeze check, races the Deacon. Replace that call with coordinateSwarmSlots({ issueId }) from src/lib/cloister/deacon-swarm.ts (after ensureWorkspace), so manual dispatch runs the identical reconcile → classify → merge → gc → dispatch pipeline the Deacon runs, including the hold skip, backoff, failed-merge block, duplicate guards, and (from this plan's earlier beads) the bounded allocator and per-spawn freeze gate. Print the returned action lines; when the issue is held, the output explains the hold and names `pan swarm resume`. Update the ineligible/eligibility pre-checks to stay (they give better errors than a silent no-op). Update the pan-swarm skill to describe idempotent re-runs."
+          "Action": "Extend swarmResetCommand (src/cli/commands/swarm.ts:334) so that after its existing stop + worktree/branch/slotAssignment cleanup it also retires the issue's slot AGENT RECORDS: enumerate the issue's slot agents (agent-<issue>-slot-N pattern — reuse the command's existing slot-agent enumeration used by swarmStopCommand), and for each agent that is (a) not running per its runtime state (stopped or pause-gated) AND (b) has no live tmux session, call removeAgentSync (src/lib/overdeck/agents.ts:834 — the canonical door that removes the overdeck.db row and the agent state dir and never touches JSONL transcripts; same door as review-agent.ts:927). Inject the removal + liveness deps through SwarmResetCommandDeps like the command's other deps so tests stub them. An agent with a live tmux session is NEVER removed — report it as skipped in the command output. The command stays idempotent: a second run with nothing to retire prints a no-op summary and exits 0. Update sync-sources/skills/pan-swarm/SKILL.md's reset documentation in the SAME commit (scripts/lint-skills.sh enforces CLI/skill sync)."
         },
         "items": [
           {
-            "id": "manual-dispatch-single-door.ac1",
-            "title": "swarmCommand routes dispatch through coordinateSwarmSlots for the single issue and sends zero calls to dispatchNextWave with an empty SlotReconcileResult (asserted via injected deps)",
+            "id": "swarm-reset-retire-records.ac1",
+            "title": "Given a reset where slot agents are stopped/pause-gated with no live tmux session, Then swarmResetCommand calls removeAgentSync for each and the summary output names the retired agent ids",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "manual-dispatch-single-door.ac2",
-            "title": "Given `pan swarm <id>` runs twice back-to-back, the second run spawns nothing: its duplicate guards emit refusal reasons and spawnRun receives zero calls (idempotence)",
+            "id": "swarm-reset-retire-records.ac2",
+            "title": "Given a slot agent whose tmux session is alive, Then reset never calls removeAgentSync for it and reports it as skipped",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "manual-dispatch-single-door.ac3",
-            "title": "With the per-issue hold set, `pan swarm <id>` spawns nothing and prints the operator-hold skip action naming the resume path",
+            "id": "swarm-reset-retire-records.ac3",
+            "title": "Retirement preserves JSONL transcripts — the test asserts removal goes through the injected removeAgentSync dep and no transcript path is unlinked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-reset-retire-records.ac4",
+            "title": "A second reset run with nothing left to retire exits 0 with a no-op summary (idempotent), and the pan-swarm SKILL.md documents record retirement in the same commit (lint passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-feedback-routing",
+        "title": "FR-15: swarm-aware feedback target resolver replaces hardcoded agent-<issue> delivery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/feedback-target.ts",
+            "src/lib/review-status.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "tests/unit/lib/cloister/feedback-target.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/feedback-target.test.ts tests/unit/lib/cloister",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feedback-target.test.ts passes covering whole-issue, slot-fallback, and needs-you cases",
+            "Existing cloister suites still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Only same-wave overlap risk is verification-runner.ts, and verdict-knockover-guard is serialized behind this item by an explicit blocks edge.",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/feedback-target.ts exporting `resolveIssueFeedbackTarget(issueId, opts?)` returning either `{ agentId }` or `{ needsYou: true, reason }`, with precedence: (1) if the whole-issue agent `agent-<issue>` exists and is running, return it — single-agent issues keep today's behavior exactly; (2) else read the issue record's swarm.slotAssignments — if non-empty, return the assigned slot agent for opts.itemId when given and its session is live, else the first slot agent with a live tmux session; (3) else return needsYou with a reason string naming the issue and what could not be delivered. Route the delivery sites that today hardcode `agent-${issueId.toLowerCase()}` through it: deliverTestFailureToWorkAgentHostSide (src/lib/review-status.ts, ~line 686), the verification-runner messageAgent sites (src/lib/cloister/verification-runner.ts — the vbrief-conflict and vbrief-ac feedback blocks around lines 522 and 575), and review-verdict-feedback delivery (src/lib/cloister/review-verdict-feedback.ts). On needsYou, the caller MUST emit an operator surface — reuse the existing needs-you escalation/notification mechanism used by escalateVerificationStuck — carrying the reason, and log it; a silent warn-and-return is exactly the bug this FR removes. Encode the incident as a test: a swarm issue with no whole-issue agent previously produced 'Agent agent-pan-1791 not running' and dropped the feedback."
+        },
+        "items": [
+          {
+            "id": "swarm-feedback-routing.ac1",
+            "title": "Given a swarm issue with live slot agents and no whole-issue agent, When test-failure feedback is delivered, Then messageAgent receives the slot agent id (agent-<issue>-slot-N), not agent-<issue>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-feedback-routing.ac2",
+            "title": "Given opts.itemId matching a slot assignment with a live session, Then the resolver returns that specific slot agent rather than an arbitrary live slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-feedback-routing.ac3",
+            "title": "Given no whole-issue agent and no live slot agents, Then delivery emits a needs-you operator notification carrying the undelivered reason and never returns silently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-feedback-routing.ac4",
+            "title": "Given a normal single-agent issue with agent-<issue> running, Then delivery behavior is unchanged (messageAgent receives agent-<issue>)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verdict-knockover-guard",
+        "title": "FR-16: state-derived verification gates never silently reset a passed review verdict",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-runner.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner.test.ts tests/unit/lib/cloister",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-runner tests pass including the new vbrief-ac-preserves-review-verdict case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts, the vbrief-ac failure path (the `if (acStatus && !acStatus.allCompleted)` block around line 537) currently calls setReviewStatusSync with `reviewStatus: 'pending'`, knocking a PASSED review verdict back to pending with no operator surface — the incident: a .pan/records restore made completed ACs look pending and silently invalidated a real review. Change the rule: state-derived gates (vbrief-ac — AC completeness comes from spec/statusOverrides state, not reviewable code; likewise the vbrief-conflict path) must NOT write reviewStatus at all. They set verificationStatus='failed' plus verificationNotes naming the cause, and when the pre-existing reviewStatus was 'passed' they additionally emit a needs-you operator notification (reuse the escalateVerificationStuck notification mechanism) stating that a passed review is being held by a state-derived gate and why. Code-derived gate failures (typecheck/lint/test checks earlier in the runner) keep their existing requeue behavior, but every write that changes reviewStatus away from 'passed' must include the reason in verificationNotes so the transition is auditable. Tests: (1) reviewStatus='passed' + vbrief-ac incomplete → reviewStatus still 'passed', verificationStatus='failed', needs-you emitted; (2) code-gate (test) failure → existing requeue preserved with reason recorded; (3) vbrief-ac failure with reviewStatus not yet 'passed' → no needs-you (normal retry messaging only)."
+        },
+        "items": [
+          {
+            "id": "verdict-knockover-guard.ac1",
+            "title": "Given reviewStatus='passed' and the vbrief-ac gate finding incomplete ACs, Then verification records verificationStatus='failed' while reviewStatus remains 'passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-knockover-guard.ac2",
+            "title": "Given that held-verdict case, Then a needs-you operator notification is emitted naming the vbrief-ac gate and the incomplete-AC cause",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-knockover-guard.ac3",
+            "title": "Given a code-gate failure (typecheck/lint/test), Then the existing requeue behavior is preserved and the reviewStatus transition carries its reason in verificationNotes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-knockover-guard.ac4",
+            "title": "Given vbrief-ac failing while reviewStatus is not 'passed', Then no needs-you notification fires (normal retry feedback only)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -776,48 +543,38 @@
     ],
     "edges": [
       {
-        "from": "swarm-freeze-resume",
-        "to": "swarm-stop",
+        "from": "salvage-merge-prune",
+        "to": "record-write-mutex",
         "type": "blocks"
       },
       {
-        "from": "swarm-stop",
-        "to": "swarm-reset",
+        "from": "salvage-merge-prune",
+        "to": "slot-completion-detection",
         "type": "blocks"
       },
       {
-        "from": "swarm-freeze-resume",
-        "to": "swarm-status",
-        "type": "informs"
-      },
-      {
-        "from": "slot-cap-liveness",
-        "to": "bounded-slot-allocator",
-        "type": "informs"
-      },
-      {
-        "from": "bounded-slot-allocator",
-        "to": "orphaned-slot-gc",
-        "type": "informs"
-      },
-      {
-        "from": "gc-live-slot-guard",
-        "to": "orphaned-slot-gc",
-        "type": "informs"
-      },
-      {
-        "from": "bounded-slot-allocator",
-        "to": "manual-dispatch-single-door",
+        "from": "salvage-merge-prune",
+        "to": "swarm-reset-retire-records",
         "type": "blocks"
       },
       {
-        "from": "mid-cycle-freeze-gate",
-        "to": "manual-dispatch-single-door",
+        "from": "salvage-merge-prune",
+        "to": "swarm-feedback-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "salvage-merge-prune",
+        "to": "verdict-knockover-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-feedback-routing",
+        "to": "verdict-knockover-guard",
         "type": "blocks"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-07-02-PAN-2214-swarm-needs-per-issue-freeze-stop-reset-controls-a-reconcile-safe-bounded-slot-allocator.vbrief.json"
+      "canonicalFilename": "2026-07-02-PAN-2214-swarm-per-issue-controls-salvage-pr-2221-onto-current-main-record-write-mutex-completion-inference-record-retirement-swarm-feedback-routing-verdict-knock-over-guard.vbrief.json"
     }
   },
   "status": "active"

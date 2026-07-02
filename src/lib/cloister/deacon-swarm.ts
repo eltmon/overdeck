@@ -24,6 +24,7 @@ import {
   getDispatchableItems,
   type PersistedTaskOperation,
 } from '../vbrief/dag.js';
+import { applyStatusOverrides } from '../vbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
@@ -88,6 +89,8 @@ export interface CoordinateSwarmSlotsDeps {
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
   /** Per-issue operator hold: stuck / deaconIgnored suppress all swarm coordination (PAN-2214). */
   getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
+  /** Per-issue record statusOverrides — the durable item done-ness the merged plan view applies. */
+  readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -132,6 +135,14 @@ function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'dea
     return getReviewStatusSync(issueId);
   } catch {
     return null;
+  }
+}
+
+function defaultReadStatusOverrides(workspacePath: string, issueId: string): Record<string, string> | undefined {
+  try {
+    return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.statusOverrides;
+  } catch {
+    return undefined;
   }
 }
 
@@ -194,21 +205,55 @@ export async function coordinateSwarmSlots(
       const spec = await Effect.runPromise(findSpecByIssue(workspace.projectPath, issueId));
       if (!spec) continue;
 
-      const readiness = analyzeSwarmReadiness(spec.document);
+      // Coordinate against the MERGED plan view (main spec + per-issue record
+      // statusOverrides), not the raw main spec. Item done-ness only lives in
+      // the overrides: slot merges mirror `done` there, and gc later deletes
+      // the slot branch + assignment — the only other merged-ness evidence.
+      // Reading the raw spec made completed items dispatchable again after gc
+      // (tier-table-config was re-dispatched to a fresh slot after its work
+      // had already been consolidated into the feature branch).
+      const overrides = (deps.readStatusOverrides ?? defaultReadStatusOverrides)(workspace.workspacePath, issueId);
+      const doc = overrides && Object.keys(overrides).length > 0
+        ? applyStatusOverrides(spec.document, overrides)
+        : spec.document;
+
+      const readiness = analyzeSwarmReadiness(doc);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
-      if (!readiness.swarmEligible || slotEligibleCount < 2) continue;
+      // Eligibility gates DISPATCH only. Reconcile/merge/gc must still run for
+      // an issue with live slot state, or the endgame starves: once fewer than
+      // two dispatchable items remain, the old early-continue skipped the whole
+      // pass and the final slots of every swarm could never merge (observed
+      // live on PAN-1791 with two finished slots waiting).
+      //
+      // The >=2 floor exists so single-item plans never START a swarm — but an
+      // in-progress swarm (evidenced by completed item overrides) must be able
+      // to finish its tail, or the LAST item of every swarm strands undispatched
+      // (observed live on PAN-1791 at 19/20 with only the e2e item left).
+      const swarmInProgress = Object.entries(overrides ?? {})
+        .some(([key, value]) => !key.includes('.') && value === 'completed');
+      const dispatchEligible = readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
+      if (dispatchEligible) {
+        actions.push(`[swarm] considered ${issueId}: swarm eligible`);
+      }
 
-      actions.push(`[swarm] considered ${issueId}: swarm eligible`);
+      const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, doc);
+      if (!dispatchEligible) {
+        const hasSlotState = reconciled.merged.length > 0 || reconciled.inFlight.length > 0
+          || reconciled.branches.length > 0 || reconciled.agents.length > 0;
+        if (!hasSlotState) continue;
+        actions.push(`[swarm] considered ${issueId}: endgame (merge/cleanup only)`);
+      }
 
-      const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, spec.document);
       const classified = await classifyInFlightSlots(reconciled.inFlight, deps, { workspacePath: workspace.workspacePath });
       for (const slot of classified) {
         actions.push(`[swarm] ${issueId} slot ${slot.slotIndex} ${slot.lifecycle}`);
       }
       actions.push(...recordStalledSlotRecovery(issueId, classified, workspace.workspacePath));
-      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, spec.document, classified, deps));
+      actions.push(...await mergeReadySlots(issueId, workspace.workspacePath, doc, classified, deps));
       actions.push(...await gcMergedSlots(issueId, workspace.workspacePath, reconciled.merged, deps));
-      actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, spec.document, reconciled, readiness, deps));
+      if (dispatchEligible) {
+        actions.push(...await dispatchNextWave(issueId, workspace.workspacePath, doc, reconciled, readiness, deps));
+      }
       recordSwarmAdvanceSuccess(issueId);
     } catch (err) {
       recordSwarmAdvanceFailure(issueId);
@@ -223,18 +268,51 @@ export async function gcMergedSlots(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'>
+    & Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
+  // A freshly dispatched slot branch points at the feature branch HEAD, so
+  // `--merged HEAD` classifies it as merged before the agent's first commit.
+  // Without a liveness guard, gc destroys the worktree/branch/assignment under
+  // the live agent and the item redispatches at the next index — the engine of
+  // the PAN-1791 slot-index runaway. Never gc a slot whose session is alive.
+  const sessionNames = new Set(await deps.listSessionNames());
+  const worktreeExists = deps.slotWorktreeExists ?? existsSync;
 
   for (const slot of slots) {
     if (slot.status !== 'merged') continue;
 
+    const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+    if (sessionNames.has(agentId)) {
+      actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
+      continue;
+    }
+
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;
     const slotBranch = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
 
-    await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
-    await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+    // Best-effort per step: a gc git failure must degrade to a logged action,
+    // never throw — a throw aborts the whole issue's coordination pass (gc,
+    // merge, AND dispatch), which error-looped every patrol cycle whenever a
+    // slot worktree was already gone or stubborn. The worktree must be gone
+    // before the branch delete is attempted (git refuses to delete a branch
+    // that is still checked out, a natural guard), and the assignment is only
+    // cleared once both are gone so a stuck slot stays visible to reconcile.
+    if (worktreeExists(slotWorkspace)) {
+      try {
+        await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
+      } catch (error) {
+        actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: worktree remove failed: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+    }
+    try {
+      await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+    } catch (error) {
+      actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
     deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
     actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
   }
@@ -377,7 +455,14 @@ export async function mergeReadySlots(
         note: `Slot branch ${slot.branch ?? slot.slotIndex} did not merge cleanly`,
       }, workspacePath);
       actions.push(`[swarm] failed-merge slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+      continue;
     }
+
+    // Verification failure (merged result fails typecheck/tests) previously
+    // fell through with no action at all — the slot silently re-verified on
+    // every pass with nobody told why. Surface the failure so the operator
+    // or recovery machinery can act on it.
+    actions.push(`[swarm] verify-failed slot ${slot.slotIndex} (item ${item.id}) for ${issueId}: ${result.failure ?? 'verification failed'}`);
   }
 
   return actions;

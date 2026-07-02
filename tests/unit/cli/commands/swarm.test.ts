@@ -63,7 +63,7 @@ function makeDeps(doc: VBriefDocument): SwarmCommandDeps {
       swarmEligible: doc.plan.items.some(item => item.metadata?.readiness === 'ready' && (item.metadata?.files_scope?.length ?? 0) > 0),
     })),
     ensureWorkspace: vi.fn(async () => '/repo/workspaces/feature-pan-2203'),
-    dispatchNextWave: vi.fn(async () => ['[swarm] dispatched implementation slot 1 (item wi-1) for PAN-2203']),
+    coordinateSwarmSlots: vi.fn(async () => ['[swarm] dispatched implementation slot 1 (item wi-1) for PAN-2203']),
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
     console: {
@@ -91,7 +91,7 @@ describe('pan swarm command', () => {
 
     expect(result.ok).toBe(false);
     expect(deps.ensureWorkspace).not.toHaveBeenCalled();
-    expect(deps.dispatchNextWave).not.toHaveBeenCalled();
+    expect(deps.coordinateSwarmSlots).not.toHaveBeenCalled();
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('PAN-2203 is not swarm eligible'));
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('missing files_scope'));
   });
@@ -107,13 +107,7 @@ describe('pan swarm command', () => {
 
     expect(result.ok).toBe(true);
     expect(deps.ensureWorkspace).toHaveBeenCalledWith('PAN-2203', { projectName: 'overdeck', projectPath: '/repo' });
-    expect(deps.dispatchNextWave).toHaveBeenCalledWith(
-      'PAN-2203',
-      '/repo/workspaces/feature-pan-2203',
-      doc,
-      expect.objectContaining({ merged: [], inFlight: [] }),
-      expect.objectContaining({ swarmEligible: true }),
-    );
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203' });
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('dispatched implementation slot 1'));
   });
 
