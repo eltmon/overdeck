@@ -39,20 +39,21 @@
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2172",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-02T07:17:49.912Z",
-    "reviewNotes": "All three FRs implemented correctly; transcript-confirmation ordering, cooldown, and skip-guards are sound; tests cover success/failure/skip paths with fake timers",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T13:59:53.454Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2182",
-    "reviewedAtCommit": "67a83dc85b7f0c68406310245be03fefa1dbbecf"
+    "deaconIgnored": true,
+    "deaconIgnoredAt": "2026-07-02T08:07:08.472Z",
+    "deaconIgnoredReason": "operator directive: drain pipeline, focus PAN-1791 only"
   },
   "closeOut": {
     "usage": {
@@ -67,8 +68,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 32086,
-            "output": 2519,
+            "input": 32651,
+            "output": 2705,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -83,10 +84,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 489,
-            "output": 10561,
-            "cacheRead": 966438,
-            "cacheWrite": 265365
+            "input": 495,
+            "output": 14928,
+            "cacheRead": 1326965,
+            "cacheWrite": 367343
           }
         },
         "test": {
@@ -105,10 +106,10 @@
         },
         "work": {
           "anthropic/claude-fable-5": {
-            "input": 15907,
-            "output": 17782,
-            "cacheRead": 3137155,
-            "cacheWrite": 109500
+            "input": 16153,
+            "output": 20074,
+            "cacheRead": 3896859,
+            "cacheWrite": 113059
           }
         }
       },
@@ -120,8 +121,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 32086,
-          "output": 2519,
+          "input": 32651,
+          "output": 2705,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -132,16 +133,16 @@
           "cacheWrite": 660969
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 489,
-          "output": 10561,
-          "cacheRead": 966438,
-          "cacheWrite": 265365
+          "input": 495,
+          "output": 14928,
+          "cacheRead": 1326965,
+          "cacheWrite": 367343
         },
         "anthropic/claude-fable-5": {
-          "input": 30400,
-          "output": 20721,
-          "cacheRead": 4009952,
-          "cacheWrite": 193874
+          "input": 30646,
+          "output": 23013,
+          "cacheRead": 4769656,
+          "cacheWrite": 197433
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 1702,
@@ -151,8 +152,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 30.867206,
-        "pricingAsOf": "2026-07-02T07:17:49.956Z"
+        "usd": 32.344558,
+        "pricingAsOf": "2026-07-02T13:59:53.501Z"
       }
     },
     "merges": [
@@ -161,5 +162,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T22:09:34.377Z",
-  "updated": "2026-07-02T07:17:49.981Z"
+  "updated": "2026-07-02T13:59:53.513Z"
 }
