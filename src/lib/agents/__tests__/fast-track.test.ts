@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { escalateFastTrackItem, groupFastTrack, isFastTrackAutoMergeAllowed } from '../fast-track.js';
+import {
+  autoMergeFastTrackBatch,
+  escalateFastTrackItem,
+  FAST_TRACK_GATE_COMMANDS,
+  groupFastTrack,
+  isFastTrackAutoMergeAllowed,
+} from '../fast-track.js';
 import type { VBriefItem, VBriefItemMetadata } from '../../vbrief/types.js';
 
 let counter = 0;
@@ -115,5 +121,93 @@ describe('escalateFastTrackItem', () => {
   it('throws when escalating an item that is not in the batch', () => {
     const batch = makeBatch();
     expect(() => escalateFastTrackItem(batch, 'nope', 'verify-failed')).toThrow(/not in fast-track batch/);
+  });
+});
+
+describe('autoMergeFastTrackBatch', () => {
+  const ISSUE = { issueId: 'PAN-1', featureWorkspace: '/ws/feature-pan-1' };
+
+  function makeBatch() {
+    return groupFastTrack([trivial(['docs/a.md'], 'a'), trivial(['docs/b.md'], 'b')]).batches[0];
+  }
+
+  function recordingRun() {
+    const calls: Array<{ command: string; cwd: string }> = [];
+    const run = async (command: string, cwd: string) => {
+      calls.push({ command, cwd });
+      return { stdout: 'ok', stderr: '' };
+    };
+    return { calls, run };
+  }
+
+  it('refuses every batch when tiered_execution is disabled and runs no commands', async () => {
+    const { calls, run } = recordingRun();
+    const outcome = await autoMergeFastTrackBatch(ISSUE, 1, makeBatch(), {
+      enabled: false,
+      mergeOptions: { deps: { run } },
+    });
+    expect(outcome.refused).toBe(true);
+    expect(outcome.refusalReason).toContain('review-then-merge');
+    expect(outcome.result).toBeUndefined();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('auto-merges a trivial batch to the feature branch after typecheck and lint pass', async () => {
+    const { calls, run } = recordingRun();
+    const outcome = await autoMergeFastTrackBatch(ISSUE, 3, makeBatch(), {
+      enabled: true,
+      mergeOptions: { deps: { run } },
+    });
+    expect(outcome.refused).toBe(false);
+    expect(outcome.result?.verified).toBe(true);
+    expect(outcome.result?.merged).toBe(true);
+    expect(calls.map(c => c.command)).toEqual([...FAST_TRACK_GATE_COMMANDS, 'git merge --no-ff "feature/pan-1-slot-3"']);
+  });
+
+  it('does not merge when the typecheck gate fails and surfaces the failure', async () => {
+    const commands: string[] = [];
+    const run = async (command: string) => {
+      commands.push(command);
+      if (command === 'npm run typecheck') throw Object.assign(new Error('TS2345'), { stdout: '', stderr: 'TS2345' });
+      return { stdout: 'ok', stderr: '' };
+    };
+    const outcome = await autoMergeFastTrackBatch(ISSUE, 1, makeBatch(), {
+      enabled: true,
+      mergeOptions: { deps: { run } },
+    });
+    expect(outcome.refused).toBe(false);
+    expect(outcome.result?.verified).toBe(false);
+    expect(outcome.result?.merged).toBe(false);
+    expect(outcome.result?.failure).toContain('Verify command failed');
+    expect(commands.some(c => c.startsWith('git merge'))).toBe(false);
+  });
+
+  it('rejects any batch containing a medium-or-harder bead', async () => {
+    const { calls, run } = recordingRun();
+    const batch = makeBatch();
+    batch.items.push(item({ difficulty: 'medium', files_scope: ['docs/m.md'], files_scope_confidence: 'high' }, 'medium'));
+    const outcome = await autoMergeFastTrackBatch(ISSUE, 1, batch, {
+      enabled: true,
+      mergeOptions: { deps: { run } },
+    });
+    expect(outcome.refused).toBe(true);
+    expect(outcome.refusalReason).toContain("non-trivial item 'medium'");
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects a batch containing an escalated item', async () => {
+    const { calls, run } = recordingRun();
+    const batch = makeBatch();
+    const { escalation } = escalateFastTrackItem(batch, 'a', 'diff-exceeds-threshold');
+    // The foreman failed to drop the escalated item from the batch — the
+    // auto-merge path must still refuse it.
+    const outcome = await autoMergeFastTrackBatch(ISSUE, 1, batch, {
+      enabled: true,
+      escalations: [escalation],
+      mergeOptions: { deps: { run } },
+    });
+    expect(outcome.refused).toBe(true);
+    expect(outcome.refusalReason).toContain('escalated');
+    expect(calls).toHaveLength(0);
   });
 });

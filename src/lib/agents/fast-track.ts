@@ -1,5 +1,6 @@
 import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
 import { hasFileOverlap } from '../vbrief/dag.js';
+import { verifyAndMergeSlot, type SlotMergeIssue, type SlotMergeOptions, type SlotMergeResult } from './slot-merge.js';
 
 /**
  * Trivial fast-track batching (PAN-1791, folding in PAN-1311). The "skip
@@ -147,4 +148,75 @@ export function groupFastTrack(items: VBriefItem[], options: FastTrackOptions = 
   flush();
 
   return { batches, rest };
+}
+
+/**
+ * Trivial-tier typecheck-gated auto-merge (PAN-1311, hazard H1). ONLY when
+ * tiered execution is enabled AND the batch is entirely trivial/simple AND
+ * nothing in it was escalated does the batch skip the review convoy: the
+ * typecheck+lint gate runs in the slot workspace and, on success, the slot
+ * branch merges to the feature branch via the verifyAndMergeSlot machinery.
+ *
+ * TRUST BOUNDARY — every refusal below is enforced here, not assumed of the
+ * caller: with tiering disabled this path refuses everything (items route
+ * through the normal review-then-merge flow); a medium-or-harder bead
+ * anywhere in the batch refuses the whole batch; an escalated item refuses
+ * the batch (isFastTrackAutoMergeAllowed); and a failed gate does NOT merge
+ * — the SlotMergeResult surfaces back to the foreman with the evidence.
+ */
+export const FAST_TRACK_GATE_COMMANDS = ['npm run typecheck', 'npm run lint'];
+
+export interface FastTrackAutoMergeResult {
+  /** True when the trust boundary refused the batch before any gate ran. */
+  refused: boolean;
+  refusalReason?: string;
+  /** Gate + merge outcome; present only when not refused. */
+  result?: SlotMergeResult;
+}
+
+export async function autoMergeFastTrackBatch(
+  issue: string | SlotMergeIssue,
+  slotIndex: number,
+  batch: FastTrackBatch,
+  opts: {
+    /** Resolved tiered-execution flag (global + per-issue override). Off by default. */
+    enabled: boolean;
+    escalations?: FastTrackEscalation[];
+    mergeOptions?: SlotMergeOptions;
+  },
+): Promise<FastTrackAutoMergeResult> {
+  if (!opts.enabled) {
+    return { refused: true, refusalReason: 'tiered_execution is disabled; batch routes through the normal review-then-merge flow' };
+  }
+
+  const nonTrivial = batch.items.find(i => !i.metadata?.difficulty || !FAST_TRACK_DIFFICULTIES.has(i.metadata.difficulty));
+  if (nonTrivial) {
+    return {
+      refused: true,
+      refusalReason: `batch '${batch.fastTrackBatchKey}' contains non-trivial item '${nonTrivial.id}' (difficulty: ${nonTrivial.metadata?.difficulty ?? 'unset'}); auto-merge only applies to trivial/simple batches`,
+    };
+  }
+
+  const escalated = batch.items.find(i => !isFastTrackAutoMergeAllowed(i.id, opts.escalations ?? []));
+  if (escalated) {
+    return {
+      refused: true,
+      refusalReason: `batch '${batch.fastTrackBatchKey}' contains escalated item '${escalated.id}'; escalated work requires full review`,
+    };
+  }
+
+  // One batch = one dispatch = one slot: reuse verifyAndMergeSlot with a
+  // synthetic batch-level item carrying the typecheck+lint gate.
+  const gateItem: VBriefItem = {
+    id: batch.fastTrackBatchKey,
+    title: `fast-track batch ${batch.fastTrackBatchKey} (${batch.items.map(i => i.id).join(', ')})`,
+    status: 'running',
+    metadata: {
+      verify_commands: FAST_TRACK_GATE_COMMANDS,
+      expected_outputs: ['typecheck and lint complete without errors'],
+    },
+  };
+
+  const result = await verifyAndMergeSlot(issue, slotIndex, gateItem, opts.mergeOptions ?? {});
+  return { refused: false, result };
 }
