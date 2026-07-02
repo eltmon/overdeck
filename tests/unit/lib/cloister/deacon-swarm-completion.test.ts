@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyInFlightSlots,
+  getFailedMergeBlock,
+  recordStalledSlotRecovery,
   resetSwarmLoopSafetyForTests,
   type CoordinateSwarmSlotsDeps,
 } from '../../../../src/lib/cloister/deacon-swarm.js';
@@ -156,7 +158,8 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     })).resolves.toEqual([
       expect.objectContaining({
-        lifecycle: 'stalled',
+        lifecycle: 'awaiting-completion-signal',
+        signal: 'completion-nudge',
         actions: ['[swarm] nudged slot 1 (item wi-1) for PAN-2203: run pan done PAN-2203'],
       }),
     ]);
@@ -168,12 +171,40 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     })).resolves.toEqual([
       expect.objectContaining({
-        lifecycle: 'stalled',
+        lifecycle: 'awaiting-completion-signal',
+        signal: 'completion-nudge',
         actions: [],
       }),
     ]);
     expect(sendCompletionNudge).toHaveBeenCalledTimes(1);
     expect(sendCompletionNudge).toHaveBeenCalledWith(agentId, 'PAN-2203');
+  });
+
+  it('does not record failed-merge recovery while waiting for a nudged slot to run pan done', async () => {
+    const agentId = 'agent-pan-2203-slot-1';
+    const fakeDeps = deps({
+      sessions: [agentId],
+      aheadCount: 1,
+      clean: true,
+    });
+
+    await classifyInFlightSlots([slot(1, agentId)], fakeDeps, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+      inferCompletion: 'nudge',
+      stallThresholdMs: 10_000,
+    });
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    const classified = await classifyInFlightSlots([slot(1, agentId)], fakeDeps, {
+      workspacePath: '/workspace',
+      issueId: 'PAN-2203',
+      inferCompletion: 'nudge',
+      stallThresholdMs: 10_000,
+    });
+
+    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
+    expect(getFailedMergeBlock('PAN-2203')).toBeUndefined();
   });
 
   it('infers ready-to-merge on the second unchanged idle observation in auto mode', async () => {
@@ -199,7 +230,8 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     })).resolves.toEqual([
       expect.objectContaining({
-        lifecycle: 'stalled',
+        lifecycle: 'awaiting-completion-signal',
+        signal: 'completion-nudge',
         actions: ['[swarm] nudged slot 2 (item wi-2) for PAN-2203: run pan done PAN-2203'],
       }),
     ]);

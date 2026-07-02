@@ -69,9 +69,10 @@ export async function classifyDoneWithoutSignal(
 
   return {
     ...slot,
-    lifecycle: 'stalled',
+    lifecycle: 'awaiting-completion-signal',
     reason: 'no-progress-timeout',
     stalledForMs: observation.stalledForMs,
+    signal: 'completion-nudge',
     actions,
   };
 }

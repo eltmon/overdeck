@@ -205,7 +205,7 @@ function defaultShouldDispatch(issueId: string): boolean {
   return !(hold?.stuck || hold?.deaconIgnored);
 }
 
-export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled';
+export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal';
 
 export interface ClassifyInFlightSlotsOptions {
   workspacePath?: string;
@@ -220,7 +220,7 @@ export interface ClassifiedSwarmSlot extends ReconciledSlotItem {
   exitStatus?: number | null;
   reason?: 'missing-agent' | 'vanished-session' | 'pane-exit-nonzero' | 'pane-exit-unknown' | 'no-progress-timeout';
   stalledForMs?: number;
-  signal?: 'inferred';
+  signal?: 'inferred' | 'completion-nudge';
   actions?: string[];
 }
 
