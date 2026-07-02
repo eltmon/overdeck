@@ -2364,11 +2364,12 @@ function parseStringArrayColumn(value: string | null): string[] {
 }
 
 function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
+  const canUseClaudePathFallback = row.harness === null || row.harness === 'claude-code';
   return {
     id: row.id,
     source: 'managed-archived',
     conversationName: row.name,
-    jsonlPath: row.discoveredJsonlPath ?? (row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
+    jsonlPath: row.discoveredJsonlPath ?? (canUseClaudePathFallback && row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
     workspacePath: row.cwd,
     primaryModel: row.primaryModel ?? row.model,
     messageCount: row.messageCount ?? 0,

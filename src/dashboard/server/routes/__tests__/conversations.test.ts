@@ -1073,6 +1073,31 @@ describe('conversations route — DB integration', () => {
     expect(rows[0].jsonlPath).toEqual(expect.stringContaining('sparse-session.jsonl'));
   });
 
+  it('returns null jsonlPath for archived non-Claude conversations without discovered_sessions enrichment', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({
+      name: 'ohmypi-archived',
+      tmuxSession: 'conv-ohmypi-archived',
+      cwd: '/cwd/ohmypi',
+      claudeSessionId: 'ohmypi-session',
+      harness: 'ohmypi',
+      model: 'gpt-5.5',
+    });
+    archiveConversation('ohmypi-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'ohmypi-archived',
+      jsonlPath: null,
+    });
+  });
+
   it('merges discovered_sessions enrichment for archived conversations', async () => {
     const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
@@ -1131,6 +1156,39 @@ describe('conversations route — DB integration', () => {
       summary: 'Indexed summary',
       enrichmentLevel: 2,
       enrichmentFailed: true,
+    });
+  });
+
+  it('returns the discovered jsonlPath for archived non-Claude conversations after discovery', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({
+      name: 'codex-archived',
+      tmuxSession: 'conv-codex-archived',
+      cwd: '/cwd/codex',
+      claudeSessionId: 'codex-session',
+      harness: 'codex',
+      model: 'gpt-5.5-codex',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/codex/sessions/rollout-codex-session.jsonl',
+      sessionId: 'codex-session',
+      workspacePath: '/cwd/codex',
+      messageCount: 3,
+      primaryModel: 'gpt-5.5-codex',
+    });
+    archiveConversation('codex-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'codex-archived',
+      jsonlPath: '/codex/sessions/rollout-codex-session.jsonl',
     });
   });
 
