@@ -41,3 +41,13 @@ pan swarm resume PAN-2203
 `pan swarm freeze` places a per-issue operator hold: the Deacon skips all swarm coordination for the issue — no slot reconciliation, merging, garbage collection, or new dispatch — until the hold is lifted. Slot agents that are already running keep running. `--reason <text>` records why the hold was placed.
 
 `pan swarm resume` lifts the hold; coordination picks the issue back up on the next Deacon patrol cycle. Both commands are idempotent: freezing an already-frozen issue or resuming an unfrozen issue succeeds with an "already" notice.
+
+## Stop a Swarm
+
+Run:
+
+```bash
+pan swarm stop PAN-2203 --reason "runaway slot dispatch"
+```
+
+`pan swarm stop` sets the same per-issue hold as `pan swarm freeze` FIRST (so the Deacon cannot re-spawn slots mid-stop), then stops every live slot agent for the issue via the agent lifecycle (agents-table status is updated, not just tmux-killed). Slot branches and worktrees are preserved — stopping deletes no work. With zero live slots it still succeeds and sets the hold. Run `pan swarm resume` to re-enable coordination afterwards.
