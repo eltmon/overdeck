@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { parsePiSessionMetadata } from '../../../../src/lib/conversations/harness-metadata.js';
+import { parseCodexSessionMetadata, parsePiSessionMetadata } from '../../../../src/lib/conversations/harness-metadata.js';
 import { scan } from '../../../../src/lib/conversations/scanner.js';
 import { findDiscoveredSessions } from '../../../../src/lib/overdeck/discovered-sessions.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
@@ -106,9 +106,85 @@ describe('parsePiSessionMetadata', () => {
   });
 });
 
+describe('parseCodexSessionMetadata', () => {
+  it('extracts nested-payload Codex rollout metadata from session_meta, token_count, and function_call records', async () => {
+    const file = writeTempSession('rollout-2026-07-02T00-00-00-000Z-codex-thread-1.jsonl', codexFixture());
+
+    const meta = await parseCodexSessionMetadata(file);
+
+    expect(meta.sessionId).toBe('codex-thread-1');
+    expect(meta.cwdFromFirstMessage).toBe('/home/user/Projects/codex-app');
+    expect(meta.messageCount).toBe(3);
+    expect(meta.firstTs).toBe('2026-07-02T11:00:00.000Z');
+    expect(meta.lastTs).toBe('2026-07-02T11:00:06.000Z');
+    expect(meta.modelsUsed).toEqual(['gpt-5.5']);
+    expect(meta.primaryModel).toBe('gpt-5.5');
+    expect(meta.tokenInput).toBe(9000);
+    expect(meta.tokenOutput).toBe(500);
+    expect(meta.toolsUsed).toEqual(['exec_command']);
+    expect(meta.filesTouched).toEqual([]);
+  });
+
+  it('skips malformed JSONL lines and returns metadata from valid Codex lines', async () => {
+    const file = writeTempSession('rollout-2026-07-02T00-00-00-000Z-codex-thread-1.jsonl', [
+      codexSessionMetaLine(),
+      '{not-json',
+      codexTurnContextLine(),
+      codexAgentMessageLine('Working on it.', '2026-07-02T11:00:03.000Z'),
+      codexTokenCountLine(5000, 200, '2026-07-02T11:00:04.000Z'),
+    ].join('\n') + '\n');
+
+    const meta = await parseCodexSessionMetadata(file);
+
+    expect(meta.sessionId).toBe('codex-thread-1');
+    expect(meta.messageCount).toBe(1);
+    expect(meta.primaryModel).toBe('gpt-5.5');
+    expect(meta.tokenInput).toBe(5000);
+    expect(meta.tokenOutput).toBe(200);
+  });
+
+  it('scan persists parsed Codex metadata with the discovered harness tag', async () => {
+    odb = setupOverdeckTestDb();
+    savedHome = process.env.HOME;
+    homeChanged = true;
+    process.env.HOME = odb.home;
+
+    const codexPath = join(
+      odb.home,
+      '.codex',
+      'sessions',
+      '2026',
+      '07',
+      '02',
+      'rollout-2026-07-02T00-00-00-000Z-codex-thread-1.jsonl',
+    );
+    writeFile(codexPath, codexFixture());
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+
+    expect(result.errors).toBe(0);
+    expect(result.inserted).toBe(1);
+    const session = findDiscoveredSessions().find((s) => s.jsonlPath === codexPath);
+    expect(session).toMatchObject({
+      harness: 'codex',
+      sessionId: 'codex-thread-1',
+      workspacePath: '/home/user/Projects/codex-app',
+      messageCount: 3,
+      primaryModel: 'gpt-5.5',
+      tokenInput: 9000,
+      tokenOutput: 500,
+    });
+    expect(session?.toolsUsed).toContain('exec_command');
+  });
+});
+
 function writeTempPiSession(content: string): string {
+  return writeTempSession('session.jsonl', content);
+}
+
+function writeTempSession(name: string, content: string): string {
   tempHome = mkdtempSync(join(tmpdir(), 'pan-2224-pi-'));
-  const file = join(tempHome, 'session.jsonl');
+  const file = join(tempHome, name);
   writeFile(file, content);
   return file;
 }
@@ -182,6 +258,78 @@ function assistantLine(): string {
         output: 25,
         cacheRead: 10,
         cacheWrite: 5,
+      },
+    },
+  });
+}
+
+function codexFixture(): string {
+  return [
+    codexSessionMetaLine(),
+    codexTurnContextLine(),
+    JSON.stringify({
+      type: 'event_msg',
+      timestamp: '2026-07-02T11:00:02.000Z',
+      payload: { type: 'user_message', message: 'fix the bug' },
+    }),
+    codexAgentMessageLine('Checking the branch first.', '2026-07-02T11:00:03.000Z'),
+    JSON.stringify({
+      type: 'response_item',
+      timestamp: '2026-07-02T11:00:03.500Z',
+      payload: {
+        type: 'function_call',
+        name: 'exec_command',
+        arguments: JSON.stringify({ cmd: 'git status', workdir: '/repo' }),
+        call_id: 'call_1',
+      },
+    }),
+    codexTokenCountLine(5000, 200, '2026-07-02T11:00:04.000Z'),
+    codexAgentMessageLine('Done.', '2026-07-02T11:00:05.000Z'),
+    codexTokenCountLine(9000, 500, '2026-07-02T11:00:06.000Z'),
+  ].join('\n') + '\n';
+}
+
+function codexSessionMetaLine(): string {
+  return JSON.stringify({
+    type: 'session_meta',
+    timestamp: '2026-07-02T11:00:00.000Z',
+    payload: {
+      id: 'codex-thread-1',
+      cwd: '/home/user/Projects/codex-app',
+      model_provider: 'openai',
+    },
+  });
+}
+
+function codexTurnContextLine(): string {
+  return JSON.stringify({
+    type: 'turn_context',
+    timestamp: '2026-07-02T11:00:01.000Z',
+    payload: { type: 'turn_context', turn_id: 'turn-1', model: 'gpt-5.5' },
+  });
+}
+
+function codexAgentMessageLine(message: string, timestamp: string): string {
+  return JSON.stringify({
+    type: 'event_msg',
+    timestamp,
+    payload: { type: 'agent_message', message },
+  });
+}
+
+function codexTokenCountLine(inputTokens: number, outputTokens: number, timestamp: string): string {
+  return JSON.stringify({
+    type: 'event_msg',
+    timestamp,
+    payload: {
+      type: 'token_count',
+      info: {
+        total_token_usage: {
+          input_tokens: inputTokens,
+          cached_input_tokens: 1000,
+          output_tokens: outputTokens,
+          total_tokens: inputTokens + outputTokens,
+        },
       },
     },
   });

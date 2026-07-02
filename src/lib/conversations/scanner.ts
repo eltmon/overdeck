@@ -30,7 +30,7 @@ import { buildCorrelationMapSync } from './correlator.js';
 import { getModelCapabilitySync } from '../model-capabilities.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
-import { parsePiSessionMetadata } from './harness-metadata.js';
+import { parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +80,9 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (file.harness === 'pi' || file.harness === 'ohmypi') {
       return parsePiSessionMetadata(file.jsonlPath);
     }
+    if (file.harness === 'codex') {
+      return parseCodexSessionMetadata(file.jsonlPath);
+    }
     return parseJsonl(file.jsonlPath);
   };
 
@@ -96,10 +99,6 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   if (opts.dryRun) {
     for (const file of filteredFiles) {
       const { jsonlPath, harness } = file;
-      if (harness === 'codex') {
-        result.skipped++;
-        continue;
-      }
       if (opts.mode === 'targeted') {
         try {
           const meta = await parseMetadata(file);
@@ -147,18 +146,6 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   // 7. Build tasks
   const tasks = filteredFiles.map((file) => async () => {
     const { jsonlPath, harness } = file;
-    if (harness === 'codex') {
-      result.skipped++;
-      dirsProcessed++;
-      await opts.onProgress?.({
-        dirsProcessed,
-        dirsTotal,
-        sessionsFound,
-        elapsedMs: Date.now() - startTs,
-      });
-      return;
-    }
-
     // Change detection: skip if file unchanged
     const existing = getDiscoveredSessionByJsonlPath(jsonlPath);
     let stat: { size: number; mtimeMs: number } | null = null;

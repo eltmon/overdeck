@@ -48,6 +48,35 @@ interface PiContentBlock {
 
 type PiLine = PiSessionLine | PiMessageLine | PiModelChangeLine | Record<string, unknown>;
 
+interface CodexTokenUsage {
+  input?: number;
+  cached_input?: number;
+  output?: number;
+  total?: number;
+  input_tokens?: number;
+  cached_input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+}
+
+interface CodexPayload {
+  type?: string;
+  id?: string;
+  cwd?: string;
+  model?: string;
+  message?: string;
+  name?: string;
+  info?: {
+    total_token_usage?: CodexTokenUsage;
+  };
+}
+
+interface CodexLine {
+  type?: string;
+  timestamp?: string;
+  payload?: CodexPayload;
+}
+
 const FILE_TOOLS = new Set(['read', 'edit', 'write', 'glob', 'notebookedit']);
 
 export async function parsePiSessionMetadata(filePath: string): Promise<SessionMetadata> {
@@ -157,6 +186,109 @@ export async function parsePiSessionMetadata(filePath: string): Promise<SessionM
   return result;
 }
 
+export async function parseCodexSessionMetadata(filePath: string): Promise<SessionMetadata> {
+  const result = emptySessionMetadata();
+  const modelCounts: Record<string, number> = {};
+  const toolsSet = new Set<string>();
+  let currentModel: string | null = null;
+
+  await readJsonl(filePath, (entry: CodexLine) => {
+    const payload = entry.payload && typeof entry.payload === 'object' ? entry.payload : undefined;
+    const recordType = payload?.type ?? entry.type;
+    recordTimestamp(result, entry.timestamp);
+
+    if (recordType === 'session_meta') {
+      if (!result.sessionId && typeof payload?.id === 'string' && payload.id.length > 0) {
+        result.sessionId = payload.id;
+      }
+      if (!result.cwdFromFirstMessage && typeof payload?.cwd === 'string' && payload.cwd.length > 0) {
+        result.cwdFromFirstMessage = payload.cwd;
+      }
+      return;
+    }
+
+    if (recordType === 'turn_context') {
+      if (typeof payload?.model === 'string' && payload.model.length > 0) {
+        currentModel = payload.model;
+        modelCounts[currentModel] = modelCounts[currentModel] ?? 0;
+      }
+      return;
+    }
+
+    if (entry.type === 'event_msg') {
+      if (recordType === 'user_message' || recordType === 'agent_message') {
+        result.messageCount++;
+        if (currentModel) modelCounts[currentModel] = (modelCounts[currentModel] ?? 0) + 1;
+        return;
+      }
+      if (recordType === 'token_count') {
+        const usage = payload?.info?.total_token_usage;
+        if (usage) {
+          result.tokenInput = pickNumber(usage.input_tokens, usage.input) ?? result.tokenInput;
+          result.tokenOutput = pickNumber(usage.output_tokens, usage.output) ?? result.tokenOutput;
+        }
+        return;
+      }
+    }
+
+    if (entry.type === 'response_item' && (recordType === 'function_call' || recordType === 'custom_tool_call')) {
+      const name = typeof payload?.name === 'string' && payload.name.length > 0 ? payload.name : 'tool';
+      toolsSet.add(name);
+    }
+  });
+
+  result.modelsUsed = Object.keys(modelCounts);
+  if (result.modelsUsed.length > 0) {
+    result.primaryModel = result.modelsUsed.reduce((a, b) =>
+      (modelCounts[a] ?? 0) >= (modelCounts[b] ?? 0) ? a : b,
+    );
+  }
+  result.toolsUsed = [...toolsSet];
+  return result;
+}
+
+async function readJsonl(filePath: string, onEntry: (entry: Record<string, unknown>) => void): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const readStream = createReadStream(filePath, { encoding: 'utf8' });
+    const rl = createInterface({ input: readStream, crlfDelay: Infinity });
+    let finalized = false;
+
+    const finalize = () => {
+      if (finalized) return;
+      finalized = true;
+      try {
+        rl.close();
+      } catch {
+        // ignore
+      }
+      try {
+        readStream.destroy();
+      } catch {
+        // ignore
+      }
+      resolve();
+    };
+
+    rl.on('line', (rawLine) => {
+      const line = rawLine.trim();
+      if (!line) return;
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+      if (!parsed || typeof parsed !== 'object') return;
+      onEntry(parsed);
+    });
+
+    rl.on('close', finalize);
+    rl.on('error', finalize);
+    readStream.on('error', finalize);
+  });
+}
+
 function emptySessionMetadata(): SessionMetadata {
   return {
     messageCount: 0,
@@ -189,6 +321,13 @@ function normalizeModel(provider: unknown, model: unknown): string | null {
 
 function num(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function pickNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return undefined;
 }
 
 function extractFilePath(toolName: string, input: Record<string, unknown> | undefined): string | null {
