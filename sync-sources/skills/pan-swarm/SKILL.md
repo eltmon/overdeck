@@ -21,6 +21,16 @@ When `pan swarm PAN-2203` succeeds, it ensures the issue workspace exists, then 
 
 Re-running `pan swarm PAN-2203` is idempotent: the coordination pass reconciles already-dispatched work (live sessions, unmerged slot branches, recorded assignments) and spawns nothing new for it, so a second back-to-back run does not duplicate slots or race the Deacon. If the issue is under an operator hold (`pan swarm freeze` / `pan swarm stop`), the command dispatches nothing and points at `pan swarm resume`.
 
+## Inspect Swarm State
+
+Run:
+
+```bash
+pan swarm status PAN-2203
+```
+
+`pan swarm status` is read-only — it performs no writes, no git mutation, and no dispatch. It prints one row per reconciled slot (index, item, lifecycle, branch merged/unmerged, agent session alive/dead), the hold state (whether the Deacon is skipping the issue and how to resume), and capacity (tmux-alive slot sessions against the reserved swarm slot limit).
+
 ## Recover a Failed Slot
 
 Run:

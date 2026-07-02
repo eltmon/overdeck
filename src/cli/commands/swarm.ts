@@ -9,11 +9,15 @@ import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import {
+  classifyInFlightSlots,
   coordinateSwarmSlots,
   getFailedMergeBlock,
   recoverFailedMergeSlot,
+  type ClassifiedSwarmSlot,
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
+import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
@@ -304,6 +308,116 @@ function safeGetReviewStatus(
   }
 }
 
+export interface SwarmStatusCommandDeps {
+  resolveProjectFromIssueSync: (issueId: string) => ResolvedProjectLike | null;
+  findSpecByIssue: typeof findSpecByIssue;
+  reconcileSlotState: typeof reconcileSlotState;
+  classifyInFlightSlots: (
+    slots: Parameters<typeof classifyInFlightSlots>[0],
+    workspacePath: string,
+  ) => Promise<ClassifiedSwarmSlot[]>;
+  getReviewStatusSync: typeof getReviewStatusSync;
+  listSessionNamesSync: () => string[];
+  getConcurrencyLimits: typeof getConcurrencyLimits;
+  countRunningSwarmSlotsForIssue: (issueId: string) => number;
+  console: ConsoleLike;
+}
+
+const defaultStatusDeps: SwarmStatusCommandDeps = {
+  resolveProjectFromIssueSync,
+  findSpecByIssue,
+  reconcileSlotState,
+  classifyInFlightSlots: (slots, workspacePath) => classifyInFlightSlots(slots, undefined, { workspacePath }),
+  getReviewStatusSync,
+  listSessionNamesSync,
+  getConcurrencyLimits,
+  countRunningSwarmSlotsForIssue,
+  console,
+};
+
+/**
+ * Read-only reconciled view of an issue's swarm: per-slot rows, the operator
+ * hold state, and slot capacity. Performs no writes, no git mutation, and no
+ * dispatch (PAN-2214).
+ */
+export async function swarmStatusCommand(
+  issueId: string,
+  deps: SwarmStatusCommandDeps = defaultStatusDeps,
+): Promise<{ ok: boolean }> {
+  const issue = issueId.toUpperCase();
+  const issueLower = issue.toLowerCase();
+  const loaded = await loadSwarmPlan(issue, deps);
+  if (!loaded.ok) {
+    deps.console.error(chalk.red(loaded.error));
+    return { ok: false };
+  }
+
+  const workspacePath = join(loaded.project.projectPath, 'workspaces', `feature-${issueLower}`);
+  const reconciled = await deps.reconcileSlotState(issue, workspacePath, loaded.doc);
+  const classified = await deps.classifyInFlightSlots(reconciled.inFlight, workspacePath);
+  const lifecycleBySlot = new Map(classified.map(slot => [slot.slotIndex, slot.lifecycle]));
+  const branchMergedBySlot = new Map(reconciled.branches.map(branch => [branch.slotIndex, branch.merged]));
+  const liveSessions = new Set(safeListSessionNames(deps));
+
+  deps.console.log(chalk.bold(`Swarm status for ${issue}`));
+
+  const hold = safeGetReviewStatus(issue, deps);
+  if (hold?.deaconIgnored) {
+    const reason = hold.deaconIgnoredReason ? ` Reason: ${hold.deaconIgnoredReason}.` : '';
+    deps.console.log(
+      `Hold: deacon-ignored — the Deacon skips all swarm coordination (reconcile, merge, garbage collection, `
+      + `and dispatch) for this issue until you run \`pan swarm resume ${issue}\`.${reason}`,
+    );
+  } else if (hold?.stuck) {
+    const reason = hold.stuckReason ? ` Reason: ${hold.stuckReason}.` : '';
+    deps.console.log(
+      `Hold: stuck — the issue is flagged stuck, so the Deacon skips all swarm coordination for it until the `
+      + `flag is cleared.${reason}`,
+    );
+  } else {
+    deps.console.log('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
+  }
+
+  const limits = deps.getConcurrencyLimits();
+  const liveSlotCount = deps.countRunningSwarmSlotsForIssue(issue);
+  deps.console.log(
+    `Capacity: ${liveSlotCount} of ${limits.reservedSwarmSlots} swarm slots in use `
+    + '(tmux-alive slot sessions counted against the reserved swarm slot limit).',
+  );
+
+  const rows = [
+    ...reconciled.merged.map(slot => ({ ...slot, lifecycle: 'merged' })),
+    ...reconciled.inFlight.map(slot => ({ ...slot, lifecycle: lifecycleBySlot.get(slot.slotIndex) ?? 'running' })),
+  ].sort((a, b) => a.slotIndex - b.slotIndex);
+
+  if (rows.length === 0) {
+    deps.console.log('Slots: none — nothing is dispatched right now, and no merged slot state remains.');
+    return { ok: true };
+  }
+
+  deps.console.log('Slots:');
+  for (const row of rows) {
+    const branch = row.branch ?? `feature/${issueLower}-slot-${row.slotIndex}`;
+    const branchState = branchMergedBySlot.get(row.slotIndex) === undefined
+      ? 'no local branch'
+      : branchMergedBySlot.get(row.slotIndex) ? 'merged' : 'unmerged';
+    const sessionName = row.agentId ?? `agent-${issueLower}-slot-${row.slotIndex}`;
+    const sessionState = liveSessions.has(sessionName) ? 'session alive' : 'session dead';
+    deps.console.log(
+      `  slot ${row.slotIndex} · item ${row.itemId} · ${row.lifecycle} · branch ${branch} (${branchState}) · ${sessionState}`,
+    );
+  }
+  return { ok: true };
+}
+
+function safeListSessionNames(deps: Pick<SwarmStatusCommandDeps, 'listSessionNamesSync'>): string[] {
+  try {
+    return deps.listSessionNamesSync();
+  } catch {
+    return [];
+  }
+}
+
 export function registerSwarmCommands(program: Command): void {
   const swarm = program
     .command('swarm <id>')
@@ -336,6 +450,14 @@ export function registerSwarmCommands(program: Command): void {
     .description('Resume swarm coordination for a frozen issue on the next Deacon patrol')
     .action(async (id: string) => {
       const result = await swarmResumeCommand(id);
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  swarm
+    .command('status <id>')
+    .description('Read-only reconciled swarm state: per-slot rows, hold state, and capacity')
+    .action(async (id: string) => {
+      const result = await swarmStatusCommand(id);
       if (!result.ok) process.exitCode = 1;
     });
 

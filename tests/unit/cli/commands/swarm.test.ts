@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
-import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResumeCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
+import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
+import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
 import {
   coordinateSwarmSlots,
   getFailedMergeBlock,
@@ -448,5 +449,129 @@ describe('pan swarm stop (PAN-2214)', () => {
     expect(result.ok).toBe(false);
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('agent-pan-2203-slot-2'));
     expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('1 of 2 slot agent(s) stopped'));
+  });
+});
+
+describe('pan swarm status (PAN-2214)', () => {
+  function makeStatusDeps(options: {
+    doc?: VBriefDocument;
+    hold?: { deaconIgnored?: boolean; deaconIgnoredReason?: string; stuck?: boolean; stuckReason?: string } | null;
+    reconciled?: Record<string, unknown>;
+    classified?: Array<Record<string, unknown>>;
+    sessionNames?: string[];
+    liveSlotCount?: number;
+  } = {}): SwarmStatusCommandDeps {
+    const doc = options.doc ?? makeDoc([
+      makeEligibleItem('wi-1', 'src/a.ts'),
+      makeEligibleItem('wi-2', 'src/b.ts'),
+    ]);
+    return {
+      resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
+      findSpecByIssue: vi.fn(() => Effect.succeed({
+        path: '/repo/.pan/specs/pan-2203.json',
+        filename: 'pan-2203.json',
+        issueId: 'PAN-2203',
+        document: doc,
+        status: 'active',
+      })) as unknown as SwarmStatusCommandDeps['findSpecByIssue'],
+      reconcileSlotState: vi.fn(async () => ({
+        issueId: 'PAN-2203',
+        merged: [],
+        inFlight: [],
+        pending: [],
+        branches: [],
+        agents: [],
+        ...options.reconciled,
+      })) as unknown as SwarmStatusCommandDeps['reconcileSlotState'],
+      classifyInFlightSlots: vi.fn(async () => (options.classified ?? []) as never),
+      getReviewStatusSync: vi.fn(() => options.hold ?? null) as unknown as SwarmStatusCommandDeps['getReviewStatusSync'],
+      listSessionNamesSync: vi.fn(() => options.sessionNames ?? []),
+      getConcurrencyLimits: vi.fn(() => ({
+        maxWorkAgents: 4,
+        reservedAdvancingSlots: 2,
+        reservedSwarmSlots: 3,
+        totalCeiling: 6,
+        exemptOperatorStarted: true,
+      })),
+      countRunningSwarmSlotsForIssue: vi.fn(() => options.liveSlotCount ?? 0),
+      console: { log: vi.fn(), error: vi.fn() },
+    };
+  }
+
+  function loggedText(deps: SwarmStatusCommandDeps): string {
+    return vi.mocked(deps.console.log).mock.calls.map(call => call.join(' ')).join('\n');
+  }
+
+  it('renders one row per reconciled slot with index, item, lifecycle, branch state, and session liveness', async () => {
+    const deps = makeStatusDeps({
+      reconciled: {
+        merged: [{ itemId: 'wi-0', slotIndex: 1, status: 'merged', branch: 'feature/pan-2203-slot-1', agentId: 'agent-pan-2203-slot-1' }],
+        inFlight: [{ itemId: 'wi-1', slotIndex: 2, status: 'in_flight', branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' }],
+        branches: [
+          { slotIndex: 1, branch: 'feature/pan-2203-slot-1', merged: true },
+          { slotIndex: 2, branch: 'feature/pan-2203-slot-2', merged: false },
+        ],
+      },
+      classified: [{ itemId: 'wi-1', slotIndex: 2, lifecycle: 'running' }],
+      sessionNames: ['agent-pan-2203-slot-2'],
+      liveSlotCount: 1,
+    });
+
+    const result = await swarmStatusCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    const output = loggedText(deps);
+    expect(output).toContain('slot 1 · item wi-0 · merged · branch feature/pan-2203-slot-1 (merged) · session dead');
+    expect(output).toContain('slot 2 · item wi-1 · running · branch feature/pan-2203-slot-2 (unmerged) · session alive');
+    expect(output).toContain('Capacity: 1 of 3 swarm slots in use');
+  });
+
+  it('prints the hold reason and the resume command when a hold is active', async () => {
+    const deps = makeStatusDeps({
+      hold: { deaconIgnored: true, deaconIgnoredReason: 'operator freeze' },
+    });
+
+    await swarmStatusCommand('PAN-2203', deps);
+
+    const output = loggedText(deps);
+    expect(output).toContain('Hold: deacon-ignored');
+    expect(output).toContain('pan swarm resume PAN-2203');
+    expect(output).toContain('Reason: operator freeze');
+  });
+
+  it('prints that coordination is active when no hold is set', async () => {
+    const deps = makeStatusDeps({ hold: null });
+
+    await swarmStatusCommand('PAN-2203', deps);
+
+    expect(loggedText(deps)).toContain('Hold: none — the Deacon is actively coordinating this issue on every patrol.');
+  });
+
+  it('is read-only: no record writes, git mutations, or spawns are possible through its deps', async () => {
+    const deps = makeStatusDeps({
+      reconciled: {
+        inFlight: [{ itemId: 'wi-1', slotIndex: 1, status: 'in_flight', branch: 'feature/pan-2203-slot-1', agentId: 'agent-pan-2203-slot-1' }],
+      },
+      classified: [{ itemId: 'wi-1', slotIndex: 1, lifecycle: 'running' }],
+    });
+
+    const result = await swarmStatusCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    // The deps surface has no write, git-mutation, or spawn members at all —
+    // assert the only calls made were the read-side ones.
+    expect(deps.reconcileSlotState).toHaveBeenCalledTimes(1);
+    expect(deps.classifyInFlightSlots).toHaveBeenCalledTimes(1);
+    expect(Object.keys(deps).sort()).toEqual([
+      'classifyInFlightSlots',
+      'console',
+      'countRunningSwarmSlotsForIssue',
+      'findSpecByIssue',
+      'getConcurrencyLimits',
+      'getReviewStatusSync',
+      'listSessionNamesSync',
+      'reconcileSlotState',
+      'resolveProjectFromIssueSync',
+    ]);
   });
 });
