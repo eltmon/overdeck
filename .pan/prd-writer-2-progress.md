@@ -1,0 +1,1 @@
+- [x] PAN-2228 — 61897aad54 — delivery door PRD: verified-per-tier contract (D1/D2), kickoff fatality via stopped+auto-resume (D3/D4), side-door migration table, no-side-door guard
