@@ -20,7 +20,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { type Role } from './agent-state.js';
-import { assignDispatchTier } from './dispatch-tier.js';
+import { assignDispatchTier, type TierAssignment } from './dispatch-tier.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
 import {
   buildCavemanExports,
@@ -138,6 +138,24 @@ export interface RegisteredSlotSpawn {
   workspace: string;
   slotIndex: number;
   slotItemId: string;
+}
+
+/**
+ * Thread a tiered-execution tier assignment into spawn options (PAN-1791).
+ * When the assignment resolved a tier, its model+harness replace the parent
+ * defaults so the dispatched bead runs on the tier its difficulty selected.
+ * With no assignment (tiering disabled), the options pass through unchanged.
+ */
+export function applyTierAssignment<T extends Pick<SpawnRunOptions, 'model' | 'harness'>>(
+  options: T,
+  assignment?: TierAssignment,
+): T {
+  if (!assignment?.model) return options;
+  return {
+    ...options,
+    model: assignment.model,
+    harness: assignment.harness ?? options.harness,
+  };
 }
 
 export function resolveRegisteredSlotSpawn(

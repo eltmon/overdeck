@@ -28,15 +28,23 @@ export function chooseDispatchTier(item: Pick<VBriefItem, 'metadata'>): Dispatch
   return 'in-context';
 }
 
-export interface DispatchTierAssignment {
+/**
+ * Tiered-execution generalization of the dispatch decision (PAN-1791).
+ * The binary in-context/registered-slot choice stays; when tiered execution
+ * is enabled for the issue, the assignment also carries the (tierName,
+ * model, harness) resolved by the resolution chain so dispatch spawns the
+ * worker difficulty selected — the fix for PAN-1196's "difficulty captured
+ * and ignored". When disabled, the result is exactly chooseDispatchTier's
+ * with no model override.
+ */
+export interface TierAssignment {
   dispatch: DispatchTier;
-  /** Set only when tiered execution resolved a tier for this item. */
   tierName?: string;
   model?: string;
   harness?: RuntimeName;
 }
 
-export interface DispatchTierAssignmentConfig extends ResolveTierConfig {
+export interface TierAssignmentConfig extends ResolveTierConfig {
   enabled: boolean;
 }
 
@@ -51,13 +59,25 @@ export interface DispatchTierAssignmentConfig extends ResolveTierConfig {
  */
 export function assignDispatchTier(
   item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
-  config?: DispatchTierAssignmentConfig,
+  config?: TierAssignmentConfig,
   planMetadata?: { [key: string]: unknown },
-): DispatchTierAssignment {
+): TierAssignment {
   const dispatch = chooseDispatchTier(item);
   if (!config || !resolveTieredExecutionEnabled(config, planMetadata)) {
     return { dispatch };
   }
   const tier = resolveTier(item, config);
   return { dispatch, tierName: tier.tierName, model: tier.model, harness: tier.harness };
+}
+
+/**
+ * Plan-metadata-agnostic entry point: honors only the global enabled flag.
+ * Kept for callers that resolve the per-plan override themselves (or have
+ * no plan in scope, e.g. the enablement-gate parity tests).
+ */
+export function chooseTierAssignment(
+  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  tiering?: TierAssignmentConfig,
+): TierAssignment {
+  return assignDispatchTier(item, tiering);
 }
