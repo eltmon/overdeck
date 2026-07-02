@@ -7,14 +7,14 @@
   "pipeline": {
     "issueId": "PAN-1791",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T13:21:07.105Z",
+    "updatedAt": "2026-07-02T13:31:12.998Z",
     "reviewNotes": "No blocking findings at 85808ba8; non-blocking replay follow-ups remain",
-    "testNotes": "Commands run from /home/eltmon/Projects/overdeck/workspaces/feature-pan-1791: npm run typecheck PASS; npm run lint PASS; npm test first sandboxed run failed with environmental EPERM for spawnSync/listen; escalated npm test ran without sandbox EPERM but FAILED: 1 failed test out of 7974, src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > PAN-2017: fails and stops a strike spawn when kickoff delivery fails, error ENOTEMPTY rmdir /tmp/pan-agent-role-QEqpR9/.overdeck/bin. Isolated rerun npx vitest run --configLoader runner src/lib/__tests__/agent-state-role.test.ts PASS (27/27), but configured full test gate still exited nonzero. UAT not required: acceptance/issue notes cover library/config/routing/supervisor behavior, not browser/dashboard UI.",
+    "testNotes": "Workspace verified before repo commands: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1791 on branch feature/pan-1791. Read .pan/continue.json, .pan/spec.vbrief.json, .pan/records/pan-1791.json, AGENTS.md, package.json; bd show PAN-1791 found no Beads issue. UAT not required: acceptance/issue notes target library/config/routing/supervisor/server behavior, not browser/dashboard UI workflows. Gates: npm run typecheck PASS; npm run lint PASS; npm test sandbox run failed with EPERM on spawn/listen, rerun escalated PASS: root Vitest 796 files passed/7915 tests passed/52 skipped, frontend issue-action tests 3 files passed/32 tests passed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2223",
     "reviewedAtCommit": "85808ba802487823bc044b6d8f0da67edec601cb",
@@ -27,10 +27,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 110535,
-            "output": 112014,
-            "cacheRead": 98257963,
-            "cacheWrite": 358332
+            "input": 110539,
+            "output": 114188,
+            "cacheRead": 99867278,
+            "cacheWrite": 360330
           },
           "anthropic/claude-opus-4-8": {
             "input": 453,
@@ -88,10 +88,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 286358,
-          "output": 379537,
-          "cacheRead": 150247728,
-          "cacheWrite": 2139702
+          "input": 286362,
+          "output": 381711,
+          "cacheRead": 151857043,
+          "cacheWrite": 2141700
         },
         "anthropic/claude-opus-4-8": {
           "input": 44689,
@@ -113,8 +113,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 233.221922,
-        "pricingAsOf": "2026-07-02T13:21:07.145Z"
+        "usd": 234.964953,
+        "pricingAsOf": "2026-07-02T13:31:13.064Z"
       }
     },
     "merges": [
@@ -125,8 +125,8 @@
   "swarm": {
     "slotAssignments": []
   },
-  "created": "2026-07-02T13:20:34.104Z",
-  "updated": "2026-07-02T13:21:07.153Z",
+  "created": "2026-07-02T13:23:12.639Z",
+  "updated": "2026-07-02T13:31:13.067Z",
   "statusOverrides": {
     "tier-table-config": "completed",
     "per-issue-tier-override": "completed",
