@@ -30,7 +30,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { VBriefItem, VBriefSubItem } from '../vbrief/types.js';
+import type { VBriefDocument, VBriefEdge, VBriefItem, VBriefSubItem } from '../vbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
 import type { DeliveryResult } from './delivery.js';
@@ -187,6 +187,13 @@ export interface SupervisorReviewEvent {
   apiUrl: string;
 }
 
+export interface SupervisorVerdict {
+  /** Bead id parsed from the inspect-status notes prefix. */
+  beadId: string;
+  /** Supervisor ack clears prior blocking findings; failed/blocked records one. */
+  status: 'passed' | 'ack' | 'failed' | 'blocked';
+}
+
 export interface DeliverCommitForReviewOptions {
   /** Agent id of the standing supervisor session. */
   supervisorAgentId: string;
@@ -218,6 +225,60 @@ function resolveApiUrl(): string {
     || process.env.DASHBOARD_URL
     || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`
   );
+}
+
+/**
+ * Does the next bead depend on a bead with an unresolved supervisor block?
+ *
+ * Verdicts are interpreted chronologically: the latest verdict for each bead is
+ * authoritative. A failed/blocked verdict halts dependents until a later
+ * passed/ack verdict for that same bead records the fix commit's approval.
+ */
+export function shouldHaltDispatch(
+  verdicts: readonly SupervisorVerdict[],
+  nextBead: Pick<VBriefItem, 'id'>,
+  dag: Pick<VBriefDocument, 'plan'>,
+): boolean {
+  const latestByBead = new Map<string, SupervisorVerdict>();
+  for (const verdict of verdicts) {
+    latestByBead.set(verdict.beadId, verdict);
+  }
+
+  const unresolvedBlockedBeads = new Set<string>();
+  for (const [beadId, verdict] of latestByBead) {
+    if (verdict.status === 'failed' || verdict.status === 'blocked') {
+      unresolvedBlockedBeads.add(beadId);
+    }
+  }
+
+  if (unresolvedBlockedBeads.size === 0) return false;
+
+  for (const dependencyId of dependencyClosure(nextBead.id, dag.plan.edges ?? [])) {
+    if (unresolvedBlockedBeads.has(dependencyId)) return true;
+  }
+
+  return false;
+}
+
+function dependencyClosure(itemId: string, edges: readonly VBriefEdge[]): Set<string> {
+  const incoming = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (edge.type !== 'blocks') continue;
+    const parents = incoming.get(edge.to) ?? [];
+    parents.push(edge.from);
+    incoming.set(edge.to, parents);
+  }
+
+  const dependencies = new Set<string>();
+  const stack = [...(incoming.get(itemId) ?? [])];
+  while (stack.length > 0) {
+    const dependencyId = stack.pop()!;
+    if (dependencies.has(dependencyId)) continue;
+    dependencies.add(dependencyId);
+    stack.push(...(incoming.get(dependencyId) ?? []));
+  }
+
+  return dependencies;
 }
 
 function childItems(item: VBriefItem): VBriefSubItem[] {
