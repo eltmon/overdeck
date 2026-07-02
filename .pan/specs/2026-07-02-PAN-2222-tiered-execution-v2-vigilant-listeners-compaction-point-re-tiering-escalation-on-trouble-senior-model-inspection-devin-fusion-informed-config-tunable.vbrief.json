@@ -4,7 +4,7 @@
     "created": "2026-07-02T20:35:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2222: Tiered execution v2: vigilant listeners, compaction-point re-tiering, escalation-on-trouble, senior-model inspection (Devin-Fusion-informed, config-tunable)",
-    "updated": "2026-07-02T21:00:45.402Z"
+    "updated": "2026-07-02T21:02:35.327Z"
   },
   "plan": {
     "id": "pan-2222",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c3f8a1d2-9b4e-4c7a-8e5f-2d1b6a9c4e73",
     "author": "agent:claude-fable-5",
-    "sequence": 29,
+    "sequence": 33,
     "created": "2026-07-02T20:35:00.000Z",
-    "updated": "2026-07-02T21:00:45.402Z",
+    "updated": "2026-07-02T21:02:35.327Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2222",
@@ -105,7 +105,7 @@
             "FR-9"
           ],
           "statusReason": "slot dispatch failed: Beads database was temporarily locked while checking PAN-2222 after 3 attempts; re-run shortly.",
-          "statusUpdatedAt": "2026-07-02T21:00:45.402Z"
+          "statusUpdatedAt": "2026-07-02T21:02:13.809Z"
         },
         "narrative": {
           "Action": "Add `by_kind?: Partial<Record<VBriefItemKind, string>>` to TieredExecutionConfig and ValidatedTieredExecutionConfig in src/lib/agents/tier-table.ts (import VBriefItemKind from ../vbrief/types.js). Validate in validateTieredExecutionConfig: every key must be in the VBriefItemKind union, every value must name a configured tier; throw TieredExecutionConfigError otherwise (existing style). Carry the validated map on the returned object so it structurally reaches assignDispatchTier via spawn-prep.ts:237 (`assignDispatchTier(item, tiered, planMetadata)`) — the byKind leg already exists in resolve-tier.ts:85; no call-site edit expected, prove with a wiring test. Do NOT hardcode any default mapping (PRD D8)."
@@ -456,8 +456,8 @@
           "traces": [
             "FR-5"
           ],
-          "statusReason": "slot dispatch failed: Beads database was temporarily locked while checking PAN-2222 after 3 attempts; re-run shortly.",
-          "statusUpdatedAt": "2026-07-02T21:00:34.890Z"
+          "statusReason": "slot dispatch failed: ",
+          "statusUpdatedAt": "2026-07-02T21:02:35.327Z"
         },
         "narrative": {
           "Action": "Add a `tierOverrides` map to workspace continue.json, sibling to statusOverrides: `{ [beadId]: { effectiveDifficulty, promotions, history: [{ at, from, to, reason }] } }`. Implement `readTierOverrides(workspace)` and `recordTierPromotion(workspace, beadId, from, to, reason)` in src/lib/vbrief/io.ts (or a sibling module next to the statusOverrides writers — follow their exact read/merge/write pattern). Add an `applyEffectiveDifficulty(item, overrides)` overlay helper (in the new src/lib/agents/tier-escalation.ts module or a small sibling) that returns the item with metadata.difficulty replaced by the effective difficulty when an override exists — used by callers BEFORE resolveTier / computeTierRunSchedule; resolve-tier.ts itself stays pure and unedited. The spec on main is NEVER written (PAN-1124, hazard H4): include a test asserting the spec file's content hash is unchanged after recordTierPromotion. Export a TierOverridesMap type for the engine and reroute beads."
