@@ -223,7 +223,8 @@ export async function gcMergedSlots(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'>
+    & Partial<Pick<CoordinateSwarmSlotsDeps, 'slotWorktreeExists'>> = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
   // A freshly dispatched slot branch points at the feature branch HEAD, so
@@ -232,6 +233,7 @@ export async function gcMergedSlots(
   // the live agent and the item redispatches at the next index — the engine of
   // the PAN-1791 slot-index runaway. Never gc a slot whose session is alive.
   const sessionNames = new Set(await deps.listSessionNames());
+  const worktreeExists = deps.slotWorktreeExists ?? existsSync;
 
   for (const slot of slots) {
     if (slot.status !== 'merged') continue;
@@ -245,8 +247,27 @@ export async function gcMergedSlots(
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;
     const slotBranch = slot.branch ?? `feature/${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
 
-    await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
-    await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+    // Best-effort per step: a gc git failure must degrade to a logged action,
+    // never throw — a throw aborts the whole issue's coordination pass (gc,
+    // merge, AND dispatch), which error-looped every patrol cycle whenever a
+    // slot worktree was already gone or stubborn. The worktree must be gone
+    // before the branch delete is attempted (git refuses to delete a branch
+    // that is still checked out, a natural guard), and the assignment is only
+    // cleared once both are gone so a stuck slot stays visible to reconcile.
+    if (worktreeExists(slotWorkspace)) {
+      try {
+        await deps.runGitCommand(`git worktree remove --force ${JSON.stringify(slotWorkspace)}`, workspacePath);
+      } catch (error) {
+        actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: worktree remove failed: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+    }
+    try {
+      await deps.runGitCommand(`git branch -D ${JSON.stringify(slotBranch)}`, workspacePath);
+    } catch (error) {
+      actions.push(`[swarm] gc deferred slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: branch delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
     deps.clearSlotAssignment(workspacePath, issueId, slot.slotIndex, slot.itemId);
     actions.push(`[swarm] gc slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
   }
