@@ -161,12 +161,12 @@ export class StandingTierManager {
   }
 
   /**
-   * Route a bead to the registered slot for its tier, spawning the standing
+   * Ensure the registered slot for a tier exists, spawning the standing
    * session lazily if it does not exist yet, and return that slot's agent id.
    * Throws for a tier the schedule does not contain — the manager never
    * spawns outside the schedule.
    */
-  async dispatchBeadToTier(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
+  async ensureStandingAgentForTier(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
     if (this.firstRunIndexFor(tierName) === -1) {
       throw new StandingTierError(
         `tier '${tierName}' is not in the schedule for ${this.options.issueId}; refusing to route bead '${bead.id}'`,
@@ -188,16 +188,21 @@ export class StandingTierManager {
    * Throws while another bead is in flight; call completeBead after the
    * foreman has staged, committed, and broadcast the result.
    */
-  async dispatchBeadExclusive(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
+  async dispatchBeadToTier(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
     if (this.inFlight) {
       throw new StandingTierError(
         `bead '${this.inFlight.beadId}' is still in flight on tier '${this.inFlight.tierName}' for ${this.options.issueId}; `
         + `only one implementation agent works a bead at a time — complete it before dispatching '${bead.id}'`,
       );
     }
-    const agentId = await this.dispatchBeadToTier(tierName, bead);
+    const agentId = await this.ensureStandingAgentForTier(tierName, bead);
     this.inFlight = { beadId: bead.id, tierName, agentId };
     return agentId;
+  }
+
+  /** Backward-compatible name for callers that already spell the invariant explicitly. */
+  async dispatchBeadExclusive(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
+    return this.dispatchBeadToTier(tierName, bead);
   }
 
   /** Mark the in-flight bead complete (committed + broadcast), freeing dispatch. */
