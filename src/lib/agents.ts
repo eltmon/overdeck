@@ -84,3 +84,19 @@ export { messageAgent } from './agents/messaging.js';
 export { buildCompactRecoverySeed, resumeAgent } from './agents/resume.js';
 
 export { autoRecoverAgents, detectCrashedAgents, recoverAgent, restartAgent, type RestartAgentOptions } from './agents/recovery.js';
+export {
+  compactAtTierRunBoundary,
+  contextWindowForModel,
+  replayCrashedStandingAgent,
+  replayStandingAgent,
+  shouldReplayCompactAtTierRunBoundary,
+  type ReplayCommit,
+  type ReplayDelivery,
+  type ReplayResult,
+  type ReplayStandingTierTarget,
+  type ReplaySupervisorTarget,
+  type ReplayTarget,
+  type TierReplayDeps,
+  type TierRunCompactionInput,
+  type TierRunCompactionOptions,
+} from './agents/tier-replay.js';
