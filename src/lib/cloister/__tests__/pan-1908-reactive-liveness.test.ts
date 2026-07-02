@@ -88,6 +88,8 @@ vi.mock('../../../lib/cloister/concurrency.js', () => ({
   resetPatrolDispatchBudget: vi.fn(),
   tryReserveAdvancingSlot: () => true,
   releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   canDispatchAdvancing: () => true,
 }));
 
