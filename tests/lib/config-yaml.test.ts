@@ -207,6 +207,166 @@ api_keys:
       );
     });
 
+    it('defaults tiered execution off when no block is configured', () => {
+      const { config } = mergeConfigs();
+
+      expect(config.tieredExecution.enabled).toBe(false);
+      expect(config.tieredExecution.replay_threshold).toBe(0.5);
+      expect(config.tieredExecution.difficulty_to_tier).toEqual({});
+    });
+
+    it('normalizes a valid tiered execution config into a difficulty map and supervisor policy', () => {
+      const { config } = mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            cheap: {
+              model: 'claude-haiku-4-5',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple'],
+            },
+            standard: {
+              model: 'claude-sonnet-5',
+              harness: 'claude-code',
+              difficulties: ['medium', 'complex'],
+            },
+            premium: {
+              model: 'claude-opus-4-6',
+              harness: 'claude-code',
+              difficulties: ['expert'],
+            },
+          },
+          supervisor: {
+            model: 'claude-opus-4-6',
+            harness: 'claude-code',
+            subscribe: 'all',
+          },
+          replay_threshold: 0.75,
+        },
+      });
+
+      expect(config.tieredExecution.enabled).toBe(true);
+      expect(config.tieredExecution.replay_threshold).toBe(0.75);
+      expect(config.tieredExecution.supervisor).toEqual({
+        model: 'claude-opus-4-6',
+        harness: 'claude-code',
+        subscribe: 'all',
+      });
+      expect(config.tieredExecution.difficulty_to_tier).toEqual({
+        trivial: 'cheap',
+        simple: 'cheap',
+        medium: 'standard',
+        complex: 'standard',
+        expert: 'premium',
+      });
+    });
+
+    it('rejects tiered execution configs where a difficulty maps to zero tiers', () => {
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            cheap: {
+              model: 'claude-haiku-4-5',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple'],
+            },
+            standard: {
+              model: 'claude-sonnet-5',
+              harness: 'claude-code',
+              difficulties: ['medium', 'complex'],
+            },
+          },
+          supervisor: {
+            model: 'claude-opus-4-6',
+            harness: 'claude-code',
+            subscribe: 'flagged',
+          },
+        },
+      })).toThrow('tiered_execution difficulty "expert" maps to zero tiers');
+    });
+
+    it('rejects tiered execution configs where a difficulty maps to multiple tiers', () => {
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            cheap: {
+              model: 'claude-haiku-4-5',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple'],
+            },
+            standard: {
+              model: 'claude-sonnet-5',
+              harness: 'claude-code',
+              difficulties: ['simple', 'medium', 'complex', 'expert'],
+            },
+          },
+          supervisor: {
+            model: 'claude-opus-4-6',
+            harness: 'claude-code',
+            subscribe: 'flagged',
+          },
+        },
+      })).toThrow('tiered_execution difficulty "simple" maps to more than one tier');
+    });
+
+    it('rejects unknown tiered execution models and harnesses', () => {
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            broken: {
+              model: 'definitely-not-a-model',
+              harness: 'claude-code',
+              difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+            },
+          },
+        },
+      } as never)).toThrow('tiered_execution.tiers.broken.model references unknown model "definitely-not-a-model"');
+
+      expect(() => mergeConfigs({
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            broken: {
+              model: 'claude-haiku-4-5',
+              harness: 'pi',
+              difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+            },
+          },
+        },
+      } as never)).toThrow('tiered_execution.tiers.broken.harness must be claude-code, ohmypi, or codex');
+    });
+
+    it('rejects tiered execution entries blocked by the shared harness policy gate', () => {
+      expect(() => mergeConfigs({
+        models: {
+          providers: {
+            anthropic: {
+              enabled: true,
+              auth: 'subscription',
+            },
+          },
+        },
+        tiered_execution: {
+          enabled: true,
+          tiers: {
+            blocked: {
+              model: 'claude-haiku-4-5',
+              harness: 'ohmypi',
+              difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+            },
+          },
+          supervisor: {
+            model: 'claude-sonnet-5',
+            harness: 'claude-code',
+            subscribe: 'sampled',
+          },
+        },
+      })).toThrow('ohmypi cannot run Anthropic models when authenticated via Claude Code subscription');
+    });
+
     it('normalizes low-cost registry classification config', () => {
       expect(mergeConfigs().config.registry.classification).toEqual({
         enabled: true,
