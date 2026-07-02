@@ -33,6 +33,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
+import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 
 import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -112,6 +113,18 @@ export interface CompletePlanningAutoSpawnResult {
 
 type CompletePlanningPhase = 'prdGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+const completePlanningGuard = createInFlightGuard();
+
+export function beginCompletePlanningLease(issueId: string): { started: boolean; release: () => void } {
+  const key = issueId.toLowerCase();
+  let release!: () => void;
+  const lease = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = completePlanningGuard.run(key, () => lease);
+  return { started, release: started ? release : () => undefined };
+}
 
 function emitCompletePlanningPhase(
   issueId: string,
@@ -1310,10 +1323,21 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     }
     const sessionName = `planning-${id.toLowerCase()}`;
     const issueLower = id.toLowerCase();
+    const completePlanningLease = beginCompletePlanningLease(id);
+    if (!completePlanningLease.started) {
+      console.log(`[complete-planning] ${id} already has an in-flight finalize; returning in-flight status`);
+      return jsonResponse({
+        success: true,
+        issueId: id,
+        inFlight: true,
+        message: 'Planning completion is already in progress for this issue',
+      }, { status: 202 });
+    }
 
-    console.log(autoSpawn
-      ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
-      : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
+    try {
+      console.log(autoSpawn
+        ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
+        : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
 
     // A planning agent waiting for an operator answer is NOT done. Real callers
     // are pan plan finalize, pan plan done, the PlanDialog Done button, and the
@@ -1581,19 +1605,22 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
     });
 
-    return jsonResponse({
-      success: true,
-      issueId: id,
-      newState,
-      gitPushed,
-      ...(beadsWarning ? { beadsWarning } : {}),
-      ...(autoSpawnResult ?? {}),
-      message: autoSpawnResult?.workAgentSpawned
-        ? 'Planning complete and work agent spawn requested'
-        : gitPushed
-          ? 'Planning complete and pushed to git - ready for execution'
-          : 'Planning complete - ready for execution',
-    });
+      return jsonResponse({
+        success: true,
+        issueId: id,
+        newState,
+        gitPushed,
+        ...(beadsWarning ? { beadsWarning } : {}),
+        ...(autoSpawnResult ?? {}),
+        message: autoSpawnResult?.workAgentSpawned
+          ? 'Planning complete and work agent spawn requested'
+          : gitPushed
+            ? 'Planning complete and pushed to git - ready for execution'
+            : 'Planning complete - ready for execution',
+      });
+    } finally {
+      completePlanningLease.release();
+    }
   })),
 );
 

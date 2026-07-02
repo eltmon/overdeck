@@ -43,4 +43,3 @@
 1205 src/lib/sync.ts
 1258 src/lib/tmux.ts
 1095 src/lib/vbrief/dag.ts
-1736 src/lib/workspace-manager.ts
