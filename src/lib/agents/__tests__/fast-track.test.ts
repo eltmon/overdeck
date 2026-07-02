@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupFastTrack } from '../fast-track.js';
+import { escalateFastTrackItem, groupFastTrack, isFastTrackAutoMergeAllowed } from '../fast-track.js';
 import type { VBriefItem, VBriefItemMetadata } from '../../vbrief/types.js';
 
 let counter = 0;
@@ -82,5 +82,38 @@ describe('groupFastTrack', () => {
     const grouping = groupFastTrack([a, b], { maxScopeFiles: 4 });
     expect(grouping.batches).toHaveLength(1);
     expect(grouping.batches[0].items.map(i => i.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('escalateFastTrackItem', () => {
+  function makeBatch() {
+    return groupFastTrack([trivial(['docs/a.md'], 'a'), trivial(['docs/b.md'], 'b'), trivial(['docs/c.md'], 'c')]).batches[0];
+  }
+
+  it('removes a mid-flight non-trivial item from its batch and routes it to the standard path', () => {
+    const batch = makeBatch();
+    const { escalation, remaining } = escalateFastTrackItem(batch, 'b', 'verify-failed', 'typecheck exploded');
+
+    expect(remaining.items.map(i => i.id)).toEqual(['a', 'c']);
+    expect(remaining.fastTrackBatchKey).toBe(batch.fastTrackBatchKey);
+    expect(escalation.itemId).toBe('b');
+    expect(escalation.fromBatchKey).toBe(batch.fastTrackBatchKey);
+    expect(escalation.reason).toBe('verify-failed');
+    expect(escalation.requiresFullReview).toBe(true);
+  });
+
+  it('marks escalated items as full-review and the auto-merge path refuses them', () => {
+    const batch = makeBatch();
+    const { escalation } = escalateFastTrackItem(batch, 'c', 'diff-exceeds-threshold');
+
+    expect(escalation.requiresFullReview).toBe(true);
+    expect(escalation.autoMergeEligible).toBe(false);
+    expect(isFastTrackAutoMergeAllowed('c', [escalation])).toBe(false);
+    expect(isFastTrackAutoMergeAllowed('a', [escalation])).toBe(true);
+  });
+
+  it('throws when escalating an item that is not in the batch', () => {
+    const batch = makeBatch();
+    expect(() => escalateFastTrackItem(batch, 'nope', 'verify-failed')).toThrow(/not in fast-track batch/);
   });
 });
