@@ -36,6 +36,7 @@ import {
   getCostSummary,
   type CostAlert,
 } from './cost-monitor.js';
+import { reconcilePiCostEventsForRunningAgents } from './pi-cost-reconciler.js';
 import {
   checkAndRotateIfNeeded,
   type SessionRotationResult,
@@ -63,7 +64,6 @@ import { sessionExists, killSession } from '../tmux.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { CostDoorLive, CostWriter } from '../overdeck/cost.js';
 
 const execAsync = promisify(exec);
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -1125,12 +1125,7 @@ export class CloisterService {
       // Check for FPP violations (Phase 6)
       this.checkFPPViolations(agentIds);
 
-      // ohmypi does not run the Claude Code PostToolUse cost hook. Reconcile its
-      // per-message JSONL usage before cost alerts so running ohmypi/kimi agents
-      // are visible to the same DB-backed spend checks.
-      if (runningAgents.some((agent) => getAgentStateSync(agent.id)?.harness === 'ohmypi')) {
-        await this.reconcilePiCostEvents();
-      }
+      await reconcilePiCostEventsForRunningAgents(runningAgents);
 
       // Check cost limits (Phase 6)
       this.checkCostAlerts(agentIds);
@@ -1623,18 +1618,6 @@ export class CloisterService {
           );
         }
       }
-    }
-  }
-
-  private async reconcilePiCostEvents(): Promise<void> {
-    try {
-      await Effect.runPromise(
-        CostWriter.use((writer) => writer.reconcile({ source: 'ohmypi' })).pipe(
-          Effect.provide(CostDoorLive),
-        ),
-      );
-    } catch (error) {
-      console.warn('[cloister] ohmypi cost reconcile failed:', error instanceof Error ? error.message : String(error));
     }
   }
 
