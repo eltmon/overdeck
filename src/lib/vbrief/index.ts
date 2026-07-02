@@ -19,6 +19,7 @@ export type {
   VBriefItemStatus,
   VBriefPriority,
   VBriefDifficulty,
+  VBriefItemKind,
 } from './types.js';
 
 // Date helpers
