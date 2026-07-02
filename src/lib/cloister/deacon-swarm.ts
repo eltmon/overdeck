@@ -26,6 +26,7 @@ import {
 } from '../vbrief/dag.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { getConcurrencyLimits, releaseSwarmSlot, tryReserveSwarmSlot } from './concurrency.js';
 import { listFeatureWorkspaces, type FeatureWorkspace } from './deacon-workspaces.js';
 
@@ -85,6 +86,8 @@ export interface CoordinateSwarmSlotsDeps {
   tryReserveSwarmSlot: () => boolean;
   releaseSwarmSlot: () => void;
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
+  /** Per-issue operator hold: stuck / deaconIgnored suppress all swarm coordination (PAN-2214). */
+  getIssueHold?: (issueId: string) => Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null;
 }
 
 const defaultDeps: CoordinateSwarmSlotsDeps = {
@@ -121,7 +124,16 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   tryReserveSwarmSlot,
   releaseSwarmSlot,
   spawnRun,
+  getIssueHold: defaultGetIssueHold,
 };
+
+function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'deaconIgnored'> | null {
+  try {
+    return getReviewStatusSync(issueId);
+  } catch {
+    return null;
+  }
+}
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled';
 
@@ -163,6 +175,11 @@ export async function coordinateSwarmSlots(
   for (const workspace of deps.listFeatureWorkspaces()) {
     const issueId = workspace.issueId.toUpperCase();
     if (filterIssueId && issueId !== filterIssueId) continue;
+    const hold = (deps.getIssueHold ?? defaultGetIssueHold)(issueId);
+    if (hold?.stuck || hold?.deaconIgnored) {
+      actions.push(`[swarm] skipped ${issueId}: ${hold.deaconIgnored ? 'deacon-ignored' : 'stuck'} — operator hold`);
+      continue;
+    }
     if (isSwarmAdvanceCoolingDown(issueId)) {
       actions.push(`[swarm] deferred ${issueId}: advance backoff active`);
       continue;
