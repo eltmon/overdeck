@@ -1,0 +1,988 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-02T20:35:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2222: Tiered execution v2: vigilant listeners, compaction-point re-tiering, escalation-on-trouble, senior-model inspection (Devin-Fusion-informed, config-tunable)"
+  },
+  "plan": {
+    "id": "pan-2222",
+    "title": "Tiered execution v2: vigilant listeners, compaction-point re-tiering, escalation-on-trouble, senior-model inspection (Devin-Fusion-informed, config-tunable)",
+    "status": "proposed",
+    "uid": "c3f8a1d2-9b4e-4c7a-8e5f-2d1b6a9c4e73",
+    "author": "agent:claude-fable-5",
+    "sequence": 1,
+    "created": "2026-07-02T20:35:00.000Z",
+    "updated": "2026-07-02T20:35:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2222",
+        "label": "PAN-2222",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/.pan/drafts/PAN-2222.md",
+        "label": "PRD (authoritative design: D1-D10, FR-1..FR-9, NFR-1..NFR-4)",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/2223",
+        "label": "PAN-1791 tiered-execution library layer (merged prerequisite)",
+        "type": "pr"
+      },
+      {
+        "uri": "https://cognition.com/blog/devin-fusion",
+        "label": "Devin Fusion (external influence)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "tiered-execution",
+      "agents",
+      "config",
+      "supervision",
+      "devin-fusion"
+    ],
+    "narratives": {
+      "Problem": "PAN-1791 landed the tiered-execution library layer, but five gaps remain: (1) standing-tier listeners are ordered into total silence and cannot flag a wrong commit; (2) the commit feed ships raw git show (up to 16MB, lockfiles included) to every tier with zero noise filtering; (3) replay/compaction respawns onto the tier captured at spawn time, wasting the one moment a model switch is free (the cache miss is already paid); (4) a mislabeled-difficulty bead fails cheaply and repeatedly with no promotion path; (5) pan inspect spawns a cold ephemeral specialist while the warm standing supervisor sits idle, and the byKind resolution leg has no config surface so kind-based routing is unreachable.",
+      "Proposal": "Layer five config-gated capabilities on the PAN-1791 library, per the PRD at .pan/drafts/PAN-2222.md (decisions D1-D10 are settled there; do not re-litigate): a minimal subtractive feed noise filter with one shared diff renderer for live+replay byte-parity (FR-1); a vigilant-listener call-out clause in the feed prompt (FR-2) with a policy-adjudicated POST /api/tiered/callouts endpoint (FR-3, notify|corroborate, never blocking); a deterministic escalation engine promoting effective difficulty one ladder step on defined triggers with retries_at_tier/max_promotions (FR-4), state in workspace continue.json tierOverrides (FR-5, PAN-1124-safe); compaction/crash-replay re-tiering that re-resolves against current config + promotions and decommissions unneeded sessions (FR-6); supervisor-owned inspection routing pan inspect to the warm standing supervisor, fail-loud with no silent ephemeral fallback (FR-7); and by_kind as real validated config (FR-8). Every new knob defaults to current behavior, locked by an extended parity suite (FR-9, NFR-1). Library seams + config + one route only; foreman-loop consumption stays PAN-2203-gated.",
+      "NonGoals": "- Listeners implementing, self-assigning, or halting the line directly (call-outs are flags; only a supervisor BLOCKED verdict blocks)\n- In-session model switching — switching happens only via replay respawn (PAN-1787 fresh-session invariant)\n- Per-tier relevance-filtered delivery (superseded by broadcast + minimal noise filter, PRD D1)\n- Backward-movement/branch-reset floundering detection (needs monitor infra; file separately when the foreman loop exists)\n- Demotion (routing a bead DOWN after success) — revisit with pilot data\n- Runtime foreman-loop wiring (PAN-2203-gated, PRD D10)\n- Hardcoded by_kind defaults or any hardcoded model fallback (docs recommendation only, PRD D8)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treated PRD D1-D10 as settled design; asked no interactive questions.",
+        "rationale": "The operator-authored PRD (commit e7f0c86fbb) explicitly says decisions are made in-doc and must not be re-litigated during planning; auto mode requires defensible defaults and the PRD is the most authoritative input available."
+      },
+      {
+        "summary": "No prerequisite measurement bead added.",
+        "rationale": "PRD §8 makes tier-measurement a prerequisite only if it did not merge with PR #2223; verified src/lib/agents/tier-metrics.ts (delivery stamping, warm-hit fractions, cost roles) is present in the worktree, so the condition is not met."
+      },
+      {
+        "summary": "Split PRD WI-2's config validation into its own bead (new-config-blocks-validation) also covering the escalation config block, and split PRD WI-6 into pure engine vs trigger wiring.",
+        "rationale": "Three beads consume the feed config and the engine's ValidatedEscalationConfig; a standalone validation bead unblocks them independently. The specialists.ts wiring carries churn risk (PRD checkpoint) and reviews independently from the pure decision engine."
+      },
+      {
+        "summary": "Resolved both PRD implementation checkpoints at planning time: the specialists.ts failed-verdict region ('Extract beadId from notes') exists at specialists.ts:515, and listSlotOwnership(issueId, workspace) is unchanged on origin/main after PAN-2214 merged.",
+        "rationale": "Verified by grep against the worktree and git show origin/main; recorded as hazards H1/H2 with the PRD's stated fallbacks so the work agent re-verifies after syncing main."
+      },
+      {
+        "summary": "Marked feed-noise-filter and escalation-state requiresInspection: true (fast); all other beads false.",
+        "rationale": "The shared diff renderer is a cross-cutting contract that feed-callout-prompt and the parity suite encode assumptions about (byte-parity NFR-2); tierOverrides is a cross-cutting state schema consumed by the engine, wiring, and compaction-reroute. Everything else is leaf work verified by named tests and the parity suite."
+      }
+    ],
+    "items": [
+      {
+        "id": "by-kind-config",
+        "title": "Make by_kind real validated config reaching the resolution chain (WI-1)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts",
+            "src/lib/agents/__tests__/resolve-tier.test.ts",
+            "src/lib/config-yaml/schema.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-table.test.ts src/lib/agents/__tests__/resolve-tier.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-table and resolve-tier suites pass including new by_kind cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `by_kind?: Partial<Record<VBriefItemKind, string>>` to TieredExecutionConfig and ValidatedTieredExecutionConfig in src/lib/agents/tier-table.ts (import VBriefItemKind from ../vbrief/types.js). Validate in validateTieredExecutionConfig: every key must be in the VBriefItemKind union, every value must name a configured tier; throw TieredExecutionConfigError otherwise (existing style). Carry the validated map on the returned object so it structurally reaches assignDispatchTier via spawn-prep.ts:237 (`assignDispatchTier(item, tiered, planMetadata)`) — the byKind leg already exists in resolve-tier.ts:85; no call-site edit expected, prove with a wiring test. Do NOT hardcode any default mapping (PRD D8)."
+        },
+        "items": [
+          {
+            "id": "by-kind-config.ac1",
+            "title": "Given config `by_kind: { design: 'senior' }`, resolution routes a `kind: 'design'`, `difficulty: 'simple'` item to tier `senior` ahead of its difficulty tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "by-kind-config.ac2",
+            "title": "validateTieredExecutionConfig rejects an unknown kind key or a by_kind value naming a non-existent tier with TieredExecutionConfigError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "by-kind-config.ac3",
+            "title": "A wiring test passes proving config-sourced by_kind reaches assignDispatchTier through the validated config object with zero spawn-prep call-site changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "by-kind-config.ac4",
+            "title": "With by_kind absent, resolution returns output identical to today's for the same inputs (defaults preserve current behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-config-blocks-validation",
+        "title": "Validate the new feed and escalation config blocks fail-loud (WI-2/WI-6 config surface)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts",
+            "src/lib/config-yaml/schema.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-table.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-table suite passes including new feed/escalation validation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the `feed` block (`callouts: 'off' | 'notify' | 'corroborate'` default 'off'; `exclude: string[]`; `exclude_subjects: string[]`; `max_diff_bytes: number | null` default null) and the `escalation` block (`enabled: boolean` default false; `retries_at_tier: number`; `max_promotions: number`; `flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>`) to TieredExecutionConfig / ValidatedTieredExecutionConfig in src/lib/agents/tier-table.ts, mirrored in src/lib/config-yaml/schema.ts. Validate in validateTieredExecutionConfig following the existing TieredExecutionConfigError style: unknown callouts policy strings rejected; max_diff_bytes must be a positive integer when set; flounder budget keys must be known difficulties and values positive; retries_at_tier/max_promotions non-negative integers. All fields optional with defaults reproducing current behavior (PRD D9). Export a ValidatedEscalationConfig type for the engine bead to consume."
+        },
+        "items": [
+          {
+            "id": "new-config-blocks-validation.ac1",
+            "title": "validateTieredExecutionConfig accepts a config with feed and escalation blocks fully populated and returns them on the validated object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-config-blocks-validation.ac2",
+            "title": "Validation rejects an unknown feed.callouts policy string, a non-positive feed.max_diff_bytes, and an unknown difficulty key in escalation.flounder_budget_minutes, each with TieredExecutionConfigError naming the offending field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-config-blocks-validation.ac3",
+            "title": "A config omitting both new blocks validates successfully and yields defaults (callouts 'off', no excludes, max_diff_bytes null, escalation disabled) — existing tier-table tests pass unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-noise-filter",
+        "title": "Shared feed diff renderer with exclude pathspecs, subject skip, and size cap (WI-2)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "feed-callout-prompt",
+            "parity-lock-extension"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-feed.ts",
+            "src/lib/agents/tier-replay.ts",
+            "src/lib/agents/__tests__/tier-feed.test.ts",
+            "src/lib/agents/__tests__/tier-replay.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-feed.test.ts src/lib/agents/__tests__/tier-replay.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-feed and tier-replay suites pass including live-vs-replay byte-equality under a filtering config",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement ONE shared `renderCommitFeedDiff(workspace, sha, feedConfig)` in src/lib/agents/tier-feed.ts using the existing execAsync pattern: excluded globs dropped git-natively via `git show <sha> -- . ':(exclude)<glob>'...`; when the rendered diff exceeds feed.max_diff_bytes, replace it with `git show --stat <sha>` output plus an explicit truncation note naming the byte size and the config knob. In broadcastCommit, skip commits entirely (zero deliveries) when the subject matches a feed.exclude_subjects prefix. Update src/lib/agents/tier-replay.ts (loadReplayCommits / the feed replay path) to call the SAME renderer and apply the SAME subject skip — do not implement filtering twice (PRD D2, hazard H3). Defaults (no excludes, null cap) must render byte-identical output to today's raw git show. No execSync anywhere."
+        },
+        "items": [
+          {
+            "id": "feed-noise-filter.ac1",
+            "title": "With feed.exclude ['bun.lock'], a commit touching bun.lock and src/x.ts produces a feed message containing the src/x.ts hunks and no bun.lock hunks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-noise-filter.ac2",
+            "title": "With exclude_subjects ['chore(beads):'], a matching commit produces zero feed deliveries live, and replay skips it identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-noise-filter.ac3",
+            "title": "A diff exceeding max_diff_bytes produces a message containing git show --stat output plus a truncation note naming the byte size and knob",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-noise-filter.ac4",
+            "title": "Replay produces feed messages byte-identical to live ones under the same filtering config (NFR-2), proven by a live-vs-replay equality test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-noise-filter.ac5",
+            "title": "With all feed knobs at defaults, the renderer produces output byte-identical to today's raw git show for the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-callout-prompt",
+        "title": "Vigilant-listener call-out clause in the feed message (WI-3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-feed.ts",
+            "src/lib/agents/tier-replay.ts",
+            "src/lib/agents/__tests__/tier-feed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-feed.test.ts src/lib/agents/__tests__/tier-replay.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-feed suite passes including callouts-off byte-parity and callouts-on clause presence",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Grow composeCommitFeedMessage (src/lib/agents/tier-feed.ts:63) to `composeCommitFeedMessage(sha, beadTitle, diff, callout?: { apiUrl, issueId, tierName, agentId })` — an OPTIONAL argument so every existing call site and replay stays byte-compatible when callouts are off (hazard H6). When feed.callouts is 'notify' or 'corroborate', broadcastCommit threads the callout context and the message gains the exact clause in PRD §5.2: stay silent by default; at most ONE call-out via the documented curl POST to <apiUrl>/api/tiered/callouts with {issueId, sha, tierName, agentId, claim}; 'Do not fix it yourself. Do not edit files. A call-out is a flag, not a task.' Replay (src/lib/agents/tier-replay.ts) threads the same callout context so replayed messages stay byte-identical to live ones (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "feed-callout-prompt.ac1",
+            "title": "With feed.callouts 'off', composeCommitFeedMessage produces output byte-identical to the pre-change message for the same inputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-callout-prompt.ac2",
+            "title": "With feed.callouts 'notify', the message contains the call-out clause, the /api/tiered/callouts endpoint URL, and the phrase limiting the listener to at most one call-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-callout-prompt.ac3",
+            "title": "With callouts enabled, replay produces messages byte-identical to the live ones (the same callout context is threaded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "callout-endpoint",
+        "title": "POST /api/tiered/callouts route with notify/corroborate policy (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/tiered-callouts.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/tiered-callouts.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new route suite passes: notify records without supervisor delivery, corroborate triggers exactly one deliverCommitForReview, disabled-issue rejected",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a new small Effect-style route module in src/dashboard/server/routes/ (follow an existing small route module's shape; register it in the server route composition). POST /api/tiered/callouts accepts { issueId, sha, beadId?, tierName, agentId, claim }; validates the body; verifies tiered execution is enabled for the issue via resolveTieredExecutionEnabled + validated config (reject with 404/409 otherwise); records the call-out (event log + review-status note); then applies the configured feed.callouts policy: 'notify' -> record + surface (activity/TTS event, feedback line to the foreman session via deliverAgentMessage); 'corroborate' -> additionally trigger exactly one deliverCommitForReview for that sha to the standing supervisor regardless of its subscription policy. A call-out NEVER mutates dispatch state, never blocks, never edits tracker status (PRD D3). Seams (event recording, deliverAgentMessage, deliverCommitForReview) must be injectable for tests. NO execSync — this is dashboard-server-reachable code (hazard H5)."
+        },
+        "items": [
+          {
+            "id": "callout-endpoint.ac1",
+            "title": "A POST under policy 'notify' records the call-out and sends zero supervisor deliveries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "callout-endpoint.ac2",
+            "title": "A POST under policy 'corroborate' records the call-out and sends exactly one deliverCommitForReview for the named sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "callout-endpoint.ac3",
+            "title": "The endpoint rejects requests for an issue without tiered execution enabled (4xx) and rejects a malformed body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "callout-endpoint.ac4",
+            "title": "Every policy path preserves dispatch state, review verdicts, and tracker status untouched — asserted via the injected seams receiving no such calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalation-state",
+        "title": "tierOverrides effective-difficulty state in workspace continue.json (WI-5)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "escalation-engine",
+            "escalation-trigger-wiring",
+            "compaction-reroute"
+          ],
+          "files_scope": [
+            "src/lib/vbrief/io.ts",
+            "src/lib/agents/tier-escalation.ts",
+            "src/lib/vbrief/__tests__/continue-state.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/vbrief/__tests__/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vbrief io suites pass including tierOverrides round-trip and spec-untouched assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a `tierOverrides` map to workspace continue.json, sibling to statusOverrides: `{ [beadId]: { effectiveDifficulty, promotions, history: [{ at, from, to, reason }] } }`. Implement `readTierOverrides(workspace)` and `recordTierPromotion(workspace, beadId, from, to, reason)` in src/lib/vbrief/io.ts (or a sibling module next to the statusOverrides writers — follow their exact read/merge/write pattern). Add an `applyEffectiveDifficulty(item, overrides)` overlay helper (in the new src/lib/agents/tier-escalation.ts module or a small sibling) that returns the item with metadata.difficulty replaced by the effective difficulty when an override exists — used by callers BEFORE resolveTier / computeTierRunSchedule; resolve-tier.ts itself stays pure and unedited. The spec on main is NEVER written (PAN-1124, hazard H4): include a test asserting the spec file's content hash is unchanged after recordTierPromotion. Export a TierOverridesMap type for the engine and reroute beads."
+        },
+        "items": [
+          {
+            "id": "escalation-state.ac1",
+            "title": "After recordTierPromotion, readTierOverrides returns the updated effectiveDifficulty, incremented promotions, and an appended history entry (round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-state.ac2",
+            "title": "recordTierPromotion preserves the spec file on main byte-for-byte — a test asserts its content hash is unchanged after the write (PAN-1124)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-state.ac3",
+            "title": "applyEffectiveDifficulty overlays the promoted difficulty so resolveTier resolves to the promoted tier, while an item without an override resolves unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalation-engine",
+        "title": "Pure deterministic escalation decision engine + floundering predicate (WI-6a)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-escalation.ts",
+            "src/lib/agents/__tests__/tier-escalation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-escalation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-escalation decision-table suite passes with no timer usage",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/tier-escalation.ts per PRD §5.3: `decideEscalation(trigger, bead, config, overrides) -> { action: 'retry', attempt } | { action: 'promote', from, to, reason } | { action: 'block', reason }` implementing D4's ladder over TIERED_EXECUTION_DIFFICULTIES (tier-table.ts:10). Trigger types: supervisor-blocked { beadId, sha }, verification-failed { beadId, detail }, floundering { beadId, dispatchedAt, now }. Rules: retry while attempts at the current tier < retries_at_tier; promote exactly ONE difficulty step when retries are exhausted; block when max_promotions is reached; an 'expert' bead always blocks (cannot promote past the top). `isFloundering(dispatchedAtIso, nowIso, budgetMinutes)` is a PURE timestamp predicate — active only when a budget is configured for the bead's effective difficulty; tests pass fixed ISO strings and need NO timers (hazard H8: any delay-based test that does appear must use fake timers). The engine only EMITS decisions; the router/foreman acts — mirror fast-track.ts's 'this module only emits the signal' contract. No model literals anywhere (hazard H7)."
+        },
+        "items": [
+          {
+            "id": "escalation-engine.ac1",
+            "title": "Decision table: a first trigger under retries_at_tier 2 returns { action: 'retry' }; the trigger after retries are exhausted returns promote with `to` exactly one difficulty step up the ladder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-engine.ac2",
+            "title": "The engine returns { action: 'block' } when max_promotions is already reached and for any 'expert' effective-difficulty bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-engine.ac3",
+            "title": "isFloundering returns false for a difficulty with no configured budget regardless of elapsed time, and true only when elapsed minutes exceed the configured budget — tested with fixed timestamps, zero timer APIs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-engine.ac4",
+            "title": "decideEscalation returns identical outputs for identical inputs and performs no I/O (no fs/network imports in the module)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalation-trigger-wiring",
+        "title": "Wire escalation triggers: supervisor BLOCKED verdict + foreman seams (WI-6b)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/lib/agents/tier-escalation.ts",
+            "src/lib/agents/__tests__/tier-escalation.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-escalation.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "escalation wiring tests pass: BLOCKED verdict with bead prefix invokes the engine only when tiered+escalation enabled",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire trigger (a): in src/dashboard/server/routes/specialists.ts, in the failed-verdict-with-bead-prefix region (search 'Extract beadId from notes', currently :515) — when the issue has tiered execution AND escalation enabled, invoke the escalation engine seam with a supervisor-blocked trigger and record the resulting promotion via recordTierPromotion (retry/block results are recorded as events only; nothing here dispatches). IMPLEMENTATION CHECKPOINT (hazard H2): this file churns; if the region moved into a service module, wire the engine there instead; fallback — expose the engine call as an exported hook invoked from wherever update.inspectStatus is set to 'failed'. Wire triggers (b)+(c) as exported seams for the PAN-2203 foreman loop: a function accepting runVerificationForIssue's failure result attributed to the in-flight bead, and the pure isFloundering predicate — no timers, no loop code here (PRD D10). Escalation disabled (default) must leave the specialists route behavior byte-identical."
+        },
+        "items": [
+          {
+            "id": "escalation-trigger-wiring.ac1",
+            "title": "A failed inspect verdict with a 'Bead <id>' prefix on a tiered+escalation-enabled issue invokes decideEscalation and persists a promote result via recordTierPromotion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-trigger-wiring.ac2",
+            "title": "With escalation disabled or tiered execution off, the failed-verdict path preserves today's behavior: zero engine calls and zero tierOverrides writes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-trigger-wiring.ac3",
+            "title": "Each exported seam (verification-failure, floundering) returns the engine's decision to the caller and runs without any foreman loop present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "compaction-reroute",
+        "title": "Compaction/crash-replay re-tiering with decommission (WI-7)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-replay.ts",
+            "src/lib/agents/standing-tiers.ts",
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-replay.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-replay.test.ts src/lib/agents/__tests__/standing-tiers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tier-replay suite passes: reroute-off parity, decommission-null, current-config respawn, crash-path gate",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `compaction_reroute: 'off' | 'on'` (default 'off') to TieredExecutionConfig + validation. With 'on', compactAtTierRunBoundary (tier-replay.ts:145) and replayCrashedStandingAgent gain a re-resolution gate BEFORE respawn per PRD §5.4: compute remaining items (not completed per statusOverrides, with tierOverrides effective difficulties applied via applyEffectiveDifficulty), run computeTierRunSchedule (standing-tiers.ts:47) over them against the freshly validated CURRENT config; if the target tier no longer appears in the schedule, return null and spawn nothing (decommission); otherwise respawn using the tier's current (model, harness) from current config — picking up both escalation promotions and mid-run operator tuning (PRD D6). Extend ReplayTarget/options with injectable inputs (doc, statusOverrides, tierOverrides, current config) as seams; export a remainingItems helper from standing-tiers.ts or accept pre-filtered items. With 'off' (default), behavior is exactly today's replayStandingAgent — existing tests must pass untouched. NOTE hazard H1: sync main first; listSlotOwnership (slot-reconcile.js) was verified unchanged after PAN-2214, but re-verify after sync; fallback per PRD — resolveReplaySlot's explicit slotIndex/slotItemId inputs."
+        },
+        "items": [
+          {
+            "id": "compaction-reroute.ac1",
+            "title": "With reroute 'off', the existing tier-replay suite passes unmodified — replay behavior preserves today's exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compaction-reroute.ac2",
+            "title": "With reroute 'on' and the target tier absent from the recomputed remaining schedule, replay returns null and spawns no session (compaction AND crash paths)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compaction-reroute.ac3",
+            "title": "With the tier's model changed in config between spawn and replay, replay spawns the agent with the NEW model from the freshly validated config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compaction-reroute.ac4",
+            "title": "The recomputed remaining schedule routes a tierOverrides-promoted bead by its effective difficulty, changing decommission/respawn decisions accordingly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-owns-inspection",
+        "title": "Route pan inspect to the warm standing supervisor when owns_inspection is on (WI-8)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/inspect-agent.ts",
+            "src/lib/agents/tier-table.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/agents/__tests__/tier-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/tier-supervisor.test.ts src/lib/agents/__tests__/tier-table.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "routing tests pass: supervisor delivery with zero ephemeral spawns when on, loud failure with no fallback, ephemeral parity when off",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `supervisor.owns_inspection: boolean` (default false) to the supervisor config block + validation in tier-table.ts and config-yaml/schema.ts. Add a routing gate at the top of spawnInspectAgent (src/lib/cloister/inspect-agent.ts) per PRD §5.5: resolve the issue's tiered-execution state (resolveTieredExecutionEnabled, tier-table.ts:67, + validated config); if enabled AND owns_inspection — resolve supervisorAgentId(issueId) (tier-supervisor.ts:55), ensure the session is alive (spawn via spawnTierSupervisor if not), and deliver the inspection via deliverCommitForReview with the bead's item, sha (from the existing getDiffBase machinery inspect.ts already imports), and PRD markdown (loadPrdDraft). If the supervisor spawn fails, FAIL LOUDLY — never silently fall back to the ephemeral path while the flag is on (PRD D7, no-bandaids). The verdict path is unchanged: the supervisor already posts 'Bead <id>'-prefixed verdicts to /api/specialists/done driving update.inspectStatus and onInspectComplete. Flag off (default): the ephemeral inspect specialist path must be byte-identical to today's. Test with injected seams; new routing tests may live in a new inspect-agent routing test file if none exists."
+        },
+        "items": [
+          {
+            "id": "supervisor-owns-inspection.ac1",
+            "title": "With owns_inspection true and a live supervisor, an inspect request produces exactly one deliverCommitForReview and zero ephemeral inspect spawns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-owns-inspection.ac2",
+            "title": "With owns_inspection true and the supervisor dead, spawnTierSupervisor runs first, then the delivery fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-owns-inspection.ac3",
+            "title": "A supervisor spawn failure surfaces a loud error and spawns NO ephemeral inspector (no silent fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-owns-inspection.ac4",
+            "title": "With owns_inspection false (default) or tiered execution disabled, the inspect flow spawns the ephemeral specialist exactly as today (parity preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parity-lock-extension",
+        "title": "Extend the parity suite: enabled-with-default-knobs equals post-PAN-1791 baseline (WI-9)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+            "src/lib/agents/__tests__/tier-feed.test.ts",
+            "src/lib/agents/__tests__/tier-replay.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "full agents test directory passes including the extended parity assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/agents/__tests__/tiered-execution-disabled.test.ts (and siblings where the fixture already lives) with the D9 lock: with tiered_execution.enabled true but EVERY new knob at its default (callouts off, no excludes, max_diff_bytes null, escalation disabled, compaction_reroute off, owns_inspection false, by_kind absent) — feed messages are byte-identical to the post-PAN-1791 baseline, replay respawn behavior is identical, the inspect path remains ephemeral, no tierOverrides state is written, and by_kind has no effect on routing. Also assert the fully-disabled parity suite stays green. This bead adds tests only; if a parity test fails, the fix belongs in the offending feature bead, not in the test."
+        },
+        "items": [
+          {
+            "id": "parity-lock-extension.ac1",
+            "title": "A new parity test passes asserting that with enabled: true and all new knobs at defaults, feed messages and replay deliveries stay byte-identical to the post-PAN-1791 baseline fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-lock-extension.ac2",
+            "title": "With all new knobs at defaults, an inspect request spawns the ephemeral inspector, no tierOverrides state persists, and routing preserves by_kind-free behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-lock-extension.ac3",
+            "title": "The pre-existing fully-disabled parity suite still passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-tiered-execution",
+        "title": "Document every new knob, the call-out contract, escalation ladder, reroute rule, and by_kind recommendation (WI-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T20:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including docs/skills checks) completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/TIERED-EXECUTION.md to document the complete config surface from PRD §5.1 (feed.callouts/exclude/exclude_subjects/max_diff_bytes, escalation.enabled/retries_at_tier/max_promotions/flounder_budget_minutes, compaction_reroute, supervisor.owns_inspection, by_kind), the call-out contract (flag not task; policy adjudicates; never blocks), the escalation ladder with a worked example (retry -> promote one step -> block at max_promotions/expert), the compaction-reroute decommission/respawn rule, supervisor-owned inspection, and the RECOMMENDED (never hardcoded — no-hardcoded-model-fallback rule) `by_kind: { design: <top-tier>, spike: <top-tier> }` routing with the Devin Fusion 'judgment is the deliverable' rationale. State explicitly that every knob defaults to current behavior."
+        },
+        "items": [
+          {
+            "id": "docs-tiered-execution.ac1",
+            "title": "docs/TIERED-EXECUTION.md contains an entry for every knob in the PRD §5.1 config surface stating its default and effect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tiered-execution.ac2",
+            "title": "The doc shows by_kind design/spike -> top tier as a recommendation with the Devin Fusion rationale (never a default) and states every knob defaults to current behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tiered-execution.ac3",
+            "title": "npm run lint (docs/skills checks) passes with the doc changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "by-kind-config",
+        "to": "new-config-blocks-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "new-config-blocks-validation",
+        "to": "feed-noise-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "new-config-blocks-validation",
+        "to": "callout-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "new-config-blocks-validation",
+        "to": "escalation-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "new-config-blocks-validation",
+        "to": "compaction-reroute",
+        "type": "blocks"
+      },
+      {
+        "from": "new-config-blocks-validation",
+        "to": "supervisor-owns-inspection",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-noise-filter",
+        "to": "feed-callout-prompt",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-state",
+        "to": "escalation-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-state",
+        "to": "compaction-reroute",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-engine",
+        "to": "escalation-trigger-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-callout-prompt",
+        "to": "callout-endpoint",
+        "type": "informs"
+      },
+      {
+        "from": "feed-callout-prompt",
+        "to": "compaction-reroute",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-owns-inspection",
+        "to": "compaction-reroute",
+        "type": "blocks"
+      },
+      {
+        "from": "by-kind-config",
+        "to": "parity-lock-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-callout-prompt",
+        "to": "parity-lock-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-trigger-wiring",
+        "to": "parity-lock-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "compaction-reroute",
+        "to": "parity-lock-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-owns-inspection",
+        "to": "parity-lock-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "callout-endpoint",
+        "to": "parity-lock-extension",
+        "type": "blocks"
+      },
+      {
+        "from": "parity-lock-extension",
+        "to": "docs-tiered-execution",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
