@@ -207,6 +207,15 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 5 (2026-07-02) — MAIN GREEN (red #3 fixed in one strike cycle); backlog exhausted of safe candidates
+
+- **PAN-2238 fixed + closed:** strike extracted the ohmypi cost lines, `e76506bf3b` green on main incl. lint; `pan done --strike` handoff clean. Red-main #3 lifetime: ~35 min file→fix-landed.
+- **PAN-2181 review PASSED** (artifact + specialists-done signal) and **the test agent spawned server-side (agent-pan-2181-test)** — phase advancement works even under the NO_RESUME boot; NO_RESUME only kills crash-recovery/redispatch, not the specialists-done → next-phase spawn path. Useful distinction for future triage. (Git-mirrored record still shows pending — SQLite is the runtime truth; the .pan/records mirror lags.)
+- **PAN-2153 objection filed (TENET-10):** routes/specialists.ts IS the merge-handoff route (11 hits for firePostMergeLifecycle/postMergeLifecycle/spawnRun). Labeled needs-handoff; its live planning session may finish (planning is safe), work pickup is not.
+- **Backlog now has ZERO safe autonomous candidates** — everything planned+ready is TENET-10 machinery (PAN-2153/2234/2145/2147/2148/2149). Run will drain as in-flight lands; progress on the parked set requires operator-supervised handoffs. Surfaced.
+- Cohort healthy: 2181 test, 2154 in UAT bundle (review+test passed, PR #2236 — bundle now 2154+MIN-831+MIN-846), 2151 work active (long turn, real progress on extraction seams), 2156 test, 2224 spawned swarm slots, 2214 hands-off.
+- Swap still 7.6/8 GB (urgent, surfaced). codex-auth paradox persists (status says logged out; sessions run fine).
+
 ## RUN-53 tick 4 (2026-07-02) — RED MAIN #3 (service.ts ratchet, PAN-1935 strike push) — strikes skip lint
 
 - **Main RED again:** PAN-1935's strike commit `1f9c0041f7` grew `src/lib/cloister/service.ts` 2057→2077 (+20 ohmypi cost-reconcile lines), tripping the god-file ratchet on the **lint** job. The strike verified typecheck + focused vitest but **never ran `npm run lint`** — third file-size red-main of the run (PAN-2218 flywheel.ts, PAN-2192 family). Filed **PAN-2238** (blocks-main) with an extraction-only fix spec (move the +20 lines out; do NOT regen baseline; TENET-10 = touch nothing else in service.ts); dispatched `strike-pan-2238` (booted, working).
