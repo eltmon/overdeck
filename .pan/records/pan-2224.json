@@ -27,9 +27,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T16:35:03.257Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-02T16:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-02T16:37:35.704Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-02T16:37Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-02T16:37:37.992Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-02T16:37:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2224\n\nharness=claude-code archived filter excludes legacy NULL-harness Claude rows\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2224 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-02T16:37:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2224\n\nharness=claude-code archived filter excludes legacy NULL-harness Claude rows\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2224 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2224.json",
@@ -105,17 +130,17 @@
     "recordedAt": "2026-07-02T16:20:44.838Z"
   },
   "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T16:35:07.123Z",
+  "updated": "2026-07-02T16:37:37.993Z",
   "pipeline": {
     "issueId": "PAN-2224",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T16:35:07.074Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-02T16:37:35.655Z",
+    "reviewNotes": "harness=claude-code archived filter excludes legacy NULL-harness Claude rows",
     "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
     "lastVerifiedCommit": "169d16a90eddd879882eb6fa66433068f2b04180",
@@ -253,7 +278,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T16:35:07.121Z"
+        "pricingAsOf": "2026-07-02T16:37:35.694Z"
       }
     },
     "merges": [

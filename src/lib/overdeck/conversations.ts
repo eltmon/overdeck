@@ -1038,7 +1038,16 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   const messageCount = `COALESCE(ds.message_count, 0)`;
   const enrichmentLevel = `COALESCE(ds.enrichment_level, 0)`;
 
-  if (options.harness !== undefined) { conditions.push('c.harness = ?'); params.push(options.harness); }
+  if (options.harness === 'claude-code') {
+    conditions.push('(c.harness = ? OR c.harness IS NULL)');
+    params.push(options.harness);
+  } else if (options.harness === 'ohmypi') {
+    conditions.push('(c.harness = ? OR c.harness = ?)');
+    params.push(options.harness, 'pi');
+  } else if (options.harness !== undefined) {
+    conditions.push('c.harness = ?');
+    params.push(options.harness);
+  }
   if (options.workspacePath !== undefined) { conditions.push('c.cwd = ?'); params.push(options.workspacePath); }
   if (options.primaryModel !== undefined) { conditions.push(`${primaryModel} = ?`); params.push(options.primaryModel); }
   if (options.issueId !== undefined) { conditions.push('c.issue_id = ?'); params.push(options.issueId); }

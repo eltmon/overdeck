@@ -1052,6 +1052,26 @@ describe('conversations route — DB integration', () => {
     expect(rows[0]).toMatchObject({ harness: 'codex' });
   });
 
+  it('includes legacy null-harness archived conversations when filtering for claude-code', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getOverdeckDatabaseSync();
+
+    createConversation({ name: 'legacy-claude-archived', tmuxSession: 'conv-legacy-claude', cwd: '/cwd/legacy' });
+    createConversation({ name: 'codex-archived', tmuxSession: 'conv-codex', cwd: '/cwd/codex', harness: 'codex' });
+    archiveConversation('legacy-claude-archived');
+    archiveConversation('codex-archived');
+    db.prepare(`UPDATE conversations SET harness = NULL WHERE name = ?`).run('legacy-claude-archived');
+
+    const response = await handleArchivedConversationsList({ harness: 'claude-code' });
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['legacy-claude-archived']);
+    expect(rows[0]).toMatchObject({ harness: null });
+  });
+
   it('normalizes relative since values when parsing archived conversation filters', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
