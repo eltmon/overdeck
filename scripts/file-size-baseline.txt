@@ -28,7 +28,7 @@
 102 src/lib/agents.ts
 7180 src/lib/cloister/deacon.ts
 1414 src/lib/cloister/merge-agent.ts
-2039 src/lib/cloister/service.ts
+2057 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts
 3012 src/lib/config-yaml.ts
 1195 src/lib/conversations/smart-compaction.ts
