@@ -104,6 +104,8 @@ vi.mock('../concurrency.js', () => ({
   resetPatrolDispatchBudget: vi.fn(),
   tryReserveAdvancingSlot: () => true,
   releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
 }));
 

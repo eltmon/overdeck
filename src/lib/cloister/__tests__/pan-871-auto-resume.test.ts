@@ -93,6 +93,8 @@ vi.mock('../concurrency.js', () => ({
   resetPatrolDispatchBudget: vi.fn(),
   tryReserveAdvancingSlot: vi.fn(() => true),
   releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: vi.fn(() => true),
+  releaseSwarmSlot: vi.fn(),
 }));
 
 vi.mock('../../overdeck/review-status-sync.js', () => ({

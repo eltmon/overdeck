@@ -94,6 +94,8 @@ vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
   resetPatrolDispatchBudget: () => {},
   tryReserveAdvancingSlot: (...args: unknown[]) => mocks.tryReserveAdvancingSlot(...args),
   releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   canDispatchAdvancing: () => true,
   getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
   countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
