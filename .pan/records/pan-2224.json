@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2224",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T16:52:45.559Z"
+    }
+  ],
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
@@ -59,93 +66,18 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-02T16:51:44.573Z",
-    "reviewNotes": "Review approved; only metadata/stale test-result changes since prior approval",
-    "testNotes": "Current-session verification for PAN-2224: npx vitest run src/dashboard/server/routes/__tests__/conversations.test.ts --configLoader runner --silent PASS (98 tests); npm run typecheck PASS; npm run lint:file-size PASS; npm run lint PASS. Browser UAT not required for this backend archived harness-filter review fix.",
-    "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T20:26:55.223Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-02T20:23:57.803Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
-    "reviewedAtCommit": "bb9d20b3e48918da35eb6336cd31b9efe3485760",
-    "lastVerifiedCommit": "bb9d20b3e48918da35eb6336cd31b9efe3485760",
-    "reviewRequestedAt": "2026-07-02T16:45:23.015Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".pan/records/pan-2224.json",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/FacetPanel.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
-        "src/dashboard/server/routes/__tests__/conversations.test.ts",
-        "src/dashboard/server/routes/__tests__/discovered-sessions.test.ts",
-        "src/lib/cloister/service.ts",
-        "src/lib/conversations/discovered-session-file.ts",
-        "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-        "src/lib/overdeck/infra.ts",
-        "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        ".pan/drafts/pan-2224.md",
-        "packages/contracts/src/types.ts",
-        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
-        "src/dashboard/server/__tests__/event-store-discovered-sessions-schema.test.ts",
-        "src/dashboard/server/routes/conversations.ts",
-        "src/dashboard/server/routes/discovered-sessions.ts",
-        "src/dashboard/server/ws-rpc.ts",
-        "src/lib/conversations/__tests__/correlator.test.ts",
-        "src/lib/conversations/__tests__/enrichment.test.ts",
-        "src/lib/conversations/__tests__/scanner.test.ts",
-        "src/lib/conversations/correlator.ts",
-        "src/lib/conversations/enrichment/enrich-session.ts",
-        "src/lib/conversations/harness-discovery.ts",
-        "src/lib/conversations/harness-metadata.ts",
-        "src/lib/conversations/scanner.ts",
-        "src/lib/database/schema.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/overdeck/discovered-sessions.ts",
-        "tests/unit/lib/conversations/harness-metadata.test.ts"
-      ],
-      "actualChangedFiles": [
-        ".pan/drafts/pan-2224.md",
-        ".pan/records/pan-2224.json",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "packages/contracts/src/types.ts",
-        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
-        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/FacetPanel.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
-        "src/dashboard/server/__tests__/event-store-discovered-sessions-schema.test.ts",
-        "src/dashboard/server/routes/__tests__/conversations.test.ts",
-        "src/dashboard/server/routes/__tests__/discovered-sessions.test.ts",
-        "src/dashboard/server/routes/conversations.ts",
-        "src/dashboard/server/routes/discovered-sessions.ts",
-        "src/dashboard/server/ws-rpc.ts",
-        "src/lib/cloister/service.ts",
-        "src/lib/conversations/__tests__/correlator.test.ts",
-        "src/lib/conversations/__tests__/enrichment.test.ts",
-        "src/lib/conversations/__tests__/scanner.test.ts",
-        "src/lib/conversations/correlator.ts",
-        "src/lib/conversations/discovered-session-file.ts",
-        "src/lib/conversations/enrichment/enrich-session.ts",
-        "src/lib/conversations/harness-discovery.ts",
-        "src/lib/conversations/harness-metadata.ts",
-        "src/lib/conversations/scanner.ts",
-        "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-        "src/lib/database/schema.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/overdeck/discovered-sessions.ts",
-        "src/lib/overdeck/infra.ts",
-        "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map",
-        "tests/unit/lib/conversations/harness-metadata.test.ts"
-      ],
-      "recordedAt": "2026-07-02T16:45:16.581Z"
-    }
+    "reviewedAtCommit": "3169b8a942943d25b10d2555bffe9428036144cc",
+    "lastVerifiedCommit": "bb9d20b3e48918da35eb6336cd31b9efe3485760"
   },
   "closeOut": {
     "usage": {
@@ -205,7 +137,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T16:51:44.612Z"
+        "pricingAsOf": "2026-07-02T20:26:55.334Z"
       }
     },
     "merges": [
@@ -217,5 +149,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-02T16:48:03.302Z",
-  "updated": "2026-07-02T16:52:14.920Z"
+  "updated": "2026-07-02T20:26:55.346Z"
 }
