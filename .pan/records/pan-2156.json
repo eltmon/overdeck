@@ -61,17 +61,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:23:06.059Z",
-    "reviewNotes": "Pure barrel decomposition: all 16 public symbols present, 9 submodules each under 1000 lines, no logic changes, DAG acyclic, async-only I/O, typecheck+lint+vitest all pass",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-02T18:23:56.875Z",
+    "reviewNotes": "Pure barrel decomposition of conversation-service.ts: all 16 public symbols present, 9 submodules each under 1000 lines, no logic changes, DAG acyclic, async-only I/O confirmed, typecheck+lint+vitest 7926 tests PASS",
     "testNotes": "Retried required gates in /home/eltmon/Projects/overdeck/workspaces/feature-pan-2156 after stale test-role failure: npm run typecheck PASS, npm run lint PASS, npx vitest run --configLoader runner PASS with 797 files passed / 7926 tests passed / 52 skipped. No browser UAT required for this behavior-preserving service refactor.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "reviewedAtCommit": "007b11585a73111b32980894a9182ee9ddbc509a",
+    "reviewedAtCommit": "b8489abf546e6f7c87935d46fbba0ce07d4dfdcc",
     "lastVerifiedCommit": "007b11585a73111b32980894a9182ee9ddbc509a",
     "reviewRequestedAt": "2026-07-02T18:05:48.217Z"
   },
@@ -96,10 +96,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 35,
-            "output": 18013,
-            "cacheRead": 2407958,
-            "cacheWrite": 414363
+            "input": 41,
+            "output": 21018,
+            "cacheRead": 2830173,
+            "cacheWrite": 532781
           }
         }
       },
@@ -117,15 +117,15 @@
           "cacheWrite": 407273
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 35,
-          "output": 18013,
-          "cacheRead": 2407958,
-          "cacheWrite": 414363
+          "input": 41,
+          "output": 21018,
+          "cacheRead": 2830173,
+          "cacheWrite": 532781
         }
       },
       "costAtCloseOut": {
-        "usd": 13.169707,
-        "pricingAsOf": "2026-07-02T18:23:06.140Z"
+        "usd": 13.785532,
+        "pricingAsOf": "2026-07-02T18:23:56.909Z"
       }
     },
     "merges": [
@@ -134,5 +134,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T18:09:19.879Z",
-  "updated": "2026-07-02T18:23:06.168Z"
+  "updated": "2026-07-02T18:23:57.001Z"
 }
