@@ -3,14 +3,15 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-02T20:03:24.602Z",
-  "updated": "2026-07-02T21:17:26.358Z",
+  "updated": "2026-07-02T21:18:07.936Z",
   "pipeline": {
     "issueId": "PAN-2234",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T21:17:26.248Z"
+    "updatedAt": "2026-07-02T21:18:07.893Z",
+    "testNotes": "Skipped: issue is already merged"
   },
   "closeOut": {
     "usage": {
@@ -25,9 +26,9 @@
         },
         "strike": {
           "custom/glm-5.2": {
-            "input": 234217,
-            "output": 41743,
-            "cacheRead": 7582144,
+            "input": 262882,
+            "output": 52668,
+            "cacheRead": 8660352,
             "cacheWrite": 0
           }
         }
@@ -40,15 +41,15 @@
           "cacheWrite": 0
         },
         "custom/glm-5.2": {
-          "input": 234217,
-          "output": 41743,
-          "cacheRead": 7582144,
+          "input": 262882,
+          "output": 52668,
+          "cacheRead": 8660352,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 1.269786,
-        "pricingAsOf": "2026-07-02T21:17:26.357Z"
+        "usd": 1.465807,
+        "pricingAsOf": "2026-07-02T21:18:07.936Z"
       }
     },
     "merges": [],
