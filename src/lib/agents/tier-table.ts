@@ -54,6 +54,29 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
   difficultyToTier: {},
 };
 
+export const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
+export type TieredExecutionIssueOverride = typeof TIERED_EXECUTION_ISSUE_OVERRIDES[number];
+
+/**
+ * Per-issue tiered_execution opt-in/out (PAN-1791 FR-9). An issue's vBRIEF
+ * may set `tiered_execution: 'on' | 'off'` in plan.metadata; an explicit
+ * value wins over the global `tiered_execution.enabled` flag, and an unset
+ * value inherits it — zero behavior change from today. Any other value is a
+ * config error (fail-loud, no silent inherit on typos like 'yes' or true).
+ */
+export function resolveTieredExecutionEnabled(
+  config: Pick<TieredExecutionConfig, 'enabled'>,
+  planMetadata?: { [key: string]: unknown },
+): boolean {
+  const override = planMetadata?.tiered_execution;
+  if (override === undefined || override === null) return config.enabled;
+  if (override === 'on') return true;
+  if (override === 'off') return false;
+  throw new TieredExecutionConfigError(
+    `plan.metadata.tiered_execution must be one of ${TIERED_EXECUTION_ISSUE_OVERRIDES.join(', ')}; got ${JSON.stringify(override)}`,
+  );
+}
+
 function isRuntimeName(value: string): value is RuntimeName {
   return value === 'claude-code' || value === 'ohmypi' || value === 'codex';
 }

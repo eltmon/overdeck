@@ -9,32 +9,32 @@ The project config declares the tier table, the routing defaults, supervisor pol
 ```yaml
 tiered_execution:
   enabled: false
-  default_tier: standard
   tiers:
     cheap:
-      model: haiku
+      model: claude-haiku-4-5
       harness: claude-code
       difficulties: [trivial, simple]
-      kinds: [docs, test, refactor]
     standard:
-      model: sonnet
+      model: claude-sonnet-4-6
       harness: claude-code
       difficulties: [medium]
-      kinds: [api, backend, frontend, infra]
     frontier:
-      model: opus
+      model: claude-opus-4-8
       harness: claude-code
       difficulties: [complex, expert]
-      kinds: [design, spike]
   supervisor:
-    enabled: true
-    model: opus
+    model: claude-opus-4-8
     harness: claude-code
-    subscribe: requiresInspection
+    subscribe: flagged
   replay_threshold: 0.5
 ```
 
-`enabled` must stay `false` unless the operator deliberately opts the project into tiered execution. The fallback `default_tier` must reference a configured tier; it is not a hardcoded model fallback.
+`enabled` must stay `false` unless the operator deliberately opts the project into tiered execution. The loader (`src/lib/agents/tier-table.ts`) validates the table at load time and fails loudly rather than falling back to a hardcoded model:
+
+- Every one of the five difficulties (`trivial`, `simple`, `medium`, `complex`, `expert`) must map to exactly one tier — a difficulty mapped to zero tiers or to two tiers is a named validation error.
+- An unknown model or harness is rejected at load, and tier/supervisor definitions pass through the same pi+Anthropic+subscription ToS gate as every other spawn (`src/lib/harness-policy.ts`).
+- A `supervisor` block is required whenever tiers are configured.
+- With no `tiered_execution` block present, the loader returns `enabled: false` with `replay_threshold: 0.5` and no error.
 
 ## Resolution Chain
 
@@ -57,12 +57,13 @@ Standing tier agents are long-lived sessions for the life of the issue. In v1, t
 
 The supervisor is a standing review tier, not an implementer. It wakes on commit events and reviews the diff against the bead description and acceptance criteria.
 
-Supported subscription policies:
+Supported subscription policies (`supervisor.subscribe`):
 
 - `all`: review every bead commit.
-- `requiresInspection`: review commits for beads whose metadata sets `requiresInspection: true`.
+- `flagged`: review only commits for beads flagged for inspection (e.g. `requiresInspection: true` in bead metadata).
 - `sampled`: review a configured sample of commits for cost measurement.
-- `off`: do not run event-driven supervisor review.
+
+There is no `off` policy — the supervisor block is required whenever tiers are configured. To run without supervision, disable tiered execution entirely.
 
 Supervisor findings block the foreman before downstream beads proceed. A clean supervisor ack does not replace the normal review and test pipeline.
 
