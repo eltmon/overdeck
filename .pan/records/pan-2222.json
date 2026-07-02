@@ -11,42 +11,41 @@
   ],
   "feedback": [],
   "created": "2026-07-02T20:24:18.891Z",
-  "updated": "2026-07-02T21:44:12.163Z",
+  "updated": "2026-07-02T22:01:32.366Z",
   "pipeline": {
     "issueId": "PAN-2222",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T21:42:09.603Z",
-    "inspectNotes": "Inspection error for bead workspace-kq8fx: tmux session inspect-pan-2222-workspace-kq8fx exited before producing a verdict. No verdict was produced.",
-    "deaconIgnored": false
+    "updatedAt": "2026-07-02T22:01:32.285Z",
+    "inspectNotes": "Inspecting bead workspace-7vhdd"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 8939,
-            "output": 5415,
-            "cacheRead": 10178889,
-            "cacheWrite": 16013
+            "input": 8945,
+            "output": 6358,
+            "cacheRead": 12994838,
+            "cacheWrite": 16856
           }
         },
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 394273,
-            "output": 8138,
-            "cacheRead": 692224,
+            "input": 1295958,
+            "output": 51016,
+            "cacheRead": 8344576,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 10364,
-            "output": 353,
+            "input": 11561,
+            "output": 524,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -62,33 +61,33 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 27995,
-          "output": 69648,
-          "cacheRead": 20808021,
-          "cacheWrite": 369698
+          "input": 28001,
+          "output": 70591,
+          "cacheRead": 23623970,
+          "cacheWrite": 370541
         },
         "openai/gpt-5.5": {
-          "input": 394273,
-          "output": 8138,
-          "cacheRead": 692224,
+          "input": 1295958,
+          "output": 51016,
+          "cacheRead": 8344576,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 10364,
-          "output": 353,
+          "input": 11561,
+          "output": 524,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.753227,
-        "pricingAsOf": "2026-07-02T21:42:09.621Z"
+        "usd": 44.247865,
+        "pricingAsOf": "2026-07-02T22:01:32.358Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.5",
   "statusOverrides": {
     "by-kind-config": "running",
