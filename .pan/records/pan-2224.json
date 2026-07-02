@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T20:30:08.887Z",
+  "updated": "2026-07-02T16:20:40.317Z",
   "pipeline": {
     "issueId": "PAN-2224",
     "reviewStatus": "pending",
@@ -20,9 +20,8 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T20:30:08.759Z",
-    "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently.",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2226"
+    "updatedAt": "2026-07-02T15:30:04.529Z",
+    "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently."
   },
   "closeOut": {
     "usage": {
@@ -37,16 +36,16 @@
         },
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 1089597,
-            "output": 69334,
-            "cacheRead": 5452288,
+            "input": 953245,
+            "output": 41390,
+            "cacheRead": 4626432,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 31176,
-            "output": 1841,
+            "input": 24029,
+            "output": 444,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -68,43 +67,77 @@
           "cacheWrite": 172617
         },
         "openai/gpt-5.5": {
-          "input": 1089597,
-          "output": 69334,
-          "cacheRead": 5452288,
+          "input": 953245,
+          "output": 41390,
+          "cacheRead": 4626432,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 31176,
-          "output": 1841,
+          "input": 24029,
+          "output": 444,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T20:30:08.873Z"
+        "usd": 17.445008,
+        "pricingAsOf": "2026-07-02T15:30:04.562Z"
       }
     },
-    "merges": [
-      "https://github.com/eltmon/overdeck/pull/2226"
-    ],
+    "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.5",
   "statusOverrides": {
-    "scan-baseline": "pending",
-    "harness-column": "running"
+    "scan-baseline": "completed",
+    "scan-verify": "completed",
+    "scan-verify.ac1": "completed",
+    "scan-verify.ac2": "completed",
+    "harness-facet-ui": "completed",
+    "harness-facet-ui.ac1": "completed",
+    "harness-facet-ui.ac2": "completed",
+    "harness-facet-ui.ac3": "completed",
+    "enrichment-excerpts": "completed",
+    "enrichment-excerpts.ac1": "completed",
+    "enrichment-excerpts.ac2": "completed",
+    "enrichment-excerpts.ac3": "completed",
+    "enrichment-excerpts.ac4": "completed",
+    "locator-correlation": "completed",
+    "locator-correlation.ac1": "completed",
+    "locator-correlation.ac2": "completed",
+    "locator-correlation.ac3": "completed",
+    "locator-correlation.ac4": "completed",
+    "transcript-fallback": "completed",
+    "transcript-fallback.ac1": "completed",
+    "transcript-fallback.ac2": "completed",
+    "transcript-fallback.ac3": "completed",
+    "codex-metadata-parser": "completed",
+    "codex-metadata-parser.ac1": "completed",
+    "codex-metadata-parser.ac2": "completed",
+    "codex-metadata-parser.ac3": "completed",
+    "pi-metadata-parser": "completed",
+    "pi-metadata-parser.ac1": "completed",
+    "pi-metadata-parser.ac2": "completed",
+    "pi-metadata-parser.ac3": "completed",
+    "discovery-sources": "completed",
+    "discovery-sources.ac1": "completed",
+    "discovery-sources.ac2": "completed",
+    "discovery-sources.ac3": "completed",
+    "discovery-sources.ac4": "completed",
+    "jsonlpath-fix": "completed",
+    "jsonlpath-fix.ac1": "completed",
+    "jsonlpath-fix.ac2": "completed",
+    "jsonlpath-fix.ac3": "completed",
+    "harness-column": "completed",
+    "harness-column.ac1": "completed",
+    "harness-column.ac2": "completed",
+    "harness-column.ac3": "completed",
+    "harness-column.ac4": "completed",
+    "scan-baseline.ac1": "completed",
+    "scan-baseline.ac2": "completed"
   },
   "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 2,
-        "itemId": "harness-column",
-        "agentId": "agent-pan-2224-slot-2",
-        "branch": "feature/pan-2224-slot-2",
-        "assignedAt": "2026-07-02T20:29:34.465Z"
-      }
-    ]
+    "slotAssignments": []
   }
 }
