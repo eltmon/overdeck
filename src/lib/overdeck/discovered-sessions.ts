@@ -52,6 +52,7 @@ function overdeckDb() {
 export interface DiscoveredSession {
   id: number;
   jsonlPath: string;
+  harness: string;
   sessionId: string | null;
   workspacePath: string | null;
   workspaceHash: string | null;
@@ -136,6 +137,7 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
   return {
     id: row['id'] as number,
     jsonlPath: row['jsonl_path'] as string,
+    harness: (row['harness'] as string | null) ?? 'claude-code',
     sessionId: (row['session_id'] as string | null) ?? null,
     workspacePath: (row['workspace_path'] as string | null) ?? null,
     workspaceHash: (row['workspace_hash'] as string | null) ?? null,
@@ -381,6 +383,7 @@ export function findEnrichedSessionIdsMissingEmbedding(model: string): number[] 
 
 export interface UpsertDiscoveredSessionOpts {
   jsonlPath: string;
+  harness: string;
   sessionId?: string | null;
   workspacePath?: string | null;
   workspaceHash?: string | null;
@@ -471,16 +474,17 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
 
   db.prepare(
     `INSERT INTO discovered_sessions (
-       jsonl_path, session_id, workspace_path, workspace_hash,
+       jsonl_path, harness, session_id, workspace_path, workspace_hash,
        message_count, first_ts, last_ts, models_used, primary_model,
        token_input, token_output, estimated_cost,
        tools_used, files_touched, tags,
        overdeck_managed, pan_issue_id, pan_agent_id,
        file_size, file_mtime, scanned_at
      ) VALUES (
-       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
      )
      ON CONFLICT(jsonl_path) DO UPDATE SET
+       harness            = excluded.harness,
        session_id         = excluded.session_id,
        workspace_path     = excluded.workspace_path,
        workspace_hash     = excluded.workspace_hash,
@@ -503,6 +507,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        scanned_at         = excluded.scanned_at`,
   ).run(
     opts.jsonlPath,
+    opts.harness ?? 'claude-code',
     opts.sessionId ?? null,
     opts.workspacePath ?? null,
     opts.workspaceHash ?? null,

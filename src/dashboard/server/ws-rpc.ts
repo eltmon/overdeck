@@ -419,6 +419,7 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
   return {
     id: session.id,
     jsonlPath: session.jsonlPath,
+    harness: session.harness,
     sessionId: session.sessionId ?? undefined,
     workspacePath: session.workspacePath ?? undefined,
     workspaceHash: session.workspaceHash ?? undefined,
