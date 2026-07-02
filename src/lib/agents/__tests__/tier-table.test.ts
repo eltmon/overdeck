@@ -154,5 +154,23 @@ describe('tiered execution tier table', () => {
       harness: 'claude-code',
       subscribe: 'flagged',
     });
+    expect(result.byKind).toEqual({});
+  });
+
+  it('validates by_kind item kinds and tier references', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      by_kind: { design: 'frontier' },
+    }));
+
+    expect(result.by_kind).toEqual({ design: 'frontier' });
+    expect(result.byKind).toEqual({ design: 'frontier' });
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      by_kind: { unknown: 'frontier' } as never,
+    }))).toThrow("tiered_execution.by_kind contains unknown item kind 'unknown'");
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      by_kind: { design: 'missing' },
+    }))).toThrow("tiered_execution.by_kind.design references unknown tier 'missing'");
   });
 });

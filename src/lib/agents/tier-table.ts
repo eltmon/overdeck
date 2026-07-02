@@ -1,6 +1,6 @@
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelId } from '../settings.js';
-import type { VBriefDifficulty } from '../vbrief/types.js';
+import type { VBriefDifficulty, VBriefItemKind } from '../vbrief/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
@@ -9,6 +9,7 @@ import { canUseHarnessSync } from '../harness-policy.js';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly VBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
+export const TIERED_EXECUTION_ITEM_KINDS: readonly VBriefItemKind[] = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
 
 export type TieredExecutionSubscription = typeof TIERED_EXECUTION_SUBSCRIPTIONS[number];
 
@@ -28,11 +29,13 @@ export interface TieredExecutionConfig {
   enabled: boolean;
   tiers: Record<string, TierDefinition>;
   supervisor?: TieredExecutionSupervisorConfig;
+  by_kind?: Partial<Record<VBriefItemKind, string>>;
   replay_threshold: number;
 }
 
 export interface ValidatedTieredExecutionConfig extends TieredExecutionConfig {
   difficultyToTier: Partial<Record<VBriefDifficulty, string>>;
+  byKind: Partial<Record<VBriefItemKind, string>>;
 }
 
 export interface TieredExecutionValidationContext {
@@ -50,6 +53,8 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
   enabled: false,
   tiers: {},
   supervisor: undefined,
+  by_kind: {},
+  byKind: {},
   replay_threshold: 0.5,
   difficultyToTier: {},
 };
@@ -87,6 +92,10 @@ function isDifficulty(value: string): value is VBriefDifficulty {
 
 function isSubscription(value: string): value is TieredExecutionSubscription {
   return (TIERED_EXECUTION_SUBSCRIPTIONS as readonly string[]).includes(value);
+}
+
+function isItemKind(value: string): value is VBriefItemKind {
+  return (TIERED_EXECUTION_ITEM_KINDS as readonly string[]).includes(value);
 }
 
 function knownModelIds(): Set<string> {
@@ -130,6 +139,7 @@ export function normalizeTieredExecutionConfig(config?: Partial<TieredExecutionC
     enabled: config?.enabled ?? false,
     tiers: config?.tiers ?? {},
     supervisor: config?.supervisor,
+    by_kind: config?.by_kind ?? {},
     replay_threshold: config?.replay_threshold ?? 0.5,
   };
 }
@@ -139,7 +149,10 @@ export function validateTieredExecutionConfig(
   context: TieredExecutionValidationContext = {},
 ): ValidatedTieredExecutionConfig {
   const config = normalizeTieredExecutionConfig(rawConfig);
-  const shouldValidateTierTable = config.enabled || Object.keys(config.tiers).length > 0 || config.supervisor !== undefined;
+  const shouldValidateTierTable = config.enabled
+    || Object.keys(config.tiers).length > 0
+    || Object.keys(config.by_kind ?? {}).length > 0
+    || config.supervisor !== undefined;
   if (!shouldValidateTierTable) {
     return { ...DEFAULT_TIERED_EXECUTION_CONFIG };
   }
@@ -185,6 +198,17 @@ export function validateTieredExecutionConfig(
     difficultyToTier[difficulty] = owners[0];
   }
 
+  const byKind: Partial<Record<VBriefItemKind, string>> = {};
+  for (const [kind, tierName] of Object.entries(config.by_kind ?? {})) {
+    if (!isItemKind(kind)) {
+      throw new TieredExecutionConfigError(`tiered_execution.by_kind contains unknown item kind '${kind}'`);
+    }
+    if (!normalizedTiers[tierName]) {
+      throw new TieredExecutionConfigError(`tiered_execution.by_kind.${kind} references unknown tier '${tierName}'`);
+    }
+    byKind[kind] = tierName;
+  }
+
   if (!config.supervisor) {
     throw new TieredExecutionConfigError('tiered_execution.supervisor is required when tiered execution tiers are configured');
   }
@@ -204,6 +228,8 @@ export function validateTieredExecutionConfig(
       harness: config.supervisor.harness,
       subscribe: config.supervisor.subscribe,
     },
+    by_kind: byKind,
+    byKind,
     replay_threshold: config.replay_threshold,
     difficultyToTier,
   };

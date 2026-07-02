@@ -6,6 +6,8 @@ import {
   resolveTier,
   type ResolveTierConfig,
 } from '../resolve-tier.js';
+import { assignDispatchTier } from '../dispatch-tier.js';
+import { validateTieredExecutionConfig, type TieredExecutionConfig } from '../tier-table.js';
 
 const CONFIG: ResolveTierConfig = {
   tiers: {
@@ -90,5 +92,31 @@ describe('resolveTier', () => {
       { tiers: CONFIG.tiers, difficultyToTier: CONFIG.difficultyToTier },
     );
     expect(resolved.tierName).toBe('cheap');
+  });
+
+  it('routes config-sourced by_kind ahead of difficulty through assignDispatchTier', () => {
+    const rawConfig: TieredExecutionConfig = {
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        standard: { model: 'claude-sonnet-4-6', harness: 'claude-code', difficulties: ['medium', 'complex'] },
+        senior: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['expert'] },
+      },
+      by_kind: { design: 'senior' },
+      supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+    };
+    const validated = validateTieredExecutionConfig(rawConfig);
+    const item = {
+      id: 'item-9',
+      title: 'design work',
+      metadata: { kind: 'design' as const, difficulty: 'simple' as const },
+    };
+
+    expect(resolveTier(item, validated).tierName).toBe('senior');
+    expect(assignDispatchTier(item, validated).tierName).toBe('senior');
+
+    const withoutByKind = validateTieredExecutionConfig({ ...rawConfig, by_kind: undefined });
+    expect(assignDispatchTier(item, withoutByKind).tierName).toBe('cheap');
   });
 });
