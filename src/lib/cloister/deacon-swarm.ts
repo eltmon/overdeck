@@ -224,7 +224,14 @@ export async function coordinateSwarmSlots(
       // two dispatchable items remain, the old early-continue skipped the whole
       // pass and the final slots of every swarm could never merge (observed
       // live on PAN-1791 with two finished slots waiting).
-      const dispatchEligible = readiness.swarmEligible && slotEligibleCount >= 2;
+      //
+      // The >=2 floor exists so single-item plans never START a swarm — but an
+      // in-progress swarm (evidenced by completed item overrides) must be able
+      // to finish its tail, or the LAST item of every swarm strands undispatched
+      // (observed live on PAN-1791 at 19/20 with only the e2e item left).
+      const swarmInProgress = Object.entries(overrides ?? {})
+        .some(([key, value]) => !key.includes('.') && value === 'completed');
+      const dispatchEligible = readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
       if (dispatchEligible) {
         actions.push(`[swarm] considered ${issueId}: swarm eligible`);
       }
