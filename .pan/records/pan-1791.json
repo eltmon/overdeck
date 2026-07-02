@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-1791",
   "schemaVersion": 2,
-  "created": "2026-06-30T13:44:36.595Z",
-  "updated": "2026-06-30T13:44:49.563Z",
-  "pipeline": {
-    "issueId": "PAN-1791",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-30T13:44:36.595Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,117 @@
       "note": "Planning session started for PAN-1791: Tiered execution: difficulty-routed bead dispatch + event-driven supervisor review (standing tier agents with plan-filtered commit feeds)",
       "timestamp": "2026-06-30T13:44:49.563Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-30T13:44:36.595Z",
+  "updated": "2026-07-02T06:03:15.987Z",
+  "pipeline": {
+    "issueId": "PAN-1791",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T06:03:15.958Z",
+    "inspectNotes": "Spec fidelity passed: tiered_execution config shape/defaults, total non-overlapping difficulty mapping, unknown model/harness rejection, ToS policy validation, and config-yaml/default cloister integration match bead workspace-ilmqn. Constraint compliance passed: reviewed CLAUDE.md and PAN-1791 PRD; no prohibited patterns found.",
+    "deaconIgnored": true,
+    "deaconIgnoredAt": "2026-07-02T06:03:15.957Z",
+    "deaconIgnoredReason": "swarm runaway rescue (conv 259): hold all swarm coordination until operator decides disposition; PAN-2214"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 41736,
+            "output": 13107,
+            "cacheRead": 1303139,
+            "cacheWrite": 33566
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 135,
+            "output": 6069,
+            "cacheRead": 329291,
+            "cacheWrite": 14113
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 530892,
+            "output": 31381,
+            "cacheRead": 7508480,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 57051,
+            "output": 9437,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 44236,
+            "output": 265631,
+            "cacheRead": 24281974,
+            "cacheWrite": 922652
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 41736,
+          "output": 13107,
+          "cacheRead": 1303139,
+          "cacheWrite": 33566
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 44371,
+          "output": 271700,
+          "cacheRead": 24611265,
+          "cacheWrite": 936765
+        },
+        "openai/gpt-5.5": {
+          "input": 530892,
+          "output": 31381,
+          "cacheRead": 7508480,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 57051,
+          "output": 9437,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 35.320333,
+        "pricingAsOf": "2026-07-02T06:03:15.978Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "tier-table-config": "running",
+    "kind-metadata-field": "running",
+    "tiered-execution-docs": "running",
+    "tier-resolution-chain": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 20,
+        "itemId": "tier-table-config",
+        "agentId": "agent-pan-1791-slot-20",
+        "branch": "feature/pan-1791-slot-20",
+        "assignedAt": "2026-07-02T05:52:36.491Z"
+      }
+    ]
+  }
 }
