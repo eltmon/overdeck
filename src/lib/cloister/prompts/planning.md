@@ -327,6 +327,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
+          "kind": "docs|api|backend|frontend|infra|test|refactor|design|spike",
           "issueLabel": "{{ISSUE_ID_LOWER}}",
           "requiresInspection": false,
           "inspectionDepth": "fast",
@@ -370,8 +371,9 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
   "handles errors", "is implemented", "TBD"-style placeholders, docs-only criteria.
 - 2–5 ACs per item; if an item genuinely needs fewer/more, set metadata.acJustification.
 - `narratives.NonGoals` MUST list everything discovery established as out of scope ("none" if genuinely nothing). Review enforces these as must-not constraints.
-- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, `metadata.inspectionDepth`, `metadata.files_scope`, `metadata.files_scope_confidence`, `metadata.verify_commands`, `metadata.expected_outputs`, `metadata.readiness`, and optional `metadata.traces: string[]` are Overdeck extensions to the vBRIEF spec
+- `metadata.difficulty`, `metadata.kind`, `metadata.issueLabel`, `metadata.requiresInspection`, `metadata.inspectionDepth`, `metadata.files_scope`, `metadata.files_scope_confidence`, `metadata.verify_commands`, `metadata.expected_outputs`, `metadata.readiness`, and optional `metadata.traces: string[]` are Overdeck extensions to the vBRIEF spec
 - Use `metadata.traces` to preserve FR-N/NFR-N requirement IDs from the PRD draft on the plan items that satisfy them.
+- `metadata.kind` is REQUIRED on every plan item for subject-matter routing. Use one of `"docs"`, `"api"`, `"backend"`, `"frontend"`, `"infra"`, `"test"`, `"refactor"`, `"design"`, or `"spike"`; default to `"backend"` when the item has no clearer subject-matter category.
 - `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness` are REQUIRED on every plan item. Use `readiness: "ready"` only for independently dispatchable tracer-bullet slices, `readiness: "sequential"` for deliberate serialization, and `readiness: "needs_refinement"` when the item must be split or clarified before work.
 - `metadata.verify_commands` and `metadata.expected_outputs` are REQUIRED on every slot-eligible item. Commands must be concrete and expected outputs must name the evidence the worker should see.
 - `metadata.requiresInspection` is REQUIRED on every plan item — see the "Inspection Requirement" section above for the decision criteria. Default to `false` unless the bead lays a foundation other beads depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.
