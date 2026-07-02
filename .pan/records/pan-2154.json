@@ -22,26 +22,42 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-07-02T06:59:13.414Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T19:09:29.519Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:28.481Z",
-  "updated": "2026-07-02T15:24:01.020Z",
+  "updated": "2026-07-02T19:09:29.522Z",
   "pipeline": {
     "issueId": "PAN-2154",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T07:00:36.159Z",
-    "reviewNotes": "PRD draft contradicts vBRIEF on directory (workspace/ vs workspace-manager/), wi-0 snapshot test (required vs forbidden), and module layout (5 vs 7 files); vBRIEF Proposal directs agents to follow the PRD as authoritative, creating mutually exclusive instructions"
+    "updatedAt": "2026-07-02T18:35:16.702Z",
+    "inspectNotes": "Spec fidelity passed for workspace-zjh9e: the diff extracts the nine public interfaces and PRE_WORKTREE_METADATA_DIRS into src/lib/workspace-manager/types.ts, re-exports only the interfaces from the barrel, and leaves PRE_WORKTREE_METADATA_DIRS off the public barrel surface. Constraint check passed: no call-site or test files were edited, no new any or execSync appeared in the new types module, and the scoped diff is pure relocation/wiring."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 298564,
+            "output": 15572,
+            "cacheRead": 1835520,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 30355,
-            "output": 5910,
+            "input": 43370,
+            "output": 6034,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -64,9 +80,15 @@
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 298564,
+          "output": 15572,
+          "cacheRead": 1835520,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 30355,
-          "output": 5910,
+          "input": 43370,
+          "output": 6034,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -84,13 +106,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 14.047416,
-        "pricingAsOf": "2026-07-02T07:00:36.239Z"
+        "usd": 16.925156,
+        "pricingAsOf": "2026-07-02T18:35:17.561Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
