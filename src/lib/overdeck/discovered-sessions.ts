@@ -84,6 +84,7 @@ export interface DiscoveredSession {
 }
 
 export interface ConversationFilter {
+  harness?: string;
   workspacePath?: string;
   primaryModel?: string;
   managed?: boolean;
@@ -193,6 +194,7 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
   const params: unknown[] = [];
   const col = (name: string) => tableAlias ? `${tableAlias}.${name}` : name;
 
+  if (filter.harness !== undefined) { conditions.push(`${col('harness')} = ?`); params.push(filter.harness); }
   if (filter.workspacePath !== undefined) { conditions.push(`${col('workspace_path')} = ?`); params.push(filter.workspacePath); }
   if (filter.primaryModel !== undefined) { conditions.push(`${col('primary_model')} = ?`); params.push(filter.primaryModel); }
   if (filter.managed === true) conditions.push(`${col('overdeck_managed')} = 1`);
