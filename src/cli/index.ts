@@ -116,6 +116,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
+import { registerSwarmCommands } from './commands/swarm.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -577,12 +578,9 @@ program
     strikeCommand(ids, options),
   );
 
-// Register workspace commands (pan workspace create, pan workspace list, etc.)
+registerSwarmCommands(program);
 registerWorkspaceCommands(program);
-
-// Register test commands (pan test run, pan test list)
 registerTestCommands(program);
-
 registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)

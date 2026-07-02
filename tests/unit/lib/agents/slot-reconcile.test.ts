@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { reconcileSlotState, type ReconciledSlotAgent, type ReconciledSlotBranch } from '../../../../src/lib/agents/slot-reconcile.js';
+import {
+  reconcileSlotState,
+  type ReconciledSlotAgent,
+  type ReconciledSlotAssignment,
+  type ReconciledSlotBranch,
+} from '../../../../src/lib/agents/slot-reconcile.js';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 
 function makeDoc(itemIds: string[]): VBriefDocument {
@@ -26,15 +31,20 @@ function makeDoc(itemIds: string[]): VBriefDocument {
   };
 }
 
-function deps(branches: ReconciledSlotBranch[], agents: ReconciledSlotAgent[]) {
+function deps(
+  branches: ReconciledSlotBranch[],
+  agents: ReconciledSlotAgent[],
+  assignments: ReconciledSlotAssignment[] = [],
+) {
   return {
     listBranches: async () => branches,
     listAgents: () => agents,
+    listSlotAssignments: () => assignments,
   };
 }
 
 describe('reconcileSlotState', () => {
-  it('returns merged, in-flight, and pending items from slot branches, agents, and status overrides', async () => {
+  it('does not infer ownership for unowned branch slots from plan order', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
       statusOverrides: { a: 'completed' },
       deps: deps(
@@ -43,24 +53,20 @@ describe('reconcileSlotState', () => {
       ),
     });
 
-    expect(result.merged.map(item => item.itemId)).toEqual(['a']);
-    expect(result.inFlight).toEqual([
-      {
-        itemId: 'b',
-        slotIndex: 2,
-        status: 'in_flight',
-        branch: 'feature/pan-1762-slot-2',
-        agentId: 'agent-pan-1762-slot-2',
-      },
-    ]);
-    expect(result.pending.map(item => item.itemId)).toEqual(['c']);
+    expect(result.merged).toEqual([]);
+    expect(result.inFlight).toEqual([]);
+    expect(result.pending).toEqual([]);
+    expect(result.branches).toEqual([{ slotIndex: 2, branch: 'feature/pan-1762-slot-2', merged: false }]);
+    expect(result.agents).toEqual([{ slotIndex: 2, agentId: 'agent-pan-1762-slot-2', status: 'running' }]);
   });
 
-  it('marks a slot branch already merged into the feature branch as complete', async () => {
+  it('marks a completed item merged only when durable ownership identifies its slot', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b']), {
+      statusOverrides: { a: 'completed' },
       deps: deps(
         [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
         [],
+        [{ slotIndex: 1, itemId: 'a', branch: 'feature/pan-1762-slot-1' }],
       ),
     });
 
@@ -73,18 +79,59 @@ describe('reconcileSlotState', () => {
         agentId: undefined,
       },
     ]);
-    expect(result.pending.map(item => item.itemId)).toEqual(['b']);
+    expect(result.pending).toEqual([]);
   });
 
-  it('returns a clean initial state when no slot branches or agents exist', async () => {
+  it('returns a clean initial state when no durable slot ownership exists', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b']), {
       deps: deps([], []),
     });
 
     expect(result.merged).toEqual([]);
     expect(result.inFlight).toEqual([]);
-    expect(result.pending.map(item => item.itemId)).toEqual(['a', 'b']);
+    expect(result.pending).toEqual([]);
     expect(result.branches).toEqual([]);
     expect(result.agents).toEqual([]);
+  });
+
+  it('uses persisted slot item ownership instead of slot-eligible item order', async () => {
+    const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: false }],
+        [{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'running', slotItemId: 'c' }],
+      ),
+    });
+
+    expect(result.inFlight).toEqual([
+      {
+        itemId: 'c',
+        slotIndex: 1,
+        status: 'in_flight',
+        branch: 'feature/pan-1762-slot-1',
+        agentId: 'agent-pan-1762-slot-1',
+      },
+    ]);
+    expect(result.pending).toEqual([]);
+  });
+
+  it('uses durable slot assignments after the owning agent state is gone', async () => {
+    const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: false }],
+        [],
+        [{ slotIndex: 1, itemId: 'c', branch: 'feature/pan-1762-slot-1' }],
+      ),
+    });
+
+    expect(result.inFlight).toEqual([
+      {
+        itemId: 'c',
+        slotIndex: 1,
+        status: 'in_flight',
+        branch: 'feature/pan-1762-slot-1',
+        agentId: undefined,
+      },
+    ]);
+    expect(result.pending).toEqual([]);
   });
 });

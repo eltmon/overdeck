@@ -74,6 +74,13 @@ export interface ConcurrencyConfig {
    */
   reserved_advancing_slots: number;
   /**
+   * Dedicated swarm-slot reserve, isolated from `max_work_agents` and
+   * `reserved_advancing_slots` (PAN-2212). Swarm slot dispatch draws only from this
+   * reserve, so a busy pipeline never starves the swarm — and swarm slots never
+   * starve review/test in reverse. Default 3.
+   */
+  reserved_swarm_slots: number;
+  /**
    * When true, operator-started work agents (no flywheelRunId) are exempt from
    * the emergency brake/governor reaping so the operator's deliberate spawns are
    * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
@@ -318,6 +325,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   concurrency: {
     max_work_agents: 6,
     reserved_advancing_slots: 3,
+    reserved_swarm_slots: 3,
     exempt_operator_started: true,
   },
   notifications: {

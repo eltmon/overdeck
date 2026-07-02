@@ -200,24 +200,22 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     vi.restoreAllMocks();
   });
 
-  it('refuses without mutation when the passed review has no code drift', async () => {
+  it('no-ops without mutation when review is already passed', async () => {
     getReviewStatusMock.mockReturnValue(passedStatus());
 
     const result = await postRequestReview('PAN-1417');
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({
-      success: false,
-      noCodeDrift: true,
-      error: 'No code drift since review passed',
+      success: true,
+      alreadyPassed: true,
+      message: 'Review already passed for PAN-1417',
     });
-    expect(result.body.hint).toContain('?force=true');
-    expect(result.body.hint).toContain('?nudge=true');
     expect(setReviewStatusMock).not.toHaveBeenCalled();
     expect(result.appendedEvents).toEqual([]);
   });
 
-  it('rejects remote workspaces without checking remote HEAD', async () => {
+  it('does not inspect remote workspaces for an already-passed non-force request', async () => {
     loadWorkspaceMetadataMock.mockReturnValue({
       location: 'remote',
       vmName: 'pan-workspace-123',
@@ -227,10 +225,10 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
 
     const result = await postRequestReview('PAN-1417');
 
-    expect(result.status).toBe(409);
+    expect(result.status).toBe(200);
     expect(result.body).toMatchObject({
-      success: false,
-      message: expect.stringContaining('PAN-1417 is executing remotely on pan-workspace-123'),
+      success: true,
+      alreadyPassed: true,
     });
     expect(execBehaviorMock.mock.calls.some(([command]) => String(command).includes('git rev-parse HEAD'))).toBe(false);
     expect(setReviewStatusMock).not.toHaveBeenCalled();
@@ -329,50 +327,37 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     expect(console.log).toHaveBeenCalledWith('[request-review] PAN-1417: forcing full review/test rerun from passed state');
   });
 
-  it('falls through to the destructive rerun path when current HEAD differs from reviewedAtCommit', async () => {
+  it('does not reset approval on a non-force request even when current HEAD differs from reviewedAtCommit', async () => {
     currentHeadSha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     getReviewStatusMock.mockReturnValue(passedStatus());
 
     const result = await postRequestReview('PAN-1417');
 
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ success: true, rerun: true });
-    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1417', expect.objectContaining({
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      readyForMerge: false,
-    }));
+    expect(result.body).toMatchObject({ success: true, alreadyPassed: true });
+    expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 
-  it('falls through to the destructive rerun path for legacy rows without reviewedAtCommit', async () => {
+  it('does not reset approval on a non-force request for legacy rows without reviewedAtCommit', async () => {
     getReviewStatusMock.mockReturnValue(passedStatus({ reviewedAtCommit: undefined }));
 
     const result = await postRequestReview('PAN-1417');
 
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ success: true, rerun: true });
+    expect(result.body).toMatchObject({ success: true, alreadyPassed: true });
     expect(execBehaviorMock.mock.calls.some(([command]) => String(command).includes('git rev-parse HEAD'))).toBe(false);
-    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1417', expect.objectContaining({
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-    }));
+    expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 
-  it('falls through to the destructive rerun path when HEAD lookup fails', async () => {
+  it('does not reset approval on a non-force request when HEAD lookup would fail', async () => {
     failHeadLookup = true;
     getReviewStatusMock.mockReturnValue(passedStatus());
 
     const result = await postRequestReview('PAN-1417');
 
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ success: true, rerun: true });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('HEAD lookup failed'));
-    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1417', expect.objectContaining({
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-    }));
+    expect(result.body).toMatchObject({ success: true, alreadyPassed: true });
+    expect(console.warn).not.toHaveBeenCalledWith(expect.stringContaining('HEAD lookup failed'));
+    expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 });

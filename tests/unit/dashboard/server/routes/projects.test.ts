@@ -81,7 +81,7 @@ vi.mock('node:fs/promises', async () => {
   };
 });
 
-import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
+import { fetchProjectSessionTree, getSlotWorkSessionNumber } from '../../../../../src/dashboard/server/routes/projects.ts';
 import { listProjectsSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
@@ -124,6 +124,12 @@ describe('fetchProjectSessionTree', () => {
 
     const result = await fetchProjectSessionTree('overdeck');
     expect(result).toEqual({ projectKey: 'overdeck', features: [] });
+  });
+
+  it('recognizes registered swarm slot session names', () => {
+    expect(getSlotWorkSessionNumber('agent-pan-2203-slot-1', 'pan-2203')).toBe(1);
+    expect(getSlotWorkSessionNumber('agent-pan-2203-slot-2', 'pan-2203')).toBe(2);
+    expect(getSlotWorkSessionNumber('agent-pan-2203-2', 'pan-2203')).toBeNull();
   });
 
   it('aggregates sessions for active feature workspaces', async () => {
