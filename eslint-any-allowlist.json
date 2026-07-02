@@ -155,7 +155,6 @@
   "src/lib/workspace-manager/migration.ts",
   "src/lib/workspace-manager/remove.ts",
   "src/lib/workspace-manager/repos.ts",
-  "src/lib/workspace-manager.ts",
   "src/lib/workspace/devcontainer-renderer.ts",
   "src/lib/workspace/ensure-devcontainer.ts",
   "src/lib/workspace/rebuild-stack.ts"
