@@ -265,7 +265,6 @@ export async function coordinateSwarmSlots(
       // two dispatchable items remain, the old early-continue skipped the whole
       // pass and the final slots of every swarm could never merge (observed
       // live on PAN-1791 with two finished slots waiting).
-      //
       // The >=2 floor exists so single-item plans never START a swarm — but an
       // in-progress swarm (evidenced by completed item overrides) must be able
       // to finish its tail, or the LAST item of every swarm strands undispatched
