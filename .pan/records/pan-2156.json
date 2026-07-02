@@ -16,6 +16,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T18:56:58.739Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T18:59:40.098Z"
     }
   ],
   "feedback": [],
@@ -66,14 +71,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:57:04.495Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-02T19:04:56.482Z",
+    "reviewNotes": "Approved: extraction verified, focused gates pass, no blockers",
+    "testNotes": "Workspace verified before repository commands. Read .pan/continue.json, .pan/spec.vbrief.json, .pan/drafts/PAN-2156.md, AGENTS.md, and attempted bd show PAN-2156 (no local bead found). UAT not required: acceptance is behavior-preserving server refactor with no UI/dashboard/browser workflow. Ran bash scripts/lint-file-size.sh (passed), wc -l src/dashboard/server/services/conversation/*.ts src/dashboard/server/services/conversation-service.ts (all conversation modules <=1000 lines; barrel 13 lines), git grep conversation-service import check, npm run typecheck (passed), npm run lint (passed), npm test with escalation after sandbox EPERM (root Vitest 797 passed/4 skipped; frontend selected tests 3 files/32 tests passed).",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "lastVerifiedCommit": "6b8c966c9b3e6867344d9b3732769dd8845d31a2",
+    "reviewedAtCommit": "ec890510c2689bc91a5a64c0e4c5d5bc91733a5b",
+    "lastVerifiedCommit": "ec890510c2689bc91a5a64c0e4c5d5bc91733a5b",
     "reviewRequestedAt": "2026-07-02T18:56:58.309Z"
   },
   "closeOut": {
@@ -126,7 +135,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.48002,
-        "pricingAsOf": "2026-07-02T18:57:04.582Z"
+        "pricingAsOf": "2026-07-02T19:04:56.521Z"
       }
     },
     "merges": [
@@ -135,5 +144,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T18:46:34.199Z",
-  "updated": "2026-07-02T18:57:04.602Z"
+  "updated": "2026-07-02T19:04:56.524Z"
 }
