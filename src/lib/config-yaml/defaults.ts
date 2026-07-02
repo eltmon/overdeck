@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { homedir } from 'os';
 import { defaultBackgroundAiFeatures } from '../background-ai/registry.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import type { NormalizedConfig } from './schema.js';
 
@@ -27,6 +28,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   providerAuth: {},
   providerPlan: {},
   providerHarnesses: {},
+  tieredExecution: {
+    ...DEFAULT_TIERED_EXECUTION_CONFIG,
+    tiers: {},
+    supervisor: { ...DEFAULT_TIERED_EXECUTION_CONFIG.supervisor },
+  },
   openrouterFavorites: [],
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),

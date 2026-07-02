@@ -4,6 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -89,6 +90,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
+    tieredExecution: {
+      ...DEFAULT_CONFIG.tieredExecution,
+      tiers: { ...DEFAULT_CONFIG.tieredExecution.tiers },
+      supervisor: { ...DEFAULT_CONFIG.tieredExecution.supervisor },
+    },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
     memory: {
@@ -187,6 +193,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
+        if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+        if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
       } else if (providers.anthropic !== undefined) {
         explicitlyDisabled.add('anthropic');
         result.enabledProviders.delete('anthropic');
@@ -308,6 +316,21 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge tmux configuration
     if (config.tmux?.config_mode) {
       result.tmux.configMode = config.tmux.config_mode;
+    }
+
+    if (config.tiered_execution) {
+      result.tieredExecution = validateTieredExecutionConfig(
+        {
+          ...result.tieredExecution,
+          ...config.tiered_execution,
+          tiers: config.tiered_execution.tiers ?? result.tieredExecution.tiers,
+          supervisor: {
+            ...result.tieredExecution.supervisor,
+            ...config.tiered_execution.supervisor,
+          },
+        },
+        { providerAuth: result.providerAuth },
+      );
     }
 
     // Merge conversation configuration

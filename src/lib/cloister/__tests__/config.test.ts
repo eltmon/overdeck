@@ -57,6 +57,19 @@ describe('loadCloisterConfig', () => {
     });
   });
 
+  it('defines tiered execution defaults', () => {
+    expect(DEFAULT_CLOISTER_CONFIG.tiered_execution).toEqual({
+      enabled: false,
+      tiers: {},
+      supervisor: {
+        model: 'claude-sonnet-4-6',
+        harness: 'claude-code',
+        subscribe: 'flagged',
+      },
+      replay_threshold: 0.5,
+    });
+  });
+
   it('loads stuck-remediation defaults when the config file has no block', () => {
     const config = loadCloisterConfigSync();
 
@@ -68,6 +81,21 @@ describe('loadCloisterConfig', () => {
       flywheel_stage1_minutes: 20,
       flywheel_stage2_minutes: 24,
       flywheel_stage3_minutes: 28,
+    });
+  });
+
+  it('loads tiered execution defaults when the config file has no block', () => {
+    const config = loadCloisterConfigSync();
+
+    expect(config.tiered_execution).toEqual({
+      enabled: false,
+      tiers: {},
+      supervisor: {
+        model: 'claude-sonnet-4-6',
+        harness: 'claude-code',
+        subscribe: 'flagged',
+      },
+      replay_threshold: 0.5,
     });
   });
 

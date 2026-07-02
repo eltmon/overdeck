@@ -5,6 +5,7 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -434,6 +435,9 @@ export interface YamlConfig {
   /** Shadow mode configuration */
   shadow?: ShadowConfig;
 
+  /** Difficulty-routed standing tier agent configuration. Off by default. */
+  tiered_execution?: Partial<TieredExecutionConfig>;
+
   /** tmux runtime configuration */
   tmux?: TmuxConfig;
 
@@ -664,6 +668,9 @@ export interface NormalizedConfig {
 
   /** Default harness by provider. Role/request harnesses override these defaults. */
   providerHarnesses: Partial<Record<ModelProvider, RuntimeName>>;
+
+  /** Difficulty-routed standing tier agent configuration. Off by default. */
+  tieredExecution: TieredExecutionConfig;
 
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];

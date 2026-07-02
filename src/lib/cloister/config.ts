@@ -11,6 +11,12 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
+import {
+  DEFAULT_TIERED_EXECUTION_CONFIG,
+  TieredExecutionValidationError,
+  validateTieredExecutionConfig,
+  type TieredExecutionConfig,
+} from '../agents/tier-table.js';
 
 const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
@@ -278,6 +284,7 @@ export interface CloisterConfig {
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
+  tiered_execution?: TieredExecutionConfig;
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
@@ -370,6 +377,11 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // now flows through resolveHarness(), which consults explicit, role,
       // providerHarnesses, and built-in provider defaults in order.
     },
+  },
+  tiered_execution: {
+    ...DEFAULT_TIERED_EXECUTION_CONFIG,
+    tiers: {},
+    supervisor: { ...DEFAULT_TIERED_EXECUTION_CONFIG.supervisor },
   },
   handoffs: {
     auto_triggers: {
@@ -481,7 +493,11 @@ export function loadCloisterConfigSync(): CloisterConfig {
 
       // Deep merge with defaults
       config = deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
+      config.tiered_execution = validateTieredExecutionConfig(config.tiered_execution);
     } catch (error) {
+      if (error instanceof TieredExecutionValidationError) {
+        throw error;
+      }
       console.error('Failed to load Cloister config:', error);
       console.error('Using default configuration');
       config = DEFAULT_CLOISTER_CONFIG;
