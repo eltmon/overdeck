@@ -235,6 +235,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
         }
         upsertDiscoveredSession({
           jsonlPath,
+          harness: 'claude-code',
           sessionId: existing.sessionId,
           workspacePath: existing.workspacePath,
           workspaceHash: existing.workspaceHash,
@@ -297,6 +298,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
       const wasExisting = !!existing;
       upsertDiscoveredSession({
         jsonlPath,
+        harness: 'claude-code',
         sessionId: meta.sessionId,
         workspacePath: resolved.workspacePath,
         workspaceHash: resolved.workspaceHash,

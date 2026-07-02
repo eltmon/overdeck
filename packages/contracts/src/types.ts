@@ -628,6 +628,7 @@ export type ProjectSessionTree = typeof ProjectSessionTree.Type
 export const DiscoveredSessionSnapshot = Schema.Struct({
   id: Schema.Number,
   jsonlPath: Schema.String,
+  harness: Schema.optional(Schema.String),
   sessionId: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   workspaceHash: Schema.optional(Schema.String),

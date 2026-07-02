@@ -116,6 +116,7 @@ const StatsResponseSchema = Schema.Struct({
 const DiscoveredSessionResponseSchema = Schema.Struct({
   id: Schema.Number,
   jsonlPath: Schema.String,
+  harness: Schema.String,
   sessionId: Schema.NullOr(Schema.String),
   workspacePath: Schema.NullOr(Schema.String),
   workspaceHash: Schema.NullOr(Schema.String),
