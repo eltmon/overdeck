@@ -6,6 +6,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T19:21:37.005Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T19:31:35.919Z"
     }
   ],
   "feedback": [],
@@ -56,17 +61,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-02T19:30:54.481Z",
-    "reviewNotes": "Approved: extraction verified, focused gates pass, no blockers",
-    "testNotes": "Required gates completed after failed/incomplete test verdict: npm run typecheck PASS; npm run lint PASS; npm test PASS with root Vitest 797 files passed / 7935 tests passed / 52 skipped and frontend action tests 3 files passed / 32 tests passed. Browser UAT not required for this non-UI refactor.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T19:31:35.681Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "reviewedAtCommit": "2337d65cfbc5acfac2b4c36552849b2e72ef01a1",
     "lastVerifiedCommit": "2337d65cfbc5acfac2b4c36552849b2e72ef01a1",
     "reviewRequestedAt": "2026-07-02T19:18:51.566Z"
   },
@@ -120,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.48002,
-        "pricingAsOf": "2026-07-02T19:30:54.513Z"
+        "pricingAsOf": "2026-07-02T19:31:35.770Z"
       }
     },
     "merges": [
@@ -129,5 +131,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T19:21:23.803Z",
-  "updated": "2026-07-02T19:30:54.596Z"
+  "updated": "2026-07-02T19:31:35.919Z"
 }
