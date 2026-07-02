@@ -4,17 +4,17 @@
     "created": "2026-07-02T13:58:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2214: Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator (re-plan: PR #2221 salvage + incident-driven FR-12..FR-16)",
-    "updated": "2026-07-02T14:06:41.797Z"
+    "updated": "2026-07-02T14:10:25.493Z"
   },
   "plan": {
     "id": "pan-2214",
     "title": "Swarm per-issue controls: salvage PR #2221 onto current main + record-write mutex, completion inference, record retirement, swarm feedback routing, verdict knock-over guard",
-    "status": "proposed",
+    "status": "running",
     "uid": "57aa9775-6aea-4735-99c4-751488dfc06c",
     "author": "agent:claude-fable-5",
-    "sequence": 10,
+    "sequence": 12,
     "created": "2026-07-02T13:58:57Z",
-    "updated": "2026-07-02T14:06:41.797Z",
+    "updated": "2026-07-02T14:10:25.493Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2214",
@@ -577,5 +577,5 @@
       "canonicalFilename": "2026-07-02-PAN-2214-swarm-per-issue-controls-salvage-pr-2221-onto-current-main-record-write-mutex-completion-inference-record-retirement-swarm-feedback-routing-verdict-knock-over-guard.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
