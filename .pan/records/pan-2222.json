@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-02T20:24:18.891Z",
-  "updated": "2026-07-02T21:43:58.359Z",
+  "updated": "2026-07-02T21:44:12.163Z",
   "pipeline": {
     "issueId": "PAN-2222",
     "reviewStatus": "pending",
@@ -88,21 +88,13 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "by-kind-config": "running",
     "escalation-state": "pending"
   },
   "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "by-kind-config",
-        "agentId": "agent-pan-2222-slot-1",
-        "branch": "feature/pan-2222-slot-1",
-        "assignedAt": "2026-07-02T21:43:58.359Z"
-      }
-    ]
+    "slotAssignments": []
   }
 }
