@@ -1,3 +1,4 @@
 - [x] PAN-2228 — 61897aad54 — delivery door PRD: verified-per-tier contract (D1/D2), kickoff fatality via stopped+auto-resume (D3/D4), side-door migration table, no-side-door guard
 - [x] PAN-2229 — 37b065294f — evals+gate PRD: F1-F4/R1-R4 golden scenarios, lint-prompts.sh extensions, two-mode trailer gate (Prompt-Change/Eval-Run)
 - [x] PAN-1983 — 658965aac7 — ground-truthed: ONE live prod path left (overdeck/backlog.ts re-export → panopticon.db); PRD = backlog door migration + legacy-import operator checkpoint + boundary-gate hole fix
+- [x] PAN-1984 — 7836f40fff — 36-file bucketed test audit (A delete/B repoint/C swap/D judgment), deletion ordering, contents-allowlist guard; depends on PAN-1983
