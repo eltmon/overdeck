@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2156",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Refactor-only extraction with no behavior change; existing coverage for parser/activity/watch/gate/context usage remains in src/dashboard/server/services/__tests__/conversation-service.test.ts at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9, and retry gates passed: npm run typecheck, npm run lint, npx vitest run --configLoader runner with 797 files / 7926 tests.",
+      "recordedAt": "2026-07-02T18:26:42.056Z"
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "resume",
@@ -21,11 +28,21 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-07-02T18:26:36.930Z"
+    },
+    {
+      "timestamp": "2026-07-02T18:26:54.533Z",
+      "reason": "end",
+      "note": "Test gate waived: Refactor-only extraction with no behavior change; existing coverage for parser/activity/watch/gate/context usage remains in src/dashboard/server/services/__tests__/conversation-service.test.ts at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9, and retry gates passed: npm run typecheck, npm run lint, npx vitest run --configLoader runner with 797 files / 7926 tests."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-07-02T18:26:56.440Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "finalize-baseline": "completed",
     "finalize-baseline.ac1": "completed",
@@ -73,16 +90,15 @@
     "issueId": "PAN-2156",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:26:36.749Z",
+    "updatedAt": "2026-07-02T18:27:14.861Z",
     "reviewNotes": "Pure barrel decomposition of conversation-service.ts: all 16 public symbols present, 9 submodules each under 1000 lines, no logic changes, DAG acyclic, async-only I/O confirmed",
     "testNotes": "Retried required gates in /home/eltmon/Projects/overdeck/workspaces/feature-pan-2156 after stale test-role failure: npm run typecheck PASS, npm run lint PASS, npx vitest run --configLoader runner PASS with 797 files passed / 7926 tests passed / 52 skipped. No browser UAT required for this behavior-preserving service refactor.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
     "lastVerifiedCommit": "007b11585a73111b32980894a9182ee9ddbc509a",
-    "reviewRequestedAt": "2026-07-02T18:05:48.217Z"
+    "reviewRequestedAt": "2026-07-02T18:26:54.535Z"
   },
   "closeOut": {
     "usage": {
@@ -105,10 +121,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 45,
-            "output": 21428,
-            "cacheRead": 2988061,
-            "cacheWrite": 654499
+            "input": 50,
+            "output": 23039,
+            "cacheRead": 3290110,
+            "cacheWrite": 780315
           }
         }
       },
@@ -126,15 +142,15 @@
           "cacheWrite": 407273
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 45,
-          "output": 21428,
-          "cacheRead": 2988061,
-          "cacheWrite": 654499
+          "input": 50,
+          "output": 23039,
+          "cacheRead": 3290110,
+          "cacheWrite": 780315
         }
       },
       "costAtCloseOut": {
-        "usd": 14.295503,
-        "pricingAsOf": "2026-07-02T18:26:36.850Z"
+        "usd": 14.882107,
+        "pricingAsOf": "2026-07-02T18:27:14.926Z"
       }
     },
     "merges": [
@@ -143,5 +159,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T18:09:19.879Z",
-  "updated": "2026-07-02T18:26:36.930Z"
+  "updated": "2026-07-02T18:27:15.574Z"
 }
