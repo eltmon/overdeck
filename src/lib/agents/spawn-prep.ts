@@ -213,6 +213,11 @@ export function resolveSlotTierSpawnParams(
   explicitModel?: string,
 ): SlotTierSpawnParams {
   const tiered = loadYamlConfig().config.tieredExecution;
+  // No tiered-execution config at all means the feature is off — the
+  // enablement-gate contract (zero behavior change when unconfigured).
+  // A plan-level `tiered_execution: on` override cannot enable tiering
+  // without a tier table to resolve against.
+  if (!tiered) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
   const planMetadata = doc?.plan?.metadata;
   if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
