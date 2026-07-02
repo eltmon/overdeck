@@ -22,11 +22,16 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-07-02T06:59:34.632Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T17:51:50.436Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:22.598Z",
-  "updated": "2026-07-02T17:05:48.670Z",
+  "updated": "2026-07-02T17:51:50.436Z",
   "pipeline": {
     "issueId": "PAN-2156",
     "reviewStatus": "pending",
@@ -86,8 +91,8 @@
       },
       "costAtCloseOut": {
         "usd": 11.125949,
-      "pricingAsOf": "2026-07-02T17:05:48.669Z"
-    }
+        "pricingAsOf": "2026-07-02T17:05:48.669Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
