@@ -43,7 +43,8 @@ peripheral, safe for autonomous pipeline flow once planned.
 | 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **written — on main** |
 | 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | **written — on main** |
 | 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | **written — on main** |
-| 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **written — on main** |
+| 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **DONE — landed 1e82badc32, issue closed** |
+| 8b | PAN-2204 | Agent direct-push-to-main guard (pre-push: block agent code pushes, allow state-plane paths) | design in issue comment 2026-07-02; **most urgent guardrail** — 3 unreviewed pushes + red-main #4 today |
 
 ## Phase 2 — route thinning (the three biggest god files, done right)
 
