@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { VBriefDifficulty, VBriefItem } from '../../vbrief/types.js';
 import {
   decideEscalation,
+  decideFlounderingEscalation,
+  decideVerificationFailureEscalation,
   isFloundering,
   type EscalationTrigger,
 } from '../tier-escalation.js';
@@ -129,6 +131,41 @@ describe('decideEscalation', () => {
     expect(source).not.toMatch(/from ['"](?:node:)?http['"]/);
     expect(source).not.toMatch(/from ['"](?:node:)?https['"]/);
     expect(source).not.toMatch(/from ['"](?:node:)?net['"]/);
+  });
+
+  it('exports foreman seams for verification failure and floundering triggers', () => {
+    expect(decideVerificationFailureEscalation({
+      bead: bead('simple'),
+      config: config({ retries_at_tier: 0 }),
+      overrides: {},
+      detail: 'gate failed',
+    })).toEqual({
+      action: 'promote',
+      from: 'simple',
+      to: 'medium',
+      reason: 'verification failed: gate failed',
+    });
+
+    expect(decideFlounderingEscalation({
+      bead: bead('medium'),
+      config: config({ retries_at_tier: 0, flounder_budget_minutes: { medium: 30 } }),
+      overrides: {},
+      dispatchedAt: '2026-07-02T10:00:00.000Z',
+      now: '2026-07-02T10:31:00.000Z',
+    })).toEqual({
+      action: 'promote',
+      from: 'medium',
+      to: 'complex',
+      reason: 'floundering since 2026-07-02T10:00:00.000Z',
+    });
+
+    expect(decideFlounderingEscalation({
+      bead: bead('medium'),
+      config: config({ flounder_budget_minutes: {} }),
+      overrides: {},
+      dispatchedAt: '2026-07-02T10:00:00.000Z',
+      now: '2026-07-02T12:00:00.000Z',
+    })).toBeNull();
   });
 });
 

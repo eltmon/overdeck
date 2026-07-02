@@ -13,6 +13,23 @@ export type EscalationAction =
   | { action: 'promote'; from: VBriefDifficulty; to: VBriefDifficulty; reason: string }
   | { action: 'block'; reason: string };
 
+export interface VerificationFailureEscalationInput {
+  bead: Pick<VBriefItem, 'id' | 'metadata'>;
+  config: ValidatedEscalationConfig;
+  overrides: TierOverridesMap;
+  detail: string;
+  attemptsAtCurrentTier?: number;
+}
+
+export interface FlounderingEscalationInput {
+  bead: Pick<VBriefItem, 'id' | 'metadata'>;
+  config: ValidatedEscalationConfig;
+  overrides: TierOverridesMap;
+  dispatchedAt: string;
+  now: string;
+  attemptsAtCurrentTier?: number;
+}
+
 export function applyEffectiveDifficulty<T extends Pick<VBriefItem, 'id' | 'metadata'>>(
   item: T,
   overrides: TierOverridesMap,
@@ -96,6 +113,32 @@ export function isFloundering(
   if (!Number.isFinite(dispatchedAt) || !Number.isFinite(now)) return false;
 
   return (now - dispatchedAt) / 60_000 > budgetMinutes;
+}
+
+export function decideVerificationFailureEscalation(
+  input: VerificationFailureEscalationInput,
+): EscalationAction {
+  return decideEscalation({
+    kind: 'verification-failed',
+    beadId: input.bead.id,
+    detail: input.detail,
+    attemptsAtCurrentTier: input.attemptsAtCurrentTier,
+  }, input.bead, input.config, input.overrides);
+}
+
+export function decideFlounderingEscalation(
+  input: FlounderingEscalationInput,
+): EscalationAction | null {
+  const effectiveDifficulty = input.overrides[input.bead.id]?.effectiveDifficulty ?? input.bead.metadata?.difficulty;
+  const budget = effectiveDifficulty ? input.config.flounder_budget_minutes[effectiveDifficulty] : undefined;
+  if (!isFloundering(input.dispatchedAt, input.now, budget)) return null;
+  return decideEscalation({
+    kind: 'floundering',
+    beadId: input.bead.id,
+    dispatchedAt: input.dispatchedAt,
+    now: input.now,
+    attemptsAtCurrentTier: input.attemptsAtCurrentTier,
+  }, input.bead, input.config, input.overrides);
 }
 
 function triggerReason(trigger: EscalationTrigger): string {

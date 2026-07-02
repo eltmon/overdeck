@@ -80,6 +80,7 @@ import { loadConfigSync, resolveModel } from '../../../lib/config-yaml.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { killSession } from '../../../lib/tmux.js';
+import { reportTieredInspectFailureEscalation } from './tiered-inspect-escalation.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -417,9 +418,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         break;
     }
 
-    // Apply the update (triggers side effects like idle state, queue processing)
     const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
-
+    if (specialist === 'inspect' && status === 'failed') yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
     // Set specialist state to idle and clear registry write-scope.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
     yield* Effect.promise(async () => {
