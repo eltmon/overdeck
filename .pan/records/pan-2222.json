@@ -11,17 +11,17 @@
   ],
   "feedback": [],
   "created": "2026-07-02T20:24:18.891Z",
-  "updated": "2026-07-02T22:01:32.366Z",
+  "updated": "2026-07-02T22:06:53.763Z",
   "pipeline": {
     "issueId": "PAN-2222",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T22:01:32.285Z",
-    "inspectNotes": "Inspecting bead workspace-7vhdd"
+    "updatedAt": "2026-07-02T22:06:53.728Z",
+    "inspectNotes": "INSPECTION PASSED for bead workspace-7vhdd. Spec fidelity: diff implements WI-5 effective-difficulty tierOverrides in workspace continue.json and preserves existing statusOverrides/spec bytes. Constraint compliance: no prohibited transports, execSync, hardcoded models, direct spec mutation, or delay-based tests."
   },
   "closeOut": {
     "usage": {
@@ -36,9 +36,9 @@
         },
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 1295958,
-            "output": 51016,
-            "cacheRead": 8344576,
+            "input": 1530828,
+            "output": 64136,
+            "cacheRead": 11053056,
             "cacheWrite": 0
           }
         },
@@ -67,9 +67,9 @@
           "cacheWrite": 370541
         },
         "openai/gpt-5.5": {
-          "input": 1295958,
-          "output": 51016,
-          "cacheRead": 8344576,
+          "input": 1530828,
+          "output": 64136,
+          "cacheRead": 11053056,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -80,8 +80,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.247865,
-        "pricingAsOf": "2026-07-02T22:01:32.358Z"
+        "usd": 47.170055,
+        "pricingAsOf": "2026-07-02T22:06:53.762Z"
       }
     },
     "merges": [],
