@@ -5,6 +5,7 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
+import type { TieredExecutionConfig, TieredExecutionInput } from '../agents/tier-table.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -492,6 +493,9 @@ export interface YamlConfig {
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
 
+  /** Difficulty-routed standing tier agent configuration. Off by default. */
+  tiered_execution?: TieredExecutionInput;
+
   /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
   experimental?: ExperimentalConfig;
 
@@ -775,6 +779,9 @@ export interface NormalizedConfig {
     agentWarnCount: number;
     agentBlockCount: number;
   };
+
+  /** Difficulty-routed standing tier agent configuration. Off by default. */
+  tieredExecution: TieredExecutionConfig;
 
   /** Experimental flag values, normalised (always defined, never undefined). */
   experimental: NormalizedExperimentalConfig;

@@ -11,6 +11,10 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
+import {
+  DEFAULT_TIERED_EXECUTION_CONFIG,
+  type TieredExecutionConfig,
+} from '../agents/tier-table.js';
 
 const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
@@ -278,6 +282,7 @@ export interface CloisterConfig {
   retention?: RetentionConfig;
   close_out?: CloseOutConfig;
   orphanProposedReconciler?: OrphanProposedReconcilerConfig;
+  tiered_execution?: TieredExecutionConfig;
 }
 
 /**
@@ -412,6 +417,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     enabled: true,
     minAttemptIntervalMs: 5 * 60 * 1000,
   },
+  tiered_execution: DEFAULT_TIERED_EXECUTION_CONFIG,
 };
 
 /**
