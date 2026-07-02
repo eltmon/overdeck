@@ -22,16 +22,22 @@ import { Data, Effect } from 'effect';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
 import {
   getProjectConfigFromWorkspacePath,
+  queueIssueRecordCommit,
   readIssueRecord,
   readIssueRecordSync,
   resolveProjectForIssue,
+  ensureIssueRecordSync,
+  writeIssueRecordSync,
   writeStatusOverrideSync,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import { parseVBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import { subItemsOf, type VBriefDocument, type VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDifficulty, type VBriefDocument, type VBriefItemStatus } from './types.js';
+import type { TierOverridesMap } from './continue-state.js';
+
+export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry } from './continue-state.js';
 
 /**
  * Synchronous spec lookup that mirrors what `findSpecByIssue` did pre-PAN-1249.
@@ -242,6 +248,45 @@ function readStatusOverridesSync(workspacePath: string): Record<string, string> 
   const project = resolveProjectForWorkspace(workspacePath);
   if (!project) return undefined;
   return readIssueRecordSync(project, issueId)?.statusOverrides;
+}
+
+export function readTierOverrides(workspacePath: string): TierOverridesMap {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return {};
+  const project = resolveProjectForWorkspace(workspacePath);
+  if (!project) return {};
+  return readIssueRecordSync(project, issueId)?.tierOverrides ?? {};
+}
+
+export function recordTierPromotion(
+  workspacePath: string,
+  beadId: string,
+  from: VBriefDifficulty,
+  to: VBriefDifficulty,
+  reason: string,
+): void {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return;
+  const project = resolveProjectForWorkspace(workspacePath);
+  if (!project) return;
+
+  const record = readIssueRecordSync(project, issueId) ?? ensureIssueRecordSync(project, issueId);
+  const existing = record.tierOverrides?.[beadId];
+  const nextOverrides: TierOverridesMap = {
+    ...(record.tierOverrides ?? {}),
+    [beadId]: {
+      effectiveDifficulty: to,
+      promotions: (existing?.promotions ?? 0) + 1,
+      history: [
+        ...(existing?.history ?? []),
+        { at: new Date().toISOString(), from, to, reason },
+      ],
+    },
+  };
+
+  record.tierOverrides = nextOverrides;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
 }
 
 /**

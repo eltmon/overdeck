@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
+import { resolveTier } from '../../agents/resolve-tier.js';
+import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
@@ -290,6 +293,69 @@ describe('updateItemStatus', () => {
     const specPath = join(PROJECT_ROOT, '.pan', 'specs', SPEC_FILENAME);
     const raw = JSON.parse(readFileSync(specPath, 'utf-8'));
     expect(raw.plan.items[0].status).toBe('pending');
+  });
+});
+
+describe('tierOverrides', () => {
+  function hashFile(path: string): string {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  }
+
+  it('round-trips tier promotions through the per-issue record', () => {
+    writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
+
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'blocked by supervisor');
+
+    const overrides = readTierOverrides(WORKSPACE_PATH);
+    expect(overrides['item-1']).toMatchObject({
+      effectiveDifficulty: 'complex',
+      promotions: 2,
+      history: [
+        { from: 'simple', to: 'medium', reason: 'verification failed' },
+        { from: 'medium', to: 'complex', reason: 'blocked by supervisor' },
+      ],
+    });
+    expect(overrides['item-1'].history[0].at).toEqual(expect.any(String));
+    expect(overrides['item-1'].history[1].at).toEqual(expect.any(String));
+  });
+
+  it('preserves the canonical spec byte-for-byte when recording a promotion', () => {
+    const specPath = writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
+    const beforeHash = hashFile(specPath);
+
+    recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
+
+    expect(hashFile(specPath)).toBe(beforeHash);
+  });
+
+  it('overlays promoted difficulty before tier resolution without changing unmatched items', () => {
+    const config = {
+      tiers: {
+        cheap: { model: 'cheap-model', harness: 'codex' as const },
+        senior: { model: 'senior-model', harness: 'codex' as const },
+      },
+      difficultyToTier: {
+        simple: 'cheap',
+        complex: 'senior',
+      },
+    };
+    const item = {
+      id: 'item-1',
+      title: 'Needs promotion',
+      status: 'pending' as const,
+      metadata: { difficulty: 'simple' as const },
+    };
+    const promoted = applyEffectiveDifficulty(item, {
+      'item-1': {
+        effectiveDifficulty: 'complex',
+        promotions: 1,
+        history: [{ at: '2026-07-02T00:00:00.000Z', from: 'simple', to: 'complex', reason: 'test' }],
+      },
+    });
+
+    expect(resolveTier(promoted, config).tierName).toBe('senior');
+    expect(resolveTier(applyEffectiveDifficulty(item, {}), config).tierName).toBe('cheap');
   });
 });
 

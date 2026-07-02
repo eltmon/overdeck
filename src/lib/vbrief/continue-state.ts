@@ -6,6 +6,8 @@
  * import them as type annotations and the structural shape must stay stable.
  */
 
+import type { VBriefDifficulty } from './types.js';
+
 export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
 
 /** Snapshot of git state at write time. */
@@ -77,6 +79,21 @@ export interface ScopeDriftRecord {
   recordedAt: string;
 }
 
+export interface TierPromotionHistoryEntry {
+  at: string;
+  from: VBriefDifficulty;
+  to: VBriefDifficulty;
+  reason: string;
+}
+
+export interface TierOverride {
+  effectiveDifficulty: VBriefDifficulty;
+  promotions: number;
+  history: TierPromotionHistoryEntry[];
+}
+
+export type TierOverridesMap = Record<string, TierOverride>;
+
 /** Reason a session ended or restarted. */
 export type ContinueSessionReason =
   | 'planning'
@@ -135,4 +152,6 @@ export interface ContinueState {
   feedback?: ContinueFeedbackEntry[];
   /** Advisory scope prediction drift recorded at pan done. */
   scopeDrift?: ScopeDriftRecord;
+  /** Effective difficulty overrides for tiered execution promotions. */
+  tierOverrides?: TierOverridesMap;
 }

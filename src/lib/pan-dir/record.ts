@@ -32,6 +32,7 @@ import type {
   ContinueResumePoint,
   ContinueSessionEntry,
   ScopeDriftRecord,
+  TierOverridesMap,
 } from '../vbrief/continue-state.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -142,6 +143,7 @@ export interface PanIssueRecord {
   resumePoint?: ContinueResumePoint | null;
   beadsMapping?: ContinueBeadsMapping;
   statusOverrides?: Record<string, string>;
+  tierOverrides?: TierOverridesMap;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
