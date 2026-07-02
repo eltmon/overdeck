@@ -12,139 +12,25 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T12:31:24.832Z",
-    "reviewNotes": "No blocking findings; noted non-blocking replay/slot recovery follow-ups",
-    "testNotes": "Commands run: npm run typecheck PASS; npm run lint PASS; npm test FAIL. UAT: not required; acceptance/notes cover library/config/routing/supervisor behavior, not browser/dashboard UI. Evidence: npm test exited 1 with 38 failed test files, 134 failed tests, 17 errors; representative unmet criteria include tests/integration/agent-spawning.test.ts TypeError in resolveTieredExecutionEnabled reading config.enabled, tests/integration/foreman-swarm.test.ts issue-id special-case guard matching PAN-1791/pan-1791 in dispatch path, and many EPERM failures from listen/spawnSync in test harness.",
+    "updatedAt": "2026-07-02T13:21:07.105Z",
+    "reviewNotes": "No blocking findings at 85808ba8; non-blocking replay follow-ups remain",
+    "testNotes": "Commands run from /home/eltmon/Projects/overdeck/workspaces/feature-pan-1791: npm run typecheck PASS; npm run lint PASS; npm test first sandboxed run failed with environmental EPERM for spawnSync/listen; escalated npm test ran without sandbox EPERM but FAILED: 1 failed test out of 7974, src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > PAN-2017: fails and stops a strike spawn when kickoff delivery fails, error ENOTEMPTY rmdir /tmp/pan-agent-role-QEqpR9/.overdeck/bin. Isolated rerun npx vitest run --configLoader runner src/lib/__tests__/agent-state-role.test.ts PASS (27/27), but configured full test gate still exited nonzero. UAT not required: acceptance/issue notes cover library/config/routing/supervisor behavior, not browser/dashboard UI.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "Bead workspace-xzhpd PASSED. standing-tiers.ts implements all four ACs: tier-run schedule from waves+difficulties (computeTierRunSchedule), exact scheduled tier set with no out-of-schedule spawns, lazy spawn at <=1 run away with reuse (no respawn), dispatchBeadToTier returns slot agent id via spawnRun registered-slot path (slotIndex/slotItemId, role work — no new agent kind). All imports verified against spawn.ts:79, spawn-prep.ts:101, resolve-tier.ts, dag.ts. Unroutable items propagate ResolveTierError (no silent fallback). Scope limited to the two expected output files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2223",
-    "reviewedAtCommit": "dad064368320ee2bd11494e911731fdffb550ead",
-    "reviewRequestedAt": "2026-07-02T12:23:49.329Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".pan/drafts/PAN-1791.md",
-        ".pan/records/pan-1791.json",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/cost.ts",
-        "src/dashboard/server/routes/__tests__/specialists.test.ts",
-        "src/dashboard/server/routes/costs.ts",
-        "src/lib/agents.ts",
-        "src/lib/agents/__tests__/dispatch-tier.test.ts",
-        "src/lib/agents/__tests__/fast-track.test.ts",
-        "src/lib/agents/__tests__/per-issue-tier-override.test.ts",
-        "src/lib/agents/__tests__/resolve-tier.test.ts",
-        "src/lib/agents/__tests__/slot-merge.test.ts",
-        "src/lib/agents/__tests__/standing-tiers.test.ts",
-        "src/lib/agents/__tests__/tier-feed.test.ts",
-        "src/lib/agents/__tests__/tier-metrics.test.ts",
-        "src/lib/agents/__tests__/tier-replay.test.ts",
-        "src/lib/agents/__tests__/tier-supervisor-verdict.test.ts",
-        "src/lib/agents/__tests__/tier-supervisor.test.ts",
-        "src/lib/agents/__tests__/tier-table.test.ts",
-        "src/lib/agents/spawn.ts",
-        "src/lib/cloister/__tests__/complexity.test.ts",
-        "src/lib/cloister/__tests__/router.test.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/database/cost-events-db.ts",
-        "src/lib/overdeck/cost-sync.ts",
-        "src/lib/overdeck/cost.ts",
-        "src/lib/vbrief/__tests__/types.test.ts",
-        "src/lib/vbrief/index.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/server/routes/specialists.ts",
-        "src/lib/agents/slot-merge.ts",
-        "src/lib/agents/slot-reconcile.ts"
-      ],
-      "declaredScope": [
-        "docs/TIERED-EXECUTION.md",
-        "roles/work.md",
-        "src/dashboard/server/routes/specialists.ts",
-        "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
-        "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
-        "src/lib/agents/dispatch-tier.ts",
-        "src/lib/agents/fast-track.ts",
-        "src/lib/agents/resolve-tier.ts",
-        "src/lib/agents/slot-merge.ts",
-        "src/lib/agents/slot-reconcile.ts",
-        "src/lib/agents/spawn-prep.ts",
-        "src/lib/agents/standing-tiers.ts",
-        "src/lib/agents/tier-feed.ts",
-        "src/lib/agents/tier-metrics.ts",
-        "src/lib/agents/tier-replay.ts",
-        "src/lib/agents/tier-supervisor.ts",
-        "src/lib/agents/tier-table.ts",
-        "src/lib/cloister/complexity.ts",
-        "src/lib/cloister/config.ts",
-        "src/lib/cloister/prompts/planning.md",
-        "src/lib/cloister/router.ts",
-        "src/lib/config-yaml/defaults.ts",
-        "src/lib/config-yaml/merge.ts",
-        "src/lib/vbrief/types.ts"
-      ],
-      "actualChangedFiles": [
-        ".pan/drafts/PAN-1791.md",
-        ".pan/records/pan-1791.json",
-        "docs/TIERED-EXECUTION.md",
-        "roles/work.md",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/cost.ts",
-        "src/dashboard/server/routes/__tests__/specialists.test.ts",
-        "src/dashboard/server/routes/costs.ts",
-        "src/lib/agents.ts",
-        "src/lib/agents/__tests__/dispatch-tier.test.ts",
-        "src/lib/agents/__tests__/fast-track.test.ts",
-        "src/lib/agents/__tests__/per-issue-tier-override.test.ts",
-        "src/lib/agents/__tests__/resolve-tier.test.ts",
-        "src/lib/agents/__tests__/slot-merge.test.ts",
-        "src/lib/agents/__tests__/standing-tiers.test.ts",
-        "src/lib/agents/__tests__/tier-feed.test.ts",
-        "src/lib/agents/__tests__/tier-metrics.test.ts",
-        "src/lib/agents/__tests__/tier-replay.test.ts",
-        "src/lib/agents/__tests__/tier-supervisor-verdict.test.ts",
-        "src/lib/agents/__tests__/tier-supervisor.test.ts",
-        "src/lib/agents/__tests__/tier-table.test.ts",
-        "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
-        "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
-        "src/lib/agents/dispatch-tier.ts",
-        "src/lib/agents/fast-track.ts",
-        "src/lib/agents/resolve-tier.ts",
-        "src/lib/agents/spawn-prep.ts",
-        "src/lib/agents/spawn.ts",
-        "src/lib/agents/standing-tiers.ts",
-        "src/lib/agents/tier-feed.ts",
-        "src/lib/agents/tier-metrics.ts",
-        "src/lib/agents/tier-replay.ts",
-        "src/lib/agents/tier-supervisor.ts",
-        "src/lib/agents/tier-table.ts",
-        "src/lib/cloister/__tests__/complexity.test.ts",
-        "src/lib/cloister/__tests__/router.test.ts",
-        "src/lib/cloister/complexity.ts",
-        "src/lib/cloister/config.ts",
-        "src/lib/cloister/prompts/planning.md",
-        "src/lib/cloister/router.ts",
-        "src/lib/config-yaml/defaults.ts",
-        "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/database/cost-events-db.ts",
-        "src/lib/overdeck/cost-sync.ts",
-        "src/lib/overdeck/cost.ts",
-        "src/lib/vbrief/__tests__/types.test.ts",
-        "src/lib/vbrief/index.ts",
-        "src/lib/vbrief/types.ts"
-      ],
-      "recordedAt": "2026-07-02T12:23:41.457Z"
-    }
+    "reviewedAtCommit": "85808ba802487823bc044b6d8f0da67edec601cb",
+    "deaconIgnored": true,
+    "deaconIgnoredAt": "2026-07-02T13:21:07.104Z",
+    "deaconIgnoredReason": "all 20 items merged; awaiting final test verdict + operator merge; swarm dispatch must stay off"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 106011,
-            "output": 81524,
-            "cacheRead": 43160383,
-            "cacheWrite": 304550
+            "input": 110535,
+            "output": 112014,
+            "cacheRead": 98257963,
+            "cacheWrite": 358332
           },
           "anthropic/claude-opus-4-8": {
             "input": 453,
@@ -177,8 +63,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 76402,
-            "output": 12731,
+            "input": 80852,
+            "output": 13440,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -202,10 +88,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 281834,
-          "output": 349047,
-          "cacheRead": 95150148,
-          "cacheWrite": 2085920
+          "input": 286358,
+          "output": 379537,
+          "cacheRead": 150247728,
+          "cacheWrite": 2139702
         },
         "anthropic/claude-opus-4-8": {
           "input": 44689,
@@ -220,15 +106,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 76402,
-          "output": 12731,
+          "input": 80852,
+          "output": 13440,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 175.882316,
-        "pricingAsOf": "2026-07-02T12:31:24.854Z"
+        "usd": 233.221922,
+        "pricingAsOf": "2026-07-02T13:21:07.145Z"
       }
     },
     "merges": [
@@ -239,6 +125,28 @@
   "swarm": {
     "slotAssignments": []
   },
-  "created": "2026-07-02T12:31:09.199Z",
-  "updated": "2026-07-02T12:31:24.855Z"
+  "created": "2026-07-02T13:20:34.104Z",
+  "updated": "2026-07-02T13:21:07.153Z",
+  "statusOverrides": {
+    "tier-table-config": "completed",
+    "per-issue-tier-override": "completed",
+    "kind-metadata-field": "completed",
+    "tier-resolution-chain": "completed",
+    "route-legacy-through-chain": "completed",
+    "dispatch-model-selection": "completed",
+    "standing-tier-lifecycle": "completed",
+    "commit-feed-delivery": "completed",
+    "foreman-dispatch-standing": "completed",
+    "supervisor-subscribe": "completed",
+    "supervisor-verdict-surface": "completed",
+    "supervisor-halt-dependents": "completed",
+    "fast-track-batching": "completed",
+    "fast-track-escalation": "completed",
+    "fast-track-automerge": "completed",
+    "tier-replay-and-compaction": "completed",
+    "tier-measurement": "completed",
+    "enablement-gate-test": "completed",
+    "tiered-execution-docs": "completed",
+    "tiered-e2e-dogfood": "completed"
+  }
 }
