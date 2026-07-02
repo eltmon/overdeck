@@ -29,6 +29,7 @@ import { runWithPool } from './work-pool.js';
 import { buildCorrelationMapSync } from './correlator.js';
 import { getModelCapabilitySync } from '../model-capabilities.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
+import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,73 +67,6 @@ export interface ScanResult {
   warnings?: string[];
 }
 
-// ─── Discovery ────────────────────────────────────────────────────────────────
-
-/**
- * Recursively collect all .jsonl files under a project directory.
- * Follows subdirectories (e.g. <uuid>/subagents/) so nested subagent transcripts
- * are discovered alongside top-level session files.
- * The projectDir (top-level hash dir) is preserved on every result entry for mode filtering.
- */
-async function collectJsonlFiles(
-  projectDir: string,
-  dir: string,
-  result: Array<{ projectDir: string; jsonlPath: string }>,
-  warnings: string[],
-): Promise<void> {
-  let entries: import('fs').Dirent[];
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'EACCES' || code === 'EPERM') {
-      warnings.push(`Permission denied while scanning ${dir}`);
-    }
-    return;
-  }
-  for (const entry of entries) {
-    const name = String(entry.name);
-    if (entry.isFile() && name.endsWith('.jsonl')) {
-      result.push({ projectDir, jsonlPath: join(dir, name) });
-    } else if (entry.isDirectory()) {
-      await collectJsonlFiles(projectDir, join(dir, name), result, warnings);
-    }
-  }
-}
-
-/**
- * Walk ~/.claude/projects/ and return all .jsonl files (including nested subagent transcripts).
- * Each entry is { projectDir, jsonlPath }.
- */
-async function discoverJsonlFiles(
-  warnings: string[],
-  targetEncodings?: string[],
-): Promise<Array<{ projectDir: string; jsonlPath: string }>> {
-  const claudeProjectsDir = join(homedir(), '.claude', 'projects');
-  const result: Array<{ projectDir: string; jsonlPath: string }> = [];
-
-  let projectDirs: string[];
-  try {
-    const entries = await fs.readdir(claudeProjectsDir, { withFileTypes: true });
-    projectDirs = entries
-      .filter((e) => e.isDirectory())
-      .map((e) => join(claudeProjectsDir, e.name));
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'EACCES' || code === 'EPERM') {
-      warnings.push(`Permission denied while scanning ${claudeProjectsDir}`);
-    }
-    return result;
-  }
-
-  for (const projectDir of projectDirs) {
-    if (targetEncodings && !projectDirMatchesAnyTarget(projectDir, targetEncodings)) continue;
-    await collectJsonlFiles(projectDir, projectDir, result, warnings);
-  }
-
-  return result;
-}
-
 // ─── Scanner ──────────────────────────────────────────────────────────────────
 
 export async function scan(opts: ScanOptions): Promise<ScanResult> {
@@ -153,7 +87,11 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const resolver = new HashResolver(opts.watchDirs ?? []);
 
   if (opts.dryRun) {
-    for (const { jsonlPath } of filteredFiles) {
+    for (const { jsonlPath, harness } of filteredFiles) {
+      if (harness !== 'claude-code') {
+        result.skipped++;
+        continue;
+      }
       if (opts.mode === 'targeted') {
         try {
           const meta = await parseJsonl(jsonlPath);
@@ -199,7 +137,19 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   let sessionsFound = 0;
 
   // 7. Build tasks
-  const tasks = filteredFiles.map(({ jsonlPath }) => async () => {
+  const tasks = filteredFiles.map(({ jsonlPath, harness }) => async () => {
+    if (harness !== 'claude-code') {
+      result.skipped++;
+      dirsProcessed++;
+      await opts.onProgress?.({
+        dirsProcessed,
+        dirsTotal,
+        sessionsFound,
+        elapsedMs: Date.now() - startTs,
+      });
+      return;
+    }
+
     // Change detection: skip if file unchanged
     const existing = getDiscoveredSessionByJsonlPath(jsonlPath);
     let stat: { size: number; mtimeMs: number } | null = null;
@@ -391,9 +341,9 @@ export function validateEstimatedCost(
 // ─── Mode filtering ───────────────────────────────────────────────────────────
 
 function filterByMode(
-  files: Array<{ projectDir: string; jsonlPath: string }>,
+  files: DiscoveredFile[],
   opts: ScanOptions,
-): Array<{ projectDir: string; jsonlPath: string }> {
+): DiscoveredFile[] {
   const targetEncodings = targetEncodingsForMode(opts);
   if (!targetEncodings) return files;
   if (targetEncodings.length === 0) return [];
