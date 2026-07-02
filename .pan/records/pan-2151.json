@@ -24,37 +24,120 @@
       "timestamp": "2026-07-02T19:32:35.637Z",
       "reason": "start",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-07-02T21:07:42.548Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2151.md",
+      ".pan/records/pan-2151.json"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "eslint-any-allowlist.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
+      "src/dashboard/server/routes/misc.ts",
+      "src/dashboard/server/routes/misc/deacon.ts",
+      "src/dashboard/server/routes/misc/health.ts",
+      "src/dashboard/server/routes/misc/meta.ts",
+      "src/dashboard/server/routes/misc/planning.ts",
+      "src/dashboard/server/routes/misc/project-mappings.ts",
+      "src/dashboard/server/routes/misc/shared.ts",
+      "src/dashboard/server/routes/misc/tldr.ts",
+      "src/dashboard/server/routes/misc/trackers.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2151.md",
+      ".pan/records/pan-2151.json",
+      "eslint-any-allowlist.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
+      "src/dashboard/server/routes/misc.ts",
+      "src/dashboard/server/routes/misc/deacon.ts",
+      "src/dashboard/server/routes/misc/health.ts",
+      "src/dashboard/server/routes/misc/meta.ts",
+      "src/dashboard/server/routes/misc/planning.ts",
+      "src/dashboard/server/routes/misc/project-mappings.ts",
+      "src/dashboard/server/routes/misc/shared.ts",
+      "src/dashboard/server/routes/misc/tldr.ts",
+      "src/dashboard/server/routes/misc/trackers.ts"
+    ],
+    "recordedAt": "2026-07-02T21:06:08.344Z"
+  },
   "created": "2026-06-30T01:25:47.990Z",
-  "updated": "2026-07-02T21:06:04.038Z",
+  "updated": "2026-07-02T21:08:15.444Z",
   "pipeline": {
     "issueId": "PAN-2151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T19:52:39.959Z",
-    "inspectNotes": "INSPECTION PASSED for bead workspace-he57r. shared-helpers diff moves the intended helpers into src/dashboard/server/routes/misc/shared.ts, preserves misc.ts exports via readPackageVersion re-export, changes only misc.ts and misc/shared.ts, and introduces no new execSync/sendKeys/explicit-any patterns."
+    "updatedAt": "2026-07-02T21:08:15.350Z",
+    "inspectNotes": "INSPECTION PASSED for bead workspace-he57r. shared-helpers diff moves the intended helpers into src/dashboard/server/routes/misc/shared.ts, preserves misc.ts exports via readPackageVersion re-export, changes only misc.ts and misc/shared.ts, and introduces no new execSync/sendKeys/explicit-any patterns.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
+    "reviewRequestedAt": "2026-07-02T21:07:42.551Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2151.md",
+        ".pan/records/pan-2151.json"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "eslint-any-allowlist.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
+        "src/dashboard/server/routes/misc.ts",
+        "src/dashboard/server/routes/misc/deacon.ts",
+        "src/dashboard/server/routes/misc/health.ts",
+        "src/dashboard/server/routes/misc/meta.ts",
+        "src/dashboard/server/routes/misc/planning.ts",
+        "src/dashboard/server/routes/misc/project-mappings.ts",
+        "src/dashboard/server/routes/misc/shared.ts",
+        "src/dashboard/server/routes/misc/tldr.ts",
+        "src/dashboard/server/routes/misc/trackers.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2151.md",
+        ".pan/records/pan-2151.json",
+        "eslint-any-allowlist.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
+        "src/dashboard/server/routes/misc.ts",
+        "src/dashboard/server/routes/misc/deacon.ts",
+        "src/dashboard/server/routes/misc/health.ts",
+        "src/dashboard/server/routes/misc/meta.ts",
+        "src/dashboard/server/routes/misc/planning.ts",
+        "src/dashboard/server/routes/misc/project-mappings.ts",
+        "src/dashboard/server/routes/misc/shared.ts",
+        "src/dashboard/server/routes/misc/tldr.ts",
+        "src/dashboard/server/routes/misc/trackers.ts"
+      ],
+      "recordedAt": "2026-07-02T21:06:08.344Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 242112,
-            "output": 11646,
-            "cacheRead": 2845184,
+            "input": 244654,
+            "output": 12016,
+            "cacheRead": 3061248,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 74035,
-            "output": 4797,
+            "input": 77605,
+            "output": 5383,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -76,14 +159,14 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 242112,
-          "output": 11646,
-          "cacheRead": 2845184,
+          "input": 244654,
+          "output": 12016,
+          "cacheRead": 3061248,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 74035,
-          "output": 4797,
+          "input": 77605,
+          "output": 5383,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -101,14 +184,16 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 21.951875,
-        "pricingAsOf": "2026-07-02T19:52:40.041Z"
+        "usd": 22.083717,
+        "pricingAsOf": "2026-07-02T21:08:15.441Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2239"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "barrel-finalize": "completed",
