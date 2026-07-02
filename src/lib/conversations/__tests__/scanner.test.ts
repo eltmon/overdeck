@@ -397,6 +397,91 @@ describe('scanner', () => {
       progressCalls[progressCalls.length - 1]?.dirsProcessed ?? 0,
     );
   });
+
+  it('correlates managed ohmypi rows by conversation_files locator without Claude path reconstruction', async () => {
+    const p = join(odb.home, '.omp', 'agent', 'sessions', '-home-user-Projects-omp', '20260702_managed-omp.jsonl');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, piSessionJsonl('managed-omp', '/home/user/Projects/omp'), 'utf8');
+    seedConversationFile(odb, {
+      id: 'conv-managed-omp',
+      name: 'conv-managed-omp',
+      cwd: '/home/user/Projects/omp',
+      issueId: 'PAN-2224',
+      locator: 'managed-omp',
+      harness: 'ohmypi',
+    });
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
+
+    expect(result.errors).toBe(0);
+    expect(session).toMatchObject({
+      harness: 'ohmypi',
+      overdeckManaged: true,
+      panIssueId: 'PAN-2224',
+      panAgentId: 'conv-managed-omp',
+      workspacePath: '/home/user/Projects/omp',
+    });
+  });
+
+  it('leaves ad-hoc pi rows unmanaged when no locator matches', async () => {
+    const p = join(odb.home, '.pi', 'agent', 'sessions', '-home-user-Projects-pi', '20260702_adhoc-pi.jsonl');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, piSessionJsonl('adhoc-pi', '/home/user/Projects/pi'), 'utf8');
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
+
+    expect(result.errors).toBe(0);
+    expect(session).toMatchObject({
+      harness: 'pi',
+      overdeckManaged: false,
+      panIssueId: null,
+      workspacePath: '/home/user/Projects/pi',
+    });
+  });
+
+  it('resolves codex workspace from the owning agent dir when rollout metadata has no cwd', async () => {
+    const owned = join(
+      odb.home,
+      '.overdeck',
+      'agents',
+      'agent-codex-fallback',
+      'codex-home',
+      'sessions',
+      '2026',
+      '07',
+      '02',
+      'rollout-2026-07-02T00-00-00-000Z-owned.jsonl',
+    );
+    const unowned = join(
+      odb.home,
+      '.codex',
+      'sessions',
+      '2026',
+      '07',
+      '02',
+      'rollout-2026-07-02T00-00-00-000Z-unowned.jsonl',
+    );
+    mkdirSync(dirname(owned), { recursive: true });
+    mkdirSync(dirname(unowned), { recursive: true });
+    writeFileSync(owned, codexWithoutSessionMetaJsonl(), 'utf8');
+    writeFileSync(unowned, codexWithoutSessionMetaJsonl(), 'utf8');
+    seedAgent(odb, 'agent-codex-fallback', '/home/user/Projects/codex-owned');
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const sessions = findDiscoveredSessions();
+
+    expect(result.errors).toBe(0);
+    expect(sessions.find((s) => s.jsonlPath === owned)).toMatchObject({
+      harness: 'codex',
+      workspacePath: '/home/user/Projects/codex-owned',
+    });
+    expect(sessions.find((s) => s.jsonlPath === unowned)).toMatchObject({
+      harness: 'codex',
+      workspacePath: null,
+    });
+  });
 });
 
 function claudeProjection(file: DiscoveredFile): { projectDir: string; jsonlPath: string } {
@@ -406,4 +491,64 @@ function claudeProjection(file: DiscoveredFile): { projectDir: string; jsonlPath
 
 function byPath(a: { jsonlPath: string }, b: { jsonlPath: string }): number {
   return a.jsonlPath.localeCompare(b.jsonlPath);
+}
+
+function piSessionJsonl(sessionId: string, cwd: string): string {
+  return [
+    JSON.stringify({
+      type: 'session',
+      id: sessionId,
+      timestamp: '2026-07-02T10:00:00.000Z',
+      cwd,
+    }),
+    JSON.stringify({
+      type: 'message',
+      timestamp: '2026-07-02T10:00:01.000Z',
+      message: { role: 'user', content: [{ type: 'text', text: 'hello from pi' }] },
+    }),
+  ].join('\n') + '\n';
+}
+
+function codexWithoutSessionMetaJsonl(): string {
+  return [
+    JSON.stringify({
+      type: 'turn_context',
+      timestamp: '2026-07-02T11:00:00.000Z',
+      payload: { type: 'turn_context', model: 'gpt-5.5' },
+    }),
+    JSON.stringify({
+      type: 'event_msg',
+      timestamp: '2026-07-02T11:00:01.000Z',
+      payload: { type: 'user_message', message: 'hello from codex' },
+    }),
+  ].join('\n') + '\n';
+}
+
+function seedConversationFile(
+  dbHandle: OverdeckTestDb,
+  input: { id: string; name: string; cwd: string; issueId: string; locator: string; harness: string },
+): void {
+  const db = dbHandle.raw();
+  db.prepare(
+    `INSERT INTO conversations (id, name, tmux_session, status, cwd, issue_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(input.id, input.name, input.name, 'active', input.cwd, input.issueId, new Date('2026-07-02T00:00:00.000Z').toISOString());
+  db.prepare(
+    `INSERT INTO conversation_files (conversation_id, harness, locator, created_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(input.id, input.harness, input.locator, Date.parse('2026-07-02T00:00:00.000Z'));
+}
+
+function seedAgent(dbHandle: OverdeckTestDb, id: string, workspace: string): void {
+  const now = new Date('2026-07-02T00:00:00.000Z').toISOString();
+  const db = dbHandle.raw();
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.prepare(
+      `INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, 'PAN-2224', 'work', 'stopped', workspace, 'codex', 'gpt-5.5', now);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
 }
