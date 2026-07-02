@@ -25,6 +25,7 @@ type SourceFilter = 'all' | SessionSource;
 interface DiscoveredSession {
   id: number;
   source: SessionSource;
+  harness: string;
   conversationName?: string | null;
   archivedAt?: string | null;
   jsonlPath: string | null;
@@ -91,8 +92,9 @@ interface SearchResponse {
   error?: string;
 }
 
-interface ArchivedConversationResponse extends Omit<DiscoveredSession, 'source'> {
+interface ArchivedConversationResponse extends Omit<DiscoveredSession, 'source' | 'harness'> {
   source: 'managed-archived';
+  harness?: string;
   conversationName: string;
   archivedAt: string;
 }
@@ -106,6 +108,7 @@ interface ScanResult {
 }
 
 interface ConversationRpcFilter {
+  harness?: string;
   workspacePath?: string;
   primaryModel?: string;
   since?: string;
@@ -195,6 +198,7 @@ function countCostFacets(sessions: DiscoveredSession[]): FacetValue[] {
 
 function buildFilterParams(filters: {
   source?: SourceFilter;
+  harness?: string;
   workspace?: string;
   since?: string;
   managed?: boolean;
@@ -208,6 +212,7 @@ function buildFilterParams(filters: {
   enrichmentLevel?: string;
 }): URLSearchParams {
   const params = new URLSearchParams();
+  if (filters.harness) params.set('harness', filters.harness);
   if (filters.workspace) params.set('workspacePath', filters.workspace);
   if (filters.since) params.set('since', filters.since);
   if (filters.managed) params.set('managed', 'true');
@@ -224,6 +229,7 @@ function buildFilterParams(filters: {
 
 function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   const payload: ConversationRpcFilter = {};
+  const harness = params.get('harness');
   const workspacePath = params.get('workspacePath');
   const primaryModel = params.get('primaryModel');
   const since = params.get('since');
@@ -235,6 +241,7 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   const minCost = params.get('minCost');
   const maxCost = params.get('maxCost');
   const enrichmentLevel = params.get('enrichmentLevel');
+  if (harness) payload.harness = harness;
   if (workspacePath) payload.workspacePath = workspacePath;
   if (primaryModel) payload.primaryModel = primaryModel;
   if (since) payload.since = since;
@@ -253,6 +260,7 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
   return {
     id: session.id,
     source: 'discovered',
+    harness: session.harness ?? 'claude-code',
     jsonlPath: session.jsonlPath,
     workspacePath: session.workspacePath ?? null,
     primaryModel: session.primaryModel ?? null,
@@ -289,7 +297,8 @@ async function fetchArchivedConversations(params: URLSearchParams): Promise<Disc
   const query = params.toString();
   const response = await fetch(`/api/conversations/archived${query ? `?${query}` : ''}`);
   if (!response.ok) throw new Error(`Failed to load archived conversations: ${response.status}`);
-  return (await response.json()) as ArchivedConversationResponse[];
+  return ((await response.json()) as ArchivedConversationResponse[])
+    .map((session) => ({ ...session, harness: session.harness ?? 'claude-code' }));
 }
 
 async function fetchSearch(
@@ -351,6 +360,7 @@ export function ConversationsPage() {
   const [semanticSearch, setSemanticSearch] = useState(false);
   const [filters, setFilters] = useState<{
     source?: SourceFilter;
+    harness?: string;
     workspace?: string;
     since?: string;
     managed?: boolean;
@@ -448,6 +458,7 @@ export function ConversationsPage() {
   const selected = selectedKey != null ? sessions.find((s) => sessionKey(s) === selectedKey) ?? null : null;
   const workspaceCostEntries = workspaceCost?.entries ?? [];
   const facetOptions = {
+    harnesses: countFacetValues(sessions.map((s) => s.harness)),
     models: countFacetValues(sessions.map((s) => s.primaryModel)),
     workspaces: workspaceCostEntries.length > 0
       ? workspaceCostEntries.map((entry) => ({ value: entry.key, count: entry.sessionCount, cost: entry.totalCost }))
@@ -461,6 +472,7 @@ export function ConversationsPage() {
   };
   const activeFilterChips = [
     sourceFilter !== 'all' ? { key: 'source', label: `Source: ${sourceFilter === 'discovered' ? 'Discovered' : 'Managed-archived'}` } : null,
+    filters.harness ? { key: 'harness', label: `Harness: ${filters.harness}` } : null,
     filters.workspace ? { key: 'workspace', label: `Workspace: ${filters.workspace}` } : null,
     filters.model ? { key: 'model', label: `Model: ${filters.model}` } : null,
     filters.tag ? { key: 'tag', label: `Tag: ${filters.tag}` } : null,

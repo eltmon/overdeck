@@ -661,6 +661,7 @@ export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
 
 /** Filter parameters for conversation search */
 export const ConversationFilter = Schema.Struct({
+  harness: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   primaryModel: Schema.optional(Schema.String),
   managed: Schema.optional(Schema.Boolean),

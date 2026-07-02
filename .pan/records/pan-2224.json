@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2224",
   "schemaVersion": 2,
-  "created": "2026-07-02T14:21:59.582Z",
-  "updated": "2026-07-02T14:33:18.744Z",
-  "pipeline": {
-    "issueId": "PAN-2224",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T14:21:59.582Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -28,6 +9,86 @@
       "timestamp": "2026-07-02T14:22:01.150Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-02T14:21:59.582Z",
+  "updated": "2026-07-02T15:30:04.563Z",
+  "pipeline": {
+    "issueId": "PAN-2224",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T15:30:04.529Z",
+    "inspectNotes": "Spec fidelity passed: WI-2/D-1/D-3 implemented with harness-discovery sources for claude-code, pi, ohmypi, codex, and agent dirs; scanner gates non-Claude parsing until parser beads. Constraint compliance passed: zero sync FS calls in harness-discovery.ts/scanner.ts and missing roots skipped silently."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 8,
+            "output": 1561,
+            "cacheRead": 1022190,
+            "cacheWrite": 3275
+          }
+        },
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 953245,
+            "output": 41390,
+            "cacheRead": 4626432,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 24029,
+            "output": 444,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 17983,
+            "output": 42934,
+            "cacheRead": 3539296,
+            "cacheWrite": 169342
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 17991,
+          "output": 44495,
+          "cacheRead": 4561486,
+          "cacheWrite": 172617
+        },
+        "openai/gpt-5.5": {
+          "input": 953245,
+          "output": 41390,
+          "cacheRead": 4626432,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 24029,
+          "output": 444,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 17.445008,
+        "pricingAsOf": "2026-07-02T15:30:04.562Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "scan-baseline": "pending"
   },
