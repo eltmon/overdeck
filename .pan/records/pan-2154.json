@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-06-30T01:20:28.481Z",
-  "updated": "2026-07-02T19:19:29.217Z",
+  "updated": "2026-07-02T19:20:01.937Z",
   "pipeline": {
     "issueId": "PAN-2154",
     "reviewStatus": "pending",
@@ -162,6 +162,11 @@
       "id": "D-test-waived",
       "summary": "Test gate waived: Pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior and full npx vitest run --configLoader runner passed.",
       "recordedAt": "2026-07-02T19:19:29.216Z"
+    },
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Pure extraction/refactor with no behavior change; existing workspace-manager coverage in tests/lib/workspace-manager.test.ts at 2ec6164c48 covers create/remove/docker behavior and full npx vitest run --configLoader runner passed.",
+      "recordedAt": "2026-07-02T19:20:01.936Z"
     }
   ]
 }
