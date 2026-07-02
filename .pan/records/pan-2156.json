@@ -49,17 +49,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T18:10:22.690Z",
-    "reviewNotes": "Pure barrel decomposition of conversation-service.ts: all 16 public symbols present, 9 submodules each under 1000 lines, no logic changes, DAG acyclic, async-only I/O confirmed",
-    "testNotes": "Verification context was read (.pan/continue.json, .pan/spec.vbrief.json, .pan/records/pan-2156.json, .pan/drafts/PAN-2156.md, AGENTS.md, package.json). Required gates were not completed in this test-role run before verdict recording; no browser UAT was exercised. Marking failed because typecheck, lint, and tests were not run to completion here.",
+    "updatedAt": "2026-07-02T18:19:29.589Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "reviewedAtCommit": "e0a7c79c3e80ab1145d3fdd88cd6817c4ecbf963",
     "lastVerifiedCommit": "e0a7c79c3e80ab1145d3fdd88cd6817c4ecbf963",
     "reviewRequestedAt": "2026-07-02T18:05:48.217Z"
   },
@@ -113,7 +110,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.644536,
-        "pricingAsOf": "2026-07-02T18:10:22.720Z"
+        "pricingAsOf": "2026-07-02T18:19:29.661Z"
       }
     },
     "merges": [
@@ -122,5 +119,12 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T18:09:19.879Z",
-  "updated": "2026-07-02T18:11:15.017Z"
+  "updated": "2026-07-02T18:19:29.746Z",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-07-02T18:19:29.746Z"
+    }
+  ]
 }
