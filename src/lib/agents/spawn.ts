@@ -53,6 +53,7 @@ import {
   defaultRunWorkspace,
   flywheelEnvExports,
   resolveRegisteredSlotSpawn,
+  resolveSlotTierSpawnParams,
   resolveFlywheelSpawnEnv,
   runAgentId,
   transitionIssueToInProgress,
@@ -82,8 +83,19 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   if (role === 'work') {
     const slot = resolveRegisteredSlotSpawn(issueId, workspace, options);
+    // Tiered execution (PAN-1791): when enabled, the slot item's difficulty
+    // selects the worker — the resolved tier's model+harness replace the
+    // parent default in the spawn params. Disabled → both stay as resolved
+    // above, unchanged.
+    let slotModel = selectedModel;
+    let slotHarness = options.harness;
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
+      const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model);
+      if (tierParams.model) {
+        slotModel = determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey });
+        slotHarness = tierParams.harness;
+      }
       await ensureRegisteredSlotWorktree(workspace, slot);
     }
     const prompt = slot
@@ -93,8 +105,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       issueId,
       workspace: slot?.workspace ?? workspace,
       agentId: slot?.agentId,
-      harness: options.harness,
-      model: selectedModel,
+      harness: slotHarness,
+      model: slotModel,
       prompt,
       role: 'work',
       allowHost: options.allowHost,

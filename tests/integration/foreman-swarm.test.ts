@@ -158,11 +158,17 @@ describe('foreman swarm dogfood', () => {
   });
 
   it('keeps the dispatch path free of issue-id special cases', () => {
+    // Comments legitimately cite the feature's issue id as provenance (repo
+    // convention); the hazard this guard exists for is CODE that branches on
+    // a specific issue id. Strip comments so only executable text is matched.
+    const stripComments = (source: string): string => source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
     const dispatchPath = [
       'src/lib/agents/dispatch-tier.ts',
       'src/lib/agents/spawn-prep.ts',
       'src/lib/agents/slot-reconcile.ts',
-    ].map(path => readFileSync(path, 'utf-8')).join('\n');
+    ].map(path => stripComments(readFileSync(path, 'utf-8'))).join('\n');
 
     expect(dispatchPath).not.toMatch(/PAN-1791|pan-1791/);
   });

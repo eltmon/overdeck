@@ -15,6 +15,7 @@ import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
 import type { SqliteDatabase } from './driver.js';
 import type { CostEvent } from '../costs/events.js';
+import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
 /** A SQLite operation against panopticon.db failed. */
 class DatabaseError extends Data.TaggedError('DatabaseError')<{
@@ -521,7 +522,7 @@ export function getAgentRollup(issueId?: string): AgentRollup[] {
     GROUP BY agent_id
     ORDER BY total_cost DESC
   `).all(...params) as Array<{
-    agent_id: string;
+    agent_id: string | null;
     total_cost: number;
     calls: number;
     total_tokens: number;
@@ -530,7 +531,8 @@ export function getAgentRollup(issueId?: string): AgentRollup[] {
   }>;
 
   return rows.map(r => ({
-    agentId: r.agent_id,
+    agentId: r.agent_id ?? 'unattributed',
+    role: deriveTieredAgentCostRole(r.agent_id ?? 'unattributed', issueId),
     totalCost: r.total_cost,
     calls: r.calls,
     totalTokens: r.total_tokens,
@@ -729,6 +731,7 @@ export interface ModelRollup {
 
 export interface AgentRollup {
   agentId: string;
+  role: string;
   totalCost: number;
   calls: number;
   totalTokens: number;

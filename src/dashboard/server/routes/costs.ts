@@ -286,7 +286,7 @@ const getCostsIssueRoute = HttpRouter.add(
 
 // ─── Route: GET /api/costs/by-agent ──────────────────────────────────────────
 // PAN-1938: served through CostResolver (overdeck read door).
-// Response shape: Rollup[] = { key: agentId, cost, tokens: { input, output, cacheRead, cacheWrite } }
+// Response shape: Rollup[] = { key: agentId, role?, cost, tokens: { input, output, cacheRead, cacheWrite } }
 
 const getCostsByAgentRoute = HttpRouter.add(
   'GET',

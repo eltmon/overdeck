@@ -4,6 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_MODEL_REFS, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -91,6 +92,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
+    tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
     memory: {
       extraction: {
         ...DEFAULT_CONFIG.memory.extraction,
@@ -419,6 +421,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge role/workhorse model configuration
     mergeRoleConfig(result, config);
 
+    if (config.tiered_execution) {
+      result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, {
+        providerAuth: result.providerAuth,
+      });
+    }
+
     // Merge legacy API keys (for backward compatibility)
     // Only enable providers that weren't explicitly disabled in models.providers
     if (config.api_keys) {
@@ -628,6 +636,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   }
 
   validateRoleModelRefs(result);
+  result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, {
+    providerAuth: result.providerAuth,
+  });
 
   return { config: result, explicitlyDisabled };
 }
