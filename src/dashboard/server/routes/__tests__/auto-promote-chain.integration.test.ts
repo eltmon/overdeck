@@ -102,6 +102,15 @@ function makeProject(issueId: string): { projectPath: string; workspacePath: str
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   mkdirSync(join(workspacePath, '.pan'), { recursive: true });
   writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
+  // PAN-2234: a qualifying PRD draft must exist for the plan-finalize PRD-first
+  // gate. With no projects.yaml in the test, the gate searches the workspace
+  // drafts candidates — write a >=20-line draft there so finalize proceeds.
+  mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
+  writeFileSync(
+    join(workspacePath, '.pan', 'drafts', `${issueId}.md`),
+    Array.from({ length: 20 }, (_, i) => `# ${issueId} PRD line ${i + 1}`).join('\n'),
+    'utf-8',
+  );
   return { projectPath, workspacePath };
 }
 
