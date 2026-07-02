@@ -147,6 +147,52 @@ describe('spec helpers', () => {
       expect(reread.status).toBe('active')
     }),
   )
+
+  it.effect('findSpecByIssue parses only files whose filename matches the issue (PAN-2216)', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-04-PAN-1-target.vbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-1', 'Target'), 'proposed'),
+      )
+      // A corrupt spec for a DIFFERENT issue: the old implementation parsed
+      // every file in the directory per lookup (and warned about this one);
+      // the filename-first implementation must never open it.
+      const fs = yield* Effect.promise(() => import('fs/promises'))
+      yield* Effect.promise(() =>
+        fs.writeFile(join(paths.specsDir, '2026-05-04-PAN-2-corrupt.vbrief.json'), 'not json{', 'utf-8'),
+      )
+      const warnings: string[] = []
+      const originalWarn = console.warn
+      console.warn = (msg: string) => warnings.push(String(msg))
+      try {
+        const found = yield* findSpecByIssue(TEST_DIR, 'PAN-1')
+        expect(found?.issueId).toBe('PAN-1')
+        expect(warnings.filter((w) => w.includes('PAN-2-corrupt'))).toEqual([])
+      } finally {
+        console.warn = originalWarn
+      }
+    }),
+  )
+
+  it.effect('findSpecByIssue returns the lexicographically-first spec when several match', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      // Two specs for the same issue (e.g., a re-plan left a superseded file).
+      // Order must match the old listSpecs()-based behavior: filename ascending.
+      yield* writeSpec(
+        join(paths.specsDir, '2026-06-01-PAN-3-newer.vbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-3', 'Newer'), 'proposed'),
+      )
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-01-PAN-3-older.vbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-3', 'Older'), 'proposed'),
+      )
+
+      const found = yield* findSpecByIssue(TEST_DIR, 'pan-3')
+      expect(found?.filename).toBe('2026-05-01-PAN-3-older.vbrief.json')
+    }),
+  )
 })
 
 describe('sessions helpers', () => {
