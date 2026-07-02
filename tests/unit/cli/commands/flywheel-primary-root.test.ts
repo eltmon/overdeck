@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { resolvePrimaryWorktreeRoot } from '../../../../src/cli/commands/flywheel.js';
+import { resolvePrimaryWorktreeRoot } from '../../../../src/lib/flywheel-start.js';
 
 let tempRoot: string;
 
