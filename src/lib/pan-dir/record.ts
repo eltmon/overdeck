@@ -187,6 +187,11 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
 
 // ─── Read / write ─────────────────────────────────────────────────────────────
 
+/**
+ * Synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
@@ -209,6 +214,11 @@ export function writeIssueRecordSync(
   return path;
 }
 
+/**
+ * Workspace-scoped synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
 export function writeIssueRecordForWorkspaceSync(
   workspacePath: string,
   issueId: string,

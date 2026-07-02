@@ -18,6 +18,7 @@ import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync } from '../projects.js';
 import { getVBriefACStatusSync } from '../vbrief/beads.js';
@@ -86,6 +87,30 @@ This was the final allowed verification attempt. The work agent is paused so it 
 An operator needs to inspect ${issueId}, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically.`;
 }
 
+function setStateDerivedVerificationFailure(
+  issueId: string,
+  failedCheck: string,
+  summary: string,
+  cycleCount: number,
+  currentStatus: ReturnType<typeof getReviewStatusSync> | null | undefined,
+): void {
+  setReviewStatusSync(issueId, {
+    verificationStatus: 'failed',
+    verificationNotes: summary,
+    verificationCycleCount: cycleCount,
+    verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+  });
+
+  if (currentStatus?.reviewStatus !== 'passed') return;
+
+  markWorkspaceStuck(issueId, 'state_derived_verification_hold', {
+    failedCheck,
+    summary,
+    reviewStatus: currentStatus.reviewStatus,
+  });
+  console.warn(`[verification-runner] ${issueId} review is passed but held by state-derived gate ${failedCheck}: ${summary}`);
+}
+
 async function escalateVerificationStuck(
   issueId: string,
   failedCheck: string,
@@ -110,6 +135,25 @@ async function escalateVerificationStuck(
   } catch (err: any) {
     console.error(`[${logPrefix}] Failed to pause ${agentId} after verification stuck:`, err);
   }
+}
+
+async function deliverVerificationFeedback(
+  issueId: string,
+  message: string,
+  details: Record<string, unknown>,
+  logPrefix: string,
+): Promise<void> {
+  const target = await resolveIssueFeedbackTarget(issueId);
+  if ('agentId' in target) {
+    await messageAgent(target.agentId, message);
+    console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
+    return;
+  }
+
+  surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+    specialist: 'verification-gate',
+    ...details,
+  });
 }
 
 async function resolveGitDirs(
@@ -327,14 +371,15 @@ async function runVerificationForIssuePromise(
               markdownBody: feedbackBody,
             }));
             if (fileResult.success) {
-              const agentId = `agent-${issueId.toLowerCase()}`;
               const hasConflicts = failures.some(f => f.hasConflicts);
               const repoList = isPolyrepo ? failures.map(f => f.repoName).join(', ') : basename(workspacePath);
               const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
                 ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
                 : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the sync issues, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
-              await messageAgent(agentId, msg);
-              console.log(`[${logPrefix}] Sync failed for ${issueId} — sent feedback to ${agentId}`);
+              await deliverVerificationFeedback(issueId, msg, {
+                failedCheck,
+                feedbackPath: fileResult.filePath,
+              }, logPrefix);
             }
           } catch (feedbackErr: any) {
             console.error(`[${logPrefix}] Failed to write sync-target feedback for ${issueId}:`, feedbackErr);
@@ -470,12 +515,13 @@ async function runVerificationForIssuePromise(
           markdownBody: feedbackBody,
         }));
         if (fileResult.success) {
-          const agentId = `agent-${issueId.toLowerCase()}`;
           const msg = shouldEscalate
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
-          await messageAgent(agentId, msg);
-          console.log(`[${logPrefix}] Verification failed for ${issueId} — sent feedback to ${agentId}`);
+          await deliverVerificationFeedback(issueId, msg, {
+            failedCheck,
+            feedbackPath: fileResult.filePath,
+          }, logPrefix);
         }
       } catch (feedbackErr: any) {
         console.error(`[${logPrefix}] Failed to write verification feedback for ${issueId}:`, feedbackErr);
@@ -495,13 +541,7 @@ async function runVerificationForIssuePromise(
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
         const summary = `vBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'pending',
-          verificationStatus: 'failed',
-          verificationNotes: summary,
-          verificationCycleCount: newCycleCount,
-          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-        });
+        setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
         if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
@@ -518,12 +558,13 @@ async function runVerificationForIssuePromise(
             markdownBody: feedbackBody,
           }));
           if (fileResult.success) {
-            const agentId = `agent-${issueId.toLowerCase()}`;
             const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
               ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
               : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
-            await messageAgent(agentId, msg);
-            console.log(`[${logPrefix}] vBRIEF conflict detected for ${issueId} — sent feedback to ${agentId}`);
+            await deliverVerificationFeedback(issueId, msg, {
+              failedCheck,
+              feedbackPath: fileResult.filePath,
+            }, logPrefix);
           }
         } catch (feedbackErr: any) {
           console.error(`[${logPrefix}] Failed to write vBRIEF conflict feedback for ${issueId}:`, feedbackErr);
@@ -547,13 +588,7 @@ async function runVerificationForIssuePromise(
         .join('\n\n');
       const summary = `Acceptance criteria check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} AC incomplete:\n\n${incompleteList}`;
 
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        verificationStatus: 'failed',
-        verificationNotes: summary,
-        verificationCycleCount: newCycleCount,
-        verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-      });
+      setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
       if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
@@ -572,12 +607,13 @@ async function runVerificationForIssuePromise(
           markdownBody: feedbackBody,
         }));
         if (fileResult.success) {
-          const agentId = `agent-${issueId.toLowerCase()}`;
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
-          await messageAgent(agentId, msg);
-          console.log(`[${logPrefix}] AC verification failed for ${issueId} — sent feedback to ${agentId}`);
+          await deliverVerificationFeedback(issueId, msg, {
+            failedCheck,
+            feedbackPath: fileResult.filePath,
+          }, logPrefix);
         }
       } catch (feedbackErr: any) {
         console.error(`[${logPrefix}] Failed to write AC verification feedback for ${issueId}:`, feedbackErr);
@@ -611,11 +647,13 @@ async function runVerificationForIssuePromise(
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
         try {
-          const agentId = `agent-${issueId.toLowerCase()}`;
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/vbrief/beads changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
-          await messageAgent(agentId, msg);
+          await deliverVerificationFeedback(issueId, msg, {
+            failedCheck,
+            changedBase,
+          }, logPrefix);
           console.error(`[${logPrefix}] VERIFICATION FAILED for ${issueId}: empty-changeset (no content files vs ${changedBase})`);
         } catch (feedbackErr: any) {
           console.error(`[${logPrefix}] Failed to send empty-changeset feedback for ${issueId}:`, feedbackErr);

@@ -112,6 +112,21 @@ function countRunningSwarmSlots(): number {
   ).length;
 }
 
+/**
+ * Count tmux-ALIVE swarm-slot work agents for one issue (agent-<issue>-slot-N).
+ * Stale agents-table rows whose tmux session is dead do NOT count — counting
+ * them blocked all dispatch at zero live slots after a reset (PAN-2214).
+ */
+export function countRunningSwarmSlotsForIssue(
+  issueId: string,
+  agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
+): number {
+  const prefix = `agent-${issueId.toLowerCase()}-slot-`;
+  return agents.filter(
+    a => a.tmuxActive && a.role === 'work' && SWARM_SLOT_ID.test(a.id) && a.id.startsWith(prefix),
+  ).length;
+}
+
 export function countRunningAgents(): RunningCounts {
   const counts = countAgentsByStatus('running');
   const workTotal = counts['work'] ?? 0;

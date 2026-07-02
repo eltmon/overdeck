@@ -25437,6 +25437,11 @@ function getIssueRecordBasePath(project, issueId) {
 	const workspacePath = getIssueWorkspacePath(issueId);
 	return workspacePath && existsSync$1(workspacePath) ? workspacePath : project.path;
 }
+/**
+* Synchronous whole-record writer. Keep this call atomic: async
+* read-modify-write flows must take `withIssueRecordLock` before reading and
+* must not split this write behind an await.
+*/
 function writeIssueRecordSync(project, issueId, record) {
 	const path = getIssueRecordPath(project, issueId);
 	const dir = dirname$1(path);

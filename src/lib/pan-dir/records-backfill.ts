@@ -28,6 +28,7 @@ import {
   writeIssueRecordSync,
   type PanIssueRecord,
 } from './records.js';
+import { withIssueRecordLock } from './record-lock.js';
 
 export interface BackfillRecordsResult {
   processed: number;
@@ -153,17 +154,19 @@ async function backfillIssue(
       return { action: 'failed', reason: 'infra repo is not a git checkout' };
     }
 
-    const existing = await readIssueRecord(project, issueId);
-    const reviewStatus = getAllReviewStatusesFromDb()[issueId.toUpperCase()] ?? null;
-    const record = await buildIssueRecord(project, issueId, { reviewStatus });
+    return await withIssueRecordLock(issueId, async () => {
+      const existing = await readIssueRecord(project, issueId);
+      const reviewStatus = getAllReviewStatusesFromDb()[issueId.toUpperCase()] ?? null;
+      const record = await buildIssueRecord(project, issueId, { reviewStatus });
 
-    if (!opts.force && existing && normalizeRecordForCompare(existing) === normalizeRecordForCompare(record)) {
-      return { action: 'skipped', reason: 'record unchanged' };
-    }
+      if (!opts.force && existing && normalizeRecordForCompare(existing) === normalizeRecordForCompare(record)) {
+        return { action: 'skipped', reason: 'record unchanged' };
+      }
 
-    const recordPath = writeIssueRecordSync(project, issueId, record);
-    queueIssueRecordCommit(project, issueId, recordPath);
-    return { action: 'written' };
+      const recordPath = writeIssueRecordSync(project, issueId, record);
+      queueIssueRecordCommit(project, issueId, recordPath);
+      return { action: 'written' };
+    });
   } catch (err) {
     return { action: 'failed', reason: (err as Error).message };
   }

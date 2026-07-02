@@ -1,10 +1,3 @@
-/**
- * Cloister Service
- *
- * Core monitoring service that watches over all running agents.
- * Named after the TARDIS's Cloister Bell - an alarm for catastrophic events.
- */
-
 import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
@@ -22,8 +15,6 @@ import {
   writeHealthEvent,
   getLatestHealthEvent,
 } from '../overdeck/health-events.js';
-// PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
-// are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
@@ -72,6 +63,7 @@ import { sessionExists, killSession } from '../tmux.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
+import { CostDoorLive, CostWriter } from '../overdeck/cost.js';
 
 const execAsync = promisify(exec);
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -86,13 +78,7 @@ async function cleanupLegacySpecialistsDirectory(): Promise<void> {
   await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });
 }
 
-/**
- * Pure helper: from a map of review statuses, return the issue IDs that are
- * orphaned in 'reviewing' state — i.e. reviewStatus='reviewing', no passed
- * review in history, and not currently being handled by a running specialist.
- *
- * Extracted for unit-testability; called by startup recovery in Cloister.start().
- */
+/** Return issues orphaned in reviewStatus='reviewing' with no active reviewer. */
 export function identifyOrphanedReviewingIssues(
   statuses: Record<string, { reviewStatus: string; history?: Array<{ type: string; status: string }> }>,
   activeReviewIssues: Set<string>,
@@ -1139,6 +1125,13 @@ export class CloisterService {
       // Check for FPP violations (Phase 6)
       this.checkFPPViolations(agentIds);
 
+      // ohmypi does not run the Claude Code PostToolUse cost hook. Reconcile its
+      // per-message JSONL usage before cost alerts so running ohmypi/kimi agents
+      // are visible to the same DB-backed spend checks.
+      if (runningAgents.some((agent) => getAgentStateSync(agent.id)?.harness === 'ohmypi')) {
+        await this.reconcilePiCostEvents();
+      }
+
       // Check cost limits (Phase 6)
       this.checkCostAlerts(agentIds);
 
@@ -1159,10 +1152,7 @@ export class CloisterService {
     }
   }
 
-  /**
-   * Scan for agent completion markers and auto-trigger review.
-   * This is the fallback for when `pan done` fails to reach the dashboard via HTTP.
-   */
+  /** Fallback scan for completion markers when `pan done` did not reach the dashboard. */
   private async checkCompletionMarkers(): Promise<void> {
     try {
       if (!existsSync(AGENTS_DIR)) return;
@@ -1177,12 +1167,7 @@ export class CloisterService {
         // Skip if no completion marker.
         if (!existsSync(completedFile)) continue;
 
-        // If a stale `completed.processed` exists from a prior round, it must
-        // not block a NEW completion. `pan done` for a feedback round writes
-        // a fresh `completed` and unlinks `.processed`, but if the unlink
-        // didn't happen (older client, races, manual recovery), fall back to
-        // an mtime comparison: if `completed` is newer than `.processed`,
-        // treat it as a new event and remove the stale processed marker.
+        // A stale `.processed` from a prior round must not block a fresh completion.
         if (existsSync(processedFile)) {
           try {
             const completedMtime = statSync(completedFile).mtimeMs;
@@ -1214,11 +1199,7 @@ export class CloisterService {
           continue;
         }
 
-        // Check retry count — give up after 3 failed attempts.
-        // If `.processed` was unlinked (e.g. by a re-run of `pan done` after a
-        // review feedback round), the on-disk state says "fresh completion" —
-        // reset any stale in-memory counter from the previous round so the
-        // trigger fires again.
+        // Check retry count; reset stale in-memory counters for fresh completions.
         const retryCount = this.processedCompletions.get(dir.name) || 0;
         if (retryCount === Infinity) {
           this.processedCompletions.delete(dir.name);
@@ -1227,8 +1208,7 @@ export class CloisterService {
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
 
-        // Skip if review is already in progress or passed — `pan done` already triggered it.
-        // This completion marker scan is only a fallback for when the HTTP call from `pan done` fails.
+        // Skip if `pan done` already triggered review.
         const { getReviewStatusSync } = await import('../review-status.js');
         const existingReview = getReviewStatusSync(issueId);
         if (existingReview && ['reviewing', 'passed'].includes(existingReview.reviewStatus || '')) {
@@ -1241,9 +1221,7 @@ export class CloisterService {
         console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...${retryCount > 0 ? ` (retry ${retryCount}/3)` : ''}`);
 
         try {
-          // Trigger review via dashboard API. Use fetch() so https:// URLs
-          // (e.g. https://pan.localhost via Traefik) work — Node's http.request
-          // rejects https URLs with "Protocol \"https:\" not supported".
+          // Use fetch() so https dashboard URLs work.
           const result = await (async (): Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }> => {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 5000);
@@ -1645,6 +1623,18 @@ export class CloisterService {
           );
         }
       }
+    }
+  }
+
+  private async reconcilePiCostEvents(): Promise<void> {
+    try {
+      await Effect.runPromise(
+        CostWriter.use((writer) => writer.reconcile({ source: 'ohmypi' })).pipe(
+          Effect.provide(CostDoorLive),
+        ),
+      );
+    } catch (error) {
+      console.warn('[cloister] ohmypi cost reconcile failed:', error instanceof Error ? error.message : String(error));
     }
   }
 
