@@ -1,7 +1,7 @@
 import { exec, spawn } from 'node:child_process';
 import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Schema } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
@@ -356,8 +356,34 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
   }
 }
 
+/**
+ * The flywheel is a project-scoped singleton: it must run from the PRIMARY
+ * worktree root, never a linked feature worktree. Every worktree contains
+ * docs/flywheel-brief.md, so the brief check alone cannot catch a caller whose
+ * shell happens to sit inside a workspaces/feature-* checkout, and an
+ * orchestrator spawned there operates inside a live work agent's worktree.
+ * A linked worktree is
+ * detected by `git rev-parse --git-common-dir` resolving to the primary's
+ * .git directory; outside a repo (or on failure) the cwd is kept and the
+ * brief check reports its own error.
+ */
+
+export async function resolvePrimaryWorktreeRoot(cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execAsync(
+      'git rev-parse --path-format=absolute --git-common-dir',
+      { cwd, timeout: 5000 },
+    );
+    const commonDir = stdout.trim();
+    if (commonDir.endsWith(`${sep}.git`)) return dirname(commonDir);
+    return cwd;
+  } catch {
+    return cwd;
+  }
+}
+
 export async function startFlywheelRun(options: StartOptions = {}): Promise<StartFlywheelRunResult> {
-  const cwd = options.cwd ?? process.cwd();
+  const cwd = options.cwd ?? await resolvePrimaryWorktreeRoot(process.cwd());
   const brief = await requireFlywheelBrief(cwd, options.brief);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
