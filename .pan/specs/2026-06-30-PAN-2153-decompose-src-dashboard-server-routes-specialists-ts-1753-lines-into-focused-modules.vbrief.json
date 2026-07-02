@@ -1,0 +1,284 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-30T01:30:39Z",
+    "author": "overdeck/plan",
+    "description": "Plan for PAN-2153: Decompose src/dashboard/server/routes/specialists.ts (1753 lines) into focused modules",
+    "updated": "2026-07-02T22:16:59.624Z"
+  },
+  "plan": {
+    "id": "pan-2153",
+    "title": "Decompose src/dashboard/server/routes/specialists.ts (1753 lines) into focused modules",
+    "status": "proposed",
+    "uid": "c6560fcb-cce9-4562-80e1-a9348d39b30e",
+    "author": "agent:opus",
+    "sequence": 4,
+    "created": "2026-06-30T01:30:39Z",
+    "updated": "2026-07-02T22:16:59.624Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2153",
+        "label": "PAN-2153",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codebase-health",
+      "refactor",
+      "behavior-preserving",
+      "dashboard-server"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/server/routes/specialists.ts is 1753 lines — over the 1,000-line file-size guard ceiling (scripts/lint-file-size.sh, CEILING=1000) and currently held above the ceiling only by a baseline grandfather entry (scripts/file-size-baseline.txt line 22: '1753 src/dashboard/server/routes/specialists.ts'). It mixes three concerns in one file: (a) a shared helper/foundation block (lines 84-234: execAsync/execFileAsync, type aliases, validateSpecialistAgentName, specialistEventRole, specialistNameForRole, validateSpecialistAutoCompleteMetadata, readJsonBody, _serverManagedMerges, postMergeGuard, firePostMergeLifecycle, getProjectPathForIssue); (b) the legacy /api/specialists/* and static-segment routes (lines 236-1029, 11 route consts including the ~438-line postSpecialistsDoneRoute that owns the post-merge lifecycle); and (c) the per-project /api/specialists/:project/:type/* routes plus /api/models/resolve (lines 1030-1713, 19 route consts). The single Layer.mergeAll at lines 1714-1752 wires all 30 routes. External importers of the public surface that must keep resolving through the barrel: server.ts:41 (specialistsRouteLayer), flywheel.ts:959 (dynamic import of firePostMergeLifecycle), workspaces/merge-ops.ts:43 (_serverManagedMerges), __tests__/agents-delivery-method.test.ts:5 (validateSpecialistAutoCompleteMetadata), and __tests__/flywheel.test.ts:52 (vi.mock of '../specialists.js' stubbing firePostMergeLifecycle). Submodules sit one directory deeper than the barrel, so every relative import in moved code gains one '../' level.",
+      "Proposal": "Behavior-preserving decomposition that mirrors the EXISTING house precedent in this same routes/ directory: routes/workspaces.ts is a thin barrel that imports per-concern *RouteLayer sub-layers from routes/workspaces/ (container-ops.ts, merge-ops.ts, review-pipeline.ts, etc.) and composes them with Layer.mergeAll (routes/workspaces.ts:120-126, 1731-1749). Apply the identical shape to specialists: create a sibling directory src/dashboard/server/routes/specialists/ holding three new submodules — shared.ts (the helper/foundation block + public re-export surface), legacy-routes.ts (the static + legacy /api/specialists/* routes, exporting specialistsLegacyRouteLayer), and project-routes.ts (the per-project routes, exporting specialistsProjectRouteLayer). Keep routes/specialists.ts as a thin barrel that imports the two sub-layers, re-exports the public symbols (firePostMergeLifecycle, validateSpecialistAutoCompleteMetadata, _serverManagedMerges, specialistsRouteLayer default) so every existing importer resolves unchanged, and composes specialistsRouteLayer = Layer.mergeAll(specialistsLegacyRouteLayer, specialistsProjectRouteLayer). Pure relocation: no logic edits, no renamed exports, no call-site changes. Done sequentially in three seams (shared -> legacy -> project) because all three mutate the same barrel file and each depends on the prior; full quality gate (typecheck + lint + full vitest suite) after each seam.",
+      "NonGoals": "- No logic changes, no behavior changes, no renamed or removed exports — pure file relocation + re-export barrel.\n- No changes to route paths, route ordering semantics, HTTP status codes, or response shapes.\n- Do NOT touch the postMergeLifecycle idempotency guard logic (createInFlightGuard / postMergeGuard) — only relocate it verbatim; tests/unit/lib/cloister/in-flight-guard.test.ts must stay green.\n- Do NOT decompose any other god file (routes/workspaces.ts, cloister/specialists.ts, agents.ts, conversations.ts) — only routes/specialists.ts.\n- Do NOT change server.ts or any other importer — the barrel must keep every existing import resolving unchanged.\n- Do NOT collapse, reorder, or 'clean up' the route consts or helpers while moving them; match existing style.\n- No new explicit `any` (A1 ratchet); `any` that moves with extracted code rides the eslint-any-allowlist.json entry for the file it lands in."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Submodules live in a sibling dir src/dashboard/server/routes/specialists/; routes/specialists.ts stays a thin barrel.",
+        "rationale": "Mirrors the in-repo routes/workspaces.ts + routes/workspaces/ precedent exactly, so every existing import of routes/specialists.js resolves unchanged with zero call-site edits."
+      },
+      {
+        "summary": "Three seams (shared -> legacy-routes -> project-routes) composed as two *RouteLayer sub-layers, rather than 5-6 finer files with a flat verbatim mergeAll list.",
+        "rationale": "The sub-layer shape is the established house pattern (routes/workspaces.ts merges per-concern *RouteLayer sub-layers); legacy-routes (~840 lines) and project-routes (~730) both stay comfortably under the 1000-line ceiling, so a finer split buys nothing while diverging from precedent. Intra-sub-layer const order is preserved, keeping route precedence identical."
+      },
+      {
+        "summary": "Seams are executed and merged sequentially (each bead blocks the next), not in parallel.",
+        "rationale": "All three seams mutate the same barrel file routes/specialists.ts and each depends on shared.ts existing first; sequential edits avoid barrel merge conflicts and keep the tree green after every bead."
+      },
+      {
+        "summary": "Repoint the one source-text test (tests/lib/cloister/review-agent.test.ts) to routes/specialists/project-routes.ts in the same bead that moves the two review-restart routes.",
+        "rationale": "That test reads specialists.ts as text and regex-matches the moved route identifiers; the issue explicitly permits repointing moved-internal tests in the same commit."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-shared",
+        "title": "Extract helper/foundation block into routes/specialists/shared.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:30:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2153",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "extract-legacy-routes",
+            "extract-project-routes"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ],
+          "kind": "refactor",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/specialists/shared.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size guard + A1 ratchet included)",
+            "full vitest suite reports 0 failed"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/specialists/shared.ts. Move the helper/foundation block verbatim from src/dashboard/server/routes/specialists.ts lines 84-234: the `execAsync`/`execFileAsync` promisified consts; the type aliases `SpecialistAgentName`, `ProjectSpecialistAgentName`, `SpecialistEventRole`, and the `SpecialistAutoCompleteBody` type; the functions `validateSpecialistAgentName`, `specialistEventRole`, `specialistNameForRole`, `validateSpecialistAutoCompleteMetadata`, `getProjectPathForIssue`, and `firePostMergeLifecycle`; the `readJsonBody` Effect; and the module-level `postMergeGuard` (createInFlightGuard) and `_serverManagedMerges` Set. Copy across only the import lines those helpers need (e.g. Effect, HttpServerRequest from effect/unstable/http, createInFlightGuard, extractPrefixSync, resolveProjectFromIssueSync, homedir, join, promisify, exec/execFile, AgentState/AgentRuntimeState types). In shared.ts, EXPORT every symbol the two route files or the barrel consume: the three type aliases, execAsync, execFileAsync, readJsonBody, validateSpecialistAgentName, specialistEventRole, specialistNameForRole, validateSpecialistAutoCompleteMetadata, getProjectPathForIssue, firePostMergeLifecycle, _serverManagedMerges. Keep `postMergeGuard` module-private to shared.ts. Then in routes/specialists.ts DELETE those moved definitions and add `import { ... } from './specialists/shared.js'`, and re-export the public ones so external importers are unaffected: `export { firePostMergeLifecycle, validateSpecialistAutoCompleteMetadata, _serverManagedMerges } from './specialists/shared.js'`. The route consts still inline in specialists.ts now reference the imported helpers. CRITICAL — import depth: shared.ts sits one directory deeper than the barrel, so every relative specifier in moved code gains one '../': '../../../lib/...' becomes '../../../../lib/...', and the DYNAMIC imports inside firePostMergeLifecycle ('../../../lib/cloister/merge-agent.js' and '../../../lib/cloister/merge-train.js') become '../../../../lib/cloister/...'. Keep the '.js' extension on every specifier (NodeNext ESM convention used throughout this repo). The barrel re-export must cover ALL external importers — server.ts:41, flywheel.ts:959, workspaces/merge-ops.ts:43, __tests__/agents-delivery-method.test.ts:5, and the __tests__/flywheel.test.ts:52 vi.mock of '../specialists.js' (the mock keeps working because flywheel.ts still imports from the barrel). Preserve the PAN-328 idempotency-guard comment block verbatim above postMergeGuard. After this seam, run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` and confirm 0 failures. Per the prd-authoring intersecting-rules reminder: this is a pure move — do not alter any helper body."
+        },
+        "items": [
+          {
+            "id": "extract-shared.ac1",
+            "title": "src/dashboard/server/routes/specialists/shared.ts exists, is under 1,000 lines, and exports firePostMergeLifecycle, validateSpecialistAutoCompleteMetadata, _serverManagedMerges, readJsonBody, validateSpecialistAgentName, specialistEventRole, specialistNameForRole, getProjectPathForIssue, execAsync, execFileAsync, and the three type aliases.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-shared.ac2",
+            "title": "routes/specialists.ts re-exports firePostMergeLifecycle, validateSpecialistAutoCompleteMetadata, and _serverManagedMerges from './specialists/shared.js'; all external importers resolve unchanged with no edits to them — server.ts:41, flywheel.ts:959 (dynamic import), workspaces/merge-ops.ts:43, __tests__/agents-delivery-method.test.ts:5, and __tests__/flywheel.test.ts:52 (vi.mock of '../specialists.js'); no helper body was edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-shared.ac3",
+            "title": "npm run typecheck and npm run lint exit cleanly and the full vitest suite (npx vitest run --configLoader runner, including tests/unit/lib/cloister/in-flight-guard.test.ts which locks the postMergeGuard) passes with 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-legacy-routes",
+        "title": "Extract static + legacy /api/specialists/* routes into routes/specialists/legacy-routes.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:30:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "kind": "refactor",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/specialists/legacy-routes.ts",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size guard + A1 ratchet included)",
+            "full vitest suite reports 0 failed"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/specialists/legacy-routes.ts. Move verbatim the static-segment + legacy route consts from routes/specialists.ts source lines 236-1029: getSpecialistsRoute, postSpecialistsResetAllRoute, postSpecialistsDoneRoute (the ~438-line post-merge/done handler), postSpecialistsLogsCleanupAllRoute, getSpecialistsProjectsRoute, postSpecialistWakeRoute, postSpecialistResetRoute, postSpecialistInitRoute, postSpecialistReportStatusRoute, getSpecialistCostRoute, postSpecialistAutoCompleteRoute. Import the helpers these routes use from './shared.js' (readJsonBody, specialistEventRole, validateSpecialistAutoCompleteMetadata, firePostMergeLifecycle, _serverManagedMerges, execFileAsync, type aliases) and re-import the lib-level dependencies they reference directly from their original sources (e.g. setReviewStatusSync as setReviewStatusBase from review-status.js, the agents.js symbols, http-handler, jsonResponse, HttpRouter/HttpServerResponse/Effect/Layer, etc.) — copy only the import lines actually used, applying the SAME one-level import-depth bump as shared.ts ('../../../lib/...' -> '../../../../lib/...', '../http-helpers.js' -> '../../http-helpers.js', './http-handler.js' -> '../http-handler.js', './agents.js' -> '../agents.js'; '.js' extensions kept). At the end of legacy-routes.ts export `export const specialistsLegacyRouteLayer = Layer.mergeAll(...)` listing those route consts in the SAME relative order they appear in the original barrel's Layer.mergeAll first two comment groups (static-segment group then legacy /api/specialists/:name/* group): getSpecialistsRoute, getSpecialistsProjectsRoute, postSpecialistsResetAllRoute, postSpecialistsDoneRoute, postSpecialistsLogsCleanupAllRoute, postSpecialistWakeRoute, postSpecialistResetRoute, postSpecialistInitRoute, postSpecialistReportStatusRoute, getSpecialistCostRoute, postSpecialistAutoCompleteRoute. The four explicit `any` occurrences (original lines 596, 667, 689, 717 — all inside postSpecialistsDoneRoute) move into this file, so ADD `\"src/dashboard/server/routes/specialists/legacy-routes.ts\"` to eslint-any-allowlist.json (keep the JSON array sorted/valid). In routes/specialists.ts, DELETE these 11 route consts and `import { specialistsLegacyRouteLayer } from './specialists/legacy-routes.js'`. Update the barrel's Layer.mergeAll to use specialistsLegacyRouteLayer in place of the individually-listed legacy routes (project routes still inline for now). After this seam, run `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner`, 0 failures. legacy-routes.ts must be under 1,000 lines (expected ~800)."
+        },
+        "items": [
+          {
+            "id": "extract-legacy-routes.ac1",
+            "title": "src/dashboard/server/routes/specialists/legacy-routes.ts exists, is under 1,000 lines, contains all 11 static+legacy route consts moved verbatim, and exports specialistsLegacyRouteLayer composed in the original barrel's mergeAll order for those groups.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-legacy-routes.ac2",
+            "title": "eslint-any-allowlist.json includes 'src/dashboard/server/routes/specialists/legacy-routes.ts' (the four moved `any` sites at original lines 596/667/689/717 now live there); npm run lint (including lint:file-size and the no-explicit-any ratchet) passes with no new any errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-legacy-routes.ac3",
+            "title": "routes/specialists.ts imports specialistsLegacyRouteLayer and the 11 legacy routes no longer appear inline in the barrel; npm run typecheck and npx vitest run --configLoader runner pass with 0 failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-project-routes",
+        "title": "Extract per-project routes into routes/specialists/project-routes.ts and thin the barrel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:30:39Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "kind": "refactor",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists.ts",
+            "src/dashboard/server/routes/specialists/project-routes.ts",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size guard + A1 ratchet included)",
+            "full vitest suite reports 0 failed"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/specialists/project-routes.ts. Move verbatim the per-project route consts from routes/specialists.ts source lines 1030-1713: getProjectSpecialistStatusRoute, postProjectSpecialistKillRoute, getProjectSpecialistRunsRoute, getProjectSpecialistRunStreamRoute, getProjectSpecialistRunRoute, postProjectSpecialistRunTerminateRoute, postProjectSpecialistGracePauseRoute, postProjectSpecialistGraceResumeRoute, postProjectSpecialistGraceExitRoute, getProjectSpecialistGraceRoute, getProjectSpecialistContextRoute, postProjectSpecialistContextRegenerateRoute, postProjectSpecialistCompleteRoute, getProjectSpecialistLatestLogRoute, postProjectSpecialistLogsCleanupRoute, postProjectSpecialistResetSessionRoute, postProjectReviewRestartRoute, postProjectReviewerRoleRestartRoute, getModelsResolveRoute. PRESERVE intra-file order exactly — several pairs are order-sensitive (getProjectSpecialistRunStreamRoute '/runs/:runId/stream' MUST stay before getProjectSpecialistRunRoute '/runs/:runId'; postProjectReviewRestartRoute MUST stay immediately before postProjectReviewerRoleRestartRoute). Import helpers from './shared.js' (validateSpecialistAgentName, readJsonBody, execAsync, type aliases) and lib deps from their original sources (copy only used import lines, same one-level import-depth bump as legacy-routes.ts; '.js' extensions kept). Export `export const specialistsProjectRouteLayer = Layer.mergeAll(...)` listing these consts in the original barrel's third comment group order. THEN finish the barrel routes/specialists.ts: delete the 19 project route consts, `import { specialistsProjectRouteLayer } from './specialists/project-routes.js'`, and reduce specialistsRouteLayer to `Layer.mergeAll(specialistsLegacyRouteLayer, specialistsProjectRouteLayer)` with `export default specialistsRouteLayer`. The barrel ends ~40-60 lines: shared re-exports + two sub-layer imports + the merge + default. CRITICAL TEST REPOINT (FR-5): tests/lib/cloister/review-agent.test.ts around line 932-937 reads `routes/specialists.ts` as text and regex-matches `postProjectReviewRestartRoute[\\s\\S]*?postProjectReviewerRoleRestartRoute`. Those two routes now live in project-routes.ts, so update that readFileSync path in the SAME commit from '../../../src/dashboard/server/routes/specialists.ts' to '../../../src/dashboard/server/routes/specialists/project-routes.ts'. Optionally remove the now-stale baseline line 'scripts/file-size-baseline.txt: 1753 src/dashboard/server/routes/specialists.ts' (the barrel is now well under the ceiling; the guard passes either way since a baselined file may shrink). After this seam run the FULL gate: `npm run typecheck` && `npm run lint` && `npx vitest run --configLoader runner` — 0 failures, and confirm `npm run lint` (lint:file-size) reports no file over 1,000 lines."
+        },
+        "items": [
+          {
+            "id": "extract-project-routes.ac1",
+            "title": "src/dashboard/server/routes/specialists/project-routes.ts exists, is under 1,000 lines, contains all 19 per-project route consts moved verbatim with order-sensitive pairs (/runs/:runId/stream before /runs/:runId; review restart before reviewer-role restart) preserved, and exports specialistsProjectRouteLayer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-project-routes.ac2",
+            "title": "routes/specialists.ts is a thin barrel: re-exports shared public symbols, imports specialistsLegacyRouteLayer + specialistsProjectRouteLayer, and exports specialistsRouteLayer = Layer.mergeAll(specialistsLegacyRouteLayer, specialistsProjectRouteLayer) with default export; server.ts:41 import is unchanged and resolves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-project-routes.ac3",
+            "title": "tests/lib/cloister/review-agent.test.ts readFileSync path is repointed to routes/specialists/project-routes.ts and its 'review restart route returns 409 for gated dispatches' assertion passes against the moved routes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-project-routes.ac4",
+            "title": "Full gate green: npm run typecheck and npm run lint pass, lint:file-size reports no file over 1,000 lines, and the full vitest suite (npx vitest run --configLoader runner) passes with 0 failed; behavior is identical (no route path, status code, ordering, or response-shape change).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-shared",
+        "to": "extract-legacy-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-legacy-routes",
+        "to": "extract-project-routes",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-30-PAN-2153-decompose-src-dashboard-server-routes-specialists-ts-1753-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

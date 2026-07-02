@@ -31,6 +31,7 @@ import type {
   ContinueHazard,
   ContinueResumePoint,
   ContinueSessionEntry,
+  ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
@@ -39,12 +40,14 @@ import {
   queueIssueRecordCommit,
   RECORD_SCHEMA_VERSION,
   readIssueRecord,
+  readIssueRecordSync,
   writeIssueRecordSync,
   type PanIssueRecord,
   type PanIssueCloseOutRecord,
   type PanIssuePipelineRecord,
   type PanIssueUsageRecord,
 } from './record.js';
+import { withIssueRecordLock } from './record-lock.js';
 
 export type {
   PanIssueRecord,
@@ -65,9 +68,10 @@ interface ContinueFile {
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   agentModel?: string;
+  scopeDrift?: ScopeDriftRecord;
 }
 
-function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback'> {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback' | 'scopeDrift'> {
   return {
     decisions: raw?.decisions,
     hazards: raw?.hazards,
@@ -75,6 +79,7 @@ function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisi
     beadsMapping: raw?.beadsMapping,
     sessionHistory: raw?.sessionHistory,
     feedback: raw?.feedback ?? [],
+    scopeDrift: raw?.scopeDrift,
   };
 }
 
@@ -114,6 +119,7 @@ function projectPipeline(
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
+    scopeDrift: status.scopeDrift,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,
     deaconIgnoredAt: status.deaconIgnoredAt,
@@ -274,9 +280,23 @@ export async function updateIssueRecordForIssue(
     const project = getProjectSync(resolved.projectKey);
     if (!project) return;
 
-    const record = await buildIssueRecord(project, issueId, { reviewStatus });
-    const recordPath = writeIssueRecordSync(project, issueId, record);
-    queueIssueRecordCommit(project, issueId, recordPath);
+    await withIssueRecordLock(issueId, async () => {
+      const record = await buildIssueRecord(project, issueId, { reviewStatus });
+      // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
+      // anything written to the record during that window would be erased by this
+      // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
+      // slot assignments during the runaway, then wiped item statusOverrides right
+      // after `pan done` — which made every completed item dispatchable again and
+      // re-spawned slots for finished work. Re-read both blocks synchronously
+      // immediately before writing so the freshest values survive the rebuild.
+      const fresh = readIssueRecordSync(project, issueId);
+      if (fresh?.swarm) record.swarm = fresh.swarm;
+      if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
+        record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
+      }
+      const recordPath = writeIssueRecordSync(project, issueId, record);
+      queueIssueRecordCommit(project, issueId, recordPath);
+    });
   } catch (err) {
     console.warn(`[pan-dir/records] Failed to update record for ${issueId}: ${(err as Error).message}`);
   }

@@ -977,10 +977,6 @@ export function listConversations(options?: { limit?: number; offset?: number })
   return rows.map(rowToLegacyConversation);
 }
 
-export function listActiveConversations(): LegacyConversation[] {
-  return listConversations();
-}
-
 export function getConversationByName(name: string): LegacyConversation | null {
   const row = overdeckDb()
     .prepare(`${LEGACY_CONVERSATION_SELECT} WHERE c.name = ?`)

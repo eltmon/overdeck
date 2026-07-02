@@ -1,0 +1,581 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-02T13:58:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2214: Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator (re-plan: PR #2221 salvage + incident-driven FR-12..FR-16)",
+    "updated": "2026-07-02T14:10:25.493Z"
+  },
+  "plan": {
+    "id": "pan-2214",
+    "title": "Swarm per-issue controls: salvage PR #2221 onto current main + record-write mutex, completion inference, record retirement, swarm feedback routing, verdict knock-over guard",
+    "status": "running",
+    "uid": "57aa9775-6aea-4735-99c4-751488dfc06c",
+    "author": "agent:claude-fable-5",
+    "sequence": 12,
+    "created": "2026-07-02T13:58:57Z",
+    "updated": "2026-07-02T14:10:25.493Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2214",
+        "label": "PAN-2214",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/2221",
+        "label": "PR #2221 (salvage starting material)",
+        "type": "pr"
+      },
+      {
+        "uri": ".pan/drafts/pan-2214.md",
+        "label": "PRD (refreshed on main f57e65d1a9)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "swarm",
+      "deacon",
+      "cloister",
+      "cli",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "PR #2221 delivered the original 11 beads (FR-1..FR-11: pan swarm freeze/resume/stop/reset/status, bounded reconcile-safe allocator, tmux-alive cap, gc guards, mid-cycle freeze re-check, manual-dispatch single door) but the verification gate exhausted its attempts on 3 deacon-swarm-synthesis test failures that are ALREADY FIXED at branch HEAD 859c9422e4. Meanwhile main moved 7 commits ahead (PAN-1791 tiered-execution merge d0f2ae1434 + PRD refresh f57e65d1a9), and a day of live swarm incidents added five new requirements (FR-12..FR-16): record lost-update wipes, silent slot completions, pause-gated agent husks, swarm feedback delivery failures, and a review verdict knocked to pending by a state-only gate.",
+      "Proposal": "Salvage, then extend. Item 1 merges origin/main into feature/pan-2214 (merge, never rebase — the branch is pushed) resolving conflicts per the PRD 'Already landed' table, and re-proves the four previously-failing suites plus full gates. Items 2-6 implement FR-12..FR-16 on the merged branch: a per-issue in-process record-write mutex (src/lib/pan-dir), done-without-signal detection in classifyInFlightSlots gated by swarm.infer_completion (default nudge), slot agent-record retirement in pan swarm reset via removeAgentSync, a shared swarm-aware feedback-target resolver replacing the hardcoded agent-<issue> delivery, and a verdict knock-over guard so state-derived gates never reset a passed review silently.",
+      "NonGoals": "- Do NOT re-implement anything in the PRD 'Already landed on main' table (gc liveness guard, dispatch-eligibility gating, merged plan view, coordinateSwarmSlots CLI routing, record-rebuild freshness re-reads, emitAgentEvent token, verdict-POST resilience)\n- Do NOT rebase or force-push feature/pan-2214 — merge only; history rewriting on the pushed PR branch is forbidden\n- No cross-process record locking (in-process per-issue mutex only; PRD scopes this explicitly)\n- No auto-merge of inferred completions by default — 'auto' mode must be an explicit config opt-in; default is 'nudge'\n- Do NOT delete or modify JSONL session transcripts anywhere (FR-14 retires DB rows + state dirs only)\n- No changes to the global Deacon freeze semantics beyond what PR #2221 already delivered (mid-cycle re-check is done)\n- No dashboard/frontend UI work — CLI and server-side lifecycle only\n- Do NOT convert the sync record-writer doors (writeIssueRecordSync, writeIssueRecordForWorkspaceSync) to async"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Re-plan contains only remaining work: the 11 completed PR #2221 beads are not re-created as items.",
+        "rationale": "They are implemented, committed, and locally green on feature/pan-2214; re-creating them would force redundant re-verification of finished work and confuse bead-based progress tracking."
+      },
+      {
+        "summary": "Salvage via git merge of origin/main into the branch, never rebase.",
+        "rationale": "PR #2221 is pushed; rebase/force-push is a forbidden one-way door per repo rules. Merge preserves history and the PRD salvage directive only requires building on current main."
+      },
+      {
+        "summary": "FR-12 mutex is in-process, per-issue, wrapping the async rebuild window in updateIssueRecordForIssue; sync writer doors stay sync.",
+        "rationale": "Both observed lost-update wipes came from the async buildIssueRecord read-modify-write window (records.ts:273-297); sync writers are atomic per event-loop turn, and converting them to async would break their callers. Cross-process locking is explicitly out of scope in the PRD."
+      },
+      {
+        "summary": "swarm.infer_completion defaults to 'nudge'; inferred ready-to-merge requires explicit 'auto'.",
+        "rationale": "PRD names the default; nudging is reversible and safe, while auto-merging inferred completions without opt-in could merge unfinished work."
+      },
+      {
+        "summary": "FR-16 rule: the vbrief-ac gate (state-derived) never resets reviewStatus from 'passed'; only code gates (typecheck/lint/test) may requeue review, always with a recorded reason + needs-you surface.",
+        "rationale": "AC completeness derives from spec/statusOverrides state, not reviewable code — the PRD states 'a .pan/records restore is not reviewable code'. Resetting a human-relevant verdict silently was the incident."
+      },
+      {
+        "summary": "Single inspection gate on the salvage-merge item (fast depth); all other items requiresInspection: false.",
+        "rationale": "Every later item builds on the merged+pruned branch, so a wrong merge resolution would force redoing all five — the classic foundation criterion. The FR items are leaves whose defects surface at tests/review."
+      },
+      {
+        "summary": "FR-14 uses removeAgentSync (overdeck/agents.ts:834) as the only retirement door.",
+        "rationale": "It is the canonical remove path already used by review-agent cleanup (removes DB row + state dir, never JSONL transcripts), honoring the single-write-door tenet."
+      }
+    ],
+    "items": [
+      {
+        "id": "salvage-merge-prune",
+        "title": "Merge origin/main into feature/pan-2214, prune duplicates per PRD landed table, re-prove gates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2214",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "record-write-mutex",
+            "slot-completion-detection",
+            "swarm-reset-retire-records",
+            "swarm-feedback-routing",
+            "verdict-knockover-guard"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon-swarm-orphan-gc.ts",
+            "src/cli/commands/swarm.ts",
+            "src/cli/commands/pause.ts",
+            "src/lib/cloister/concurrency.ts",
+            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-gc.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-hold.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts",
+            "tests/integration/foreman-swarm.test.ts",
+            "sync-sources/skills/pan-swarm/SKILL.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git merge-base --is-ancestor origin/main HEAD && echo MAIN-ANCESTOR-OK",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-synthesis.test.ts tests/integration/foreman-swarm.test.ts tests/lib/cloister/auto-resume-gating.test.ts tests/fixtures/synced-skills.test.ts",
+            "npx vitest run tests/unit/lib/cloister tests/unit/cli/commands/swarm.test.ts tests/unit/cli/commands/pause.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "MAIN-ANCESTOR-OK printed (origin/main is an ancestor of HEAD)",
+            "All four sentinel suites pass (they pass at pre-merge HEAD 859c9422e4 and must still pass post-merge)",
+            "Full cloister + swarm/pause CLI suites pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Run `git fetch origin && git merge origin/main` on feature/pan-2214 (7 commits behind: PAN-1791 tiered-execution merge d0f2ae1434 with ~4.7k insertions across 49 files including src/lib/vbrief/types.ts, config-yaml, router, and tests/integration/foreman-swarm.test.ts; plus PRD refresh f57e65d1a9 and state batches). NEVER rebase or force-push — merge only. Resolve conflicts by the PRD 'Already landed on main' table: keep MAIN's gc liveness guard, gc git-failure degradation, dispatch-eligibility gating, final-item tail-starvation dispatch, merged-plan view, and coordinateSwarmSlots CLI routing; keep THIS BRANCH's per-spawn freeze/hold re-check with claim unwind, bounded durable-state allocator with advance-on-conflict, gcOrphanedSlots, tmux-alive capacity check, and the pan swarm freeze/resume/stop/reset/status CLI surface. After the merge, delete any branch-side code that duplicates a main-side implementation of the same behavior (one implementation per behavior). Re-run the four suites that failed in the previous verification cycle (deacon-swarm-synthesis, foreman-swarm, auto-resume-gating, synced-skills — all pass at pre-merge HEAD; a post-merge failure means a wrong conflict resolution, not a new bug) plus the full cloister/CLI suites, typecheck, and lint. Commit the merge; push."
+        },
+        "items": [
+          {
+            "id": "salvage-merge-prune.ac1",
+            "title": "Given the completed item, `git merge-base --is-ancestor origin/main HEAD` exits 0 — the branch contains all of current main with no rebase or force-push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "salvage-merge-prune.ac2",
+            "title": "Given the merged branch, When npx vitest run executes the four previously-failing sentinel suites (deacon-swarm-synthesis, foreman-swarm, auto-resume-gating, synced-skills), Then vitest exits 0 with zero failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "salvage-merge-prune.ac3",
+            "title": "Given the merged branch, When npm run typecheck and npm run lint execute, Then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "salvage-merge-prune.ac4",
+            "title": "The merged deacon-swarm.ts preserves exactly one implementation each of the gc liveness guard and dispatch-eligibility gating (main's) alongside the branch's per-spawn freeze gate and bounded allocator — proven by deacon-swarm-gc, deacon-swarm-hold, and deacon-swarm-dispatch suites passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "record-write-mutex",
+        "title": "FR-12: per-issue async mutex serializing .pan/records read-modify-write",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record-lock.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/records-backfill.ts",
+            "src/lib/pan-dir/__tests__/record-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-lock.test.ts passes, including the concurrent-rebuild-preserves-swarm-and-statusOverrides regression",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only src/lib/pan-dir (record lock + rebuild flow) — zero file overlap with the cloister/CLI items in the same wave.",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/pan-dir/record-lock.ts exporting `withIssueRecordLock(issueId, fn)` — a per-issue async mutex (Map of issueId to promise chain; entries cleaned up when the chain drains). In src/lib/pan-dir/records.ts, wrap the body of updateIssueRecordForIssue (line ~273: buildIssueRecord → fresh re-read → writeIssueRecordSync → queueIssueRecordCommit) in withIssueRecordLock so two concurrent rebuilds for the same issue serialize and the freshness re-read (added after the PAN-1791 wipes) cannot itself go stale between read and write. Keep the existing swarm/statusOverrides re-read logic — the mutex closes the window the re-read only narrows. Do NOT convert writeIssueRecordSync / writeIssueRecordForWorkspaceSync (src/lib/pan-dir/record.ts:190,212) to async — their callers depend on sync semantics and a sync function is atomic per event-loop turn; instead add a doc comment on both stating the invariant: sync writers must never be split by an await; async read-modify-write flows must go through withIssueRecordLock. Route the records-backfill rebuild (src/lib/pan-dir/records-backfill.ts:164 region) through the same lock. Tests: (1) two concurrent updateIssueRecordForIssue calls for one issue execute strictly serially (execution-order log assertion); (2) a writeIssueRecordForWorkspaceSync writing swarm.slotAssignments between a concurrent rebuild's read and write survives into the final record; (3) locks are per-issue — concurrent updates for different issues overlap (no global serialization). Simulate async gaps with resolved promises/microtasks or fake timers — no real delays."
+        },
+        "items": [
+          {
+            "id": "record-write-mutex.ac1",
+            "title": "Given two concurrent updateIssueRecordForIssue calls for the same issue, When both resolve, Then the test's execution-order log proves the second rebuild started only after the first's write completed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-write-mutex.ac2",
+            "title": "Given swarm.slotAssignments written via writeIssueRecordForWorkspaceSync while a rebuild is in flight, When the rebuild completes, Then the final record preserves the slot assignments (PAN-1791 wipe regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-write-mutex.ac3",
+            "title": "Given concurrent updateIssueRecordForIssue calls for two different issues, Then their critical sections overlap in the order log — the mutex is per-issue, not global",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-write-mutex.ac4",
+            "title": "writeIssueRecordSync and writeIssueRecordForWorkspaceSync remain synchronous functions (no signature change), and each carries the never-split-by-await invariant comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "slot-completion-detection",
+        "title": "FR-13: done-without-signal detection in classifyInFlightSlots, gated by swarm.infer_completion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/config.ts",
+            "tests/unit/lib/cloister/deacon-swarm-completion.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-completion.test.ts tests/unit/lib/cloister/deacon-swarm-stall.test.ts tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "New completion-inference suite passes covering nudge/auto/off modes and the dirty-tree and zero-commits negative cases",
+            "Existing stall and dispatch suites still pass (no regression in stalled/running classification)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Confined to classifyInFlightSlots + cloister config + its own test files; no same-wave item touches deacon-swarm.ts (the salvage item is in the prior wave).",
+          "traces": [
+            "FR-13",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend classifyInFlightSlots (src/lib/cloister/deacon-swarm.ts:364) — which already tracks per-slot progress via slotProgressObservations (pane output digest + branch tip commit time) and classifies 'stalled' past swarmStallThresholdMs (deacon-swarm.ts:448, env PAN_SWARM_STALL_THRESHOLD_MS) — to detect done-without-signal: a LIVE slot session whose progress is idle past the threshold AND whose slot branch has at least one commit ahead of the issue branch AND whose slot worktree is clean. Add an injectable dep for the clean-worktree check (git status --porcelain in the slot worktree, async exec only — no execSync) alongside the existing getBranchTipCommitTime pattern. Behavior by config swarm.infer_completion ('off'|'nudge'|'auto', default 'nudge'; read via cloister config in src/lib/cloister/config.ts with env override PAN_SWARM_INFER_COMPLETION following the stall-threshold pattern): 'off' — current behavior (running/stalled only); 'nudge' — on first idle expiry meeting the done-signature, emit ONE nudge action delivering the exact completion command (`pan done <ISSUE>` with the real issue id) to the slot session, recorded so it never repeats for the same unchanged observation; 'auto' — additionally, on a SECOND consecutive idle expiry with the done-signature still holding, classify the slot 'ready-to-merge' and append a `signal: inferred` marker to the coordination action log. Slots with a dirty worktree or zero commits ahead are never nudged or inferred (they classify stalled as today). All timing tests use vi.useFakeTimers() or the existing options.now injection — never real waits."
+        },
+        "items": [
+          {
+            "id": "slot-completion-detection.ac1",
+            "title": "Given infer_completion='nudge' and a live slot idle past threshold with commits ahead and a clean worktree, Then classifyInFlightSlots emits exactly one nudge action containing `pan done` and does not repeat it on the next unchanged observation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac2",
+            "title": "Given infer_completion='auto' and the done-signature holding across a second consecutive idle expiry, Then the slot classifies ready-to-merge and the action log contains a `signal: inferred` marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac3",
+            "title": "Given infer_completion='off', Then classification output preserves current behavior for the same inputs (running/stalled only, no nudges, no inference)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac4",
+            "title": "Given a dirty slot worktree OR zero commits ahead, Then no nudge fires and no inference happens regardless of mode — the slot falls back to the existing stalled classification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slot-completion-detection.ac5",
+            "title": "Given the new completion-inference suite, When it runs, Then it exits 0 driving all timing through fake timers or the injected `now` option — no real-clock waits appear in the tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-reset-retire-records",
+        "title": "FR-14: pan swarm reset retires dead slot agent records via removeAgentSync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/swarm.ts",
+            "sync-sources/skills/pan-swarm/SKILL.md",
+            "tests/unit/cli/commands/swarm.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/swarm.test.ts",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "swarm.test.ts passes including the new retirement cases (retires dead slot agents, spares live ones, transcript survives)",
+            "lint passes — scripts/lint-skills.sh accepts the updated pan-swarm SKILL.md in the same commit",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend swarmResetCommand (src/cli/commands/swarm.ts:334) so that after its existing stop + worktree/branch/slotAssignment cleanup it also retires the issue's slot AGENT RECORDS: enumerate the issue's slot agents (agent-<issue>-slot-N pattern — reuse the command's existing slot-agent enumeration used by swarmStopCommand), and for each agent that is (a) not running per its runtime state (stopped or pause-gated) AND (b) has no live tmux session, call removeAgentSync (src/lib/overdeck/agents.ts:834 — the canonical door that removes the overdeck.db row and the agent state dir and never touches JSONL transcripts; same door as review-agent.ts:927). Inject the removal + liveness deps through SwarmResetCommandDeps like the command's other deps so tests stub them. An agent with a live tmux session is NEVER removed — report it as skipped in the command output. The command stays idempotent: a second run with nothing to retire prints a no-op summary and exits 0. Update sync-sources/skills/pan-swarm/SKILL.md's reset documentation in the SAME commit (scripts/lint-skills.sh enforces CLI/skill sync)."
+        },
+        "items": [
+          {
+            "id": "swarm-reset-retire-records.ac1",
+            "title": "Given a reset where slot agents are stopped/pause-gated with no live tmux session, Then swarmResetCommand calls removeAgentSync for each and the summary output names the retired agent ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-reset-retire-records.ac2",
+            "title": "Given a slot agent whose tmux session is alive, Then reset never calls removeAgentSync for it and reports it as skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-reset-retire-records.ac3",
+            "title": "Retirement preserves JSONL transcripts — the test asserts removal goes through the injected removeAgentSync dep and no transcript path is unlinked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-reset-retire-records.ac4",
+            "title": "A second reset run with nothing left to retire exits 0 with a no-op summary (idempotent), and the pan-swarm SKILL.md documents record retirement in the same commit (lint passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-feedback-routing",
+        "title": "FR-15: swarm-aware feedback target resolver replaces hardcoded agent-<issue> delivery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/feedback-target.ts",
+            "src/lib/review-status.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "tests/unit/lib/cloister/feedback-target.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/feedback-target.test.ts tests/unit/lib/cloister",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feedback-target.test.ts passes covering whole-issue, slot-fallback, and needs-you cases",
+            "Existing cloister suites still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Only same-wave overlap risk is verification-runner.ts, and verdict-knockover-guard is serialized behind this item by an explicit blocks edge.",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/feedback-target.ts exporting `resolveIssueFeedbackTarget(issueId, opts?)` returning either `{ agentId }` or `{ needsYou: true, reason }`, with precedence: (1) if the whole-issue agent `agent-<issue>` exists and is running, return it — single-agent issues keep today's behavior exactly; (2) else read the issue record's swarm.slotAssignments — if non-empty, return the assigned slot agent for opts.itemId when given and its session is live, else the first slot agent with a live tmux session; (3) else return needsYou with a reason string naming the issue and what could not be delivered. Route the delivery sites that today hardcode `agent-${issueId.toLowerCase()}` through it: deliverTestFailureToWorkAgentHostSide (src/lib/review-status.ts, ~line 686), the verification-runner messageAgent sites (src/lib/cloister/verification-runner.ts — the vbrief-conflict and vbrief-ac feedback blocks around lines 522 and 575), and review-verdict-feedback delivery (src/lib/cloister/review-verdict-feedback.ts). On needsYou, the caller MUST emit an operator surface — reuse the existing needs-you escalation/notification mechanism used by escalateVerificationStuck — carrying the reason, and log it; a silent warn-and-return is exactly the bug this FR removes. Encode the incident as a test: a swarm issue with no whole-issue agent previously produced 'Agent agent-pan-1791 not running' and dropped the feedback."
+        },
+        "items": [
+          {
+            "id": "swarm-feedback-routing.ac1",
+            "title": "Given a swarm issue with live slot agents and no whole-issue agent, When test-failure feedback is delivered, Then messageAgent receives the slot agent id (agent-<issue>-slot-N), not agent-<issue>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-feedback-routing.ac2",
+            "title": "Given opts.itemId matching a slot assignment with a live session, Then the resolver returns that specific slot agent rather than an arbitrary live slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-feedback-routing.ac3",
+            "title": "Given no whole-issue agent and no live slot agents, Then delivery emits a needs-you operator notification carrying the undelivered reason and never returns silently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-feedback-routing.ac4",
+            "title": "Given a normal single-agent issue with agent-<issue> running, Then delivery behavior is unchanged (messageAgent receives agent-<issue>)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verdict-knockover-guard",
+        "title": "FR-16: state-derived verification gates never silently reset a passed review verdict",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-02T13:58:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2214",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-runner.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner.test.ts tests/unit/lib/cloister",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-runner tests pass including the new vbrief-ac-preserves-review-verdict case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts, the vbrief-ac failure path (the `if (acStatus && !acStatus.allCompleted)` block around line 537) currently calls setReviewStatusSync with `reviewStatus: 'pending'`, knocking a PASSED review verdict back to pending with no operator surface — the incident: a .pan/records restore made completed ACs look pending and silently invalidated a real review. Change the rule: state-derived gates (vbrief-ac — AC completeness comes from spec/statusOverrides state, not reviewable code; likewise the vbrief-conflict path) must NOT write reviewStatus at all. They set verificationStatus='failed' plus verificationNotes naming the cause, and when the pre-existing reviewStatus was 'passed' they additionally emit a needs-you operator notification (reuse the escalateVerificationStuck notification mechanism) stating that a passed review is being held by a state-derived gate and why. Code-derived gate failures (typecheck/lint/test checks earlier in the runner) keep their existing requeue behavior, but every write that changes reviewStatus away from 'passed' must include the reason in verificationNotes so the transition is auditable. Tests: (1) reviewStatus='passed' + vbrief-ac incomplete → reviewStatus still 'passed', verificationStatus='failed', needs-you emitted; (2) code-gate (test) failure → existing requeue preserved with reason recorded; (3) vbrief-ac failure with reviewStatus not yet 'passed' → no needs-you (normal retry messaging only)."
+        },
+        "items": [
+          {
+            "id": "verdict-knockover-guard.ac1",
+            "title": "Given reviewStatus='passed' and the vbrief-ac gate finding incomplete ACs, Then verification records verificationStatus='failed' while reviewStatus remains 'passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-knockover-guard.ac2",
+            "title": "Given that held-verdict case, Then a needs-you operator notification is emitted naming the vbrief-ac gate and the incomplete-AC cause",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-knockover-guard.ac3",
+            "title": "Given a code-gate failure (typecheck/lint/test), Then the existing requeue behavior is preserved and the reviewStatus transition carries its reason in verificationNotes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-knockover-guard.ac4",
+            "title": "Given vbrief-ac failing while reviewStatus is not 'passed', Then no needs-you notification fires (normal retry feedback only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "salvage-merge-prune",
+        "to": "record-write-mutex",
+        "type": "blocks"
+      },
+      {
+        "from": "salvage-merge-prune",
+        "to": "slot-completion-detection",
+        "type": "blocks"
+      },
+      {
+        "from": "salvage-merge-prune",
+        "to": "swarm-reset-retire-records",
+        "type": "blocks"
+      },
+      {
+        "from": "salvage-merge-prune",
+        "to": "swarm-feedback-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "salvage-merge-prune",
+        "to": "verdict-knockover-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-feedback-routing",
+        "to": "verdict-knockover-guard",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-02-PAN-2214-swarm-per-issue-controls-salvage-pr-2221-onto-current-main-record-write-mutex-completion-inference-record-retirement-swarm-feedback-routing-verdict-knock-over-guard.vbrief.json"
+    }
+  },
+  "status": "active"
+}

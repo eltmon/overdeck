@@ -218,10 +218,31 @@ export function findSpecByIssue(
   issueId: string,
 ): Effect.Effect<PanSpecEntry | null, FsError> {
   return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const { specsDir } = projectPanPaths(projectRoot)
+    const exists = yield* fs.exists(specsDir).pipe(Effect.catch(() => Effect.succeed(false)))
+    if (!exists) return null
+
+    const filenames = yield* fs.readDirectory(specsDir).pipe(
+      Effect.mapError((cause) => new FsError({ path: specsDir, operation: 'readDirectory', cause })),
+    )
+
+    // PAN-2216: the filename already encodes the issue id, so match on it and
+    // parse only the matching file(s). The previous implementation went through
+    // listSpecs(), which read and JSON-parsed EVERY spec in the directory for a
+    // single lookup — ~257 files per call, called once per workspace per
+    // resource-discovery refresh.
     const upperIssueId = issueId.toUpperCase()
-    const all = yield* listSpecs(projectRoot)
-    return all.find((entry) => entry.issueId.toUpperCase() === upperIssueId) ?? null
-  })
+    const matching = filenames
+      .filter((filename) => parseVBriefFilename(filename)?.issueId.toUpperCase() === upperIssueId)
+      .sort((a, b) => a.localeCompare(b))
+
+    for (const filename of matching) {
+      const entry = yield* entryFromFile(specsDir, filename)
+      if (entry) return entry
+    }
+    return null
+  }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
 

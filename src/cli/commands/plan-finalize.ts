@@ -8,9 +8,11 @@ import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync } from '../../li
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
+import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
+import { findProjectByPathSync, getProjectSwarmHotspots } from '../../lib/projects.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -19,6 +21,8 @@ interface PlanFinalizeOptions {
   promote?: boolean;
   /** Commander negation: `--no-quality-lint` arrives as `qualityLint: false` (default true). */
   qualityLint?: boolean;
+  /** Commander negation: `--no-prd` arrives as `prd: false` (default true) — bypass the PRD-first gate. */
+  prd?: boolean;
 }
 
 export type PlanFinalizeQualityGateResult =
@@ -27,16 +31,56 @@ export type PlanFinalizeQualityGateResult =
 
 export function evaluatePlanFinalizeQualityGate(
   doc: VBriefDocument,
-  options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string } = {},
+  options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string; hotspots?: string[] } = {},
 ): PlanFinalizeQualityGateResult {
   if (options.qualityLint === false) {
     return { ok: true, skipped: true, issues: [] };
   }
-  const issues = lintPlanQuality(doc, { prdText: options.prdText });
+  const issues = lintPlanQuality(doc, { prdText: options.prdText, hotspots: options.hotspots });
   const errors = issues.filter(issue => issue.severity === 'error');
   return errors.length > 0
     ? { ok: false, skipped: false, issues }
     : { ok: true, skipped: false, issues };
+}
+
+export function formatReadinessReport(verdict: SwarmReadinessVerdict): string[] {
+  const lines: string[] = ['Readiness report:'];
+  lines.push('  dependency waves:');
+  if (verdict.waves.length === 0) {
+    lines.push('    none');
+  } else {
+    for (const wave of verdict.waves) {
+      const ids = wave.items.map(item => item.id).join(', ') || 'none';
+      lines.push(`    wave ${wave.index}: ${ids}`);
+    }
+  }
+
+  lines.push('  file-overlap matrix:');
+  const matrixRows = Object.entries(verdict.overlapMatrix);
+  if (matrixRows.length === 0) {
+    lines.push('    none');
+  } else {
+    let printed = false;
+    for (const [itemId, overlaps] of matrixRows) {
+      for (const [otherId, sharedFiles] of Object.entries(overlaps)) {
+        if (itemId > otherId) continue;
+        printed = true;
+        lines.push(`    ${itemId} <-> ${otherId}: ${sharedFiles.length > 0 ? sharedFiles.join(', ') : '(conservative overlap)'}`);
+      }
+    }
+    if (!printed) lines.push('    no cross-item file overlaps');
+  }
+
+  lines.push('  conflict groups:');
+  if (verdict.conflictGroups.length === 0) {
+    lines.push('    none');
+  } else {
+    for (const group of verdict.conflictGroups) {
+      const shared = group.sharedFiles.length > 0 ? ` - ${group.sharedFiles.join(', ')}` : '';
+      lines.push(`    ${group.itemIds.join(' + ')} (${group.reason})${shared}`);
+    }
+  }
+  return lines;
 }
 
 interface PromotePlanningResult {
@@ -100,6 +144,22 @@ function readPrdDraftText(workspacePath: string, issueId: string): string | unde
   }
 }
 
+/**
+ * Format the PRD-first gate failure message (PAN-2234). Exported so tests can
+ * assert on the exact text and so both finalize exit paths share one source.
+ */
+export function formatPrdGateFailureMessage(
+  issueId: string,
+  result: PrdGateResult,
+  projectRootHint: string | null,
+): string {
+  if (result.reason === 'too-short') {
+    return `✗ PRD-first gate: PRD draft too short for ${issueId}. Found ${result.path} (${result.lineCount} lines; minimum is ${MIN_PRD_LINES}). Expand it into a real implementation brief, then re-run finalize. For a genuinely trivial issue use --no-prd.`;
+  }
+  const canonical = projectRootHint ? getIssueDraftPath(projectRootHint, issueId) : `.pan/drafts/${issueId}.md`;
+  return `✗ PRD-first gate: no PRD draft found for ${issueId}. Write ${canonical} first (roles/plan.md, Outputs #1), then re-run finalize. For a genuinely trivial issue use --no-prd.`;
+}
+
 export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Promise<void> {
   const startDir = options.workspace ? resolve(options.workspace) : process.cwd();
   const workspacePath = findWorkspaceRoot(startDir);
@@ -124,6 +184,26 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const workspaceName = workspacePath.split('/').pop() || '';
   const issueId = workspaceName.replace(/^feature-/, '').toUpperCase();
 
+  // PRD-first gate (PAN-2234): refuse to finalize without a non-trivial PRD
+  // draft. The prompt in roles/plan.md has always required this; this is the
+  // mechanical enforcement. --no-prd bypasses loudly (and propagates noPrd to
+  // the complete-planning endpoint so the server doesn't 422 the same run).
+  const projectRootHint = findProjectByPathSync(workspacePath)?.path ?? null;
+  if (options.prd === false) {
+    if (!options.json) console.error(chalk.yellow('⚠ PRD gate SKIPPED (--no-prd)'));
+  } else {
+    const prdGate = checkPrdGateSync({ projectRoot: projectRootHint, workspacePath, issueId });
+    if (!prdGate.ok) {
+      const message = formatPrdGateFailureMessage(issueId, prdGate, projectRootHint);
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: 'PRD-first gate failed', message, prdGate }));
+      } else {
+        console.error(chalk.red(message));
+      }
+      process.exit(4);
+    }
+  }
+
   if (!options.json) {
     console.log(chalk.dim(`workspace: ${workspacePath}`));
     console.log(chalk.dim('finalizing vBRIEF and creating beads…'));
@@ -131,7 +211,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planDoc = readPlanSync(planPath);
   const prdText = readPrdDraftText(workspacePath, issueId);
-  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText });
+  const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspacePath));
+  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText, hotspots });
+  const readinessReport = formatReadinessReport(analyzeSwarmReadiness(planDoc, { hotspots }));
   if (qualityGate.skipped) {
     if (!options.json) {
       console.error(chalk.yellow('⚠ quality lint SKIPPED (--no-quality-lint)'));
@@ -145,6 +227,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         for (const line of formatQualityIssues(qualityGate.issues)) {
           console.error(chalk.red('  ' + line));
         }
+        console.error('');
+        for (const line of readinessReport) console.error(chalk.dim(line));
         console.error(chalk.dim('Use --no-quality-lint only for an emergency one-run bypass.'));
       }
       process.exit(3);
@@ -160,6 +244,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         }
       }
     }
+  }
+  if (!options.json) {
+    for (const line of readinessReport) console.error(chalk.dim(line));
   }
 
   emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
@@ -222,7 +309,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const noPromote = options.promote === false;
   if (!noPromote) {
     emitAutoPromotePhase(issueId, 'completePlanning', 'start', autoSpawnOnFinalize ? 'posting complete-planning autoSpawn request' : 'posting complete-planning request');
-    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize);
+    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize, { noPrd: options.prd === false });
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
@@ -320,7 +407,7 @@ const promoteFailure = (error: string): PromotePlanningResult => ({
   workAgentSpawned: false, workAgentMessage: null, workAgentError: null, workAgentSkipReason: null,
 });
 
-export async function promotePlanning(issueId: string, autoSpawn = false): Promise<PromotePlanningResult> {
+export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean } = {}): Promise<PromotePlanningResult> {
   const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
   let lastError = 'complete-planning failed';
 
@@ -334,7 +421,7 @@ export async function promotePlanning(issueId: string, autoSpawn = false): Promi
         response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
-          body: JSON.stringify(autoSpawn ? { autoSpawn: true } : {}),
+          body: JSON.stringify({ ...(autoSpawn ? { autoSpawn: true } : {}), ...(opts.noPrd ? { noPrd: true } : {}) }),
           signal: controller.signal,
         });
       } finally {

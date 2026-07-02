@@ -4,17 +4,17 @@
     "created": "2026-06-29T20:00:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2174: bug(flywheel): intermittently idles (asks a question / drops ScheduleWakeup) instead of ticking",
-    "updated": "2026-06-30T01:09:35.780Z"
+    "updated": "2026-06-30T02:30:43.699Z"
   },
   "plan": {
     "id": "pan-2174",
     "title": "bug(flywheel): intermittently idles (asks a question / drops ScheduleWakeup) instead of ticking",
-    "status": "running",
+    "status": "completed",
     "uid": "a9842a08-425e-4141-bb1f-34708c43ba49",
     "author": "agent:claude-opus-4-8",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-06-29T20:00:00.000Z",
-    "updated": "2026-06-30T01:09:35.780Z",
+    "updated": "2026-06-30T02:30:43.699Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2174",
@@ -216,5 +216,5 @@
       "canonicalFilename": "2026-06-29-PAN-2174-bug-flywheel-intermittently-idles-asks-a-question-drops-schedulewakeup-instead-of-ticking.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

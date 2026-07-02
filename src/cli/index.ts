@@ -116,6 +116,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
+import { registerSwarmCommands } from './commands/swarm.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -355,7 +356,7 @@ review
 review
   .command('restart <id>')
   .description('Kill running reviewers and dispatch fresh review pipeline')
-  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-4-6)')
+  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-5)')
   .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
   .action(reviewRestartCommand);
 
@@ -424,11 +425,13 @@ planCmd
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
+  .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planFinalizeCommand);
 
 planCmd
   .command('done <id>')
   .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
 // Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
@@ -577,12 +580,9 @@ program
     strikeCommand(ids, options),
   );
 
-// Register workspace commands (pan workspace create, pan workspace list, etc.)
+registerSwarmCommands(program);
 registerWorkspaceCommands(program);
-
-// Register test commands (pan test run, pan test list)
 registerTestCommands(program);
-
 registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)

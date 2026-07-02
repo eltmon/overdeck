@@ -11,6 +11,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
 
 const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
@@ -73,11 +74,24 @@ export interface ConcurrencyConfig {
    */
   reserved_advancing_slots: number;
   /**
+   * Dedicated swarm-slot reserve, isolated from `max_work_agents` and
+   * `reserved_advancing_slots` (PAN-2212). Swarm slot dispatch draws only from this
+   * reserve, so a busy pipeline never starves the swarm — and swarm slots never
+   * starve review/test in reverse. Default 3.
+   */
+  reserved_swarm_slots: number;
+  /**
    * When true, operator-started work agents (no flywheelRunId) are exempt from
    * the emergency brake/governor reaping so the operator's deliberate spawns are
    * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
    */
   exempt_operator_started?: boolean;
+}
+
+export type SwarmInferCompletionMode = 'off' | 'nudge' | 'auto';
+
+export interface SwarmConfig {
+  infer_completion: SwarmInferCompletionMode;
 }
 
 /**
@@ -268,9 +282,11 @@ export interface CloisterConfig {
   stuck_remediation?: StuckRemediationConfig;
   monitoring: MonitoringConfig;
   concurrency?: ConcurrencyConfig;
+  swarm?: SwarmConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
+  tiered_execution?: TieredExecutionConfig;
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
@@ -316,7 +332,11 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   concurrency: {
     max_work_agents: 6,
     reserved_advancing_slots: 3,
+    reserved_swarm_slots: 3,
     exempt_operator_started: true,
+  },
+  swarm: {
+    infer_completion: 'nudge',
   },
   notifications: {
     slack_webhook: undefined,
@@ -362,6 +382,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // now flows through resolveHarness(), which consults explicit, role,
       // providerHarnesses, and built-in provider defaults in order.
     },
+  },
+  tiered_execution: {
+    enabled: false,
+    tiers: {},
+    supervisor: undefined,
+    replay_threshold: 0.5,
   },
   handoffs: {
     auto_triggers: {

@@ -133,6 +133,39 @@ describe('pickFromSequence – author/assignee safety gate', () => {
   });
 });
 
+describe('pickFromSequence – auto_pickup_backlog blanket release (PAN-2059 + vision.mdx)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const readyPlanned = {
+    issueLabels: (id: string) => (id === 'PAN-UNRELEASED' ? ['ready'] : ['ready']),
+    isAuthorizedIssue: () => true,
+    isReadyOrHasPrd: () => true,
+    requireReady: true,
+  };
+
+  it('OFF: a ready+planned issue with no `released` label is skipped', () => {
+    const result = pickFromSequence([makeNode('PAN-UNRELEASED', 1)], readyPlanned);
+    expect(result).toBeNull();
+  });
+
+  it('ON: the toggle blanket-releases, so the same unreleased issue is picked', () => {
+    const result = pickFromSequence([makeNode('PAN-UNRELEASED', 1)], { ...readyPlanned, autoPickupBacklog: true });
+    expect(result?.issueId).toBe('PAN-UNRELEASED');
+  });
+
+  it('ON: vetoed still hard-stops even under blanket release', () => {
+    const nodes = [makeNode('PAN-VETO', 1), makeNode('PAN-OK', 2)];
+    const result = pickFromSequence(nodes, {
+      issueLabels: (id) => (id === 'PAN-VETO' ? ['ready', 'vetoed'] : ['ready']),
+      isAuthorizedIssue: () => true,
+      isReadyOrHasPrd: () => true,
+      requireReady: true,
+      autoPickupBacklog: true,
+    });
+    expect(result?.issueId).toBe('PAN-OK');
+  });
+});
+
 describe('pickFromSequence – vetoed / parked label gates (PAN-2006)', () => {
   beforeEach(() => vi.clearAllMocks());
 

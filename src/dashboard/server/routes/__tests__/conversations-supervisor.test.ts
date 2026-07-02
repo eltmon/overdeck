@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 20_000 });
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 let overdeckHome: string;
 let channelsEnabled = false;
@@ -91,8 +91,16 @@ function cleanupSession(session: string): void {
   rmSync(join(overdeckHome, 'sockets', `pty-${session}.sock`), { force: true });
 }
 
+function ensurePtySupervisorBuildArtifact(): void {
+  const supervisorDistPath = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  if (existsSync(supervisorDistPath)) return;
+  mkdirSync(dirname(supervisorDistPath), { recursive: true });
+  writeFileSync(supervisorDistPath, '#!/usr/bin/env node\n');
+}
+
 describe('spawnConversationSession PTY supervisor wiring', () => {
   beforeEach(() => {
+    ensurePtySupervisorBuildArtifact();
     overdeckHome = join(tmpdir(), `pan-conv-supervisor-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     process.env.OVERDECK_HOME = overdeckHome;
     channelsEnabled = false;

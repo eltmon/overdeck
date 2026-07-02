@@ -31,6 +31,7 @@ import type {
   ContinueHazard,
   ContinueResumePoint,
   ContinueSessionEntry,
+  ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -58,6 +59,27 @@ export interface PanIssueCloseOutRecord {
   closedAt?: string;
 }
 
+export interface PanIssueSwarmFailedMergeBlock {
+  issueId: string;
+  itemId: string;
+  slotIndex: number;
+  branch?: string;
+  note: string;
+}
+
+export interface PanIssueSwarmSlotAssignment {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+  assignedAt?: string;
+}
+
+export interface PanIssueSwarmRecord {
+  failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
+  slotAssignments?: PanIssueSwarmSlotAssignment[];
+}
+
 export interface PanIssuePipelineRecord {
   issueId: string;
   reviewStatus: string;
@@ -79,6 +101,8 @@ export interface PanIssuePipelineRecord {
   lastVerifiedCommit?: string;
   /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
   reviewRequestedAt?: string;
+  /** PAN-1762: advisory files_scope drift recorded at pan done. */
+  scopeDrift?: ScopeDriftRecord;
   autoMerge?: boolean;
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;
@@ -120,6 +144,8 @@ export interface PanIssueRecord {
   statusOverrides?: Record<string, string>;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
+  scopeDrift?: ScopeDriftRecord;
+  swarm?: PanIssueSwarmRecord;
 
   pipeline: PanIssuePipelineRecord;
   closeOut: PanIssueCloseOutRecord;
@@ -161,12 +187,44 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
 
 // ─── Read / write ─────────────────────────────────────────────────────────────
 
+/**
+ * Synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
   record: PanIssueRecord,
 ): string {
   const path = getIssueRecordPath(project, issueId);
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const now = new Date().toISOString();
+  const next: PanIssueRecord = {
+    ...record,
+    issueId: issueId.toUpperCase(),
+    schemaVersion: RECORD_SCHEMA_VERSION,
+    created: record.created || now,
+    updated: now,
+  };
+  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  return path;
+}
+
+/**
+ * Workspace-scoped synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
+export function writeIssueRecordForWorkspaceSync(
+  workspacePath: string,
+  issueId: string,
+  record: PanIssueRecord,
+): string {
+  const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   const dir = dirname(path);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -198,6 +256,16 @@ export async function readIssueRecord(
 
 export function readIssueRecordSync(project: ProjectConfig, issueId: string): PanIssueRecord | null {
   const path = getIssueRecordPath(project, issueId);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    return JSON.parse(raw) as PanIssueRecord;
+  } catch {
+    return null;
+  }
+}
+
+export function readIssueRecordForWorkspaceSync(workspacePath: string, issueId: string): PanIssueRecord | null {
+  const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   try {
     const raw = readFileSync(path, 'utf-8');
     return JSON.parse(raw) as PanIssueRecord;
@@ -477,6 +545,7 @@ export interface RecordContinueView {
   beadsMapping: ContinueBeadsMapping;
   sessionHistory: ContinueSessionEntry[];
   feedback: ContinueFeedbackEntry[];
+  scopeDrift?: ScopeDriftRecord;
 }
 
 export function readRecordContinueViewSync(
@@ -492,6 +561,7 @@ export function readRecordContinueViewSync(
     beadsMapping: record.beadsMapping ?? {},
     sessionHistory: record.sessionHistory ?? [],
     feedback: record.feedback ?? [],
+    scopeDrift: record.scopeDrift,
   };
 }
 
@@ -528,6 +598,18 @@ export function clearRecordFeedbackSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   record.feedback = [];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Record advisory scope prediction drift in the per-issue record (sync). */
+export function writeRecordScopeDriftSync(
+  project: ProjectConfig,
+  issueId: string,
+  scopeDrift: ScopeDriftRecord,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.scopeDrift = scopeDrift;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }

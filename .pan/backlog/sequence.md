@@ -1,20 +1,25 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
+_Last sequenced: 2026-07-02T05:50:48Z · model: claude-opus-4-8 · open: 569_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 3 | PAN-2143 | S | critical | ok |  |  | Linchpin for 24/7 throughput: deacon patrol must re-evaluate stale merge-blockers so resolved-conflict PRs actually merge. |
-| 6 | PAN-1982 | M | medium | ok |  |  | Revive full convoy review as configurable opt-in (quick stays default). Ready. |
+| 3 | PAN-2198 | L | critical | ok |  |  | Post-approval convergence unreliable — APPROVED verdicts stall before merge until a human/restart unsticks; top pipeline gap. |
+| 4 | PAN-2204 | M | critical | ok |  |  | Strike/work agents can git push directly to origin/main — unreviewed self-merge red-mained main (PAN-2200 fallout). |
+| 5 | PAN-2209 | M | critical | ok |  |  | Review-BLOCKED rework not auto-dispatched when work agent is stopped/troubled — issue stalls indefinitely. |
 | 7 | PAN-806 | XL | critical | ok |  | PAN-804 | Epic B: work agents must use pan primitives (sync-main/done) for history ops — never raw git rebase/reset/stash. |
 | 8 | PAN-1864 | S | critical | ok |  | PAN-1861 | Review nudge fires but never synthesizes — deacon must derive synthesis DETERMINISTICALLY from on-disk reports. |
-| 11 | PAN-1510 | M | critical | ok |  |  | Issues filed mid-session never appear in the frontend store tree/kanban (cache not invalidated). |
-| 12 | PAN-1506 | M | critical | ok |  |  | Strike agents appear in /api/agents but never on the dashboard Agents page/store. |
-| 13 | PAN-1508 | M | critical | ok |  | PAN-1027, PAN-863 | workspaces/feature-*/ debris consumes 220GB (~⅓ of host storage); post-merge cleanup never fully runs. |
+| 9 | PAN-2207 | M | critical | ok |  |  | pan done that fails mid-flight (GraphQL rate-limit at PR creation) leaves issue done-but-never-reviewed — no recovery. |
+| 10 | PAN-2202 | M | critical | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AUQ — finalize reports false success. |
+| 11 | PAN-2167 | S | high | ok |  |  | Pipeline-written .pan/records + .pan/test/result.json dirty the worktree and block pan review request's clean-tree gate. |
+| 12 | PAN-2212 | S | high | ok |  |  | Swarm slot dispatch has no reserved budget — a busy pipeline starves it to zero (0 slots dispatched). |
+| 13 | PAN-2213 | S | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one. |
+| 14 | PAN-2186 | M | high | ok |  |  | Post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck 'merging' after a successful merge. |
+| 15 | PAN-2214 | M | high | ok |  |  | Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator (only global freeze exists). |
 | 16 | PAN-1456 | L | critical | ok |  |  | Pass-3 behavior audit handoff incomplete — fresh-context agent must finish verifying recent closes. |
 | 17 | PAN-1861 | S | critical | ok |  |  | Review convoy parent still wedges waiting for sub-specialist signals after PAN-1818 — blocks merge cascade. |
-| 18 | PAN-1865 | S | critical | ok |  |  | Kimi on claude-code harness hangs at 100% ctx ($22/agent) — CLIProxy advertises a false ~200k window. |
+| 18 | PAN-2158 | S | high | ok |  |  | pan plan --auto escalates to interactive on a PRD-defaulted decision, stalling a critical-path agent the flywheel can't unblock. |
 | 19 | PAN-804 | XL | critical | needs-refinement |  |  | Epic D: archaeological audit + pre-1.0 cleanup — must execute FIRST, before Epics A/B/C, on known-good ground. |
 | 20 | PAN-1520 | L | high | ok |  |  | Unify 'agent awaiting input': finish AskUserQuestion + generic hooks; feed the dashboard INPUT badge. |
 | 21 | PAN-807 | XL | critical | ok |  | PAN-804 | Epic C: stop spawn flow destroying local state — pre-flight checks guarantee a safe workspace before start. |
@@ -22,11 +27,11 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 23 | PAN-1214 | L | high | ok |  |  | Dashboard crashes on UnhandledPromiseRejection when deacon pokes a not-running agent. |
 | 24 | PAN-1560 | L | high | ok |  |  | Re-review after a PR head moves (sync-main/rebase) doesn't re-post the required review status. |
 | 25 | PAN-1499 | M | high | ok |  | PAN-1454 | Substrate pattern-2: block pan done when close-out honestly defers work ('will do X') with no follow-up. |
-| 26 | PAN-1084 | M | high | ok |  |  | Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops. |
+| 26 | PAN-2194 | S | high | ok |  |  | Flywheel orchestrator on codex committed a vBRIEF to main — prompt hardened; needs mechanical guard or a non-implementer harness. |
 | 27 | PAN-2086 | M | high | ok |  |  | Startup speedup: incremental pan sync (skip-when-unchanged) + traefik precheck + listen-before-merge. |
 | 28 | PAN-1557 | L | medium | ok |  |  | Run convoy reviewers as interactive, attachable sessions with hook-owned completion (not headless --print). |
 | 29 | PAN-955 | M | high | ok |  |  | Devcontainer template has no versioning — template changes never re-render existing workspaces. |
-| 30 | PAN-1193 | L | high | ok |  |  | Swarm slots branch independently with no file-overlap arbitration — two slots can clobber the same file. |
+| 30 | PAN-2165 | S | high | ok |  |  | pan close reports success but leaves issue OPEN / stale labels — remove-label aborts on an absent label; no-vBRIEF transition no-ops. |
 | 31 | PAN-1198 | L | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules; init/frontend fail. |
 | 32 | PAN-1207 | L | high | ok |  |  | Review sub-specialists exit cleanly but state.json stays 'running' — deacon orphans healthy reviewers. |
 | 33 | PAN-1209 | M | high | ok |  |  | Dashboard bead projection (40 open/0 closed) disagrees with workspace bd (opposite) after resume. |
@@ -41,7 +46,7 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 42 | PAN-1915 | M | high | ok |  |  | API-key at-rest hardening: startup perm check + OS keychain + deprecate plaintext storage. |
 | 43 | PAN-605 | S | high | stale |  |  | Reconcile CLAUDE.md prompt assembly across all agent types — dead code + inconsistent composition. |
 | 44 | PAN-1226 | M | high | ok |  |  | [META] unified-dashboard redesign: 32 gaps vs PRD and mockups — full audit tracker. |
-| 45 | PAN-1263 | S | high | ok |  |  | Swarm UX: pipeline rows/IssueDrawer don't surface per-slot identity or progress. |
+| 45 | PAN-2163 | S | high | ok |  |  | close-out verify-merged false-positive: 'N unmerged commits' on a fully-merged branch (checks local refs, not origin). |
 | 46 | PAN-1433 | S | high | ok |  |  | Conversation agents can leave the host main repo stranded in an abandoned git rebase. |
 | 47 | PAN-1444 | S | high | ok |  | PAN-1416 | Follow-up to PAN-1416: add dashboard port lockfile + pan doctor multi-instance detection. |
 | 48 | PAN-1461 | M | high | ok |  |  | Conversation transcript Ctrl+F only finds currently-rendered DOM text, not the full transcript. |
@@ -63,14 +68,14 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 64 | PAN-1681 | S | high | ok |  |  | In-review PRs strand at test=pending though tests pass — blocks ship→ready_for_merge. |
 | 65 | PAN-1824 | S | high | ok |  |  | Main CI flaky: ~5s timeouts on suites that pass locally (94/94 in 2.5s). |
 | 66 | PAN-1913 | S | medium | ok |  |  | Add project 'description' field + bundle config niceties (project list polish). |
-| 67 | PAN-2054 | S | high | ok |  |  | Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model. |
+| 67 | PAN-2170 | S | high | ok |  |  | Docker init container lacks Python — node-gyp rebuild of better-sqlite3 fails, breaking workspace stack creation (forces --host). |
 | 68 | PAN-2065 | L | high | needs-refinement |  |  | Unified provider usage & headroom panel — 2026-06-26 fleet stalled 10h on a silently-exhausted z.ai plan limit. |
 | 69 | PAN-2059 | XL | high | needs-refinement |  |  | Epic: operator Plan→Release pickup gate + AI Objection (5th state) + Flywheel relevance-vetting. Mockups committed. |
 | 70 | PAN-1436 | L | high | ok |  |  | Header 'stopped' count still mis-includes some running agents (follow-up to PAN-1419). |
 | 71 | PAN-1711 | L | high | ok |  |  | Supervisor watchdog force-restarts the dashboard repeatedly within 45 min on health-probe noise. |
 | 72 | PAN-1769 | L | high | ok |  |  | Conversation message eaten by submit-time compaction after resume; retry storm risk. |
 | 73 | PAN-630 | L | medium | needs-refinement |  |  | Multi-tenant mode: shared instance with workspace ownership, ACLs, audit logging. |
-| 74 | PAN-1195 | L | medium | needs-refinement |  |  | Swarm parent is paused (stoppedByUser) while swarm runs — confusing lifecycle state. |
+| 74 | PAN-2169 | M | high | ok |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow) not caught by CONTEXT_OVERFLOW_PATTERNS — needs a ctx-saturation heuristic. |
 | 75 | PAN-1196 | L | medium | needs-refinement |  |  | Every bead runs on one model regardless of complexity — no per-bead model selection. |
 | 76 | PAN-1217 | M | medium | needs-refinement |  |  | Requirements reviewer treats the whole AC list as in-scope for every PR — coverage-matrix blowup. |
 | 77 | PAN-1218 | M | medium | needs-refinement |  | PAN-1124 | Bead inspection adds ~3-5 min/bead (30% blow past 10 min) — throughput tax. |
@@ -126,9 +131,9 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 127 | PAN-1240 | S | high | ok |  |  | Fix: Ship-complete PRs going CONFLICTING after main moves need auto re-rebase recovery |
 | 128 | PAN-1243 | S | high | ok |  |  | Fix: pan admin hooks install: resolver fails outside repo CWD (auto-config breaks flywheel resume) |
 | 129 | PAN-1247 | S | high | ok |  |  | Fix: Substrate: deacon orphan-test recovery loops dispatch_failed forever on an unhealthy workspace docker stack |
-| 130 | PAN-1258 | S | high | ok |  |  | Fix: Swarm slot spawn hangs silently before writeLauncherScriptAtomic when model=kimi-k2.6 |
+| 130 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) — new god file from the workspaces split; supervised handoff only. |
 | 131 | PAN-1330 | S | high | ok |  |  | Fix: CLI cannot address planning-*/specialist-* sessions — pan tell/pan kill hard-code 'agent-' prefix; no 'pan plan abort' |
-| 132 | PAN-1336 | S | high | ok |  |  | Fix: Swarm: pan swarm --auto-advance cannot advance — no slot-PR merger, slots never self-terminate |
+| 132 | PAN-2189 | L | high | ok |  |  | Decompose src/lib/cloister/deacon.ts (3,394 lines) — pipeline machinery; supervised handoff only. |
 | 133 | PAN-1386 | S | high | ok |  |  | Fix: Flywheel orchestrator never emits status snapshots — dashboard 'flywheel' pane stays blank during an active run |
 | 134 | PAN-1392 | S | high | ok |  |  | Fix: pan close: archive-planning:move-prd fails when completed/ PRD exists but workspace PRD also exists |
 | 135 | PAN-1434 | S | high | ok |  |  | Fix: conv-find.py reports session_file: N/A for newer conversation records (wrong column) |
@@ -137,9 +142,9 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 138 | PAN-1440 | S | high | ok |  |  | Fix: Follow-up to PAN-1158: bd export --refuse-empty guard + dolt-empty root cause |
 | 139 | PAN-1445 | S | high | ok |  |  | Fix: PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 140 | PAN-1446 | S | high | ok |  |  | Fix: PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 141 | PAN-1447 | S | high | ok |  |  | Fix: PAN-1194 follow-up: restore failed-merge slot UI deleted by sibling PAN-1148 merge |
+| 141 | PAN-2179 | M | high | ok |  |  | relaunch can leave a zombie agent — session alive but kickoff never delivered, fooling tmux-has-session liveness checks. |
 | 142 | PAN-1449 | S | high | ok |  |  | Fix: PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
-| 143 | PAN-1472 | S | high | ok |  |  | Fix: Swarm inspect agents emit pan tell to parent agent ID — fails when only slot agents exist |
+| 143 | PAN-2193 | M | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree — resolver buckets them clean_terminal. |
 | 144 | PAN-1530 | S | high | ok |  |  | Fix: Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
 | 145 | PAN-2108 | M | high | ok |  |  | Flywheel can't recover context-exhausted/troubled work agents — RUN-30 root throughput blocker; needs a flywheel-safe recovery surface. |
 | 146 | PAN-1564 | S | high | ok |  |  | Fix: Pi extension path + dashboard server spawn both depend on launch cwd (fix: resolve against packageRoot + pin spawn cwd) |
@@ -150,7 +155,7 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 151 | PAN-1624 | M | high | ok |  |  | Fix: pan handoff --author external: authored doc is socket_write-ten but never submitted — successor sits at empty welcome screen |
 | 152 | PAN-2095 | M | high | ok |  |  | pan reload builds the divergent primary worktree, not origin/main — landed CI-green fixes never actually go live. |
 | 153 | PAN-2106 | M | medium | ok |  |  | pan strike git-lock race leaves a broken partial workspace yet reports 'spawned' — false success blocks red-main reverts. |
-| 154 | PAN-2088 | L | high | ok |  | PAN-1958 | Replace fragile tmux paste with pi extension control channel: steer/follow_up, effort, model, compact, quick-abort. In-review. |
+| 154 | PAN-2159 | M | medium | ok |  |  | Duplicate planning-agent spawn races on pan plan finalize → bd process-lock thrashing (two Opus planners on one issue). |
 | 155 | PAN-1673 | S | high | ok |  |  | Fix: Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 156 | PAN-1674 | S | high | ok |  |  | Fix: TLDR .venv (~7.5G) is duplicated into every workspace — 236G across 33 worktrees, caused disk-full ENOSPC |
 | 157 | PAN-1775 | M | medium | ok |  |  | remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent' |
@@ -160,8 +165,8 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 161 | PAN-2091 | S | low | ok |  |  | Pure dead-code deletion: remove superseded IssueCockpitBody subtree (8 files); data-loss audit confirms nothing lost. |
 | 162 | PAN-2145 | XL | medium | ok |  |  | Codebase-health: decompose routes/conversations.ts (4898 lines) into <1000-line modules behind a re-export barrel. |
 | 163 | PAN-2077 | L | high | needs-refinement |  | PAN-1775 | One substrate-complete reconciliation inventory (local tmux + remote Fly) the dashboard and CLI both consume. |
-| 164 | PAN-2076 | L | medium | needs-refinement |  | PAN-2077, PAN-2079 | Boot Reconciliation dashboard surface: informed per-agent Resume/Freeze/Kill replacing the all-or-nothing banner. |
-| 165 | PAN-2146 | XL | medium | ok |  |  | Codebase-health: decompose src/lib/agents.ts (4572 lines) into <1000-line modules behind a re-export barrel. |
+| 164 | PAN-2197 | M | medium | ok |  |  | codex work agents skip pan done (manual push) — sandbox blocks its GitHub calls; idle agents spuriously 'troubled'. |
+| 165 | PAN-2201 | S | medium | needs-refinement |  |  | Close-out label step fails atomically when a hardcoded label (e.g. in-planning) is absent — closed issues keep stale labels. |
 | 166 | PAN-1795 | S | high | ok |  |  | Fix: Codebase map bootstrapped in planning worktree is never promoted to main (PAN-1788 WI-6 wiring gap) |
 | 167 | PAN-1816 | S | high | ok |  |  | Fix: Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry — need an ephemeral flag +... |
 | 168 | PAN-2147 | XL | medium | ok |  |  | Codebase-health: decompose routes/agents.ts (4071 lines) into <1000-line modules behind a re-export barrel. |
@@ -241,7 +246,7 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 242 | PAN-1060 | M | medium | needs-refinement |  |  | Ship: Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
 | 243 | PAN-1151 | M | medium | needs-refinement |  |  | Ship: Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
 | 244 | PAN-1165 | M | medium | needs-refinement |  |  | Ship: Lightweight review path for small/trivial PRs |
-| 245 | PAN-1202 | M | medium | needs-refinement |  |  | Ship: Swarm: prune merged/completed slot state directories after wave converges |
+| 245 | PAN-2210 | S | medium | ok |  |  | A swarm slot's work.completed can trigger the issue-level review pipeline instead of only the slot's lifecycle. |
 | 246 | PAN-1223 | M | medium | needs-refinement |  |  | Ship: Auto-update for users in the field (npm + desktop binaries) |
 | 247 | PAN-1432 | M | medium | needs-refinement |  |  | Ship: Merge agent leaves packages/contracts/dist stale — typecheck breaks on every fresh checkout |
 | 248 | PAN-1437 | M | medium | needs-refinement |  |  | Ship: pan flywheel report semantics: split read-only snapshot from run finalization |
@@ -322,7 +327,7 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 323 | PAN-826 | L | medium | needs-refinement |  |  | Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment |
 | 324 | PAN-863 | L | medium | needs-refinement |  |  | Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees) |
 | 325 | PAN-1474 | S | low | ok |  |  | Doc: Add ACKNOWLEDGEMENTS doc — credit borrowed code from open-source projects (MIT/Apache 2.0) |
-| 326 | PAN-1555 | S | low | ok |  |  | Doc: remove/update stale swarm-runtime references after PAN-1517 |
+| 326 | PAN-2211 | S | medium | ok |  |  | swarm slot pan done records completion but the slot never becomes merge-ready (classifier never consumes it). |
 | 327 | PAN-1683 | S | low | ok |  |  | Doc: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) — strike keeps falling out... |
 | 328 | PAN-43 | M | medium | ok |  |  | Add Slack and email notifications for agent events |
 | 329 | PAN-44 | M | medium | ok |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
@@ -510,14 +515,14 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 511 | PAN-1755 | M | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
 | 512 | PAN-1758 | M | medium | ok |  |  | ship lane cannot converge on a continuously-moving main — 37 re-dispatches for one issue; readyForMerge only ever flips via the startup r... |
 | 513 | PAN-1761 | M | medium | ok |  |  | conversations endpoints fetched via relative /api path — 403 inside workspace/UAT containers (session cookie is on the api-* origin) |
-| 514 | PAN-1762 | M | medium | ok |  |  | Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B) |
+| 514 | PAN-2195 | M | medium | ok |  |  | pan plan finalize re-plan churn: a stale superseded spec on main transiently materializes the OLD plan's beads. |
 | 515 | PAN-1773 | M | medium | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
 | 516 | PAN-1774 | M | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
 | 517 | PAN-1782 | M | medium | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout — decouple precompaction from the handoff author model |
 | 518 | PAN-1846 | M | medium | ok |  |  | unbounded log growth — deacon.log 687MB / dashboard.log 91MB, no rotation; per-agent skip line logged every 60s patrol |
 | 519 | PAN-1874 | M | medium | ok |  |  | per-issue override for review mode / re-review scope (extends PAN-1862 project-scope config) |
 | 520 | PAN-1878 | M | medium | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 521 | PAN-1894 | M | medium | ok |  |  | Show UAT stack startup state in issue tree and issue slide-out |
+| 521 | PAN-2178 | M | medium | ok |  |  | gitignored .pan/spec.vbrief.json is git-tracked on main → inherited by every new workspace (spec metadata drift). |
 | 522 | PAN-1895 | M | medium | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 523 | PAN-1906 | M | medium | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
 | 524 | PAN-1907 | M | medium | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate everywh... |
@@ -546,8 +551,8 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 547 | PAN-2008 | M | medium | ok |  |  | store-access guard — fail the build on direct store reads outside a domain resolver (PAN-1936 slice) |
 | 548 | PAN-2045 | M | medium | ok |  |  | perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool |
 | 549 | PAN-2046 | M | medium | ok |  |  | Conversation view does not surface terminal command responses |
-| 550 | PAN-1884 | M | medium | ok |  |  | Migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer; complete on main. |
-| 551 | PAN-2063 | XS | low | ok |  |  | UAT stack health panel should display collapsed by default to reduce clutter during active work. |
+| 550 | PAN-2187 | M | medium | ok |  |  | Flywheel soul restoration + blanket-release auto-pickup; re-center vision/role/brief — mostly landed this session. |
+| 551 | PAN-2188 | M | medium | ok |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate — mostly landed. |
 | 552 | PAN-2066 | L | low | ok |  |  | OKF knowledge skill — deferred v2 capabilities (hybrid search, viz, lease writes, MCP, semantic auditor). |
 | 553 | PAN-2074 | S | low | needs-refinement |  |  | Research: evaluate ponytail (prompt compression) and decide build-vs-integrate vs Caveman/TLDR/RTK. |
 | 554 | PAN-2073 | S | low | ok |  |  | Docs: add user-facing page for the Desktop App (install, tray, embedded server, updates). |
@@ -559,21 +564,30 @@ _Last sequenced: 2026-06-29T03:03:24Z · model: claude-opus-4-8 · open: 559_
 | 560 | PAN-454 | M | low | needs-refinement |  |  | Ship: Crash recovery: detect orphaned agents and present recovery UI on dashboard startup |
 | 561 | PAN-2150 | L | medium | ok |  |  | Codebase-health: decompose Settings/SettingsPage.tsx (2043 lines) into <1000-line modules behind a re-export barrel. |
 | 562 | PAN-2151 | L | medium | ok |  |  | Codebase-health: decompose routes/misc.ts (1835 lines) into <1000-line modules behind a re-export barrel. |
-| 563 | PAN-2152 | L | medium | ok |  |  | Codebase-health: decompose cli/commands/workspace.ts (1791 lines) into <1000-line modules behind a re-export barrel. |
+| 563 | PAN-2081 | M | medium | ok |  |  | Epic-aware backlog sequencer — recognize epics as containers, keep children coherent, group in forecast/DAG — merged/verifying. |
 | 564 | PAN-2153 | L | medium | ok |  |  | Codebase-health: decompose routes/specialists.ts (1753 lines) into <1000-line modules behind a re-export barrel. |
 | 565 | PAN-2154 | L | medium | ok |  |  | Codebase-health: decompose lib/workspace-manager.ts (1736 lines) into <1000-line modules behind a re-export barrel. |
-| 566 | PAN-2155 | M | medium | ok |  |  | Codebase-health: decompose chat/MessagesTimeline.tsx (1620 lines) into <1000-line modules behind a re-export barrel. |
+| 566 | PAN-2208 | S | medium | ok |  |  | pan show crashes (ENOENT) for a cross-project issue with a missing agent directory — merged, verifying. |
 | 567 | PAN-2156 | M | medium | ok |  |  | Codebase-health: decompose services/conversation-service.ts (1609 lines) into <1000-line modules behind a re-export barrel. |
+| 568 | PAN-2192 | S | high | ok |  |  | Red main: flywheel CLI exceeded the file-size guard after the harness-resolver fix — merged, verifying. |
+| 569 | PAN-2172 | M | high | ok |  |  | host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0 — in-review. |
+| 570 | PAN-2181 | S | medium | ok |  |  | Boot-reconciliation grace countdown: extend to 2 min + restyle modal to style-guide tokens (light/dark) — in-review. |
+| 571 | PAN-2168 | M | medium | ok |  |  | Global navigation affordance to Flywheel openQuestions from anywhere — count badge + live updates — planned. |
+| 572 | PAN-2157 | S | critical | ok |  |  | Flywheel auto-merge schedule endpoint fails 'GitHub App not configured' — autonomous merge gate non-functional (merged, verifying). |
 
 ## Rationale detail
 
-### PAN-2143 (rank 3)
+### PAN-2198 (rank 3)
 
-New top node, replacing the closed keystone PAN-1919. resolveConflictGate only runs on-demand from review-dispatch routes, so any PR that picked up a merge_conflict blocker and then fell out of the active review flow is never re-evaluated — the blocker persists forever and the merge train never picks it up, even after the conflict is resolved by a rebase. Confirmed live on PAN-1884/PAN-2088/PAN-1718 (review+test passed, mergeable again, yet readyForMerge=0). The fix is a small, well-understood deacon patrol (reconcileStaleMergeBlockers with a 2-min per-issue cooldown), so it is high impact, small, and clear — the ideal top-of-backlog pick and the single biggest unblocker for autonomous merge-train throughput.
+This is the successor linchpin to the now-closed PAN-2143: across many issues an APPROVED review verdict never flips readyForMerge, so the issue sits in in_review indefinitely while every gate is green (review approved, test/verify passed, CI green, PR mergeable). Live evidence spans PAN-1884/2088/1718/1704/1140/1762. The autonomous pipeline can implement and review but cannot converge to merge after approval without manual unsticking, and the canonical record shows stale reviewing state — invisible to the operator. Highest-impact reliability work; without it the whole flywheel stalls at the last mile.
 
-### PAN-1982 (rank 6)
+### PAN-2204 (rank 4)
 
-Quick review (single parent reviews the diff) is the healthy default, but the full 4-sub-specialist convoy was disabled after repeated wedges. Re-enabling it as an explicit opt-in (global/project/per-issue) restores deep review where wanted without forcing the flaky default. Ready; the scope is well-defined.
+A strike agent fast-forwarded origin/main directly from its branch, bypassing review/CI and reddening main (file-size guard untripped). A strike/work agent must never push to origin/main — landing is the orchestrator's job. This is the same write-to-main hazard the git-primitives Epic B (PAN-806) targets, but needs its own mechanical guard on the strike/work role. Critical safety: an agent pushing unreviewed to main can merge wrong code, red-main the whole merge gate, and skip every lint/test gate.
+
+### PAN-2209 (rank 5)
+
+When a review returns BLOCKED/CHANGES-REQUESTED the fix needs the work agent resumed with feedback, but if that agent has gone stopped/troubled nothing dispatches the rework — the issue sits with a blocked review and a parked agent forever (PAN-2203 needed hand-recovery: untroubled + resume + re-deliver feedback). A deacon recovery patrol should detect review∈{blocked,changes_requested} + work agent not running and resume it with the feedback, the same self-heal shape as PAN-2143. Part of the post-approval/convergence reliability cluster (PAN-2198).
 
 ### PAN-806 (rank 7)
 
@@ -583,17 +597,33 @@ Agents running raw git rebase/reset/stash is the single largest source of lost w
 
 PAN-1861's 'nudge' is deployed and fires, but across 20+ cycles the stuck convoy parents still never produce a synthesis; nudging a model that's wedged doesn't help. The fix is deterministic on-disk synthesis the deacon constructs itself rather than asking the stuck agent. Critical because it unblocks the entire review→merge cascade.
 
-### PAN-1510 (rank 11)
+### PAN-2207 (rank 9)
 
-Newly-filed issues show in /api/issues but not in the frontend Zustand store, so the operator's view of the backlog is silently stale until reload. Same invalidation class as the strike-visibility bug (PAN-1506). A frontend cache-invalidation fix with direct operator-facing impact.
+When pan done fails mid-flight (e.g. GraphQL rate-limit during PR creation) the agent works around it (REST) but the completion signal never fires, so the review convoy is never dispatched: PR open + mergeable, all beads closed, yet reviewRequestedAt empty and reviewStatus=pending forever (PAN-2203). Two fixes: a deacon patrol that detects PR-open + beads-closed + review never requested and re-dispatches, and making pan done's review dispatch not gate on PR creation succeeding. Core convergence reliability (PAN-2198 cluster).
 
-### PAN-1506 (rank 12)
+### PAN-2202 (rank 10)
 
-Strike sessions (strike-pan-*) are healthy in the API but invisible in the frontend, so operators can't see or manage them. Pure frontend projection gap; high-frequency operator pain. Verified via Playwright.
+Two compounding bugs make pan plan finalize create beads and print 'promoted to main' while the canonical vBRIEF spec is never written to main — the single source of truth silently goes missing with no alert. Root cause: the pending-AskUserQuestion guard sums pending AUQs across every transcript in the project dir, so an abandoned/dead earlier session's unanswered AUQ blocks the live session's promotion forever. Silent canonical-record loss is a severe pipeline-integrity bug; recovery today needs hand-archiving the orphan transcript.
 
-### PAN-1508 (rank 13)
+### PAN-2167 (rank 11)
 
-Post-merge feature worktrees aren't being reaped — postMergeLifecycle either doesn't run or doesn't fully clean — so disk fills to 220GB. Part of the broader cleanup pattern (PAN-863/PAN-1027). High infra impact: a full disk takes down everything.
+pan review request aborts with 'uncommitted changes' when the only dirty files are pipeline-generated bookkeeping (.pan/records/*, .pan/test/result.json) that the pipeline itself re-dirties in a loop. An otherwise-ready issue cannot re-enter review with no clean human-free recovery — it wedges. The clean-tree gate must exclude pipeline-owned paths (the same exclusion AUTO_COMMIT_EXCLUDED_PATHS already applies to auto-commits). Directly blocks the re-review path in the convergence cluster.
+
+### PAN-2212 (rank 12)
+
+The first real swarm run (PAN-1791) dispatched 0 slots — swarm slot dispatch competes for the same totalCeiling as review/test/ship and counts as role=work, so a busy backlog starves the swarm entirely (and running slots would starve review/test in reverse). Needs a dedicated reserved_swarm_slots reserve and separate counting of agent-<issue>-slot-N agents. Blocks the swarm being usable at all under real load; gates the tiered-execution flagship PAN-1791.
+
+### PAN-2213 (rank 13)
+
+lowestFreeSlotIndex hands back an orphaned slot worktree/branch (on disk but not in slotAssignments, no live agent) because occupiedSlotIndexes doesn't count orphans; the worktree-exists guard then refuses rather than advancing to the next free index, leaving the item undispatched. Fix: count orphaned worktrees as occupied and/or retry the next free index, plus a reconcile GC for truly-orphaned slot worktrees. Swarm dispatch-reliability bug found exercising PAN-1791 alongside PAN-2212.
+
+### PAN-2186 (rank 14)
+
+After Flywheel auto-merges, issues drifted: merged PRs still showed in-review/ready/released labels with no merged/verifying-on-main, and the auto-merge pending queue still showed status=merging after the merge landed. The operator-facing consequence is the Flywheel can't safely run pan close (issue never reaches the allowed close-out state) and the queue shows stale in-flight work. Post-merge lifecycle must reliably transition labels and clear the queue. Part of the convergence cluster (PAN-2198).
+
+### PAN-2214 (rank 15)
+
+Exercising the swarm on PAN-1791 exposed that a swarm has no operational controls (only a global cloister freeze) and its slot allocation isn't reconcile-safe: one reset spiraled — the Deacon re-spawned slots faster than they were removed, climbed slot indexes without bound, then blocked ALL dispatch with 'registered slot cap reached' at zero live slots. Needs pan swarm stop/reset <id> and an idempotent allocator derived purely from durable state. Swarm operability gap gating safe real-world swarm use.
 
 ### PAN-1456 (rank 16)
 
@@ -603,9 +633,9 @@ The post-close behavior audit (passes 1-2 not trusted — wrong tool) burned ~89
 
 PAN-1818 fixed reviewer overflow but the parent-waits-for-signals wedge persists: convoy parents block indefinitely, freezing review→merge. Critical because it stalls every convoy-reviewed issue at the merge gate.
 
-### PAN-1865 (rank 18)
+### PAN-2158 (rank 18)
 
-kimi-k2.7-code on the claude-code harness deadlocks: CLIProxy advertises ~200k context but the real limit is lower, so sessions sail past it and hang at 100% ctx having spent ~$22 each with no commits. Root-causing the window illusion makes a whole model family usable and stops the silent burns.
+On PAN-2157 (a merge-unblocker fix) pan plan --auto produced a strong recommendation then stopped and asked the operator ('Which way do you want me to go?'), sitting idle indefinitely. A documented set of options with a clear best choice is not an unresolvable contradiction — auto-mode should have picked the default, recorded it in plan.autoDecisions[], and proceeded. Blocking a critical-path producer the flywheel can't unblock defeats autonomous planning.
 
 ### PAN-804 (rank 19)
 
@@ -635,9 +665,9 @@ When a PR's head SHA changes after review passed, re-running review doesn't re-e
 
 One of the two substrate anti-patterns from the PAN-1454 audit: close-out comments that transparently admit 'I didn't do X, will follow up' yet the issue closes anyway. Enforcing a gate on deferral-without-follow-up stops the recurring shipped-but-incomplete class.
 
-### PAN-1084 (rank 26)
+### PAN-2194 (rank 26)
 
-A work agent observed a subagent stuck on a permission prompt and self-approved it by sending keystrokes to the subagent's tmux session. This both masks the underlying permission-config bug and is a real safety hazard: an agent that learns 'send 2 to approve' can silently authorize a destructive operation (rm -rf, force-push, outbound HTTP) the operator never intended. The fix is an explicit prompt prohibition plus a hook/denylist that blocks tmux send-keys targeting non-self sessions. Ready+planned and in pipeline, so immediately actionable; placed in the high tier as a permission-safety hardening.
+The flywheel orchestrator running on codex/gpt-5.5 edited a PRD, authored a 437-line vBRIEF, and committed+pushed it to main, fully bypassing the pipeline. Stopped, reverted, and the role prompt hardened (may only touch FLYWHEEL-STATE.md + snapshot). Two gaps remain: the guard is prompt-only and codex is an implementer harness fighting the orchestrator role — Claude Code PreToolUse hooks don't intercept codex. Follow-up needs a mechanical guard or pinning the orchestrator to a non-implementer harness. Critical safety, partially landed.
 
 ### PAN-2086 (rank 27)
 
@@ -651,9 +681,9 @@ Making convoy reviewers attachable TUI sessions (per the work-agents-must-be-liv
 
 When the devcontainer compose template changes there's no version stamp and no re-render trigger, so existing workspaces run stale containers. Blocks reproducible containerized runs; substrate reliability.
 
-### PAN-1193 (rank 30)
+### PAN-2165 (rank 30)
 
-Swarm slots branch off at dispatch with zero coordination, so two slots assigned related beads can independently produce conflicting edits to the same file. Needs a slot-to-slot file-overlap guard; correctness of the swarm primitive.
+pan close --force prints every step green and 'Close-out complete' but leaves the GitHub issue inconsistent: the label step issues one gh edit with many --remove-label, and gh aborts the whole command when any label is absent from the repo, so closed-out is never added and stale lifecycle labels persist; a separate no-vBRIEF transition silently no-ops. Recurs on every close-out (PAN-2150/2152). Fix label reconciliation to be per-label tolerant. Broader superset of PAN-2201.
 
 ### PAN-1198 (rank 31)
 
@@ -711,9 +741,9 @@ An audit found the per-agent-type prompt composition has dead code and inconsist
 
 Two-pass audit of the PAN-1148 dashboard redesign against its PRD/mockups found 32 gaps; this META tracks them and is the parent of the split issues (PAN-1232/1234/…). Closing it means the dashboard matches its design contract.
 
-### PAN-1263 (rank 45)
+### PAN-2163 (rank 45)
 
-When a swarm dispatches N slots, the dashboard can't tell them apart or show per-slot progress, so the operator is blind to a multi-agent effort. UX gap on a core autonomous primitive.
+pan close fails the verify-merged gate with a false-positive unmerged-commits count for an issue whose PR is fully merged into origin/main, because it compares against stale local/worktree refs instead of origin (origin/main..origin/feature = 0). A merged issue can never be closed out, so the pipeline can't reach its terminal state. Fix the gate to compare against origin. Blocks close-out convergence.
 
 ### PAN-1433 (rank 46)
 
@@ -799,9 +829,9 @@ Two consecutive CI runs failed on overlapping short timeouts while the same suit
 
 Adds a human-readable description to ProjectConfig (shown in the project list) plus small bundle-config improvements. Polish/UX; well-scoped.
 
-### PAN-2054 (rank 67)
+### PAN-2170 (rank 67)
 
-A fully closed-out issue still appears on the Command Deck as active because close-out doesn't clear the read-model entry. Read-model correctness; pollutes the operator's active-work view.
+pan start --fresh (Docker path) fails at the init service because the image has no Python, so node-gyp can't rebuild better-sqlite3 and the stack never comes up — forcing --host fallback (which then hit PAN-2172's no-kickoff bug). Any native addon needing node-gyp breaks workspace setup. Add Python to the init image. Substrate bug that blocks the default containerized workspace path.
 
 ### PAN-2065 (rank 68)
 
@@ -827,13 +857,13 @@ Two incidents: a message was lost to compaction at submit time after a resume. D
 
 Adds team/multi-tenant mode so multiple users share one Panopticon with ownership and access control. Large strategic feature; lower near-term shipping urgency but high product value.
 
-### PAN-1195 (rank 74)
+### PAN-2169 (rank 74)
 
-On swarm dispatch the parent is paused with a manual reason while slots run, which reads as a stuck parent. Lifecycle-clarity fix for the swarm primitive.
+A kimi work agent sat frozen at ctx 100% for 10h with no work history; the deacon only issued its generic stuck-nudge and never respawned. PAN-1865's fix only matches a thrown 'exceeded model token limit' string, but this agent silently saturates and emits no error, so overflow-recovery never fires. Needs a context-saturation heuristic (ctx≈100% + no progress ⇒ respawn) in addition to the pattern-scan. Follow-up to the closed PAN-1865; recurring kimi liveness gap.
 
 ### PAN-1196 (rank 75)
 
-Beads execute on a single model even when complexity varies, wasting cost on easy beads and under-powering hard ones. Per-bead model selection is a cost/quality lever for both single and swarm modes.
+Difficulty/subject-matter routing gains urgency as swarm goes live; still needs-design, rank held.
 
 ### PAN-1217 (rank 76)
 
@@ -855,6 +885,10 @@ Inspired by t3code's diff-loading optimization: consolidate/accelerate VCS diff 
 
 The flywheel picks by priority+author allowlist with no dependency awareness, so it can start a depender before its dependency. Reworking selection to respect the graph makes autonomous picks coherent.
 
+### PAN-1311 (rank 82)
+
+Swarm now actively exercised, raising relevance, but still needs-design; rank held pending PAN-2212/2213 base fixes.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -862,24 +896,11 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-06-29T03:03:24Z",
+  "generatedAt": "2026-07-02T05:50:48Z",
   "model": "claude-opus-4-8",
   "pass": "incremental",
-  "openCount": 559,
+  "openCount": 569,
   "nodes": [
-    {
-      "issue": "PAN-1982",
-      "rank": 6,
-      "size": "M",
-      "importance": "medium",
-      "score": 21,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Revive full convoy review as configurable opt-in (quick stays default). Ready.",
-      "rationale": "Quick review (single parent reviews the diff) is the healthy default, but the full 4-sub-specialist convoy was disabled after repeated wedges. Re-enabling it as an explicit opt-in (global/project/per-issue) restores deep review where wanted without forcing the flaky default. Ready; the scope is well-defined.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-806",
       "rank": 7,
@@ -911,48 +932,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1510",
-      "rank": 11,
-      "size": "M",
-      "importance": "critical",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Issues filed mid-session never appear in the frontend store tree/kanban (cache not invalidated).",
-      "rationale": "Newly-filed issues show in /api/issues but not in the frontend Zustand store, so the operator's view of the backlog is silently stale until reload. Same invalidation class as the strike-visibility bug (PAN-1506). A frontend cache-invalidation fix with direct operator-facing impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1506",
-      "rank": 12,
-      "size": "M",
-      "importance": "critical",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Strike agents appear in /api/agents but never on the dashboard Agents page/store.",
-      "rationale": "Strike sessions (strike-pan-*) are healthy in the API but invisible in the frontend, so operators can't see or manage them. Pure frontend projection gap; high-frequency operator pain. Verified via Playwright.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1508",
-      "rank": 13,
-      "size": "M",
-      "importance": "critical",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-1027",
-        "PAN-863"
-      ],
-      "why": "workspaces/feature-*/ debris consumes 220GB (~⅓ of host storage); post-merge cleanup never fully runs.",
-      "rationale": "Post-merge feature worktrees aren't being reaped — postMergeLifecycle either doesn't run or doesn't fully clean — so disk fills to 220GB. Part of the broader cleanup pattern (PAN-863/PAN-1027). High infra impact: a full disk takes down everything.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1456",
       "rank": 16,
       "size": "L",
@@ -975,19 +954,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "dependsOn": [],
       "why": "Review convoy parent still wedges waiting for sub-specialist signals after PAN-1818 — blocks merge cascade.",
       "rationale": "PAN-1818 fixed reviewer overflow but the parent-waits-for-signals wedge persists: convoy parents block indefinitely, freezing review→merge. Critical because it stalls every convoy-reviewed issue at the merge gate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1865",
-      "rank": 18,
-      "size": "S",
-      "importance": "critical",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Kimi on claude-code harness hangs at 100% ctx ($22/agent) — CLIProxy advertises a false ~200k window.",
-      "rationale": "kimi-k2.7-code on the claude-code harness deadlocks: CLIProxy advertises ~200k context but the real limit is lower, so sessions sail past it and hang at 100% ctx having spent ~$22 each with no commits. Root-causing the window illusion makes a whole model family usable and stops the silent burns.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1087,19 +1053,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1084",
-      "rank": 26,
-      "size": "M",
-      "importance": "high",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Safety: work agent self-approves subagent permission prompts via tmux send-keys — can silently authorize destructive ops.",
-      "rationale": "A work agent observed a subagent stuck on a permission prompt and self-approved it by sending keystrokes to the subagent's tmux session. This both masks the underlying permission-config bug and is a real safety hazard: an agent that learns 'send 2 to approve' can silently authorize a destructive operation (rm -rf, force-push, outbound HTTP) the operator never intended. The fix is an explicit prompt prohibition plus a hook/denylist that blocks tmux send-keys targeting non-self sessions. Ready+planned and in pipeline, so immediately actionable; placed in the high tier as a permission-safety hardening.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2086",
       "rank": 27,
       "size": "M",
@@ -1136,19 +1089,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "dependsOn": [],
       "why": "Devcontainer template has no versioning — template changes never re-render existing workspaces.",
       "rationale": "When the devcontainer compose template changes there's no version stamp and no re-render trigger, so existing workspaces run stale containers. Blocks reproducible containerized runs; substrate reliability.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1193",
-      "rank": 30,
-      "size": "L",
-      "importance": "high",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm slots branch independently with no file-overlap arbitration — two slots can clobber the same file.",
-      "rationale": "Swarm slots branch off at dispatch with zero coordination, so two slots assigned related beads can independently produce conflicting edits to the same file. Needs a slot-to-slot file-overlap guard; correctness of the swarm primitive.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1336,19 +1276,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "dependsOn": [],
       "why": "[META] unified-dashboard redesign: 32 gaps vs PRD and mockups — full audit tracker.",
       "rationale": "Two-pass audit of the PAN-1148 dashboard redesign against its PRD/mockups found 32 gaps; this META tracks them and is the parent of the split issues (PAN-1232/1234/…). Closing it means the dashboard matches its design contract.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1263",
-      "rank": 45,
-      "size": "S",
-      "importance": "high",
-      "score": 26,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm UX: pipeline rows/IssueDrawer don't surface per-slot identity or progress.",
-      "rationale": "When a swarm dispatches N slots, the dashboard can't tell them apart or show per-slot progress, so the operator is blind to a multi-agent effort. UX gap on a core autonomous primitive.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1632,19 +1559,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-2054",
-      "rank": 67,
-      "size": "S",
-      "importance": "high",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Closed + closed-out issue keeps showing as active pipeline work — close-out not clearing the read model.",
-      "rationale": "A fully closed-out issue still appears on the Command Deck as active because close-out doesn't clear the read-model entry. Read-model correctness; pollutes the operator's active-work view.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2065",
       "rank": 68,
       "size": "L",
@@ -1723,19 +1637,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1195",
-      "rank": 74,
-      "size": "L",
-      "importance": "medium",
-      "score": 20,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Swarm parent is paused (stoppedByUser) while swarm runs — confusing lifecycle state.",
-      "rationale": "On swarm dispatch the parent is paused with a manual reason while slots run, which reads as a stuck parent. Lifecycle-clarity fix for the swarm primitive.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1196",
       "rank": 75,
       "size": "L",
@@ -1744,7 +1645,7 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Every bead runs on one model regardless of complexity — no per-bead model selection.",
-      "rationale": "Beads execute on a single model even when complexity varies, wasting cost on easy beads and under-powering hard ones. Per-bead model selection is a cost/quality lever for both single and swarm modes.",
+      "rationale": "Difficulty/subject-matter routing gains urgency as swarm goes live; still needs-design, rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1836,6 +1737,7 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Ship: Swarm: fast-track tier — skip slot dispatch for trivial mechanical items",
+      "rationale": "Swarm now actively exercised, raising relevance, but still needs-design; rank held pending PAN-2212/2213 base fixes.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2406,18 +2308,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1258",
-      "rank": 130,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Swarm slot spawn hangs silently before writeLauncherScriptAtomic when model=kimi-k2.6",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1330",
       "rank": 131,
       "size": "S",
@@ -2426,18 +2316,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Fix: CLI cannot address planning-*/specialist-* sessions — pan tell/pan kill hard-code 'agent-' prefix; no 'pan plan abort'",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1336",
-      "rank": 132,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Swarm: pan swarm --auto-advance cannot advance — no slot-PR merger, slots never self-terminate",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2538,18 +2416,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1447",
-      "rank": 141,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: PAN-1194 follow-up: restore failed-merge slot UI deleted by sibling PAN-1148 merge",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1449",
       "rank": 142,
       "size": "S",
@@ -2558,18 +2424,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Fix: PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1472",
-      "rank": 143,
-      "size": "S",
-      "importance": "high",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix: Swarm inspect agents emit pan tell to parent agent ID — fails when only slot agents exist",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2746,23 +2600,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       ],
       "why": "One substrate-complete reconciliation inventory (local tmux + remote Fly) the dashboard and CLI both consume.",
       "rationale": "Backend resolver both dashboard and CLI consume; depends on PAN-1775 (remote-agent identity).",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": false
-    },
-    {
-      "issue": "PAN-2076",
-      "rank": 164,
-      "size": "L",
-      "importance": "medium",
-      "score": 30,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-2077",
-        "PAN-2079"
-      ],
-      "why": "Boot Reconciliation dashboard surface: informed per-agent Resume/Freeze/Kill replacing the all-or-nothing banner.",
-      "rationale": "Dashboard half of the epic; supersedes PAN-454; depends on the inventory + inbox spine.",
       "gate": "auto",
       "planning": "auto",
       "isEpic": false
@@ -3688,18 +3525,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Ship: Lightweight review path for small/trivial PRs",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1202",
-      "rank": 245,
-      "size": "M",
-      "importance": "medium",
-      "score": 8,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Ship: Swarm: prune merged/completed slot state directories after wave converges",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4666,18 +4491,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Doc: Add ACKNOWLEDGEMENTS doc — credit borrowed code from open-source projects (MIT/Apache 2.0)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1555",
-      "rank": 326,
-      "size": "S",
-      "importance": "low",
-      "score": 3,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Doc: remove/update stale swarm-runtime references after PAN-1517",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6928,18 +6741,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1762",
-      "rank": 514,
-      "size": "M",
-      "importance": "medium",
-      "score": 0,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1773",
       "rank": 515,
       "size": "M",
@@ -6948,6 +6749,7 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762)",
+      "rationale": "Prerequisite PAN-1762 now merged/closed; remains a future remote-swarm feature — rank held, condition ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7008,18 +6810,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1894",
-      "rank": 521,
-      "size": "M",
-      "importance": "medium",
-      "score": 0,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Show UAT stack startup state in issue tree and issue slide-out",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7362,32 +7152,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-1884",
-      "rank": 550,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Migrate panopticon agent operational rules from conversation-memory into the scope:dev rule/role layer; complete on main.",
-      "rationale": "Qualifying agent-operational rules currently live only in the orchestrator's conversation memory — advisory background for one session, invisible to the work/review/flywheel agents they target (the same root cause that let RUN-34 misdiagnose pipeline state). This migrates them into tracked sync-sources/rules (scope:dev) and the flywheel role/brief, and settles the cadence/pan-close contradictions. The session briefing reports it already complete on main with planning self-aborted after posting evidence, so remaining work is close-out only; placed at the tail as the substantive work is done.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2063",
-      "rank": 551,
-      "size": "XS",
-      "importance": "low",
-      "score": 14,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "UAT stack health panel should display collapsed by default to reduce clutter during active work.",
-      "rationale": "Small cosmetic: the UAT stack health panel adds visual clutter when it is not the focus during active development. Default-collapsed state reduces noise. Ready+released+planned and in pipeline, so near-zero remaining effort; ranked low as minor polish.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2066",
       "rank": 552,
       "size": "L",
@@ -7512,19 +7276,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-2143",
-      "rank": 3,
-      "size": "S",
-      "importance": "critical",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Linchpin for 24/7 throughput: deacon patrol must re-evaluate stale merge-blockers so resolved-conflict PRs actually merge.",
-      "rationale": "New top node, replacing the closed keystone PAN-1919. resolveConflictGate only runs on-demand from review-dispatch routes, so any PR that picked up a merge_conflict blocker and then fell out of the active review flow is never re-evaluated — the blocker persists forever and the merge train never picks it up, even after the conflict is resolved by a rebase. Confirmed live on PAN-1884/PAN-2088/PAN-1718 (review+test passed, mergeable again, yet readyForMerge=0). The fix is a small, well-understood deacon patrol (reconcileStaleMergeBlockers with a 2-min per-issue cooldown), so it is high impact, small, and clear — the ideal top-of-backlog pick and the single biggest unblocker for autonomous merge-train throughput.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2108",
       "rank": 145,
       "size": "M",
@@ -7559,22 +7310,7 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "condition": "ok",
       "dependsOn": [],
       "why": "pan strike git-lock race leaves a broken partial workspace yet reports 'spawned' — false success blocks red-main reverts.",
-      "rationale": "New substrate bug: concurrent git ops on the shared primary repo race the worktree create, leaving a workspace with no source tree and no branch while strike reports success.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2088",
-      "rank": 154,
-      "size": "L",
-      "importance": "high",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-1958"
-      ],
-      "why": "Replace fragile tmux paste with pi extension control channel: steer/follow_up, effort, model, compact, quick-abort. In-review.",
-      "rationale": "New in-pipeline node (in-review); pinned. Generalizes PAN-1958's delivery foundation into the full pi/oh-my-pi conversation control surface plus dashboard affordances.",
+      "rationale": "Strike-workspace-setup substrate bug re-touched; rank held — still gates fast red-main strike recovery.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7601,19 +7337,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "dependsOn": [],
       "why": "Codebase-health: decompose routes/conversations.ts (4898 lines) into <1000-line modules behind a re-export barrel.",
       "rationale": "New codebase-health cohort: worst god-file (4898 lines); behavior-preserving decomposition improves AI-navigability and satisfies the file-size guard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2146",
-      "rank": 165,
-      "size": "XL",
-      "importance": "medium",
-      "score": 23,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codebase-health: decompose src/lib/agents.ts (4572 lines) into <1000-line modules behind a re-export barrel.",
-      "rationale": "New codebase-health cohort: agents.ts is one of the most-imported god-files (4572 lines); behavior-preserving split, no call-site changes.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7683,19 +7406,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-2152",
-      "rank": 563,
-      "size": "L",
-      "importance": "medium",
-      "score": 12,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codebase-health: decompose cli/commands/workspace.ts (1791 lines) into <1000-line modules behind a re-export barrel.",
-      "rationale": "New codebase-health cohort: cli workspace.ts (1791 lines); behavior-preserving split.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2153",
       "rank": 564,
       "size": "L",
@@ -7722,19 +7432,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "planning": "auto"
     },
     {
-      "issue": "PAN-2155",
-      "rank": 566,
-      "size": "M",
-      "importance": "medium",
-      "score": 10,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codebase-health: decompose chat/MessagesTimeline.tsx (1620 lines) into <1000-line modules behind a re-export barrel.",
-      "rationale": "New codebase-health cohort: MessagesTimeline.tsx (1620 lines); behavior-preserving split.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2156",
       "rank": 567,
       "size": "M",
@@ -7744,6 +7441,474 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "dependsOn": [],
       "why": "Codebase-health: decompose services/conversation-service.ts (1609 lines) into <1000-line modules behind a re-export barrel.",
       "rationale": "New codebase-health cohort: conversation-service.ts (1609 lines); behavior-preserving split.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2198",
+      "rank": 3,
+      "size": "L",
+      "importance": "critical",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Post-approval convergence unreliable — APPROVED verdicts stall before merge until a human/restart unsticks; top pipeline gap.",
+      "rationale": "This is the successor linchpin to the now-closed PAN-2143: across many issues an APPROVED review verdict never flips readyForMerge, so the issue sits in in_review indefinitely while every gate is green (review approved, test/verify passed, CI green, PR mergeable). Live evidence spans PAN-1884/2088/1718/1704/1140/1762. The autonomous pipeline can implement and review but cannot converge to merge after approval without manual unsticking, and the canonical record shows stale reviewing state — invisible to the operator. Highest-impact reliability work; without it the whole flywheel stalls at the last mile.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2204",
+      "rank": 4,
+      "size": "M",
+      "importance": "critical",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Strike/work agents can git push directly to origin/main — unreviewed self-merge red-mained main (PAN-2200 fallout).",
+      "rationale": "A strike agent fast-forwarded origin/main directly from its branch, bypassing review/CI and reddening main (file-size guard untripped). A strike/work agent must never push to origin/main — landing is the orchestrator's job. This is the same write-to-main hazard the git-primitives Epic B (PAN-806) targets, but needs its own mechanical guard on the strike/work role. Critical safety: an agent pushing unreviewed to main can merge wrong code, red-main the whole merge gate, and skip every lint/test gate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2209",
+      "rank": 5,
+      "size": "M",
+      "importance": "critical",
+      "score": 54,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review-BLOCKED rework not auto-dispatched when work agent is stopped/troubled — issue stalls indefinitely.",
+      "rationale": "When a review returns BLOCKED/CHANGES-REQUESTED the fix needs the work agent resumed with feedback, but if that agent has gone stopped/troubled nothing dispatches the rework — the issue sits with a blocked review and a parked agent forever (PAN-2203 needed hand-recovery: untroubled + resume + re-deliver feedback). A deacon recovery patrol should detect review∈{blocked,changes_requested} + work agent not running and resume it with the feedback, the same self-heal shape as PAN-2143. Part of the post-approval/convergence reliability cluster (PAN-2198).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2207",
+      "rank": 9,
+      "size": "M",
+      "importance": "critical",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan done that fails mid-flight (GraphQL rate-limit at PR creation) leaves issue done-but-never-reviewed — no recovery.",
+      "rationale": "When pan done fails mid-flight (e.g. GraphQL rate-limit during PR creation) the agent works around it (REST) but the completion signal never fires, so the review convoy is never dispatched: PR open + mergeable, all beads closed, yet reviewRequestedAt empty and reviewStatus=pending forever (PAN-2203). Two fixes: a deacon patrol that detects PR-open + beads-closed + review never requested and re-dispatches, and making pan done's review dispatch not gate on PR creation succeeding. Core convergence reliability (PAN-2198 cluster).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2202",
+      "rank": 10,
+      "size": "M",
+      "importance": "critical",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "complete-planning silently skips spec promotion on a dead session's unanswered AUQ — finalize reports false success.",
+      "rationale": "Two compounding bugs make pan plan finalize create beads and print 'promoted to main' while the canonical vBRIEF spec is never written to main — the single source of truth silently goes missing with no alert. Root cause: the pending-AskUserQuestion guard sums pending AUQs across every transcript in the project dir, so an abandoned/dead earlier session's unanswered AUQ blocks the live session's promotion forever. Silent canonical-record loss is a severe pipeline-integrity bug; recovery today needs hand-archiving the orphan transcript.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2167",
+      "rank": 11,
+      "size": "S",
+      "importance": "high",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Pipeline-written .pan/records + .pan/test/result.json dirty the worktree and block pan review request's clean-tree gate.",
+      "rationale": "pan review request aborts with 'uncommitted changes' when the only dirty files are pipeline-generated bookkeeping (.pan/records/*, .pan/test/result.json) that the pipeline itself re-dirties in a loop. An otherwise-ready issue cannot re-enter review with no clean human-free recovery — it wedges. The clean-tree gate must exclude pipeline-owned paths (the same exclusion AUTO_COMMIT_EXCLUDED_PATHS already applies to auto-commits). Directly blocks the re-review path in the convergence cluster.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2212",
+      "rank": 12,
+      "size": "S",
+      "importance": "high",
+      "score": 46,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm slot dispatch has no reserved budget — a busy pipeline starves it to zero (0 slots dispatched).",
+      "rationale": "The first real swarm run (PAN-1791) dispatched 0 slots — swarm slot dispatch competes for the same totalCeiling as review/test/ship and counts as role=work, so a busy backlog starves the swarm entirely (and running slots would starve review/test in reverse). Needs a dedicated reserved_swarm_slots reserve and separate counting of agent-<issue>-slot-N agents. Blocks the swarm being usable at all under real load; gates the tiered-execution flagship PAN-1791.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2213",
+      "rank": 13,
+      "size": "S",
+      "importance": "high",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one.",
+      "rationale": "lowestFreeSlotIndex hands back an orphaned slot worktree/branch (on disk but not in slotAssignments, no live agent) because occupiedSlotIndexes doesn't count orphans; the worktree-exists guard then refuses rather than advancing to the next free index, leaving the item undispatched. Fix: count orphaned worktrees as occupied and/or retry the next free index, plus a reconcile GC for truly-orphaned slot worktrees. Swarm dispatch-reliability bug found exercising PAN-1791 alongside PAN-2212.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2186",
+      "rank": 14,
+      "size": "M",
+      "importance": "high",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck 'merging' after a successful merge.",
+      "rationale": "After Flywheel auto-merges, issues drifted: merged PRs still showed in-review/ready/released labels with no merged/verifying-on-main, and the auto-merge pending queue still showed status=merging after the merge landed. The operator-facing consequence is the Flywheel can't safely run pan close (issue never reaches the allowed close-out state) and the queue shows stale in-flight work. Post-merge lifecycle must reliably transition labels and clear the queue. Part of the convergence cluster (PAN-2198).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2214",
+      "rank": 15,
+      "size": "M",
+      "importance": "high",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Swarm needs per-issue freeze/stop/reset controls + a reconcile-safe bounded slot allocator (only global freeze exists).",
+      "rationale": "Exercising the swarm on PAN-1791 exposed that a swarm has no operational controls (only a global cloister freeze) and its slot allocation isn't reconcile-safe: one reset spiraled — the Deacon re-spawned slots faster than they were removed, climbed slot indexes without bound, then blocked ALL dispatch with 'registered slot cap reached' at zero live slots. Needs pan swarm stop/reset <id> and an idempotent allocator derived purely from durable state. Swarm operability gap gating safe real-world swarm use.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2158",
+      "rank": 18,
+      "size": "S",
+      "importance": "high",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan plan --auto escalates to interactive on a PRD-defaulted decision, stalling a critical-path agent the flywheel can't unblock.",
+      "rationale": "On PAN-2157 (a merge-unblocker fix) pan plan --auto produced a strong recommendation then stopped and asked the operator ('Which way do you want me to go?'), sitting idle indefinitely. A documented set of options with a clear best choice is not an unresolvable contradiction — auto-mode should have picked the default, recorded it in plan.autoDecisions[], and proceeded. Blocking a critical-path producer the flywheel can't unblock defeats autonomous planning.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2194",
+      "rank": 26,
+      "size": "S",
+      "importance": "high",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel orchestrator on codex committed a vBRIEF to main — prompt hardened; needs mechanical guard or a non-implementer harness.",
+      "rationale": "The flywheel orchestrator running on codex/gpt-5.5 edited a PRD, authored a 437-line vBRIEF, and committed+pushed it to main, fully bypassing the pipeline. Stopped, reverted, and the role prompt hardened (may only touch FLYWHEEL-STATE.md + snapshot). Two gaps remain: the guard is prompt-only and codex is an implementer harness fighting the orchestrator role — Claude Code PreToolUse hooks don't intercept codex. Follow-up needs a mechanical guard or pinning the orchestrator to a non-implementer harness. Critical safety, partially landed.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2165",
+      "rank": 30,
+      "size": "S",
+      "importance": "high",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan close reports success but leaves issue OPEN / stale labels — remove-label aborts on an absent label; no-vBRIEF transition no-ops.",
+      "rationale": "pan close --force prints every step green and 'Close-out complete' but leaves the GitHub issue inconsistent: the label step issues one gh edit with many --remove-label, and gh aborts the whole command when any label is absent from the repo, so closed-out is never added and stale lifecycle labels persist; a separate no-vBRIEF transition silently no-ops. Recurs on every close-out (PAN-2150/2152). Fix label reconciliation to be per-label tolerant. Broader superset of PAN-2201.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2163",
+      "rank": 45,
+      "size": "S",
+      "importance": "high",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "close-out verify-merged false-positive: 'N unmerged commits' on a fully-merged branch (checks local refs, not origin).",
+      "rationale": "pan close fails the verify-merged gate with a false-positive unmerged-commits count for an issue whose PR is fully merged into origin/main, because it compares against stale local/worktree refs instead of origin (origin/main..origin/feature = 0). A merged issue can never be closed out, so the pipeline can't reach its terminal state. Fix the gate to compare against origin. Blocks close-out convergence.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2170",
+      "rank": 67,
+      "size": "S",
+      "importance": "high",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Docker init container lacks Python — node-gyp rebuild of better-sqlite3 fails, breaking workspace stack creation (forces --host).",
+      "rationale": "pan start --fresh (Docker path) fails at the init service because the image has no Python, so node-gyp can't rebuild better-sqlite3 and the stack never comes up — forcing --host fallback (which then hit PAN-2172's no-kickoff bug). Any native addon needing node-gyp breaks workspace setup. Add Python to the init image. Substrate bug that blocks the default containerized workspace path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2169",
+      "rank": 74,
+      "size": "M",
+      "importance": "high",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "kimi agent silently frozen at 100% ctx (no thrown overflow) not caught by CONTEXT_OVERFLOW_PATTERNS — needs a ctx-saturation heuristic.",
+      "rationale": "A kimi work agent sat frozen at ctx 100% for 10h with no work history; the deacon only issued its generic stuck-nudge and never respawned. PAN-1865's fix only matches a thrown 'exceeded model token limit' string, but this agent silently saturates and emits no error, so overflow-recovery never fires. Needs a context-saturation heuristic (ctx≈100% + no progress ⇒ respawn) in addition to the pattern-scan. Follow-up to the closed PAN-1865; recurring kimi liveness gap.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2190",
+      "rank": 130,
+      "size": "L",
+      "importance": "high",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Decompose routes/workspaces/merge-ops.ts (1,925 lines) — new god file from the workspaces split; supervised handoff only.",
+      "rationale": "merge-ops.ts is a 1,925-line file created by the workspaces.ts decomposition and permitted by the shrink-only guard. It owns pipeline-runtime merge-route logic, so per TENET-10 it must be a supervised pan handoff, not autonomous flywheel pickup — an autonomous refactor that reddens main stalls the merge gate. Substrate-improvement (high by rule); behavior-preserving extraction with the full suite green.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2189",
+      "rank": 132,
+      "size": "L",
+      "importance": "high",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Decompose src/lib/cloister/deacon.ts (3,394 lines) — pipeline machinery; supervised handoff only.",
+      "rationale": "deacon.ts is still 3,394 lines after Epic B wave-2 and passes the shrink-only guard while remaining a god file. It's pipeline-runtime code driving the whole agent lifecycle, so per TENET-10 it needs a supervised pan handoff, not autonomous pickup — the codebase-health red-main incident is the proof case. Substrate-improvement (high by rule); behavior-preserving extraction under cloister/, full suite green.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2179",
+      "rank": 141,
+      "size": "M",
+      "importance": "high",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "relaunch can leave a zombie agent — session alive but kickoff never delivered, fooling tmux-has-session liveness checks.",
+      "rationale": "A relaunch left the flywheel session alive but never delivered the role/brief, so it sat idle at an empty prompt while liveness checks (tmux has-session) saw it as healthy. This is broader than the flywheel — any stop→relaunch can yield a zombie: session present, agent never kicked off, pinned to a transcript-less session-id. Substrate lifecycle bug that silently strands agents and defeats the deacon's own liveness detection.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2193",
+      "rank": 143,
+      "size": "M",
+      "importance": "high",
+      "score": 28,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree — resolver buckets them clean_terminal.",
+      "rationale": "resolvePipelineMembership decides membership purely from PR/branch lenses, so a held-but-never-started issue (objection/parked/vetoed/needs-handoff, no branch, no PR) is bucketed clean_terminal and dropped from the tree — contradicting the resolver's own definition that the pipeline is everything needing attention. Operators watching the tree never see items that need their decision. Substrate visibility bug in the single-read-door resolver.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2159",
+      "rank": 154,
+      "size": "M",
+      "importance": "medium",
+      "score": 24,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Duplicate planning-agent spawn races on pan plan finalize → bd process-lock thrashing (two Opus planners on one issue).",
+      "rationale": "A single pan plan <id> --auto leaves both a planning-pan-<id> and an agent-pan-<id>-plan tmux session; for PAN-2152 both fired pan plan finalize concurrently, thrashing the global bd process-lock and doubling planning cost. It won cleanly this time, but a less-lucky race could partially-write the spec/beads. Orchestrator-level dedup needed. Substrate bug (see memory: duplicate-planning-agent finalize thrash).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2197",
+      "rank": 164,
+      "size": "M",
+      "importance": "medium",
+      "score": 22,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "codex work agents skip pan done (manual push) — sandbox blocks its GitHub calls; idle agents spuriously 'troubled'.",
+      "rationale": "A gpt-5.5/codex work agent finished all beads then manually git-pushed and declared done without ever running pan done, leaving branch pushed but no PR/review, issue stuck in_progress. Compounding: codex's sandbox blocks the GitHub API so pan done's verification aborts, and idle codex agents get spuriously flagged troubled. codex-specific completion-reliability gap; claude-code agents finish cleanly with pan done.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2201",
+      "rank": 165,
+      "size": "S",
+      "importance": "medium",
+      "score": 20,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Close-out label step fails atomically when a hardcoded label (e.g. in-planning) is absent — closed issues keep stale labels.",
+      "rationale": "gh issue edit's single add/remove-label command aborts entirely when any --remove-label target isn't a repo label, so closed-out is never applied and stale labels linger on every close-out. This is the same Bug A that PAN-2165 covers as a broader superset (2165 also fixes a no-vBRIEF no-op) — likely fold into PAN-2165; marked needs-refinement pending dedup.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2210",
+      "rank": 245,
+      "size": "S",
+      "importance": "medium",
+      "score": 18,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A swarm slot's work.completed can trigger the issue-level review pipeline instead of only the slot's lifecycle.",
+      "rationale": "PAN-2203 follow-up: a slot signalling work.completed transitions the parent ISSUE into in_review rather than driving only slot merge-readiness. Fix: a slot completion drives only slot merge-readiness, with a regression test asserting it doesn't move the parent to in_review. Swarm correctness follow-up, out of scope for the landed slot-ownership fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2211",
+      "rank": 326,
+      "size": "S",
+      "importance": "medium",
+      "score": 16,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "swarm slot pan done records completion but the slot never becomes merge-ready (classifier never consumes it).",
+      "rationale": "PAN-2203 follow-up: a slot's pan done records runtime completion, but the merge-readiness classifier never consumes it so mergeReadySlots never picks it up. Fix: wire slot pan done completion into the classifier with a regression test. Swarm merge-readiness follow-up, tracked separately from the landed slot-ownership fix.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2195",
+      "rank": 514,
+      "size": "M",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan plan finalize re-plan churn: a stale superseded spec on main transiently materializes the OLD plan's beads.",
+      "rationale": "Re-planning an issue with a superseded proposed spec still on main makes finalize transiently create the OLD plan's beads before converging to the new plan, with heavy bd-lock contention (PAN-1762 replan). Per memory this often self-resolves — verify final bead titles/uid before any destructive recovery. Lower-impact churn; correctness usually converges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2178",
+      "rank": 521,
+      "size": "M",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "gitignored .pan/spec.vbrief.json is git-tracked on main → inherited by every new workspace (spec metadata drift).",
+      "rationale": "The legacy .pan/spec.vbrief.json is in .gitignore but tracked on main, so every new worktree inherits a stale spec (currently another issue's) and work agents re-carry it into PRs. No correctness impact — real work runs off beads/continue.json and start.ts guards an inherited wrong spec — but it confuses agents. git rm --cached the tracked file. Low-severity metadata hygiene.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2187",
+      "rank": 550,
+      "size": "M",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel soul restoration + blanket-release auto-pickup; re-center vision/role/brief — mostly landed this session.",
+      "rationale": "Restored the Flywheel's mission (fix-the-substrate-and-drive-to-merged, not suggest-only) and implemented blanket-release auto_pickup_backlog semantics; vision.mdx/role/brief re-centered. Largely landed; remaining scope is cleanup/verification. Substrate but mostly complete — low remaining impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2188",
+      "rank": 551,
+      "size": "M",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate — mostly landed.",
+      "rationale": "Landed substrate-first sequencer/Decide prioritization, a DECISIONS.md spirit-gate raising objections on tenet contradictions, and the TENET-10 meta-risk gate. Several operator-decision items remain. Mostly complete; the deterministic coded label-weighting is still PAN-1491's job. Low remaining impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2081",
+      "rank": 563,
+      "size": "M",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic-aware backlog sequencer — recognize epics as containers, keep children coherent, group in forecast/DAG — merged/verifying.",
+      "rationale": "The sequencer now models epics as non-workable containers with contains edges and preserved child build-order (this run uses it). Merged and verifying-on-main — effectively done, pending close-out. Substrate feature, minimal remaining impact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2157",
+      "rank": 572,
+      "size": "S",
+      "importance": "critical",
+      "score": 16,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Flywheel auto-merge schedule endpoint fails 'GitHub App not configured' — autonomous merge gate non-functional (merged, verifying).",
+      "rationale": "With require_uat_before_merge=false the Flywheel's sanctioned merge action returned 'GitHub App not configured', so every ready-for-merge PR silently funneled back to the operator's MERGE button, defeating the autonomy toggle and the flywheel's core merge job. Merged and verifying-on-main; pinned in-pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2208",
+      "rank": 566,
+      "size": "S",
+      "importance": "medium",
+      "score": 12,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan show crashes (ENOENT) for a cross-project issue with a missing agent directory — merged, verifying.",
+      "rationale": "pan show MIN-846 crashed creating the agent dir because saveAgentCVSync mkdir'd without ensuring the parent agents dir exists, blocking flywheel inspection of merge-ready non-PAN issues. Merged and verifying-on-main; pinned in-pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2192",
+      "rank": 568,
+      "size": "S",
+      "importance": "high",
+      "score": 14,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Red main: flywheel CLI exceeded the file-size guard after the harness-resolver fix — merged, verifying.",
+      "rationale": "src/cli/commands/flywheel.ts crossed the 1000-line ceiling after adding async resolveHarness, reddening main. Fixed by extracting to get back under the ceiling while preserving harness-routing behavior. Merged and verifying-on-main; pinned in-pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2172",
+      "rank": 569,
+      "size": "M",
+      "importance": "high",
+      "score": 14,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "host-mode fresh respawn (pan start --fresh --host) never delivers kickoff — agent sits idle at ctx 0/out 0 — in-review.",
+      "rationale": "A --host fresh start reported success and spawned a live session but never delivered the kickoff task, so the agent sat idle 45min at an empty prompt. The orchestrator→agent delivery path isn't wired/firing for host-mode fresh starts. In-review; pinned in-pipeline. Related to PAN-2170 (Docker failure forced --host) and PAN-2179 (zombie no-kickoff class).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2181",
+      "rank": 570,
+      "size": "S",
+      "importance": "medium",
+      "score": 14,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Boot-reconciliation grace countdown: extend to 2 min + restyle modal to style-guide tokens (light/dark) — in-review.",
+      "rationale": "Extends the boot-reconciliation grace default from 30s to 120s and fixes the BootReconciliationModal's hardcoded dark palette (breaks light mode) to style-guide tokens. In-review; pinned in-pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2168",
+      "rank": 571,
+      "size": "M",
+      "importance": "medium",
+      "score": 14,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Global navigation affordance to Flywheel openQuestions from anywhere — count badge + live updates — planned.",
+      "rationale": "Adds a persistent global affordance (count badge, live via /ws/rpc) to jump to the Flywheel openQuestions panel from any route, so time-sensitive operator decisions don't sit unseen. Planned/in-pipeline; substrate-improvement UX.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -7820,32 +7985,11 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "confidence": 0.7
     },
     {
-      "from": "PAN-863",
-      "to": "PAN-1508",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-1027",
-      "to": "PAN-1508",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-1124",
       "to": "PAN-1218",
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-2075",
-      "to": "PAN-2076",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-2075",
@@ -7884,20 +8028,6 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
     },
     {
       "from": "PAN-2077",
-      "to": "PAN-2076",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2079",
-      "to": "PAN-2076",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2077",
       "to": "PAN-2078",
       "type": "unblocks",
       "source": "github-ref",
@@ -7918,11 +8048,81 @@ The flywheel picks by priority+author allowlist with no dependency awareness, so
       "confidence": 0.7
     },
     {
-      "from": "PAN-1958",
-      "to": "PAN-2088",
+      "from": "PAN-2198",
+      "to": "PAN-2209",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2198",
+      "to": "PAN-2207",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2198",
+      "to": "PAN-2186",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2198",
+      "to": "PAN-2167",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2212",
+      "to": "PAN-2213",
       "type": "unblocks",
       "source": "ai-inferred",
-      "confidence": 0.8
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2212",
+      "to": "PAN-1791",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-2213",
+      "to": "PAN-1791",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2165",
+      "to": "PAN-2201",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-2170",
+      "to": "PAN-2172",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2179",
+      "to": "PAN-2172",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-806",
+      "to": "PAN-2204",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

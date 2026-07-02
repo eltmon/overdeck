@@ -42,7 +42,13 @@ function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'dr
           title: 'Promote the spec',
           status: 'pending',
           narrative: { Action: 'Promote the finalized workspace spec into the project specs directory' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.pan/specs/*.vbrief.json'],
+            files_scope_confidence: 'high',
+            readiness: 'sequential',
+            verify_commands: ['npm test -- src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts'],
+          },
           subItems: [
             {
               id: 'item-1.ac1',
@@ -63,7 +69,13 @@ function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'dr
           title: 'Start the work agent',
           status: 'pending',
           narrative: { Action: 'Start the work agent only when auto-start policy allows it' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['src/lib/agents.ts'],
+            files_scope_confidence: 'high',
+            readiness: 'sequential',
+            verify_commands: ['npm test -- src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts'],
+          },
           subItems: [
             {
               id: 'item-2.ac1',
@@ -90,6 +102,15 @@ function makeProject(issueId: string): { projectPath: string; workspacePath: str
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   mkdirSync(join(workspacePath, '.pan'), { recursive: true });
   writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
+  // PAN-2234: a qualifying PRD draft must exist for the plan-finalize PRD-first
+  // gate. With no projects.yaml in the test, the gate searches the workspace
+  // drafts candidates — write a >=20-line draft there so finalize proceeds.
+  mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
+  writeFileSync(
+    join(workspacePath, '.pan', 'drafts', `${issueId}.md`),
+    Array.from({ length: 20 }, (_, i) => `# ${issueId} PRD line ${i + 1}`).join('\n'),
+    'utf-8',
+  );
   return { projectPath, workspacePath };
 }
 

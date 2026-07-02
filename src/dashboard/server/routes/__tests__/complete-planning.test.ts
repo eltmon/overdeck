@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  beginCompletePlanningLease,
   completePlanningArtifacts,
   completePlanningAutoSpawn,
   completePlanningAutoSpawnAndKill,
@@ -14,6 +15,11 @@ import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
 let projectRoot: string | null = null;
+
+const flush = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
 
 function makeProject(issueId: string): { projectPath: string; workspacePath: string } {
   projectRoot = mkdtempSync(join(tmpdir(), 'complete-planning-'));
@@ -37,7 +43,12 @@ function makeDoc(issueId: string): VBriefDocument {
           title: 'Promote spec',
           status: 'pending',
           narrative: { Action: 'Promote the finalized spec into the project planning directory' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.pan/spec.vbrief.json'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
           subItems: [
             {
               id: 'item-1.ac1',
@@ -58,7 +69,12 @@ function makeDoc(issueId: string): VBriefDocument {
           title: 'Create beads',
           status: 'pending',
           narrative: { Action: 'Materialize one bead task for each finalized plan item' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.beads/issues.jsonl'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
           subItems: [
             {
               id: 'item-2.ac1',
@@ -88,6 +104,22 @@ afterEach(() => {
 });
 
 describe('completePlanningArtifacts', () => {
+  it('serializes concurrent complete-planning attempts for the same issue', async () => {
+    const first = beginCompletePlanningLease('PAN-2247');
+    const second = beginCompletePlanningLease('pan-2247');
+
+    expect(first.started).toBe(true);
+    expect(second.started).toBe(false);
+
+    first.release();
+    await flush();
+
+    const third = beginCompletePlanningLease('PAN-2247');
+    expect(third.started).toBe(true);
+    third.release();
+    await flush();
+  });
+
   it('stages workspace planning artifacts without force-adding .pan', () => {
     const issueId = 'PAN-1931';
     const { workspacePath } = makeProject(issueId);

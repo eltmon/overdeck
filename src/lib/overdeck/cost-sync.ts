@@ -8,6 +8,7 @@
  */
 import type { CostEvent } from '../costs/events.js';
 import { getOverdeckDatabaseSync } from './infra.js';
+import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
 /**
  * Query total memory-extraction cost in USD for an issue within a time window.
@@ -267,10 +268,52 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
     last_updated: number;
   }>;
 
+  // PAN-472: fetch the per-model and per-stage breakdowns for ALL issues in two
+  // grouped queries instead of two full-table scans per issue. The old N+1 shape
+  // ran 1 + 2×308 sync queries (~3.7s of event-loop blocking) per call — and the
+  // Command Deck polls this every 15s.
+  const modelRows = db
+    .prepare(
+      `SELECT UPPER(issue_id) AS issue_id,
+              model,
+              SUM(cost) AS cost,
+              COUNT(*)  AS calls,
+              SUM(input + output + cache_read + cache_write) AS tokens
+       FROM cost_events
+       GROUP BY UPPER(issue_id), model`,
+    )
+    .all() as Array<{ issue_id: string; model: string | null; cost: number; calls: number; tokens: number }>;
+  const stageRows = db
+    .prepare(
+      `SELECT UPPER(issue_id) AS issue_id,
+              session_type AS stage,
+              SUM(cost) AS cost,
+              COUNT(*)  AS calls,
+              SUM(input + output + cache_read + cache_write) AS tokens
+       FROM cost_events
+       GROUP BY UPPER(issue_id), session_type`,
+    )
+    .all() as Array<{ issue_id: string; stage: string | null; cost: number; calls: number; tokens: number }>;
+
+  const modelsByIssue: Record<string, Record<string, ModelBreakdown>> = {};
+  for (const r of modelRows) {
+    (modelsByIssue[r.issue_id] ??= {})[r.model ?? 'unknown'] = {
+      cost: r.cost ?? 0,
+      calls: r.calls ?? 0,
+      tokens: r.tokens ?? 0,
+    };
+  }
+  const stagesByIssue: Record<string, Record<string, StageBreakdown>> = {};
+  for (const r of stageRows) {
+    (stagesByIssue[r.issue_id] ??= {})[r.stage ?? 'unknown'] = {
+      cost: r.cost ?? 0,
+      calls: r.calls ?? 0,
+      tokens: r.tokens ?? 0,
+    };
+  }
+
   const result: Record<string, IssueAggregate> = {};
   for (const row of rows) {
-    const models = getModelBreakdownForIssueSync(row.issue_id);
-    const stages = getStageBreakdownForIssueSync(row.issue_id);
     result[row.issue_id] = {
       issueId: row.issue_id,
       totalCost: row.total_cost ?? 0,
@@ -280,8 +323,8 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
       cacheWriteTokens: row.cache_write_tokens ?? 0,
       lastUpdated: row.last_updated != null ? new Date(row.last_updated).toISOString() : new Date().toISOString(),
       budgetWarning: false,
-      models,
-      stages,
+      models: modelsByIssue[row.issue_id] ?? {},
+      stages: stagesByIssue[row.issue_id] ?? {},
     };
   }
   return result;
@@ -438,6 +481,7 @@ export function getBackgroundCostBySourceSync(hours = 24): Record<string, number
  */
 export interface AgentRollup {
   agentId: string;
+  role: string;
   totalCost: number;
   calls: number;
   totalTokens: number;
@@ -474,6 +518,7 @@ export function getAgentRollup(issueId?: string): AgentRollup[] {
     .filter((r) => r.agent_id != null)
     .map((r) => ({
       agentId: r.agent_id as string,
+      role: deriveTieredAgentCostRole(r.agent_id as string, issueId),
       totalCost: r.total_cost ?? 0,
       calls: r.calls ?? 0,
       totalTokens: r.total_tokens ?? 0,

@@ -1,0 +1,588 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-30T01:24:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2154: Decompose src/lib/workspace-manager.ts (1736 lines) into focused modules",
+    "updated": "2026-07-02T18:22:51.954Z"
+  },
+  "plan": {
+    "id": "pan-2154",
+    "title": "Decompose src/lib/workspace-manager.ts (1736 lines) into focused modules",
+    "status": "running",
+    "uid": "7be76342-63e2-47bc-a10c-79225971b80e",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 4,
+    "created": "2026-06-30T01:24:23Z",
+    "updated": "2026-07-02T18:22:51.954Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2154",
+        "label": "PAN-2154",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2154.md",
+        "label": "PRD draft (authoritative layout + requirements)",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/codebase-health/REMAINING-BACKLOG.md",
+        "label": "codebase-health backlog",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "decomposition",
+      "behavior-preserving"
+    ],
+    "narratives": {
+      "Problem": "src/lib/workspace-manager.ts is 1736 lines — a god file over the 1000-line file-size ceiling (baselined/grandfathered at '1736 src/lib/workspace-manager.ts' in scripts/file-size-baseline.txt:46). It mixes seven concerns plus the Effect public surface: pre-PAN-967 migration, settings mirroring, git-worktree/port/symlink/template primitives, the large createWorkspace flow, repo-add, Docker cleanup, and workspace removal. 14 src/test files import from it, so the public named-export surface must not change.",
+      "Proposal": "Behavior-preserving decomposition following the authoritative PRD draft at .pan/drafts/PAN-2154.md. Create seven cohesive submodules under a NEW sibling directory src/lib/workspace-manager/ (types.ts, migration.ts, worktree-ops.ts, create.ts, repos.ts, docker.ts, remove.ts), each under 1000 lines, layered acyclically (types ← migration/worktree-ops/docker ← create/repos/remove ← barrel). A file src/lib/workspace-manager.ts and a directory src/lib/workspace-manager/ coexist under NodeNext (the .js import resolves to the file/barrel; submodules import as './workspace-manager/<name>.js') — the same pattern routes/workspaces.ts + routes/workspaces/ uses. src/lib/workspace-manager.ts becomes a ~140-line barrel: the devcontainer-renderer import block, the two Effect-error mappers (toWmFsError/toWmProcessError), the 9 Effect-wrapper exports, and re-export statements keeping the public surface byte-identical so all 14 importers + 5 test files resolve unchanged with zero call-site/test edits. One submodule = one bead = one commit; full quality gate after every seam.",
+      "NonGoals": "- No logic changes, signature changes, bug fixes, or behavior changes of any kind — pure moves + re-exports.\n- No renamed or removed exports; the barrel's public named-export set is identical before and after.\n- No edits to any of the 14 call sites or any test file that imports src/lib/workspace-manager.ts (PRD acceptance #4: git diff --name-only main must list ONLY the barrel, the new src/lib/workspace-manager/*.ts files, eslint-any-allowlist.json, and scripts/file-size-baseline.txt).\n- Do NOT add a new export-snapshot test — it would violate PRD acceptance #4; the no-loss audit is typecheck of all 14 importers (a dropped export fails the build) + the existing barrel-importing tests + git-grep of export names + the full vitest suite per seam.\n- Do NOT delete createSymlinks (pre-existing dead code at line 518) — move it verbatim into worktree-ops.ts; deletion is a separate future cleanup.\n- Do NOT touch the already-separate src/lib/workspace/ modules (devcontainer-renderer, ensure-devcontainer, etc.) beyond importing from them.\n- No new explicit `any`; no execSync (preserve async execAsync); no new import cycles.\n- No re-export of internal helpers or *Promise functions from the barrel — only the previously-public symbols."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopt the PRD draft's 7-module layout under a NEW directory src/lib/workspace-manager/, not the 5-module src/lib/workspace/ layout my initial exploration sketched.",
+        "rationale": "The PRD draft (.pan/drafts/PAN-2154.md) is the authoritative, human-verified spec for this issue. It explicitly chose src/lib/workspace-manager/ (file+dir coexist under NodeNext, citing the routes/workspaces precedent) and scoped touching the existing src/lib/workspace/ modules as out of scope. Honoring the PRD avoids fragmenting the workspace domain and matches the codebase-health campaign convention."
+      },
+      {
+        "summary": "Do NOT add an export-surface snapshot test as a no-loss gate (unlike PAN-2146's agents.ts decomposition).",
+        "rationale": "PRD acceptance #4 constrains the diff to exactly four file categories and forbids new test files. For a pure type/value re-export refactor, TypeScript already fails the build if any of the 14 importers loses a symbol, and the existing tests (tests/lib/workspace-manager.test.ts, src/lib/__tests__/relocate-venv-scripts.test.ts, tests/lib/pan-artifacts.test.ts) import the public surface from the barrel — together with PRD AC#1 (git grep of export names) and the full vitest suite per seam, that is the blocking no-loss audit the additive-refactor rule requires."
+      },
+      {
+        "summary": "worktree-ops.ts and types.ts are NOT added to eslint-any-allowlist.json; only migration.ts, create.ts, repos.ts, docker.ts, remove.ts are.",
+        "rationale": "Verified at SHA b0110a6f6e: the worktree-ops symbol set (lines 309-631 + preTrustDirectorySync 1212-1250) and the types/PRE_WORKTREE_METADATA_DIRS set carry zero explicit `any`. The PRD's NFR-1 list mistakenly included worktree-ops.ts. The A1 rule only requires allowlisting files that actually carry moved `any`; adding a clean file is unnecessary."
+      },
+      {
+        "summary": "Final bead removes the '1736 src/lib/workspace-manager.ts' line from scripts/file-size-baseline.txt entirely (per PRD NFR-4), and removes the stale src/lib/workspace-manager.ts entry from eslint-any-allowlist.json (line 153, per PRD NFR-1).",
+        "rationale": "The shrunk barrel is < 1000 lines so it needs no baseline entry (removing the line prevents silent re-inflation), and after extraction it carries no `any` so its allowlist entry is stale. Both are explicit PRD requirements."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi-1-types",
+        "title": "Extract shared types + PRE_WORKTREE_METADATA_DIRS into workspace-manager/types.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2154",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi-2-migration",
+            "wi-3-worktree-ops",
+            "wi-4-create",
+            "wi-5-repos",
+            "wi-6-docker",
+            "wi-7-remove"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the new directory src/lib/workspace-manager/ and a types.ts inside it. Move verbatim all 9 exported interfaces (PanMigrationResult, WorkspaceProgress, WorkspaceCreateOptions, WorkspaceCreateResult, AddReposToWorkspaceOptions, AddReposToWorkspaceResult, WorkspaceRemoveOptions, WorkspaceRemoveResult, DockerCleanupResult) plus the value `const PRE_WORKTREE_METADATA_DIRS = new Set(['.pan', '.beads'])`, exporting each. In src/lib/workspace-manager.ts delete the moved definitions and re-export the interfaces with `export type { PanMigrationResult, WorkspaceProgress, WorkspaceCreateOptions, WorkspaceCreateResult, AddReposToWorkspaceOptions, AddReposToWorkspaceResult, WorkspaceRemoveOptions, WorkspaceRemoveResult, DockerCleanupResult } from './workspace-manager/types.js'`. Do NOT re-export PRE_WORKTREE_METADATA_DIRS (it was private; it stays off the public surface and is imported by worktree-ops.ts in a later bead). This bead establishes the directory + '.js' ESM import extension + 'export type' convention every later seam copies; types.ts carries no `any`, so it is NOT added to eslint-any-allowlist.json. Use ESM relative imports with the .js extension, matching the existing src/lib import style."
+        },
+        "items": [
+          {
+            "id": "wi-1-types.ac1",
+            "title": "The new file src/lib/workspace-manager/types.ts contains the 9 interfaces verbatim plus the PRE_WORKTREE_METADATA_DIRS const, and is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-types.ac2",
+            "title": "src/lib/workspace-manager.ts re-exports the 9 interfaces via `export type { ... } from './workspace-manager/types.js'` and does NOT re-export PRE_WORKTREE_METADATA_DIRS; `git grep` shows the identical set of exported interface names as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-types.ac3",
+            "title": "types.ts is NOT added to eslint-any-allowlist.json; `npm run typecheck` exits 0 and `npm run lint` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-types.ac4",
+            "title": "`npx vitest run --configLoader runner` passes with 0 failed and no importer or test file is edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-2-migration",
+        "title": "Extract migration/settings sync fns into workspace-manager/migration.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move migrateOverdeckToPanSync, copyOverdeckSettingsToWorkspaceSync (with its nested isBrokenHookCommand), and ensurePanGitignoreSync verbatim into src/lib/workspace-manager/migration.ts, exporting all three. Import the PanMigrationResult type from './types.js'. In the barrel, delete the moved definitions, add `import { migrateOverdeckToPanSync, copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync } from './workspace-manager/migration.js'`, re-export those three (`export { ... }`), and keep the migrateOverdeckToPan/copyOverdeckSettingsToWorkspace/ensurePanGitignore Effect wrappers referencing the imported *Sync fns. This module carries explicit `any` (catch blocks @89,145,231) — add 'src/lib/workspace-manager/migration.ts' to eslint-any-allowlist.json in the same commit. Introduce no NEW `any`."
+        },
+        "items": [
+          {
+            "id": "wi-2-migration.ac1",
+            "title": "The new file src/lib/workspace-manager/migration.ts contains migrateOverdeckToPanSync, copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync moved verbatim, imports PanMigrationResult from './types.js', and is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-migration.ac2",
+            "title": "The barrel re-exports those three *Sync fns, each of the three migration Effect wrappers resolves against the imported fns, and git grep shows the public export-name set is preserved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-migration.ac3",
+            "title": "'src/lib/workspace-manager/migration.ts' is added to eslint-any-allowlist.json and `npm run lint` exits 0 with no new explicit `any`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-migration.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed (tests/lib/pan-artifacts.test.ts still green); no importer/test edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-3-worktree-ops",
+        "title": "Extract worktree/port/symlink/template primitives into workspace-manager/worktree-ops.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim into src/lib/workspace-manager/worktree-ops.ts: validateFeatureName, relocateVenvScripts, createWorktree, removeWorktree, assignPort, releasePort, createSymlinks (DEAD CODE — move as-is, do not delete), the TEXT_EXTENSIONS const, isPreWorktreeMetadataOnlyDir, stagePreWorktreeMetadataSync, mergeDirectoryWithoutOverwriteSync, restorePreWorktreeMetadataSync, copyProjectTemplateDirs (with nested copyDir), and preTrustDirectorySync. Export every symbol other modules/the barrel need (all of the above functions). Import PRE_WORKTREE_METADATA_DIRS from './types.js'. In the barrel, delete the moved definitions and re-export ONLY the previously-public ones: `export { relocateVenvScripts, preTrustDirectorySync } from './workspace-manager/worktree-ops.js'`; the preTrustDirectory Effect wrapper references the imported preTrustDirectorySync. This module carries NO explicit `any` — do NOT add it to eslint-any-allowlist.json. No new import cycle (worktree-ops imports only from ./types.js)."
+        },
+        "items": [
+          {
+            "id": "wi-3-worktree-ops.ac1",
+            "title": "src/lib/workspace-manager/worktree-ops.ts exists, under 1000 lines, containing the listed 13 functions + TEXT_EXTENSIONS moved verbatim (createSymlinks included, unmodified), importing PRE_WORKTREE_METADATA_DIRS from './types.js'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-worktree-ops.ac2",
+            "title": "The barrel re-exports relocateVenvScripts and preTrustDirectorySync from './workspace-manager/worktree-ops.js'; the preTrustDirectory Effect wrapper resolves; the public export-name set is unchanged (git grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-worktree-ops.ac3",
+            "title": "worktree-ops.ts is NOT added to eslint-any-allowlist.json; `npm run lint` exits 0 with no new explicit `any`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-worktree-ops.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed (src/lib/__tests__/relocate-venv-scripts.test.ts still green); no importer/test edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-4-create",
+        "title": "Extract createWorkspacePromise into workspace-manager/create.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move createWorkspacePromise (~580 lines) verbatim into src/lib/workspace-manager/create.ts, exporting it. Add the imports it needs: the create types from './types.js'; from './migration.js' nothing unless used; from './worktree-ops.js' the primitives it calls (validateFeatureName, createWorktree, assignPort, relocateVenvScripts, copyProjectTemplateDirs, stagePreWorktreeMetadataSync, restorePreWorktreeMetadataSync, preTrustDirectorySync); and the devcontainer-renderer import block from '../workspace/devcontainer-renderer.js' (createWorkspacePlaceholdersSync as createPlaceholders, sanitizeComposeFileSync, renderDevcontainerSync, DEVCONTAINER_DIRNAME, processTemplatesSync). In the barrel, delete the moved definition, `import { createWorkspacePromise } from './workspace-manager/create.js'`, and keep the createWorkspace Effect wrapper referencing it. createWorkspacePromise is NOT re-exported from the barrel. This module carries explicit `any` (@712,811,856,872,947,985,1050,1100) — add 'src/lib/workspace-manager/create.ts' to eslint-any-allowlist.json. No NEW `any`; preserve async execAsync, add no execSync."
+        },
+        "items": [
+          {
+            "id": "wi-4-create.ac1",
+            "title": "The new file src/lib/workspace-manager/create.ts contains createWorkspacePromise, imports the create types from './types.js', primitives from './worktree-ops.js', and the renderer symbols from '../workspace/devcontainer-renderer.js', and is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-create.ac2",
+            "title": "The barrel imports createWorkspacePromise from './workspace-manager/create.js' (not re-exported), the createWorkspace Effect wrapper resolves, and the public export-name set is unchanged (git grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-create.ac3",
+            "title": "'src/lib/workspace-manager/create.ts' is added to eslint-any-allowlist.json, `npm run lint` exits 0 with no new explicit `any`, and no execSync was introduced.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-create.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed (tests/lib/workspace-manager.test.ts createWorkspace case still green); no importer/test edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-5-repos",
+        "title": "Extract addReposToWorkspacePromise into workspace-manager/repos.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move addReposToWorkspacePromise verbatim into src/lib/workspace-manager/repos.ts, exporting it. Import the AddRepos types from './types.js' and createWorktree (and any other primitive it uses) from './worktree-ops.js'. In the barrel, delete the moved definition, `import { addReposToWorkspacePromise } from './workspace-manager/repos.js'`, and keep the addReposToWorkspace Effect wrapper referencing it (not re-exported from the barrel). This module carries explicit `any` (@1320) — add 'src/lib/workspace-manager/repos.ts' to eslint-any-allowlist.json. No NEW `any`."
+        },
+        "items": [
+          {
+            "id": "wi-5-repos.ac1",
+            "title": "The new file src/lib/workspace-manager/repos.ts contains addReposToWorkspacePromise, imports the AddRepos types from './types.js' and createWorktree from './worktree-ops.js', and is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-repos.ac2",
+            "title": "The barrel imports addReposToWorkspacePromise from './workspace-manager/repos.js' (not re-exported), the addReposToWorkspace Effect wrapper resolves, and the public export-name set is unchanged (git grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-repos.ac3",
+            "title": "'src/lib/workspace-manager/repos.ts' is added to eslint-any-allowlist.json and `npm run lint` exits 0 with no new explicit `any`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-repos.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed; no importer/test edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-6-docker",
+        "title": "Extract Docker enumeration + cleanup into workspace-manager/docker.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move getContainersReferencingWorkspacePathPromise and stopWorkspaceDockerPromise verbatim into src/lib/workspace-manager/docker.ts, exporting both. Import DockerCleanupResult from './types.js' and DEVCONTAINER_DIRNAME from '../workspace/devcontainer-renderer.js'. In the barrel, delete the moved definitions, `import { getContainersReferencingWorkspacePathPromise, stopWorkspaceDockerPromise } from './workspace-manager/docker.js'`, and keep the getContainersReferencingWorkspacePath/stopWorkspaceDocker Effect wrappers referencing them (not re-exported from the barrel). This module carries explicit `any` (@1438,1454) — add 'src/lib/workspace-manager/docker.ts' to eslint-any-allowlist.json. No NEW `any`; preserve async execAsync, add no execSync."
+        },
+        "items": [
+          {
+            "id": "wi-6-docker.ac1",
+            "title": "The new file src/lib/workspace-manager/docker.ts contains getContainersReferencingWorkspacePathPromise and stopWorkspaceDockerPromise, imports DockerCleanupResult from './types.js' and DEVCONTAINER_DIRNAME from '../workspace/devcontainer-renderer.js', and is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-docker.ac2",
+            "title": "The barrel imports both promise fns from './workspace-manager/docker.js' (not re-exported), each of the two matching Effect wrappers resolves, and git grep shows the public export-name set is preserved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-docker.ac3",
+            "title": "'src/lib/workspace-manager/docker.ts' is added to eslint-any-allowlist.json, `npm run lint` exits 0 with no new explicit `any`, and no execSync was introduced.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-docker.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed (tests/lib/workspace-manager.test.ts stopWorkspaceDocker cases still green); no importer/test edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-7-remove",
+        "title": "Extract removeWorkspacePromise into workspace-manager/remove.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move removeWorkspacePromise verbatim into src/lib/workspace-manager/remove.ts, exporting it. Import the remove types from './types.js'; removeWorktree and releasePort from './worktree-ops.js'; the docker helpers (getContainersReferencingWorkspacePathPromise and/or stopWorkspaceDockerPromise as used) from './docker.js'; and DEVCONTAINER_DIRNAME from '../workspace/devcontainer-renderer.js' if referenced. In the barrel, delete the moved definition, `import { removeWorkspacePromise } from './workspace-manager/remove.js'`, and keep the removeWorkspace Effect wrapper referencing it (not re-exported from the barrel). This module carries explicit `any` (@1530,1551) — add 'src/lib/workspace-manager/remove.ts' to eslint-any-allowlist.json. No NEW `any`; preserve async execAsync, add no execSync. Layering stays acyclic: remove imports docker, never the reverse."
+        },
+        "items": [
+          {
+            "id": "wi-7-remove.ac1",
+            "title": "The new file src/lib/workspace-manager/remove.ts contains removeWorkspacePromise, imports the remove types from './types.js', removeWorktree+releasePort from './worktree-ops.js', and the docker helpers from './docker.js', and is under 1000 lines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-remove.ac2",
+            "title": "The barrel imports removeWorkspacePromise from './workspace-manager/remove.js' (not re-exported), the removeWorkspace Effect wrapper resolves, and the public export-name set is unchanged (git grep).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-remove.ac3",
+            "title": "'src/lib/workspace-manager/remove.ts' is added to eslint-any-allowlist.json, `npm run lint` exits 0 with no new explicit `any`, no execSync introduced, and no import cycle (docker does not import remove).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-remove.ac4",
+            "title": "`npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed; no importer/test edited.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-8-barrel-trim",
+        "title": "Confirm thin barrel, drop file-size baseline line, and remove stale allowlist entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-30T01:24:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "After all extractions, confirm src/lib/workspace-manager.ts contains only: its imports (including the devcontainer-renderer block and the *Sync/*Promise imports from ./workspace-manager/*.js), the two Effect-error mappers (toWmFsError, toWmProcessError), the 9 Effect-wrapper exports, and the re-export statements for the public types + *Sync fns — no migrate/copy/create/repos/docker/remove function bodies remain. Remove the '1736 src/lib/workspace-manager.ts' line from scripts/file-size-baseline.txt entirely (the barrel is now < 1000 and needs no baseline entry, per NFR-4). Remove the stale 'src/lib/workspace-manager.ts' entry (line 153) from eslint-any-allowlist.json since the barrel no longer carries `any` (per NFR-1). Run the final full gate."
+        },
+        "items": [
+          {
+            "id": "wi-8-barrel-trim.ac1",
+            "title": "src/lib/workspace-manager.ts is materially smaller (~140 lines) and contains only imports, the two Effect-error mappers, the 9 Effect-wrapper exports, and `export`/`export type` re-export statements — no migrate/copy/create/repos/docker/remove function bodies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-barrel-trim.ac2",
+            "title": "The '1736 src/lib/workspace-manager.ts' line is removed from scripts/file-size-baseline.txt, every src/lib/workspace-manager/*.ts file is under 1000 lines, and `bash scripts/lint-file-size.sh` passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-barrel-trim.ac3",
+            "title": "The 'src/lib/workspace-manager.ts' entry is removed from eslint-any-allowlist.json and `npm run lint` exits 0 (no unused-allowlist or new-any error).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-barrel-trim.ac4",
+            "title": "`git diff --name-only main` lists ONLY src/lib/workspace-manager.ts, the new src/lib/workspace-manager/*.ts files, eslint-any-allowlist.json, and scripts/file-size-baseline.txt; `npm run typecheck` exits 0 and `npx vitest run --configLoader runner` reports 0 failed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi-1-types",
+        "to": "wi-2-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-types",
+        "to": "wi-3-worktree-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-types",
+        "to": "wi-6-docker",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2-migration",
+        "to": "wi-4-create",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-worktree-ops",
+        "to": "wi-4-create",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-worktree-ops",
+        "to": "wi-5-repos",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-worktree-ops",
+        "to": "wi-7-remove",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-6-docker",
+        "to": "wi-7-remove",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4-create",
+        "to": "wi-8-barrel-trim",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5-repos",
+        "to": "wi-8-barrel-trim",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-7-remove",
+        "to": "wi-8-barrel-trim",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-30-PAN-2154-decompose-src-lib-workspace-manager-ts-1736-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "active"
+}

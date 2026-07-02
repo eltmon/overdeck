@@ -21,6 +21,9 @@ const {
   markWorkspaceStuckMock,
   findProjectByPathMock,
   existsSyncMock,
+  getVBriefACStatusSyncMock,
+  resolveIssueFeedbackTargetMock,
+  surfaceIssueFeedbackNeedsYouMock,
 } = vi.hoisted(() => ({
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
     .mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' }),
@@ -34,6 +37,9 @@ const {
   markWorkspaceStuckMock: vi.fn(),
   findProjectByPathMock: vi.fn(),
   existsSyncMock: vi.fn(),
+  getVBriefACStatusSyncMock: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
+  resolveIssueFeedbackTargetMock: vi.fn(),
+  surfaceIssueFeedbackNeedsYouMock: vi.fn(),
 }));
 
 vi.mock('child_process', () => {
@@ -97,6 +103,11 @@ vi.mock('../../src/lib/projects.js', () => ({
   findProjectByPathSync: findProjectByPathMock,
 }));
 
+vi.mock('../../src/lib/cloister/feedback-target.js', () => ({
+  resolveIssueFeedbackTarget: resolveIssueFeedbackTargetMock,
+  surfaceIssueFeedbackNeedsYou: surfaceIssueFeedbackNeedsYouMock,
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal() as any;
   return {
@@ -107,7 +118,7 @@ vi.mock('fs', async (importOriginal) => {
 
 vi.mock('../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: vi.fn().mockReturnValue(Effect.succeed({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] })),
-  getVBriefACStatusSync: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
+  getVBriefACStatusSync: getVBriefACStatusSyncMock,
 }));
 
 // Import under test after mocks
@@ -150,6 +161,8 @@ describe('runVerificationForIssue', () => {
     stopAgentMock.mockReturnValue(Effect.succeed(undefined));
     findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
     existsSyncMock.mockImplementation((p: string) => p.endsWith('/.git'));
+    getVBriefACStatusSyncMock.mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] });
+    resolveIssueFeedbackTargetMock.mockResolvedValue({ agentId: `agent-${issueId.toLowerCase()}` });
   });
 
   describe('circuit breaker', () => {
@@ -288,7 +301,11 @@ describe('runVerificationForIssue', () => {
 
       expect(setReviewStatusMock).toHaveBeenCalledWith(
         issueId,
-        expect.objectContaining({ reviewStatus: 'pending', verificationStatus: 'failed' })
+        expect.objectContaining({
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: expect.stringContaining('Verification FAILED at lint'),
+        })
       );
     });
 
@@ -420,6 +437,80 @@ describe('runVerificationForIssue', () => {
         expect.objectContaining({
           markdownBody: expect.stringContaining('NEEDS-YOU: Verification stuck'),
         })
+      );
+    });
+  });
+
+  describe('state-derived verification gates', () => {
+    beforeEach(() => {
+      runQualityGatesMock.mockReturnValue(Effect.succeed(makePassedResults()));
+      getVBriefACStatusSyncMock.mockReturnValue({
+        allCompleted: false,
+        totalPending: 1,
+        totalCount: 2,
+        items: [
+          {
+            itemTitle: 'FR-16',
+            pending: 1,
+            total: 2,
+            criteria: [
+              { title: 'preserve passed review verdict', status: 'pending' },
+              { title: 'code gate behavior unchanged', status: 'completed' },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('preserves a passed review verdict when vbrief-ac fails', async () => {
+      getReviewStatusMock.mockReturnValue({ reviewStatus: 'passed', verificationCycleCount: 0 });
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result).toMatchObject({
+        outcome: 'failed',
+        failedCheck: 'vbrief-ac',
+        cycleCount: 1,
+      });
+      expect(setReviewStatusMock).toHaveBeenCalledWith(
+        issueId,
+        expect.objectContaining({
+          verificationStatus: 'failed',
+          verificationNotes: expect.stringContaining('Acceptance criteria check FAILED'),
+          verificationCycleCount: 1,
+        }),
+      );
+      expect(setReviewStatusMock).not.toHaveBeenCalledWith(
+        issueId,
+        expect.objectContaining({ reviewStatus: 'pending' }),
+      );
+    });
+
+    it('emits needs-you when a passed review is held by vbrief-ac state', async () => {
+      getReviewStatusMock.mockReturnValue({ reviewStatus: 'passed', verificationCycleCount: 0 });
+
+      await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(markWorkspaceStuckMock).toHaveBeenCalledWith(
+        issueId,
+        'state_derived_verification_hold',
+        expect.objectContaining({
+          failedCheck: 'vbrief-ac',
+          summary: expect.stringContaining('Acceptance criteria check FAILED'),
+          reviewStatus: 'passed',
+        }),
+      );
+    });
+
+    it('does not emit needs-you for vbrief-ac before review has passed', async () => {
+      getReviewStatusMock.mockReturnValue({ reviewStatus: 'pending', verificationCycleCount: 0 });
+
+      await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(markWorkspaceStuckMock).not.toHaveBeenCalledWith(
+        issueId,
+        'state_derived_verification_hold',
+        expect.any(Object),
       );
     });
   });

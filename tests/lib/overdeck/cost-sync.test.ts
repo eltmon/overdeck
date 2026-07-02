@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { insertCostEventSync, getTodayCostSync } from '../../../src/lib/overdeck/cost-sync.js';
+import { insertCostEventSync, getTodayCostSync, getCostsByIssueSync } from '../../../src/lib/overdeck/cost-sync.js';
 import { closeOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
 
@@ -62,5 +62,41 @@ describe('getTodayCostSync', () => {
     }));
 
     expect(getTodayCostSync(new Date('2026-06-25T23:59:00.000Z'))).toBeCloseTo(1.5, 8);
+  });
+});
+
+describe('getCostsByIssueSync', () => {
+  it('aggregates totals with per-model and per-stage breakdowns, case-folding issue ids (PAN-472)', () => {
+    insertCostEventSync(costEvent({
+      issueId: 'pan-9', sessionType: 'work', model: 'gpt-test', cost: 1,
+      input: 100, output: 50, requestId: 'a1',
+    }));
+    insertCostEventSync(costEvent({
+      issueId: 'PAN-9', sessionType: 'work', model: 'gpt-test', cost: 2,
+      input: 200, output: 100, requestId: 'a2',
+    }));
+    insertCostEventSync(costEvent({
+      issueId: 'PAN-9', sessionType: 'review', model: 'claude-test', cost: 4,
+      input: 10, output: 5, requestId: 'a3',
+    }));
+    insertCostEventSync(costEvent({
+      issueId: 'PAN-10', sessionType: 'planning', model: 'gpt-test', cost: 8,
+      input: 1, output: 1, requestId: 'b1',
+    }));
+
+    const result = getCostsByIssueSync();
+
+    // 'pan-9' and 'PAN-9' fold into one issue.
+    expect(Object.keys(result).sort()).toEqual(['PAN-10', 'PAN-9']);
+    expect(result['PAN-9'].totalCost).toBeCloseTo(7, 8);
+    expect(result['PAN-9'].inputTokens).toBe(310);
+    expect(result['PAN-9'].outputTokens).toBe(155);
+    expect(result['PAN-9'].models['gpt-test']).toEqual({ cost: 3, calls: 2, tokens: 450 });
+    expect(result['PAN-9'].models['claude-test']).toEqual({ cost: 4, calls: 1, tokens: 15 });
+    expect(result['PAN-9'].stages['work']).toEqual({ cost: 3, calls: 2, tokens: 450 });
+    expect(result['PAN-9'].stages['review']).toEqual({ cost: 4, calls: 1, tokens: 15 });
+    expect(result['PAN-10'].totalCost).toBeCloseTo(8, 8);
+    expect(result['PAN-10'].models['gpt-test']).toEqual({ cost: 8, calls: 1, tokens: 2 });
+    expect(result['PAN-10'].stages['planning']).toEqual({ cost: 8, calls: 1, tokens: 2 });
   });
 });

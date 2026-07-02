@@ -1,0 +1,794 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-02T17:58:40.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2151: Decompose src/dashboard/server/routes/misc.ts (1835 lines) into focused modules",
+    "updated": "2026-07-02T19:33:02.739Z"
+  },
+  "plan": {
+    "id": "pan-2151",
+    "title": "Decompose src/dashboard/server/routes/misc.ts (1835 lines) into focused modules",
+    "status": "approved",
+    "uid": "4a37d2f5-1b10-4279-bac5-91cf1d410c4b",
+    "author": "agent:claude-fable-5",
+    "sequence": 6,
+    "created": "2026-07-02T17:58:40.000Z",
+    "updated": "2026-07-02T19:33:02.739Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2151",
+        "label": "PAN-2151",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2151.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "codebase-health",
+      "substrate-improvement",
+      "behavior-preserving"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/server/routes/misc.ts is 1832 lines (baselined at 1835 in scripts/file-size-baseline.txt:20) — a catch-all god file of ~37 API route handlers spanning trackers, project-mappings, health, deacon control, planning sessions, TLDR, cache, metrics, shadow, and dev endpoints. Flagged by the A3 file-size campaign. Its public surface is only readPackageVersion + miscRouteLayer (named and default), consumed by server.ts:51 and tests/dashboard/version-api.test.ts:13.",
+      "Proposal": "Pure relocation into topical submodules under a new sibling dir src/dashboard/server/routes/misc/ (shared, trackers, project-mappings, health, deacon, planning, tldr, meta), each exporting a sub-layer. misc.ts becomes a thin barrel that re-exports readPackageVersion and composes miscRouteLayer = Layer.mergeAll(<sub-layers>, bootReconciliationRouteLayer). A barrel-exports freeze test lands first (PAN-2146 pattern). One seam per commit, full gate (typecheck + lint + full vitest) after each. Full seam-by-seam detail with verified line citations lives in .pan/drafts/PAN-2151.md.",
+      "NonGoals": "- No logic edits, no renamed exports, no added/removed routes — pure relocation only.\n- No modernization of moved code: the sync sendKeys/sessionExists tmux calls and the require() in getIssueDataService move verbatim (fixing them is follow-up work, not this issue).\n- No decomposition or relocation of boot-reconciliation.ts (already extracted).\n- No importer edits: server.ts and tests/dashboard/version-api.test.ts stay untouched.\n- No file-size-baseline regeneration beyond updating the single misc.ts line.\n- No new public API surface: the barrel exports exactly what misc.ts exports today (default, miscRouteLayer, readPackageVersion).",
+      "Risks": "(1) Effect Layer / HttpRouter import paths must move with the routes; a missed import surfaces immediately at typecheck. (2) Module-level state with external writers would be unsafe to duplicate — verified there are none: pendingConfirmations has no writers outside misc.ts. (3) misc.ts is in eslint-any-allowlist.json:78; any explicit any that moves must carry its new file into the allowlist or lint fails (the moved any all lands in misc/meta.ts). (4) The full suite must run per seam (the file-size + any ratchets live in npm run lint), not just changed tests. (5) getProjectPath (shared) calls getProjectMappings (project-mappings group) — the extract-project-mappings bead states the resolution rule."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reused the 2026-06-30 planning session's seam grouping and PRD draft; this session fixed spec-contract violations (plan.id, uid, required metadata) rather than re-deriving the decomposition.",
+        "rationale": "The prior grouping was verified against the file by symbol-usage grep this session and remains correct; re-planning from scratch would discard verified work."
+      },
+      {
+        "summary": "Added a barrel-exports freeze test as the first bead (misc-barrel-exports.test.ts).",
+        "rationale": "PAN-2146 (agents.ts decomposition) landed the same pattern first, and the additive-refactor rule requires a no-loss audit gate before deletion/replacement."
+      },
+      {
+        "summary": "Submodules live under a sibling directory src/dashboard/server/routes/misc/ (not flat in routes/).",
+        "rationale": "Keeps the relocation scoped and obvious; matches the existing routes/workspaces/ precedent."
+      },
+      {
+        "summary": "misc.ts re-exports readPackageVersion from misc/shared.ts so tests/dashboard/version-api.test.ts resolves unchanged.",
+        "rationale": "Zero call-site changes is a hard issue requirement; re-exporting satisfies it without repointing tests."
+      },
+      {
+        "summary": "Cross-group helper rule: a helper used by routes in 2+ submodules goes to misc/shared.ts; otherwise it moves into its single owning submodule.",
+        "rationale": "Mechanical rule verified by usage grep; removes per-helper judgment calls from the work agent."
+      },
+      {
+        "summary": "Seams run sequentially (linear blocks chain); one seam per commit with the full gate between each.",
+        "rationale": "Every seam mutates misc.ts (shared mutation), and the issue requires the full gate after each seam; sequencing keeps regressions bisectable."
+      },
+      {
+        "summary": "Only shared-helpers carries requiresInspection: true; all extraction seams are false.",
+        "rationale": "shared.ts is the one foundation every later seam imports; extraction seams are mechanical moves whose defects surface at typecheck/the freeze test, matching the inspection rubric."
+      },
+      {
+        "summary": "boot-reconciliation.ts stays where it is; the barrel keeps merging bootReconciliationRouteLayer unchanged.",
+        "rationale": "It is already extracted; touching it would exceed the pure-relocation scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "freeze-barrel-exports",
+        "title": "Add barrel-exports freeze test for routes/misc.ts before any extraction",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "misc-barrel-exports.test.ts runs green",
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts mirroring src/lib/__tests__/agents-barrel-exports.test.ts (PAN-2146 precedent). It must import * as barrel from '../misc.js' and assert Object.keys(barrel).sort() equals exactly ['default','miscRouteLayer','readPackageVersion']. This is the no-loss audit gate: it locks the public surface before any code moves. No source files change in this bead."
+        },
+        "items": [
+          {
+            "id": "freeze-barrel-exports.ac1",
+            "title": "New test misc-barrel-exports.test.ts validates that the misc.ts barrel exports exactly default, miscRouteLayer, and readPackageVersion (sorted Object.keys equality, PAN-2146 pattern)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "freeze-barrel-exports.ac2",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-helpers",
+        "title": "Create misc/shared.ts with cross-group helpers; misc.ts imports/re-exports from it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/shared.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "extract-trackers",
+            "extract-project-mappings",
+            "extract-health",
+            "extract-deacon",
+            "extract-planning",
+            "extract-tldr",
+            "extract-meta",
+            "barrel-finalize"
+          ]
+        },
+        "narrative": {
+          "Action": "Create directory src/dashboard/server/routes/misc/. Move verbatim from misc.ts into misc/shared.ts, exporting each: readPackageVersion (misc.ts:92), _overdeckVersion/getOverdeckVersion (:110-116), overdeckDevMode (:119), readJsonBody (:314), getProjectPath (:167), isGitHubIssue (:181), getGitHubLocalPaths (:194). In misc.ts add: export { readPackageVersion } from './misc/shared.js'; and import the other helpers from './misc/shared.js'. Move only the node/lib imports these helpers need; delete now-dead imports from misc.ts. Do NOT edit any helper body."
+        },
+        "items": [
+          {
+            "id": "shared-helpers.ac1",
+            "title": "misc/shared.ts contains readPackageVersion, getOverdeckVersion, overdeckDevMode, readJsonBody, getProjectPath, isGitHubIssue, and getGitHubLocalPaths with unchanged bodies, and misc.ts re-exports readPackageVersion from it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-helpers.ac2",
+            "title": "tests/dashboard/version-api.test.ts passes unmodified — its import of readPackageVersion from routes/misc.js still resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-helpers.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-trackers",
+        "title": "Extract tracker + rally routes into misc/trackers.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/trackers.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim postTrackersRefreshRoute (misc.ts:326), getTrackerStatusRoute (:551), postRallyValidateRoute (:631) into misc/trackers.ts. Export const trackersRouteLayer = Layer.mergeAll(postTrackersRefreshRoute, getTrackerStatusRoute, postRallyValidateRoute). Import needed helpers from './shared.js' and move the lib imports these routes use. In misc.ts replace the three route consts in the mergeAll with trackersRouteLayer imported from './misc/trackers.js'; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-trackers.ac1",
+            "title": "misc/trackers.ts contains postTrackersRefreshRoute, getTrackerStatusRoute, and postRallyValidateRoute with unchanged bodies and exports trackersRouteLayer; those consts no longer appear in misc.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-trackers.ac2",
+            "title": "wc -l src/dashboard/server/routes/misc/trackers.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-trackers.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-project-mappings",
+        "title": "Extract project-mappings CRUD routes into misc/project-mappings.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/project-mappings.ts",
+            "src/dashboard/server/routes/misc/shared.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim getProjectMappingsRoute (misc.ts:347), putProjectMappingsRoute (:355), postProjectMappingsRoute (:371) plus their group-local helpers PROJECT_MAPPINGS_FILE, ProjectMapping interface, getProjectMappings, saveProjectMappings (:141-166) into misc/project-mappings.ts. NOTE: getProjectPath in misc/shared.ts calls getProjectMappings — export getProjectMappings from misc/project-mappings.ts and import it in shared.ts (or keep the mappings helpers in shared.ts if that import would be circular; decide by typecheck, record which in the commit message). Export projectMappingsRouteLayer = Layer.mergeAll(...). Update misc.ts composition; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-project-mappings.ac1",
+            "title": "misc/project-mappings.ts contains the three project-mappings routes with unchanged bodies and exports projectMappingsRouteLayer; those consts no longer appear in misc.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-project-mappings.ac2",
+            "title": "wc -l src/dashboard/server/routes/misc/project-mappings.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-project-mappings.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-health",
+        "title": "Extract system/agent health routes into misc/health.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/health.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim getSystemHealthRoute (misc.ts:418), getGodviewSystemHealthRoute (:432), getHealthAgentsRoute (:452), postHealthAgentPingRoute (:519) into misc/health.ts. Export healthRouteLayer = Layer.mergeAll(...). Move the imports these routes use (getSystemHealthSnapshot, checkAgentHealth/determineHealthStatus, listSessionNames, etc.). Update misc.ts composition; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-health.ac1",
+            "title": "misc/health.ts contains the four health routes with unchanged bodies and exports healthRouteLayer; those consts no longer appear in misc.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-health.ac2",
+            "title": "wc -l src/dashboard/server/routes/misc/health.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-health.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-deacon",
+        "title": "Extract resume + deacon-control routes into misc/deacon.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim getNoResumeModeRoute (misc.ts:681), postResumeAllRoute (:691), getDeaconStatusRoute (:713), getDeaconLogsRoute (:746), postDeaconPatrolRoute (:775), getDeaconPauseRoute (:799), postDeaconPauseRoute (:817) into misc/deacon.ts. Export deaconRouteLayer = Layer.mergeAll(...). bootReconciliationRouteLayer stays imported and merged in the barrel exactly as today — do not move it. Update misc.ts composition; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-deacon.ac1",
+            "title": "misc/deacon.ts contains the seven resume/deacon routes with unchanged bodies and exports deaconRouteLayer; those consts no longer appear in misc.ts, and the barrel preserves the bootReconciliationRouteLayer merge unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-deacon.ac2",
+            "title": "wc -l src/dashboard/server/routes/misc/deacon.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-deacon.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-planning",
+        "title": "Extract planning-session routes into misc/planning.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/planning.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim getPlanningStatusRoute (misc.ts:984), postPlanningMessageRoute (:1074), deletePlanningSessionRoute (:1276) plus their group-local helpers PLANNING_FINISHED_STATUSES (:220), checkPlanStatus (:222), claudePlanningSystemPromptFiles (:1055), isNotFound (:1068) into misc/planning.ts. Export planningRouteLayer = Layer.mergeAll(...). These routes use shared helpers (getProjectPath, isGitHubIssue, getGitHubLocalPaths, readJsonBody) — import them from './shared.js'. The sync sendKeys/sessionExists tmux usage moves verbatim (modernizing is out of scope). Update misc.ts composition; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-planning.ac1",
+            "title": "misc/planning.ts contains the three planning routes plus checkPlanStatus, PLANNING_FINISHED_STATUSES, claudePlanningSystemPromptFiles, and isNotFound with unchanged bodies and exports planningRouteLayer; those symbols no longer appear in misc.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-planning.ac2",
+            "title": "wc -l src/dashboard/server/routes/misc/planning.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-planning.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-tldr",
+        "title": "Extract TLDR daemon routes into misc/tldr.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/tldr.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim getTldrStatusRoute (misc.ts:1309), postTldrStartRoute (:1381), postTldrStopRoute (:1409), postTldrReloadRoute (:1441) plus their group-local helper getIndexStats (:250) into misc/tldr.ts. Export tldrRouteLayer = Layer.mergeAll(...). Update misc.ts composition; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-tldr.ac1",
+            "title": "misc/tldr.ts contains the four TLDR routes plus getIndexStats with unchanged bodies and exports tldrRouteLayer; those symbols no longer appear in misc.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-tldr.ac2",
+            "title": "wc -l src/dashboard/server/routes/misc/tldr.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-tldr.ac3",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-meta",
+        "title": "Extract remaining routes (version/projects/confirmations/skills/cache/metrics/shadow/dev) into misc/meta.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/misc/meta.ts",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move verbatim the remaining 13 routes: getVersionRoute (misc.ts:833), getRegisteredProjectsRoute (:853), getConfirmationsRoute (:882), postConfirmationRespondRoute (:890), getSkillsRoute (:930), getCacheStatusRoute (:1504), clearCacheRoute (:1519), getMetricsRuntimesRoute (:1535), getMetricsTasksRoute (:1586), postShadowMonitorRoute (:1619), postShadowObserveRoute (:1665), postDevRebuildRoute (:1740), postRestartDashboardRoute (:1770) plus group-local helpers getIssueDataService (:134), ConfirmationRequest/pendingConfirmations (:209/:218), METRICS_FILE/loadRuntimeMetrics (:237/:239), overdeckProjectRoot (:1727), execAsync (:88). Export metaRouteLayer = Layer.mergeAll(...). This file carries the moved explicit any (loadRuntimeMetrics Promise<any> at :239, comparators at :1543/:1600) — add src/dashboard/server/routes/misc/meta.ts to eslint-any-allowlist.json in this same commit. Check wc -l; if over 1000, split shadow+dev routes into misc/meta-ops.ts along the route boundaries. Update misc.ts composition; delete dead imports."
+        },
+        "items": [
+          {
+            "id": "extract-meta.ac1",
+            "title": "misc/meta.ts contains the 13 remaining routes plus their group-local helpers with unchanged bodies and exports metaRouteLayer; those symbols no longer appear in misc.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-meta.ac2",
+            "title": "eslint-any-allowlist.json contains src/dashboard/server/routes/misc/meta.ts (the moved explicit any) in the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-meta.ac3",
+            "title": "wc -l src/dashboard/server/routes/misc/meta.ts prints a value under 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-meta.ac4",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "barrel-finalize",
+        "title": "Reduce misc.ts to a thin barrel; update size baseline + any-allowlist; final gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-02T17:58:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc.ts",
+            "scripts/file-size-baseline.txt",
+            "eslint-any-allowlist.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (file-size guard + A1 ratchet included)",
+            "vitest exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Verify misc.ts now contains only: the header route-inventory comment, imports of the seven sub-layers + bootReconciliationRouteLayer, export { readPackageVersion } from './misc/shared.js', miscRouteLayer = Layer.mergeAll(<seven sub-layers>, bootReconciliationRouteLayer), and export default miscRouteLayer. Update scripts/file-size-baseline.txt:20 from '1835 src/dashboard/server/routes/misc.ts' to the barrel's actual new line count (PAN-2146 precedent: agents.ts 5824 -> 86). If misc.ts no longer contains explicit any, remove its entry from eslint-any-allowlist.json (currently line 78). Run wc -l on every misc/*.ts to confirm all under 1000. The freeze test from freeze-barrel-exports must still run green unmodified."
+        },
+        "items": [
+          {
+            "id": "barrel-finalize.ac1",
+            "title": "misc.ts contains only imports, the readPackageVersion re-export, the miscRouteLayer composition, and the default export (a thin barrel, roughly 80 lines or fewer)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "barrel-finalize.ac2",
+            "title": "scripts/file-size-baseline.txt records the barrel's shrunk line count for misc.ts and scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "barrel-finalize.ac3",
+            "title": "misc-barrel-exports.test.ts and tests/dashboard/version-api.test.ts both run green unmodified, and src/dashboard/server/server.ts resolves miscRouteLayer with no importer edits anywhere",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "barrel-finalize.ac4",
+            "title": "npm run typecheck and npm run lint both succeed and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "freeze-barrel-exports",
+        "to": "shared-helpers",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-helpers",
+        "to": "extract-trackers",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-trackers",
+        "to": "extract-project-mappings",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-project-mappings",
+        "to": "extract-health",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-health",
+        "to": "extract-deacon",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-deacon",
+        "to": "extract-planning",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-planning",
+        "to": "extract-tldr",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-tldr",
+        "to": "extract-meta",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-meta",
+        "to": "barrel-finalize",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-02-PAN-2151-decompose-src-dashboard-server-routes-misc-ts-1835-lines-into-focused-modules.vbrief.json"
+    }
+  },
+  "status": "active"
+}

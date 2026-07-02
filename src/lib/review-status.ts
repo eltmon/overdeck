@@ -15,6 +15,7 @@ import {
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
+import type { ScopeDriftRecord } from './vbrief/continue-state.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -113,6 +114,8 @@ export interface ReviewStatus {
   deaconIgnoredAt?: string;
   /** Optional free-form reason shown alongside the ignore toggle. */
   deaconIgnoredReason?: string;
+  /** PAN-1762: advisory files_scope drift recorded at pan done and surfaced to review. */
+  scopeDrift?: ScopeDriftRecord;
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
@@ -133,7 +136,7 @@ export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationSt
  * failed, UAT ok, merge not started). Extracted so both setReviewStatusSync and the
  * journal→DB reconcile in getReviewStatusSync derive readyForMerge identically.
  */
-function reviewGatesPassedSync(
+export function reviewGatesPassedSync(
   s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
 ): boolean {
   return (
@@ -174,7 +177,6 @@ export function mergeGateEligibility(
   if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
   return { eligible: true };
 }
-
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
@@ -481,7 +483,12 @@ export function setReviewStatusSync(
     if (canSkipTests) {
       console.log(`[review-status] Skipping test role for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
       emitActivityEntrySync({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
-      setReviewStatusSync(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate' });
+      setReviewStatusSync(issueId, {
+        testStatus: 'passed',
+        testNotes: 'Skipped: no code changed since pre-review verification gate',
+        verificationStatus: 'passed',
+        verificationNotes: 'Pre-review verification already covered the reviewed commit',
+      });
       void emitReactiveLifecycleEvent('test.passed', issueId);
     } else {
       void emitReactiveLifecycleEvent('review.approved', issueId);
@@ -679,26 +686,26 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     const { resolveProjectFromIssueSync } = await import('./projects.js');
     const resolved = resolveProjectFromIssueSync(issueId);
     const workspace = resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined;
-    const notes = status.testNotes;
-    let feedbackPath: string | undefined;
+    const notes = status.testNotes; let feedbackPath: string | undefined;
     try {
       const { writeFeedbackFile } = await import('./cloister/feedback-writer.js');
       const r = await Effect.runPromise(writeFeedbackFile({
-        issueId,
-        workspacePath: workspace,
-        specialist: 'test-agent',
-        outcome: 'failed',
-        summary: `Tests FAILED for ${issueId}`,
+        issueId, workspacePath: workspace, specialist: 'test-agent', outcome: 'failed', summary: `Tests FAILED for ${issueId}`,
         markdownBody: `# Test failure\n\n${notes ?? 'The test gate reported failures. See .pan/test/result.json and re-run the project test suite.'}\n\n## Required\nFix the failing tests, commit and push, then re-run \`pan done ${issueId}\`.`,
       }));
       if (r.success) feedbackPath = r.filePath;
     } catch { /* non-fatal — the message below still carries the summary */ }
 
-    const agentId = `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\n${feedbackPath ? `MUST READ: ${feedbackPath}\n\n` : ''}${notes ? `${notes.slice(0, 400)}\n\n` : ''}Fix the failing tests, commit and push, then re-run pan done ${issueId}. Do NOT stop at the prompt.`;
-    const { messageAgent } = await import('./agents.js');
-    await messageAgent(agentId, message);
-    console.log(`[review-status] delivered test failure to the work agent for ${issueId} (host-side)`);
+    const { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } = await import('./cloister/feedback-target.js');
+    const target = await resolveIssueFeedbackTarget(issueId);
+    if ('agentId' in target) {
+      const { messageAgent } = await import('./agents.js');
+      await messageAgent(target.agentId, message);
+      console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
+    } else {
+      surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
+    }
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -800,7 +807,6 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   maybeRecoverTestVerdictHostSide(issueId, enriched);
   return enriched;
 }
-
 
 /**
  * On server startup, clear any mergeStatus stuck at 'merging'.
@@ -1013,7 +1019,6 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
     console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
 }
-
 
 /** Tagged error for review-status Effect variants. */
 export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
