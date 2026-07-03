@@ -239,7 +239,7 @@ describe('workflows', () => {
       expect(verifyStep.details).toEqual(['Branch already cleaned up (squash-merged)']);
     });
 
-    it('accepts a squash-merged GitHub PR when the branch tip predates mergedAt', async () => {
+    it('accepts a squash-merged GitHub PR when the branch tip matches the merged PR head', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command.startsWith('git branch --list')) {
           return { stdout: '  feature/pan-100\n', stderr: '' };
@@ -252,12 +252,12 @@ describe('workflows', () => {
         }
         if (command.startsWith('gh pr list')) {
           return {
-            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"abc123","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
             stderr: '',
           };
         }
-        if (command.startsWith('git show -s --format=%cI feature/pan-100')) {
-          return { stdout: '2026-07-02T11:59:00Z\n', stderr: '' };
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'abc123\n', stderr: '' };
         }
         if (command.startsWith('git log main..feature/pan-100')) {
           throw new Error('should not count ancestry-only unmerged commits after GitHub squash confirmation');
@@ -274,7 +274,45 @@ describe('workflows', () => {
 
       expect(verifyStep.step).toBe('close-out:verify-merged');
       expect(verifyStep.success).toBe(true);
-      expect(verifyStep.details).toEqual(['PR #2182 is squash-merged and feature/pan-100 has no post-merge commits']);
+      expect(verifyStep.details).toEqual(['PR #2182 is squash-merged and feature/pan-100 matches the merged PR head']);
+    });
+
+    it('rejects a squash-merged GitHub PR when the branch tip no longer matches the merged PR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'newer-branch-tip\n', stderr: '' };
+        }
+        if (command.startsWith('git log main..feature/pan-100')) {
+          throw new Error('should fail immediately on mismatched merged PR head');
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.step).toBe('close-out:verify-merged');
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('feature/pan-100 does not match the head commit of merged PR #2182; inspect before closing out.');
     });
 
     it('should abort if archive fails', async () => {

@@ -546,6 +546,7 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
 type GitHubMergedPr = {
   number?: number;
   mergedAt?: string | null;
+  headRefOid?: string | null;
   url?: string | null;
 };
 
@@ -561,30 +562,34 @@ async function verifySquashMergedPrByBranch(
 
   try {
     const { stdout: prJson } = await execAsync(
-      `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(branchName)} --json number,mergedAt,url`,
+      `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(branchName)} --json number,mergedAt,headRefOid,url`,
       { cwd: ctx.projectPath, encoding: 'utf-8' },
     );
     const prs = JSON.parse(prJson) as GitHubMergedPr[];
     const mergedPr = prs
-      .filter((pr) => typeof pr.mergedAt === 'string' && pr.mergedAt.length > 0)
+      .filter((pr) => (
+        typeof pr.mergedAt === 'string'
+        && pr.mergedAt.length > 0
+        && typeof pr.headRefOid === 'string'
+        && pr.headRefOid.length > 0
+      ))
       .sort((a, b) => Date.parse(String(b.mergedAt)) - Date.parse(String(a.mergedAt)))[0];
-    if (!mergedPr?.mergedAt) return null;
+    if (!mergedPr?.headRefOid) return null;
 
-    const { stdout: tipDateRaw } = await execAsync(
-      `git show -s --format=%cI ${branchRef} 2>/dev/null`,
+    const { stdout: tipShaRaw } = await execAsync(
+      `git rev-parse ${branchRef} 2>/dev/null`,
       { cwd: ctx.projectPath, encoding: 'utf-8' },
     );
-    const tipDateMs = Date.parse(tipDateRaw.trim());
-    const mergedAtMs = Date.parse(mergedPr.mergedAt);
-    if (!Number.isFinite(tipDateMs) || !Number.isFinite(mergedAtMs)) return null;
+    const tipSha = tipShaRaw.trim();
+    if (!tipSha) return null;
 
-    if (tipDateMs <= mergedAtMs) {
+    if (tipSha === mergedPr.headRefOid) {
       const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
-      return stepOk(step, [`${prLabel} is squash-merged and ${branchName} has no post-merge commits`]);
+      return stepOk(step, [`${prLabel} is squash-merged and ${branchName} matches the merged PR head`]);
     }
 
     const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
-    return stepFailed(step, `${branchName} has commits newer than merged ${prLabel}; inspect before closing out.`);
+    return stepFailed(step, `${branchName} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
   } catch {
     return null;
   }
