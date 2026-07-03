@@ -26,6 +26,7 @@ type SourceFilter = 'all' | SessionSource;
 interface DiscoveredSession {
   id: number;
   source: SessionSource;
+  discoveredId?: number | null;
   harness: string;
   conversationId?: string | null;
   conversationName?: string | null;
@@ -219,6 +220,7 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
   return {
     id: session.id,
     source: 'discovered',
+    discoveredId: session.id,
     harness: session.harness ?? 'claude-code',
     conversationId: session.conversationId ?? null,
     conversationName: session.conversationName ?? null,
@@ -247,6 +249,7 @@ function fromFeedRow(row: SessionsFeedRowSnapshot): DiscoveredSession {
   return {
     id: row.id,
     source: row.source,
+    discoveredId: row.discoveredId ?? null,
     harness: row.harness ?? 'claude-code',
     conversationId: row.conversationId ?? null,
     conversationName: row.conversationName ?? null,

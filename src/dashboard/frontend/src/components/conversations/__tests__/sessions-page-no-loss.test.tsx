@@ -56,6 +56,7 @@ vi.mock('../SessionTranscript', () => ({
 const DISCOVERED_ROW = {
   id: 11,
   source: 'discovered',
+  discoveredId: 11,
   harness: 'claude-code',
   conversationId: '87',
   conversationName: 'managed-conv',
@@ -81,6 +82,7 @@ const ARCHIVED_ROW = {
   ...DISCOVERED_ROW,
   id: 22,
   source: 'managed-archived',
+  discoveredId: 33,
   conversationId: '22',
   conversationName: 'archived-conv',
   conversationTitle: 'Archived target',
@@ -96,6 +98,15 @@ const DISCOVERED_DETAIL = {
   filesTouched: ['/home/user/Projects/alpha/src/auth.ts'],
   summary: 'Summary from detail',
   summaryDetailed: 'Detailed summary from detail',
+};
+
+const ARCHIVED_DETAIL = {
+  ...DISCOVERED_DETAIL,
+  id: 33,
+  toolsUsed: ['Bash'],
+  filesTouched: ['/home/user/Projects/alpha/src/archived-only.ts'],
+  summary: 'Archived hydrated summary',
+  summaryDetailed: 'Archived hydrated detail',
 };
 
 const FEED_FACETS_RESPONSE = {
@@ -135,7 +146,9 @@ describe('sessions page no-loss audit', () => {
     rpcMocks.stats.mockResolvedValue({ total: 10, enriched: 4, embedded: 3, managedCount: 2 });
     rpcMocks.cost.mockResolvedValue({ sessionCount: 10, totalCost: 0.246, totalTokensIn: 1000, totalTokensOut: 500 });
     rpcMocks.scan.mockResolvedValue({ inserted: 1, updated: 0, skipped: 0, errors: 0, durationMs: 10 });
-    rpcMocks.get.mockResolvedValue(DISCOVERED_DETAIL);
+    rpcMocks.get.mockImplementation(({ id }: { id: number }) => Promise.resolve(
+      id === ARCHIVED_ROW.discoveredId ? ARCHIVED_DETAIL : DISCOVERED_DETAIL,
+    ));
     rpcMocks.enrich.mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 });
     rpcMocks.embed.mockResolvedValue({ total: 1, embedded: 1, model: 'text-embedding-3-small' });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }));
@@ -197,6 +210,11 @@ describe('sessions page no-loss audit', () => {
 
     fireEvent.click(screen.getByText('Archived target'));
     expect(await screen.findByRole('button', { name: 'Unarchive' })).toBeInTheDocument();
+    expect(await screen.findByText('Archived hydrated summary')).toBeInTheDocument();
+    expect(screen.getByText('Archived hydrated detail')).toBeInTheDocument();
+    expect(screen.getByText('Bash')).toBeInTheDocument();
+    expect(screen.getByText('/home/user/Projects/alpha/src/archived-only.ts')).toBeInTheDocument();
+    expect(rpcMocks.get).toHaveBeenCalledWith({ id: ARCHIVED_ROW.discoveredId });
 
     fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'target' } });
     expect(await screen.findByRole('button', { name: 'Prev' })).toBeInTheDocument();

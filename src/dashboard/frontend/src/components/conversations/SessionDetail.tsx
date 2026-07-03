@@ -15,6 +15,7 @@ import { SessionTranscript } from './SessionTranscript';
 export interface Session {
   id: number;
   source?: 'discovered' | 'managed-archived';
+  discoveredId?: number | null;
   conversationId?: string | null;
   conversationName?: string | null;
   conversationTitle?: string | null;
@@ -137,21 +138,47 @@ async function fetchSession(sessionId: number): Promise<Session> {
   return fromRpcSession(session);
 }
 
+function mergeArchivedDetail(session: Session, discovered: Session | undefined): Session {
+  if (!discovered) return session;
+  return {
+    ...session,
+    harness: discovered.harness ?? session.harness,
+    jsonlPath: discovered.jsonlPath ?? session.jsonlPath,
+    workspacePath: discovered.workspacePath ?? session.workspacePath,
+    primaryModel: discovered.primaryModel ?? session.primaryModel,
+    messageCount: discovered.messageCount || session.messageCount,
+    firstTs: discovered.firstTs ?? session.firstTs,
+    lastTs: discovered.lastTs ?? session.lastTs,
+    estimatedCost: discovered.estimatedCost || session.estimatedCost,
+    tokenInput: discovered.tokenInput || session.tokenInput,
+    tokenOutput: discovered.tokenOutput || session.tokenOutput,
+    toolsUsed: discovered.toolsUsed.length > 0 ? discovered.toolsUsed : session.toolsUsed,
+    filesTouched: discovered.filesTouched.length > 0 ? discovered.filesTouched : session.filesTouched,
+    tags: discovered.tags.length > 0 ? discovered.tags : session.tags,
+    summary: discovered.summary ?? session.summary,
+    summaryDetailed: discovered.summaryDetailed ?? session.summaryDetailed,
+    enrichmentLevel: discovered.enrichmentLevel || session.enrichmentLevel,
+    enrichmentFailed: discovered.enrichmentFailed,
+    panIssueId: discovered.panIssueId ?? session.panIssueId,
+  };
+}
+
 export function SessionDetail({ session, onClose }: Props) {
   const queryClient = useQueryClient();
   const [pendingCost, setPendingCost] = useState<CostThresholdDetails | null>(null);
   const [customModel, setCustomModel] = useState('');
   const isArchived = session.source === 'managed-archived';
+  const detailSessionId = isArchived ? session.discoveredId ?? null : session.id;
   const enrichProgress = useDashboardStore((s) => s.enrichProgressBySessionId[session.id]);
 
   const { data: freshSession } = useQuery({
-    queryKey: ['discovered-session', session.id],
-    queryFn: () => fetchSession(session.id),
+    queryKey: ['discovered-session', detailSessionId],
+    queryFn: () => fetchSession(detailSessionId!),
     staleTime: Infinity,
     placeholderData: session,
-    enabled: !isArchived,
+    enabled: detailSessionId != null,
   });
-  const displaySession = isArchived ? session : freshSession ?? session;
+  const displaySession = isArchived ? mergeArchivedDetail(session, freshSession) : freshSession ?? session;
   const commandDeckConversationId = displaySession.conversationId ?? (isArchived ? String(displaySession.id) : null);
 
   const invalidateSessionQueries = () => {
