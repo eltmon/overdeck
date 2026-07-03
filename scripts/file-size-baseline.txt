@@ -17,7 +17,7 @@
 5316 src/dashboard/server/routes/conversations.ts
 1028 src/dashboard/server/routes/flywheel.ts
 4110 src/dashboard/server/routes/issues.ts
-1835 src/dashboard/server/routes/misc.ts
+64 src/dashboard/server/routes/misc.ts
 1149 src/dashboard/server/routes/settings.ts
 1753 src/dashboard/server/routes/specialists.ts
 1767 src/dashboard/server/routes/workspaces.ts

@@ -7,6 +7,7 @@ import { Anchor, CheckCircle, Circle, Star } from 'lucide-react';
 interface Session {
   id: number;
   source: 'discovered' | 'managed-archived';
+  harness: string;
   workspacePath: string | null;
   jsonlPath: string | null;
   primaryModel: string | null;
@@ -93,6 +94,11 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
                     ) : session.overdeckManaged && (
                       <span className="shrink-0 rounded-full border border-cyan-700 bg-cyan-950 px-1.5 py-0.5 text-[10px] font-medium text-cyan-200">
                         Managed{session.panIssueId ? ` · ${session.panIssueId}` : ''}
+                      </span>
+                    )}
+                    {session.harness !== 'claude-code' && (
+                      <span className="shrink-0 border border-gray-700 bg-gray-900 px-1.5 py-0.5 font-mono text-[10px] text-gray-300">
+                        {session.harness}
                       </span>
                     )}
                   </div>
