@@ -186,17 +186,20 @@
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-03T11:20:28.181Z",
+  "updated": "2026-07-03T11:21:26.730Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:20:28.139Z",
-    "reviewNotes": "BootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.",
+    "updatedAt": "2026-07-03T11:21:26.685Z",
+    "reviewNotes": "No blocking findings; held banner token fix is clean at 84d25af.",
+    "testNotes": "Commands run from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2181: npm run typecheck passed; npm run lint passed; npm test initially hit sandbox EPERM, escalated rerun passed with 802 root test files/8016 tests plus frontend 3 files/32 tests; targeted npx vitest run --configLoader runner tests/e2e/styleguide-conformance.spec.ts passed outside sandbox with 4 tests; npm --prefix ./src/dashboard/frontend run test -- src/components/__tests__/BootReconciliationModal.test.tsx passed with 3 tests; npm run build:dashboard passed. UAT required by AC3; ran workspace-built dashboard on API_PORT=3061 with OVERDECK_DISABLE_DEACON=1 and Playwright script /tmp/pan-2181-uat.cjs. UAT exercised BootReconciliationModal in light and dark themes with mocked /api/boot-reconciliation pending state, verified heading/countdown/default actions (resume all, hold all, review each, freeze), per-agent review rows, remote chip, read-only row; inspected screenshots /tmp/pan-2181-light-modal.png and /tmp/pan-2181-dark-modal.png for legibility.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
+    "reviewedAtCommit": "84d25afe64f83886585ba07a0d3c3c3891d61eab",
     "lastVerifiedCommit": "373becf50b32d3f950651c662182db79a45e4792",
     "reviewRequestedAt": "2026-07-03T11:19:56.707Z"
   },
@@ -219,8 +222,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 75509,
-            "output": 7820,
+            "input": 76511,
+            "output": 7972,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -264,8 +267,8 @@
           "cacheWrite": 386098
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 75509,
-          "output": 7820,
+          "input": 76511,
+          "output": 7972,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -284,7 +287,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.228558,
-        "pricingAsOf": "2026-07-03T11:20:28.180Z"
+        "pricingAsOf": "2026-07-03T11:21:26.718Z"
       }
     },
     "merges": [
@@ -292,8 +295,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "restyle-modal-tokens": "completed",
     "restyle-modal-tokens.ac1": "completed",
