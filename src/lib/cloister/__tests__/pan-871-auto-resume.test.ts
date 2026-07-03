@@ -121,6 +121,7 @@ vi.mock('os', async (importOriginal) => {
 });
 
 vi.mock('../agent-idle.js', () => ({
+  getAgentEffectiveLastActivityMs: vi.fn(() => Date.now()),
   isAgentIdleForNudge: vi.fn(() => false),
 }));
 
