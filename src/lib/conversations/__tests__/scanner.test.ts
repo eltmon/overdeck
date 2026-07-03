@@ -28,6 +28,7 @@ vi.mock('../jsonl-async.js', async (importOriginal) => {
 let odb: OverdeckTestDb;
 let fakeClaudeDir: string;
 let savedHome: string | undefined;
+const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 // Fixture JSONL lines for a simple session
 const SESSION_JSONL = [
@@ -53,7 +54,7 @@ beforeEach(() => {
   mkdirSync(join(fakeClaudeDir, '-home-user-Projects-otherapp'), { recursive: true });
   savedHome = process.env.HOME;
   process.env.HOME = odb.home; // point ~ to test dir so scanner finds ~/.claude/projects
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 afterEach(() => {
   teardownOverdeckTestDb(odb);
@@ -62,7 +63,7 @@ afterEach(() => {
   } else {
     delete process.env.HOME;
   }
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 describe('work-pool', () => {
   it('runWithPool respects maxParallel — concurrent tasks never exceed limit', async () => {
