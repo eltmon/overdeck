@@ -1,8 +1,23 @@
 {
   "issueId": "PAN-2227",
   "schemaVersion": 2,
-  "feedback": [],
-  "harness": "claude-code",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T06:56Z] review-agent → CHANGES-REQUESTED — seq 6",
+      "timestamp": "2026-07-03T06:56:45.088Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 6,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T06:56:45Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2227\n\n.beads/issues.jsonl deletes/replaces unrelated open PAN-2255/PAN-2261 bead records\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2227 -m \"Fixed review issues\"`"
+    }
+  ],
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "filesize-staleness-update": "completed",
@@ -58,14 +73,14 @@
   },
   "pipeline": {
     "issueId": "PAN-2227",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T06:50:54.784Z",
-    "reviewNotes": ".beads/issues.jsonl deletes unrelated open PAN-2255/PAN-2261 records",
+    "updatedAt": "2026-07-03T06:57:36.159Z",
+    "reviewNotes": ".beads/issues.jsonl deletes/replaces unrelated open PAN-2255/PAN-2261 bead records",
     "verificationNotes": "Verification FAILED at test (87912ms):\n\nlegacy exception list:\nsrc/lib/pan-dir/evil.ts:4:  return fs.writeFileString(path, content);\nRoute durable mutations through src/lib/pan-dir/record.ts or update the allowlist/legacy list.\n✗ state.json written outside writeAgentStateJsonSync:\nsrc/lib/agents.ts:8: state.json write outside writeAgentStateJsonSync\n✗ ad-hoc write to the workspace/project continue file outside legacy exceptions:\nsrc/lib/evil.ts:3:  writeFileSync(continuePath, '{}');\n✗ ad-hoc write to the workspace/project continue file outside legacy exceptions:\nsrc/lib/sneaky.ts:3:  writeFileSync(continuePath, '{}');\n✖ agent main-push guard: agents land code via PR — pan done\nRefusing agent-context push to refs/heads/main because this range touches code paths:\nsrc/code.ts\n\nOperator-directed escape hatch: OVERDECK_OPERATOR_PUSH=1 git push ...\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n✖ agent main-push guard: missing push range; refusing because this is a trust gate.\nAgents land code via PR — run pan done. Operator escape hatch: OVERDECK_OPERATOR_PUSH=1 git push ...\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/dashboard/server/routes/issues.ts:1:import { Db } from '../../../lib/overdeck/infra.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n(node:3298044) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\nguard-agent-main-push.sh invoked\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n",
     "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2268",
@@ -163,10 +178,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 34,
-            "output": 1424,
-            "cacheRead": 217425,
-            "cacheWrite": 112670
+            "input": 139,
+            "output": 6069,
+            "cacheRead": 1245746,
+            "cacheWrite": 345646
           }
         }
       },
@@ -190,15 +205,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 34,
-          "output": 1424,
-          "cacheRead": 217425,
-          "cacheWrite": 112670
+          "input": 139,
+          "output": 6069,
+          "cacheRead": 1245746,
+          "cacheWrite": 345646
         }
       },
       "costAtCloseOut": {
-        "usd": 30.786612,
-        "pricingAsOf": "2026-07-03T06:50:55.373Z"
+        "usd": 31.203995,
+        "pricingAsOf": "2026-07-03T06:57:37.286Z"
       }
     },
     "merges": [
@@ -207,5 +222,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T06:34:08.236Z",
-  "updated": "2026-07-03T06:50:58.505Z"
+  "updated": "2026-07-03T06:57:42.997Z"
 }
