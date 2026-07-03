@@ -280,7 +280,7 @@ async function fetchPrState(
   issueId: string,
 ): Promise<{ hasPr: boolean; reviewDecision: string | null }> {
   const { fetchIssuePullRequest } = await import(
-    '../../dashboard/server/routes/issues.js'
+    '../overdeck/pull-requests.js'
   );
   const result = await fetchIssuePullRequest(issueId);
   if (!result.pr) return { hasPr: false, reviewDecision: null };

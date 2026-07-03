@@ -92,7 +92,7 @@ vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js
 }));
 
 // Import the function under test after mocks.
-import { fetchIssueDiscussions } from '../../../../../src/dashboard/server/routes/issues.js';
+import { fetchIssueDiscussions } from '../../../../../src/lib/overdeck/discussions.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
