@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -9,6 +10,15 @@ const activityLogger = vi.hoisted(() => ({
 
 const reviewStatusStore = vi.hoisted(() => ({
   getReviewStatusSync: vi.fn(() => null),
+}));
+
+const githubAppMocks = vi.hoisted(() => ({
+  isGitHubAppConfigured: vi.fn(() => false),
+  listPullRequestsForHead: vi.fn(() => Effect.succeed([])),
+}));
+
+const trackerUtilsMocks = vi.hoisted(() => ({
+  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3603 })),
 }));
 
 const childProcessMocks = vi.hoisted(() => ({
@@ -29,6 +39,15 @@ vi.mock('../../activity-logger.js', () => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: reviewStatusStore.getReviewStatusSync,
+}));
+
+vi.mock('../../github-app.js', () => ({
+  isGitHubAppConfigured: githubAppMocks.isGitHubAppConfigured,
+  listPullRequestsForHead: githubAppMocks.listPullRequestsForHead,
+}));
+
+vi.mock('../../tracker-utils.js', () => ({
+  resolveGitHubIssueSync: trackerUtilsMocks.resolveGitHubIssueSync,
 }));
 
 import {
@@ -90,6 +109,12 @@ describe('orphan proposed spec reconciler', () => {
     activityLogger.emitActivityEntrySync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReturnValue(null);
+    githubAppMocks.isGitHubAppConfigured.mockReset();
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(false);
+    githubAppMocks.listPullRequestsForHead.mockReset();
+    githubAppMocks.listPullRequestsForHead.mockReturnValue(Effect.succeed([]));
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReset();
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3603 });
     childProcessMocks.exec.mockReset();
     childProcessMocks.exec.mockImplementation((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
       callback(null, '[]', '');
@@ -390,6 +415,33 @@ describe('orphan proposed spec reconciler', () => {
     expect(command).toBe('gh pr list --head feature/pan-3603 --state open --json number --limit 1');
     expect(options).toMatchObject({ cwd: projectPath });
     expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+  });
+
+  it('checks open PRs with GitHub App REST when configured', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3604', 'proposed');
+    writeBeads(projectPath, 'PAN-3604');
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(true);
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3604 });
+    githubAppMocks.listPullRequestsForHead.mockReturnValue(Effect.succeed([
+      { number: 1708, state: 'open', merged: false, mergedAt: null, mergeCommit: null },
+    ]));
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3604' }));
+
+    await expect(reconcileOrphanProposedSpecs({
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual(['Skipped orphan proposed spec PAN-3604: open-pr']);
+
+    expect(spawnWorkAgent).not.toHaveBeenCalled();
+    expect(githubAppMocks.listPullRequestsForHead).toHaveBeenCalledWith('eltmon', 'overdeck', 'feature/pan-3604', 'open');
+    expect(childProcessMocks.exec).not.toHaveBeenCalled();
   });
 
   it('surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)', async () => {
