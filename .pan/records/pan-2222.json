@@ -69,7 +69,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:34:41.597Z",
+    "updatedAt": "2026-07-03T02:36:53.676Z",
     "reviewNotes": "review passed; no blocking findings",
     "testNotes": "Verification did not complete: only workspace/branch and planning context reads were started; configured gates (typecheck, lint, tests) were not run, and UAT was not exercised. Cannot pass PAN-2222 without completed gate evidence.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -208,7 +208,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.318182,
-        "pricingAsOf": "2026-07-03T02:34:41.647Z"
+        "pricingAsOf": "2026-07-03T02:36:56.139Z"
       }
     },
     "merges": [
@@ -227,6 +227,6 @@
       }
     ]
   },
-  "created": "2026-07-03T02:34:41.629Z",
-  "updated": "2026-07-03T02:34:41.648Z"
+  "created": "2026-07-03T02:36:55.911Z",
+  "updated": "2026-07-03T02:36:56.167Z"
 }
