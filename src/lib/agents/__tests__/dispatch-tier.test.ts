@@ -256,6 +256,13 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
   });
 
+  it('leaves ordinary single work-agent starts untouched when no vBRIEF plan is readable', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(null);
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
+  });
+
   it('uses the first dispatchable item and skips completed blockers', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([

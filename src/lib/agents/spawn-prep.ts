@@ -256,13 +256,9 @@ export function resolveSingleWorkTierSpawnParams(
   if (explicitModel) return {};
 
   const doc = readWorkspacePlanSync(workspace);
+  if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
   if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
-  if (!doc) {
-    throw new Error(
-      `Tiered execution is enabled but no vBRIEF plan is readable in ${workspace}.`,
-    );
-  }
 
   const item = getDispatchableItems(doc, new Set())[0];
   if (!item) return {};
