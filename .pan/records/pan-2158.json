@@ -16,6 +16,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T15:35:03.886Z"
+    },
+    {
+      "timestamp": "2026-07-03T16:22:34.008Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:22:35.126Z"
     }
   ],
   "feedback": [],
@@ -30,56 +40,56 @@
   },
   "pipeline": {
     "issueId": "PAN-2158",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:39:36.503Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T16:35:24.677Z",
     "reviewNotes": "No blocking findings; focused tests and typecheck passed",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "testNotes": "TypeScript typecheck passed; eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit lints passed. `npm test` passed: root vitest 813 test files passed / 4 skipped (8171 tests passed / 52 skipped); frontend vitest 3 files / 32 tests passed. No browser UAT required: PAN-2158 is a CLI planning auto-mode behavior fix with no dashboard/UI acceptance criteria and no frontend files changed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2303",
-    "reviewedAtCommit": "de65dfecf4b9692d9b97564007bf1d9536dba18a",
-    "lastVerifiedCommit": "31df0d7ef9debd5fbbb76e91a5da74cc324034bc",
-    "reviewRequestedAt": "2026-07-03T15:35:02.491Z"
+    "reviewedAtCommit": "6a0c3b2cdfb5abbe67e5bad51b3decf4a9344314",
+    "lastVerifiedCommit": "6a0c3b2cdfb5abbe67e5bad51b3decf4a9344314",
+    "reviewRequestedAt": "2026-07-03T16:22:34.009Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 15502,
-            "output": 2042,
+            "input": 16541,
+            "output": 2164,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1036133,
-            "output": 22767,
-            "cacheRead": 7960320,
+            "input": 1567592,
+            "output": 33359,
+            "cacheRead": 11225856,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 15502,
-          "output": 2042,
+          "input": 16541,
+          "output": 2164,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1036133,
-          "output": 22767,
-          "cacheRead": 7960320,
+          "input": 1567592,
+          "output": 33359,
+          "cacheRead": 11225856,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 2.587857,
-        "pricingAsOf": "2026-07-03T15:39:36.527Z"
+        "usd": 3.755559,
+        "pricingAsOf": "2026-07-03T16:35:24.971Z"
       }
     },
     "merges": [
@@ -88,5 +98,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T15:32:13.088Z",
-  "updated": "2026-07-03T15:39:36.527Z"
+  "updated": "2026-07-03T16:35:24.983Z"
 }
