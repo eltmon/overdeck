@@ -1,0 +1,333 @@
+{
+  "issueId": "PAN-2222",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T00:05:39.608Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T00:06:37.334Z"
+    },
+    {
+      "timestamp": "2026-07-03T00:23:14.035Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T00:23:24.473Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T00:24Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T00:24:54.081Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T00:28:04.374Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T00:30:06.560Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T00:24:54Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2222\n\nreplay call-out messages can use the wrong beadId\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2222 -m \"Fixed review issues\"`"
+    }
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-2222.json",
+      "src/dashboard/server/routes/__tests__/specialists.test.ts",
+      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+      "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
+      "src/lib/cloister/__tests__/inspect-agent.test.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/lib/vbrief/continue-state.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/agents/__tests__/tier-supervisor.test.ts",
+      "src/lib/agents/standing-tiers.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/vbrief/__tests__/continue-state.test.ts"
+    ],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/server/routes/specialists.ts",
+      "src/dashboard/server/routes/tiered-callouts.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/agents/__tests__/resolve-tier.test.ts",
+      "src/lib/agents/__tests__/tier-escalation.test.ts",
+      "src/lib/agents/__tests__/tier-feed.test.ts",
+      "src/lib/agents/__tests__/tier-replay.test.ts",
+      "src/lib/agents/__tests__/tier-supervisor.test.ts",
+      "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+      "src/lib/agents/standing-tiers.ts",
+      "src/lib/agents/tier-escalation.ts",
+      "src/lib/agents/tier-feed.ts",
+      "src/lib/agents/tier-replay.ts",
+      "src/lib/agents/tier-table.ts",
+      "src/lib/cloister/inspect-agent.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/vbrief/__tests__/continue-state.test.ts",
+      "src/lib/vbrief/io.ts",
+      "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-2222.json",
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/server/routes/__tests__/specialists.test.ts",
+      "src/dashboard/server/routes/specialists.ts",
+      "src/dashboard/server/routes/tiered-callouts.ts",
+      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/agents/__tests__/resolve-tier.test.ts",
+      "src/lib/agents/__tests__/tier-escalation.test.ts",
+      "src/lib/agents/__tests__/tier-feed.test.ts",
+      "src/lib/agents/__tests__/tier-replay.test.ts",
+      "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+      "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
+      "src/lib/agents/tier-escalation.ts",
+      "src/lib/agents/tier-feed.ts",
+      "src/lib/agents/tier-replay.ts",
+      "src/lib/agents/tier-table.ts",
+      "src/lib/cloister/__tests__/inspect-agent.test.ts",
+      "src/lib/cloister/inspect-agent.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/lib/vbrief/continue-state.ts",
+      "src/lib/vbrief/io.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+    ],
+    "recordedAt": "2026-07-03T00:58:13.501Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "by-kind-config": "completed",
+    "escalation-state": "completed",
+    "feed-noise-filter": "completed",
+    "feed-noise-filter.ac1": "completed",
+    "feed-noise-filter.ac2": "completed",
+    "feed-noise-filter.ac3": "completed",
+    "feed-noise-filter.ac4": "completed",
+    "feed-noise-filter.ac5": "completed",
+    "docs-tiered-execution": "completed",
+    "docs-tiered-execution.ac1": "completed",
+    "docs-tiered-execution.ac2": "completed",
+    "docs-tiered-execution.ac3": "completed",
+    "parity-lock-extension": "completed",
+    "parity-lock-extension.ac1": "completed",
+    "parity-lock-extension.ac2": "completed",
+    "parity-lock-extension.ac3": "completed",
+    "compaction-reroute": "completed",
+    "compaction-reroute.ac1": "completed",
+    "compaction-reroute.ac2": "completed",
+    "compaction-reroute.ac3": "completed",
+    "compaction-reroute.ac4": "completed",
+    "escalation-trigger-wiring": "completed",
+    "escalation-trigger-wiring.ac1": "completed",
+    "escalation-trigger-wiring.ac2": "completed",
+    "escalation-trigger-wiring.ac3": "completed",
+    "feed-callout-prompt": "completed",
+    "feed-callout-prompt.ac1": "completed",
+    "feed-callout-prompt.ac2": "completed",
+    "feed-callout-prompt.ac3": "completed",
+    "supervisor-owns-inspection": "completed",
+    "supervisor-owns-inspection.ac1": "completed",
+    "supervisor-owns-inspection.ac2": "completed",
+    "supervisor-owns-inspection.ac3": "completed",
+    "supervisor-owns-inspection.ac4": "completed",
+    "escalation-engine": "completed",
+    "escalation-engine.ac1": "completed",
+    "escalation-engine.ac2": "completed",
+    "escalation-engine.ac3": "completed",
+    "escalation-engine.ac4": "completed",
+    "callout-endpoint": "completed",
+    "callout-endpoint.ac1": "completed",
+    "callout-endpoint.ac2": "completed",
+    "callout-endpoint.ac3": "completed",
+    "callout-endpoint.ac4": "completed",
+    "new-config-blocks-validation": "completed",
+    "new-config-blocks-validation.ac1": "completed",
+    "new-config-blocks-validation.ac2": "completed",
+    "new-config-blocks-validation.ac3": "completed",
+    "escalation-state.ac1": "completed",
+    "escalation-state.ac2": "completed",
+    "escalation-state.ac3": "completed",
+    "by-kind-config.ac1": "completed",
+    "by-kind-config.ac2": "completed",
+    "by-kind-config.ac3": "completed",
+    "by-kind-config.ac4": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2222",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T00:48:28.022Z",
+    "reviewNotes": "Round 2 blocked (operator-relayed from agent-pan-2222-review-62225f49 report; verdict POST was dropped): replay call-out messages can use target.slotItemId for every replayed commit, so replay can generate non-byte-identical feed messages and corroborate the wrong bead.",
+    "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
+    "lastVerifiedCommit": "62225f49bf034dba326f199cf9d2e01322eaae52",
+    "reviewRequestedAt": "2026-07-03T00:23:14.036Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/records/pan-2222.json",
+        "src/dashboard/server/routes/__tests__/specialists.test.ts",
+        "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+        "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
+        "src/lib/cloister/__tests__/inspect-agent.test.ts",
+        "src/lib/vbrief/__tests__/io.test.ts",
+        "src/lib/vbrief/continue-state.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/agents/__tests__/tier-supervisor.test.ts",
+        "src/lib/agents/standing-tiers.ts",
+        "src/lib/config-yaml/schema.ts",
+        "src/lib/vbrief/__tests__/continue-state.test.ts"
+      ],
+      "declaredScope": [
+        "docs/TIERED-EXECUTION.md",
+        "src/dashboard/server/routes/specialists.ts",
+        "src/dashboard/server/routes/tiered-callouts.ts",
+        "src/dashboard/server/server.ts",
+        "src/lib/agents/__tests__/resolve-tier.test.ts",
+        "src/lib/agents/__tests__/tier-escalation.test.ts",
+        "src/lib/agents/__tests__/tier-feed.test.ts",
+        "src/lib/agents/__tests__/tier-replay.test.ts",
+        "src/lib/agents/__tests__/tier-supervisor.test.ts",
+        "src/lib/agents/__tests__/tier-table.test.ts",
+        "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+        "src/lib/agents/standing-tiers.ts",
+        "src/lib/agents/tier-escalation.ts",
+        "src/lib/agents/tier-feed.ts",
+        "src/lib/agents/tier-replay.ts",
+        "src/lib/agents/tier-table.ts",
+        "src/lib/cloister/inspect-agent.ts",
+        "src/lib/config-yaml/schema.ts",
+        "src/lib/vbrief/__tests__/continue-state.test.ts",
+        "src/lib/vbrief/io.ts",
+        "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/records/pan-2222.json",
+        "docs/TIERED-EXECUTION.md",
+        "src/dashboard/server/routes/__tests__/specialists.test.ts",
+        "src/dashboard/server/routes/specialists.ts",
+        "src/dashboard/server/routes/tiered-callouts.ts",
+        "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+        "src/dashboard/server/server.ts",
+        "src/lib/agents/__tests__/resolve-tier.test.ts",
+        "src/lib/agents/__tests__/tier-escalation.test.ts",
+        "src/lib/agents/__tests__/tier-feed.test.ts",
+        "src/lib/agents/__tests__/tier-replay.test.ts",
+        "src/lib/agents/__tests__/tier-table.test.ts",
+        "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+        "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
+        "src/lib/agents/tier-escalation.ts",
+        "src/lib/agents/tier-feed.ts",
+        "src/lib/agents/tier-replay.ts",
+        "src/lib/agents/tier-table.ts",
+        "src/lib/cloister/__tests__/inspect-agent.test.ts",
+        "src/lib/cloister/inspect-agent.ts",
+        "src/lib/vbrief/__tests__/io.test.ts",
+        "src/lib/vbrief/continue-state.ts",
+        "src/lib/vbrief/io.ts",
+        "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+      ],
+      "recordedAt": "2026-07-03T00:22:02.226Z"
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 9231,
+            "output": 15553,
+            "cacheRead": 25284068,
+            "cacheWrite": 958111
+          }
+        },
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 1784346,
+            "output": 79078,
+            "cacheRead": 14504448,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 13815,
+            "output": 728,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 19056,
+            "output": 64233,
+            "cacheRead": 10629132,
+            "cacheWrite": 353685
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 28287,
+          "output": 79786,
+          "cacheRead": 35913200,
+          "cacheWrite": 1311796
+        },
+        "openai/gpt-5.5": {
+          "input": 1784346,
+          "output": 79078,
+          "cacheRead": 14504448,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 13815,
+          "output": 728,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 75.129131,
+        "pricingAsOf": "2026-07-03T00:48:28.049Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2249"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "swarm": {
+    "slotAssignments": []
+  },
+  "created": "2026-07-02T23:14:10.593Z",
+  "updated": "2026-07-03T00:58:13.502Z"
+}

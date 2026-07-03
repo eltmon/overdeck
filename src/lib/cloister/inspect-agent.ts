@@ -39,6 +39,14 @@ import {
 import type { ModelId } from '../settings.js';
 import { getProviderEnvForModel, saveAgentRuntimeState, saveAgentState } from '../agents.js';
 import { isIssueClosed } from './issue-closed.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { resolveTieredExecutionEnabled } from '../agents/tier-table.js';
+import {
+  deliverCommitForReview,
+  loadPrdDraft,
+  spawnTierSupervisor,
+  supervisorAgentId,
+} from '../agents/tier-supervisor.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -130,7 +138,63 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');
 
   return `<!-- overdeck:orchestration-context-start -->\n${prompt}\n<!-- overdeck:orchestration-context-end -->`;
-}async function spawnInspectAgentPromise(
+}
+
+async function routeInspectToStandingSupervisorIfEnabled(
+  context: InspectContext,
+): Promise<{
+  success: boolean;
+  tmuxSession?: string;
+  message: string;
+  error?: string;
+} | undefined> {
+  const { config } = loadYamlConfig();
+  const tiered = config.tieredExecution;
+  if (!tiered?.supervisor?.owns_inspection) return undefined;
+
+  const doc = readWorkspacePlanSync(context.workspace);
+  const enabled = resolveTieredExecutionEnabled(tiered, doc?.plan.metadata);
+  if (!enabled) return undefined;
+
+  const item = doc?.plan.items.find(candidate => candidate.id === context.beadId);
+  if (!doc || !item) {
+    throw new Error(
+      `Standing supervisor inspection for ${context.issueId} bead ${context.beadId} requires a readable vBRIEF item in ${context.workspace}.`,
+    );
+  }
+
+  const agentId = supervisorAgentId(context.issueId);
+  if (!await Effect.runPromise(sessionExists(agentId))) {
+    await spawnTierSupervisor(context.issueId, tiered.supervisor, { workspace: context.workspace });
+  }
+
+  setReviewStatusSync(context.issueId.toUpperCase(), {
+    inspectStatus: 'inspecting',
+    inspectNotes: `Inspecting bead ${context.beadId}`,
+    inspectStartedAt: new Date().toISOString(),
+    inspectBeadId: context.beadId,
+  });
+
+  const sha = await Effect.runPromise(getCurrentHead(context.workspace));
+  const prdMarkdown = await loadPrdDraft(context.projectPath, context.issueId);
+  await deliverCommitForReview({
+    supervisorAgentId: agentId,
+    workspacePath: context.workspace,
+    issueId: context.issueId,
+    item,
+    sha,
+    beadId: context.beadId,
+    prdMarkdown,
+  });
+
+  return {
+    success: true,
+    tmuxSession: agentId,
+    message: `Routed inspect for ${context.issueId} bead ${context.beadId} to standing supervisor`,
+  };
+}
+
+async function spawnInspectAgentPromise(
   context: InspectContext,
   opts: { deep?: boolean } = {},
 ): Promise<{
@@ -157,6 +221,9 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
         message,
       };
     }
+
+    const supervisorRoute = await routeInspectToStandingSupervisorIfEnabled(context);
+    if (supervisorRoute) return supervisorRoute;
 
     if (await Effect.runPromise(sessionExists(tmuxSession))) {
       // Stale session left behind by a previous inspection run — clear it.
