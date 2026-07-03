@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import { Effect } from 'effect';
 import { promisify } from 'util';
 import {
   getAgentRuntimeStateSync,
@@ -8,6 +9,7 @@ import {
   resumeAgent,
   type AgentState,
 } from '../agents.js';
+import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
@@ -103,6 +105,10 @@ async function evaluateAgent(
     return;
   }
   if (!sessionExistsSync(agentId)) return;
+  if (agent.role === 'plan' && agent.auto === true) {
+    await evaluateAutoPlanningAgent(agent, config, now, actions);
+    return;
+  }
   if (agent.role !== 'work') return;
 
   const issueId = issueIdForAgent(agent);
@@ -158,6 +164,45 @@ async function evaluateAgent(
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck));
     logAction(actions, transitionAction(1, issueId, idleMinutes, 'poked'));
   }
+}
+
+async function evaluateAutoPlanningAgent(
+  agent: AgentState,
+  config: StuckRemediationConfig,
+  now: number,
+  actions: string[],
+): Promise<void> {
+  const agentId = agent.id;
+  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
+
+  const pendingQuestions = await Effect.runPromise(countPendingAskUserQuestionsForAgent(agentId));
+  if (pendingQuestions === 0) return;
+
+  const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
+  if (lastActivityMs === null || !Number.isFinite(lastActivityMs)) return;
+  const lastActivity = new Date(lastActivityMs).toISOString();
+
+  const stuckState = readStuckRemediationState(agentId);
+  if (stuckState) {
+    const firstStuckMs = new Date(stuckState.firstStuckAt).getTime();
+    if (Number.isFinite(firstStuckMs) && lastActivityMs > firstStuckMs) {
+      clearStuckRemediationState(agentId);
+      return;
+    }
+  }
+
+  const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
+  const lastStage = stuckState?.lastStage ?? 0;
+  if (idleMinutes < config.stage1_minutes || lastStage >= 1) return;
+
+  const issueId = issueIdForAgent(agent);
+  const message =
+    `This planning session was launched with \`pan plan ${issueId} --auto\`, so do not wait for operator input. ` +
+    `Proceed with the most defensible default from the issue/PRD/comments, record the choice in \`plan.autoDecisions[]\` with rationale, and continue to \`pan plan finalize\`. ` +
+    `Only halt for a genuine contradiction between authoritative inputs.`;
+  await messageAgent(agentId, message);
+  writeStuckRemediationState(agentId, stageState(1, now, firstStuckAt(lastActivity, stuckState)));
+  logAction(actions, transitionAction(1, issueId, idleMinutes, 'auto-planning-default'));
 }
 
 // The flywheel orchestrator is a singleton with role 'flywheel'. It ticks

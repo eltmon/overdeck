@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { AgentState } from '../../agents.js';
 import type { StuckRemediationState } from '../stuck-remediation-state.js';
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   getFlywheelActiveRunId: vi.fn(),
   isFlywheelGloballyPaused: vi.fn(),
   describeAgentDeath: vi.fn(),
+  countPendingAskUserQuestionsForAgent: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -38,6 +40,10 @@ vi.mock('../../agents.js', () => ({
   markAgentTroubled: mocks.markAgentTroubled,
   messageAgent: mocks.messageAgent,
   resumeAgent: mocks.resumeAgent,
+}));
+
+vi.mock('../../agent-enrichment.js', () => ({
+  countPendingAskUserQuestionsForAgent: mocks.countPendingAskUserQuestionsForAgent,
 }));
 
 vi.mock('../../persistent-logger.js', () => ({
@@ -186,6 +192,7 @@ describe('checkStuckAgentRemediation', () => {
     mocks.getFlywheelActiveRunId.mockReturnValue('RUN-8');
     mocks.resumeFlywheel.mockResolvedValue({ activeRunId: 'RUN-8' });
     mocks.describeAgentDeath.mockReturnValue('exit=1 at 2026-05-23T11:59:00Z');
+    mocks.countPendingAskUserQuestionsForAgent.mockReturnValue(Effect.succeed(0));
     mockReadyBeads();
   });
 
@@ -401,6 +408,59 @@ describe('checkStuckAgentRemediation', () => {
       '[deacon] stuck-remediation agent=agent-pan-1415 error=send failed',
     );
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+
+  it('auto-advances an idle auto-planning agent with a pending question', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([
+      agent({
+        id: 'planning-pan-2158',
+        issueId: 'PAN-2158',
+        role: 'plan',
+        auto: true,
+      }),
+    ]);
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+    mocks.countPendingAskUserQuestionsForAgent.mockReturnValue(Effect.succeed(1));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    const expectedAction = '[deacon] stuck-remediation stage=1 issue=PAN-2158 idleMin=25 action=auto-planning-default';
+    expect(actions).toEqual([expectedAction]);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'planning-pan-2158',
+      expect.stringContaining('pan plan PAN-2158 --auto'),
+    );
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'planning-pan-2158',
+      expect.stringContaining('plan.autoDecisions[]'),
+    );
+    expect(mocks.resumeAgent).not.toHaveBeenCalled();
+    expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
+    expect(mocks.writeStuckRemediationState).toHaveBeenCalledWith('planning-pan-2158', {
+      lastStage: 1,
+      lastStageAt: new Date(NOW).toISOString(),
+      firstStuckAt: lastActivity(25),
+    });
+    expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+
+  it('does not auto-advance interactive planning agents', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([
+      agent({
+        id: 'planning-pan-2158',
+        issueId: 'PAN-2158',
+        role: 'plan',
+        auto: false,
+      }),
+    ]);
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+    mocks.countPendingAskUserQuestionsForAgent.mockReturnValue(Effect.succeed(1));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual([]);
+    expectNoStage();
+    expect(mocks.countPendingAskUserQuestionsForAgent).not.toHaveBeenCalled();
   });
 });
 
