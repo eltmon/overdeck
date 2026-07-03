@@ -5,16 +5,17 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter } from 'lucide-react';
 import { WS_METHODS } from '@overdeck/contracts';
-import type { DiscoveredSessionSnapshot } from '@overdeck/contracts';
+import type { DiscoveredSessionSnapshot, SessionsFeedFacetsSnapshot, SessionsFeedRowSnapshot } from '@overdeck/contracts';
 import { SessionTable } from './SessionTable';
 import { SessionDetail } from './SessionDetail';
 import { ScanButton } from './ScanButton';
 import { FacetPanel } from './FacetPanel';
 import { useDashboardStore, selectScanProgress } from '../../lib/store';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { accumulateFeedPages } from './feedPages';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -49,10 +50,9 @@ interface DiscoveredSession {
   panIssueId: string | null;
 }
 
-interface ListResponse {
-  sessions: DiscoveredSession[];
-  count: number;
-  total: number;
+interface FeedResponse {
+  rows: DiscoveredSession[];
+  nextCursor: string | null;
 }
 
 interface StatsResponse {
@@ -70,22 +70,6 @@ interface CostResponse {
   totalTokensOut: number;
 }
 
-interface WorkspaceCostEntry {
-  key: string;
-  totalCost: number;
-  sessionCount: number;
-  totalTokensIn: number;
-  totalTokensOut: number;
-}
-
-interface WorkspaceCostResponse {
-  groupBy: 'workspace' | 'model' | 'day' | 'month';
-  entries: readonly WorkspaceCostEntry[];
-  grandTotal: number;
-  totalTokensIn: number;
-  totalTokensOut: number;
-}
-
 interface SearchResponse {
   sessions: DiscoveredSession[];
   total: number;
@@ -95,13 +79,6 @@ interface SearchResponse {
 
 interface ConversationsPageProps {
   initialSessionKey?: string | null;
-}
-
-interface ArchivedConversationResponse extends Omit<DiscoveredSession, 'source' | 'harness'> {
-  source: 'managed-archived';
-  harness?: string;
-  conversationName: string;
-  archivedAt: string;
 }
 
 interface ScanResult {
@@ -125,6 +102,7 @@ interface ConversationRpcFilter {
   tools?: string[];
   files?: string[];
   enrichmentLevel?: number;
+  source?: SessionSource;
 }
 
 interface FacetValue {
@@ -136,69 +114,42 @@ interface FacetValue {
   maxCost?: string;
 }
 
-function countFacetValues(values: Array<string | null | undefined>, costs?: number[]): FacetValue[] {
-  const counts = new Map<string, FacetValue>();
-  values.forEach((value, index) => {
-    if (!value) return;
-    const current = counts.get(value) ?? { value, count: 0, cost: 0 };
-    current.count += 1;
-    current.cost = (current.cost ?? 0) + (costs?.[index] ?? 0);
-    counts.set(value, current);
-  });
-  return [...counts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function countTimeFacets(sessions: DiscoveredSession[]): FacetValue[] {
-  const now = Date.now();
-  const ranges = [
-    { value: 'today', label: 'Today', days: 1 },
-    { value: '7d', label: 'Last 7 days', days: 7 },
-    { value: '30d', label: 'Last 30 days', days: 30 },
-    { value: '90d', label: 'Last 90 days', days: 90 },
-  ];
-  return ranges.map((range) => {
-    const cutoff = now - range.days * 86_400_000;
-    const count = sessions.filter((session) => {
-      const ts = session.lastTs ? Date.parse(session.lastTs) : NaN;
-      return Number.isFinite(ts) && ts >= cutoff;
-    }).length;
-    return { value: range.value, label: range.label, count };
-  });
-}
-
 function sessionKey(session: DiscoveredSession): string {
   return `${session.source}:${session.id}`;
 }
 
-function compareSessionsByLastTs(a: DiscoveredSession, b: DiscoveredSession): number {
-  const aTime = a.lastTs ? Date.parse(a.lastTs) : 0;
-  const bTime = b.lastTs ? Date.parse(b.lastTs) : 0;
-  return bTime - aTime;
-}
-
-function countCostFacets(sessions: DiscoveredSession[]): FacetValue[] {
-  const ranges = [
-    { value: 'free', label: '$0', minCost: undefined, maxCost: '0' },
-    { value: 'low', label: '$0–$0.01', minCost: '0', maxCost: '0.01' },
-    { value: 'medium', label: '$0.01–$0.05', minCost: '0.01', maxCost: '0.05' },
-    { value: 'high', label: '$0.05+', minCost: '0.05', maxCost: undefined },
-  ];
-  return ranges.map((range) => {
-    const min = range.minCost === undefined ? undefined : Number(range.minCost);
-    const max = range.maxCost === undefined ? undefined : Number(range.maxCost);
-    const matching = sessions.filter((session) => {
-      const cost = session.estimatedCost;
-      return (min === undefined || cost >= min) && (max === undefined || cost <= max);
-    });
-    return {
-      value: range.value,
-      label: range.label,
-      count: matching.length,
-      cost: matching.reduce((sum, session) => sum + session.estimatedCost, 0),
-      minCost: range.minCost,
-      maxCost: range.maxCost,
-    };
-  });
+function toFacetOptions(facets: SessionsFeedFacetsSnapshot | undefined) {
+  return {
+    harnesses: [],
+    models: facets?.primaryModels.map((model) => ({ value: model.value, count: model.count })) ?? [],
+    workspaces: [],
+    tags: facets?.tags.map((tag) => ({ value: tag.value, count: tag.count })) ?? [],
+    tools: facets?.tools.map((tool) => ({ value: tool.value, count: tool.count })) ?? [],
+    files: facets?.files.map((file) => ({ value: file.value, count: file.count })) ?? [],
+    timeRanges: facets?.timeBuckets.map((bucket) => ({
+      value: bucket.value === '24h' ? 'today' : bucket.value,
+      label: bucket.value === '24h' ? 'Today' : bucket.value,
+      count: bucket.count,
+    })) ?? [],
+    costRanges: facets?.costBuckets.map((bucket) => ({
+      value: bucket.value,
+      label: bucket.value,
+      count: bucket.count,
+      minCost: bucket.value === '<$0.10' ? undefined : bucket.value === '$0.10-1' ? '0.10' : bucket.value === '$1-10' ? '1' : '10',
+      maxCost: bucket.value === '<$0.10' ? '0.10' : bucket.value === '$0.10-1' ? '1' : bucket.value === '$1-10' ? '10' : undefined,
+    })) ?? [],
+    enrichmentLevels: facets?.enrichmentLevels.map((level) => ({ value: String(level.value), count: level.count })) ?? [],
+  } satisfies {
+    harnesses: FacetValue[];
+    models: FacetValue[];
+    workspaces: FacetValue[];
+    tags: FacetValue[];
+    tools: FacetValue[];
+    files: FacetValue[];
+    timeRanges: FacetValue[];
+    costRanges: FacetValue[];
+    enrichmentLevels: FacetValue[];
+  };
 }
 
 function buildFilterParams(filters: {
@@ -229,6 +180,7 @@ function buildFilterParams(filters: {
   if (filters.minCost) params.set('minCost', filters.minCost);
   if (filters.maxCost) params.set('maxCost', filters.maxCost);
   if (filters.enrichmentLevel) params.set('enrichmentLevel', filters.enrichmentLevel);
+  if (filters.source && filters.source !== 'all') params.set('source', filters.source);
   return params;
 }
 
@@ -246,6 +198,7 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   const minCost = params.get('minCost');
   const maxCost = params.get('maxCost');
   const enrichmentLevel = params.get('enrichmentLevel');
+  const source = params.get('source');
   if (harness) payload.harness = harness;
   if (workspacePath) payload.workspacePath = workspacePath;
   if (primaryModel) payload.primaryModel = primaryModel;
@@ -258,6 +211,7 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   if (minCost && Number.isFinite(Number(minCost))) payload.minCost = Number(minCost);
   if (maxCost && Number.isFinite(Number(maxCost))) payload.maxCost = Number(maxCost);
   if (enrichmentLevel && Number.isFinite(Number(enrichmentLevel))) payload.enrichmentLevel = Number(enrichmentLevel);
+  if (source === 'discovered' || source === 'managed-archived') payload.source = source;
   return payload;
 }
 
@@ -289,23 +243,53 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
   };
 }
 
-async function fetchSessions(params: URLSearchParams): Promise<ListResponse> {
-  const result = await getTransport().request((client) =>
-    (client as PanRpcProtocolClient)[WS_METHODS.listDiscoveredSessions]({
-      ...filterPayload(params),
-      limit: Number(params.get('limit') ?? 50),
-      offset: Number(params.get('offset') ?? 0),
-    }),
-  );
-  return { ...result, sessions: result.sessions.map(fromRpcSession) };
+function fromFeedRow(row: SessionsFeedRowSnapshot): DiscoveredSession {
+  return {
+    id: row.id,
+    source: row.source,
+    harness: row.harness ?? 'claude-code',
+    conversationId: row.conversationId ?? null,
+    conversationName: row.conversationName ?? null,
+    conversationTitle: row.conversationTitle ?? null,
+    archivedAt: row.archivedAt ?? null,
+    jsonlPath: row.jsonlPath ?? null,
+    workspacePath: row.workspacePath ?? null,
+    primaryModel: row.primaryModel ?? null,
+    messageCount: row.messageCount,
+    firstTs: row.firstTs ?? null,
+    lastTs: row.lastTs ?? null,
+    estimatedCost: row.estimatedCost,
+    tokenInput: row.tokenInput,
+    tokenOutput: row.tokenOutput,
+    toolsUsed: [],
+    filesTouched: [],
+    tags: [...row.tags],
+    summary: row.summary ?? null,
+    enrichmentLevel: row.enrichmentLevel as 0 | 1 | 2 | 3,
+    enrichmentFailed: row.enrichmentFailed,
+    overdeckManaged: row.overdeckManaged,
+    panIssueId: row.panIssueId ?? null,
+  };
 }
 
-async function fetchArchivedConversations(params: URLSearchParams): Promise<DiscoveredSession[]> {
-  const query = params.toString();
-  const response = await fetch(`/api/conversations/archived${query ? `?${query}` : ''}`);
-  if (!response.ok) throw new Error(`Failed to load archived conversations: ${response.status}`);
-  return ((await response.json()) as ArchivedConversationResponse[])
-    .map((session) => ({ ...session, harness: session.harness ?? 'claude-code' }));
+async function fetchFeed(params: URLSearchParams, cursor?: string): Promise<FeedResponse> {
+  const result = await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.listSessionsFeed]({
+      ...filterPayload(params),
+      limit: Number(params.get('limit') ?? 50),
+      ...(cursor ? { cursor } : {}),
+    }),
+  );
+  return { rows: result.rows.map(fromFeedRow), nextCursor: result.nextCursor ?? null };
+}
+
+async function fetchFeedFacets(params: URLSearchParams): Promise<SessionsFeedFacetsSnapshot> {
+  return getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.getSessionsFeedFacets]({
+      ...filterPayload(params),
+      limit: Number(params.get('limit') ?? 50),
+    }),
+  );
 }
 
 async function fetchSearch(
@@ -340,12 +324,6 @@ async function fetchStats(): Promise<StatsResponse> {
 async function fetchCost(params: URLSearchParams): Promise<CostResponse> {
   return getTransport().request((client) =>
     (client as PanRpcProtocolClient)[WS_METHODS.getConversationCost](filterPayload(params)),
-  );
-}
-
-async function fetchWorkspaceCost(params: URLSearchParams): Promise<WorkspaceCostResponse> {
-  return getTransport().request((client) =>
-    (client as PanRpcProtocolClient)[WS_METHODS.getConversationCostByWorkspace](filterPayload(params)),
   );
 }
 
@@ -401,23 +379,24 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
     setSelectedKey(initialSessionKey);
   }, [initialSessionKey]);
 
-  const listParams = new URLSearchParams({ limit: '50' });
-  const archivedParams = new URLSearchParams({ limit: '50' });
+  const feedParams = new URLSearchParams({ limit: '100' });
   for (const [key, value] of filterParams) {
-    listParams.set(key, value);
-    archivedParams.set(key, value);
+    feedParams.set(key, value);
   }
 
-  const { data: listData, isLoading: isListLoading } = useQuery({
-    queryKey: ['discovered-sessions', listParams.toString()],
-    queryFn: () => fetchSessions(listParams),
-    enabled: !effectiveQuery && sourceFilter !== 'managed-archived',
+  const feedQuery = useInfiniteQuery({
+    queryKey: ['sessions-feed', feedParams.toString()],
+    queryFn: ({ pageParam }) => fetchFeed(feedParams, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: !effectiveQuery,
   });
 
-  const { data: archivedSessions = [], isLoading: isArchivedLoading } = useQuery({
-    queryKey: ['archived-conversations', archivedParams.toString()],
-    queryFn: () => fetchArchivedConversations(archivedParams),
-    enabled: !effectiveQuery && sourceFilter !== 'discovered',
+  const { data: feedFacets } = useQuery({
+    queryKey: ['sessions-feed-facets', feedParams.toString()],
+    queryFn: () => fetchFeedFacets(feedParams),
+    enabled: !effectiveQuery,
+    staleTime: 30_000,
   });
 
   const SEARCH_PAGE_SIZE = 50;
@@ -440,47 +419,25 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
     staleTime: 30_000,
   });
 
-  const { data: workspaceCost } = useQuery({
-    queryKey: ['discovered-sessions-cost-workspace', filterParams.toString()],
-    queryFn: () => fetchWorkspaceCost(filterParams),
-    staleTime: 30_000,
-  });
-
   const scanMutation = useMutation({
     mutationFn: triggerScan,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
+      void queryClient.invalidateQueries({ queryKey: ['sessions-feed'] });
+      void queryClient.invalidateQueries({ queryKey: ['sessions-feed-facets'] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
     },
   });
 
   const isLoading = effectiveQuery
     ? isSearchLoading
-    : (sourceFilter === 'all' ? isListLoading || isArchivedLoading : sourceFilter === 'managed-archived' ? isArchivedLoading : isListLoading);
-  const discoveredSessions = listData?.sessions ?? [];
+    : feedQuery.isLoading;
+  const feedSessions = accumulateFeedPages(feedQuery.data?.pages);
   const sessions = effectiveQuery
     ? (searchData?.sessions ?? [])
-    : sourceFilter === 'managed-archived'
-      ? archivedSessions
-      : sourceFilter === 'discovered'
-        ? discoveredSessions
-        : [...discoveredSessions, ...archivedSessions].sort(compareSessionsByLastTs);
+    : feedSessions;
 
   const selected = selectedKey != null ? sessions.find((s) => sessionKey(s) === selectedKey) ?? null : null;
-  const workspaceCostEntries = workspaceCost?.entries ?? [];
-  const facetOptions = {
-    harnesses: countFacetValues(sessions.map((s) => s.harness)),
-    models: countFacetValues(sessions.map((s) => s.primaryModel)),
-    workspaces: workspaceCostEntries.length > 0
-      ? workspaceCostEntries.map((entry) => ({ value: entry.key, count: entry.sessionCount, cost: entry.totalCost }))
-      : countFacetValues(sessions.map((s) => s.workspacePath), sessions.map((s) => s.estimatedCost)),
-    tags: countFacetValues(sessions.flatMap((s) => s.tags)),
-    tools: countFacetValues(sessions.flatMap((s) => s.toolsUsed)),
-    files: countFacetValues(sessions.flatMap((s) => s.filesTouched)),
-    timeRanges: countTimeFacets(sessions),
-    costRanges: countCostFacets(sessions),
-    enrichmentLevels: countFacetValues(sessions.map((s) => String(s.enrichmentLevel))),
-  };
+  const facetOptions = toFacetOptions(feedFacets);
   const activeFilterChips = [
     sourceFilter !== 'all' ? { key: 'source', label: `Source: ${sourceFilter === 'discovered' ? 'Discovered' : 'Managed-archived'}` } : null,
     filters.harness ? { key: 'harness', label: `Harness: ${filters.harness}` } : null,
@@ -532,17 +489,6 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
             <span><span className="text-green-400 font-mono">{stats.enriched}</span> enriched</span>
             <span><span className="text-blue-400 font-mono">{stats.managedCount}</span> managed</span>
             <span><span className="text-amber-300 font-mono">${(cost?.totalCost ?? 0).toFixed(4)}</span> est. cost</span>
-            {workspaceCostEntries.length > 0 && (
-              <span data-testid="workspace-cost-breakdown" className="text-gray-500">
-                Workspace costs:{' '}
-                {workspaceCostEntries.slice(0, 3).map((entry) => (
-                  <span key={entry.key} className="mr-2">
-                    <span className="text-gray-300">{entry.key}</span>{' '}
-                    <span className="text-amber-300 font-mono">${entry.totalCost.toFixed(4)}</span>
-                  </span>
-                ))}
-              </span>
-            )}
           </div>
         )}
 
@@ -656,6 +602,11 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
                 sessions={sessions}
                 selectedId={selectedKey}
                 onSelect={handleSelectSession}
+                hasMore={!effectiveQuery && feedQuery.hasNextPage}
+                isLoadingMore={feedQuery.isFetchingNextPage}
+                onLoadMore={() => {
+                  void feedQuery.fetchNextPage();
+                }}
               />
               {effectiveQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
                 <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 shrink-0 text-xs text-gray-400">

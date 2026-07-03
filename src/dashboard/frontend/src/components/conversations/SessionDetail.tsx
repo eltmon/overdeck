@@ -157,6 +157,8 @@ export function SessionDetail({ session, onClose }: Props) {
   const invalidateSessionQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ['discovered-session', session.id] });
     void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
+    void queryClient.invalidateQueries({ queryKey: ['sessions-feed'] });
+    void queryClient.invalidateQueries({ queryKey: ['sessions-feed-facets'] });
     void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-search'] });
     void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
   };
@@ -181,6 +183,8 @@ export function SessionDetail({ session, onClose }: Props) {
     mutationFn: () => unarchiveConversation(displaySession.conversationName),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['archived-conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['sessions-feed'] });
+      void queryClient.invalidateQueries({ queryKey: ['sessions-feed-facets'] });
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
