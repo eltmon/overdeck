@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2227",
   "schemaVersion": 2,
-  "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-02T23:57:47.269Z",
-  "pipeline": {
-    "issueId": "PAN-2227",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-02T23:57:46.810Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,84 @@
       "timestamp": "2026-07-02T23:57:46.810Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-02T23:57:46.810Z",
+  "updated": "2026-07-03T02:28:10.607Z",
+  "pipeline": {
+    "issueId": "PAN-2227",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T02:28:10.551Z",
+    "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 640595,
+            "output": 27988,
+            "cacheRead": 2948096,
+            "cacheWrite": 0
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 181633,
+            "output": 12787,
+            "cacheRead": 2706432,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 24923,
+            "output": 824,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 21712,
+            "output": 72458,
+            "cacheRead": 12732476,
+            "cacheWrite": 361889
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 822228,
+          "output": 40775,
+          "cacheRead": 5654528,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 24923,
+          "output": 824,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 21712,
+          "output": 72458,
+          "cacheRead": 12732476,
+          "cacheWrite": 361889
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 29.25778,
+        "pricingAsOf": "2026-07-03T02:28:10.606Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "gpt-5.5"
 }
