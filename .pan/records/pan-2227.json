@@ -142,16 +142,16 @@
     "recordedAt": "2026-07-03T06:06:39.318Z"
   },
   "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-03T06:13:41.934Z",
+  "updated": "2026-07-03T06:17:27.589Z",
   "pipeline": {
     "issueId": "PAN-2227",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T06:13:37.852Z",
+    "updatedAt": "2026-07-03T06:17:26.524Z",
     "reviewNotes": ".beads/issues.jsonl still appends stale duplicate workspace-a3lct record",
     "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2268",
@@ -262,7 +262,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.472422,
-        "pricingAsOf": "2026-07-03T06:13:37.899Z"
+        "pricingAsOf": "2026-07-03T06:17:27.150Z"
       }
     },
     "merges": [
