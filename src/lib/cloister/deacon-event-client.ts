@@ -16,6 +16,7 @@ export interface DeaconEventClientOptions {
 export interface DeaconEventClient {
   append(event: Omit<DomainEvent, 'sequence'>): number;
   appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+  subscribe(fn: (event: { sequence: number; type: string; timestamp: string; payload: unknown }) => void): () => void;
   flushNow(): Promise<void>;
   bufferedCount(): number;
 }
@@ -46,6 +47,8 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
   let inFlight = false;
   let retryMs = baseRetryMs;
   let dropped = 0;
+
+  type StoredEventLike = { sequence: number; type: string; timestamp: string; payload: unknown };
 
   const schedule = (delayMs: number): void => {
     if (timer) clearTimeout(timer);
@@ -97,6 +100,37 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
     }
   }
 
+  async function fetchJson<T>(url: URL, signal?: AbortSignal): Promise<T> {
+    const token = options.token ?? ensureInternalTokenSync();
+    const response = await fetchImpl(url, {
+      signal,
+      headers: {
+        [INTERNAL_TOKEN_HEADER]: token,
+        origin: dashboardUrl,
+      },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json() as Promise<T>;
+  }
+
+  async function fetchLatestSequence(signal?: AbortSignal): Promise<number> {
+    const body = await fetchJson<{ latestSequence?: unknown }>(new URL('/api/internal/events', dashboardUrl), signal);
+    return typeof body.latestSequence === 'number' && Number.isFinite(body.latestSequence) && body.latestSequence >= 0
+      ? body.latestSequence
+      : 0;
+  }
+
+  function parseStoredEvents(raw: unknown): StoredEventLike[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((event): event is StoredEventLike =>
+      !!event &&
+      typeof event === 'object' &&
+      typeof (event as { sequence?: unknown }).sequence === 'number' &&
+      typeof (event as { type?: unknown }).type === 'string' &&
+      typeof (event as { timestamp?: unknown }).timestamp === 'string',
+    );
+  }
+
   return {
     append(event) {
       enqueue(event);
@@ -105,6 +139,70 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
     appendAsync(event) {
       enqueue(event);
       return Promise.resolve(0);
+    },
+    subscribe(fn) {
+      let active = true;
+      let cursor = -1;
+      let pollTimer: ReturnType<typeof setTimeout> | null = null;
+      let pollInFlight = false;
+      let pollRetryMs = baseRetryMs;
+      let abortController: AbortController | null = null;
+
+      const clearPollTimer = (): void => {
+        if (pollTimer) clearTimeout(pollTimer);
+        pollTimer = null;
+      };
+
+      const schedulePoll = (delayMs: number): void => {
+        if (!active) return;
+        clearPollTimer();
+        pollTimer = setTimeout(() => {
+          pollTimer = null;
+          void poll();
+        }, delayMs);
+      };
+
+      const poll = async (): Promise<void> => {
+        if (!active || pollInFlight) return;
+        pollInFlight = true;
+        abortController?.abort();
+        abortController = new AbortController();
+        try {
+          if (cursor < 0) {
+            cursor = await fetchLatestSequence(abortController.signal);
+          }
+          const url = new URL('/api/internal/events', dashboardUrl);
+          url.searchParams.set('since', String(cursor));
+          const body = await fetchJson<{ latestSequence?: unknown; events?: unknown }>(url, abortController.signal);
+          const latestSequence = typeof body.latestSequence === 'number' && Number.isFinite(body.latestSequence) && body.latestSequence >= 0
+            ? body.latestSequence
+            : cursor;
+          const events = parseStoredEvents(body.events);
+          for (const event of events) {
+            fn(event);
+          }
+          const newestSequence = events.length > 0 ? events[events.length - 1]!.sequence : latestSequence;
+          if (newestSequence > cursor) cursor = newestSequence;
+          pollRetryMs = baseRetryMs;
+          schedulePoll(events.length > 0 ? 0 : debounceMs);
+        } catch (error) {
+          if (!active) return;
+          warn(`[deacon-event-client] failed to subscribe to events: ${error instanceof Error ? error.message : String(error)}; retrying in ${pollRetryMs}ms`);
+          schedulePoll(pollRetryMs);
+          pollRetryMs = Math.min(pollRetryMs * 2, maxRetryMs);
+        } finally {
+          pollInFlight = false;
+        }
+      };
+
+      void poll();
+
+      return () => {
+        active = false;
+        clearPollTimer();
+        abortController?.abort();
+        abortController = null;
+      };
     },
     flushNow,
     bufferedCount: () => queue.length,

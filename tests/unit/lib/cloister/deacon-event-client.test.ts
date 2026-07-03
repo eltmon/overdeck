@@ -101,4 +101,42 @@ describe('deacon event client', () => {
     expect(client.bufferedCount()).toBe(3);
     expect(warn).toHaveBeenCalledWith('[deacon-event-client] buffer overflow: dropped 1 oldest event');
   });
+
+  it('subscribes to internal events with cursor-based polling', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ latestSequence: 10 }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          latestSequence: 12,
+          events: [event(11), event(12)].map((item, index) => ({ ...item, sequence: 11 + index })),
+        }),
+      } as Response);
+    const received: Array<{ sequence: number; type: string; timestamp: string; payload: unknown }> = [];
+    const client = createDeaconEventClient({
+      dashboardUrl: 'http://127.0.0.1:3011',
+      token: 'test-token',
+      fetchImpl,
+    });
+
+    let unsubscribe = () => {};
+    unsubscribe = client.subscribe((event) => {
+      received.push(event);
+      if (received.length === 2) unsubscribe();
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(received).toEqual([
+      { ...event(11), sequence: 11 },
+      { ...event(12), sequence: 12 },
+    ]);
+  });
 });

@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import type { DomainEvent } from '@overdeck/contracts';
 
@@ -58,6 +58,12 @@ export function appendInternalEvents(
   return events.length;
 }
 
+export function parseInternalEventsSince(raw: string | null): number | null {
+  if (raw === null || raw.trim().length === 0) return null;
+  const since = Number.parseInt(raw, 10);
+  return Number.isFinite(since) && since >= 0 ? since : null;
+}
+
 const internalEventsRoute = HttpRouter.add(
   'POST',
   '/api/internal/events',
@@ -83,6 +89,28 @@ const internalEventsRoute = HttpRouter.add(
   })),
 );
 
-export const internalEventsRouteLayer = Layer.mergeAll(internalEventsRoute);
+const internalEventsReadRoute = HttpRouter.add(
+  'GET',
+  '/api/internal/events',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = validateInternalEventsHeaders(request.headers as HeaderMap);
+    if (!auth.ok) return jsonResponse({ error: auth.error }, { status: auth.status });
+
+    const urlOpt = HttpServerRequest.toURL(request);
+    const url = Option.isSome(urlOpt) ? urlOpt.value : new URL(request.url, 'http://localhost');
+    const since = parseInternalEventsSince(url.searchParams.get('since'));
+    const eventStore = yield* EventStoreService;
+    const latestSequence = yield* eventStore.getLatestSequence;
+    if (since === null) {
+      return jsonResponse({ latestSequence });
+    }
+
+    const events = yield* eventStore.readFrom(since);
+    return jsonResponse({ latestSequence, events });
+  })),
+);
+
+export const internalEventsRouteLayer = Layer.mergeAll(internalEventsRoute, internalEventsReadRoute);
 
 export default internalEventsRouteLayer;

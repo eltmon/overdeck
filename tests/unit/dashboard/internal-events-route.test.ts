@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   appendInternalEvents,
   parseInternalEventsBody,
+  parseInternalEventsSince,
   validateInternalEventsHeaders,
 } from '../../../src/dashboard/server/routes/internal-events.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../src/lib/internal-token.js';
@@ -46,5 +47,13 @@ describe('internal events route helpers', () => {
 
     expect(count).toBe(2);
     expect(appended).toHaveLength(2);
+  });
+
+  it('parses an optional since cursor for internal event replay', () => {
+    expect(parseInternalEventsSince(null)).toBeNull();
+    expect(parseInternalEventsSince('')).toBeNull();
+    expect(parseInternalEventsSince('12')).toBe(12);
+    expect(parseInternalEventsSince('-1')).toBeNull();
+    expect(parseInternalEventsSince('not-a-number')).toBeNull();
   });
 });
