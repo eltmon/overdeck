@@ -124,7 +124,13 @@ export function BootReconciliationModal() {
     queryKey: BOOT_RECONCILIATION_QUERY_KEY,
     queryFn: fetchBootReconciliation,
     staleTime: 5_000,
-    refetchInterval: (query) => query.state.data?.decision === 'pending' ? 10_000 : false,
+    refetchInterval: (query) => {
+      const decision = query.state.data?.decision;
+      if (decision === 'pending') return 10_000;
+      // Held states keep the banner's count fresh (same cadence as the old NoResumeBanner).
+      if (decision === 'hold_all' || decision === 'per_agent') return 30_000;
+      return false;
+    },
     refetchOnWindowFocus: true,
   });
 
@@ -186,6 +192,43 @@ export function BootReconciliationModal() {
   }, [data?.set]);
 
   const secondsLeft = useCountdown(data?.graceDeadline ?? null);
+
+  // PAN-2278: a hold_all / per_agent decision must stay visible — the boot
+  // choice silently parks agents otherwise (the affordance NoResumeBanner used
+  // to provide before PAN-2076 replaced it with this modal).
+  if (data && (data.decision === 'hold_all' || data.decision === 'per_agent')) {
+    const perAgentChoices = data.perAgent ?? {};
+    const heldAgents = (Array.isArray(data.set) ? data.set : []).filter((agent) =>
+      !agent.readOnly && (data.decision !== 'per_agent' || perAgentChoices[agent.issueId] !== 'resume'));
+    if (heldAgents.length === 0) return null;
+    const bannerPending = decisionMutation.isPending;
+    return (
+      <div
+        className="sticky top-0 z-40 bg-orange-950/70 border-b-2 border-orange-400/70 px-4 py-2 flex items-center gap-3 shrink-0"
+        data-testid="boot-reconciliation-held-banner"
+      >
+        <Pause className="w-5 h-5 text-orange-300 shrink-0" />
+        <p className="text-orange-100 text-sm font-medium flex-1">
+          Boot reconciliation is holding {heldAgents.length} stopped agent{heldAgents.length === 1 ? '' : 's'} from
+          the boot at {formatTime(data.decidedAt ?? data.graceDeadline)}. Held agents will not pick up work until
+          resumed. Click <span className="font-semibold">Resume all</span> to put them back to work, or use{' '}
+          <code className="font-mono text-xs bg-orange-500/20 px-1 rounded">pan start &lt;id&gt;</code>{' '}
+          to spawn one individually.
+        </p>
+        <button
+          type="button"
+          onClick={() => decisionMutation.mutate({ decision: 'resume_all' })}
+          disabled={bannerPending}
+          data-testid="boot-reconciliation-held-resume-all"
+          className="shrink-0 inline-flex items-center gap-1.5 h-[32px] rounded-[var(--radius-sm)] bg-orange-400 px-[14px] text-[12px] font-medium text-orange-950 transition-opacity hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Play className="w-3.5 h-3.5" />
+          {bannerPending ? 'Resuming…' : 'Resume all'}
+        </button>
+      </div>
+    );
+  }
+
   if (data?.decision !== 'pending') return null;
 
   const agentSet = Array.isArray(data.set) ? data.set : [];

@@ -36,6 +36,9 @@ vi.mock('../config.js', () => ({
 
 vi.mock('../no-resume-mode.js', () => ({
   getNoResumeMode: vi.fn(() => ({ active: mocks.noResumeActive, since: null })),
+  // PAN-2278: startBootReconciliation short-circuits to hold_all only on an
+  // explicit request; mocks.noResumeActive now models "explicit".
+  isExplicitNoResumeRequest: vi.fn(() => mocks.noResumeActive),
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({
@@ -156,7 +159,7 @@ describe('boot reconciliation', () => {
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
-  it('uses hold_all immediately when no-resume mode is active at boot', () => {
+  it('uses hold_all immediately when an explicit no-resume request is active at boot', () => {
     mocks.noResumeActive = true;
     mocks.agents = [
       { id: 'agent-pan-2076', role: 'work', status: 'stopped', workspace: join(testHome, 'workspace') },

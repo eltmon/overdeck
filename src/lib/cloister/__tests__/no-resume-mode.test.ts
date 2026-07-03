@@ -81,4 +81,48 @@ describe('no-resume mode', () => {
       expect(source).not.toContain('OVERDECK_NO_RESUME');
     }
   });
+
+  describe('isExplicitNoResumeRequest (PAN-2278)', () => {
+    it('is false when OVERDECK_NO_RESUME is not set, regardless of gate source', async () => {
+      const { isExplicitNoResumeRequest } = await import('../no-resume-mode.js');
+
+      expect(isExplicitNoResumeRequest({})).toBe(false);
+      expect(isExplicitNoResumeRequest({ OVERDECK_RESUME_GATE_SOURCE: 'flag' })).toBe(false);
+      expect(isExplicitNoResumeRequest({ OVERDECK_NO_RESUME: '0' })).toBe(false);
+    });
+
+    it('treats the boot-gates default stamp as non-explicit — the dialog path must run', async () => {
+      const { isExplicitNoResumeRequest } = await import('../no-resume-mode.js');
+
+      expect(isExplicitNoResumeRequest({
+        OVERDECK_NO_RESUME: '1',
+        OVERDECK_RESUME_GATE_SOURCE: 'default',
+      })).toBe(false);
+      expect(isExplicitNoResumeRequest({
+        OVERDECK_NO_RESUME: 'true',
+        OVERDECK_RESUME_GATE_SOURCE: ' DEFAULT ',
+      })).toBe(false);
+    });
+
+    it('treats flag and env sources — and a missing source — as explicit requests', async () => {
+      const { isExplicitNoResumeRequest } = await import('../no-resume-mode.js');
+
+      expect(isExplicitNoResumeRequest({
+        OVERDECK_NO_RESUME: '1',
+        OVERDECK_RESUME_GATE_SOURCE: 'flag',
+      })).toBe(true);
+      expect(isExplicitNoResumeRequest({
+        OVERDECK_NO_RESUME: '1',
+        OVERDECK_RESUME_GATE_SOURCE: 'env',
+      })).toBe(true);
+      // Manual operator export without boot-gates involvement stays explicit.
+      expect(isExplicitNoResumeRequest({ OVERDECK_NO_RESUME: '1' })).toBe(true);
+    });
+
+    it('keeps boot reconciliation on the explicit-request door, not the raw env', () => {
+      const source = readFileSync(resolve(CLOISTER_DIR, 'boot-reconciliation.ts'), 'utf-8');
+      expect(source).toContain('isExplicitNoResumeRequest()');
+      expect(source).not.toContain('getNoResumeMode()');
+    });
+  });
 });
