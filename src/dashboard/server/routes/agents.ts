@@ -215,6 +215,10 @@ import {
   postAgentSwitchModelRoute,
   validateAgentDeliveryMethodOrigin,
 } from './agents/control.js';
+import {
+  handleContainerOrchestration,
+  handleRemoteAgentSpawn,
+} from './agents/spawn-helpers.js';
 
 export {
   buildPanStartArgs,
@@ -725,113 +729,14 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (isRemote && workspaceMetadata) {
-      const { spawnRemoteAgent, checkRemoteSpendCap } = yield* Effect.promise(() => import('../../../lib/remote/remote-agents.js'));
-      const { createFlyProviderFromConfig } = yield* Effect.promise(() => import('../../../lib/remote/index.js'));
-      const { loadConfigSync: loadPanConfig } = yield* Effect.promise(() => import('../../../lib/config.js'));
-      const panConfig = loadPanConfig();
-      const spendCap = checkRemoteSpendCap(panConfig);
-      if (!spendCap.allowed) {
-        return jsonResponse({ error: spendCap.message }, { status: 429 });
-      }
-      const fly = createFlyProviderFromConfig(panConfig.remote);
-      yield* Effect.promise(() => fly.syncAllCredentials(workspaceMetadata.vmName));
-
-      const { buildWorkAgentPrompt, getTrackerContext } = yield* Effect.promise(() => import('../../../lib/cloister/work-agent-prompt.js'));
-      const trackerContext = yield* Effect.promise(() => getTrackerContext(issueId, workspacePath));
-      const agentPrompt = yield* Effect.promise(() => buildWorkAgentPrompt({
+      return yield* handleRemoteAgentSpawn({
         issueId,
-        env: 'REMOTE',
-        workspacePath: '/workspace',
-        skipDynamicContext: true,
-        trackerContext,
-      }));
-
-      emitStartAgentPhase(issueId, 'spawn', 'start', 'starting remote work agent', {
         workspacePath,
-        vmName: workspaceMetadata.vmName,
-      });
-      const state = yield* Effect.promise(() => spawnRemoteAgent({
-        issueId,
-        workspace: workspaceMetadata,
-        prompt: agentPrompt,
-        model: spawnModel,
-        tier: fly.getResiliencyTier(),
-      }));
-
-      // Write canonical state.json so activeRoleRunExists() sees this remote
-      // work agent as active before we emit the lifecycle transition below.
-      // spawnRemoteAgent only writes remote-state.json; without state.json the
-      // Cloister duplicate-spawn guard misses the in-flight remote agent and
-      // would spawn a second local work run when in_progress is emitted.
-      yield* saveAgentState({
-        id: state.id,
-        issueId: state.issueId,
-        workspace: workspacePath,
-        role: 'work',
-        model: spawnModel,
-        status: 'starting',
-        startedAt: state.startedAt,
-        harness: 'claude-code',
-      });
-      updateRegistryForAgentStart(state.issueId, workspacePath, state.id);
-
-      // PAN-1048: lifecycle.transitionTo() is the single source of issue.transitioned.
-      // The redundant issue.statusChanged emit was racing with reactive Cloister:
-      // Cloister mapped 'in_progress' → 'work' role and tried to spawn a second
-      // run while activeRoleRunExists() still saw no state.json for the
-      // in-flight spawn above. state.json is now written before this emit.
-      yield* Effect.promise(() => Effect.runPromise(
-        lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
-      ));
-
-      // PAN-1048 review feedback 003: emit a contract-compliant agent.started
-      // event. The reducer writes event.payload.agent into agentsById keyed by
-      // event.payload.agentId — the previous shape ({ agentId: issueId, issueId })
-      // omitted .agent and used the issue ID as the key, inserting `undefined`
-      // into the read model and breaking dashboard consumers.
-      //
-      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
-      // append in one SQLite transaction.
-      yield* saveAgentStateAndEmitEventProgram({
-        id: state.id,
-        issueId: state.issueId,
-        workspace: workspacePath,
-        role: 'work',
-        model: spawnModel,
-        status: state.status,
-        startedAt: state.startedAt,
-        harness: 'claude-code',
-      }, {
-        type: 'agent.started',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId: state.id,
-          issueId: state.issueId,
-          agent: {
-            id: state.id,
-            issueId: state.issueId,
-            role: 'work' as const,
-            model: spawnModel,
-            status: state.status,
-            startedAt: state.startedAt,
-            lastActivity: state.lastActivity,
-          },
-        },
-      });
-      emitStartAgentPhase(issueId, 'spawn', 'success', 'remote work agent spawn requested', {
-        agentId: state.id,
-        vmName: workspaceMetadata.vmName,
-      });
-      try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
-      invalidateAgentsCache();
-      return jsonResponse({
-        success: true,
-        message: `Starting remote agent for ${issueId}`,
-        remote: true,
-        vmName: workspaceMetadata.vmName,
-        agentId: state.id,
+        workspaceMetadata,
+        spawnModel,
         projectPath,
-        guardrails: spawnGuardrails,
+        spawnGuardrails,
+        lifecycle,
       });
     }
 
@@ -945,244 +850,22 @@ const postAgentsRoute = HttpRouter.add(
       );
     };
 
-    if (existsSync(workspacePath) && existsSync(devScript)) {
-      let dockerRunning = false;
-      try {
-        yield* Effect.promise(() => execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' }));
-        dockerRunning = true;
-      } catch {}
-
-      if (dockerRunning) {
-        const getComposeProjectName = async (id: string, wPath: string): Promise<string> => {
-          const featureFolder = `feature-${id.toLowerCase()}`;
-          const expected = `overdeck-${featureFolder}`;
-          const validate = (value: string, devPath: string): string => {
-            if (value !== expected) {
-              throw new Error(`Invalid COMPOSE_PROJECT_NAME in ${devPath}: expected ${expected}`);
-            }
-            return value;
-          };
-
-          const devScriptPaths = [join(wPath, '.devcontainer', 'dev'), join(wPath, 'dev')];
-          for (const devPath of devScriptPaths) {
-            try {
-              if (existsSync(devPath)) {
-                const content = await readFile(devPath, 'utf-8');
-                const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-                if (match) return validate(`${match[1]}${featureFolder}`, devPath);
-                const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-                if (literalMatch) return validate(literalMatch[1], devPath);
-              }
-            } catch (error) {
-              if (error instanceof Error && error.message.startsWith('Invalid COMPOSE_PROJECT_NAME')) throw error;
-            }
-          }
-          return expected;
-        };
-
-        let featureName: string;
-        try {
-          featureName = yield* Effect.promise(() => getComposeProjectName(issueId, workspacePath));
-        } catch (error) {
-          return jsonResponse({
-            success: false,
-            blocked: true,
-            skipped: true,
-            error: error instanceof Error ? error.message : String(error),
-          }, { status: 422 });
-        }
-        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_container_check', {
-          issueId,
-          featureName,
-          workspacePath,
-        }));
-        let containersReady = false;
-
-        try {
-          const { stdout: existing } = yield* Effect.promise(() => execFileAsync(
-            'docker',
-            ['ps', '--filter', `name=${featureName}`, '--format', '{{.Names}}|{{.Status}}'],
-            { encoding: 'utf-8' }
-          ));
-          const runningContainers = existing.trim().split('\n').filter(Boolean);
-          const allHealthy = runningContainers.length > 0 && runningContainers.every(line => {
-            const status = line.split('|')[1] || '';
-            return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
-          });
-          if (allHealthy) containersReady = true;
-        } catch {}
-
-        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_container_check_result', {
-          issueId,
-          featureName,
-          containersReady,
-        }));
-
-        if (!containersReady && !allowHost) {
-          const earlyAgentId = agentSessionName;
-          const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
-          yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-          // PAN-1048 R2: legacy `runtime` field removed; PAN-1055: persist user-picked harness.
-          saveAgentStateSync({
-            id: earlyAgentId,
-            issueId,
-            ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-            model: 'pending-container-start',
-            status: 'starting',
-            startedAt: new Date().toISOString(),
-            workspace: workspacePath,
-            role,
-            hostOverride: allowHost || undefined,
-          });
-          updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
-          yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
-            issueId,
-            featureName,
-            workspacePath,
-            role,
-          }));
-
-              const containerActivityId = `containers-${Date.now()}`;
-
-              // Start containers in background and spawn agent when ready
-              (async () => {
-                try {
-                  const containerUid = process.getuid?.() ?? 1000;
-                  const containerGid = process.getgid?.() ?? 1000;
-                  await appendAgentLifecycleLog(earlyAgentId, 'agent.container_start_spawned', {
-                    issueId,
-                    featureName,
-                    workspacePath,
-                  });
-                  const containerChild = spawn('./dev', ['all'], {
-                    cwd: workspacePath,
-                    stdio: 'ignore',
-                    env: buildChildEnvWithoutTmuxSync(process.env, { UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` }),
-                    detached: true,
-                  });
-                  containerChild.unref();
-
-                  const maxWaitMs = 3 * 60 * 1000;
-                  const pollIntervalMs = 3000;
-                  const startTime = Date.now();
-                  let healthy = false;
-
-                  while (Date.now() - startTime < maxWaitMs) {
-                    try {
-                      const { stdout } = await execFileAsync(
-                        'docker',
-                        ['ps', '--filter', `name=${featureName}`, '--format', '{{.Names}}|{{.Status}}'],
-                        { encoding: 'utf-8' }
-                      );
-                      const containers = stdout.trim().split('\n').filter(Boolean);
-                      const allH = containers.length > 0 && containers.every(line => {
-                        const status = line.split('|')[1] || '';
-                        return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
-                      });
-                      if (allH) { healthy = true; break; }
-                    } catch {}
-                    await new Promise(r => setTimeout(r, pollIntervalMs));
-                  }
-
-                  await appendAgentLifecycleLog(earlyAgentId, healthy ? 'agent.container_wait_succeeded' : 'agent.container_wait_timed_out', {
-                    issueId,
-                    featureName,
-                    waitedMs: Date.now() - startTime,
-                  });
-
-                  if (!healthy) {
-                    // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
-                    saveAgentStateSync({
-                      id: earlyAgentId,
-                      issueId,
-                      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-                      model: 'pending-container-start',
-                      status: 'error',
-                      startedAt: new Date().toISOString(),
-                      workspace: workspacePath,
-                      role,
-                    });
-                    return;
-                  }
-
-                  // Docker named volumes may create root-owned empty node_modules.
-                  // Remove them — workspace creation runs bun install which creates
-                  // correct workspace-aware node_modules with proper local package resolution.
-                  for (const nmDir of [join(workspacePath, 'node_modules'), join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules')]) {
-                    try {
-                      if (existsSync(nmDir)) {
-                        const stat = await lstat(nmDir);
-                        if (!stat.isSymbolicLink()) {
-                          await rm(nmDir, { recursive: true, force: true });
-                          console.log(`[start-agent] Removed Docker-created ${nmDir}`);
-                        }
-                      }
-                    } catch (nmErr: any) {
-                      console.warn(`[start-agent] Could not remove ${nmDir}: ${nmErr.message}`);
-                    }
-                  }
-
-                  await appendAgentLifecycleLog(earlyAgentId, 'agent.work_spawn_requested_after_containers', {
-                    issueId,
-                    role,
-                    workspacePath,
-                    harness: effectiveHarness,
-                  });
-                  emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent after containers became healthy', { workspacePath });
-                  const activityId = await spawnPanCommand(
-                    buildPanStartArgs({
-                      issueId,
-                      model: spawnModel,
-                      harness: effectiveHarness,
-                      allowHost,
-                    }),
-                    workspacePath,
-                  );
-                  emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested after container startup', {
-                    workspacePath,
-                    activityId,
-                  });
-                  await updateIssueStatus();
-                } catch (err: any) {
-                  const errorMessage = err instanceof Error ? err.message : String(err);
-                  emitStartAgentPhase(issueId, 'spawn', 'failure', errorMessage, { workspacePath });
-                  await appendAgentLifecycleLog(earlyAgentId, 'agent.container_start_failed', {
-                    issueId,
-                    error: errorMessage,
-                  }).catch(() => undefined);
-                  // PAN-1048 R2: legacy `runtime` removed from state writes.
-                  try { saveAgentStateSync({
-                    id: earlyAgentId,
-                    issueId,
-                    model: 'pending-container-start',
-                    status: 'error',
-                    startedAt: new Date().toISOString(),
-                    workspace: workspacePath,
-                    role,
-                  }); } catch { /* non-fatal */ }
-                  console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
-                }
-              })();
-
-          yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-            type: 'issue.statusChanged',
-            timestamp: new Date().toISOString(),
-            payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
-          })));
-          try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
-          invalidateAgentsCache();
-          return jsonResponse({
-            success: true,
-            message: `Starting containers and agent for ${issueId} (this may take a few minutes)`,
-            startingContainers: true,
-            containerActivityId,
-            agentId: earlyAgentId,
-            projectPath,
-            guardrails: spawnGuardrails,
-          });
-        }
-      }
-    }
+    const containerResponse = yield* handleContainerOrchestration({
+      issueId,
+      workspacePath,
+      devScript,
+      agentSessionName,
+      role,
+      effectiveHarness,
+      allowHost,
+      spawnModel,
+      spawnGuardrails,
+      projectPath,
+      eventStore,
+      spawnPanCommand,
+      updateIssueStatus,
+    });
+    if (containerResponse) return containerResponse;
 
     // Containers already ready or no containers needed
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
