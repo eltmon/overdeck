@@ -761,6 +761,24 @@ describe('IssueCard', () => {
     expect(boardActionRow()).toHaveAttribute('data-visible-mode', 'pinned');
   });
 
+  it('surfaces the troubled gate as a badge on the Board card, with no one-click clear', () => {
+    renderIssueCard({
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'stopped',
+        troubled: true,
+        consecutiveFailures: 3,
+      }),
+    });
+
+    const badge = screen.getByTestId('card-troubled-TEST-123');
+    expect(badge).toHaveTextContent('Troubled');
+    expect(badge.getAttribute('title')).toContain('pan untroubled TEST-123');
+    // Unlike Unpause, clearing troubled requires investigation — no card button.
+    expect(screen.queryByTestId('card-untroubled-TEST-123')).toBeNull();
+  });
+
   it('opens the hybrid Board action overflow menu on right-click', async () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
