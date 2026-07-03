@@ -77,6 +77,11 @@
       "reason": "feedback",
       "note": "[2026-07-03T06:13Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-03T06:13:41.934Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T06:25:36.188Z"
     }
   ],
   "feedback": [
@@ -142,20 +147,20 @@
     "recordedAt": "2026-07-03T06:06:39.318Z"
   },
   "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-03T06:21:08.526Z",
+  "updated": "2026-07-03T06:25:40.806Z",
   "pipeline": {
     "issueId": "PAN-2227",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T06:21:07.659Z",
-    "reviewNotes": ".beads/issues.jsonl still appends stale duplicate workspace-a3lct record",
+    "updatedAt": "2026-07-03T06:25:40.739Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2268",
-    "lastVerifiedCommit": "b06158cfd937ffca5c3e09efa956eae3ec1bf266",
+    "lastVerifiedCommit": "0ed29dcf768220717128e9b249bdf1d6b828bbff",
     "reviewRequestedAt": "2026-07-03T06:08:10.985Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -262,7 +267,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.472422,
-        "pricingAsOf": "2026-07-03T06:21:08.106Z"
+        "pricingAsOf": "2026-07-03T06:25:40.803Z"
       }
     },
     "merges": [
