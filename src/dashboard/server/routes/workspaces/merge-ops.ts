@@ -42,6 +42,7 @@ import { setMergeQueueTriggerHandler } from '../../services/merge-queue-service.
 import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
+import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -333,7 +334,6 @@ export async function pushApproveMain(
     return { pushed: false, httpStatus: 400, error };
   }
 }
-
 
 // ─── Route: POST /api/issues/:issueId/sync-main ──────────────────────────
 
@@ -1566,17 +1566,16 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         try {
           await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
           await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
-          // Detect orphaned merge commit: local main is AHEAD of origin/main from a
-          // previous approve attempt whose push failed. git pull --ff-only would fail
-          // here with "not possible to fast-forward". Surface a recoverable error
-          // with explicit instructions rather than silently hard-resetting.
-          const { stdout: aheadCountRaw } = await execAsync(
-            'git rev-list origin/main..HEAD --count',
+          // Detect local-only main commits without silently hard-resetting.
+          const { stdout: divergenceRaw } = await execAsync(
+            'git rev-list --left-right --count HEAD...origin/main',
             { cwd: projectPath, encoding: 'utf-8' }
           );
-          const aheadCount = parseInt(aheadCountRaw.trim(), 10) || 0;
+          const [aheadRaw = '0', behindRaw = '0'] = divergenceRaw.trim().split(/\s+/);
+          const aheadCount = parseInt(aheadRaw, 10) || 0;
+          const behindCount = parseInt(behindRaw, 10) || 0;
           if (aheadCount > 0) {
-            const error = `Local main is ${aheadCount} commit(s) ahead of origin/main — a previous approve attempt left unpushed work. To recover, preserve it:\n  cd ${projectPath} && git push origin main\nIf those commits should not land, revert them explicitly instead of resetting. Then unstick the workspace and retry.`;
+            const error = buildLocalMainRecoveryError(projectPath, aheadCount, behindCount);
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 409 });
           }

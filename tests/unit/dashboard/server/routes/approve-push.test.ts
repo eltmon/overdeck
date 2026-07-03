@@ -110,6 +110,7 @@ vi.mock('../../../../../src/lib/database/index.js', () => ({
 
 // ─── Import under test (after mocks) ─────────────────────────────────────────
 
+import { buildLocalMainRecoveryError } from '../../../../../src/dashboard/server/routes/workspaces/git-recovery-advice.js';
 import { pushApproveMain } from '../../../../../src/dashboard/server/routes/workspaces/merge-ops.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -217,5 +218,28 @@ describe('pushApproveMain — approve route divergence guard', () => {
       expect(result.error).toContain('git merge origin/main');
       expect(result.error).not.toMatch(/git reset --hard/i);
     }
+  });
+});
+
+describe('approve route local-main recovery advice', () => {
+  it('tells operators to merge origin/main before pushing when local main truly diverged', () => {
+    const error = buildLocalMainRecoveryError(PROJECT_PATH, 2, 3);
+
+    expect(error).toContain('Local main has diverged from origin/main');
+    expect(error).toContain('2 local commit(s)');
+    expect(error).toContain('3 remote commit(s)');
+    expect(error).toContain('git fetch origin main && git merge origin/main');
+    expect(error).toContain('Resolve any conflicts, then push main');
+    expect(error).not.toMatch(/cd .*git push origin main/);
+    expect(error).not.toMatch(/git reset --hard/i);
+  });
+
+  it('tells operators to push only when local main is ahead without remote-only commits', () => {
+    const error = buildLocalMainRecoveryError(PROJECT_PATH, 2, 0);
+
+    expect(error).toContain('Local main is 2 commit(s) ahead of origin/main');
+    expect(error).toContain('git push origin main');
+    expect(error).not.toContain('Local main has diverged');
+    expect(error).not.toMatch(/git reset --hard/i);
   });
 });

@@ -6,20 +6,39 @@
       "timestamp": "2026-07-03T04:19:13.849Z",
       "reason": "end",
       "note": "No deviations. Full npm test initially failed under sandbox EPERM; escalated rerun passed. Delivered non-destructive unstick git repair classification and removed reset-hard advice from unstick, approve, and dashboard stuck surfaces."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T04:20Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-03T04:20:50.628Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T04:20Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T04:20:53.232Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:22:02.322Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-03T04:02:51.756Z",
-  "updated": "2026-07-03T04:19:22.033Z",
+  "updated": "2026-07-03T04:23:19.561Z",
   "pipeline": {
     "issueId": "PAN-2254",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:19:21.919Z",
+    "updatedAt": "2026-07-03T04:23:19.478Z",
+    "reviewNotes": "Approve-route recovery tells true-diverged main to push directly, which cannot succeed",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2272",
+    "lastVerifiedCommit": "39de331464c5b2984dd627bf30e92fe3c4c6ee51",
     "reviewRequestedAt": "2026-07-03T04:19:13.851Z"
   },
   "closeOut": {
@@ -44,7 +63,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:19:22.027Z"
+        "pricingAsOf": "2026-07-03T04:23:19.560Z"
       }
     },
     "merges": [
