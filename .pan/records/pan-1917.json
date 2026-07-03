@@ -1,9 +1,16 @@
 {
   "issueId": "PAN-1917",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T20:32:31.030Z"
+    }
+  ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "perf-baseline": "completed",
     "conversation-identity": "completed",
@@ -54,17 +61,17 @@
   "pipeline": {
     "issueId": "PAN-1917",
     "reviewStatus": "pending",
-    "testStatus": "testing",
-    "verificationStatus": "failed",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T20:23:46.849Z",
-    "reviewNotes": "Unified feed search still uses discovered-only search and leaves managed-archived rows unsearchable.",
+    "updatedAt": "2026-07-03T22:05:27.320Z",
+    "reviewNotes": "Review reset by deacon: no active review session after 93min",
     "verificationNotes": "Verification FAILED at test (100223ms):\n\nill suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:436:69\n    434|       }) as { name: string; tmuxSession: string };\n    435|     });\n    436|     await expect.poll(() => sessions.has(conversation.tmuxSession)).to…\n       |                                                                     ^\n    437|     await expect.poll(() => tmuxSessionExists(conversation.tmuxSession…\n    438|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:436:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > delivers through real conversation routes and keeps plain forks off Channels MCP\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:470:63\n    468|     }).not.toBeNull();\n    469|     const parent = await page.evaluate(() => (window as any).current a…\n    470|     await expect.poll(() => sessions.has(parent.tmuxSession)).toBe(tru…\n       |                                                               ^\n    471|     await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toB…\n    472|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:470:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
     "reviewedAtCommit": "e50efa6a00e3999d6780f5ea22e953cf275d723c",
-    "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
+    "lastVerifiedCommit": "a6b5d198a3bd61ec2d3e8706763d7e5afd3fdadd",
     "reviewRequestedAt": "2026-07-03T20:01:18.204Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -226,7 +233,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.557539,
-        "pricingAsOf": "2026-07-03T20:23:46.883Z"
+        "pricingAsOf": "2026-07-03T22:05:27.467Z"
       }
     },
     "merges": [
@@ -260,5 +267,5 @@
     }
   },
   "created": "2026-07-03T20:23:46.887Z",
-  "updated": "2026-07-03T20:23:46.887Z"
+  "updated": "2026-07-03T22:05:27.582Z"
 }

@@ -4,7 +4,7 @@ import { Schema } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import { SessionsFeedFacetsSnapshot, SessionsFeedRowSnapshot, WS_METHODS } from '@overdeck/contracts';
-import { toSessionsFeedRowSnapshot } from '../../../../src/dashboard/server/services/sessions-feed-rpc.js';
+import { normalizeSessionsFeedFilter, toSessionsFeedRowSnapshot } from '../../../../src/dashboard/server/services/sessions-feed-rpc.js';
 import type { SessionsFeedRow } from '../../../../src/lib/overdeck/sessions-feed.js';
 
 describe('sessions feed websocket RPC contracts', () => {
@@ -72,5 +72,17 @@ describe('sessions feed websocket RPC contracts', () => {
       expect(source).toContain('return listSessionsFeed(payload as SessionsFeedFilter)');
       expect(source).toContain('return getSessionsFeedFacets(payload as SessionsFeedFilter)');
     }
+  });
+
+  it('preserves keyword query through the feed RPC normalizer', () => {
+    const filter = normalizeSessionsFeedFilter({
+      query: 'managed archived needle',
+      source: 'managed-archived',
+      limit: 100,
+    });
+
+    expect(filter.query).toBe('managed archived needle');
+    expect(filter.source).toBe('managed-archived');
+    expect(filter.limit).toBe(100);
   });
 });

@@ -158,11 +158,13 @@ export function normalizeSessionsFeedFilter(input: {
   readonly offset?: number;
   readonly cursor?: string;
   readonly source?: SessionsFeedFilter['source'];
+  readonly query?: string;
 }): SessionsFeedFilter {
   return {
     ...normalizeConversationFilter(input),
     ...normalizeConversationPagination(input.limit, input.offset),
     cursor: input.cursor,
     source: input.source,
+    query: input.query,
   };
 }
