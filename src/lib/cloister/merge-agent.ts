@@ -11,7 +11,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync } from '../activity-logger.js';
-import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
+import { verifyMergedBeforeLifecycle } from './merged-pr-verification.js';
 
 const execAsync = promisify(exec);
 
@@ -273,63 +273,6 @@ const _postMergeInFlight = new Map<string, Promise<void>>();
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
-
-async function verifyMergedBeforeLifecycle(
-  issueId: string,
-  projectPath: string,
-  sourceBranch?: string,
-  options?: { allowVerifiedNoPrMerge?: boolean },
-): Promise<{ merged: boolean; reason: string }> {
-  // PAN-1531: single merge oracle — GitHub PR API is the authoritative answer
-  // for "is this PR merged." The prior ancestor-of-main and diff-fallback
-  // heuristics were retired because they produced "the oracles disagree"
-  // bugs (PAN-1024) and made the meaning of "merged" muddy. For non-GitHub
-  // projects the operator confirms manually.
-  const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
-  const quotedBranch = shellQuote(branchName);
-
-  const ghResolved = resolveGitHubIssueSync(issueId);
-  if (!ghResolved.isGitHub) {
-    return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
-  }
-
-  const { owner, repo } = ghResolved;
-  try {
-    if (isGitHubAppConfigured()) {
-      const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
-      const mergedPr = prs.find((pr) => pr.merged || pr.mergedAt || pr.mergeCommit);
-      if (mergedPr) {
-        return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
-      }
-      if (prs.length === 0) {
-        if (options?.allowVerifiedNoPrMerge) {
-          return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
-        }
-        return { merged: false, reason: `No PR found for ${branchName}; refusing to infer merge from branch state alone` };
-      }
-      return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
-    }
-
-    const { stdout } = await execAsync(
-      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
-      { cwd: projectPath },
-    );
-    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
-    const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
-    if (mergedPr) {
-      return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
-    }
-    if (prs.length === 0) {
-      if (options?.allowVerifiedNoPrMerge) {
-        return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
-      }
-      return { merged: false, reason: `No PR found for ${branchName}; refusing to infer merge from branch state alone` };
-    }
-    return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
-  } catch (err: any) {
-    return { merged: false, reason: `Unable to verify merge state for ${branchName} via GitHub PR API: ${err?.message?.slice(0, 200) || 'unknown'}` };
-  }
 }
 
 export async function postMergeLifecycle(

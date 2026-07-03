@@ -60,6 +60,7 @@ import {
   getIssuePrTabCacheGeneration,
   setCachedIssuePrTabResponse,
 } from '../services/pr-tab-cache.js';
+import { githubPrLookupSource, lookupPullRequestNumberForBranch } from '../services/github-pr-lookup.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
@@ -76,7 +77,6 @@ import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
-import { isGitHubAppConfigured, listPullRequestsForHead } from '../../../lib/github-app.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -3306,36 +3306,13 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
   try {
-    if (isGitHubAppConfigured()) {
-      const prs = await Effect.runPromise(listPullRequestsForHead(githubCheck.owner, githubCheck.repo, branchName, 'all'));
-      const pr = prs[0];
-      if (!pr) {
-        return { issueId: upper, repoArg: null, prNumber: null };
-      }
-      return { issueId: upper, repoArg, prNumber: String(pr.number) };
-    }
-
-    const { stdout } = await execFileAsync(
-      'gh',
-      [
-        'pr', 'list',
-        '--repo', repoArg,
-        '--head', branchName,
-        '--state', 'all',
-        '--json', 'number',
-        '--limit', '1',
-        '--jq', '.[0].number',
-      ],
-      { encoding: 'utf-8', timeout: 15000 },
-    );
-    const prNumber = stdout.trim();
-    if (!prNumber) {
+    const prNumber = await lookupPullRequestNumberForBranch(githubCheck.owner, githubCheck.repo, branchName);
+    if (prNumber == null) {
       return { issueId: upper, repoArg: null, prNumber: null };
     }
-    return { issueId: upper, repoArg, prNumber };
+    return { issueId: upper, repoArg, prNumber: String(prNumber) };
   } catch (err: any) {
-    const source = isGitHubAppConfigured() ? 'GitHub App PR lookup' : 'gh pr list';
-    return { issueId: upper, repoArg: null, prNumber: null, error: `${source} failed: ${err.message}` };
+    return { issueId: upper, repoArg: null, prNumber: null, error: `${githubPrLookupSource()} failed: ${err.message}` };
   }
 }
 
@@ -3790,34 +3767,9 @@ export async function fetchIssueDiscussions(
       }
       const branchName = `feature/${issueId.toLowerCase()}`;
       try {
-        if (isGitHubAppConfigured() && prOwner && prRepo) {
-          const prs = await Effect.runPromise(listPullRequestsForHead(prOwner, prRepo, branchName, 'all'));
-          const pr = prs[0];
-          if (pr) return pr.number;
-          return null;
-        }
-
-        const { stdout } = await execFileAsync(
-          'gh',
-          [
-            'pr', 'list',
-            '--repo', prRepoArg,
-            '--head', branchName,
-            '--state', 'all',
-            '--json', 'number',
-            '--limit', '1',
-            '--jq', '.[0].number',
-          ],
-          { encoding: 'utf-8', timeout: 15000 },
-        );
-        const trimmed = stdout.trim();
-        if (trimmed) {
-          const parsed = parseInt(trimmed, 10);
-          if (Number.isFinite(parsed)) return parsed;
-        }
+        if (prOwner && prRepo) return lookupPullRequestNumberForBranch(prOwner, prRepo, branchName);
       } catch (err: any) {
-        const source = isGitHubAppConfigured() ? 'GitHub App PR lookup' : 'gh pr list';
-        errors.push(`${source} failed: ${err?.message ?? String(err)}`);
+        errors.push(`${githubPrLookupSource()} failed: ${err?.message ?? String(err)}`);
       }
     }
     return null;
