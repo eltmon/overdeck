@@ -35,9 +35,9 @@ describe('resolveAllowedHarness (PAN-1842)', () => {
     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: 'ohmypi' });
   });
 
-  it('falls back to claude-code when resolveHarness throws', async () => {
+  it('surfaces resolveHarness errors instead of falling back to claude-code', async () => {
     resolveHarnessMock.mockRejectedValue(new Error('model denied'));
 
-    expect(await resolveAllowedHarness(undefined, 'gpt-5.5')).toBe('claude-code');
+    await expect(resolveAllowedHarness(undefined, 'gpt-5.5')).rejects.toThrow('model denied');
   });
 });

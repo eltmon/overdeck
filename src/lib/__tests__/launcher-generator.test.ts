@@ -1004,11 +1004,9 @@ describe('pi model provider qualification (PAN-1799)', () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('kimi-k2.6')).toBe('kimi-coding/kimi-k2.6');
   });
-  it('qualifies openai models with openai-codex; unknown ids inherit the anthropic default (parity with conversations)', async () => {
+  it('qualifies openai models with openai-codex and rejects unknown model ids', async () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
-    // getProviderForModelSync falls back to anthropic for unknown ids — the
-    // same behavior conversations.ts has always had for pi model resolution.
-    expect(qualifyPiModel('totally-unknown-model')).toBe('anthropic/totally-unknown-model');
+    expect(() => qualifyPiModel('totally-unknown-model')).toThrow('Unknown model "totally-unknown-model".');
   });
 });

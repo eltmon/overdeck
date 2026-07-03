@@ -474,11 +474,11 @@ program
   .command('handoff [conv] [focus...]')
   .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters. Very large source conversations are auto-degraded (truncated smart summary → heuristic → focus-only) and still hand off without aborting.')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
-  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code, pi, or codex')
+  .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
-  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code, pi, or codex (only when --author=external)')
+  .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')
   .action(handoffCommand);
 
 program
