@@ -224,6 +224,15 @@ export class SupervisorWatchdog {
         this.state.consecutiveHardFailures = 0;
         this.state.lastError = patrolFailure.message;
         if (!patrolFailure.restartReady) return;
+        if (this.state.consecutiveFailures < this.config.busyFailThreshold) {
+          if (this.state.consecutiveFailures === this.config.failThreshold) {
+            await this.log(
+              `watchdog: deacon patrol heartbeat stale but dashboard health is OK — `
+              + `${this.state.consecutiveFailures} consecutive patrol failures; deferring restart until ${this.config.busyFailThreshold}`,
+            );
+          }
+          return;
+        }
         restartReason = patrolFailure.reason;
         restartLogReason = patrolFailure.logReason;
       } else {
