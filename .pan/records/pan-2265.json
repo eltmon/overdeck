@@ -57,6 +57,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T16:39:25.008Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:42:53.043Z"
     }
   ],
   "feedback": [],
@@ -152,18 +157,21 @@
     "recordedAt": "2026-07-03T16:39:12.519Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T16:39:37.966Z",
+  "updated": "2026-07-03T16:43:58.577Z",
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:39:37.908Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T16:43:58.337Z",
+    "reviewNotes": "Review passed; new delta is test/result metadata and runtime surface remains approved",
+    "testNotes": "npm run typecheck: clean; npm run lint: clean; focused vitest suites: tests/unit/lib/github-app.test.ts, tests/unit/cli/commands/flywheel-surfaces.test.ts, src/lib/cloister/__tests__/issue-closed.test.ts, src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts, tests/unit/lib/forge.test.ts, tests/unit/lib/github-graphql-cooldown.test.ts, tests/unit/lib/webhook-handlers.test.ts, tests/unit/dashboard/server/routes/issue-pr.test.ts, tests/unit/dashboard/server/routes/issue-discussions.test.ts — 9 files, 135 tests passed. Browser UAT not required: spec NonGoals exclude frontend changes and the issue is backend-only GitHub GraphQL/App-REST routing.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "lastVerifiedCommit": "cb9346517d7149ae5e128b16de62ce16500fa01a",
+    "reviewedAtCommit": "f47031d77c4684c4cad288ffe85fce8e015e515f",
+    "lastVerifiedCommit": "f47031d77c4684c4cad288ffe85fce8e015e515f",
     "reviewRequestedAt": "2026-07-03T16:39:24.422Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -270,8 +278,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 34081,
-            "output": 1840,
+            "input": 35120,
+            "output": 1999,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -286,9 +294,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 478226,
-            "output": 15461,
-            "cacheRead": 4529152,
+            "input": 770549,
+            "output": 20783,
+            "cacheRead": 5814016,
             "cacheWrite": 0
           }
         }
@@ -301,8 +309,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 34081,
-          "output": 1840,
+          "input": 35120,
+          "output": 1999,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -313,15 +321,15 @@
           "cacheWrite": 170267
         },
         "custom/kimi-k2.7-code": {
-          "input": 478226,
-          "output": 15461,
-          "cacheRead": 4529152,
+          "input": 770549,
+          "output": 20783,
+          "cacheRead": 5814016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.351097,
-        "pricingAsOf": "2026-07-03T16:39:37.965Z"
+        "usd": 9.894214,
+        "pricingAsOf": "2026-07-03T16:43:58.576Z"
       }
     },
     "merges": [
