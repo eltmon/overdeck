@@ -123,20 +123,28 @@ async function deliverReviewVerdictFeedbackPromise(
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
-    const target = await resolveIssueFeedbackTarget(issueId, { itemId: opts.slotItemId });
-    if ('agentId' in target) {
-      try {
-        await messageAgent(target.agentId, message);
-        agentMessageSent = true;
-      } catch (err) {
-        console.log(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+    try {
+      const target = await resolveIssueFeedbackTarget(issueId, { itemId: opts.slotItemId });
+      if ('agentId' in target) {
+        try {
+          await messageAgent(target.agentId, message);
+          agentMessageSent = true;
+        } catch (err) {
+          console.log(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } else {
+        try {
+          surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+            specialist: 'review-agent',
+            feedbackPath: fileResult.filePath,
+            slotItemId: opts.slotItemId,
+          });
+        } catch (err) {
+          console.warn(`[review-verdict-feedback] Could not mark ${issueId} as needing human attention; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
-    } else {
-      surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-        specialist: 'review-agent',
-        feedbackPath: fileResult.filePath,
-        slotItemId: opts.slotItemId,
-      });
+    } catch (err) {
+      console.warn(`[review-verdict-feedback] Could not resolve a feedback target for ${issueId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else if (!fileResult.success) {
     console.error(`[review-verdict-feedback] Failed to write feedback file for ${issueId}: ${fileResult.error}`);
