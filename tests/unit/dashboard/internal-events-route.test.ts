@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   appendInternalEvents,
   computeInternalReplaySince,
+  mergeInternalEventReplay,
   parseInternalEventsBody,
   parseInternalEventsSince,
   validateInternalEventsHeaders,
@@ -61,5 +62,20 @@ describe('internal events route helpers', () => {
   it('caps internal replay windows before readFrom()', () => {
     expect(computeInternalReplaySince(900, 1000)).toEqual({ since: 900, skipped: 0 });
     expect(computeInternalReplaySince(0, 2000)).toEqual({ since: 1000, skipped: 1000 });
+  });
+
+  it('merges replayed and buffered events without dropping the live gap', () => {
+    expect(mergeInternalEventReplay(
+      [
+        { sequence: 10, type: 'activity.entry', timestamp: '2026-07-03T00:00:10.000Z', payload: { message: 'replay' } },
+      ],
+      [
+        { sequence: 11, type: 'activity.entry', timestamp: '2026-07-03T00:00:11.000Z', payload: { message: 'live' } },
+      ],
+      9,
+    )).toEqual([
+      { sequence: 10, type: 'activity.entry', timestamp: '2026-07-03T00:00:10.000Z', payload: { message: 'replay' } },
+      { sequence: 11, type: 'activity.entry', timestamp: '2026-07-03T00:00:11.000Z', payload: { message: 'live' } },
+    ]);
   });
 });

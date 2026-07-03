@@ -6,7 +6,7 @@ import type { DomainEvent } from '@overdeck/contracts';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
 import { formatFrame } from './events.js';
-import { getEventStore } from '../event-store.js';
+import { getEventStore, type StoredEvent } from '../event-store.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 import { getHeaderFromMap, type HeaderMap } from './origin-validation.js';
@@ -77,6 +77,29 @@ export function computeInternalReplaySince(since: number, latestSequence: number
   return { since, skipped: 0 };
 }
 
+export function mergeInternalEventReplay(
+  replayed: StoredEvent[],
+  buffered: StoredEvent[],
+  since: number,
+): StoredEvent[] {
+  const merged: StoredEvent[] = [];
+  let maxSequence = since;
+
+  for (const event of replayed) {
+    merged.push(event);
+    if (event.sequence > maxSequence) maxSequence = event.sequence;
+  }
+
+  const live = [...buffered].sort((a, b) => a.sequence - b.sequence);
+  for (const event of live) {
+    if (event.sequence <= maxSequence) continue;
+    merged.push(event);
+    maxSequence = event.sequence;
+  }
+
+  return merged;
+}
+
 const internalEventsRoute = HttpRouter.add(
   'POST',
   '/api/internal/events',
@@ -127,9 +150,6 @@ const internalEventsStreamRoute = HttpRouter.add(
     const url = Option.isSome(urlOpt) ? urlOpt.value : new URL(request.url, 'http://localhost');
     const since = parseInternalEventsSince(url.searchParams.get('since')) ?? 0;
     const eventStore = getEventStore();
-    const latestSequence = eventStore.getLatestSequence();
-    const replayWindow = computeInternalReplaySince(since, latestSequence);
-    const missed = eventStore.readFrom(replayWindow.since);
 
     const encoder = new TextEncoder();
     let cleanup: (() => void) | null = null;
@@ -137,6 +157,8 @@ const internalEventsStreamRoute = HttpRouter.add(
     const nodeStream = new ReadableStream<Uint8Array>({
       start(controller) {
         let closed = false;
+        let replaying = true;
+        const buffered: StoredEvent[] = [];
         const safeEnqueue = (chunk: Uint8Array) => {
           if (closed) return;
           try {
@@ -146,19 +168,31 @@ const internalEventsStreamRoute = HttpRouter.add(
           }
         };
 
+        const unsubscribeFn = eventStore.subscribe((event) => {
+          if (replaying) {
+            buffered.push(event);
+            return;
+          }
+          safeEnqueue(encoder.encode(formatFrame(event)));
+        });
+
+        const latestSequence = eventStore.getLatestSequence();
+        const replayWindow = computeInternalReplaySince(since, latestSequence);
+        const missed = eventStore.readFrom(replayWindow.since);
+
+        const merged = mergeInternalEventReplay(missed, buffered, replayWindow.since);
+        replaying = false;
+        buffered.length = 0;
+
         safeEnqueue(encoder.encode(`: connected\n\n`));
         if (replayWindow.skipped > 0) {
           safeEnqueue(
             encoder.encode(`: replay truncated, skipped ${replayWindow.skipped} events (cap ${MAX_REPLAY_EVENTS})\n\n`),
           );
         }
-        for (const event of missed) {
+        for (const event of merged) {
           safeEnqueue(encoder.encode(formatFrame(event)));
         }
-
-        const unsubscribeFn = eventStore.subscribe((event) => {
-          safeEnqueue(encoder.encode(formatFrame(event)));
-        });
 
         cleanup = () => {
           if (closed) return;

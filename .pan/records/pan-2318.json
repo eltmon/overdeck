@@ -62,6 +62,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T22:22:58.104Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T22:25Z] review-agent → CHANGES-REQUESTED — seq 7",
+      "timestamp": "2026-07-03T22:25:38.187Z"
     }
   ],
   "feedback": [
@@ -99,6 +104,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-03T22:18:28Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nInternal event stream replays unbounded readFrom cursor\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 7,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T22:25:38Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2318\n\nInternal event stream can miss replay/live gap events\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2318 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -213,17 +225,17 @@
     "recordedAt": "2026-07-03T21:35:21.351Z"
   },
   "created": "2026-07-03T18:47:58.596Z",
-  "updated": "2026-07-03T22:23:01.951Z",
+  "updated": "2026-07-03T22:25:38.187Z",
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T22:23:01.914Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
+    "updatedAt": "2026-07-03T22:25:34.336Z",
+    "reviewNotes": "Internal event stream can miss replay/live gap events",
     "verificationNotes": "Verification FAILED at test (50837ms):\n\ngit\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/dashboard/metrics-stuck-count.test.ts [ tests/unit/dashboard/metrics-stuck-count.test.ts ]\nError: [vitest] No \"readCloisterStateFile\" export is defined on the \"../../../src/lib/cloister/service.js\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"../../../src/lib/cloister/service.js\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ createDeaconSupervisor src/dashboard/server/services/deacon-supervisor.ts:60:39\n     58| export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}…\n     59|   const forkImpl = deps.fork ?? fork;\n     60|   const readState = deps.readState ?? readCloisterStateFile;\n       |                                       ^\n     61|   const emitActivity = deps.emitActivity ?? emitActivityEntrySync;\n     62|   const now = deps.now ?? Date.now;\n ❯ src/dashboard/server/services/deacon-supervisor.ts:199:27\n ❯ src/dashboard/server/services/cloister-control-surface.ts:19:1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "inspectNotes": "Spec fidelity PASS: diff implements WI-1 deacon child entry, supervisor, tsdown entry, main spawn/shutdown wiring, and single-deacon lock. Constraint compliance PASS: no new execSync/sync tmux/Bun child path violations; deacon-supervisor tests use fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
@@ -391,7 +403,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.4635679999999995,
-        "pricingAsOf": "2026-07-03T22:23:01.941Z"
+        "pricingAsOf": "2026-07-03T22:25:34.365Z"
       }
     },
     "merges": [
