@@ -40,7 +40,7 @@ async function fetchBootReconciliation(): Promise<BootReconciliationState> {
 async function postBootReconciliationDecision(input: {
   decision: Exclude<BootReconciliationDecision, 'pending'>;
   perAgent?: Record<string, BootReconciliationPerAgentAction>;
-}): Promise<{ ok: boolean; count: number; resumed: string[] }> {
+}): Promise<{ ok: boolean; count: number; resumed: string[]; skipped: Record<string, number>; deferred: number }> {
   const res = await fetch('/api/boot-reconciliation/decision', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -114,6 +114,21 @@ const CONCERN_ORDER: BootReconciliationConcern[] = [
   'paused_troubled',
 ];
 
+function formatDecisionSkipSummary(skipped: Record<string, number> = {}, deferred = 0): string {
+  const labels: Record<string, string> = {
+    workspace_missing: 'workspace missing',
+    merged: 'already merged',
+    completed: 'completed',
+    other: 'not resumable',
+  };
+  const parts = Object.entries(labels)
+    .map(([key, label]) => ({ count: skipped[key] ?? 0, label }))
+    .filter((item) => item.count > 0)
+    .map((item) => `${item.count} ${item.label}`);
+  if (deferred > 0) parts.push(`${deferred} deferred`);
+  return parts.join(', ');
+}
+
 export function BootReconciliationModal() {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
@@ -155,13 +170,15 @@ export function BootReconciliationModal() {
 
   const decisionMutation = useMutation({
     mutationFn: postBootReconciliationDecision,
-    onSuccess: ({ count }) => {
+    onSuccess: ({ count, skipped, deferred }) => {
       void queryClient.invalidateQueries({ queryKey: BOOT_RECONCILIATION_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
+      const skipSummary = formatDecisionSkipSummary(skipped, deferred);
+      const message = count > 0
+        ? `Boot decision saved. Resuming ${count} agent${count === 1 ? '' : 's'}.${skipSummary ? ` Also skipped ${skipSummary}.` : ''}`
+        : `Boot decision saved. No agents resumed${skipSummary ? ` — ${skipSummary}` : ''}.`;
       showAlert({
-        message: count > 0
-          ? `Boot decision saved. Resuming ${count} agent${count === 1 ? '' : 's'}.`
-          : 'Boot decision saved. No agents were resumed.',
+        message,
         variant: 'success',
       });
     },
