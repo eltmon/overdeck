@@ -635,45 +635,6 @@ program
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
   .action(devCommand);
 
-/**
- * Wait for the dashboard to be healthy, then — when Traefik is enabled — wait for
- * the Traefik-routed URL to return 200. Returns the URL that should be announced
- * and opened. Falls back to the direct localhost API port when Traefik is not
- * ready within the bounded timeout.
- */
-async function resolveDashboardReadyUrl(config: {
-  traefikEnabled: boolean;
-  traefikDomain: string;
-  dashboardPort: number;
-  dashboardApiPort: number;
-  healthTimeoutMs?: number;
-  traefikTimeoutMs?: number;
-}): Promise<{ readyUrl: string; apiUrl: string; traefikReady: boolean }> {
-  const { waitForDashboardHealth, waitForTraefikHealth } = await import('../lib/platform-lifecycle.js');
-  await Effect.runPromise(
-    waitForDashboardHealth(config.dashboardApiPort, { timeoutMs: config.healthTimeoutMs ?? 15_000 }),
-  );
-  if (config.traefikEnabled) {
-    const traefikReady = await Effect.runPromise(
-      waitForTraefikHealth(config.traefikDomain, { timeoutMs: config.traefikTimeoutMs ?? 10_000 }),
-    );
-    if (traefikReady) {
-      return {
-        readyUrl: `https://${config.traefikDomain}`,
-        apiUrl: `https://${config.traefikDomain}/api`,
-        traefikReady: true,
-      };
-    }
-    const readyUrl = `http://localhost:${config.dashboardApiPort}`;
-    return { readyUrl, apiUrl: readyUrl, traefikReady: false };
-  }
-  return {
-    readyUrl: `http://localhost:${config.dashboardPort}`,
-    apiUrl: `http://localhost:${config.dashboardApiPort}`,
-    traefikReady: false,
-  };
-}
-
 program
   .command('up')
   .description('Start dashboard (and Traefik if enabled)')
@@ -695,6 +656,7 @@ program
     const { fileURLToPath } = await import('url');
     const { readFileSync, existsSync } = await import('fs');
     const { parse } = await import('@iarna/toml');
+    const { resolveDashboardReadyUrl } = await import('./up-readiness.js');
 
     // Find dashboard - check bundled first, then source
     const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -944,99 +906,11 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    // Shared post-launch sidecars (CLIProxy, smee, TLDR) — must run for
-    // every launch mode so the Electron fast-path does not skip them.
-    async function startPostLaunchSidecars(): Promise<void> {
-      // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
-      // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
-      // sidecar still comes up and will pick up credentials once they log in.
-      try {
-        const { startCliproxySync, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
-        console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-        startCliproxySync();
-        console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
-        console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
-      }
-
-      // Start smee-client webhook relay (optional — non-fatal)
-      try {
-        const { startSmeeProcessSync } = await import('../lib/smee.js');
-        console.log(chalk.dim('\nStarting smee-client webhook relay...'));
-        startSmeeProcessSync();
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
-        console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
-      }
-
-      // Start TLDR daemon on project root (if Python3 and venv available)
-      try {
-        const { getTldrDaemonServiceSync } = await import('../lib/tldr-daemon.js');
-        const projectRoot = process.cwd();
-        const venvPath = join(projectRoot, '.venv');
-        if (existsSync(venvPath)) {
-          console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-          const tldrService = getTldrDaemonServiceSync(projectRoot, venvPath);
-          await tldrService.start(true);  // background mode
-          console.log(chalk.green('✓ TLDR daemon started'));
-        } else {
-          console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
-          console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
-        }
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
-        console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
-      }
-
-      try {
-        const { loadConfigSync } = await import('../lib/config-yaml.js');
-        const { startTtsDaemon } = await import('../lib/tts-daemon.js');
-        const ttsConfig = loadConfigSync().config.tts;
-        if (ttsConfig.daemonAutoStart) {
-          console.log(chalk.dim('\nStarting Qwen TTS daemon...'));
-          const result = await Effect.runPromise(startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 }));
-          if (result.ok) {
-            console.log(chalk.green(`✓ Qwen TTS daemon listening on http://${ttsConfig.daemonHost}:${ttsConfig.daemonPort}`));
-          } else {
-            console.log(chalk.yellow('⚠ Failed to start Qwen TTS daemon:'), result.error ?? result.status?.error ?? 'unknown error');
-          }
-        }
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to evaluate Qwen TTS daemon auto-start:'), error?.message || String(error));
-      }
-
-      // Start the supervisor sidecar — exposes POST /restart-dashboard on a
-      // separate port so the dashboard's Force Restart button still works
-      // when the dashboard process itself has crashed.
-      try {
-        const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
-        startSupervisorProcessSync();
-        console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPortSync()}`));
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
-        console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
-      }
-
-      // Deferred context sync — moved off the critical path of `overdeck up`.
-      // Spawned detached AFTER the dashboard is up so it neither blocks the
-      // ~22s before the server spawns nor contends with the server's own boot.
-      // A separate process so it completes regardless of how `pan up` exits
-      // (foreground supervision, --detach, or the Electron fast-path). Its
-      // output is discarded; the next Claude Code session picks up the result.
-      try {
-        const selfCli = fileURLToPath(import.meta.url);
-        const syncChild = spawn(process.execPath, [selfCli, 'sync', '--if-changed'], {
-          detached: true,
-          stdio: 'ignore',
-        });
-        syncChild.on('error', () => { /* non-fatal: sync is best-effort */ });
-        syncChild.unref();
-        console.log(chalk.dim('Context sync (skills, rules, hooks, MCP, CLAUDE.md) running in background'));
-      } catch (error: any) {
-        console.log(chalk.yellow('⚠ Could not start deferred context sync (non-fatal):'), error?.message || String(error));
-      }
-    }
+    const { startPostLaunchSidecars } = await import('./up-sidecars.js');
+    const startUpSidecars = () => startPostLaunchSidecars({
+      selfCli: fileURLToPath(import.meta.url),
+      projectRoot: process.cwd(),
+    });
 
     async function openDashboardInBrowser(url: string): Promise<void> {
       if (options.open === false) return;
@@ -1086,7 +960,7 @@ program
       if (launchSucceeded) {
         child.unref();
         console.log(chalk.green('✓ Desktop app launched'));
-        await startPostLaunchSidecars();
+        await startUpSidecars();
         return;
       }
     }
@@ -1263,7 +1137,7 @@ program
       }
     }
 
-    await startPostLaunchSidecars();
+    await startUpSidecars();
   });
 
 program
