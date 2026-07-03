@@ -1,23 +1,114 @@
 {
   "issueId": "PAN-2257",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-03T09:26:26.615Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2257.md",
+      ".pan/records/pan-2257.json",
+      ".pan/test/result.json",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+    ],
+    "declaredScope": [
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2257.md",
+      ".pan/records/pan-2257.json",
+      ".pan/test/result.json",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "recordedAt": "2026-07-03T09:26:20.325Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2257",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T09:25:24.331Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T09:26:26.633Z",
     "reviewNotes": "No blocking findings; only review/test artifacts changed since prior pass",
     "testNotes": "Verified after specialist feedback: configured root npm test passed (812 files passed, 4 skipped; 8139 tests passed, 52 skipped) and frontend issue action tests passed (3 files, 32 tests). Previously named suites also passed directly.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
-    "reviewedAtCommit": "acb701b5d9e8e286b3ebf00f7d3d1e4ddfccc769"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
+    "reviewedAtCommit": "acb701b5d9e8e286b3ebf00f7d3d1e4ddfccc769",
+    "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2257.md",
+        ".pan/records/pan-2257.json",
+        ".pan/test/result.json",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+      ],
+      "declaredScope": [
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "tests/e2e/styleguide-conformance.spec.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2257.md",
+        ".pan/records/pan-2257.json",
+        ".pan/test/result.json",
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "tests/e2e/styleguide-conformance.spec.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
+      ],
+      "recordedAt": "2026-07-03T09:26:20.325Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -41,14 +132,16 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T09:25:24.359Z"
+        "pricingAsOf": "2026-07-03T09:26:26.649Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2281"
+    ],
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T09:23:06.958Z",
-  "updated": "2026-07-03T09:26:14.854Z",
+  "updated": "2026-07-03T09:26:26.649Z",
   "statusOverrides": {
     "verify-troubled-tree": "completed",
     "verify-troubled-tree.ac1": "completed",
