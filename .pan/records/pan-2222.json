@@ -16,17 +16,19 @@
       "reason": "feedback",
       "note": "[2026-07-03T02:40Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-03T02:40:06.414Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T02:40:06Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2222\n\ntracked failed .pan/test/result.json would poison the test stage\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2222 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T02:42:43.305Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T02:46:44.518Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-2222.json",
@@ -165,17 +167,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2222",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:40:02.430Z",
+    "updatedAt": "2026-07-03T02:46:49.447Z",
     "reviewNotes": "tracked failed .pan/test/result.json would poison the test stage",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
-    "lastVerifiedCommit": "393881d1da7fd54af896efe50d2ffb5ead38511e",
+    "lastVerifiedCommit": "29f476e8813f2b18c2a6b7edb0832494e8f661b1",
     "reviewRequestedAt": "2026-07-03T02:38:26.910Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -313,7 +316,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.318182,
-        "pricingAsOf": "2026-07-03T02:40:02.480Z"
+        "pricingAsOf": "2026-07-03T02:46:49.470Z"
       }
     },
     "merges": [
@@ -333,5 +336,5 @@
     ]
   },
   "created": "2026-07-03T02:36:55.911Z",
-  "updated": "2026-07-03T02:40:06.414Z"
+  "updated": "2026-07-03T02:46:49.498Z"
 }
