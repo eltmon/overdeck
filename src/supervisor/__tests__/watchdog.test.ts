@@ -167,13 +167,14 @@ describe('SupervisorWatchdog', () => {
     expect(recovered.status().restartAttempts).toEqual([]);
   });
 
-  it('restarts when dashboard health is OK but deacon patrol heartbeat is stale', async () => {
+  it('defers restart when dashboard health is OK but deacon patrol heartbeat is stale', async () => {
     const spawns = { count: 0 };
     const logs: string[] = [];
     const watchdog = makeWatchdog({
       spawns,
       logs,
       fetchOk: true,
+      config: { ...config, failThreshold: 1, busyFailThreshold: 3 },
       now: () => Date.parse('2026-05-17T15:35:00.000Z'),
       deaconStatus: {
         isRunning: true,
@@ -183,11 +184,22 @@ describe('SupervisorWatchdog', () => {
     });
 
     await watchdog.checkOnce();
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 2,
+      consecutiveHardFailures: 0,
+    });
+    expect(logs.some((msg) => msg.includes('deferring restart until 3'))).toBe(true);
+
+    await watchdog.checkOnce();
 
     expect(spawns.count).toBe(1);
     expect(watchdog.status()).toMatchObject({
       healthy: false,
-      consecutiveFailures: 1,
+      consecutiveFailures: 3,
       consecutiveHardFailures: 0,
     });
     expect(watchdog.status().lastError).toContain('deacon patrol heartbeat stale');
@@ -200,6 +212,7 @@ describe('SupervisorWatchdog', () => {
     const watchdog = makeWatchdog({
       spawns,
       fetchOk: true,
+      config: { ...config, busyFailThreshold: 3 },
       now: () => now,
       deaconStatus: {
         isRunning: true,
@@ -226,6 +239,7 @@ describe('SupervisorWatchdog', () => {
     const watchdog = makeWatchdog({
       spawns,
       fetchOk: true,
+      config: { ...config, busyFailThreshold: 1 },
       now: () => now,
       deaconStatus: {
         isRunning: true,
