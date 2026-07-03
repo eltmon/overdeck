@@ -78,6 +78,7 @@
   "src/dashboard/server/routes/misc/meta.ts",
   "src/dashboard/server/routes/show.ts",
   "src/dashboard/server/routes/specialists.ts",
+  "src/dashboard/server/routes/specialists/legacy-routes.ts",
   "src/dashboard/server/routes/workspaces.ts",
   "src/dashboard/server/routes/workspaces/merge-ops.ts",
   "src/dashboard/server/services/agent-spawner.ts",
