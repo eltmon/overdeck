@@ -21,24 +21,29 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T04:22:02.322Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:34:56.512Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-03T04:02:51.756Z",
-  "updated": "2026-07-03T04:23:19.561Z",
+  "updated": "2026-07-03T04:35:05.443Z",
   "pipeline": {
     "issueId": "PAN-2254",
     "reviewStatus": "reviewing",
-    "testStatus": "passed",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:23:19.478Z",
-    "reviewNotes": "Approve-route recovery tells true-diverged main to push directly, which cannot succeed",
+    "updatedAt": "2026-07-03T04:35:05.055Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2272",
-    "lastVerifiedCommit": "39de331464c5b2984dd627bf30e92fe3c4c6ee51",
+    "lastVerifiedCommit": "848e7773c5f6c95345c3114dcc16f3ccc2622140",
     "reviewRequestedAt": "2026-07-03T04:19:13.851Z"
   },
   "closeOut": {
@@ -63,7 +68,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:23:19.560Z"
+        "pricingAsOf": "2026-07-03T04:35:05.400Z"
       }
     },
     "merges": [
