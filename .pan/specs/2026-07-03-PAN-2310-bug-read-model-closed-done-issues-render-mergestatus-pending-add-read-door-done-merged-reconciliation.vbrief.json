@@ -4,17 +4,17 @@
     "created": "2026-07-03T16:28:29.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2310: read-door done→merged reconciliation so closed/done issues never render mergeStatus=pending",
-    "updated": "2026-07-03T16:31:32.099Z"
+    "updated": "2026-07-03T16:40:59.973Z"
   },
   "plan": {
     "id": "pan-2310",
     "title": "bug(read-model): closed/done issues render mergeStatus=pending — add read-door done→merged reconciliation",
-    "status": "proposed",
+    "status": "running",
     "uid": "8d5d5e4f-8aba-4940-861a-7d1911cf6950",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-03T16:28:29.000Z",
-    "updated": "2026-07-03T16:31:32.099Z",
+    "updated": "2026-07-03T16:40:59.973Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2310",
@@ -129,5 +129,5 @@
       "canonicalFilename": "2026-07-03-PAN-2310-bug-read-model-closed-done-issues-render-mergestatus-pending-add-read-door-done-merged-reconciliation.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
