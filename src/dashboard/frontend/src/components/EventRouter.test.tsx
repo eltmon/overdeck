@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardSnapshot, DomainEvent } from '@overdeck/contracts'
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
-import { EventRouter } from './EventRouter'
+import { EventRouter, eventRouterReconnectDelayMs } from './EventRouter'
 import { useDashboardStore } from '../lib/store'
 
 const wsTransport = vi.hoisted(() => {
@@ -147,6 +147,7 @@ describe('EventRouter memory updates', () => {
   })
 
   it('ignores heartbeat frames for sequencing while resetting stream staleness', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
     render(<EventRouter />)
 
     await act(async () => {
@@ -175,11 +176,18 @@ describe('EventRouter memory updates', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(17)
     })
+    expect(resetTransport).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
     expect(resetTransport).toHaveBeenCalledTimes(1)
+    random.mockRestore()
   })
 
   it('forces a fresh reconnect when the domain stream goes stale', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
     render(<EventRouter />)
 
     await act(async () => {
@@ -197,10 +205,65 @@ describe('EventRouter memory updates', () => {
       await Promise.resolve()
     })
 
+    expect(unsubscribe).not.toHaveBeenCalled()
+    expect(resetTransport).not.toHaveBeenCalled()
+    expect(subscribe).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_999)
+    })
+    expect(resetTransport).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+      await Promise.resolve()
+    })
+
     expect(unsubscribe).toHaveBeenCalledTimes(1)
     expect(resetTransport).toHaveBeenCalledTimes(1)
     expect(subscribe).toHaveBeenCalledTimes(2)
     expect(request).toHaveBeenCalledTimes(2)
+    random.mockRestore()
+    warn.mockRestore()
+  })
+
+  it('resets reconnect attempts to the base delay after receiving an event', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(37_000)
+      await Promise.resolve()
+    })
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledTimes(2)
+
+    act(() => {
+      wsTransport.subscribed!(systemHeartbeatEvent())
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(35_000)
+    })
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_999)
+    })
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+      await Promise.resolve()
+    })
+    expect(resetTransport).toHaveBeenCalledTimes(2)
+
+    random.mockRestore()
     warn.mockRestore()
   })
 
@@ -225,6 +288,10 @@ describe('EventRouter memory updates', () => {
   })
 
   it('shows an actionable retry overlay after repeated reconnect failures', async () => {
+    let resolveBootstrap: (value: DashboardSnapshot) => void = () => undefined
+    request.mockReturnValueOnce(new Promise<DashboardSnapshot>((resolve) => {
+      resolveBootstrap = resolve
+    }))
     render(<EventRouter />)
 
     await act(async () => {
@@ -238,6 +305,18 @@ describe('EventRouter memory updates', () => {
     expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
     const button = document.querySelector<HTMLButtonElement>('button')
     expect(button?.textContent).toBe('Retry')
+
+    act(() => {
+      button!.click()
+    })
+
+    expect(resetTransport).not.toHaveBeenCalled()
+    expect(subscribe).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveBootstrap(snapshot)
+      await Promise.resolve()
+    })
 
     act(() => {
       button!.click()
@@ -361,5 +440,23 @@ describe('EventRouter memory updates', () => {
 
     expect(request.mock.calls.length).toBe(callsAtWindowEnd)
     error.mockRestore()
+  })
+})
+
+describe('eventRouterReconnectDelayMs', () => {
+  it('doubles reconnect delays and caps the base delay at 30s', () => {
+    const noJitter = () => 0.5
+    expect(eventRouterReconnectDelayMs(1, noJitter)).toBe(2_000)
+    expect(eventRouterReconnectDelayMs(2, noJitter)).toBe(4_000)
+    expect(eventRouterReconnectDelayMs(3, noJitter)).toBe(8_000)
+    expect(eventRouterReconnectDelayMs(5, noJitter)).toBe(30_000)
+    expect(eventRouterReconnectDelayMs(10, noJitter)).toBe(30_000)
+  })
+
+  it('applies jitter within -20% and +20% bounds without exceeding the 30s cap', () => {
+    expect(eventRouterReconnectDelayMs(1, () => 0)).toBe(1_600)
+    expect(eventRouterReconnectDelayMs(1, () => 1)).toBe(2_400)
+    expect(eventRouterReconnectDelayMs(5, () => 0)).toBe(24_000)
+    expect(eventRouterReconnectDelayMs(5, () => 1)).toBe(30_000)
   })
 })
