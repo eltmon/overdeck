@@ -28,6 +28,7 @@ const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
   };
 });
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
+const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
   if (typeof callback === 'function') {
@@ -131,7 +132,7 @@ vi.mock('../../../src/lib/activity-log.js', () => ({
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
+  setReviewStatusSync: mockSetReviewStatusSync,
 }));
 
 vi.mock('../../../src/lib/memory/cli.js', () => ({
@@ -242,6 +243,25 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     expect(mockWriteFile).toHaveBeenCalledOnce();
     expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('persists reviewStatus passed in the merge status write when requested', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { markReviewPassed: true });
+
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      reviewStatus: 'passed',
+    });
+  });
+
+  it('does not persist reviewStatus passed by default', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+    });
   });
 
   // The in-process fallback path exercises several real dynamic imports and

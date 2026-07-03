@@ -45,8 +45,8 @@ export interface WebhookPayload {
   branches?: Array<{ name: string }>;
 }
 
-function issueIdFromBranch(ref: string): string | null {
-  const match = ref.match(/feature\/([a-z]+-\d+)$/i);
+export function issueIdFromBranch(ref: string): string | null {
+  const match = ref.match(/(?:feature|strike)\/([a-z]+-\d+)$/i);
   return match ? match[1].toUpperCase() : null;
 }
 
@@ -392,7 +392,8 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       const project = resolveProjectFromIssueSync(issueId);
       if (project) {
         const branchName = pr.head.ref;
-        postMergeLifecycle(issueId, project.projectPath, branchName).catch(err =>
+        const markReviewPassed = branchName.startsWith('strike/');
+        postMergeLifecycle(issueId, project.projectPath, branchName, { markReviewPassed }).catch(err =>
           console.warn(`[webhook] postMergeLifecycle failed for ${issueId} (${branchName}): ${err?.message ?? err}`),
         );
       }

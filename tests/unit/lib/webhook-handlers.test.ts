@@ -10,6 +10,7 @@ import {
   handlePullRequestReview,
   handlePullRequestReviewThread,
   handleStatus,
+  issueIdFromBranch,
   needsBlockerReconciliation,
   refreshMergeStateFromGitHub,
   type WebhookPayload,
@@ -21,6 +22,7 @@ const mockSetReviewStatus = vi.fn();
 const mockIsGitHubAppConfigured = vi.fn();
 const mockGetPullRequestState = vi.fn();
 const mockExecFile = vi.fn();
+const mockPostMergeLifecycle = vi.fn();
 let ghPrViewStdout = '';
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -46,6 +48,14 @@ vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({
 
 vi.mock('../../../src/lib/cloister/ci-failure-feedback.js', () => ({
   relayCiFailureFeedback: () => Effect.succeed({ agentMessageSent: false }),
+}));
+
+vi.mock('../../../src/lib/cloister/merge-agent.js', () => ({
+  postMergeLifecycle: (...args: Parameters<typeof mockPostMergeLifecycle>) => mockPostMergeLifecycle(...args),
+}));
+
+vi.mock('../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssueSync: () => ({ projectPath: '/tmp/test-project' }),
 }));
 
 vi.mock('../../../src/lib/github-app.js', () => ({
@@ -74,6 +84,15 @@ function makePayload(overrides: Partial<WebhookPayload> = {}): WebhookPayload {
     ...overrides,
   };
 }
+
+describe('issueIdFromBranch', () => {
+  it('parses feature and strike issue refs only', () => {
+    expect(issueIdFromBranch('feature/pan-123')).toBe('PAN-123');
+    expect(issueIdFromBranch('strike/pan-123')).toBe('PAN-123');
+    expect(issueIdFromBranch('main')).toBeNull();
+    expect(issueIdFromBranch('uat/pan-slate-0625')).toBeNull();
+  });
+});
 
 describe('handleCheckSuite', () => {
   it('adds failing_checks blocker on check suite failure', async () => {
@@ -228,6 +247,23 @@ describe('handleCheckRun', () => {
 });
 
 describe('handlePullRequest', () => {
+  it('dispatches postMergeLifecycle with review passed marking for merged strike PRs', async () => {
+    mockPostMergeLifecycle.mockResolvedValue(undefined);
+
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'closed',
+      pull_request: {
+        number: 1,
+        head: { ref: 'strike/pan-123' },
+        merged: true,
+      },
+    })));
+
+    expect(mockPostMergeLifecycle).toHaveBeenCalledWith('PAN-123', '/tmp/test-project', 'strike/pan-123', {
+      markReviewPassed: true,
+    });
+  });
+
   it('adds draft_pr blocker when PR is draft', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
