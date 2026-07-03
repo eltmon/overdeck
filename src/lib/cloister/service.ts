@@ -2,7 +2,7 @@
 import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
-import type { EventStore } from '../../dashboard/server/event-store.js';
+import type { DomainEvent } from '@overdeck/contracts';
 import { loadCloisterConfigSync } from './config.js';
 import {
   getAgentHealth,
@@ -128,6 +128,17 @@ export type ReactiveIssueState =
 export interface CloisterDomainEventLike {
   type: string;
   payload?: unknown;
+}
+
+interface CloisterEventStore {
+  append(event: Omit<DomainEvent, 'sequence'>): number;
+  subscribe?: (fn: (event: CloisterDomainEventLike) => void) => () => void;
+}
+
+let cloisterEventStoreProvider: (() => CloisterEventStore) | null = null;
+
+export function setCloisterEventStoreProvider(provider: (() => CloisterEventStore) | null): void {
+  cloisterEventStoreProvider = provider;
 }
 
 const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
@@ -648,7 +659,7 @@ export class CloisterService {
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
   private domainEventUnsubscribe: (() => void) | null = null;
-  private eventStore: EventStore | null = null;
+  private eventStore: CloisterEventStore | null = null;
 
   // ─── Status cache ────────────────────────────────────────────────────────────
   // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
@@ -887,6 +898,25 @@ export class CloisterService {
     if (this.domainEventUnsubscribe) return;
 
     try {
+      const injected = cloisterEventStoreProvider?.();
+      if (injected) {
+        this.eventStore = injected;
+        if (injected.subscribe) {
+          this.domainEventUnsubscribe = injected.subscribe((event) => {
+            void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
+              console.error('[cloister] Reactive lifecycle event handling failed:', error);
+              emitActivityEntrySync({
+                source: 'cloister',
+                level: 'error',
+                message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            });
+          });
+        }
+        console.log('  ✓ Cloister event store provider installed');
+        return;
+      }
+
       const { initEventStore } = await import('../../dashboard/server/event-store.js');
       const store = await initEventStore();
       this.eventStore = store;
