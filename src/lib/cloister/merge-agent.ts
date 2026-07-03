@@ -11,6 +11,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync } from '../activity-logger.js';
+import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 
 const execAsync = promisify(exec);
 
@@ -295,6 +296,21 @@ async function verifyMergedBeforeLifecycle(
 
   const { owner, repo } = ghResolved;
   try {
+    if (isGitHubAppConfigured()) {
+      const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
+      const mergedPr = prs.find((pr) => pr.merged || pr.mergedAt || pr.mergeCommit);
+      if (mergedPr) {
+        return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
+      }
+      if (prs.length === 0) {
+        if (options?.allowVerifiedNoPrMerge) {
+          return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
+        }
+        return { merged: false, reason: `No PR found for ${branchName}; refusing to infer merge from branch state alone` };
+      }
+      return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
+    }
+
     const { stdout } = await execAsync(
       `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
       { cwd: projectPath },
