@@ -32,9 +32,10 @@ async function fetchDiscoveredMessages(sessionId: number): Promise<MessagesRespo
 }
 
 function conversationIdentifier(session: Session): string | null {
+  if (session.conversationName) return session.conversationName;
   if (session.conversationId) return session.conversationId;
   if (session.source === 'managed-archived') return String(session.id);
-  return session.conversationName ?? null;
+  return null;
 }
 
 export function SessionTranscript({ session }: { session: Session }) {

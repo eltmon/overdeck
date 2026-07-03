@@ -89,7 +89,7 @@ describe('SessionTranscript', () => {
     renderTranscript({ ...BASE_SESSION, conversationId: '7', conversationName: 'managed-conv', overdeckManaged: true });
 
     await screen.findByTestId('conversation-panel');
-    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/7');
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/managed-conv');
     expect(componentMocks.conversationPanel).toHaveBeenCalledWith(expect.objectContaining({
       embedded: true,
       viewMode: 'conversation',
