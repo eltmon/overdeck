@@ -1,7 +1,62 @@
 {
   "issueId": "PAN-1917",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T08:44:39.138Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T08:47Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-03T08:47:45.254Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T08:52:29.893Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T08:52:57.815Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T10:21:59.313Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T10:21:59.413Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T10:22:05.177Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T10:52:46.075Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T10:52:50.373Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T08:47:45Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-1917 (attempt 3/3):\n\nFailed check: test\n\nVerification FAILED at test (21741ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1917/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1917\n\n\n Test Files  78 passed (78)\n      Tests  897 passed (897)\n   Start at  04:47:25\n   Duration  8.86s (transform 23.67s, setup 17.83s, import 64.86s, tests 37.49s, environment 52.87s)\n\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-1917, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
+    }
+  ],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -53,16 +108,19 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "testing",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T08:44:12.582Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-03T08:47:44.560Z",
+    "reviewNotes": "No blocking findings in self-review",
+    "testNotes": "Verified outside the restricted specialist sandbox: npm test passed (root Vitest 816 files/8153 tests plus frontend issueActions 3 files/32 tests). The previously named tests/integration/agent-spawning.test.ts suite passed outside sandbox (43 tests); its specialist failures were sandbox EPERM on spawnSync /bin/sh for git init. Focused PAN-1917 backend/API suites passed, frontend conversations suites passed, and VITEST_INCLUDE_BENCH=1 sessions-feed benchmark passed. Read-only UAT against the existing operator-managed dashboard succeeded: /sessions returned HTTP 200 and headless Playwright rendered Session History with filters, Conversations, transcript, and Load text. No dashboard start/stop/restart was performed.",
+    "verificationNotes": "Verification FAILED at test (21741ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1917/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1917\n\n\n Test Files  78 passed (78)\n      Tests  897 passed (897)\n   Start at  04:47:25\n   Duration  8.86s (transform 23.67s, setup 17.83s, import 64.86s, tests 37.49s, environment 52.87s)\n\n",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
+    "reviewedAtCommit": "b93c438174dd9bd878628154155efa9aef7f4f2c",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
     "scopeDrift": {
@@ -195,7 +253,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.374843,
-        "pricingAsOf": "2026-07-03T08:44:12.627Z"
+        "pricingAsOf": "2026-07-03T08:47:44.603Z"
       }
     },
     "merges": [
@@ -229,12 +287,5 @@
     }
   },
   "created": "2026-07-03T08:37:35.067Z",
-  "updated": "2026-07-03T08:44:39.139Z",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T08:44:39.138Z"
-    }
-  ]
+  "updated": "2026-07-03T10:52:50.373Z"
 }
