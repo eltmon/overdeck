@@ -24,13 +24,12 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from '../../shared/ContextMenu';
-import { IssueActionDialogHost, clearTroubledGateForAgent, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
-import { useAlert } from '../../DialogProvider';
+import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
+import { TroubledBadges } from './TroubledBadges';
 import styles from '../styles/command-deck.module.css';
-
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
 interface FeatureItemProps {
@@ -318,25 +317,6 @@ function formatPausedAge(pausedAt?: string): string | null {
   if (hours < 1) return `${Math.max(1, Math.floor(ms / 60_000))}m`;
   if (hours < 48) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
-}
-
-function getTroubledBadgeLabel(session: SessionNodeType): string {
-  const queued = session.queuedMailCount ?? 0;
-  return queued > 0 ? `Troubled · ${queued} queued` : 'Troubled';
-}
-
-function getTroubledBadgeTitle(session: SessionNodeType): string {
-  const parts = [
-    `Session: ${session.sessionId}.`,
-    session.troubledReason ? `Reason: ${session.troubledReason}.` : 'Reason: unavailable.',
-    `Failures: ${session.consecutiveFailures ?? 0}.`,
-    session.troubledAt ? `Troubled at: ${session.troubledAt}.` : 'Troubled at: unavailable.',
-    `Queued deliveries: ${session.queuedMailCount ?? 0}.`,
-  ];
-  if ((session.consecutiveFailures ?? 0) === 0) {
-    parts.push('Likely spurious: troubled with 0 failures.');
-  }
-  return parts.join(' ');
 }
 
 function formatRoleList(roles: readonly string[]): string {
@@ -944,7 +924,6 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
-  const alert = useAlert();
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1088,11 +1067,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     }
   }, [onSelect, expanded, feature.issueId]);
 
-  const handleClearTroubled = useCallback((event: React.MouseEvent, sessionId: string) => {
-    event.stopPropagation();
-    void clearTroubledGateForAgent(sessionId, queryClient, alert).catch(() => undefined);
-  }, [alert, queryClient]);
-
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)
     : null;
@@ -1152,24 +1126,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               ))}
             </span>
           )}
-          {troubledSessions.length > 0 && (
-            <span className={styles.featureBadgeGroup}>
-              {troubledSessions.map((session) => (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  key={`troubled-${session.sessionId}`}
-                  className={`${styles.featureBadge} ${styles.featureBadge_troubled}`}
-                  data-testid="feature-troubled"
-                  title={getTroubledBadgeTitle(session)}
-                  onClick={(event) => handleClearTroubled(event, session.sessionId)}
-                >
-                  <AlertTriangle size={10} aria-hidden />
-                  {getTroubledBadgeLabel(session)}
-                </span>
-              ))}
-            </span>
-          )}
+          <TroubledBadges sessions={troubledSessions} />
           {pausedSession && (
             <span className={styles.featureBadgeGroup} data-testid="feature-paused">
               <span
