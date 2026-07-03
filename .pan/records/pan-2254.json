@@ -40,16 +40,20 @@
   ],
   "feedback": [],
   "created": "2026-07-03T04:02:51.756Z",
-  "updated": "2026-07-03T12:10:12.426Z",
+  "updated": "2026-07-03T12:11:27.693Z",
   "pipeline": {
     "issueId": "PAN-2254",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T12:10:12.394Z",
+    "updatedAt": "2026-07-03T12:11:27.670Z",
+    "reviewNotes": "No blocking findings; reviewed metadata and file-size baseline update only",
+    "testNotes": "Read AGENTS.md, .pan/records/pan-2254.json, .pan/specs/2026-07-03-PAN-2254-unstick-endpoint-prescribes-git-reset-hard-origin-main-when-local-main-is-merely-ahead-destructive-advice-for-a-recoverable-state.vbrief.json, and review notes; .pan/continue.json and .pan/spec.vbrief.json were absent at top-level. bd show PAN-2254 found no Beads issue. UAT not required: acceptance/review notes are backend/operator-message recovery guidance, not browser workflow. Commands: npm run typecheck passed; npm run lint passed; npm test failed under sandbox with EPERM for git subprocesses/listeners, then escalated npm test passed with root 807 passed/4 skipped files and frontend 3 passed files; focused npx vitest approve-push/unstick-route passed 2 files/20 tests; frontend KanbanBoard.test.tsx passed 1 file/84 tests. Main-side verification after specialist feedback also recorded configured root npm test passed (812 files passed, 4 skipped; 8139 tests passed, 52 skipped) and frontend issue action tests passed (3 files, 32 tests).",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2272",
+    "reviewedAtCommit": "9df8c4438245c69ce68970877d0f64dd6ec2258b",
     "lastVerifiedCommit": "9558e9f4dd4545bbecb20f502bc95ab49e01ae32",
     "reviewRequestedAt": "2026-07-03T04:19:13.851Z"
   },
@@ -58,8 +62,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 10401,
-            "output": 1413,
+            "input": 11403,
+            "output": 1563,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -67,15 +71,15 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 10401,
-          "output": 1413,
+          "input": 11403,
+          "output": 1563,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T12:10:12.425Z"
+        "pricingAsOf": "2026-07-03T12:11:27.692Z"
       }
     },
     "merges": [
@@ -83,8 +87,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed"
