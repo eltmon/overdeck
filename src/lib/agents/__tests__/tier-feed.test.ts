@@ -153,6 +153,7 @@ describe('broadcastCommit', () => {
       apiUrl: 'http://api.test',
       sha: 'abc123',
       beadTitle: 'my bead',
+      beadId: 'bead-1',
       tiers: [TIERS[0]],
       feedConfig: feedConfig({ callouts: 'notify' }),
       deliver,
@@ -167,8 +168,29 @@ describe('broadcastCommit', () => {
       'Do not fix it yourself. Do not edit files. A call-out is a flag, not a task.',
     );
     expect(deliveries[0].message).toContain(
-      `"issueId":"PAN-1","sha":"abc123","tierName":"cheap","agentId":"agent-pan-1-slot-1"`,
+      `"issueId":"PAN-1","sha":"abc123","beadId":"bead-1","tierName":"cheap","agentId":"agent-pan-1-slot-1"`,
     );
+  });
+
+  it('does not render an invalid call-out curl when the bead id is unavailable', async () => {
+    const { deliver, gitShow, deliveries, recordDelivery } = spies();
+
+    await broadcastCommit({
+      workspace: '/ws',
+      issueId: 'PAN-1',
+      apiUrl: 'http://api.test',
+      sha: 'abc123',
+      beadTitle: 'my bead',
+      tiers: [TIERS[0]],
+      feedConfig: feedConfig({ callouts: 'corroborate' }),
+      deliver,
+      gitShow,
+      recordDelivery,
+    });
+
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0].message).not.toContain('/api/tiered/callouts');
+    expect(deliveries[0].message).toContain('Do NOT respond to this message');
   });
 
   it('records timestamped token metrics for every feed delivery', async () => {

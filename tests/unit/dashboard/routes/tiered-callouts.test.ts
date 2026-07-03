@@ -72,6 +72,17 @@ describe('handleTieredCallout', () => {
     expect(disabled.deliverSupervisorReview).not.toHaveBeenCalled();
   });
 
+  it('requires beadId before corroborating through the supervisor', async () => {
+    const d = deps('corroborate');
+    const { beadId: _beadId, ...withoutBeadId } = BASE_CALLOUT;
+
+    const result = await handleTieredCallout(withoutBeadId, d);
+
+    expect(result).toEqual({ status: 400, body: { error: 'beadId is required for corroborate callouts' } });
+    expect(d.recordCallout).not.toHaveBeenCalled();
+    expect(d.deliverSupervisorReview).not.toHaveBeenCalled();
+  });
+
   it('does not call dispatch, verdict, or tracker mutation seams on any policy path', async () => {
     const notify = deps('notify');
     const corroborate = deps('corroborate');

@@ -32,6 +32,8 @@ export interface BroadcastCommitOptions {
   sha: string;
   /** Title of the bead the commit implements, shown in the feed header. */
   beadTitle: string;
+  /** Id of the bead the commit implements, required for call-out corroboration. */
+  beadId?: string;
   /** Commit subject used by feed.exclude_subjects. Defaults to beadTitle for legacy callers. */
   commitSubject?: string;
   /** The standing tier agents to deliver to — every one of them hears it. */
@@ -67,6 +69,7 @@ export interface RenderCommitFeedDiffDeps {
 export interface CommitFeedCalloutContext {
   apiUrl: string;
   issueId: string;
+  beadId: string;
   tierName: string;
   agentId: string;
 }
@@ -137,6 +140,7 @@ export function composeCommitFeedMessage(
     const body = JSON.stringify({
       issueId: callout.issueId,
       sha,
+      beadId: callout.beadId,
       tierName: callout.tierName,
       agentId: callout.agentId,
       claim: '<one sentence: what is wrong and where>',
@@ -190,7 +194,7 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
   const diff = await renderDiff(options.workspace, options.sha, feedConfig);
   const baseMessage = composeCommitFeedMessage(options.sha, options.beadTitle, diff);
   const baseTokenCount = estimateFeedDeliveryTokens(baseMessage);
-  const includeCallout = feedConfig.callouts !== 'off' && options.issueId !== undefined;
+  const includeCallout = feedConfig.callouts !== 'off' && options.issueId !== undefined && options.beadId !== undefined;
   const apiUrl = options.apiUrl ?? resolveFeedApiUrl();
 
   const deliveries: BroadcastDelivery[] = [];
@@ -199,6 +203,7 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
       ? composeCommitFeedMessage(options.sha, options.beadTitle, diff, {
         apiUrl,
         issueId: options.issueId!,
+        beadId: options.beadId!,
         tierName: tier.tierName,
         agentId: tier.agentId,
       })

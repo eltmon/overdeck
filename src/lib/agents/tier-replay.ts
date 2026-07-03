@@ -39,6 +39,7 @@ export interface ReplayCommit {
   sha: string;
   subject: string;
   diff: string;
+  beadId?: string;
 }
 
 export interface ReplayDelivery {
@@ -140,16 +141,19 @@ export async function replayStandingAgent(
   options: TierReplayOptions = {},
 ): Promise<ReplayResult> {
   const deps = replayDeps(options.deps);
-  const agent = await spawnReplayTarget(target, deps);
+  const replayTarget: ReplayTarget = target.kind === 'tier'
+    ? { ...target, ...resolveReplaySlot(target, deps) }
+    : target;
+  const agent = await spawnReplayTarget(replayTarget, deps);
   const commits = await loadReplayCommits(
-    target.workspace,
-    target.base,
-    target.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed,
+    replayTarget.workspace,
+    replayTarget.base,
+    replayTarget.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed,
     deps,
   );
-  const deliveries = target.kind === 'tier'
-    ? await replayTierFeed(agent.id, target, commits, deps)
-    : await replaySupervisorFeed(agent.id, target, commits, deps);
+  const deliveries = replayTarget.kind === 'tier'
+    ? await replayTierFeed(agent.id, replayTarget, commits, deps)
+    : await replaySupervisorFeed(agent.id, replayTarget, commits, deps);
 
   return { agent, commits, deliveries };
 }
@@ -298,14 +302,16 @@ async function replayTierFeed(
   const includeCallout = feedConfig.callouts !== 'off';
   const apiUrl = target.apiUrl ?? resolveFeedApiUrl();
   for (const commit of commits) {
+    const beadId = commit.beadId ?? target.slotItemId;
     const message = composeCommitFeedMessage(
       commit.sha,
       commit.subject,
       commit.diff,
-      includeCallout
+      includeCallout && beadId
         ? {
           apiUrl,
           issueId: target.issueId,
+          beadId,
           tierName: target.tierName,
           agentId,
         }

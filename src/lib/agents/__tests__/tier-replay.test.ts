@@ -67,7 +67,10 @@ function deps() {
   ]);
   const gitShow = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/file.ts b/file.ts\n+${sha}\n`);
   const renderDiff = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/file.ts b/file.ts\n+${sha}\n`);
-  return { spawn, deliver, stop, gitLog, gitShow, renderDiff, deliveries };
+  const listSlotOwnership = vi.fn(() => [
+    { slotIndex: 27, itemId: 'bead-a', agentId: 'agent-pan-1791-slot-27' },
+  ]);
+  return { spawn, deliver, stop, gitLog, gitShow, renderDiff, listSlotOwnership, deliveries };
 }
 
 function feedConfig(overrides: Partial<ValidatedTieredExecutionFeedConfig> = {}): ValidatedTieredExecutionFeedConfig {
@@ -249,6 +252,7 @@ describe('tier replay', () => {
       apiUrl: 'http://api.test',
       sha: '1111111111111111111111111111111111111111',
       beadTitle: 'bead-a first commit',
+      beadId: 'bead-a',
       commitSubject: 'bead-a first commit',
       tiers: [{ tierName: 'standard', agentId: 'agent-pan-1791-slot-27' }],
       feedConfig: config,
@@ -262,7 +266,7 @@ describe('tier replay', () => {
 
     replaySeams.gitLog.mockResolvedValue([
       { sha: 'skip111111111111111111111111111111111111', subject: 'chore(beads): close bead' },
-      { sha: '1111111111111111111111111111111111111111', subject: 'bead-a first commit' },
+      { sha: '1111111111111111111111111111111111111111', subject: 'bead-a first commit', beadId: 'bead-a' },
     ]);
     replaySeams.renderDiff = renderDiff;
 
@@ -282,6 +286,25 @@ describe('tier replay', () => {
     expect(replaySeams.deliveries).toHaveLength(1);
     expect(replaySeams.deliveries[0].message).toBe(liveDeliveries[0].message);
     expect(replaySeams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
+  });
+
+  it('uses resolved slot ownership as the replay call-out bead id', async () => {
+    const seams = deps();
+
+    await replayCrashedStandingAgent({
+      kind: 'tier',
+      issueId: 'PAN-1791',
+      workspace: '/ws',
+      base: 'main',
+      tierName: 'standard',
+      agentId: 'agent-pan-1791-slot-27',
+      apiUrl: 'http://api.test',
+      feedConfig: feedConfig({ callouts: 'corroborate' }),
+    }, { deps: seams });
+
+    expect(seams.listSlotOwnership).toHaveBeenCalledWith('PAN-1791', '/ws');
+    expect(seams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
+    expect(seams.deliveries[0].message).toContain('"beadId":"bead-a"');
   });
 
   it('decommissions a tier during compaction and crash replay when reroute removes it from the remaining schedule', async () => {
