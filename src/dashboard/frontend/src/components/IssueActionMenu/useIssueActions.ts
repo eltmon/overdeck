@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { useAlert, useConfirm } from '../DialogProvider';
 import {
@@ -56,6 +56,8 @@ type PostActionInput = {
   selectedBeadId?: string | null;
 };
 
+type AlertFn = ReturnType<typeof useAlert>;
+
 function activeAgentForIssue(agents: Agent[], issueId: string) {
   const issueAgents = agents.filter((agent) => agent.issueId?.toLowerCase() === issueId.toLowerCase());
   return issueAgents.find((agent) => !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status)) ?? issueAgents[0];
@@ -77,6 +79,33 @@ function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | u
     .replace(':id', encodeURIComponent(issueId))
     .replace(':agentId', encodeURIComponent(agent?.id ?? ''))
     .replace(':beadId', encodeURIComponent(selectedBeadId ?? state.selectedBeadId ?? ''));
+}
+
+const untroubledAction = ISSUE_ACTIONS.find((action) => action.key === 'untroubled');
+
+export async function clearTroubledGateForAgent(
+  agentId: string,
+  queryClient: QueryClient,
+  alert: AlertFn,
+): Promise<void> {
+  if (!untroubledAction?.endpoint) {
+    throw new Error('Clear troubled gate action is not registered');
+  }
+
+  const response = await fetch(untroubledAction.endpoint.replace(':agentId', encodeURIComponent(agentId)), {
+    method: 'POST',
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
+    body: '{}',
+  });
+  if (!response.ok) {
+    const message = await responseError(response, `Failed to run ${untroubledAction.label}`);
+    void alert({ message, variant: 'error' });
+    throw new Error(message);
+  }
+
+  await refreshDashboardState(queryClient);
+  void alert({ message: `Cleared troubled state for ${agentId}`, variant: 'success' });
 }
 
 function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue | undefined) {

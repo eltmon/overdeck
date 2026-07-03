@@ -603,6 +603,13 @@ export const SessionNode = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
+  // Troubled gate (PAN-2257): message delivery queues mail while this is true,
+  // so session-tree rows need the gate state and its queue count.
+  troubled: Schema.optional(Schema.Boolean),
+  troubledAt: Schema.optional(Schema.String),
+  troubledReason: Schema.optional(Schema.String),
+  consecutiveFailures: Schema.optional(Schema.Number),
+  queuedMailCount: Schema.optional(Schema.Number),
   // PAN-2053: read-only model-origin for the right-click MODEL inspector. Set
   // only when the agent's role uses a weighted model distribution.
   modelOrigin: Schema.optional(ModelOrigin),
