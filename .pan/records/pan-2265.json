@@ -16,9 +16,112 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T20:33:52.444Z"
+    },
+    {
+      "timestamp": "2026-07-03T20:46:30.659Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T20:46:30.928Z"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".beads/issues.jsonl",
+      ".pan/drafts/PAN-2265.md",
+      ".pan/records/pan-2265.json",
+      ".pan/test/result.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/webhooks.ts",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/cloister/__tests__/issue-closed.test.ts",
+      "src/lib/cloister/merged-pr-verification.ts",
+      "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+      "src/lib/github-pr-lookup.ts",
+      "src/lib/overdeck/discussions.ts",
+      "src/lib/overdeck/pull-requests.ts",
+      "tests/integration/cli/doctor.test.ts",
+      "tests/lib/cloister/auto-resume-gating.test.ts",
+      "tests/lib/reopen.test.ts",
+      "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+      "tests/unit/dashboard/server/services/agent-projection.test.ts",
+      "tests/unit/dashboard/unstick-endpoint.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/routes/issues.ts",
+      "src/lib/cloister/__tests__/merge-agent.test.ts",
+      "tests/unit/lib/cloister/issue-closed.test.ts"
+    ],
+    "declaredScope": [
+      "src/cli/commands/flywheel-surfaces.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/dashboard/server/services/pr-tab-cache.ts",
+      "src/lib/cloister/__tests__/merge-agent.test.ts",
+      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+      "src/lib/cloister/issue-closed.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/forge.ts",
+      "src/lib/github-app.ts",
+      "src/lib/github-graphql-cooldown.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/unit/cli/commands/flywheel-surfaces.test.ts",
+      "tests/unit/lib/cloister/issue-closed.test.ts",
+      "tests/unit/lib/forge.test.ts",
+      "tests/unit/lib/github-app.test.ts",
+      "tests/unit/lib/github-graphql-cooldown.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".beads/issues.jsonl",
+      ".pan/drafts/PAN-2265.md",
+      ".pan/records/pan-2265.json",
+      ".pan/test/result.json",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/flywheel-surfaces.ts",
+      "src/dashboard/server/routes/webhooks.ts",
+      "src/dashboard/server/services/pr-tab-cache.ts",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/cloister/__tests__/issue-closed.test.ts",
+      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+      "src/lib/cloister/issue-closed.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/merged-pr-verification.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+      "src/lib/forge.ts",
+      "src/lib/github-app.ts",
+      "src/lib/github-graphql-cooldown.ts",
+      "src/lib/github-pr-lookup.ts",
+      "src/lib/overdeck/discussions.ts",
+      "src/lib/overdeck/pull-requests.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/integration/cli/doctor.test.ts",
+      "tests/lib/cloister/auto-resume-gating.test.ts",
+      "tests/lib/reopen.test.ts",
+      "tests/unit/cli/commands/flywheel-surfaces.test.ts",
+      "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+      "tests/unit/dashboard/server/services/agent-projection.test.ts",
+      "tests/unit/dashboard/unstick-endpoint.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+      "tests/unit/lib/forge.test.ts",
+      "tests/unit/lib/github-app.test.ts",
+      "tests/unit/lib/github-graphql-cooldown.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "recordedAt": "2026-07-03T20:46:22.198Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -64,15 +167,112 @@
   },
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T20:02:26.373Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T20:51:01.863Z",
+    "reviewNotes": "Review passed; no blocking findings",
+    "testNotes": "npm run typecheck: clean; npm run lint: clean (eslint, effect, permissions, state-writes, overdeck-boundaries, skills, prompts, file-size, ratchet-audit); focused vitest suites: 10 files / 151 tests passed (github-app, flywheel-surfaces, orphan-proposed-reconciler, issue-closed, pan-444-post-merge-step0, forge, issue-pr, issue-discussions, webhook-handlers, github-graphql-cooldown). Browser UAT not required: vBRIEF NonGoals explicitly exclude frontend changes and any dashboard/UI work; issue is backend-only GitHub GraphQL/App-REST routing.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "lastVerifiedCommit": "2d3c58b9947e979f933ca22fa2600c1dd28fc1c9"
+    "reviewedAtCommit": "8a735a90c125644cfed0ba207b4876f03927509f",
+    "lastVerifiedCommit": "8a735a90c125644cfed0ba207b4876f03927509f",
+    "reviewRequestedAt": "2026-07-03T20:46:30.660Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/PAN-2265.md",
+        ".pan/records/pan-2265.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/webhooks.ts",
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+        "src/lib/cloister/__tests__/issue-closed.test.ts",
+        "src/lib/cloister/merged-pr-verification.ts",
+        "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+        "src/lib/github-pr-lookup.ts",
+        "src/lib/overdeck/discussions.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "tests/integration/cli/doctor.test.ts",
+        "tests/lib/cloister/auto-resume-gating.test.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+        "tests/unit/dashboard/server/services/agent-projection.test.ts",
+        "tests/unit/dashboard/unstick-endpoint.test.ts",
+        "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+        "tests/unit/lib/webhook-handlers.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/server/routes/issues.ts",
+        "src/lib/cloister/__tests__/merge-agent.test.ts",
+        "tests/unit/lib/cloister/issue-closed.test.ts"
+      ],
+      "declaredScope": [
+        "src/cli/commands/flywheel-surfaces.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/dashboard/server/services/pr-tab-cache.ts",
+        "src/lib/cloister/__tests__/merge-agent.test.ts",
+        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+        "src/lib/cloister/issue-closed.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/orphan-proposed-reconciler.ts",
+        "src/lib/forge.ts",
+        "src/lib/github-app.ts",
+        "src/lib/github-graphql-cooldown.ts",
+        "src/lib/webhook-handlers.ts",
+        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
+        "tests/unit/lib/cloister/issue-closed.test.ts",
+        "tests/unit/lib/forge.test.ts",
+        "tests/unit/lib/github-app.test.ts",
+        "tests/unit/lib/github-graphql-cooldown.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/PAN-2265.md",
+        ".pan/records/pan-2265.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/flywheel-surfaces.ts",
+        "src/dashboard/server/routes/webhooks.ts",
+        "src/dashboard/server/services/pr-tab-cache.ts",
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+        "src/lib/cloister/__tests__/issue-closed.test.ts",
+        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+        "src/lib/cloister/issue-closed.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/merged-pr-verification.ts",
+        "src/lib/cloister/orphan-proposed-reconciler.ts",
+        "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+        "src/lib/forge.ts",
+        "src/lib/github-app.ts",
+        "src/lib/github-graphql-cooldown.ts",
+        "src/lib/github-pr-lookup.ts",
+        "src/lib/overdeck/discussions.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "src/lib/webhook-handlers.ts",
+        "tests/integration/cli/doctor.test.ts",
+        "tests/lib/cloister/auto-resume-gating.test.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+        "tests/unit/dashboard/server/services/agent-projection.test.ts",
+        "tests/unit/dashboard/unstick-endpoint.test.ts",
+        "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+        "tests/unit/lib/forge.test.ts",
+        "tests/unit/lib/github-app.test.ts",
+        "tests/unit/lib/github-graphql-cooldown.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+        "tests/unit/lib/webhook-handlers.test.ts"
+      ],
+      "recordedAt": "2026-07-03T20:46:22.198Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -87,8 +287,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 45638,
-            "output": 5558,
+            "input": 46665,
+            "output": 5737,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -103,9 +303,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1209433,
-            "output": 45104,
-            "cacheRead": 10932480,
+            "input": 1704919,
+            "output": 50123,
+            "cacheRead": 12201728,
             "cacheWrite": 0
           }
         }
@@ -118,8 +318,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 45638,
-          "output": 5558,
+          "input": 46665,
+          "output": 5737,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -130,15 +330,15 @@
           "cacheWrite": 170267
         },
         "custom/kimi-k2.7-code": {
-          "input": 1209433,
-          "output": 45104,
-          "cacheRead": 10932480,
+          "input": 1704919,
+          "output": 50123,
+          "cacheRead": 12201728,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.380945,
-        "pricingAsOf": "2026-07-03T20:02:26.435Z"
+        "usd": 12.112893,
+        "pricingAsOf": "2026-07-03T20:51:01.920Z"
       }
     },
     "merges": [
@@ -147,5 +347,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:40:19.407Z",
-  "updated": "2026-07-03T20:33:52.444Z"
+  "updated": "2026-07-03T20:51:01.921Z"
 }
