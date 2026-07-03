@@ -148,6 +148,11 @@ describe('parseSearchParams', () => {
     expect(filter.primaryModel).toBe('claude-sonnet-4-6');
   });
 
+  it('parses harness filter', () => {
+    const filter = parseSearchParams(new URLSearchParams('harness=codex'));
+    expect(filter.harness).toBe('codex');
+  });
+
   it('parses managed=true', () => {
     const filter = parseSearchParams(new URLSearchParams('managed=true'));
     expect(filter.managed).toBe(true);
@@ -344,6 +349,35 @@ describe('search (route logic)', () => {
       filter: { workspacePath: '/home/user/Projects/alpha' },
     });
     expect(result.sessions.every((s) => s.workspacePath === '/home/user/Projects/alpha')).toBe(true);
+  });
+
+  it('filter by harness returns only matching sessions', async () => {
+    upsertDiscoveredSession({
+      jsonlPath: '/route/codex.jsonl',
+      harness: 'codex',
+      workspacePath: '/home/user/Projects/codex',
+      workspaceHash: 'hash-codex',
+      messageCount: 2,
+      firstTs: '2025-01-01T00:00:00Z',
+      lastTs: '2025-01-01T00:02:00Z',
+      modelsUsed: ['gpt-5.5'],
+      primaryModel: 'gpt-5.5',
+      tokenInput: 10,
+      tokenOutput: 20,
+      estimatedCost: 0,
+      toolsUsed: [],
+      filesTouched: [],
+      tags: [],
+      overdeckManaged: false,
+      panIssueId: null,
+      panAgentId: null,
+      fileSize: null,
+      fileMtime: null,
+    });
+
+    const result = findDiscoveredSessions({ harness: 'codex' });
+    expect(result.map((session) => session.jsonlPath)).toEqual(['/route/codex.jsonl']);
+    expect(result.every((session) => session.harness === 'codex')).toBe(true);
   });
 
   it('limit is honored', async () => {

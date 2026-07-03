@@ -673,6 +673,7 @@ export interface ArchivedConversationWithEnrichment {
   issueId: string | null;
   createdAt: string;
   claudeSessionId: string | null;
+  harness: RuntimeName | null;
   title: string | null;
   totalCost: number;
   archivedAt: string;
@@ -695,6 +696,7 @@ export interface ArchivedConversationWithEnrichment {
 }
 
 export interface ArchivedConversationListOptions {
+  harness?: RuntimeName;
   workspacePath?: string;
   primaryModel?: string;
   unmanaged?: boolean;
@@ -1022,20 +1024,6 @@ export function listArchivedConversations(): LegacyConversation[] {
   return rows.map(rowToLegacyConversation);
 }
 
-function matchesArchivedOptions(conv: ArchivedConversationWithEnrichment, options: ArchivedConversationListOptions): boolean {
-  if (options.workspacePath !== undefined && conv.cwd !== options.workspacePath) return false;
-  if (options.primaryModel !== undefined && conv.primaryModel !== options.primaryModel && conv.model !== options.primaryModel) return false;
-  if (options.issueId !== undefined && conv.issueId !== options.issueId) return false;
-  if (options.since !== undefined && (conv.lastTs ?? conv.archivedAt) < options.since) return false;
-  if (options.before !== undefined && (conv.lastTs ?? conv.archivedAt) >= options.before) return false;
-  if (options.after !== undefined && (conv.firstTs ?? conv.createdAt) < options.after) return false;
-  if (options.minCost !== undefined && (conv.estimatedCost ?? conv.totalCost) < options.minCost) return false;
-  if (options.maxCost !== undefined && (conv.estimatedCost ?? conv.totalCost) > options.maxCost) return false;
-  if (options.minMessages !== undefined && (conv.messageCount ?? 0) < options.minMessages) return false;
-  if (options.unmanaged === true) return false;
-  return true;
-}
-
 export function listArchivedConversationsWithEnrichment(options: ArchivedConversationListOptions = {}): ArchivedConversationWithEnrichment[] {
   ensureDiscoveredSessionsSchema();
   const db = overdeckDb();
@@ -1050,6 +1038,16 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   const messageCount = `COALESCE(ds.message_count, 0)`;
   const enrichmentLevel = `COALESCE(ds.enrichment_level, 0)`;
 
+  if (options.harness === 'claude-code') {
+    conditions.push('(c.harness = ? OR c.harness IS NULL)');
+    params.push(options.harness);
+  } else if (options.harness === 'ohmypi') {
+    conditions.push('(c.harness = ? OR c.harness = ?)');
+    params.push(options.harness, 'pi');
+  } else if (options.harness !== undefined) {
+    conditions.push('c.harness = ?');
+    params.push(options.harness);
+  }
   if (options.workspacePath !== undefined) { conditions.push('c.cwd = ?'); params.push(options.workspacePath); }
   if (options.primaryModel !== undefined) { conditions.push(`${primaryModel} = ?`); params.push(options.primaryModel); }
   if (options.issueId !== undefined) { conditions.push('c.issue_id = ?'); params.push(options.issueId); }
@@ -1099,6 +1097,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
       c.cwd,
       c.issue_id,
       c.created_at,
+      c.harness,
       (
         SELECT cf.locator FROM conversation_files cf
         WHERE cf.conversation_id = c.id
@@ -1138,7 +1137,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
 
   type RawRow = {
     legacy_id: number; uuid: string; name: string; cwd: string; issue_id: string | null;
-    created_at: number; claude_session_id: string | null; title: string | null;
+    created_at: number; harness: string | null; claude_session_id: string | null; title: string | null;
     total_cost: number | null; archived_at: number | null; model: string | null;
     discovered_jsonl_path: string | null; discovered_workspace_path: string | null;
     message_count: number | null; first_ts: number | null; last_ts: number | null;
@@ -1157,6 +1156,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
     issueId: r.issue_id ?? null,
     createdAt: toIso(r.created_at) ?? new Date(0).toISOString(),
     claudeSessionId: r.claude_session_id ?? null,
+    harness: normalizeHarness(r.harness),
     title: r.title ?? null,
     totalCost: r.total_cost ?? 0,
     archivedAt: toIso(r.archived_at) ?? toIso(r.created_at) ?? new Date(0).toISOString(),

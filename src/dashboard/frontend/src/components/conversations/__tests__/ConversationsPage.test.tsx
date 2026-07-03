@@ -42,6 +42,7 @@ vi.mock('../FacetPanel', () => ({
         <button onClick={() => onChange('source', undefined)}>All</button>
         <button onClick={() => onChange('source', 'discovered')}>Discovered</button>
         <button onClick={() => onChange('source', 'managed-archived')}>Managed-archived</button>
+        <button onClick={() => onChange('harness', 'codex')}>Codex</button>
       </div>
     );
   },
@@ -69,6 +70,7 @@ vi.mock('../ScanButton', () => ({
 
 const SESSION_STUB = {
   id: 1,
+  harness: 'claude-code',
   jsonlPath: '/fake/1.jsonl',
   workspacePath: '/home/user/Projects/alpha',
   primaryModel: 'claude-sonnet-4-6',
@@ -225,6 +227,17 @@ describe('ConversationsPage endpoint selection', () => {
 
     await waitFor(() => {
       expect(rpcMocks.list).toHaveBeenLastCalledWith({ managed: true, limit: 50, offset: 0 });
+    });
+  });
+
+  it('list RPC includes active harness facet filter', async () => {
+    renderPage(makeClient());
+
+    fireEvent.click(screen.getByText('Filters'));
+    fireEvent.click(await screen.findByText('Codex'));
+
+    await waitFor(() => {
+      expect(rpcMocks.list).toHaveBeenLastCalledWith({ harness: 'codex', limit: 50, offset: 0 });
     });
   });
 
