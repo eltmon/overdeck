@@ -48,5 +48,25 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T09:23:06.958Z",
-  "updated": "2026-07-03T09:25:24.432Z"
+  "updated": "2026-07-03T09:26:14.854Z",
+  "statusOverrides": {
+    "verify-troubled-tree": "completed",
+    "verify-troubled-tree.ac1": "completed",
+    "verify-troubled-tree.ac2": "completed",
+    "verify-troubled-tree.ac3": "completed",
+    "clear-troubled-badge": "completed",
+    "clear-troubled-badge.ac1": "completed",
+    "clear-troubled-badge.ac2": "completed",
+    "clear-troubled-badge.ac3": "completed",
+    "clear-troubled-badge.ac4": "completed",
+    "render-troubled-badge": "completed",
+    "render-troubled-badge.ac1": "completed",
+    "render-troubled-badge.ac2": "completed",
+    "render-troubled-badge.ac3": "completed",
+    "render-troubled-badge.ac4": "completed",
+    "session-tree-troubled-fields": "completed",
+    "session-tree-troubled-fields.ac1": "completed",
+    "session-tree-troubled-fields.ac2": "completed",
+    "session-tree-troubled-fields.ac3": "completed"
+  }
 }
