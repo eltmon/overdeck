@@ -41,6 +41,19 @@ function hasReadyBeads(readyByQueryRoot: Map<string, ReadyBeadsByIssue>, agent: 
   return (readyByQueryRoot.get(resolveBeadsQueryRoot(agent.workspace))?.[issueLabel] ?? []).length > 0;
 }
 
+function shouldCheckReadyBeadsForAgent(agent: AgentState, now: number): boolean {
+  const agentId = agent.id;
+  if (!agentId) return false;
+  if (agent.status !== 'running') return false;
+  if (agent.role !== 'work') return false;
+  if (!agent.workspace) return false;
+  const completedAt = (agent as AgentState & { completedAt?: string }).completedAt;
+  if (agent.paused || agent.troubled || completedAt) return false;
+  if (!sessionExistsSync(agentId)) return false;
+  if (shouldSkipReviewStatus(getReviewStatusSync(issueIdForAgent(agent)))) return false;
+  return isAgentIdleForNudge(agentId, 5 * 60 * 1000, now);
+}
+
 function firstStuckAt(runtimeLastActivity: string, stuckState: StuckRemediationState | null): string {
   return stuckState?.firstStuckAt ?? runtimeLastActivity;
 }
@@ -94,13 +107,10 @@ async function evaluateAgent(
     await evaluateFlywheelOrchestrator(agent, config, now, actions);
     return;
   }
-  if (!sessionExistsSync(agentId)) return;
-  if (agent.role !== 'work') return;
+  if (!shouldCheckReadyBeadsForAgent(agent, now)) return;
+  if (!agent.workspace) return;
 
   const issueId = issueIdForAgent(agent);
-  const reviewStatus = getReviewStatusSync(issueId);
-  if (shouldSkipReviewStatus(reviewStatus)) return;
-  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
   if (hasReadyBeads(readyByQueryRoot, agent, issueId.toLowerCase())) return;
 
   const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
@@ -365,7 +375,7 @@ export async function checkStuckAgentRemediation(opts: StuckRemediationOptions =
   let sawFlywheelOrchestrator = false;
 
   for (const agent of runningAgents) {
-    if (agent.role !== 'work' || agent.status !== 'running' || !agent.workspace) continue;
+    if (!shouldCheckReadyBeadsForAgent(agent, now)) continue;
     const queryRoot = resolveBeadsQueryRoot(agent.workspace);
     const workspaceAgents = workAgentsByQueryRoot.get(queryRoot) ?? [];
     workspaceAgents.push(agent);

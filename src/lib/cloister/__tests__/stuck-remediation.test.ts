@@ -332,7 +332,7 @@ describe('checkStuckAgentRemediation', () => {
 
     expect(actions).toEqual([]);
     expectNoStage();
-    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledWith('/tmp/workspace-pan-1415', ['PAN-1415'], { acquisitionTimeoutMs: 500 });
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
   });
 
   it('skips agents with open ready beads', async () => {
@@ -361,6 +361,7 @@ describe('checkStuckAgentRemediation', () => {
     expect(actions).toEqual([]);
     expectNoStage();
     expect(mocks.getReviewStatusSync).not.toHaveBeenCalled();
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
   });
 
   it('skips all agents when stuck remediation is disabled', async () => {
@@ -387,6 +388,7 @@ describe('checkStuckAgentRemediation', () => {
     expect(actions).toEqual([]);
     expectNoStage();
     expect(mocks.getAgentRuntimeStateSync).not.toHaveBeenCalled();
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
   });
 
   it('continues processing other agents when one agent throws during stage handling', async () => {

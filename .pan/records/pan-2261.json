@@ -44,6 +44,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T16:55:57.634Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T16:56Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-07-03T16:56:54.419Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T16:56Z] review-agent → CHANGES-REQUESTED — seq 4",
+      "timestamp": "2026-07-03T16:56:58.284Z"
     }
   ],
   "feedback": [
@@ -60,6 +70,20 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-03T16:14:09Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2261\n\nDeacon batching is keyed by feature workspace, so fleet load can still run one bd list per work agent\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2261 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T16:56:54Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2261\n\nStuck remediation still performs eager ready-beads reads before cheap skip guards\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2261 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 4,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T16:56:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2261\n\nStuck remediation still performs eager ready-beads reads before cheap skip guards\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2261 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -102,16 +126,16 @@
     "recordedAt": "2026-07-03T16:10:20.583Z"
   },
   "created": "2026-07-03T03:32:43.537Z",
-  "updated": "2026-07-03T16:56:03.053Z",
+  "updated": "2026-07-03T16:56:58.285Z",
   "pipeline": {
     "issueId": "PAN-2261",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:56:02.970Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-03T16:56:54.277Z",
+    "reviewNotes": "Stuck remediation still performs eager ready-beads reads before cheap skip guards",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2302",
     "lastVerifiedCommit": "e2218d73c5111beb548422a3630247f3248930a6",
     "reviewRequestedAt": "2026-07-03T16:11:52.217Z",
@@ -177,7 +201,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T16:56:03.036Z"
+        "pricingAsOf": "2026-07-03T16:56:54.357Z"
       }
     },
     "merges": [
