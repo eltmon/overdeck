@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   appendInternalEvents,
+  computeInternalReplaySince,
   parseInternalEventsBody,
   parseInternalEventsSince,
   validateInternalEventsHeaders,
@@ -55,5 +56,10 @@ describe('internal events route helpers', () => {
     expect(parseInternalEventsSince('12')).toBe(12);
     expect(parseInternalEventsSince('-1')).toBeNull();
     expect(parseInternalEventsSince('not-a-number')).toBeNull();
+  });
+
+  it('caps internal replay windows before readFrom()', () => {
+    expect(computeInternalReplaySince(900, 1000)).toEqual({ since: 900, skipped: 0 });
+    expect(computeInternalReplaySince(0, 2000)).toEqual({ since: 1000, skipped: 1000 });
   });
 });

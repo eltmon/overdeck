@@ -66,6 +66,17 @@ export function parseInternalEventsSince(raw: string | null): number | null {
   return Number.isFinite(since) && since >= 0 ? since : null;
 }
 
+const MAX_REPLAY_EVENTS = 1000;
+
+export function computeInternalReplaySince(since: number, latestSequence: number): { since: number; skipped: number } {
+  const span = latestSequence - since;
+  if (span > MAX_REPLAY_EVENTS) {
+    const skipped = span - MAX_REPLAY_EVENTS;
+    return { since: since + skipped, skipped };
+  }
+  return { since, skipped: 0 };
+}
+
 const internalEventsRoute = HttpRouter.add(
   'POST',
   '/api/internal/events',
@@ -116,7 +127,9 @@ const internalEventsStreamRoute = HttpRouter.add(
     const url = Option.isSome(urlOpt) ? urlOpt.value : new URL(request.url, 'http://localhost');
     const since = parseInternalEventsSince(url.searchParams.get('since')) ?? 0;
     const eventStore = getEventStore();
-    const missed = eventStore.readFrom(since);
+    const latestSequence = eventStore.getLatestSequence();
+    const replayWindow = computeInternalReplaySince(since, latestSequence);
+    const missed = eventStore.readFrom(replayWindow.since);
 
     const encoder = new TextEncoder();
     let cleanup: (() => void) | null = null;
@@ -134,6 +147,11 @@ const internalEventsStreamRoute = HttpRouter.add(
         };
 
         safeEnqueue(encoder.encode(`: connected\n\n`));
+        if (replayWindow.skipped > 0) {
+          safeEnqueue(
+            encoder.encode(`: replay truncated, skipped ${replayWindow.skipped} events (cap ${MAX_REPLAY_EVENTS})\n\n`),
+          );
+        }
         for (const event of missed) {
           safeEnqueue(encoder.encode(formatFrame(event)));
         }
