@@ -1146,7 +1146,9 @@ describe('DivergedBadge', () => {
   it('includes recovery instructions in title', () => {
     const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
     const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
-    expect(title).toContain('git reset --hard origin/main');
+    expect(title).toContain('preserving local work');
+    expect(title).toContain('pushing local-only commits');
+    expect(title).not.toContain('git reset --hard');
   });
 
   it('handles malformed stuckDetails gracefully without throwing', () => {
@@ -1204,7 +1206,7 @@ describe('DivergedBadge', () => {
     await waitFor(() => {
       const s = useDashboardStore.getState().reviewStatusByIssueId['PAN-43'];
       expect(s?.stuck).toBeFalsy();
-      // Lifecycle reset — prior results invalid after `git reset --hard origin/main`
+      // Lifecycle reset — prior results invalid after project main repair.
       expect(s?.reviewStatus).toBe('pending');
       expect(s?.testStatus).toBe('pending');
       expect(s?.readyForMerge).toBe(false);
