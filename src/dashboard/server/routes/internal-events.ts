@@ -1,10 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
-import { Effect, Layer, Option } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { Effect, Layer, Option, Stream } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import type { DomainEvent } from '@overdeck/contracts';
 
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
+import { formatFrame } from './events.js';
+import { getEventStore } from '../event-store.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 import { getHeaderFromMap, type HeaderMap } from './origin-validation.js';
@@ -89,9 +91,22 @@ const internalEventsRoute = HttpRouter.add(
   })),
 );
 
-const internalEventsReadRoute = HttpRouter.add(
+const internalEventsLatestRoute = HttpRouter.add(
   'GET',
-  '/api/internal/events',
+  '/api/internal/events/latest',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = validateInternalEventsHeaders(request.headers as HeaderMap);
+    if (!auth.ok) return jsonResponse({ error: auth.error }, { status: auth.status });
+
+    const latestSequence = getEventStore().getLatestSequence();
+    return jsonResponse({ latestSequence });
+  })),
+);
+
+const internalEventsStreamRoute = HttpRouter.add(
+  'GET',
+  '/api/internal/events/stream',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const auth = validateInternalEventsHeaders(request.headers as HeaderMap);
@@ -99,18 +114,69 @@ const internalEventsReadRoute = HttpRouter.add(
 
     const urlOpt = HttpServerRequest.toURL(request);
     const url = Option.isSome(urlOpt) ? urlOpt.value : new URL(request.url, 'http://localhost');
-    const since = parseInternalEventsSince(url.searchParams.get('since'));
-    const eventStore = yield* EventStoreService;
-    const latestSequence = yield* eventStore.getLatestSequence;
-    if (since === null) {
-      return jsonResponse({ latestSequence });
-    }
+    const since = parseInternalEventsSince(url.searchParams.get('since')) ?? 0;
+    const eventStore = getEventStore();
+    const missed = eventStore.readFrom(since);
 
-    const events = yield* eventStore.readFrom(since);
-    return jsonResponse({ latestSequence, events });
+    const encoder = new TextEncoder();
+    let cleanup: (() => void) | null = null;
+
+    const nodeStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        let closed = false;
+        const safeEnqueue = (chunk: Uint8Array) => {
+          if (closed) return;
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            closed = true;
+          }
+        };
+
+        safeEnqueue(encoder.encode(`: connected\n\n`));
+        for (const event of missed) {
+          safeEnqueue(encoder.encode(formatFrame(event)));
+        }
+
+        const unsubscribeFn = eventStore.subscribe((event) => {
+          safeEnqueue(encoder.encode(formatFrame(event)));
+        });
+
+        cleanup = () => {
+          if (closed) return;
+          closed = true;
+          unsubscribeFn();
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
+        };
+      },
+      cancel() {
+        if (cleanup) {
+          cleanup();
+          cleanup = null;
+        }
+      },
+    });
+
+    const effectStream = Stream.fromReadableStream<Uint8Array, unknown>({
+      evaluate: () => nodeStream,
+      onError: (err) => err,
+    });
+
+    return HttpServerResponse.stream(effectStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    });
   })),
 );
 
-export const internalEventsRouteLayer = Layer.mergeAll(internalEventsRoute, internalEventsReadRoute);
+export const internalEventsRouteLayer = Layer.mergeAll(internalEventsRoute, internalEventsLatestRoute, internalEventsStreamRoute);
 
 export default internalEventsRouteLayer;

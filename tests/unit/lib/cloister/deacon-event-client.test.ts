@@ -103,6 +103,10 @@ describe('deacon event client', () => {
   });
 
   it('subscribes to internal events with cursor-based polling', async () => {
+    const frame = (item: { sequence: number; type: string; timestamp: string; payload: unknown }) =>
+      `event: ${item.type}\n` +
+      `id: ${item.sequence}\n` +
+      `data: ${JSON.stringify(item)}\n\n`;
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
@@ -112,10 +116,9 @@ describe('deacon event client', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({
-          latestSequence: 12,
-          events: [event(11), event(12)].map((item, index) => ({ ...item, sequence: 11 + index })),
-        }),
+        body: new Response(
+          frame({ ...event(11), sequence: 11 }) + frame({ ...event(12), sequence: 12 }),
+        ).body,
       } as Response);
     const received: Array<{ sequence: number; type: string; timestamp: string; payload: unknown }> = [];
     const client = createDeaconEventClient({

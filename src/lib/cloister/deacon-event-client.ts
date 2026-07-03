@@ -114,21 +114,39 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
   }
 
   async function fetchLatestSequence(signal?: AbortSignal): Promise<number> {
-    const body = await fetchJson<{ latestSequence?: unknown }>(new URL('/api/internal/events', dashboardUrl), signal);
+    const body = await fetchJson<{ latestSequence?: unknown }>(new URL('/api/internal/events/latest', dashboardUrl), signal);
     return typeof body.latestSequence === 'number' && Number.isFinite(body.latestSequence) && body.latestSequence >= 0
       ? body.latestSequence
       : 0;
   }
 
-  function parseStoredEvents(raw: unknown): StoredEventLike[] {
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((event): event is StoredEventLike =>
-      !!event &&
-      typeof event === 'object' &&
-      typeof (event as { sequence?: unknown }).sequence === 'number' &&
-      typeof (event as { type?: unknown }).type === 'string' &&
-      typeof (event as { timestamp?: unknown }).timestamp === 'string',
-    );
+  function parseStreamFrame(frame: string): StoredEventLike | null {
+    const dataLines: string[] = [];
+    for (const line of frame.split(/\r?\n/)) {
+      if (!line.startsWith('data:')) continue;
+      dataLines.push(line.slice(5).replace(/^\s/, ''));
+    }
+    if (dataLines.length === 0) return null;
+    try {
+      const parsed = JSON.parse(dataLines.join('\n')) as unknown;
+      if (!parsed || typeof parsed !== 'object') return null;
+      const record = parsed as Record<string, unknown>;
+      if (
+        typeof record.sequence !== 'number' ||
+        typeof record.type !== 'string' ||
+        typeof record.timestamp !== 'string'
+      ) {
+        return null;
+      }
+      return {
+        sequence: record.sequence,
+        type: record.type,
+        timestamp: record.timestamp,
+        payload: record.payload,
+      };
+    } catch {
+      return null;
+    }
   }
 
   return {
@@ -144,8 +162,8 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
       let active = true;
       let cursor = -1;
       let pollTimer: ReturnType<typeof setTimeout> | null = null;
-      let pollInFlight = false;
-      let pollRetryMs = baseRetryMs;
+      let connectInFlight = false;
+      let reconnectMs = baseRetryMs;
       let abortController: AbortController | null = null;
 
       const clearPollTimer = (): void => {
@@ -158,44 +176,68 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
         clearPollTimer();
         pollTimer = setTimeout(() => {
           pollTimer = null;
-          void poll();
+          void connect();
         }, delayMs);
       };
 
-      const poll = async (): Promise<void> => {
-        if (!active || pollInFlight) return;
-        pollInFlight = true;
+      const connect = async (): Promise<void> => {
+        if (!active || connectInFlight) return;
+        connectInFlight = true;
         abortController?.abort();
         abortController = new AbortController();
         try {
           if (cursor < 0) {
             cursor = await fetchLatestSequence(abortController.signal);
           }
-          const url = new URL('/api/internal/events', dashboardUrl);
+
+          const url = new URL('/api/internal/events/stream', dashboardUrl);
           url.searchParams.set('since', String(cursor));
-          const body = await fetchJson<{ latestSequence?: unknown; events?: unknown }>(url, abortController.signal);
-          const latestSequence = typeof body.latestSequence === 'number' && Number.isFinite(body.latestSequence) && body.latestSequence >= 0
-            ? body.latestSequence
-            : cursor;
-          const events = parseStoredEvents(body.events);
-          for (const event of events) {
-            fn(event);
+          const response = await fetchImpl(url, {
+            signal: abortController.signal,
+            headers: {
+              [INTERNAL_TOKEN_HEADER]: options.token ?? ensureInternalTokenSync(),
+              origin: dashboardUrl,
+            },
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.body) throw new Error('missing response body');
+
+          reconnectMs = baseRetryMs;
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (active) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let frameEnd = buffer.indexOf('\n\n');
+            while (frameEnd >= 0) {
+              const frame = buffer.slice(0, frameEnd);
+              buffer = buffer.slice(frameEnd + 2);
+              const event = parseStreamFrame(frame);
+              if (event) {
+                fn(event);
+                if (event.sequence > cursor) cursor = event.sequence;
+              }
+              frameEnd = buffer.indexOf('\n\n');
+            }
           }
-          const newestSequence = events.length > 0 ? events[events.length - 1]!.sequence : latestSequence;
-          if (newestSequence > cursor) cursor = newestSequence;
-          pollRetryMs = baseRetryMs;
-          schedulePoll(events.length > 0 ? 0 : debounceMs);
+
+          if (!active) return;
+          schedulePoll(debounceMs);
         } catch (error) {
           if (!active) return;
-          warn(`[deacon-event-client] failed to subscribe to events: ${error instanceof Error ? error.message : String(error)}; retrying in ${pollRetryMs}ms`);
-          schedulePoll(pollRetryMs);
-          pollRetryMs = Math.min(pollRetryMs * 2, maxRetryMs);
+          warn(`[deacon-event-client] failed to subscribe to events: ${error instanceof Error ? error.message : String(error)}; retrying in ${reconnectMs}ms`);
+          schedulePoll(reconnectMs);
+          reconnectMs = Math.min(reconnectMs * 2, maxRetryMs);
         } finally {
-          pollInFlight = false;
+          connectInFlight = false;
         }
       };
 
-      void poll();
+      void connect();
 
       return () => {
         active = false;
