@@ -13,30 +13,32 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
-  clearPendingConversationControlAcksForTests,
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
-  getPendingConversationControlAckCount,
   getInFlightForkPipelineCount,
-  deliverConversationViaControlChannel,
-  handleConversationAbort,
-  handleConversationCompact,
-  handleConversationControlAck,
   handleConversationSwitchModel,
-  handleConversationThinkingLevel,
   parseSummaryForkFocus,
-  pickDeliverAs,
   readExistingHandoffDoc,
   recoverStuckForks,
-  registerConversationControlAck,
   registerInFlightForkPipeline,
-  validateConversationControlAckOrigin,
-  resolveConversationDeliveryMethod,
-  resolveConversationControlAck,
   piConversationSystemPromptFiles,
   shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
+import {
+  clearPendingConversationControlAcksForTests,
+  deliverConversationViaControlChannel,
+  getPendingConversationControlAckCount,
+  handleConversationAbort,
+  handleConversationCompact,
+  handleConversationControlAck,
+  handleConversationThinkingLevel,
+  pickDeliverAs,
+  registerConversationControlAck,
+  resolveConversationControlAck,
+  resolveConversationDeliveryMethod,
+  validateConversationControlAckOrigin,
+} from '../../../../lib/overdeck/conversation-delivery.js';
 import { deliverAgentMessage } from '../../../../lib/agents.js';
 import { sendKeysAsync } from '../../../../lib/tmux.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
@@ -689,7 +691,7 @@ describe('conversations route — DB integration', () => {
 
   it('keeps claude-code composer delivery on deliverAgentMessage', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationMessage } = await import('../conversations.js');
+    const { handleConversationMessage } = await import('../../../../lib/overdeck/conversation-message.js');
     vi.mocked(deliverAgentMessage).mockClear();
 
     createConversation({
@@ -760,7 +762,7 @@ describe('conversations route — DB integration', () => {
 
   it('stores uploaded images under the owning conversation attachment directory', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { getConversationAttachmentDir } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
@@ -776,7 +778,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects unsupported mimeType before writing files', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -788,7 +790,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects magic-byte mismatch for valid mimeType', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -808,7 +810,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects oversized upload payloads before writing files', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -821,7 +823,7 @@ describe('conversations route — DB integration', () => {
 
   it('rejects empty upload payloads', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'upload-test', tmuxSession: 'conv-upload-test', cwd: '/cwd' });
 
@@ -837,7 +839,7 @@ describe('conversations route — DB integration', () => {
     deliverMock.mockClear();
 
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
+    const { handleConversationImageUpload, handleConversationMessage } = await import('../../../../lib/overdeck/conversation-message.js');
 
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
     createConversation({ name: 'other-conv', tmuxSession: 'conv-other-conv', cwd: '/cwd' });
@@ -870,7 +872,7 @@ describe('conversations route — DB integration', () => {
 
   it('delete-image removes only conversation-owned uploads', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { removeConversationAttachment } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'owner-conv', tmuxSession: 'conv-owner-conv', cwd: '/cwd' });
@@ -889,7 +891,7 @@ describe('conversations route — DB integration', () => {
 
   it('ended and archived cleanup preserve unsent uploads newer than session history', async () => {
     const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'unsent-conv', tmuxSession: 'conv-unsent-conv', cwd: '/cwd' });
@@ -914,7 +916,7 @@ describe('conversations route — DB integration', () => {
 
   it('archive prunes unreferenced uploads while preserving prose-first referenced ones', async () => {
     const { createConversation, markConversationEnded, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationImageUpload } = await import('../conversations.js');
+    const { handleConversationImageUpload } = await import('../../../../lib/overdeck/conversation-message.js');
     const { cleanupUnreferencedConversationAttachments } = await import('../../services/conversation-attachments.js');
 
     createConversation({ name: 'archived-conv', tmuxSession: 'conv-archived-conv', cwd: '/cwd' });
@@ -1588,18 +1590,18 @@ describe('validateOrigin', () => {
 
 describe('transformMessageForHarness (PAN-1535)', () => {
   it('passes claude-code messages through unchanged', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const message = '@/home/u/.overdeck/conversation-attachments/c1/abc.png\nhello';
     expect(transformMessageForHarness(message, 'claude-code', ['/home/u/.overdeck/conversation-attachments/c1/abc.png'])).toBe(message);
   });
 
   it('passes through unchanged when there are no managed paths', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     expect(transformMessageForHarness('hello', 'pi', [])).toBe('hello');
   });
 
   it('rewrites pi messages to an explicit Read-tool instruction', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const path = '/home/u/.overdeck/conversation-attachments/c1/abc.png';
     const out = transformMessageForHarness(`@${path}\nwhat is this?`, 'pi', [path]);
     expect(out).toContain('Read tool');
@@ -1609,7 +1611,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('handles empty user text by switching to a describe-what-you-see prompt', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const path = '/home/u/.overdeck/conversation-attachments/c1/abc.png';
     const out = transformMessageForHarness(`@${path}`, 'pi', [path]);
     expect(out).toContain('describe what you see');
@@ -1618,7 +1620,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('handles multiple managed attachments', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const p1 = '/home/u/.overdeck/conversation-attachments/c1/a.png';
     const p2 = '/home/u/.overdeck/conversation-attachments/c1/b.png';
     const out = transformMessageForHarness(`@${p1}\n@${p2}\ncompare`, 'pi', [p1, p2]);
@@ -1630,7 +1632,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('leaves unmanaged @mentions in user prose alone', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     const managed = '/home/u/.overdeck/conversation-attachments/c1/a.png';
     const unmanaged = '/etc/passwd';
     const out = transformMessageForHarness(`@${managed}\nalso look at @${unmanaged} please`, 'pi', [managed]);
@@ -1639,7 +1641,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   });
 
   it('escapes regex metacharacters in attachment paths', async () => {
-    const { transformMessageForHarness } = await import('../conversations.js');
+    const { transformMessageForHarness } = await import('../../../../lib/overdeck/conversation-message.js');
     // Paths can legitimately contain `.` and other regex metacharacters
     const path = '/home/u/.overdeck/conversation-attachments/c1/file.with.dots.png';
     const out = transformMessageForHarness(`@${path}\nhi`, 'pi', [path]);

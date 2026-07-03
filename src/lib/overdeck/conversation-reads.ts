@@ -7,7 +7,6 @@ import { Effect } from 'effect';
 
 import { withConcurrencyLimit } from '../concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
-import { detectAwaitingInputForAgent, parseCodexApprovalPrompt } from '../agent-input-detection.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
@@ -47,6 +46,7 @@ import {
   resolveCodexRolloutPath,
   resolvePiSessionPath,
 } from '../../dashboard/server/routes/jsonl-resolver.js';
+import { codexConversationPendingInput } from './conversation-delivery.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -188,41 +188,6 @@ export function askUserQuestionSnapshotFromScan(
       options: q.options.map(o => ({ label: o.label, description: o.description })),
     })),
   };
-}
-
-const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
-
-export async function codexConversationPendingInput(
-  conv: Conversation,
-  sessionAlive: boolean,
-  askedAt: string,
-): Promise<{ kinds: PendingInputKind[]; approval?: PendingAskUserQuestionSnapshot }> {
-  if (!sessionAlive || getHarnessBehavior(conv.harness).transcriptKind !== 'codex-rollout-jsonl') return { kinds: [] };
-  try {
-    const detection = await Effect.runPromise(
-      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }),
-    );
-    if (!detection) return { kinds: [] };
-    if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
-
-    const parsed = parseCodexApprovalPrompt(detection.prompt);
-    if (parsed) {
-      const approval: PendingAskUserQuestionSnapshot = {
-        toolUseId: `${CODEX_APPROVAL_TOOL_PREFIX}${conv.tmuxSession}`,
-        askedAt,
-        questions: [{
-          question: parsed.detail ? `${parsed.header}\n\n${parsed.detail}` : parsed.header,
-          header: 'Codex approval',
-          multiSelect: false,
-          options: parsed.options.map((o) => ({ label: `${o.number}. ${o.label}` })),
-        }],
-      };
-      return { kinds: ['permissionRequest'], approval };
-    }
-    return { kinds: ['permissionRequest'] };
-  } catch {
-    return { kinds: [] };
-  }
 }
 
 export async function getConversationsPendingInputFeed(

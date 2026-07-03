@@ -29,7 +29,6 @@ import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
-import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
 import {
   archiveConversationByName,
   handleArchivedConversationsList,
@@ -43,7 +42,6 @@ import {
 } from '../../../lib/overdeck/conversation-diffs.js';
 import {
   askUserQuestionSnapshotFromScan,
-  codexConversationPendingInput,
   generateAiTitle,
   getCachedMessages,
   getConversationAbout,
@@ -54,6 +52,28 @@ import {
   patchConversationTitle,
   retitleConversation,
 } from '../../../lib/overdeck/conversation-reads.js';
+import {
+  clearPendingConversationControlAcksForTests,
+  codexConversationPendingInput,
+  deliverCodexApprovalChoice,
+  deliverConversationViaControlChannel,
+  getPendingConversationControlAckCount,
+  handleConversationAbort,
+  handleConversationCompact,
+  handleConversationControlAck,
+  handleConversationDeliveryMethod,
+  handleConversationThinkingLevel,
+  isPiControlChannelHarness,
+  pickDeliverAs,
+  resolveConversationControlAck,
+  resolveConversationDeliveryMethod,
+  sendConversationControlCommand,
+  validateConversationControlAckOrigin,
+} from '../../../lib/overdeck/conversation-delivery.js';
+import {
+  handleConversationImageUpload,
+  handleConversationMessage,
+} from '../../../lib/overdeck/conversation-message.js';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -77,7 +97,6 @@ import {
   setConversationEffort,
   setConversationHarness,
   setConversationClaudeSessionId,
-  updateConversationDeliveryMethod,
   updateConversationForkFallbackReason,
   setForkRequest,
   recordConversationHandoff,
@@ -107,7 +126,7 @@ import {
   listSessionNames,
   findManagedServerPidSync,
 } from '../../../lib/tmux.js';
-import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
+import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -143,8 +162,6 @@ import {
   summarizeConversationActivity,
 } from '../services/conversation-service.js';
 import { resolveConversationGitInfo } from '../services/git-info.js';
-import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
-import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import {
   compactConversationNative,
   shouldInterceptManualCompact,
@@ -170,7 +187,6 @@ import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adap
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
-  extractConversationAttachmentPaths,
   hasConversationAttachment,
   isManagedConversationAttachmentPath,
   removeConversationAttachment,
@@ -182,7 +198,6 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
-const MAX_FILENAME_LENGTH = 255;
 const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
 const CONVERSATION_LIST_ENRICHMENT_CONCURRENCY = 8;
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -469,33 +484,6 @@ export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
   }
 }
 
-const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
-  ['image/png', '.png'],
-  ['image/jpeg', '.jpg'],
-  ['image/gif', '.gif'],
-  ['image/webp', '.webp'],
-]);
-
-/** Validate image magic bytes match the declared MIME type. */
-function validateImageMagicBytes(bytes: Buffer, mimeType: string): boolean {
-  switch (mimeType) {
-    case 'image/png':
-      return bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
-    case 'image/jpeg':
-      return bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
-    case 'image/gif':
-      return bytes.length >= 4 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38;
-    case 'image/webp':
-      return (
-        bytes.length >= 12 &&
-        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
-      );
-    default:
-      return false;
-  }
-}
-
 /**
  * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
  * Polls every 500ms for up to 30 seconds. Claude Code takes a few seconds to start.
@@ -704,97 +692,6 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-export const CONTROL_ACK_TIMEOUT_MS = 10_000;
-
-export interface ConversationControlAck {
-  id: string
-  ok: boolean
-  error?: string
-}
-
-interface PendingConversationControlAck {
-  resolve: () => void
-  reject: (error: Error) => void
-  timer: ReturnType<typeof setTimeout>
-}
-
-const pendingConversationControlAcks = new Map<string, PendingConversationControlAck>();
-
-export function registerConversationControlAck(
-  commandId: string,
-  timeoutMs: number = CONTROL_ACK_TIMEOUT_MS,
-): Promise<void> {
-  const existing = pendingConversationControlAcks.get(commandId);
-  if (existing) {
-    clearTimeout(existing.timer);
-    existing.reject(new Error(`Replaced pending conversation control ack ${commandId}`));
-    pendingConversationControlAcks.delete(commandId);
-  }
-
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pendingConversationControlAcks.delete(commandId);
-      reject(new Error(`Timed out waiting for conversation control ack ${commandId}`));
-    }, timeoutMs);
-    pendingConversationControlAcks.set(commandId, {
-      resolve: () => {
-        clearTimeout(timer);
-        pendingConversationControlAcks.delete(commandId);
-        resolve();
-      },
-      reject: (error: Error) => {
-        clearTimeout(timer);
-        pendingConversationControlAcks.delete(commandId);
-        reject(error);
-      },
-      timer,
-    });
-  });
-}
-
-export function resolveConversationControlAck(ack: ConversationControlAck): 'resolved' | 'rejected' | 'unknown' {
-  const pending = pendingConversationControlAcks.get(ack.id);
-  if (!pending) return 'unknown';
-  if (ack.ok) {
-    pending.resolve();
-    return 'resolved';
-  }
-  pending.reject(new Error(ack.error || `Conversation control command ${ack.id} failed`));
-  return 'rejected';
-}
-
-export function getPendingConversationControlAckCount(): number {
-  return pendingConversationControlAcks.size;
-}
-
-export function clearPendingConversationControlAcksForTests(): void {
-  for (const pending of pendingConversationControlAcks.values()) {
-    clearTimeout(pending.timer);
-  }
-  pendingConversationControlAcks.clear();
-}
-
-export function handleConversationControlAck(
-  body: Record<string, unknown>,
-): { status: number; body: { ok: true; outcome: 'resolved' | 'rejected' | 'unknown' } | { error: string } } {
-  const id = typeof body['id'] === 'string' ? body['id'].trim() : '';
-  if (!id) return { status: 400, body: { error: 'id is required' } };
-  const ok = body['ok'] === true;
-  const error = typeof body['error'] === 'string' ? body['error'] : undefined;
-  const outcome = resolveConversationControlAck({ id, ok, ...(error !== undefined ? { error } : {}) });
-  return { status: 200, body: { ok: true, outcome } };
-}
-
-export function validateConversationControlAckOrigin(
-  headers: HeaderMap,
-  method = 'POST',
-): { ok: true } | { ok: false; error: string } {
-  const origin = getHeaderFromMap(headers, 'origin');
-  const referer = getHeaderFromMap(headers, 'referer');
-  if (!origin && !referer) return { ok: true };
-  return validateOriginHeaders(headers, method);
-}
-
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
   if (value === undefined || value === null) return { ok: true, focus: undefined };
   if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
@@ -819,13 +716,6 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
   };
-}
-
-function safeUploadExtension(filename: string, mimeType: string): string {
-  const mimeExtension = ALLOWED_UPLOAD_MIME_TYPES.get(mimeType);
-  if (!mimeExtension) return '';
-  const originalExtension = extname(filename).toLowerCase();
-  return originalExtension === mimeExtension ? originalExtension : mimeExtension;
 }
 
 export async function handleConversationHandoffDoc(
@@ -857,246 +747,6 @@ export async function handleConversationHandoffDoc(
   }
 }
 
-export async function handleConversationImageUpload(
-  name: string,
-  filename: string,
-  bytes: Buffer,
-  mimeType: string,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  if (!filename || !mimeType) {
-    return jsonResponse({ error: 'filename and mimeType are required' }, { status: 400 });
-  }
-
-  if (filename.length > MAX_FILENAME_LENGTH) {
-    return jsonResponse(
-      { error: `filename exceeds maximum length of ${MAX_FILENAME_LENGTH} characters` },
-      { status: 400 },
-    );
-  }
-
-  if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
-    return jsonResponse({ error: `Unsupported mimeType: ${mimeType}` }, { status: 400 });
-  }
-
-  if (bytes.length === 0) {
-    return jsonResponse({ error: 'Payload is empty' }, { status: 400 });
-  }
-
-  if (bytes.length > MAX_UPLOAD_BYTES) {
-    return jsonResponse(
-      { error: `Payload exceeds maximum size of ${MAX_UPLOAD_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-
-  if (!validateImageMagicBytes(bytes, mimeType)) {
-    return jsonResponse({ error: 'File content does not match declared MIME type' }, { status: 400 });
-  }
-
-  const extension = safeUploadExtension(filename, mimeType)!;
-
-  // Re-verify conversation exists before writing — it may have been deleted or
-  // archived during the async validation above.
-  const convBeforeWrite = getConversationByName(name);
-  if (!convBeforeWrite) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  const attachmentDir = await ensureConversationAttachmentDir(name);
-  // Pre-write containment: resolve the directory before writing to detect
-  // any symlink tampering that would redirect writes outside the intended
-  // root. This eliminates the TOCTOU window between write and check.
-  let resolvedDir: string;
-  let attachmentsRoot: string;
-  try {
-    resolvedDir = await realpath(attachmentDir);
-    attachmentsRoot = await realpath(getConversationAttachmentsRoot());
-  } catch (err) {
-    console.error('[conversations] Failed to resolve attachment path:', err);
-    return jsonResponse({ error: 'Attachment directory is misconfigured' }, { status: 500 });
-  }
-  if (!resolvedDir.startsWith(`${attachmentsRoot}/`)) {
-    return jsonResponse({ error: 'Invalid attachment path' }, { status: 500 });
-  }
-
-  const fileName = `${randomUUID()}${extension}`;
-  const path = join(resolvedDir, fileName);
-  const tmpPath = `${path}.tmp`;
-  try {
-    await writeFile(tmpPath, bytes);
-    await rename(tmpPath, path);
-  } catch (err) {
-    await rm(tmpPath, { force: true }).catch(() => {});
-    throw err;
-  }
-
-  return jsonResponse({ path });
-}
-
-export async function handleConversationMessage(
-  name: string,
-  body: Record<string, unknown>,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  if (conv.status === 'ended') {
-    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
-  }
-
-  const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-  if (!message) {
-    return jsonResponse({ error: 'Message is required' }, { status: 400 });
-  }
-  if (message.length > MAX_MESSAGE_LENGTH) {
-    return jsonResponse(
-      { error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
-      { status: 400 },
-    );
-  }
-
-  // Overdeck-native compaction writes Claude-format JSONL records. It must
-  // only run on Claude Code conversations — running it on a Pi conversation
-  // would corrupt the Pi transcript (P0, 2026-05-14). For Pi, let `/compact`
-  // pass through to Pi's own compaction.
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl' && shouldInterceptManualCompact(message)) {
-    const compactSessionFile = await resolveSessionFile(conv);
-    if (!compactSessionFile || !existsSync(compactSessionFile)) {
-      return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
-    }
-    const result = await compactConversationNative(compactSessionFile, conv.name);
-    setConversationClaudeSessionId(conv.name, result.forkedSessionId);
-    return jsonResponse({ ok: true, compacted: true, mode: 'overdeck-native', model: result.model });
-  }
-
-  const allAttachmentPaths = extractConversationAttachmentPaths(message);
-  // Validate managed attachments concurrently — each check is independent IO.
-  const managedChecks = await Promise.all(
-    allAttachmentPaths.map(async (attachmentPath) => {
-      const managed = await isManagedConversationAttachmentPath(attachmentPath);
-      if (!managed) return { managed: false as const, attachmentPath };
-      const hasAttachment = await hasConversationAttachment(conv.name, attachmentPath);
-      return { managed: true as const, attachmentPath, hasAttachment };
-    }),
-  );
-  for (const check of managedChecks) {
-    if (check.managed && !check.hasAttachment) {
-      return jsonResponse({ error: 'One or more attached images are unavailable for this conversation' }, { status: 400 });
-    }
-    // Unmanaged @paths in prose are allowed to pass through
-  }
-  const managedAttachmentPaths = managedChecks
-    .filter((c): c is { managed: true; attachmentPath: string; hasAttachment: boolean } => c.managed)
-    .map((c) => c.attachmentPath);
-  const harness: RuntimeName = conv.harness ?? 'claude-code';
-  const behavior = getHarnessBehavior(harness);
-
-  // Guard: text-only models (e.g. mimo-v2.5-pro) return 404 on image input,
-  // which the harness mistranslates as "model may not exist". Drop the image
-  // attachments and continue with the text rather than failing the whole turn.
-  // The composer also blocks attach up front; this is the server-side safety
-  // net for direct API callers. PAN-1685.
-  let outboundMessage = message;
-  let effectiveAttachmentPaths = managedAttachmentPaths;
-  let droppedImageCount = 0;
-  if (managedAttachmentPaths.length > 0 && !modelSupportsImagesSync(conv.model ?? '')) {
-    for (const p of managedAttachmentPaths) {
-      outboundMessage = outboundMessage.split(`@${p}`).join('');
-    }
-    outboundMessage = outboundMessage.trim();
-    droppedImageCount = managedAttachmentPaths.length;
-    effectiveAttachmentPaths = [];
-    if (!outboundMessage) {
-      return jsonResponse(
-        { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
-        { status: 422 },
-      );
-    }
-  }
-
-  let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
-
-  // PAN-1546: Claude conversations get prompt-time memory via the in-Claude
-  // UserPromptSubmit hook; ohmypi has no such hook, so inject server-side here for
-  // issue-linked ohmypi conversations (no-op otherwise).
-  if (behavior.injectsPromptTimeMemory) {
-    deliveredMessage = await injectPiConversationMemory(
-      { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
-      deliveredMessage,
-    );
-  }
-
-  if (isPiControlChannelHarness(harness)) {
-    await deliverConversationViaControlChannel(conv, deliveredMessage, {
-      source: 'operator',
-      deliverAs: pickDeliverAs(body['deliverAs']),
-    });
-  } else {
-    // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
-    // eaten-by-compaction watcher below can tell whether this message ever
-    // landed. Claude-only — the probe parses Claude-format JSONL.
-    let watchFromByteOffset: number | null = null;
-    if (behavior.transcriptKind === 'claude-jsonl' && conv.claudeSessionId) {
-      const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
-      watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
-    }
-
-    try {
-      await deliverAgentMessage(
-        conv.tmuxSession,
-        deliveredMessage,
-        'conversation-message',
-        resolveConversationDeliveryMethod(conv),
-      );
-    } catch (deliveryErr: unknown) {
-      const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
-      if (errMsg.includes('MessageDeliveryFailed')) {
-        return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
-      }
-      throw deliveryErr;
-    }
-
-    // Watch in the background for Claude Code's submit-time compaction eating
-    // the just-delivered prompt (compact boundary lands, message doesn't) and
-    // redeliver once. The POST already returned ok by the time this matters.
-    if (watchFromByteOffset !== null && conv.claudeSessionId) {
-      void watchForEatenConversationMessage({
-        conversationName: conv.name,
-        tmuxSession: conv.tmuxSession,
-        cwd: conv.cwd,
-        sessionId: conv.claudeSessionId,
-        message: deliveredMessage,
-        deliveryMethod: resolveConversationDeliveryMethod(conv),
-        fromByteOffset: watchFromByteOffset,
-      }).then((outcome) => {
-        if (outcome === 'redelivered') {
-          console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
-        }
-      }).catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
-      });
-    }
-  }
-
-  // Generate AI title for conversations created via instant-start (no message at creation)
-  if (conv.titleSource === 'default') {
-    void generateAiTitle(name, message, conversationReadDependencies).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
-    });
-  }
-
-  return jsonResponse({ ok: true, ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}) });
-}
-
 /** Generate a default conversation name, e.g. 20260404-1234 */
 function generateConversationName(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -1120,6 +770,11 @@ const conversationReadDependencies = {
   shouldReportUnresolvedLiveSession,
 };
 
+const conversationMessageDependencies = {
+  resolveSessionFile,
+  generateAiTitle: (name: string, message: string) => generateAiTitle(name, message, conversationReadDependencies),
+};
+
 function conversationReadJson(response: { body: unknown; status?: number }): ReturnType<typeof jsonResponse> {
   return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
 }
@@ -1137,16 +792,6 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 
-export function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
-  const harness = conv.harness ?? 'claude-code';
-  // No-loss retirement for pi/oh-my-pi message bodies: the old tmux path only
-  // provided fire-and-forget text delivery, now replaced by the acknowledged
-  // extension control channel. It provided no other pi/oh-my-pi behavior. The
-  // WI-7 Escape abort key remains the only sanctioned tmux write for Pi.
-  if (isPiControlChannelHarness(harness)) return 'auto';
-  return conv.deliveryMethod ?? (getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? 'tmux' : 'auto');
-}
-
 async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
   if (transcriptKind === 'ohmypi-jsonl') await waitForPiTuiReady(tmuxSession);
@@ -1154,147 +799,6 @@ async function waitForConversationRuntimeReady(tmuxSession: string, harness: Run
     await waitForClaudeReady(tmuxSession);
     console.log(`[conversations] Claude ready in ${tmuxSession}`);
   } else if (transcriptKind !== 'codex-rollout-jsonl') await waitForReadySignal(tmuxSession, 30);
-}
-
-type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | 'steer' | 'follow_up'>;
-type ConversationControlCommandInput = Omit<ControlCommand, 'id'>;
-
-const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const satisfies readonly ThinkingLevel[];
-const PI_CONVERSATION_ABORT_KEY = 'Escape';
-
-function isPiControlChannelHarness(harness: RuntimeName): boolean {
-  return harness === 'ohmypi' || harness === 'pi';
-}
-
-function parseThinkingLevel(value: unknown): ThinkingLevel | null {
-  return typeof value === 'string' && (THINKING_LEVELS as readonly string[]).includes(value)
-    ? value as ThinkingLevel
-    : null;
-}
-
-export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDeliverAs {
-  if (bodyDeliverAs === 'follow_up') return 'follow_up';
-  // Default to steer, never a bare prompt: Pi delivers steer immediately when
-  // idle and queues it when a run is active, whereas a bare prompt is rejected
-  // mid-turn with AgentBusyError — and Pi's extension-side sendUserMessage
-  // wrapper swallows that rejection, so the message would be silently lost.
-  // Heartbeat-based busy detection is not viable: heartbeats are only written
-  // at tool-end/turn-end, so a thinking model always looks idle.
-  return 'steer';
-}
-
-export async function sendConversationControlCommand(
-  conv: Pick<Conversation, 'tmuxSession'>,
-  commandInput: ConversationControlCommandInput,
-): Promise<void> {
-  const id = randomUUID();
-  const ackPromise = registerConversationControlAck(id);
-  const command: ControlCommand = {
-    id,
-    ...commandInput,
-  };
-
-  try {
-    await writeConversationControlCommand(conv.tmuxSession, command);
-  } catch (err) {
-    resolveConversationControlAck({
-      id,
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-  await ackPromise;
-}
-
-export async function deliverConversationViaControlChannel(
-  conv: Pick<Conversation, 'tmuxSession'>,
-  message: string,
-  options: {
-    source: 'operator' | 'orchestrator'
-    deliverAs: ConversationControlDeliverAs
-  },
-): Promise<void> {
-  await sendConversationControlCommand(conv, {
-    type: options.deliverAs,
-    message,
-    source: options.source,
-  });
-}
-
-export async function handleConversationThinkingLevel(
-  name: string,
-  body: Record<string, unknown>,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (!isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Thinking level control is only supported for Pi conversations' }, { status: 400 });
-  }
-
-  if (conv.status === 'ended') {
-    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
-  }
-
-  const level = parseThinkingLevel(body['level']);
-  if (!level) {
-    return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
-  }
-
-  await sendConversationControlCommand(conv, { type: 'set_thinking_level', level });
-  setConversationEffort(name, level);
-  const updated = getConversationByName(name) ?? conv;
-  return jsonResponse({ ok: true, effort: updated.effort ?? level });
-}
-
-export async function handleConversationCompact(
-  name: string,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (!isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Compact control endpoint is only supported for Pi conversations' }, { status: 400 });
-  }
-
-  if (conv.status === 'ended') {
-    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
-  }
-
-  await sendConversationControlCommand(conv, { type: 'compact' });
-  return jsonResponse({ ok: true });
-}
-
-export async function handleConversationAbort(
-  name: string,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (!isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Abort control endpoint is only supported for Pi conversations' }, { status: 400 });
-  }
-
-  if (conv.status === 'ended') {
-    return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
-  }
-
-  // NFR-4: this single TUI interrupt key is the only sanctioned remaining
-  // tmux write for pi/oh-my-pi conversations. All message and live-control
-  // traffic must use the extension control channel; the extension API exposes
-  // no turn-abort primitive, and Escape was verified to cancel a running omp
-  // turn while keeping the TUI session alive.
-  await sendKeysAsync(conv.tmuxSession, PI_CONVERSATION_ABORT_KEY, 'conversation-abort');
-  return jsonResponse({ ok: true, key: PI_CONVERSATION_ABORT_KEY });
 }
 
 export async function handleConversationSwitchModel(
@@ -1369,64 +873,6 @@ export async function handleConversationSwitchModel(
     harness,
     sessionAlive: false,
   });
-}
-
-/**
- * PAN-1690 — answer a Codex approval menu from the dashboard. Codex select
- * popups default-highlight the first option and confirm on Enter, so option N
- * is reached with Down×(N-1) then Enter (verified against the codex 0.137 TUI).
- * Small delays let the TUI process each keystroke.
- */
-async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
-  for (let i = 1; i < optionNumber; i += 1) {
-    await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Down', 'codex-approval'));
-    await new Promise((r) => setTimeout(r, 60));
-  }
-  await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Enter', 'codex-approval'));
-}
-
-/** Rewrite an outgoing conversation message so harnesses without Claude Code's
- *  `@`-mention pre-submit parser still surface image attachments to the model.
- *
- *  Claude Code's TUI parses `@/abs/path` tokens at submit time and inlines the
- *  file as vision input — the model sees the image, not the path. Pi (and
- *  similar harnesses) lack that parser; the model sees `@/abs/path` as literal
- *  text and may or may not decide to call its Read tool. Replace the
- *  composer-injected `@path` prefix with an explicit instruction so any
- *  harness with a Read tool will see and process the attachment. PAN-1535. */
-export function transformMessageForHarness(
-  message: string,
-  harness: RuntimeName,
-  managedPaths: string[],
-): string {
-  if (getHarnessBehavior(harness).transcriptKind === 'claude-jsonl') return message;
-  if (managedPaths.length === 0) return message;
-
-  // Strip each managed `@<path>` token (exact literal match, escaped for
-  // regex metacharacters) so we don't accidentally strip unmanaged prose
-  // mentions of similar-looking paths.
-  let body = message;
-  for (const p of managedPaths) {
-    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    body = body.replace(new RegExp(`(?<!\\S)@${escaped}`, 'g'), '');
-  }
-  // Collapse the multiple blank lines left behind by stripping, and trim.
-  const rest = body
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .reduce<string[]>((acc, line) => {
-      if (line === '' && acc.length > 0 && acc[acc.length - 1] === '') return acc;
-      acc.push(line);
-      return acc;
-    }, [])
-    .join('\n')
-    .trim();
-
-  const bullets = managedPaths.map((p) => `- ${p}`).join('\n');
-  if (!rest) {
-    return `Please use your Read tool on the file(s) below and describe what you see.\n\nFiles:\n${bullets}`;
-  }
-  return `Please use your Read tool on the file(s) below before responding, then answer the message that follows based on what you see.\n\nFiles:\n${bullets}\n\nMessage:\n${rest}`;
 }
 
 function resolvePtySupervisorScriptPath(): string {
@@ -2826,7 +2272,7 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        return await handleConversationMessage(name, body);
+        return await handleConversationMessage(name, body, conversationMessageDependencies);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         // Log the full stack (falls back to message) so a 500's cause is
@@ -2922,16 +2368,7 @@ const postConversationDeliveryMethodRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        const deliveryMethod = body['deliveryMethod'] ?? body['method'];
-        if (deliveryMethod !== 'auto' && deliveryMethod !== 'channels' && deliveryMethod !== 'tmux' && deliveryMethod !== null) {
-          return jsonResponse({ error: "deliveryMethod must be 'auto', 'channels', 'tmux', or null" }, { status: 400 });
-        }
-        updateConversationDeliveryMethod(name, deliveryMethod as 'auto' | 'channels' | 'tmux' | null);
-        return jsonResponse({ ok: true, deliveryMethod });
+        return await handleConversationDeliveryMethod(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] update delivery method failed:', msg);
