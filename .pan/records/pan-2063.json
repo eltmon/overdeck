@@ -51,10 +51,11 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "pending",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T07:58:14.762Z",
+    "mergeStatus": "failed",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T07:58:39.744Z",
     "reviewNotes": "No blocking findings; UAT collapse behavior meets requirements and non-goals.",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
     "reviewedAtCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
     "lastVerifiedCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
@@ -124,7 +125,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.492847,
-        "pricingAsOf": "2026-07-03T07:58:14.897Z"
+        "pricingAsOf": "2026-07-03T07:58:39.843Z"
       }
     },
     "merges": [
@@ -133,7 +134,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-07-03T07:58:14.897Z",
+  "updated": "2026-07-03T07:58:39.843Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
