@@ -104,7 +104,7 @@ export async function renderCommitFeedDiff(
   const maxBytes = feedConfig.max_diff_bytes;
   if (maxBytes === null || Buffer.byteLength(diff, 'utf-8') <= maxBytes) return diff;
 
-  const stat = await gitShow(workspace, sha, ['--stat']);
+  const stat = await gitShow(workspace, sha, ['--stat', ...pathspecArgs]);
   return [
     stat.trimEnd(),
     '',

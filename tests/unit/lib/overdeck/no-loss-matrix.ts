@@ -446,6 +446,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/specialists/:project/:issueId/reviewer/:role/restart',   kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration + AgentWriter.spawn' },
   { surface: 'GET /api/models/resolve',                                          kind: 'http', disposition: 'RELOCATE',    door: 'Settings' },
 
+  // ── tiered-callouts.ts ────────────────────────────────────────────────────
+  { surface: 'POST /api/tiered/callouts',                 kind: 'http', disposition: 'RELOCATE',    door: 'Tiered execution supervisor/callout orchestration' },
+
   // ── terminals.ts ──────────────────────────────────────────────────────────
   { surface: 'POST /api/terminals',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },
   { surface: 'DELETE /api/terminals/:name',               kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },

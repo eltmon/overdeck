@@ -280,4 +280,27 @@ describe('renderCommitFeedDiff', () => {
     expect(diff).toContain('bytes exceeded 40 bytes');
     expect(gitShow).toHaveBeenLastCalledWith('/ws', 'abc123', ['--stat']);
   });
+
+  it('keeps exclude pathspecs on the max_diff_bytes stat fallback', async () => {
+    const gitShow = vi.fn(async (_workspace: string, _sha: string, args: string[]) => {
+      if (args.includes('--stat')) return 'commit abc123\n\n src/x.ts | 200 +++++\n';
+      return 'commit abc123\n\n' + 'x'.repeat(100);
+    });
+
+    const diff = await renderCommitFeedDiff('/ws', 'abc123', feedConfig({
+      exclude: ['bun.lock', '.pan/records/**'],
+      max_diff_bytes: 40,
+    }), { gitShow });
+
+    expect(diff).toContain('src/x.ts | 200 +++++');
+    expect(diff).not.toContain('bun.lock');
+    expect(diff).not.toContain('.pan/records');
+    expect(gitShow).toHaveBeenLastCalledWith('/ws', 'abc123', [
+      '--stat',
+      '--',
+      '.',
+      ':(exclude)bun.lock',
+      ':(exclude).pan/records/**',
+    ]);
+  });
 });
