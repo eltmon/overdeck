@@ -12,9 +12,27 @@
       "timestamp": "2026-07-03T21:35:29.360Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T21:38Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-03T21:38:22.138Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T21:38:22.204Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T21:38:22Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2318 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (50837ms):\n\ngit\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/dashboard/metrics-stuck-count.test.ts [ tests/unit/dashboard/metrics-stuck-count.test.ts ]\nError: [vitest] No \"readCloisterStateFile\" export is defined on the \"../../../src/lib/cloister/service.js\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"../../../src/lib/cloister/service.js\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ createDeaconSupervisor src/dashboard/server/services/deacon-supervisor.ts:60:39\n     58| export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}…\n     59|   const forkImpl = deps.fork ?? fork;\n     60|   const readState = deps.readState ?? readCloisterStateFile;\n       |                                       ^\n     61|   const emitActivity = deps.emitActivity ?? emitActivityEntrySync;\n     62|   const now = deps.now ?? Date.now;\n ❯ src/dashboard/server/services/deacon-supervisor.ts:199:27\n ❯ src/dashboard/server/services/cloister-control-surface.ts:19:1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2318 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2318 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".eslintrc.cjs",
@@ -127,16 +145,18 @@
     "recordedAt": "2026-07-03T21:35:21.351Z"
   },
   "created": "2026-07-03T18:47:58.596Z",
-  "updated": "2026-07-03T21:35:35.603Z",
+  "updated": "2026-07-03T21:38:26.787Z",
   "pipeline": {
     "issueId": "PAN-2318",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T21:35:35.553Z",
+    "updatedAt": "2026-07-03T21:38:26.641Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (50837ms):\n\ngit\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/dashboard/metrics-stuck-count.test.ts [ tests/unit/dashboard/metrics-stuck-count.test.ts ]\nError: [vitest] No \"readCloisterStateFile\" export is defined on the \"../../../src/lib/cloister/service.js\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\nvi.mock(import(\"../../../src/lib/cloister/service.js\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n    ...actual,\n    // your mocked methods\n  }\n})\n\n ❯ createDeaconSupervisor src/dashboard/server/services/deacon-supervisor.ts:60:39\n     58| export function createDeaconSupervisor(deps: DeaconSupervisorDeps = {}…\n     59|   const forkImpl = deps.fork ?? fork;\n     60|   const readState = deps.readState ?? readCloisterStateFile;\n       |                                       ^\n     61|   const emitActivity = deps.emitActivity ?? emitActivityEntrySync;\n     62|   const now = deps.now ?? Date.now;\n ❯ src/dashboard/server/services/deacon-supervisor.ts:199:27\n ❯ src/dashboard/server/services/cloister-control-surface.ts:19:1\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "inspectNotes": "Spec fidelity PASS: diff implements WI-1 deacon child entry, supervisor, tsdown entry, main spawn/shutdown wiring, and single-deacon lock. Constraint compliance PASS: no new execSync/sync tmux/Bun child path violations; deacon-supervisor tests use fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2327",
     "reviewRequestedAt": "2026-07-03T21:35:29.361Z",
@@ -302,7 +322,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.4635679999999995,
-        "pricingAsOf": "2026-07-03T21:35:35.595Z"
+        "pricingAsOf": "2026-07-03T21:38:26.725Z"
       }
     },
     "merges": [
