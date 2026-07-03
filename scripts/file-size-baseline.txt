@@ -22,7 +22,6 @@
 1753 src/dashboard/server/routes/specialists.ts
 1767 src/dashboard/server/routes/workspaces.ts
 1925 src/dashboard/server/routes/workspaces/merge-ops.ts
-1610 src/dashboard/server/services/conversation-service.ts
 1466 src/dashboard/server/services/issue-data-service.ts
 1317 src/dashboard/server/ws-rpc.ts
 102 src/lib/agents.ts
