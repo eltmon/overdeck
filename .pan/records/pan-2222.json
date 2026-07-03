@@ -78,15 +78,18 @@
     "outsideDeclaredScope": [
       ".pan/records/pan-2222.json",
       "src/dashboard/server/routes/__tests__/specialists.test.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
       "src/dashboard/server/routes/tiered-inspect-escalation.ts",
       "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
       "src/lib/cloister/__tests__/inspect-agent.test.ts",
       "src/lib/vbrief/__tests__/io.test.ts",
       "src/lib/vbrief/continue-state.ts",
       "sync-sources/hooks/record-cost-event.js",
-      "sync-sources/hooks/record-cost-event.js.map"
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
     "declaredScopeUntouched": [
+      "src/dashboard/server/routes/specialists.ts",
       "src/lib/agents/__tests__/tier-supervisor.test.ts",
       "src/lib/agents/standing-tiers.ts",
       "src/lib/config-yaml/schema.ts",
@@ -119,7 +122,7 @@
       ".pan/records/pan-2222.json",
       "docs/TIERED-EXECUTION.md",
       "src/dashboard/server/routes/__tests__/specialists.test.ts",
-      "src/dashboard/server/routes/specialists.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
       "src/dashboard/server/routes/tiered-callouts.ts",
       "src/dashboard/server/routes/tiered-inspect-escalation.ts",
       "src/dashboard/server/server.ts",
@@ -141,9 +144,10 @@
       "src/lib/vbrief/io.ts",
       "sync-sources/hooks/record-cost-event.js",
       "sync-sources/hooks/record-cost-event.js.map",
-      "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+      "tests/unit/dashboard/routes/tiered-callouts.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
-    "recordedAt": "2026-07-03T01:08:06.910Z"
+    "recordedAt": "2026-07-03T01:51:50.491Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -368,5 +372,5 @@
     ]
   },
   "created": "2026-07-02T23:14:10.593Z",
-  "updated": "2026-07-03T01:36:39.989Z"
+  "updated": "2026-07-03T01:51:50.493Z"
 }
