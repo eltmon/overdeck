@@ -80,6 +80,11 @@ export function getCanonicalStatus(status: string | undefined, stateType?: strin
   return 'backlog'; // Default fallback
 }
 
+export function shouldRefreshPlanningStateForIssue(issue: any): boolean {
+  const canonical = getCanonicalStatus(issue?.status, issue?.stateType);
+  return canonical !== 'done' && canonical !== 'canceled';
+}
+
 // Poll intervals (ms)
 const POLL_INTERVALS = {
   github:  { default: 30_000, min: 15_000, max: 300_000 },
@@ -728,6 +733,7 @@ export class IssueDataService {
   private schedulePlanningRefreshForIssues(issues: any[]): void {
     for (const issue of issues) {
       const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+      if (!shouldRefreshPlanningStateForIssue(issue)) continue;
       if (!identifier || this.planningRefreshQueued.has(identifier) || planningStateRefreshInFlight.has(identifier)) continue;
       this.planningRefreshQueued.add(identifier);
       this.planningRefreshQueue.push(identifier);

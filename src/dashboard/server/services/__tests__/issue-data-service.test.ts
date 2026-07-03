@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { computeBeadCounts, IssueDataService } from '../issue-data-service.js';
+import { computeBeadCounts, IssueDataService, shouldRefreshPlanningStateForIssue } from '../issue-data-service.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
 describe('computeBeadCounts', () => {
@@ -102,5 +102,57 @@ describe('IssueDataService tracker-polling gate (PAN-1817)', () => {
     expect(polls.linear).toHaveBeenCalledTimes(1);
     expect(polls.rally).toHaveBeenCalledTimes(1);
     svc.stop();
+  });
+});
+
+describe('IssueDataService planning refresh gate', () => {
+  function makeService() {
+    const cache = { getBackoffMs: () => 0 } as any;
+    const svc = new IssueDataService(cache);
+    vi.spyOn(svc as any, 'drainPlanningRefreshQueue').mockImplementation(() => {});
+    return svc;
+  }
+
+  it('queues planning refreshes for active issues only, not terminal done/canceled issues', () => {
+    const svc = makeService();
+    const terminal = Array.from({ length: 1000 }, (_, idx) => ({
+      identifier: `PAN-DONE-${idx}`,
+      status: idx % 2 === 0 ? 'Done' : 'Canceled',
+    }));
+    const active = Array.from({ length: 10 }, (_, idx) => ({
+      identifier: `PAN-ACTIVE-${idx}`,
+      status: idx % 2 === 0 ? 'In Progress' : 'Todo',
+    }));
+
+    (svc as any).schedulePlanningRefreshForIssues([...terminal, ...active]);
+
+    expect((svc as any).planningRefreshQueue).toEqual(active.map((issue) => issue.identifier));
+    expect((svc as any).planningRefreshQueued.size).toBe(10);
+  });
+
+  it('preserves planning refreshes for active non-terminal issues', () => {
+    const svc = makeService();
+    const active = [
+      { identifier: 'PAN-READY', status: 'Ready' },
+      { identifier: 'PAN-REVIEW', status: 'In Review' },
+      { identifier: 'PAN-VERIFYING', status: 'Verifying on main' },
+    ];
+
+    (svc as any).schedulePlanningRefreshForIssues(active);
+
+    expect((svc as any).planningRefreshQueue).toEqual(['PAN-READY', 'PAN-REVIEW', 'PAN-VERIFYING']);
+  });
+
+  it('uses getCanonicalStatus stateType handling rather than a separate status mapping', () => {
+    expect(shouldRefreshPlanningStateForIssue({
+      identifier: 'PAN-CUSTOM-DONE',
+      status: 'Custom Done Name',
+      stateType: 'completed',
+    })).toBe(false);
+    expect(shouldRefreshPlanningStateForIssue({
+      identifier: 'PAN-CUSTOM-ACTIVE',
+      status: 'Custom Active Name',
+      stateType: 'started',
+    })).toBe(true);
   });
 });
