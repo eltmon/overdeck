@@ -16,6 +16,7 @@ import {
 
 let odb: OverdeckTestDb;
 let fakeJsonlPath: string;
+const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 const MOCK_JSONL = [
   JSON.stringify({
@@ -69,11 +70,11 @@ beforeEach(() => {
   odb = setupOverdeckTestDb();
   fakeJsonlPath = join(odb.home, 'sess.jsonl');
   writeFileSync(fakeJsonlPath, MOCK_JSONL, 'utf8');
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 afterEach(() => {
   teardownOverdeckTestDb(odb);
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 // ─── model-fallback ───────────────────────────────────────────────────────────
 

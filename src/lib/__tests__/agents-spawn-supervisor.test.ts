@@ -17,6 +17,7 @@ let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
+const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
   return {
@@ -180,7 +181,7 @@ beforeEach(() => {
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   mockSpawnDependencies();
-}, 20_000);
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 afterEach(() => {
   vi.doUnmock('../harness-resolve.js');
@@ -208,7 +209,7 @@ afterEach(() => {
   rmSync(tmpHome, { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });
   rmSync(packageRootDir, { recursive: true, force: true });
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 describe('spawnAgent PTY supervisor wiring', () => {
   it('decides supervisor eligibility from Docker and harness only', async () => {

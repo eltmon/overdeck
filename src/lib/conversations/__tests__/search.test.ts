@@ -9,6 +9,7 @@ import {
 } from '../../../../tests/helpers/overdeck-test-db.js';
 
 let odb: OverdeckTestDb | undefined;
+const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 function resetDb() {
   if (odb) teardownOverdeckTestDb(odb);
@@ -24,7 +25,7 @@ afterEach(() => {
     teardownOverdeckTestDb(odb);
     odb = undefined;
   }
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 // ─── parseRelativeTime ────────────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ describe('searchSessions', () => {
     seedSession({ id: 1, workspace: '/home/user/Projects/alpha', tags: ['feat'], cost: 0.01 });
     seedSession({ id: 2, workspace: '/home/user/Projects/beta', tags: ['fix'], cost: 0.05 });
     seedSession({ id: 3, workspace: '/home/user/Projects/alpha', tags: ['feat', 'large'], cost: 0.20 });
-  });
+  }, HEAVY_HOOK_TIMEOUT_MS);
 
   it('filter by workspacePath returns matching sessions', async () => {
     const result = await searchSessions({ filter: { workspacePath: '/home/user/Projects/alpha' } });
@@ -258,7 +259,7 @@ describe('FTS total is not derived from the capped candidate slice', () => {
         summary: `cache eviction bugfix in session ${i}`,
       });
     }
-  });
+  }, HEAVY_HOOK_TIMEOUT_MS);
 
   it('FTS total reflects true match count, not the paginated slice', async () => {
     // Request only 2 of the 5 matching sessions
@@ -316,7 +317,7 @@ describe('FTS pagination with non-zero offset', () => {
         summary: `pagination regression test session ${i}`,
       });
     }
-  });
+  }, HEAVY_HOOK_TIMEOUT_MS);
 
   it('page 2 (offset=3, limit=3) returns 3 distinct results', async () => {
     const page1 = await searchSessions({ q: 'pagination regression test', limit: 3, offset: 0 });
@@ -415,7 +416,7 @@ describe('similar-session search paginates after excluding the reference session
       });
       insertEmbedding(s.id, MODEL, new Float32Array(vectors[i]));
     }
-  });
+  }, HEAVY_HOOK_TIMEOUT_MS);
 
   it('returns non-overlapping pages after the reference is removed', async () => {
     const page1 = await searchSessions({ similarTo: 1, embeddingModel: MODEL, limit: 2, offset: 0 });
@@ -491,7 +492,7 @@ describe('semantic+FTS search respects filter constraints', () => {
       const emb = new Float32Array(4).fill(i * 0.1);
       insertEmbedding(s.id, MODEL, emb);
     }
-  });
+  }, HEAVY_HOOK_TIMEOUT_MS);
 
   it('filter excludes sessions outside requested workspace', async () => {
     // similarTo=session 1 (workspace-A); q matches all 4; filter restricts to workspace-A
