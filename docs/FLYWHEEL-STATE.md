@@ -207,6 +207,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 12 (2026-07-03) — finalizes slow-but-live (verified holder); swap COMPLETELY full
+
+- **Dual finalize (2261/2255) still grinding ~45 min** — diagnosed the lock properly before acting: holder is a LIVE `pan plan finalize` pid (lock file `~/.overdeck/locks/bd-*.lock` carries {pid, ts, caller}; ts advancing, process 3m old) → slow serialization, NOT the frozen-ts hang; no SIGTERM. PAN-2257 start stays deferred. REUSABLE: read the lock file JSON + `ps -o etime` on its pid to distinguish live-holder from hung-holder before intervening.
+- **Swap 8180/8191 MB — completely full**, RAM climbing (34/64 GB). Escalated to operator as imminent-OOM.
+- PAN-2260 verdicts still pending. UAT bundle unchanged (PAN-2254 #2272 + MIN-831 + MIN-846). Main GREEN (5681f0c3e4).
+
 ## RUN-53 tick 11 (2026-07-03) — PAN-2257 planned; dual finalize saturates the bd lock (start deferred)
 
 - **PAN-2257 finalized** (spec promoted to .pan/specs/, beads created; the planner itself hit a bd-lock timeout on auto-promotion and self-recovered via `pan plan done`). PAN-2261 mid-finalize (bead 1/5, slow under lock contention — it is planning the fix for the very lock it's fighting). PAN-2255 mid-finalize with self-raised `OVERDECK_BD_TIMEOUT_MS=180000` (useful knob — REUSABLE for lock-heavy windows).
