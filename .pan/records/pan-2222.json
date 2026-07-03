@@ -36,15 +36,42 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T00:30:06.560Z"
+    },
+    {
+      "timestamp": "2026-07-03T01:08:20.242Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T01:08:20.731Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T01:09Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-03T01:09:53.468Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T01:09Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T01:09:55.146Z"
     }
   ],
   "feedback": [
     {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T01:09:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2222\n\nfeed.exclude is ignored by max_diff_bytes stat fallback\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2222 -m \"Fixed review issues\"`"
+    },
+    {
       "seq": 2,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-07-03T00:24:54Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2222\n\nreplay call-out messages can use the wrong beadId\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2222 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-03T01:09:55Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2222\n\nfeed.exclude is ignored by max_diff_bytes stat fallback\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2222 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -116,7 +143,7 @@
       "sync-sources/hooks/record-cost-event.js.map",
       "tests/unit/dashboard/routes/tiered-callouts.test.ts"
     ],
-    "recordedAt": "2026-07-03T00:58:13.501Z"
+    "recordedAt": "2026-07-03T01:08:06.910Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -179,18 +206,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2222",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T00:48:28.022Z",
-    "reviewNotes": "Round 2 blocked (operator-relayed from agent-pan-2222-review-62225f49 report; verdict POST was dropped): replay call-out messages can use target.slotItemId for every replayed commit, so replay can generate non-byte-identical feed messages and corroborate the wrong bead.",
+    "updatedAt": "2026-07-03T01:36:39.882Z",
+    "reviewNotes": "feed.exclude is ignored by max_diff_bytes stat fallback",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
     "lastVerifiedCommit": "62225f49bf034dba326f199cf9d2e01322eaae52",
-    "reviewRequestedAt": "2026-07-03T00:23:14.036Z",
+    "reviewRequestedAt": "2026-07-03T01:08:20.244Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2222.json",
@@ -199,7 +226,9 @@
         "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
         "src/lib/cloister/__tests__/inspect-agent.test.ts",
         "src/lib/vbrief/__tests__/io.test.ts",
-        "src/lib/vbrief/continue-state.ts"
+        "src/lib/vbrief/continue-state.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map"
       ],
       "declaredScopeUntouched": [
         "src/lib/agents/__tests__/tier-supervisor.test.ts",
@@ -254,9 +283,11 @@
         "src/lib/vbrief/__tests__/io.test.ts",
         "src/lib/vbrief/continue-state.ts",
         "src/lib/vbrief/io.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "sync-sources/hooks/record-cost-event.js.map",
         "tests/unit/dashboard/routes/tiered-callouts.test.ts"
       ],
-      "recordedAt": "2026-07-03T00:22:02.226Z"
+      "recordedAt": "2026-07-03T01:08:06.910Z"
     }
   },
   "closeOut": {
@@ -317,7 +348,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.129131,
-        "pricingAsOf": "2026-07-03T00:48:28.049Z"
+        "pricingAsOf": "2026-07-03T01:36:39.962Z"
       }
     },
     "merges": [
@@ -326,8 +357,16 @@
     "ranOn": "eltmon-z790"
   },
   "swarm": {
-    "slotAssignments": []
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "feed-noise-filter",
+        "agentId": "agent-pan-2222-slot-1",
+        "branch": "feature/pan-2222-slot-1",
+        "assignedAt": "2026-07-03T01:20:00.000Z"
+      }
+    ]
   },
   "created": "2026-07-02T23:14:10.593Z",
-  "updated": "2026-07-03T00:58:13.502Z"
+  "updated": "2026-07-03T01:36:39.989Z"
 }
