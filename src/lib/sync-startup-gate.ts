@@ -1,6 +1,6 @@
 import { createHash, type Hash } from 'crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { OVERDECK_HOME, SYNC_SOURCES, isDevMode } from './paths.js';
 import { listProjectsSync } from './projects.js';
 
@@ -21,8 +21,12 @@ function computeSyncInputHash(): string {
   // Dev mode affects which skills are copied from sync-sources/dev-skills.
   hash.update(String(isDevMode()));
 
-  // mirrorProjectSkillsSync depends on the cwd and registered project-local skills.
+  // mirrorProjectSkillsSync depends on the cwd, its top-level skills/ tree, and registered project-local skills.
   hash.update(process.cwd());
+  const cwdSkillsRoot = resolveTopLevelSkillsRoot(process.cwd());
+  if (cwdSkillsRoot) {
+    updateHashFromDirectory(hash, join(cwdSkillsRoot, 'skills'));
+  }
 
   for (const [key, dir] of Object.entries(SYNC_SOURCES)) {
     if (!existsSync(dir)) {
@@ -50,6 +54,34 @@ function computeSyncInputHash(): string {
   }
 
   return hash.digest('hex');
+}
+
+function resolveTopLevelSkillsRoot(startDir: string): string | null {
+  let dir = startDir;
+  while (true) {
+    const candidate = join(dir, 'skills');
+    if (containsSkillDefinitions(candidate)) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function containsSkillDefinitions(dir: string): boolean {
+  if (!existsSync(dir)) return false;
+  try {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (existsSync(join(dir, entry.name, 'SKILL.md')) || existsSync(join(dir, entry.name, 'skill.md'))) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 function updateHashFromDirectory(hash: Hash, dir: string): void {

@@ -139,6 +139,16 @@
       "reason": "feedback",
       "note": "[2026-07-03T17:02Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-03T17:02:14.904Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T17:06:41.366Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T17:08Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-07-03T17:08:20.607Z"
     }
   ],
   "feedback": [
@@ -148,10 +158,17 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-03T17:02:14Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2086\n\nstartup sync gate still misses the top-level skills mirror input\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2086 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T17:08:20Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2086\n\nstartup sync gate still misses the top-level skills mirror input\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2086 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-03T17:02:14.905Z",
+  "updated": "2026-07-03T17:08:20.607Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "blocked",
@@ -160,11 +177,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T17:02:12.068Z",
+    "updatedAt": "2026-07-03T17:07:56.935Z",
     "reviewNotes": "startup sync gate still misses the top-level skills mirror input",
     "inspectNotes": "Bead workspace-h51bn PASS. Implements Task 1 Step 1 (profile via time/timeAsync helpers + [sync-timing] summary) and Step 2 (content-hash gate: isStartupSyncNeededSync + writeSyncManifestSync at ~/.overdeck/.sync-manifest.json). Hash covers SYNC_SOURCES tree + global.md + per-project project.md + devMode + cwd; missing input falls back to needed=true (conservative). 6 unit tests cover all gate branches. Manual pan sync / pan sync --force behavior unchanged. Follow-up bead expected to wire the gate into the deferred startup spawn in src/cli/index.ts and add the --if-changed flag per the Task 1 guardrail.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2313",
-    "lastVerifiedCommit": "5cfb20ebb6d47c78ae7f76b4ce0cebfd01d56f60",
+    "lastVerifiedCommit": "6bfb4bdd876e7b1d630b66a4bde1cefee6c413b7",
     "reviewRequestedAt": "2026-07-03T16:57:20.281Z"
   },
   "closeOut": {
@@ -243,7 +260,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.01451,
-        "pricingAsOf": "2026-07-03T17:02:12.168Z"
+        "pricingAsOf": "2026-07-03T17:07:57.022Z"
       }
     },
     "merges": [

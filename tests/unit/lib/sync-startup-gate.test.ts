@@ -136,6 +136,26 @@ describe('isStartupSyncNeededSync', () => {
     expect(result.needed).toBe(true);
   });
 
+  it('returns needed when the cwd top-level skill mirror source changes', async () => {
+    const projectPath = join(dirs.base, 'top-level-skills-project');
+    const nestedPath = join(projectPath, 'nested');
+    mkdirSync(join(projectPath, 'skills', 'local-skill'), { recursive: true });
+    mkdirSync(nestedPath, { recursive: true });
+    write(join(projectPath, 'skills', 'local-skill', 'SKILL.md'), '# top-level skill\n');
+
+    const previousCwd = process.cwd();
+    process.chdir(nestedPath);
+    try {
+      const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
+      writeSyncManifestSync();
+      write(join(projectPath, 'skills', 'local-skill', 'SKILL.md'), '# top-level skill changed\n');
+      const result = isStartupSyncNeededSync();
+      expect(result.needed).toBe(true);
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
   it('falls back to needed when a sync source directory is missing', async () => {
     rmSync(join(dirs.syncSources, 'rules'), { recursive: true, force: true });
     const { isStartupSyncNeededSync } = await import('../../../src/lib/sync.js');
