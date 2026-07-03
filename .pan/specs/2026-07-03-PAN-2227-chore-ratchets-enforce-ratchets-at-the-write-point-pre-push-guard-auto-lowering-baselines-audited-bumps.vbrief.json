@@ -1,0 +1,865 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T00:03:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2227: chore(ratchets): enforce ratchets at the write point — pre-push guard, auto-lowering baselines, audited bumps (planned jointly with PAN-2204 per operator directive)"
+  },
+  "plan": {
+    "id": "pan-2227",
+    "title": "chore(ratchets): enforce ratchets at the write point — pre-push guard, auto-lowering baselines, audited bumps",
+    "status": "proposed",
+    "uid": "bd379d3c-8a4e-4985-b5a2-00564cfeb6f0",
+    "author": "agent:claude-fable-5",
+    "sequence": 1,
+    "created": "2026-07-03T00:03:01Z",
+    "updated": "2026-07-03T00:03:01Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2227",
+        "label": "PAN-2227",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2204",
+        "label": "PAN-2204",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2227.md",
+        "label": "PRD (implementation brief — read FIRST)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "ratchets",
+      "guardrails",
+      "pre-push",
+      "codebase-health",
+      "infra"
+    ],
+    "narratives": {
+      "Problem": "The A1 (no-explicit-any allowlist) and A3 (file-size) ratchets enforce only in CI, but this repo's write pattern is direct-to-main bot commits — so every violation becomes a red-main outage (3 in 4 days) or a silent baseline bump (4 bump commits, 2 without issue refs; allowlist grew 143→159; baselines keep dead high-water marks giving >13,000 lines of silent regrowth headroom). Separately (PAN-2204), strike/work agents can push unreviewed code straight to origin/main — 4 instances in one week, 2 of which red-mained main. Both problems are fixed at the same write point: .husky/pre-push.",
+      "Proposal": "Implement the PRD at .pan/drafts/PAN-2227.md exactly (WI-1..WI-6, locked decisions D1-D6): staleness check + --update auto-lowering in scripts/lint-file-size.sh; a new scripts/lint-ratchet-audit.sh (range mode + last-commit mode) requiring an issue reference for baseline raises and allowlist additions; pre-push wiring (working-tree file-size run + per-ref range audit); CI lint job fetch-depth: 0; baseline reconciliation; fixture-repo unit tests. PLUS the PAN-2204 unit (operator-directed joint planning, additional requirements FR-9..FR-12): a scripts/guard-agent-main-push.sh that rejects agent-context code pushes to refs/heads/main (paths src/, packages/, roles/, skills/, scripts/) with an OVERDECK_OPERATOR_PUSH=1 escape hatch and state-plane paths always allowed; plus the strike/flywheel/work prompt rewrites so strikes stop after pushing their strike/<id> branch and the Flywheel (the spawner) owns review + gates + gh-API merge. FR-9: pre-push rejects agent-context (OVERDECK_AGENT_ID set or panopticon-agent[bot] committer identity) code pushes to main unless OVERDECK_OPERATOR_PUSH=1. FR-10: roles/strike.md instructs stop-after-branch-push, never self-merge to main. FR-11: roles/flywheel.md + docs/flywheel-brief.md state the Flywheel owns strike merges (review diff, run gates, land via gh-API squash-merge, then pan done <id> --strike). FR-12: roles/work.md explicitly forbids pushing to origin/main.",
+      "NonGoals": "- Shrinking any god file (Phase 2/3 queue items own that)\n- Removing allowlist entries or fixing any-usage (A1 follow-ups)\n- Any commit-msg-hook enforcement tier (possible follow-up, not this issue)\n- The circular-dependency ratchet (PAN-2230) and source-introspection lint (PAN-2231)\n- Server-side / GitHub pre-receive enforcement (local hook + prompts only; gh-API squash-merges intentionally bypass the local hook)\n- Modifying production src/** code (NFR-1: pure bash scripts, hook, workflow, prompt-file, and test changes)\n- Changing pan done --strike CLI semantics (prompt-only reassignment of who runs it — the Flywheel instead of the strike)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Included PAN-2204's work items (agent-main-push guard, strike/flywheel/work prompt rewrites, guard tests) in this vBRIEF",
+        "rationale": "Operator-approved planning directive on the issue (2026-07-02): plan PAN-2227 together with PAN-2204 as one implementation unit — both are .husky/pre-push work in the same file."
+      },
+      {
+        "summary": "PAN-2204 guard implemented as a separate script scripts/guard-agent-main-push.sh invoked from the hook, not inline sh",
+        "rationale": "Matches the repo's guard-script convention and the existing tests/unit/scripts/ fixture-repo test pattern; inline hook logic is untestable."
+      },
+      {
+        "summary": "Strike landing rewrite is REQUIRED in the same PR as the guard: strikes stop after pushing strike/<id>; the Flywheel reviews, runs gates, and lands via gh-API merge",
+        "rationale": "roles/strike.md today instructs `git checkout main && git merge --ff-only strike/<id> && git push origin main` — landing the guard without the prompt rewrite would wedge every strike. Direction is operator-approved in PAN-2204's refinement comment ('whoever spawns a strike owns its merge')."
+      },
+      {
+        "summary": "Bot-committer detection uses git config user.name == panopticon-agent[bot], which is this machine's GLOBAL git identity — so effectively all local code pushes to main need OVERDECK_OPERATOR_PUSH=1",
+        "rationale": "This is the PAN-2204 design as written; the friction is deliberate (the guard exists because unreviewed direct-to-main writes caused 4 incidents in a week). Operator escape hatch is explicit and documented in the rejection message."
+      },
+      {
+        "summary": "Agent guard fails CLOSED when the push range base cannot be determined on a main push",
+        "rationale": "It is a trust gate; an undeterminable range on main should not silently pass. OVERDECK_OPERATOR_PUSH=1 remains available. Non-main refs are never evaluated, so pan done feature pushes are unaffected."
+      },
+      {
+        "summary": "Baseline reconciliation (--update) must land BEFORE the pre-push wiring bead (edge reconcile→wiring)",
+        "rationale": "Once the hook runs the file-size guard's new check mode, an unreconciled baseline (which has 7 dead + 10 stale-high entries today) would refuse the work agent's own pushes — the plan must not wedge itself."
+      },
+      {
+        "summary": "Regenerate reconciliation numbers at execution; do not copy the PRD's 7-drop/10-lower table",
+        "rationale": "PRD §8 mandates re-verification; the allowlist already drifted 155→159 between PRD authoring and planning, and Phase-0 decompositions keep shrinking baselined files."
+      }
+    ],
+    "items": [
+      {
+        "id": "filesize-staleness-update",
+        "title": "staleness detection + --update auto-lowering writer in scripts/lint-file-size.sh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-file-size.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/lint-file-size.sh",
+            "bash scripts/lint-file-size.sh; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "script parses cleanly",
+            "check mode exits 1 on the CURRENT baseline listing 'stale baseline' entries (the real baseline has stale entries today — that failure is the evidence the new check works; the reconcile bead greens it)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly (before/after snippets in .pan/drafts/PAN-2227.md §5 WI-1): add MODE=check/--update arg parsing after set -euo pipefail; extend the baselined branch (grep anchor 'god files must shrink, not grow') to also flag n < allowed as 'stale baseline: <f> is <n> lines but baselined at <allowed> — run: bash scripts/lint-file-size.sh --update' (track stale separately from fail; both exit 1 in check mode); after the find loop, pass over baseline entries to flag missing-from-disk and ≤-CEILING files as stale; implement --update to rebuild the baseline in place (drop missing/≤-ceiling entries, write min(n, allowed) otherwise — never raise, never add), path-sorted via sort -k2, printing '✓ baseline updated: X lowered, Y dropped, Z unchanged'; update the header comment documenting --update, D3 (sub-ceiling entries dropped), D4 (raising stays a manual audited edit)."
+        },
+        "items": [
+          {
+            "id": "filesize-staleness-update.ac1",
+            "title": "check mode exits 1 and prints 'stale baseline' naming the entry and the --update fix command when a baselined file's current count is below its entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filesize-staleness-update.ac2",
+            "title": "check mode exits 1 for baseline entries whose file is missing from disk or now at or under CEILING (1000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filesize-staleness-update.ac3",
+            "title": "--update lowers stale-high entries to current counts, drops missing/sub-ceiling entries, never raises or adds entries, preserves path-sorted '<lines> <path>' format, and prints the lowered/dropped/unchanged summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filesize-staleness-update.ac4",
+            "title": "the header comment contains documentation of --update, the sub-ceiling drop rule (D3), and the raising-is-a-manual-audited-edit rule (D4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "baseline-reconcile",
+        "title": "reconcile scripts/file-size-baseline.txt via --update (lowers and drops only)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-file-size.sh",
+            "git diff main -- scripts/file-size-baseline.txt | grep -c '^+[0-9]' || true"
+          ],
+          "expected_outputs": [
+            "check mode prints '✓ file-size guard passed' and exits 0",
+            "every changed baseline line is a lower or a removal vs main — no raised counts, no added paths"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5: run `bash scripts/lint-file-size.sh --update`, inspect the diff (the script can only lower or drop per FR-3 — anything else is a bug in the previous bead), commit with this issue's reference in the message (suggested: 'chore(infra): reconcile file-size baseline via --update (pan-2227)'). Then run `bash scripts/lint-file-size.sh` and confirm ✓. Regenerate — do NOT copy the PRD's 7-drop/10-lower table; sibling decompositions have drifted it."
+        },
+        "items": [
+          {
+            "id": "baseline-reconcile.ac1",
+            "title": "the baseline diff vs main contains only lowered counts and removed lines — no raises, no additions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "baseline-reconcile.ac2",
+            "title": "bash scripts/lint-file-size.sh prints ✓ and exits 0 at HEAD after the commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "baseline-reconcile.ac3",
+            "title": "the reconciliation commit message contains the pan-2227 issue reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-audit-script",
+        "title": "new scripts/lint-ratchet-audit.sh (range + last-commit modes) wired into the lint chain",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-2227",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "prepush-ratchet-wiring",
+            "ratchet-audit-tests"
+          ],
+          "files_scope": [
+            "scripts/lint-ratchet-audit.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/lint-ratchet-audit.sh",
+            "npm run lint:ratchet-audit"
+          ],
+          "expected_outputs": [
+            "script parses cleanly",
+            "last-commit mode exits 0 on the current repo printing the '✓ ratchet audit passed' line (the newest baseline/allowlist-touching commits on this branch are decreases or ref-carrying)"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "brand-new standalone script plus one package.json script entry; shares no file with any other wave-0 item",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 exactly. Guard-script convention (#!/usr/bin/env bash, set -euo pipefail, cd \"$(dirname \"$0\")/..\"). Interface: lint-ratchet-audit.sh [--range <base>..<head>]. Ratchet files: scripts/file-size-baseline.txt and eslint-any-allowlist.json. Commit selection: range mode = git rev-list --reverse '<range>' -- <file> per ratchet file; last-commit mode = git log -1 --format=%H -- <file> (empty → pass). Per commit C: if git rev-parse -q --verify \"$C^\" fails (root/shallow), print the ⚠ skip warning and continue (NFR-3 — never a false red). Baseline increases: materialize parent+current revisions via git show (missing at parent = empty), compare per-path with awk/sort — a path only in new, or with a larger count, is an increase. Allowlist increases: parse BOTH revisions as JSON with the node -e idiom from .husky/pre-push's read_version (D6 — set-based, never raw text diff), comm -13 old new = added paths. Any increase in a commit whose full message (git log -1 --format=%B) lacks grep -Eq '([A-Z]+-[0-9]+|#[0-9]+)' → print sha+subject, each increase, the amend instruction, exit 1. Success: '✓ ratchet audit passed (no unaudited baseline/allowlist increases)'. Wire package.json: add \"lint:ratchet-audit\": \"bash scripts/lint-ratchet-audit.sh\" below lint:file-size, and append ' && npm run lint:ratchet-audit' to the \"lint\" chain (re-grep the chain first — sibling items PAN-2230/2231 may have appended entries; chain after whatever is last)."
+        },
+        "items": [
+          {
+            "id": "ratchet-audit-script.ac1",
+            "title": "range mode exits 1 naming the offending commit when a commit in range raises/adds a baseline entry or adds an allowlist path and its full message has no issue reference matching ([A-Z]+-[0-9]+|#[0-9]+)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-script.ac2",
+            "title": "the audit exits 0 for lowered baseline entries, removed allowlist paths, and ref-carrying increases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-script.ac3",
+            "title": "last-commit mode (no args) audits the newest commit touching each ratchet file; a missing parent (root commit / shallow clone) prints a ⚠ warning and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-script.ac4",
+            "title": "package.json contains a lint:ratchet-audit entry and the lint chain runs it after lint:file-size",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-script.ac5",
+            "title": "allowlist comparison is set-based via JSON parse — reordering the array without adding paths produces no failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prepush-ratchet-wiring",
+        "title": "pre-push: working-tree file-size guard + per-ref range-mode ratchet audit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".husky/pre-push*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sh -n .husky/pre-push",
+            "shellcheck .husky/pre-push || true"
+          ],
+          "expected_outputs": [
+            "hook parses as POSIX sh",
+            "no new shellcheck errors beyond pre-existing ones"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 exactly (snippets in the PRD). (1) After set -e and before read_version(){, run `bash scripts/lint-file-size.sh </dev/null` with the PAN-2227 comment explaining it checks the WORKING TREE (D1) — stdin MUST be detached or it consumes the ref list. (2) Inside the ref loop add a refs/heads/*) case ABOVE refs/tags/v*: zero-sha branch deletion → continue; new branch (remote_sha all-zero) → base=$(git merge-base origin/main \"$local_sha\" 2>/dev/null || true); else base=$remote_sha; if base non-empty run `bash scripts/lint-ratchet-audit.sh --range \"$base..$local_sha\" </dev/null`, else warn+skip. set -e makes a non-zero exit refuse the push. Hook syntax stays POSIX sh (NFR-4) — never switch the shebang to bash. Manual implementation checkpoint (PRD WI-3): in a scratch clone verify a ref-less baseline-raise push is refused and a normal push succeeds; fallback if misbehaving under sh is shellcheck + simplify to POSIX constructs."
+        },
+        "items": [
+          {
+            "id": "prepush-ratchet-wiring.ac1",
+            "title": "pre-push runs bash scripts/lint-file-size.sh with stdin detached before the ref loop, so a working tree with a grown baselined file or new >1000-line src file refuses to push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prepush-ratchet-wiring.ac2",
+            "title": "the refs/heads/* case applies lint-ratchet-audit.sh --range to exactly the pushed range (remote sha as base, or merge-base origin/main for new branches) and skips branch deletions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prepush-ratchet-wiring.ac3",
+            "title": "the hook preserves the refs/tags/v* release guard unchanged and stays POSIX-sh-compatible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prepush-ratchet-wiring.ac4",
+            "title": "scratch-clone checkpoint: the hook refuses a push containing a ref-less baseline raise, and accepts a clean push and a tag push exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-main-push-guard",
+        "title": "PAN-2204: scripts/guard-agent-main-push.sh + pre-push wiring — agents cannot push code to main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-2227",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "agent-guard-tests",
+            "strike-role-rewrite"
+          ],
+          "files_scope": [
+            "scripts/guard-agent-main-push.sh",
+            ".husky/pre-push*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n scripts/guard-agent-main-push.sh",
+            "sh -n .husky/pre-push"
+          ],
+          "expected_outputs": [
+            "guard script parses cleanly",
+            "hook still parses as POSIX sh"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PAN-2204's operator-specified design. New scripts/guard-agent-main-push.sh in the guard-script convention, interface: guard-agent-main-push.sh --range <base>..<head>. Logic, in order: (1) OVERDECK_OPERATOR_PUSH=1 in env → exit 0 (operator escape hatch). (2) Agent-context detection: OVERDECK_AGENT_ID env var non-empty, OR git config user.name equals 'panopticon-agent[bot]'. Not agent context → exit 0. (3) git diff --name-only over the range; if ANY path matches ^(src|packages|roles|skills|scripts)/ → exit 1 with a message that names the rule ('agents land code via PR — pan done'), lists the offending paths, and states the escape hatch (OVERDECK_OPERATOR_PUSH=1 git push … for operator-directed pushes). Everything else (state-plane: .pan/records/, .beads/, .pan/specs/, .pan/drafts/, docs/FLYWHEEL-STATE.md, and all other non-code paths) → exit 0 so deacon/planning sync commits keep working. Fail CLOSED: called with an empty/undeterminable range → exit 1 with an explanatory message (it is a trust gate; the escape hatch remains). Wire into .husky/pre-push inside the refs/heads/*) case added by the previous bead: only when the branch is main (case \"$local_ref\" in refs/heads/main) and base is known, run `bash scripts/guard-agent-main-push.sh --range \"$base..$local_sha\" </dev/null` BEFORE the ratchet audit. gh-API squash-merges (review pipeline, operator bridge-merges) never run the local hook and are intentionally unaffected. Note: this machine's global git user.name IS panopticon-agent[bot], so all local code pushes to main will need the escape hatch — deliberate friction, document it in the rejection message."
+        },
+        "items": [
+          {
+            "id": "agent-main-push-guard.ac1",
+            "title": "a push range to refs/heads/main touching src/, packages/, roles/, skills/, or scripts/ while OVERDECK_AGENT_ID is set or git user.name is panopticon-agent[bot] exits 1 with a message naming 'pan done' and the OVERDECK_OPERATOR_PUSH=1 escape hatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-main-push-guard.ac2",
+            "title": "a main push touching only state-plane paths (.pan/records/, .beads/, .pan/specs/, .pan/drafts/, docs/FLYWHEEL-STATE.md) exits 0 in agent context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-main-push-guard.ac3",
+            "title": "OVERDECK_OPERATOR_PUSH=1 exits 0 regardless of paths; a non-agent context (no OVERDECK_AGENT_ID, human user.name) exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-main-push-guard.ac4",
+            "title": "the hook invokes the guard only for refs/heads/main — feature-branch pushes (pan done flow) are never evaluated by it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-main-push-guard.ac5",
+            "title": "an empty or undeterminable range on a main push exits 1 (fail closed) with an explanatory message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-fetch-depth",
+        "title": "CI lint job checkout fetch-depth: 0 for the parent-diff audit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -A3 'timeout-minutes: 20  # PAN-1651' .github/workflows/ci.yml | grep -c 'fetch-depth: 0'"
+          ],
+          "expected_outputs": [
+            "the lint job's checkout step carries fetch-depth: 0; grep returns 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4: in the lint job ONLY (grep anchor 'timeout-minutes: 20  # PAN-1651' — the FIRST of the two timeout-minutes:20 hits; the second at ~line 195 is the smoke-test job, do not touch it), add `with: fetch-depth: 0` to its `- uses: actions/checkout@v4` step, with the PAN-2227 comment ('lint:ratchet-audit diffs the last baseline/allowlist commit against its parent'). Leave every other job's checkout untouched. If a sibling item already added fetch-depth to this job, skip (PRD §8.4)."
+        },
+        "items": [
+          {
+            "id": "ci-fetch-depth.ac1",
+            "title": "the lint job's actions/checkout@v4 step contains fetch-depth: 0 with the PAN-2227 comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-fetch-depth.ac2",
+            "title": "all other jobs' checkout steps are byte-identical to main (diff shows exactly one hunk)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "filesize-tests",
+        "title": "fixture-repo unit tests for lint-file-size.sh (six PRD cases)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/lint-file-size.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-file-size.test.ts"
+          ],
+          "expected_outputs": [
+            "all six cases pass in the new test file"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "acJustification": "2 ACs: the six behavioral cases are enumerated inside ac1; splitting them into six ACs would duplicate the WI-6 case list verbatim."
+        },
+        "narrative": {
+          "Action": "PRD WI-6, first file. Copy the fixture pattern from tests/unit/scripts/lint-overdeck-boundaries.test.ts (makeTempRepo/installScript/execFileSync('bash', [script]) — execFileSync in vitest fixtures is allowed; the no-execSync rule covers server-reachable production code). Six cases: (1) new src file >1000 lines with no baseline entry → check fails naming the file; (2) baselined file grew → fails with 'god files must shrink'; (3) baselined file shrank (still >1000) → fails with 'stale baseline' + --update instruction; (4) after --update the entry equals the new count and check passes; (5) --update drops entries for a deleted file and a ≤-ceiling file; check passes; (6) --update never raises: a violation entry (file above its baseline) is left unchanged and check still fails with the grow message. No timers/retries/delays anywhere — the fake-timers rule does not apply."
+        },
+        "items": [
+          {
+            "id": "filesize-tests.ac1",
+            "title": "the test file covers all six WI-6 lint-file-size cases (new-god-file fail, grow fail, stale fail with --update hint, update-then-pass, drop deleted/sub-ceiling, never-raise) with assertions on exit status and output text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filesize-tests.ac2",
+            "title": "npx vitest run on the new file passes; npm run test:unit stays green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-audit-tests",
+        "title": "fixture-repo unit tests for lint-ratchet-audit.sh (six PRD cases)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/lint-ratchet-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-ratchet-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "all six cases pass in the new test file"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ],
+          "acJustification": "2 ACs: the six behavioral cases are enumerated inside ac1; splitting them would duplicate the WI-6 case list verbatim."
+        },
+        "narrative": {
+          "Action": "PRD WI-6, second file. Same fixture pattern; the fixture repo needs ≥2 commits with explicit per-case commit messages. Six cases: (1) commit raising a baseline entry, message without issue ref → range mode over that commit fails and names the sha; (2) same raise with PAN-123 in the message → passes; (3) commit adding an allowlist path without ref → fails; with #456 → passes; (4) lowering a baseline entry / removing an allowlist path with no ref → passes; (5) last-commit mode: the newest touching commit is audited and unrelated newer commits don't mask it; (6) root commit touching a ratchet file → WARN + exit 0 (NFR-3)."
+        },
+        "items": [
+          {
+            "id": "ratchet-audit-tests.ac1",
+            "title": "the test file exercises all six WI-6 ratchet-audit cases (ref-less raise fails naming sha, ref-carrying raise passes, allowlist add fails/passes by ref, decreases free, last-commit unmasked, root-commit warns+passes) with assertions on exit status and output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-tests.ac2",
+            "title": "npx vitest run on the new file passes; npm run test:unit stays green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-guard-tests",
+        "title": "fixture-repo unit tests for guard-agent-main-push.sh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/guard-agent-main-push.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/guard-agent-main-push.test.ts"
+          ],
+          "expected_outputs": [
+            "all cases pass in the new test file"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Same fixture pattern (makeTempRepo + installScript + execFileSync('bash', [script], { env })). Drive agent-context via env injection: OVERDECK_AGENT_ID / OVERDECK_OPERATOR_PUSH in the env option, and per-fixture `git config user.name` for the bot-committer signal. Cases: (1) agent context + range touching src/ → exit 1, output names 'pan done' and OVERDECK_OPERATOR_PUSH; (2) agent context + range touching only .pan/records/ and .beads/ → exit 0; (3) OVERDECK_OPERATOR_PUSH=1 + code paths → exit 0; (4) no OVERDECK_AGENT_ID and human user.name + code paths → exit 0; (5) empty range argument → exit 1 (fail closed). Note the guard itself is ref-agnostic (the hook only calls it for main), so the tests exercise the script contract, not the hook."
+        },
+        "items": [
+          {
+            "id": "agent-guard-tests.ac1",
+            "title": "the test file covers agent-blocked, state-plane-allowed, escape-hatch, non-agent-allowed, and empty-range-fail-closed cases with exit-status and output assertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-guard-tests.ac2",
+            "title": "npx vitest run on the new file passes; npm run test:unit stays green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strike-role-rewrite",
+        "title": "PAN-2204: roles/strike.md — strikes stop after pushing strike/<id>; never self-merge to main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/strike.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "grep -c 'git push origin main' roles/strike.md || true"
+          ],
+          "expected_outputs": [
+            "prompt lint passes",
+            "grep finds zero instructional occurrences of pushing main (a prohibition sentence MAY name it — verify the landing steps contain no checkout/merge/push-to-main commands)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite the landing procedure (current steps 4-7, grep anchor 'Merge directly to main') and the framing line 'You implement the fix and merge it directly to `main`': the strike (1) implements + commits on strike/<id>, (2) rebases onto origin/main, (3) runs the full quality gates IN THE WORKSPACE (npm run typecheck && npm run lint && npm test — lint includes the file-size ratchet, so a strike can no longer red-main), (4) pushes ONLY the strike/<id> branch, (5) signals readiness via pan tell flywheel-orchestrator 'strike <ID>: fix ready on strike/<id>, gates green — review and land' (issue-comment fallback if the tell fails), then STOPS. Explicitly forbid: git checkout main, git merge into main, git push origin main — the pre-push guard (guard-agent-main-push.sh) now mechanically rejects it. State that whoever spawned the strike (normally the Flywheel) owns review + merge + running pan done <id> --strike post-merge; the strike itself no longer runs pan done --strike. Keep the abort/push-back signal sections intact. Also update the intro sentence at the 'Unlike the normal Overdeck pipeline' anchor to say the strike skips the review pipeline but landing is the spawner's, not the strike's."
+        },
+        "items": [
+          {
+            "id": "strike-role-rewrite.ac1",
+            "title": "the landing procedure contains no git checkout main / git merge to main / git push origin main instructions and instead ends with a branch push + pan tell readiness signal + stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-role-rewrite.ac2",
+            "title": "the rewritten procedure requires that typecheck, lint (named as including the file-size ratchet), and tests all pass in the workspace before the strike sends the readiness signal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-role-rewrite.ac3",
+            "title": "the role states the spawner (Flywheel/operator) owns review, merge, and pan done <id> --strike, and that the pre-push guard mechanically rejects agent pushes to main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-role-rewrite.ac4",
+            "title": "npm run lint:prompts passes on the edited role file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-owns-strike-merge",
+        "title": "PAN-2204: roles/flywheel.md + docs/flywheel-brief.md — the Flywheel owns strike merges",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md",
+            "docs/flywheel-brief.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "prompt lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the strike dispatch bullet in roles/flywheel.md (grep anchor: '**Strike:** `pan strike <id>` for `blocks-main` emergencies — bypasses the pipeline, lands') — it currently says the strike 'lands on main'. New contract (operator-approved in PAN-2204's refinement): 'whoever spawns a strike owns its merge.' On a strike's readiness signal (pan tell / issue comment), the Flywheel: (1) reviews the strike/<id> diff itself, (2) runs the quality gates (typecheck, lint including file-size, tests), (3) lands via gh-API squash-merge (gh pr create from strike/<id> if needed, then gh pr merge --squash) — NEVER a local git push to main (the pre-push guard rejects agent pushes; gh-API merges intentionally bypass the local hook), (4) runs pan done <id> --strike as the post-merge lifecycle handoff. Mirror the same ownership statement in docs/flywheel-brief.md near its merge-policy section. Keep both files' existing structure; this is a contract update, not a rewrite."
+        },
+        "items": [
+          {
+            "id": "flywheel-owns-strike-merge.ac1",
+            "title": "roles/flywheel.md's strike bullet contains the new contract — the Flywheel reviews the diff, runs gates, lands via gh-API squash-merge, and runs pan done <id> --strike — and no longer says the strike lands on main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-owns-strike-merge.ac2",
+            "title": "docs/flywheel-brief.md carries the same strike-merge ownership statement ('whoever spawns a strike owns its merge')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-owns-strike-merge.ac3",
+            "title": "each of the two files contains the statement that the landing path is gh-API merge, never a local git push to origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-role-no-main-push",
+        "title": "PAN-2204: roles/work.md — explicit prohibition on pushing to origin/main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T00:03:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2227",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "prompt lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "acJustification": "2 ACs: a one-paragraph prompt addition has exactly two observable properties (the statement exists; lint stays green)."
+        },
+        "narrative": {
+          "Action": "In the Completion section of roles/work.md (grep anchor: 'git push -u origin \"$(git branch --show-current)\"'), add a short explicit prohibition: work agents push ONLY their feature branch; never push to origin/main, never merge into main — landing is the review pipeline's job via pan done, and the pre-push guard mechanically rejects agent code pushes to main. Two or three sentences, matching the file's existing voice. No other changes."
+        },
+        "items": [
+          {
+            "id": "work-role-no-main-push.ac1",
+            "title": "roles/work.md's completion section contains the prohibition that agents never push to or merge into origin/main, and names pan done as the only landing path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-role-no-main-push.ac2",
+            "title": "npm run lint:prompts passes on the edited role file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "filesize-staleness-update",
+        "to": "baseline-reconcile",
+        "type": "blocks"
+      },
+      {
+        "from": "filesize-staleness-update",
+        "to": "filesize-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-reconcile",
+        "to": "prepush-ratchet-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-audit-script",
+        "to": "prepush-ratchet-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "ratchet-audit-script",
+        "to": "ratchet-audit-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "prepush-ratchet-wiring",
+        "to": "agent-main-push-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-main-push-guard",
+        "to": "agent-guard-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-main-push-guard",
+        "to": "strike-role-rewrite",
+        "type": "informs"
+      },
+      {
+        "from": "strike-role-rewrite",
+        "to": "flywheel-owns-strike-merge",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
