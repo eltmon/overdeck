@@ -207,6 +207,44 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 13 (2026-07-03) — ROOT DISK 100% FULL found + fixed (freed 104GB); it explained the whole cascade
+
+- **Root filesystem hit 100% (238MB free of 832GB).** /tmp is on the root disk (NOT tmpfs) — so: bash output capture died (ENOSPC in the harness tasks dir), PAN-2257's docker init failed, PAN-2261's spec promotion stranded, and the "swap full" alarm was a co-symptom of general pressure. **Applied the documented PAN-1674 remedy: `rm -rf workspaces/*/.venv` (regenerable TLDR caches, 7.5GB × ~14 workspaces) → freed 104GB, disk at 87%.** REUSABLE triage: when bash output capture starts failing with ENOSPC, check `df -h /` FIRST — it's disk, not tmpfs; also docker had 12GB reclaimable containers + 9.5GB images (left for operator).
+- **PAN-2255 planned** (spec on main). **PAN-2261 planning done but spec promotion stranded** ("completion already in progress" — the in-flight completion died with the disk; bead workspace-5d14n exists); re-ran `pan plan done`, needs verification, else re-run now that disk is fixed.
+- PAN-2257 + PAN-2255 starts queued in a background retry loop (bd busy but cycling — verified holders live). Swap still pegged 8191/8191 (operator drain suggested). Main GREEN (9dbf84d47c).
+
+## RUN-53 tick 12 (2026-07-03) — finalizes slow-but-live (verified holder); swap COMPLETELY full
+
+- **Dual finalize (2261/2255) still grinding ~45 min** — diagnosed the lock properly before acting: holder is a LIVE `pan plan finalize` pid (lock file `~/.overdeck/locks/bd-*.lock` carries {pid, ts, caller}; ts advancing, process 3m old) → slow serialization, NOT the frozen-ts hang; no SIGTERM. PAN-2257 start stays deferred. REUSABLE: read the lock file JSON + `ps -o etime` on its pid to distinguish live-holder from hung-holder before intervening.
+- **Swap 8180/8191 MB — completely full**, RAM climbing (34/64 GB). Escalated to operator as imminent-OOM.
+- PAN-2260 verdicts still pending. UAT bundle unchanged (PAN-2254 #2272 + MIN-831 + MIN-846). Main GREEN (5681f0c3e4).
+
+## RUN-53 tick 11 (2026-07-03) — PAN-2257 planned; dual finalize saturates the bd lock (start deferred)
+
+- **PAN-2257 finalized** (spec promoted to .pan/specs/, beads created; the planner itself hit a bd-lock timeout on auto-promotion and self-recovered via `pan plan done`). PAN-2261 mid-finalize (bead 1/5, slow under lock contention — it is planning the fix for the very lock it's fighting). PAN-2255 mid-finalize with self-raised `OVERDECK_BD_TIMEOUT_MS=180000` (useful knob — REUSABLE for lock-heavy windows).
+- **`pan start PAN-2257` hung >5 min** waiting on the bd lock held by the dual finalizes → killed by my command timeout, no partial state (no session/workspace created beyond the existing planning one). Deferred to next tick after finalizes drain. LESSON: never dispatch starts during active finalizes; sequence them.
+- PAN-2260 verdicts pending. UAT bundle unchanged (PAN-2254 #2272 + MIN-831 + MIN-846). Main GREEN (77539c2a96). Swap ~7.7/8.2 GB.
+
+## RUN-53 tick 10 (2026-07-03) — planning FULLY restored (PAN-2275 fixed+deployed); codex plan path now works end-to-end
+
+- **PAN-2275 fixed + closed:** 35c9903c89 "fix: deliver codex planning kickoff" (spawn-planning-session.ts again). Deploy chain repeated as documented: pull → npm run build → `OVERDECK_NO_RESUME=1 pan restart --health-timeout 120000` (ms!) → re-kick all three plans → **verified prompts landed** (all three sessions actively Working, not just booted). The codex plan path took TWO stacked fixes: PAN-2274 (flag crash) then PAN-2275 (missing kickoff delivery) — when fixing a spawn path, verify the WHOLE lifecycle (boot AND kickoff AND first activity), not just the first failure mode.
+- PAN-2260 review+test convoys live. UAT bundle: PAN-2254 (#2272) + MIN-831 + MIN-846. PAN-2258 remains operator-owned (retries stopped). PAN-2224 ready=false standing. Main GREEN (35c9903c89 success; 362326972b in progress at tick time). Swap still FULL.
+
+## RUN-53 tick 9 (2026-07-03) — codex plannings are ZOMBIES (PAN-2275, 2nd gap in same path); PAN-2254 in UAT bundle; 2258 retries stopped
+
+- **PAN-2275 filed + struck:** after the PAN-2274 flag fix, codex plan sessions boot a clean TUI but the planning kickoff prompt is NEVER delivered — idle welcome banner ~20 min, zero activity. Claude plan path injects the task at spawn; codex path lacks the equivalent ([PROMPT] positional or post-boot delivery). PAN-2257/2261/2255 stalled a second time; re-kick all three after the strike lands. LESSON: a booted TUI ≠ a working agent — verify the kickoff prompt landed (scrollback shows actual task text, not just the banner) before counting a plan/work session as dispatched.
+- **PAN-2258 review convoy vanished a 4th time; retries STOPPED** per plan. PR #2269 (green) needs an operator review decision or the PAN-2270 fix first. Surfaced.
+- **PAN-2254 review+test PASSED → UAT bundle** (PR #2272; bundle = 2254 + MIN-831 + MIN-846). ~70 min issue→ready. PAN-2260 still in review. PAN-2224 still ready=false despite passed/passed + merge pending (derivation gate question open).
+- Main GREEN (86b8c55ffa). Swap still FULL (8.1/8.2 GB, urgent standing). Context ~88% — continuing on harness compaction (proven earlier this run) rather than handoff.
+
+## RUN-53 tick 8 (2026-07-03) — PAN-2274 fixed end-to-end (needed rebuild + restart); swap FULL; 2258 convoy reaped 3rd time
+
+- **PAN-2274 deploy chain (REUSABLE):** strike landed a43fb24c85 (green) but re-plan STILL crashed — the fix is in `src/lib/planning/spawn-planning-session.ts`, generated by the RUNNING dashboard server. `npm run build` alone did NOT fix it (server keeps old code in memory). Fix required: rebuild + `OVERDECK_NO_RESUME=1 pan restart` (preserving the operator's resume posture rather than silently changing it from my shell env). After restart, all 3 re-plans (2257/2261/2255) boot into live codex TUIs. **`--health-timeout` is in MILLISECONDS** (default 15000) — passing `120` means 120ms and false-fails the restart while the server actually comes up fine; verify with curl before reacting.
+- **PAN-2258 review convoy vanished a THIRD time** without verdict (live at 00:33, gone by 00:53; no deacon.log kill entries). Hypothesis escalated on PAN-2270: the manually-materialized workspace has no runtime registration, so patrols orphan-reap attached convoys — strike-origin PRs need first-class support. 4th restart issued under the new server; if it dies again, PR #2269 needs an operator review path.
+- **PAN-2153 + PAN-2154 MERGED** (deacon checkMergedWorkSessions reaped their sessions per PAN-1726 — that patrol works). PAN-2254 work→review+test in ~50 min; PAN-2260 in review. PAN-2224 held at ready=false despite review+test passed + merge pending — derivation gate question open.
+- **SWAP FULL (8.1/8.2 GB)** — surfaced urgent; OOM killer risk with 25+ live sessions.
+- Orchestrator context ~85% — next tick may require `pan handoff` continuity.
+
 ## RUN-53 tick 7 (2026-07-03) — planning DOWN for codex-routed agents (PAN-2274); PAN-2258 convoy vanished twice
 
 - **All 3 routed planning sessions (2257/2261/2255) crashed at spawn:** `error: unexpected argument '--append-system-prompt-file'` from the **codex** binary. Root cause: `roleSystemPromptInjectionSync()` (src/lib/agents/runtime-command.ts:604, the PAN-2087 --agent replacement) builds claude-code-only flags harness-blind; the plan spawn splices them into the codex command line. Filed **PAN-2274** + struck. After it lands, re-run `pan plan --auto` for all three. REUSABLE: a planning pane showing "Usage: codex ... try '--help'" + instant exit = this bug, zero planning happened despite the session existing.

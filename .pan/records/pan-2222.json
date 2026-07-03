@@ -154,13 +154,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2222",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T03:05:34.326Z",
+    "updatedAt": "2026-07-03T07:58:11.579Z",
     "testNotes": "npm run typecheck passed; npm run lint initially OOMed during build:cli, rerun passed; npm test under sandbox failed with EPERM for spawn/listen, rerun elevated completed with 1 failed test: src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > PAN-2017: fails and stops a strike spawn when kickoff delivery fails, ENOTEMPTY rmdir /tmp/pan-agent-role-lmi50p. UAT not required: acceptance is backend/library/config/docs with no UI/dashboard criterion.",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
@@ -251,10 +251,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 10084,
-            "output": 47065,
-            "cacheRead": 31444376,
-            "cacheWrite": 1109430
+            "input": 11131,
+            "output": 65720,
+            "cacheRead": 37322686,
+            "cacheWrite": 1132956
           }
         },
         "inspect": {
@@ -267,8 +267,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 15807,
-            "output": 1059,
+            "input": 16809,
+            "output": 1216,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -284,10 +284,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 29140,
-          "output": 111298,
-          "cacheRead": 42073508,
-          "cacheWrite": 1463115
+          "input": 30187,
+          "output": 129953,
+          "cacheRead": 47951818,
+          "cacheWrite": 1486641
         },
         "openai/gpt-5.5": {
           "input": 1784346,
@@ -296,15 +296,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 15807,
-          "output": 1059,
+          "input": 16809,
+          "output": 1216,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 84.765067,
-        "pricingAsOf": "2026-07-03T03:05:34.380Z"
+        "usd": 91.88068,
+        "pricingAsOf": "2026-07-03T07:58:11.983Z"
       }
     },
     "merges": [
@@ -324,5 +324,5 @@
     ]
   },
   "created": "2026-07-03T02:56:10.923Z",
-  "updated": "2026-07-03T03:05:34.381Z"
+  "updated": "2026-07-03T07:58:11.983Z"
 }

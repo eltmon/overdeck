@@ -296,6 +296,41 @@ describe('initial kickoff transcript confirmation', () => {
     expect(snapshot).not.toHaveBeenCalled();
   });
 
+  it('delivers codex kickoff as a short pointer to .pan/kickoff.md', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-kickoff-'));
+    const fullPrompt = 'Full planning instructions for PAN-2275';
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+
+    try {
+      await expect(deliverInitialPromptWithRetry(
+        baseState.id,
+        fullPrompt,
+        'test:codex-planning-kickoff',
+        undefined,
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'plan', workspace })),
+          deliver,
+          snapshot,
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'tmux' });
+
+      expect(readFileSync(join(workspace, '.pan', 'kickoff.md'), 'utf-8')).toBe(fullPrompt);
+      expect(deliver).toHaveBeenCalledWith(
+        baseState.id,
+        expect.stringContaining('Read that file in full now'),
+        'test:codex-planning-kickoff',
+        undefined,
+      );
+      expect(deliver.mock.calls[0]?.[1]).toContain('`.pan/kickoff.md`');
+      expect(deliver.mock.calls[0]?.[1]).not.toContain(fullPrompt);
+      expect(snapshot).not.toHaveBeenCalled();
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   it('does not count a pre-existing user record as kickoff landing', async () => {
     vi.useFakeTimers();
     const snapshot = vi.fn(async (_workspace: string, _sessionId: string, options?: { fromByteOffset?: number }) => (

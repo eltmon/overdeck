@@ -155,6 +155,12 @@ describe('ensureOverdeckTmuxServerSync', () => {
     expect(argv).toContain('overdeck-tmux-server');
     expect(argv).not.toContain('--scope');
     expect(argv).toContain('--collect');
+    // PAN-1798: start-server daemonizes, so the unit MUST be Type=forking.
+    // Under the default Type=simple the founding client's exit deactivates the
+    // unit and the cgroup kill murders the forked server — the unit can never
+    // win the founding race (observed 5x per boot, 2026-07-03).
+    expect(argv).toContain('--service-type=forking');
+    expect(argv.indexOf('--service-type=forking')).toBeLessThan(argv.indexOf('tmux'));
   });
 
   it('skips founding when the server is already alive', () => {

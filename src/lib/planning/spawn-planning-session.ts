@@ -28,7 +28,7 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
+import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
 import { getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
@@ -732,6 +732,23 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
           join(agentStateDir, 'auto-spawn-on-finalize.json'),
           JSON.stringify({ autoSpawnOnFinalize: true }),
         );
+      }
+    }
+
+    if (behavior.usesCodexHome) {
+      const delivery = await deliverInitialPromptWithRetry(
+        sessionName,
+        initMessage,
+        'spawnPlanningSession:initial-prompt',
+      );
+      if (!delivery.ok) {
+        const errorMsg = `Codex planning kickoff prompt delivery failed: ${delivery.failure ?? 'unknown error'}`;
+        console.error(`[start-planning] ${errorMsg}`);
+        await Effect.runPromise(killSession(sessionName)).catch(() => {});
+        const existingErrState = getAgentStateSync(sessionName);
+        if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
+        progress(5, 'Launching planning session', errorMsg, 'error');
+        return { success: false, error: errorMsg };
       }
     }
 
