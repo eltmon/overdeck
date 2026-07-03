@@ -1,1 +1,0 @@
-{"status":"passed","notes":"Gates passed after fixing PAN-2222 sync-target-branch: npm run typecheck; npm run lint; npm test (backend 807 files/8093 tests passed, 4 skipped; frontend issueActions 3 files/32 tests passed). Branch feature/pan-2222 is synced with origin/main; sync-sources/hooks/record-cost-event.js.map conflict resolved and pushed."}
