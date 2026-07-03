@@ -167,19 +167,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2222",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:47:37.195Z",
-    "reviewNotes": "review passed; no blocking findings",
-    "testNotes": "Gates passed after fixing PAN-2222 sync-target-branch: npm run typecheck; npm run lint; npm test (backend 807 files/8093 tests passed, 4 skipped; frontend issueActions 3 files/32 tests passed). Branch feature/pan-2222 is synced with origin/main; sync-sources/hooks/record-cost-event.js.map conflict resolved and pushed.",
+    "updatedAt": "2026-07-03T02:48:15.767Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
-    "reviewedAtCommit": "2ba02b4d9ae5e788eb5bd96308e2e7da546a7c6c",
     "lastVerifiedCommit": "29f476e8813f2b18c2a6b7edb0832494e8f661b1",
     "reviewRequestedAt": "2026-07-03T02:38:26.910Z",
     "scopeDrift": {
@@ -318,7 +315,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.318182,
-        "pricingAsOf": "2026-07-03T02:47:37.235Z"
+        "pricingAsOf": "2026-07-03T02:48:15.907Z"
       }
     },
     "merges": [
@@ -338,5 +335,5 @@
     ]
   },
   "created": "2026-07-03T02:36:55.911Z",
-  "updated": "2026-07-03T02:47:37.237Z"
+  "updated": "2026-07-03T02:48:16.013Z"
 }
