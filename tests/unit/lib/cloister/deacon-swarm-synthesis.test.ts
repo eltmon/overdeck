@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
-import { dispatchNextWave, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
 import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+
+let workspacePath: string;
 
 function item(
   id: string,
@@ -69,6 +74,11 @@ function deps(): Pick<
   | 'recordSlotAssignment'
   | 'clearSlotAssignment'
   | 'spawnRun'
+  | 'shouldDispatch'
+  | 'getMaxSlotIndex'
+  | 'listSlotAssignments'
+  | 'listSessionNames'
+  | 'slotWorktreeExists'
 > {
   return {
     registeredSlotCapacityAvailable: vi.fn(() => true),
@@ -78,11 +88,26 @@ function deps(): Pick<
     recordSlotAssignment: vi.fn(),
     clearSlotAssignment: vi.fn(),
     spawnRun: vi.fn(async () => undefined),
+    shouldDispatch: vi.fn(() => true),
+    getMaxSlotIndex: vi.fn(() => 4),
+    listSlotAssignments: vi.fn(() => []),
+    listSessionNames: vi.fn(async () => []),
+    slotWorktreeExists: vi.fn(() => false),
   };
 }
 
 describe('deacon-swarm synthesis dispatch', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-synthesis-'));
+  });
+
+  afterEach(() => {
+    rmSync(workspacePath, { recursive: true, force: true });
+  });
+
   it('dispatches a synthesis-phase slot before implementation for a convergence item without synthesis output', async () => {
+    const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const plan = doc([
       item('parent-a', ['src/a.ts'], {}, 'completed'),
       item('parent-b', ['src/b.ts'], {}, 'completed'),
@@ -93,7 +118,7 @@ describe('deacon-swarm synthesis dispatch', () => {
     ]);
     const fakeDeps = deps();
 
-    await expect(dispatchNextWave('PAN-2203', '/workspace', plan, reconciled(), analyzeSwarmReadiness(plan), fakeDeps))
+    await expect(dispatchNextWave('PAN-2203', workspacePath, plan, reconciled(), analyzeSwarmReadiness(plan), fakeDeps))
       .resolves.toEqual(['[swarm] dispatched synthesis slot 1 (item join) for PAN-2203']);
 
     expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({
@@ -107,6 +132,7 @@ describe('deacon-swarm synthesis dispatch', () => {
   });
 
   it('dispatches implementation with synthesis context after synthesis output is persisted', async () => {
+    const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const plan = doc([
       item('parent-a', ['src/a.ts'], {}, 'completed'),
       item('parent-b', ['src/b.ts'], {}, 'completed'),
@@ -120,7 +146,7 @@ describe('deacon-swarm synthesis dispatch', () => {
     ]);
     const fakeDeps = deps();
 
-    await expect(dispatchNextWave('PAN-2203', '/workspace', plan, reconciled(), analyzeSwarmReadiness(plan), fakeDeps))
+    await expect(dispatchNextWave('PAN-2203', workspacePath, plan, reconciled(), analyzeSwarmReadiness(plan), fakeDeps))
       .resolves.toEqual(['[swarm] dispatched implementation slot 1 (item join) for PAN-2203']);
 
     expect(fakeDeps.spawnRun).toHaveBeenCalledWith('PAN-2203', 'work', expect.objectContaining({
@@ -131,6 +157,7 @@ describe('deacon-swarm synthesis dispatch', () => {
   });
 
   it('dispatches single-parent items directly to implementation', async () => {
+    const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const plan = doc([
       item('parent-a', ['src/a.ts'], {}, 'completed'),
       item('child', ['src/child.ts']),
@@ -139,7 +166,7 @@ describe('deacon-swarm synthesis dispatch', () => {
     ]);
     const fakeDeps = deps();
 
-    await expect(dispatchNextWave('PAN-2203', '/workspace', plan, {
+    await expect(dispatchNextWave('PAN-2203', workspacePath, plan, {
       ...reconciled(),
       merged: [{ itemId: 'parent-a', slotIndex: 1, status: 'merged' }],
     }, analyzeSwarmReadiness(plan), fakeDeps))
