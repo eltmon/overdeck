@@ -12,7 +12,7 @@ import {
   getBootReconciliationPendingHoldSet,
   listBootReconciliationCandidates,
 } from './boot-reconciliation.js';
-import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
+import { bootReconciliationSkipReason, type BootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
@@ -53,6 +53,27 @@ export interface AutoResumeNotifierDeps {
 
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
+
+export type BootReconciliationDecisionSkipBreakdown = Record<BootReconciliationSkipReason | 'other', number>;
+
+export interface BootReconciliationDecisionResult {
+  resumed: string[];
+  skipped: BootReconciliationDecisionSkipBreakdown;
+  deferred: number;
+}
+
+function emptyBootReconciliationDecisionResult(): BootReconciliationDecisionResult {
+  return {
+    resumed: [],
+    skipped: {
+      workspace_missing: 0,
+      merged: 0,
+      completed: 0,
+      other: 0,
+    },
+    deferred: 0,
+  };
+}
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
   if (state.paused !== true || !state.issueId) return false;
@@ -886,19 +907,19 @@ function bootReconciliationDecisionKey(): string | null {
 
 export async function applyBootReconciliationDecision(
   deps: AutoResumeNotifierDeps,
-): Promise<string[]> {
+): Promise<BootReconciliationDecisionResult> {
   const decisionKey = bootReconciliationDecisionKey();
-  if (!decisionKey) return [];
+  if (!decisionKey) return emptyBootReconciliationDecisionResult();
   if (appliedBootReconciliationDecisions.has(decisionKey)) {
     logDeaconEventSync('applyBootReconciliationDecision: decision already applied');
-    return [];
+    return emptyBootReconciliationDecisionResult();
   }
 
   const state = getBootReconciliationState();
   if (state.decision === 'hold_all') {
     appliedBootReconciliationDecisions.add(decisionKey);
     logDeaconEventSync('applyBootReconciliationDecision: hold_all — no agents resumed');
-    return [];
+    return emptyBootReconciliationDecisionResult();
   }
 
   let candidates = listBootReconciliationCandidates();
@@ -906,7 +927,7 @@ export async function applyBootReconciliationDecision(
     candidates = candidates.filter((agent) => state.perAgent[agent.issueId] === 'resume');
   }
 
-  const resumed: string[] = [];
+  const result = emptyBootReconciliationDecisionResult();
   let resumeAttempts = 0;
   const concurrencyLimits = getConcurrencyLimits();
   const runningBefore = countRunningAgents();
@@ -914,13 +935,15 @@ export async function applyBootReconciliationDecision(
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
 
-  for (const agent of candidates) {
+  for (const [index, agent] of candidates.entries()) {
     if (resumeAttempts >= workSlots) {
+      result.deferred += candidates.length - index;
       logDeaconEventSync(`applyBootReconciliationDecision: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates`);
       break;
     }
     const load1 = loadavg()[0];
     if (load1 > loadCeiling) {
+      result.deferred += candidates.length - index;
       logDeaconEventSync(`applyBootReconciliationDecision: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates`);
       break;
     }
@@ -928,20 +951,23 @@ export async function applyBootReconciliationDecision(
       await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
     }
 
-    const result = await handleAgentStoppedEvent(
+    const resumedAgentId = await handleAgentStoppedEvent(
       agent.id,
       { skipGlobalGates: true, context: 'boot-reconciliation' },
       deps,
     );
-    if (result) {
-      resumed.push(result);
+    if (resumedAgentId) {
+      result.resumed.push(resumedAgentId);
       resumeAttempts++;
+    } else {
+      const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
+      result.skipped[skipReason]++;
     }
   }
 
   appliedBootReconciliationDecisions.add(decisionKey);
-  logDeaconEventSync(`applyBootReconciliationDecision: decision=${state.decision} resumed ${resumed.length} agent(s)`);
-  return resumed;
+  logDeaconEventSync(`applyBootReconciliationDecision: decision=${state.decision} resumed ${result.resumed.length} agent(s)`);
+  return result;
 }
 
 /**

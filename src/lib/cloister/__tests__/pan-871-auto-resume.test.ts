@@ -266,6 +266,7 @@ import { isIssueClosed } from '../issue-closed.js';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { workResumeSlotsAvailable } from '../concurrency.js';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
@@ -286,6 +287,7 @@ const mockWriteFileSync = writeFileSync as any;
 const mockCaptureTranscriptUserRecordSnapshot = captureTranscriptUserRecordSnapshot as any;
 const mockEmitActivityEntrySync = emitActivityEntrySync as any;
 const mockEmitActivityTtsSync = emitActivityTtsSync as any;
+const mockWorkResumeSlotsAvailable = workResumeSlotsAvailable as any;
 
 // Default existsSync behaviour mirrors the module mock: no completed markers present.
 const noCompletedMarkers = (path: string) =>
@@ -329,6 +331,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockDeliverInitialPromptWithRetry.mockResolvedValue({ ok: true, path: 'supervisor' });
     mockRecordAgentFailure.mockResolvedValue(null);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
+    mockWorkResumeSlotsAvailable.mockReturnValue(6);
     mockExistsSync.mockImplementation(noCompletedMarkers);
     vi.mocked(listAllAgentsSync).mockReturnValue([
       { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
@@ -509,8 +512,10 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     const first = await applyBootReconciliationDecision();
     const second = await applyBootReconciliationDecision();
 
-    expect(first).toEqual(['agent-pan-871']);
-    expect(second).toEqual([]);
+    expect(first.resumed).toEqual(['agent-pan-871']);
+    expect(first.skipped).toEqual({ workspace_missing: 0, merged: 0, completed: 0, other: 0 });
+    expect(first.deferred).toBe(0);
+    expect(second.resumed).toEqual([]);
     expect(mockResumeAgent).toHaveBeenCalledTimes(1);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
   });
@@ -538,11 +543,111 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
-    const resumed = await applyBootReconciliationDecision();
+    const result = await applyBootReconciliationDecision();
 
-    expect(resumed).toEqual(['agent-pan-872']);
+    expect(result.resumed).toEqual(['agent-pan-872']);
     expect(mockResumeAgent).toHaveBeenCalledTimes(1);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-872');
+  });
+
+  it('reports skipped candidates by boot reconciliation category', async () => {
+    const states = {
+      'agent-missing': {
+        id: 'agent-missing',
+        issueId: 'PAN-MISSING',
+        workspace: '/tmp/missing-workspace',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'stopped',
+        startedAt: new Date().toISOString(),
+      },
+      'agent-merged': {
+        id: 'agent-merged',
+        issueId: 'PAN-MERGED',
+        workspace: '/tmp/workspace',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'stopped',
+        startedAt: new Date().toISOString(),
+      },
+      'agent-completed': {
+        id: 'agent-completed',
+        issueId: 'PAN-COMPLETED',
+        workspace: '/tmp/workspace',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'stopped',
+        startedAt: new Date().toISOString(),
+      },
+      'agent-other': {
+        id: 'agent-other',
+        issueId: 'PAN-OTHER',
+        workspace: '/tmp/workspace',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'stopped',
+        startedAt: new Date().toISOString(),
+      },
+    } as const;
+    vi.mocked(listAllAgentsSync).mockReturnValue(Object.values(states) as any);
+    mockGetAgentState.mockImplementation((agentId: keyof typeof states) => states[agentId]);
+    mockGetReviewStatus.mockImplementation((issueId: string) => ({
+      issueId,
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      mergeStatus: issueId === 'PAN-MERGED' ? 'merged' : 'pending',
+      updatedAt: new Date().toISOString(),
+    }));
+    mockExistsSync.mockImplementation((path: string) => {
+      if (path === '/tmp/missing-workspace') return false;
+      if (path.endsWith('/agent-completed/completed')) return true;
+      if (path.endsWith('/agent-completed/completed.processed')) return false;
+      if (path.endsWith('/completed') || path.endsWith('/completed.processed')) return false;
+      return true;
+    });
+    mockIsIssueClosed.mockImplementation((issueId: string) => Promise.resolve(issueId === 'PAN-OTHER'));
+    appSettingsMocks.getBootReconciliationState.mockReturnValue({
+      decision: 'resume_all',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:30.000Z',
+      bootId: 'boot-pan-2076-skip-breakdown',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+
+    const result = await applyBootReconciliationDecision();
+
+    expect(result.resumed).toEqual([]);
+    expect(result.skipped).toEqual({ workspace_missing: 1, merged: 1, completed: 1, other: 1 });
+    expect(result.deferred).toBe(0);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+  });
+
+  it('reports candidates deferred by the boot reconciliation concurrency gate', async () => {
+    vi.mocked(listAllAgentsSync).mockReturnValue([
+      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
+      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work' },
+    ] as any);
+    mockWorkResumeSlotsAvailable.mockReturnValue(0);
+    appSettingsMocks.getBootReconciliationState.mockReturnValue({
+      decision: 'resume_all',
+      perAgent: {},
+      decidedAt: '2026-06-29T15:00:30.000Z',
+      bootId: 'boot-pan-2076-deferred-breakdown',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    });
+
+    const result = await applyBootReconciliationDecision();
+
+    expect(result.resumed).toEqual([]);
+    expect(result.skipped).toEqual({ workspace_missing: 0, merged: 0, completed: 0, other: 0 });
+    expect(result.deferred).toBe(2);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 
   it('does not nudge an idle work agent when the issue is closed', async () => {
