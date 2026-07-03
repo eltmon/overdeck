@@ -477,18 +477,18 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-gray-950 text-gray-100">
+    <div className="flex flex-col h-full bg-background text-foreground">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 shrink-0">
-        <h1 className="text-lg font-semibold text-white">Session History</h1>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+        <h1 className="text-lg font-medium text-foreground">Session History</h1>
 
         {/* Stats bar */}
         {stats && (
-          <div className="flex items-center gap-4 text-xs text-gray-400 ml-2">
-            <span><span className="text-white font-mono">{stats.total}</span> indexed</span>
-            <span><span className="text-green-400 font-mono">{stats.enriched}</span> enriched</span>
-            <span><span className="text-blue-400 font-mono">{stats.managedCount}</span> managed</span>
-            <span><span className="text-amber-300 font-mono">${(cost?.totalCost ?? 0).toFixed(4)}</span> est. cost</span>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground ml-2">
+            <span><span className="text-foreground font-mono">{stats.total}</span> indexed</span>
+            <span><span className="text-success font-mono">{stats.enriched}</span> enriched</span>
+            <span><span className="text-primary font-mono">{stats.managedCount}</span> managed</span>
+            <span><span className="text-signal-cost-foreground font-mono">${(cost?.totalCost ?? 0).toFixed(4)}</span> est. cost</span>
           </div>
         )}
 
@@ -498,13 +498,13 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
           <>
             {/* Search bar */}
             <div className="relative w-72">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-500" />
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search sessions…"
                 value={query}
                 onChange={(e) => handleQueryChange(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded pl-8 pr-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                className="w-full bg-card border border-border rounded pl-8 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
               />
             </div>
 
@@ -515,8 +515,8 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
               }}
               className={`px-3 py-1.5 rounded text-xs border transition-colors ${
                 semanticSearch
-                  ? 'bg-purple-900 border-purple-600 text-purple-200'
-                  : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500'
+                  ? 'bg-signal-review/8 border-signal-review/32 text-signal-review-foreground'
+                  : 'bg-card border-border text-muted-foreground hover:border-border'
               }`}
             >
               {semanticSearch ? 'Semantic' : 'Keyword'}
@@ -529,8 +529,8 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
           onClick={() => setShowFacets((v) => !v)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border transition-colors ${
             showFacets
-              ? 'bg-blue-900 border-blue-600 text-blue-200'
-              : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-gray-500'
+              ? 'bg-primary border-primary text-primary-foreground'
+              : 'bg-card border-border text-muted-foreground hover:border-border'
           }`}
         >
           <Filter className="h-3.5 w-3.5" />
@@ -547,8 +547,8 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
       </div>
 
       {activeFilterChips.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800 bg-gray-950 shrink-0 text-xs">
-          <span className="text-gray-500">Active filters</span>
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-background shrink-0 text-xs">
+          <span className="text-muted-foreground">Active filters</span>
           {activeFilterChips.map((chip) => (
             <button
               key={chip.key}
@@ -557,14 +557,14 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
               if (chip.key === 'minCost') handleFilterChange('maxCost', undefined);
               if (chip.key === 'maxCost') handleFilterChange('minCost', undefined);
             }}
-              className="px-2 py-1 rounded-full bg-blue-950 text-blue-200 border border-blue-800 hover:bg-blue-900 transition-colors"
+              className="px-2 py-1 rounded-sm bg-primary/8 text-primary border border-primary/32 hover:bg-primary hover:text-primary-foreground transition-colors"
             >
-              {chip.label} <span className="text-blue-400">×</span>
+              {chip.label} <span className="text-primary">×</span>
             </button>
           ))}
           <button
             onClick={() => setFilters({})}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Clear all
           </button>
@@ -579,18 +579,18 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
         )}
 
         {/* Session list */}
-        <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${selected ? 'border-r border-gray-800' : ''}`}>
+        <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${selected ? 'border-r border-border' : ''}`}>
           {searchVisible && searchData?.error && (
-            <div className="px-4 py-2 border-b border-amber-900 bg-amber-950/40 text-amber-200 text-xs">
+            <div className="px-4 py-2 border-b border-warning/32 bg-warning/8 text-warning-foreground text-xs">
               Semantic search unavailable: {searchData.error}
             </div>
           )}
           {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
               Loading sessions…
             </div>
           ) : sessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-gray-500 gap-2">
+            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
               <span className="text-sm">No sessions found</span>
               {!stats?.total && (
                 <span className="text-xs">Run a scan to discover Claude Code sessions</span>
@@ -609,7 +609,7 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
                 }}
               />
               {effectiveQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
-                <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 shrink-0 text-xs text-gray-400">
+                <div className="flex items-center justify-between px-4 py-2 border-t border-border shrink-0 text-xs text-muted-foreground">
                   <span>
                     {searchOffset + 1}–{searchOffset + sessions.length} of {searchData.total} results
                   </span>
@@ -617,14 +617,14 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
                     <button
                       disabled={searchOffset === 0}
                       onClick={() => setSearchOffset((o) => Math.max(0, o - SEARCH_PAGE_SIZE))}
-                      className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="px-2 py-1 rounded bg-muted hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Prev
                     </button>
                     <button
                       disabled={searchOffset + SEARCH_PAGE_SIZE >= searchData.total}
                       onClick={() => setSearchOffset((o) => o + SEARCH_PAGE_SIZE)}
-                      className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="px-2 py-1 rounded bg-muted hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Next
                     </button>
