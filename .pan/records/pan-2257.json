@@ -1,28 +1,6 @@
 {
   "issueId": "PAN-2257",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T08:55:05.617Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T08:58:06.311Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T09:03:07.120Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T09:05:05.988Z"
-    }
-  ],
   "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
@@ -34,12 +12,12 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-03T09:07:37.077Z",
-    "reviewNotes": "No blocking findings across correctness, security, requirements, or performance",
-    "testNotes": "Verified after test-agent feedback: npm run lint; focused Command Deck frontend test; focused dashboard server routes test; dashboard frontend build; Playwright UAT capture for troubled badge rendering; full npm test.",
+    "updatedAt": "2026-07-03T09:25:24.331Z",
+    "reviewNotes": "No blocking findings; only review/test artifacts changed since prior pass",
+    "testNotes": "Verified after specialist feedback: configured root npm test passed (812 files passed, 4 skipped; 8139 tests passed, 52 skipped) and frontend issue action tests passed (3 files, 32 tests). Previously named suites also passed directly.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
-    "reviewedAtCommit": "9c484cd11a2b6645798cb7e53b487a48970dc492"
+    "reviewedAtCommit": "acb701b5d9e8e286b3ebf00f7d3d1e4ddfccc769"
   },
   "closeOut": {
     "usage": {
@@ -63,12 +41,12 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T09:07:37.104Z"
+        "pricingAsOf": "2026-07-03T09:25:24.359Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "created": "2026-07-03T08:54:57.565Z",
-  "updated": "2026-07-03T09:07:37.176Z"
+  "created": "2026-07-03T09:23:06.958Z",
+  "updated": "2026-07-03T09:25:24.432Z"
 }
