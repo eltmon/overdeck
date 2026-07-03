@@ -610,6 +610,25 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(tmux.sendKeys).toHaveBeenCalledWith('agent-pan-kickoff-1', expect.stringContaining('do the work'));
     });
 
+    it('marks kickoffDelivered true after a ready flywheel kickoff is delivered', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+
+      const state = await spawnRun('RUN-KICKOFF-1', 'flywheel', {
+        agentId: 'flywheel-orchestrator',
+        workspace: testWorkspace,
+        prompt: 'run the flywheel tick loop',
+        allowHost: true,
+        registerConversation: true,
+        flywheelRunId: 'RUN-1',
+      });
+
+      expect(state.kickoffDelivered).toBe(true);
+      expect(getAgentStateSync('flywheel-orchestrator')?.kickoffDelivered).toBe(true);
+      expect(readFileSync(join(getAgentDir('flywheel-orchestrator'), 'initial-prompt.md'), 'utf8'))
+        .toContain('run the flywheel tick loop');
+      expect(tmux.sendKeys).toHaveBeenCalledWith('flywheel-orchestrator', expect.stringContaining('run the flywheel tick loop'));
+    });
+
     it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
