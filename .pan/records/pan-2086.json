@@ -118,7 +118,7 @@
   ],
   "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-03T16:13:11.163Z",
+  "updated": "2026-07-03T16:38:52.548Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "pending",
@@ -220,7 +220,7 @@
     "cold-boot-breakdown": "completed",
     "cold-boot-breakdown.ac1": "completed",
     "cold-boot-breakdown.ac2": "completed",
-    "defer-readmodel-merge": "cancelled",
+    "defer-readmodel-merge": "completed",
     "defer-readmodel-merge.ac3": "completed",
     "sync-incremental-core": "completed",
     "sync-incremental-core.ac1": "completed",
@@ -239,6 +239,8 @@
     "batch-lifecycle-log.ac2": "completed",
     "batch-lifecycle-log.ac3": "completed",
     "batch-lifecycle-log.ac4": "completed",
-    "dashboard-auto-open.ac4": "completed"
+    "dashboard-auto-open.ac4": "completed",
+    "defer-readmodel-merge.ac1": "completed",
+    "defer-readmodel-merge.ac2": "completed"
   }
 }
