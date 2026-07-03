@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-01T05:30:43.175Z",
-  "updated": "2026-07-03T11:09:48.828Z",
+  "updated": "2026-07-03T19:37:48.739Z",
   "pipeline": {
     "issueId": "PAN-1456",
     "reviewStatus": "pending",
@@ -49,5 +49,12 @@
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T11:09:48.827Z"
     }
-  ]
+  ],
+  "statusOverrides": {
+    "inventory-remaining-issues": "completed",
+    "inventory-remaining-issues.ac1": "completed",
+    "inventory-remaining-issues.ac2": "completed",
+    "inventory-remaining-issues.ac3": "completed",
+    "inventory-remaining-issues.ac4": "completed"
+  }
 }
