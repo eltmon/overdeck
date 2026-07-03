@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync } from 'fs';
 import { join } from 'node:path';
 import { getAgentDir } from '../agents/agent-state.js';
 import { getReviewStatusSync } from '../review-status.js';
