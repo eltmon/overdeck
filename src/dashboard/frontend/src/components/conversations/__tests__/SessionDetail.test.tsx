@@ -11,6 +11,10 @@ import type { ComponentProps } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionDetail } from '../SessionDetail';
 
+vi.mock('../SessionTranscript', () => ({
+  SessionTranscript: () => <div data-testid="session-transcript" />,
+}));
+
 const rpcMocks = vi.hoisted(() => ({
   get: vi.fn(),
   enrich: vi.fn().mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 }),

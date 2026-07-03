@@ -26,6 +26,7 @@ interface DiscoveredSession {
   id: number;
   source: SessionSource;
   harness: string;
+  conversationId?: string | null;
   conversationName?: string | null;
   archivedAt?: string | null;
   jsonlPath: string | null;
@@ -261,6 +262,8 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
     id: session.id,
     source: 'discovered',
     harness: session.harness ?? 'claude-code',
+    conversationId: session.conversationId ?? null,
+    conversationName: session.conversationName ?? null,
     jsonlPath: session.jsonlPath,
     workspacePath: session.workspacePath ?? null,
     primaryModel: session.primaryModel ?? null,
@@ -663,7 +666,7 @@ export function ConversationsPage() {
 
         {/* Detail panel */}
         {selected && (
-          <div className="w-96 shrink-0 overflow-auto">
+          <div className="min-w-[28rem] flex-[1.15] overflow-hidden">
             <SessionDetail
               session={selected}
               onClose={() => setSelectedKey(null)}
