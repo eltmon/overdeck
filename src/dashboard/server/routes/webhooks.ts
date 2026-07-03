@@ -21,6 +21,7 @@ import {
   handleIssueComment,
   handlePullRequest,
   handlePullRequestReview,
+  handlePullRequestReviewComment,
   handlePullRequestReviewThread,
   handleStatus,
   isTrackedRepositorySync,
@@ -90,6 +91,9 @@ async function dispatchWebhook(eventType: string, payload: WebhookPayload): Prom
       break;
     case 'pull_request_review':
       await Effect.runPromise(handlePullRequestReview(payload));
+      break;
+    case 'pull_request_review_comment':
+      await Effect.runPromise(handlePullRequestReviewComment(payload));
       break;
     case 'pull_request_review_thread':
       await Effect.runPromise(handlePullRequestReviewThread(payload));

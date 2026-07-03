@@ -9,6 +9,7 @@ import {
   handleIssueComment,
   handlePullRequest,
   handlePullRequestReview,
+  handlePullRequestReviewComment,
   handlePullRequestReviewThread,
   handleStatus,
   needsBlockerReconciliation,
@@ -625,6 +626,21 @@ describe('handleIssueComment', () => {
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledTimes(1);
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-222');
+  });
+});
+
+describe('handlePullRequestReviewComment', () => {
+  it('bumps PR tab cache generation for inline PR review comments', async () => {
+    await Effect.runPromise(handlePullRequestReviewComment(makePayload({
+      action: 'created',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-555' },
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-555');
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 });
 

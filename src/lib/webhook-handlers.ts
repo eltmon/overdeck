@@ -528,6 +528,15 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   }
 }
 
+async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): Promise<void> {
+  if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
+  const pr = payload.pull_request;
+  if (!pr) return;
+  const issueId = issueIdFromBranch(pr.head.ref);
+  if (!issueId) return;
+  bumpIssuePrTabCacheGeneration(issueId);
+}
+
 async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const issue = payload.issue;
@@ -708,6 +717,15 @@ export const handlePullRequestReview = (
   Effect.tryPromise({
     try: () => handlePullRequestReviewPromise(payload),
     catch: (cause) => toGhError('handlePullRequestReview', cause),
+  });
+
+/** Effect: handle a `pull_request_review_comment` GitHub webhook payload. */
+export const handlePullRequestReviewComment = (
+  payload: WebhookPayload,
+): Effect.Effect<void, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => handlePullRequestReviewCommentPromise(payload),
+    catch: (cause) => toGhError('handlePullRequestReviewComment', cause),
   });
 
 /** Effect: handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
