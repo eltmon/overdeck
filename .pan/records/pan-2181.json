@@ -191,15 +191,15 @@
     }
   ],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-03T11:14:14.486Z",
+  "updated": "2026-07-03T11:15:42.827Z",
   "pipeline": {
     "issueId": "PAN-2181",
     "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:14:14.461Z",
+    "updatedAt": "2026-07-03T11:15:41.756Z",
     "reviewNotes": "BootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
@@ -290,7 +290,7 @@
       },
       "costAtCloseOut": {
         "usd": 18.436468,
-        "pricingAsOf": "2026-07-03T11:14:14.484Z"
+        "pricingAsOf": "2026-07-03T11:15:42.761Z"
       }
     },
     "merges": [
