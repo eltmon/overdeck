@@ -36,12 +36,28 @@ allowlist_at() {
     sort -u
 }
 
+parent_baseline_at() {
+  for parent in "$@"; do
+    baseline_at "$parent"
+  done | awk '
+    !($2 in max) || $1 > max[$2] { max[$2] = $1 }
+    END { for (path in max) print max[path], path }
+  ' | sort -k2
+}
+
+parent_allowlist_at() {
+  for parent in "$@"; do
+    allowlist_at "$parent"
+  done | sort -u
+}
+
 baseline_increases_for_commit() {
   local commit="$1"
+  shift
   local old_file new_file
   old_file=$(mktemp)
   new_file=$(mktemp)
-  baseline_at "$commit^" > "$old_file"
+  parent_baseline_at "$@" > "$old_file"
   baseline_at "$commit" > "$new_file"
   awk '
     FILENAME == ARGV[1] { old[$2] = $1; next }
@@ -53,10 +69,11 @@ baseline_increases_for_commit() {
 
 allowlist_increases_for_commit() {
   local commit="$1"
+  shift
   local old_file new_file
   old_file=$(mktemp)
   new_file=$(mktemp)
-  allowlist_at "$commit^" > "$old_file"
+  parent_allowlist_at "$@" > "$old_file"
   allowlist_at "$commit" > "$new_file"
   comm -13 "$old_file" "$new_file" | sed 's/^/allowlist added: /'
   rm -f "$old_file" "$new_file"
@@ -80,10 +97,13 @@ audit_commit() {
     return 0
   fi
 
+  local parents
+  read -r -a parents <<< "$(git rev-list --parents -n 1 "$commit" | cut -d' ' -f2-)"
+
   local increases
   increases=$(
-    baseline_increases_for_commit "$commit"
-    allowlist_increases_for_commit "$commit"
+    baseline_increases_for_commit "$commit" "${parents[@]}"
+    allowlist_increases_for_commit "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then

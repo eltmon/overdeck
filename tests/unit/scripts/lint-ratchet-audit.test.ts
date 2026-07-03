@@ -147,4 +147,23 @@ describe('lint-ratchet-audit.sh', () => {
     expect(result.output).toContain(`cannot see parent of ${rootCommit.slice(0, 12)}`);
     expect(result.output).toContain('ratchet audit passed');
   });
+
+  it('does not attribute already-main ratchet additions to a local merge commit', () => {
+    const root = setupRepo();
+    execFileSync('git', ['checkout', '-b', 'feature'], { cwd: root });
+    writeFileSync(join(root, 'README.md'), 'feature work\n');
+    commitAll(root, 'feature work');
+
+    execFileSync('git', ['checkout', 'master'], { cwd: root });
+    writeAllowlist(root, ['src/legacy.ts', 'src/main-added.ts']);
+    const mainTip = commitAll(root, 'main adds allowlist');
+
+    execFileSync('git', ['checkout', 'feature'], { cwd: root });
+    execFileSync('git', ['merge', '--no-ff', 'master', '-m', 'merge main'], { cwd: root });
+
+    const result = runAudit(root, ['--range', `${mainTip}..HEAD`]);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
 });
