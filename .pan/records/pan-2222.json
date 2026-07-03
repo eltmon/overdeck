@@ -1,8 +1,97 @@
 {
   "issueId": "PAN-2222",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-03T02:38:26.908Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T02:38:27.228Z"
+    }
+  ],
   "feedback": [],
-  "harness": "claude-code",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-2222.json",
+      ".pan/test/result.json",
+      "src/dashboard/server/routes/__tests__/specialists.test.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+      "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
+      "src/lib/cloister/__tests__/inspect-agent.test.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/lib/vbrief/continue-state.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/routes/specialists.ts",
+      "src/lib/agents/__tests__/tier-supervisor.test.ts",
+      "src/lib/agents/standing-tiers.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/vbrief/__tests__/continue-state.test.ts"
+    ],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/server/routes/specialists.ts",
+      "src/dashboard/server/routes/tiered-callouts.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/agents/__tests__/resolve-tier.test.ts",
+      "src/lib/agents/__tests__/tier-escalation.test.ts",
+      "src/lib/agents/__tests__/tier-feed.test.ts",
+      "src/lib/agents/__tests__/tier-replay.test.ts",
+      "src/lib/agents/__tests__/tier-supervisor.test.ts",
+      "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+      "src/lib/agents/standing-tiers.ts",
+      "src/lib/agents/tier-escalation.ts",
+      "src/lib/agents/tier-feed.ts",
+      "src/lib/agents/tier-replay.ts",
+      "src/lib/agents/tier-table.ts",
+      "src/lib/cloister/inspect-agent.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/vbrief/__tests__/continue-state.test.ts",
+      "src/lib/vbrief/io.ts",
+      "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-2222.json",
+      ".pan/test/result.json",
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/server/routes/__tests__/specialists.test.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/dashboard/server/routes/tiered-callouts.ts",
+      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/agents/__tests__/resolve-tier.test.ts",
+      "src/lib/agents/__tests__/tier-escalation.test.ts",
+      "src/lib/agents/__tests__/tier-feed.test.ts",
+      "src/lib/agents/__tests__/tier-replay.test.ts",
+      "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/__tests__/tiered-execution-disabled.test.ts",
+      "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
+      "src/lib/agents/tier-escalation.ts",
+      "src/lib/agents/tier-feed.ts",
+      "src/lib/agents/tier-replay.ts",
+      "src/lib/agents/tier-table.ts",
+      "src/lib/cloister/__tests__/inspect-agent.test.ts",
+      "src/lib/cloister/inspect-agent.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/lib/vbrief/continue-state.ts",
+      "src/lib/vbrief/io.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
+      "tests/unit/dashboard/routes/tiered-callouts.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "recordedAt": "2026-07-03T02:38:21.164Z"
+  },
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "by-kind-config": "completed",
@@ -63,31 +152,34 @@
   },
   "pipeline": {
     "issueId": "PAN-2222",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:37:43.601Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-03T02:38:27.062Z",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
     "lastVerifiedCommit": "393881d1da7fd54af896efe50d2ffb5ead38511e",
-    "reviewRequestedAt": "2026-07-03T01:08:20.244Z",
+    "reviewRequestedAt": "2026-07-03T02:38:26.910Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2222.json",
+        ".pan/test/result.json",
         "src/dashboard/server/routes/__tests__/specialists.test.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
         "src/dashboard/server/routes/tiered-inspect-escalation.ts",
         "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
         "src/lib/cloister/__tests__/inspect-agent.test.ts",
         "src/lib/vbrief/__tests__/io.test.ts",
         "src/lib/vbrief/continue-state.ts",
         "sync-sources/hooks/record-cost-event.js",
-        "sync-sources/hooks/record-cost-event.js.map"
+        "sync-sources/hooks/record-cost-event.js.map",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "declaredScopeUntouched": [
+        "src/dashboard/server/routes/specialists.ts",
         "src/lib/agents/__tests__/tier-supervisor.test.ts",
         "src/lib/agents/standing-tiers.ts",
         "src/lib/config-yaml/schema.ts",
@@ -118,9 +210,10 @@
       ],
       "actualChangedFiles": [
         ".pan/records/pan-2222.json",
+        ".pan/test/result.json",
         "docs/TIERED-EXECUTION.md",
         "src/dashboard/server/routes/__tests__/specialists.test.ts",
-        "src/dashboard/server/routes/specialists.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
         "src/dashboard/server/routes/tiered-callouts.ts",
         "src/dashboard/server/routes/tiered-inspect-escalation.ts",
         "src/dashboard/server/server.ts",
@@ -142,9 +235,10 @@
         "src/lib/vbrief/io.ts",
         "sync-sources/hooks/record-cost-event.js",
         "sync-sources/hooks/record-cost-event.js.map",
-        "tests/unit/dashboard/routes/tiered-callouts.test.ts"
+        "tests/unit/dashboard/routes/tiered-callouts.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
-      "recordedAt": "2026-07-03T01:08:06.910Z"
+      "recordedAt": "2026-07-03T02:38:21.164Z"
     }
   },
   "closeOut": {
@@ -205,7 +299,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.318182,
-        "pricingAsOf": "2026-07-03T02:37:43.641Z"
+        "pricingAsOf": "2026-07-03T02:38:27.148Z"
       }
     },
     "merges": [
@@ -225,5 +319,5 @@
     ]
   },
   "created": "2026-07-03T02:36:55.911Z",
-  "updated": "2026-07-03T02:37:43.645Z"
+  "updated": "2026-07-03T02:38:27.235Z"
 }
