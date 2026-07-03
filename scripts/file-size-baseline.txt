@@ -7,7 +7,6 @@
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 1174 src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx
 1488 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
-4071 src/dashboard/server/routes/agents.ts
 1413 src/dashboard/server/routes/command-deck.ts
 5291 src/dashboard/server/routes/conversations.ts
 1005 src/dashboard/server/routes/flywheel.ts
