@@ -154,11 +154,11 @@
     "issueId": "PAN-2222",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:38:27.062Z",
+    "updatedAt": "2026-07-03T02:38:59.495Z",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
     "lastVerifiedCommit": "393881d1da7fd54af896efe50d2ffb5ead38511e",
@@ -299,7 +299,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.318182,
-        "pricingAsOf": "2026-07-03T02:38:27.148Z"
+        "pricingAsOf": "2026-07-03T02:38:59.565Z"
       }
     },
     "merges": [
@@ -319,5 +319,5 @@
     ]
   },
   "created": "2026-07-03T02:36:55.911Z",
-  "updated": "2026-07-03T02:38:27.235Z"
+  "updated": "2026-07-03T02:38:59.594Z"
 }
