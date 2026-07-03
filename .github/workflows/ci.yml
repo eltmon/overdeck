@@ -77,6 +77,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # PAN-2227: lint:ratchet-audit diffs the last baseline/allowlist commit against its parent
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
