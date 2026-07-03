@@ -524,7 +524,7 @@ function writeStateFile(running: boolean, pid?: number): void {
 /**
  * Read Cloister running state from file
  */
-function readStateFile(): { running: boolean; pid?: number; startedAt?: string } {
+export function readCloisterStateFile(): { running: boolean; pid?: number; startedAt?: string } {
   try {
     if (existsSync(CLOISTER_STATE_FILE)) {
       const data = JSON.parse(readFileSync(CLOISTER_STATE_FILE, 'utf-8'));
@@ -1982,7 +1982,7 @@ export class CloisterService {
       return true;
     }
     // Check if another process has Cloister running
-    const stateFile = readStateFile();
+    const stateFile = readCloisterStateFile();
     return stateFile.running;
   }
 }
