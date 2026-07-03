@@ -6,6 +6,7 @@ import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { validateOriginHeaders, getHeaderFromMap, type HeaderMap } from '../../dashboard/server/routes/origin-validation.js';
 import { detectAwaitingInputForAgent, parseCodexApprovalPrompt } from '../agent-input-detection.js';
 import {
+  getConversationById,
   getConversationByName,
   setConversationEffort,
   updateConversationDeliveryMethod,
@@ -19,6 +20,8 @@ import {
   type ThinkingLevel,
 } from '../runtimes/conversation-control.js';
 import { sendRawKeystroke, sendKeysAsync } from '../tmux.js';
+import { deliverAgentMessage } from '../agents.js';
+import { tmuxSessionExists } from './conversation-runtime.js';
 import type { PendingAskUserQuestionSnapshot, PendingInputKind } from '../agent-enrichment.js';
 
 export const CONTROL_ACK_TIMEOUT_MS = 10_000;
@@ -36,6 +39,12 @@ interface PendingConversationControlAck {
 }
 
 const pendingConversationControlAcks = new Map<string, PendingConversationControlAck>();
+
+const PLAN_ACTION_KEYSTROKES: Record<string, string> = {
+  'approve-auto': '1',
+  'approve-manual': '2',
+  'reject-ultraplan': '3',
+};
 
 export function registerConversationControlAck(
   commandId: string,
@@ -110,6 +119,81 @@ export function validateConversationControlAckOrigin(
   const referer = getHeaderFromMap(headers, 'referer');
   if (!origin && !referer) return { ok: true };
   return validateOriginHeaders(headers, method);
+}
+
+export async function handleConversationCodexApproval(
+  rawId: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  try {
+    const optionNumber = Number((body as { optionNumber?: unknown }).optionNumber);
+    if (!Number.isInteger(optionNumber) || optionNumber < 1 || optionNumber > 9) {
+      return jsonResponse({ error: 'optionNumber must be an integer 1-9' }, { status: 400 });
+    }
+    const numericId = Number(rawId);
+    const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
+      ? getConversationById(numericId)
+      : getConversationByName(rawId);
+    if (!conv) {
+      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+    }
+    if (getHarnessBehavior(conv.harness).transcriptKind !== 'codex-rollout-jsonl') {
+      return jsonResponse({ error: 'Not a Codex conversation' }, { status: 400 });
+    }
+    if (!(await tmuxSessionExists(conv.tmuxSession))) {
+      return jsonResponse({ error: 'Conversation session is not running' }, { status: 409 });
+    }
+    // Re-detect uncached so we only send keystrokes when the menu is still
+    // up, and so we can bound optionNumber to the options actually shown.
+    const detection = await Effect.runPromise(
+      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false }),
+    );
+    const parsed = detection ? parseCodexApprovalPrompt(detection.prompt) : null;
+    if (!parsed) {
+      return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
+    }
+    if (optionNumber > parsed.options.length) {
+      return jsonResponse({ error: `optionNumber out of range (1-${parsed.options.length})` }, { status: 400 });
+    }
+    await deliverCodexApprovalChoice(conv.tmuxSession, optionNumber);
+    return jsonResponse({ ok: true, optionNumber });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] codex approval failed:', msg);
+    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function handleConversationPlanAction(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  try {
+    const conv = getConversationByName(name);
+    if (!conv) {
+      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+    }
+    const action = typeof body['action'] === 'string' ? body['action'] : '';
+    const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
+    if (action === 'reject-feedback') {
+      await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, '4', 'plan-action-reject'));
+      if (feedback) {
+        await new Promise(r => setTimeout(r, 300));
+        await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', resolveConversationDeliveryMethod(conv));
+      }
+      return jsonResponse({ ok: true });
+    }
+    const keystroke = PLAN_ACTION_KEYSTROKES[action];
+    if (!keystroke) {
+      return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
+    }
+    await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, keystroke, `plan-action-${action}`));
+    return jsonResponse({ ok: true });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] plan action failed:', msg);
+    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
 type ConversationControlDeliverAs = Extract<ControlCommand['type'], 'prompt' | 'steer' | 'follow_up'>;

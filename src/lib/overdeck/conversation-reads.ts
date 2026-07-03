@@ -10,6 +10,9 @@ import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type Pen
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
+import { listSessionNames } from '../tmux.js';
+import { sessionFilePath } from '../paths.js';
+import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
   CONVERSATION_TITLE_MODEL,
   fallbackTranscriptTitle,
@@ -41,6 +44,7 @@ import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../../dash
 import { parseCodexConversationMessages } from '../../dashboard/server/services/codex-conversation-parser.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import {
+  readLauncherPinnedSessionId,
   resolveAgentHarness,
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
@@ -64,6 +68,118 @@ export type ConversationMessagesParseResult = Awaited<ReturnType<typeof parseCon
 
 function result(body: unknown, status?: number): ConversationReadResult {
   return status === undefined ? { body } : { body, status };
+}
+
+const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+
+/**
+ * Find a Claude Code session JSONL by its (globally-unique) session id, searching
+ * every project dir under ~/.claude/projects/. Claude keys session files by the
+ * cwd AT RUNTIME, so when a repo directory is renamed (e.g. Projects/panopticon-cli
+ * → Projects/overdeck) a conversation's recorded cwd goes stale and the
+ * deterministic sessionFilePath(cwd, id) points at a dir that no longer exists,
+ * while the JSONL itself lives under the new encoded dir. A by-id search recovers
+ * it. Mirrors the cross-dir lookup the non-DB specialist/agent fallback already
+ * uses below.
+ */
+// PAN-2220: memoize by-id lookups. The sweep below stats <sessionId>.jsonl in
+// EVERY project dir (~2,200 on this machine), and the conversation-list
+// enrichment resolves session files per row per request — for each stale-cwd
+// conversation that meant a full sweep on every list build (~1.7s of
+// event-loop-adjacent syscall storm). A found path is stable (re-verified
+// with one existsSync); a miss is re-swept after a short TTL so a transcript
+// that appears later is still discovered.
+const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
+const SESSION_FILE_MISS_TTL_MS = 60_000;
+
+async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
+  if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) return null;
+  const cached = sessionFileByIdCache.get(sessionId);
+  if (cached) {
+    if (cached.path) {
+      if (existsSync(cached.path)) return cached.path;
+      sessionFileByIdCache.delete(sessionId);
+    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
+      return null;
+    }
+  }
+  try {
+    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const dirs = await readdir(claudeProjects);
+    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+    const candidates = dirs
+      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+    const STAT_BATCH_SIZE = 50;
+    for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
+      const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+      const checks = await Promise.all(
+        batch.map(async (candidate) => {
+          try {
+            await stat(candidate);
+            return candidate;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const found = checks.find((c): c is string => c !== null);
+      if (found) {
+        sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
+        return found;
+      }
+    }
+  } catch {
+    /* ~/.claude/projects unreadable */
+  }
+  sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
+  return null;
+}
+
+export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
+  // conversations use sessions/. The shared resolver checks both and skips sidecars.
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
+    const piPath = await resolvePiSessionPath(conv.tmuxSession);
+    // Fall through if the harness is stale from an earlier ohmypi run.
+    if (piPath) return piPath;
+  }
+  // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
+    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
+    if (codexPath) return codexPath;
+    // Fall through if codex path not found — same stale-harness recovery.
+  }
+  // claude-code: prefer the launcher's pinned live session id, then the recorded
+  // canonical id. Do not guess from JSONL mtime; compaction can make old files
+  // newer than the terminal's current transcript.
+  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
+  const sessionId = pinned ?? conv.claudeSessionId;
+  if (sessionId) {
+    const deterministic = sessionFilePath(conv.cwd, sessionId);
+    if (existsSync(deterministic)) return deterministic;
+    // conv.cwd may be stale (e.g. the repo dir was renamed after this conversation
+    // ran), so the deterministic path points at a dir that no longer exists. Recover
+    // the JSONL by its globally-unique session id across all project dirs. If still
+    // not found (e.g. a live conversation before its first turn writes the file),
+    // return the deterministic path so the live-session banner logic is preserved.
+    const found = await findClaudeSessionFileById(sessionId);
+    if (found) return found;
+    const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
+    return discovered ?? deterministic;
+  }
+  const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
+  if (discovered) return discovered;
+  // Neither the launcher nor the conversation record yields a session id. For a
+  // live conversation this must never happen — scream so it gets attention
+  // instead of silently rendering a wrong/empty transcript. The /messages route
+  // turns this (for an active conversation) into a visible panel error.
+  console.error(
+    `[conversations] UNRESOLVED claude-code session for conversation '${conv.name}' ` +
+      `(tmux=${conv.tmuxSession}, status=${conv.status}, cwd=${conv.cwd}): no --session-id ` +
+      `pinned in launcher.sh and no recorded claudeSessionId. The transcript panel cannot be trusted.`,
+  );
+  return null;
 }
 
 // ─── Messages cache ───────────────────────────────────────────────────────────
@@ -313,7 +429,6 @@ export async function getConversationRead(
 const SPECIALIST_SESSION_CACHE_TTL_MS = 5_000;
 const SPECIALIST_SESSION_CACHE_MAX = 100;
 const specialistSessionFileCache = new Map<string, { path: string; timestamp: number }>();
-const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 function getSpecialistSessionCache(name: string): string | undefined {
   const entry = specialistSessionFileCache.get(name);

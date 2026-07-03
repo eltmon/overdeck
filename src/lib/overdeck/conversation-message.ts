@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { extname, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
+
+import { Option } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { compactConversationNative, shouldInterceptManualCompact } from '../../dashboard/server/services/conversation-compaction.js';
@@ -17,6 +19,7 @@ import {
   getConversationAttachmentsRoot,
   hasConversationAttachment,
   isManagedConversationAttachmentPath,
+  removeConversationAttachment,
 } from '../../dashboard/server/services/conversation-attachments.js';
 import {
   getConversationByName,
@@ -30,9 +33,33 @@ import {
   resolveConversationDeliveryMethod,
 } from './conversation-delivery.js';
 
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const MAX_FILENAME_LENGTH = 255;
+const UPLOAD_READ_TIMEOUT_MS = 10_000;
+const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
+const UPLOAD_RATE_LIMIT_MAX = 10;
+const UPLOAD_RATE_LIMIT_MAP_MAX = 1_000;
+const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
+let lastRateLimitPruneAt = 0;
+
+function isLoopbackAddress(addr: string): boolean {
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+export function resolveConversationUploadClientIp(
+  remoteAddressOption: Option.Option<string>,
+  forwardedFor: string | undefined,
+): string {
+  const remoteAddress = Option.getOrElse(remoteAddressOption, () => 'unknown');
+  // Only trust X-Forwarded-From when the direct connection comes from a
+  // loopback address (i.e. we are behind a local reverse proxy). Otherwise
+  // a client can spoof any IP and bypass rate-limiting.
+  if (isLoopbackAddress(remoteAddress) && forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  return remoteAddress;
+}
 
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
@@ -127,6 +154,74 @@ export async function handleConversationImageUpload(
   }
 
   return jsonResponse({ path });
+}
+
+export function checkConversationUploadRateLimit(remoteAddress: string): boolean {
+  const now = Date.now();
+  // Prune stale entries at most once per rate-limit window to avoid O(n)
+  // scans on every request. The hard size cap is still enforced after pruning.
+  if (now - lastRateLimitPruneAt > UPLOAD_RATE_LIMIT_WINDOW_MS) {
+    lastRateLimitPruneAt = now;
+    for (const [ip, entry] of uploadRateLimit) {
+      if (now > entry.resetAt) {
+        uploadRateLimit.delete(ip);
+      }
+    }
+  }
+  // If still over cap after pruning stale entries, evict oldest entries
+  // (Map iteration order is insertion order).
+  while (uploadRateLimit.size >= UPLOAD_RATE_LIMIT_MAP_MAX) {
+    const firstKey = uploadRateLimit.keys().next().value;
+    if (firstKey !== undefined) {
+      uploadRateLimit.delete(firstKey);
+    } else {
+      break;
+    }
+  }
+  const entry = uploadRateLimit.get(remoteAddress);
+  if (!entry || now > entry.resetAt) {
+    uploadRateLimit.set(remoteAddress, { count: 1, resetAt: now + UPLOAD_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= UPLOAD_RATE_LIMIT_MAX) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
+export async function handleConversationImageUploadFile(
+  name: string,
+  filename: string,
+  filePath: string,
+  mimeType: string,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const bytes = await Promise.race([
+    readFile(filePath),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Upload read timeout')), UPLOAD_READ_TIMEOUT_MS),
+    ),
+  ]);
+  return handleConversationImageUpload(name, filename, bytes, mimeType);
+}
+
+export async function handleConversationImageDelete(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const conv = getConversationByName(name);
+  if (!conv) {
+    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  }
+  const path = typeof body['path'] === 'string' ? body['path'].trim() : '';
+  if (!path) {
+    return jsonResponse({ error: 'path is required' }, { status: 400 });
+  }
+  const removed = await removeConversationAttachment(name, path);
+  if (!removed) {
+    return jsonResponse({ error: 'Attachment not found for conversation' }, { status: 404 });
+  }
+  return jsonResponse({ ok: true });
 }
 
 export function transformMessageForHarness(message: string, harness: RuntimeName, attachmentPaths: string[]): string {
