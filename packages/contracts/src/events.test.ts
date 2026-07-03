@@ -304,6 +304,32 @@ describe("Agent lifecycle events", () => {
 
       expect(second.agentsById["agent-pan-1908"]).toEqual(first.agentsById["agent-pan-1908"])
     })
+
+    it("materializes a strike session under its issue from a role-bearing status event", () => {
+      const changed = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
+        type: "agent.status_changed" as const,
+        sequence: 1,
+        timestamp: "2026-06-15T12:01:00.000Z",
+        payload: {
+          agentId: "strike-pan-2258",
+          issueId: "PAN-2258",
+          status: "running",
+          role: "strike",
+          sessionId: "session-strike-pan-2258",
+          hasLiveTmuxSession: true,
+        },
+      }))
+
+      expect(changed.agentsById["strike-pan-2258"]).toMatchObject({
+        id: "strike-pan-2258",
+        issueId: "PAN-2258",
+        status: "running",
+        role: "strike",
+        sessionId: "session-strike-pan-2258",
+        hasLiveTmuxSession: true,
+      })
+      expect(changed.agentIdBySessionId["session-strike-pan-2258"]).toBe("strike-pan-2258")
+    })
   })
 
   describe("agent.stopped", () => {
