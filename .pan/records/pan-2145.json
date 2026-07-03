@@ -12,37 +12,166 @@
       "reason": "resume",
       "agentModel": "claude-opus-4-8",
       "timestamp": "2026-07-03T14:52:11.561Z"
+    },
+    {
+      "timestamp": "2026-07-03T23:08:18.715Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2145.md",
+      ".pan/records/pan-2145.json",
+      "src/lib/overdeck/conversation-list.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/routes/__tests__/conversation-compaction.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts"
+    ],
+    "declaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/conversation-compaction.test.ts",
+      "src/dashboard/server/routes/__tests__/conversation-teardown.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-handoff-delivery.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-resolve-harness.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations.test.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/overdeck/conversation-archive.ts",
+      "src/lib/overdeck/conversation-delivery.ts",
+      "src/lib/overdeck/conversation-diffs.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "tests/dashboard/conversations-patch.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2145.md",
+      ".pan/records/pan-2145.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/conversation-teardown.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-handoff-delivery.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-resolve-harness.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+      "src/dashboard/server/routes/__tests__/conversations.test.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/overdeck/conversation-archive.ts",
+      "src/lib/overdeck/conversation-delivery.ts",
+      "src/lib/overdeck/conversation-diffs.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/overdeck/conversation-list.ts",
+      "src/lib/overdeck/conversation-message.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "tests/dashboard/conversations-patch.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+      "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+    ],
+    "recordedAt": "2026-07-03T23:08:08.540Z"
+  },
   "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-03T23:06:16.081Z",
+  "updated": "2026-07-03T23:08:18.897Z",
   "pipeline": {
     "issueId": "PAN-2145",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T21:59:18.640Z",
-    "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door."
+    "updatedAt": "2026-07-03T23:08:18.828Z",
+    "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2332",
+    "reviewRequestedAt": "2026-07-03T23:08:18.717Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2145.md",
+        ".pan/records/pan-2145.json",
+        "src/lib/overdeck/conversation-list.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/server/routes/__tests__/conversation-compaction.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts"
+      ],
+      "declaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/routes/__tests__/conversation-compaction.test.ts",
+        "src/dashboard/server/routes/__tests__/conversation-teardown.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-handoff-delivery.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-resolve-harness.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations.test.ts",
+        "src/dashboard/server/routes/conversations.ts",
+        "src/lib/overdeck/conversation-archive.ts",
+        "src/lib/overdeck/conversation-delivery.ts",
+        "src/lib/overdeck/conversation-diffs.ts",
+        "src/lib/overdeck/conversation-forks.ts",
+        "src/lib/overdeck/conversation-message.ts",
+        "src/lib/overdeck/conversation-reads.ts",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "tests/dashboard/conversations-patch.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2145.md",
+        ".pan/records/pan-2145.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/routes/__tests__/conversation-teardown.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-handoff-delivery.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-resolve-harness.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+        "src/dashboard/server/routes/__tests__/conversations.test.ts",
+        "src/dashboard/server/routes/conversations.ts",
+        "src/lib/overdeck/conversation-archive.ts",
+        "src/lib/overdeck/conversation-delivery.ts",
+        "src/lib/overdeck/conversation-diffs.ts",
+        "src/lib/overdeck/conversation-forks.ts",
+        "src/lib/overdeck/conversation-list.ts",
+        "src/lib/overdeck/conversation-message.ts",
+        "src/lib/overdeck/conversation-reads.ts",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "tests/dashboard/conversations-patch.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-fork-pipeline.test.ts",
+        "tests/unit/dashboard/server/routes/conversations-no-loss.test.ts"
+      ],
+      "recordedAt": "2026-07-03T23:08:08.540Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "inspect-deep": {
           "openai/gpt-5.5": {
-            "input": 446925,
-            "output": 20501,
-            "cacheRead": 3211264,
+            "input": 449031,
+            "output": 20891,
+            "cacheRead": 3415040,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 21777,
-            "output": 350,
+            "input": 24043,
+            "output": 683,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -58,14 +187,14 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 446925,
-          "output": 20501,
-          "cacheRead": 3211264,
+          "input": 449031,
+          "output": 20891,
+          "cacheRead": 3415040,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 21777,
-          "output": 350,
+          "input": 24043,
+          "output": 683,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -77,14 +206,16 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.260822,
-        "pricingAsOf": "2026-07-03T21:59:18.874Z"
+        "usd": 23.38494,
+        "pricingAsOf": "2026-07-03T23:08:18.873Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2332"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "item-residue": "completed",
