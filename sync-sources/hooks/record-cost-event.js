@@ -27074,6 +27074,44 @@ const PROVIDERS = {
 		description: "Route via omp using MISTRAL_API_KEY."
 	}
 };
+var UnknownModelError = class extends Error {
+	constructor(modelId, suggestion) {
+		super(`Unknown model "${modelId}".${suggestion ? ` Did you mean "${suggestion}"?` : ""}`);
+		this.name = "UnknownModelError";
+	}
+};
+function knownModelIds$1() {
+	return Array.from(new Set([
+		...Object.values(PROVIDERS).flatMap((provider) => provider.models.map(String)),
+		...Object.keys(MODEL_DEPRECATIONS),
+		...Object.values(MODEL_DEPRECATIONS).map(String)
+	]));
+}
+function editDistance(a, b) {
+	const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+	const current = new Array(b.length + 1);
+	for (let i = 1; i <= a.length; i += 1) {
+		current[0] = i;
+		for (let j = 1; j <= b.length; j += 1) current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+		previous.splice(0, previous.length, ...current);
+	}
+	return previous[b.length];
+}
+function nearestKnownModelId(modelId) {
+	const normalizedInput = modelId.toLowerCase();
+	const compactInput = normalizedInput.replace(/[^a-z0-9]/g, "");
+	let best;
+	for (const candidate of knownModelIds$1()) {
+		const normalizedCandidate = candidate.toLowerCase();
+		const distance = Math.min(editDistance(normalizedInput, normalizedCandidate), editDistance(compactInput, normalizedCandidate.replace(/[^a-z0-9]/g, "")));
+		if (!best || distance < best.distance) best = {
+			model: candidate,
+			distance
+		};
+	}
+	if (!best) return void 0;
+	return best.distance <= Math.max(2, Math.floor(modelId.length / 3)) ? best.model : void 0;
+}
 /**
 * Get provider for a given model ID
 */
@@ -27155,7 +27193,7 @@ function getProviderForModelSync(modelId) {
 		"mistral-small-latest",
 		"codestral-latest"
 	].includes(modelId)) return PROVIDERS.mistral;
-	return PROVIDERS.anthropic;
+	throw new UnknownModelError(String(modelId), nearestKnownModelId(String(modelId)));
 }
 //#endregion
 //#region ../../src/lib/harness-policy.ts

@@ -80,8 +80,8 @@ async function appendTellInterventionForUserSource(normalizedId: string, caller:
 export async function messageAgent(agentId: string, message: string, caller = 'internal'): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
-  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
-  if (gateBlockReason) {
+  if (agentState?.paused === true) {
+    const gateBlockReason = getAgentResumeGateBlockReason(agentState) ?? 'agent is paused';
     queueAgentMail(normalizedId, message);
     logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
     console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
@@ -91,6 +91,13 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   if (runtimeState?.state === 'suspended') {
+    const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+    if (gateBlockReason) {
+      queueAgentMail(normalizedId, message);
+      logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+      console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
+      return;
+    }
     console.log(`[agents] Auto-resuming suspended agent ${normalizedId} to deliver message`);
     const { resumeAgent } = await import('../agents.js');
     const result = await resumeAgent(normalizedId, message);
@@ -119,6 +126,13 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
   // session before re-creating it.
   if (agentState && agentState.status === 'stopped') {
+    const gateBlockReason = getAgentResumeGateBlockReason(agentState);
+    if (gateBlockReason) {
+      queueAgentMail(normalizedId, message);
+      logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+      console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
+      return;
+    }
     console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await Effect.runPromise(sessionExists(normalizedId))})`);
 
     const { resumeAgent } = await import('../agents.js');

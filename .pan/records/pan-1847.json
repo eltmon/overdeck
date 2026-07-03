@@ -998,6 +998,31 @@
       "reason": "feedback",
       "note": "[2026-07-03T01:41Z] review-agent → FAILED — seq 185",
       "timestamp": "2026-07-03T01:41:32.286Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T01:51Z] review-agent → FAILED — seq 186",
+      "timestamp": "2026-07-03T01:51:36.963Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T02:08Z] review-agent → FAILED — seq 187",
+      "timestamp": "2026-07-03T02:08:25.713Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T02:11Z] review-agent → FAILED — seq 188",
+      "timestamp": "2026-07-03T02:11:55.792Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T02:16Z] review-agent → FAILED — seq 189",
+      "timestamp": "2026-07-03T02:16:18.249Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T02:20Z] review-agent → FAILED — seq 190",
+      "timestamp": "2026-07-03T02:20:16.748Z"
     }
   ],
   "feedback": [
@@ -2295,10 +2320,45 @@
       "outcome": "failed",
       "timestamp": "2026-07-03T01:41:32Z",
       "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 186,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T01:51:36Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 187,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T02:08:25Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 188,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T02:11:55Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 189,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T02:16:18Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 190,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T02:20:16Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-06-16T16:16:39.356Z",
-  "updated": "2026-07-03T01:41:32.287Z",
+  "updated": "2026-07-03T02:20:16.748Z",
   "pipeline": {
     "issueId": "PAN-1847",
     "reviewStatus": "failed",

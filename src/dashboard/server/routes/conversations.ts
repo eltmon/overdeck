@@ -128,7 +128,7 @@ import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
-import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
+import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../../../lib/providers.js';
 import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -355,11 +355,7 @@ export async function resolveAllowedHarness(requested: unknown, model?: string |
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
     requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
-  try {
-    return await resolveHarness({ model, explicit });
-  } catch {
-    return 'claude-code';
-  }
+  return resolveHarness({ model, explicit });
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -3025,7 +3021,7 @@ const postConversationRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create conversation failed:', msg);
-        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
       }
     });
   }),
@@ -4720,7 +4716,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create summary fork failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: error instanceof UnknownModelError ? msg : 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
       }
     });
   }),

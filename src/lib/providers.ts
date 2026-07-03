@@ -13,6 +13,7 @@ import type { ModelId, GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
+import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
 export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral';
 
@@ -252,6 +253,56 @@ export function getBuiltInDefaultHarness(provider: ProviderName | string): Runti
   return 'claude-code';
 }
 
+export class UnknownModelError extends Error {
+  constructor(modelId: string, suggestion?: string) {
+    super(`Unknown model "${modelId}".${suggestion ? ` Did you mean "${suggestion}"?` : ''}`);
+    this.name = 'UnknownModelError';
+  }
+}
+
+function knownModelIds(): string[] {
+  return Array.from(new Set([
+    ...Object.values(PROVIDERS).flatMap((provider) => provider.models.map(String)),
+    ...Object.keys(MODEL_DEPRECATIONS),
+    ...Object.values(MODEL_DEPRECATIONS).map(String),
+  ]));
+}
+
+function editDistance(a: string, b: string): number {
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  const current = new Array<number>(b.length + 1);
+  for (let i = 1; i <= a.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[b.length];
+}
+
+function nearestKnownModelId(modelId: string): string | undefined {
+  const normalizedInput = modelId.toLowerCase();
+  const compactInput = normalizedInput.replace(/[^a-z0-9]/g, '');
+  let best: { model: string; distance: number } | undefined;
+  for (const candidate of knownModelIds()) {
+    const normalizedCandidate = candidate.toLowerCase();
+    const distance = Math.min(
+      editDistance(normalizedInput, normalizedCandidate),
+      editDistance(compactInput, normalizedCandidate.replace(/[^a-z0-9]/g, '')),
+    );
+    if (!best || distance < best.distance) {
+      best = { model: candidate, distance };
+    }
+  }
+  if (!best) return undefined;
+  return best.distance <= Math.max(2, Math.floor(modelId.length / 3)) ? best.model : undefined;
+}
+
 /**
  * Get provider for a given model ID
  */
@@ -324,8 +375,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
     return PROVIDERS.mistral;
   }
 
-  // Default to Anthropic if unknown
-  return PROVIDERS.anthropic;
+  throw new UnknownModelError(String(modelId), nearestKnownModelId(String(modelId)));
 }
 
 /**
