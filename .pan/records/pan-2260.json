@@ -35,7 +35,7 @@
     }
   ],
   "created": "2026-07-03T04:04:30.342Z",
-  "updated": "2026-07-03T04:22:24.332Z",
+  "updated": "2026-07-03T04:30:57.854Z",
   "pipeline": {
     "issueId": "PAN-2260",
     "reviewStatus": "blocked",
@@ -43,7 +43,7 @@
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:22:23.540Z",
+    "updatedAt": "2026-07-03T04:30:57.269Z",
     "reviewNotes": "Squash-merge verification trusts timestamps instead of proving the branch ref matches the merged PR head",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
     "reviewRequestedAt": "2026-07-03T04:20:16.617Z"
@@ -70,7 +70,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:22:24.140Z"
+        "pricingAsOf": "2026-07-03T04:30:57.720Z"
       }
     },
     "merges": [
