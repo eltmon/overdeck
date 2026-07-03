@@ -82,16 +82,16 @@
     "recordedAt": "2026-07-03T23:08:08.540Z"
   },
   "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-03T23:08:18.897Z",
+  "updated": "2026-07-03T23:08:51.232Z",
   "pipeline": {
     "issueId": "PAN-2145",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T23:08:18.828Z",
+    "updatedAt": "2026-07-03T23:08:51.173Z",
     "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2332",
     "reviewRequestedAt": "2026-07-03T23:08:18.717Z",
@@ -170,8 +170,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 24043,
-            "output": 683,
+            "input": 26381,
+            "output": 816,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -193,8 +193,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 24043,
-          "output": 683,
+          "input": 26381,
+          "output": 816,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -207,7 +207,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.38494,
-        "pricingAsOf": "2026-07-03T23:08:18.873Z"
+        "pricingAsOf": "2026-07-03T23:08:51.231Z"
       }
     },
     "merges": [
