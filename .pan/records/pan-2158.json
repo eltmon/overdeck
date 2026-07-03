@@ -26,71 +26,73 @@
       "reason": "feedback",
       "note": "[2026-07-03T15:15Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-07-03T15:15:38.403Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-03T15:15:38Z",
-      "markdownBody": "# Test failure\n\nTypeScript typecheck passed; eslint + custom lints passed. `npm test` failed: root vitest 32 files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests. Targeted PAN-2158-related tests passed (4 files, 107 tests). No browser UAT required. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-2158`."
+      "timestamp": "2026-07-03T15:30:37.774Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T15:30:38.604Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-03T13:58:27.754Z",
-  "updated": "2026-07-03T15:15:38.454Z",
+  "updated": "2026-07-03T15:30:38.604Z",
   "pipeline": {
     "issueId": "PAN-2158",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
-    "verificationStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:15:38.392Z",
+    "updatedAt": "2026-07-03T15:30:38.280Z",
     "reviewNotes": "No blocking findings; focused tests and typecheck passed",
     "testNotes": "TypeScript typecheck passed; eslint + custom lints passed. `npm test` failed: root vitest 32 files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests. Targeted PAN-2158-related tests passed (4 files, 107 tests). No browser UAT required. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2303",
     "reviewedAtCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
     "lastVerifiedCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
-    "reviewRequestedAt": "2026-07-03T14:59:14.663Z"
+    "reviewRequestedAt": "2026-07-03T15:30:37.784Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 10723,
-            "output": 679,
+            "input": 12890,
+            "output": 1089,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 666517,
-            "output": 14823,
-            "cacheRead": 5365504,
+            "input": 668207,
+            "output": 15463,
+            "cacheRead": 5713152,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 10723,
-          "output": 679,
+          "input": 12890,
+          "output": 1089,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 666517,
-          "output": 14823,
-          "cacheRead": 5365504,
+          "input": 668207,
+          "output": 15463,
+          "cacheRead": 5713152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 1.711929,
-        "pricingAsOf": "2026-07-03T15:15:38.453Z"
+        "usd": 1.782147,
+        "pricingAsOf": "2026-07-03T15:30:38.498Z"
       }
     },
     "merges": [
