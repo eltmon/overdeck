@@ -4,17 +4,17 @@
     "created": "2026-07-02T20:35:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2222: Tiered execution v2: vigilant listeners, compaction-point re-tiering, escalation-on-trouble, senior-model inspection (Devin-Fusion-informed, config-tunable)",
-    "updated": "2026-07-02T21:43:58.312Z"
+    "updated": "2026-07-03T03:27:21.485Z"
   },
   "plan": {
     "id": "pan-2222",
     "title": "Tiered execution v2: vigilant listeners, compaction-point re-tiering, escalation-on-trouble, senior-model inspection (Devin-Fusion-informed, config-tunable)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "c3f8a1d2-9b4e-4c7a-8e5f-2d1b6a9c4e73",
     "author": "agent:claude-fable-5",
-    "sequence": 73,
+    "sequence": 74,
     "created": "2026-07-02T20:35:00.000Z",
-    "updated": "2026-07-02T21:43:58.312Z",
+    "updated": "2026-07-03T03:27:21.485Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2222",
@@ -989,5 +989,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
