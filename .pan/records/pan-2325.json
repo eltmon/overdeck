@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-03T21:24:26.452Z",
+  "updated": "2026-07-03T21:35:42.813Z",
   "pipeline": {
     "issueId": "PAN-2325",
     "reviewStatus": "pending",
@@ -64,5 +64,16 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "recovery-and-ignore-guard-test": "completed",
+    "recovery-and-ignore-guard-test.ac1": "completed",
+    "recovery-and-ignore-guard-test.ac2": "completed",
+    "recovery-and-ignore-guard-test.ac3": "completed",
+    "untrack-and-gitignore": "completed",
+    "untrack-and-gitignore.ac1": "completed",
+    "untrack-and-gitignore.ac2": "completed",
+    "untrack-and-gitignore.ac3": "completed",
+    "untrack-and-gitignore.ac4": "completed"
+  }
 }
