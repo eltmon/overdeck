@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import type { AgentState } from '../../agents.js';
 import type { StuckRemediationState } from '../stuck-remediation-state.js';
 
 const mocks = vi.hoisted(() => ({
-  execFile: vi.fn(),
   getAgentRuntimeStateSync: vi.fn(),
   listRunningAgentsSync: vi.fn(),
   markAgentTroubled: vi.fn(),
@@ -26,10 +26,6 @@ const mocks = vi.hoisted(() => ({
   getFlywheelActiveRunId: vi.fn(),
   isFlywheelGloballyPaused: vi.fn(),
   describeAgentDeath: vi.fn(),
-}));
-
-vi.mock('child_process', () => ({
-  execFile: mocks.execFile,
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -99,7 +95,22 @@ vi.mock('../agent-death.js', () => ({
   describeAgentDeath: mocks.describeAgentDeath,
 }));
 
+vi.mock('../../beads-query.js', () => ({
+  resolveBeadsQueryRoot: vi.fn((workspacePath: string) => {
+    const parts = workspacePath.split('/');
+    const workspaceName = parts.at(-1) ?? '';
+    const parent = parts.at(-2) ?? '';
+    return workspaceName.startsWith('feature-') && parent === 'workspaces'
+      ? parts.slice(0, -2).join('/') || '/'
+      : workspacePath;
+  }),
+  queryReadyBeadsByIssueLabels: vi.fn((_workspace: string, issueIds: readonly string[]) => Effect.succeed({
+    byIssue: Object.fromEntries(issueIds.map((issueId) => [issueId.toLowerCase(), []])),
+  })),
+}));
+
 import { checkStuckAgentRemediation } from '../stuck-remediation.js';
+import { queryReadyBeadsByIssueLabels } from '../../beads-query.js';
 
 const NOW = Date.parse('2026-05-23T12:00:00.000Z');
 const DEFAULT_CONFIG = {
@@ -146,10 +157,10 @@ function state(lastStage: StuckRemediationState['lastStage'], idleMinutes: numbe
   };
 }
 
-function mockReadyBeads(stdout = ''): void {
-  mocks.execFile.mockImplementation((_command, _args, _options, callback) => {
-    callback(null, { stdout, stderr: '' });
-  });
+const mockQueryReadyBeadsByIssueLabels = queryReadyBeadsByIssueLabels as any;
+
+function mockReadyBeads(beads: Record<string, unknown[]> = {}): void {
+  mockQueryReadyBeadsByIssueLabels.mockReturnValue(Effect.succeed({ byIssue: beads }));
 }
 
 function expectNoStage(): void {
@@ -321,11 +332,13 @@ describe('checkStuckAgentRemediation', () => {
 
     expect(actions).toEqual([]);
     expectNoStage();
-    expect(mocks.execFile).not.toHaveBeenCalled();
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
   });
 
   it('skips agents with open ready beads', async () => {
-    mockReadyBeads('○ workspace-zkug pan-1415: remaining task\n');
+    mockReadyBeads({
+      'pan-1415': [{ id: 'workspace-zkug', title: 'PAN-1415: remaining task', status: 'open', labels: ['pan-1415'] }],
+    });
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(100));
 
     const actions = await checkStuckAgentRemediation({ now: NOW });
@@ -333,6 +346,7 @@ describe('checkStuckAgentRemediation', () => {
     expect(actions).toEqual([]);
     expectNoStage();
     expect(mocks.readStuckRemediationState).not.toHaveBeenCalled();
+    expect(mocks.resumeAgent).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -347,6 +361,7 @@ describe('checkStuckAgentRemediation', () => {
     expect(actions).toEqual([]);
     expectNoStage();
     expect(mocks.getReviewStatusSync).not.toHaveBeenCalled();
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
   });
 
   it('skips all agents when stuck remediation is disabled', async () => {
@@ -372,8 +387,8 @@ describe('checkStuckAgentRemediation', () => {
 
     expect(actions).toEqual([]);
     expectNoStage();
-    expect(mocks.execFile).not.toHaveBeenCalled();
     expect(mocks.getAgentRuntimeStateSync).not.toHaveBeenCalled();
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
   });
 
   it('continues processing other agents when one agent throws during stage handling', async () => {
@@ -401,6 +416,35 @@ describe('checkStuckAgentRemediation', () => {
       '[deacon] stuck-remediation agent=agent-pan-1415 error=send failed',
     );
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+
+  it('queries ready beads once for work agents across one project fleet', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([
+      agent({
+        id: 'agent-pan-1415',
+        issueId: 'PAN-1415',
+        workspace: '/tmp/project/workspaces/feature-pan-1415',
+      }),
+      agent({
+        id: 'agent-pan-1416',
+        issueId: 'PAN-1416',
+        workspace: '/tmp/project/workspaces/feature-pan-1416',
+      }),
+    ]);
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual([
+      '[deacon] stuck-remediation stage=1 issue=PAN-1415 idleMin=25 action=poked',
+      '[deacon] stuck-remediation stage=1 issue=PAN-1416 idleMin=25 action=poked',
+    ]);
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledTimes(1);
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledWith(
+      '/tmp/project',
+      ['PAN-1415', 'PAN-1416'],
+      { acquisitionTimeoutMs: 500 },
+    );
   });
 });
 
@@ -485,7 +529,7 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
     // bd ready / review-status guards are work-agent-only and must NOT fire
     // for the flywheel (no beads, no issueId).
-    expect(mocks.execFile).not.toHaveBeenCalled();
+    expect(mockQueryReadyBeadsByIssueLabels).not.toHaveBeenCalled();
     expect(mocks.getReviewStatusSync).not.toHaveBeenCalled();
   });
 

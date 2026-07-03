@@ -1,7 +1,5 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { cpus, loadavg } from 'os';
 import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
@@ -42,8 +40,7 @@ import {
   sessionExists,
   sessionExistsSync,
 } from '../tmux.js';
-
-const execAsync = promisify(exec);
+import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type BeadEntry } from '../beads-query.js';
 
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
@@ -397,6 +394,10 @@ function buildStalledResumePrompt(state: AgentState): string | null {
   return buildDefaultResumeContinueMessage(state.issueId);
 }
 
+function readyBeadLine(bead: BeadEntry): string {
+  return `${bead.id} ${bead.title}`.trim();
+}
+
 export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -491,6 +492,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
   const actions: string[] = [];
 
   const states = listAgentStates({ status: 'running', role: 'work' });
+  const eligibleByQueryRoot = new Map<string, AgentState[]>();
 
   for (const state of states) {
     const agentId = state.id;
@@ -516,55 +518,51 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
       } catch { /* fall through and nudge */ }
     }
 
-    // Open beads for THIS issue?
-    const issueLabel = state.issueId.toLowerCase();
-    let openBeads: string[] = [];
-    try {
-      const { stdout } = await execAsync(`bd ready -l ${issueLabel}`, {
-        cwd: state.workspace,
-        encoding: 'utf-8',
-        timeout: 10_000,
-      });
-      // bd ready output: lines starting with "○ workspace-XXXX ● ... pan-NNN: title"
-      openBeads = stdout
-        .split('\n')
-        .filter(l => /^[○◐]\s+workspace-/i.test(l.trim()))
-        .map(l => l.trim());
-    } catch (err: unknown) {
-      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} bd ready failed: ${err instanceof Error ? err.message : String(err)}`);
-      continue;
-    }
-    if (openBeads.length === 0) continue;
+    const queryRoot = resolveBeadsQueryRoot(state.workspace);
+    const workspaceStates = eligibleByQueryRoot.get(queryRoot) ?? [];
+    workspaceStates.push(state);
+    eligibleByQueryRoot.set(queryRoot, workspaceStates);
+  }
 
-    // Build the nudge: tell the agent what's next, do not just ping.
-    const firstBead = openBeads[0]?.replace(/^[○◐]\s+/, '').slice(0, 200) ?? '';
-    // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
-    // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
-    // agent running with NO original context — only this nudge. Point it at the
-    // brief on disk so it can self-recover the full plan/role/decisions/hazards
-    // instead of guessing from the bead title alone.
-    const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
-    const message = [
-      `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
-      ``,
-      `Next ready bead: ${firstBead}`,
-      ``,
-      `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
-      ``,
-      `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
-      `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
-      `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
-    ].join('\n');
+  for (const [queryRoot, workspaceStates] of eligibleByQueryRoot) {
+    const issues = workspaceStates.map((state) => state.issueId);
+    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(queryRoot, issues, { acquisitionTimeoutMs: 500 }));
 
-    try {
-      const { messageAgent } = await import('../agents.js');
-      await messageAgent(agentId, message);
-      writeFileSync(cooldownFile, String(Date.now()), 'utf-8');
-      const action = `Nudged idle ${agentId} (${state.issueId}) — ${openBeads.length} open bead(s)`;
-      actions.push(action);
-      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
-    } catch (err: unknown) {
-      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} messageAgent failed: ${err instanceof Error ? err.message : String(err)}`);
+    for (const state of workspaceStates) {
+      const agentId = state.id;
+      const openBeads = ready.byIssue[state.issueId.toLowerCase()] ?? [];
+      if (openBeads.length === 0) continue;
+
+      // Build the nudge: tell the agent what's next, do not just ping.
+      const firstBead = readyBeadLine(openBeads[0]!).slice(0, 200);
+      // PAN-2102: startup kickoff delivery can silently fail on large briefs (the
+      // ~50KB initial prompt trips the PTY supervisor's echo-confirm), leaving the
+      // agent running with NO original context — only this nudge. Point it at the
+      // brief on disk so it can self-recover the full plan/role/decisions/hazards
+      // instead of guessing from the bead title alone.
+      const briefPath = join(getAgentDir(agentId), 'initial-prompt.md');
+      const message = [
+        `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
+        ``,
+        `Next ready bead: ${firstBead}`,
+        ``,
+        `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
+        ``,
+        `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
+        `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
+        `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
+      ].join('\n');
+
+      try {
+        const { messageAgent } = await import('../agents.js');
+        await messageAgent(agentId, message);
+        writeFileSync(join(getAgentDir(agentId), '.last-bead-nudge'), String(Date.now()), 'utf-8');
+        const action = `Nudged idle ${agentId} (${state.issueId}) — ${openBeads.length} open bead(s)`;
+        actions.push(action);
+        logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
+      } catch (err: unknown) {
+        logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} messageAgent failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 
