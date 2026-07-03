@@ -17,7 +17,7 @@ read_version() {
 }
 
 while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
-  case "$local_ref" in
+  case "$remote_ref" in
     refs/heads/*)
       # PAN-2227: audited ratchet bumps — every pushed commit that raises a
       # baseline entry or adds an eslint-any-allowlist entry must reference
@@ -32,21 +32,21 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
         base="$remote_sha"
       fi
       if [ -n "$base" ]; then
-        if [ "$local_ref" = "refs/heads/main" ]; then
+        if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "$base..$local_sha" </dev/null
         fi
         bash scripts/lint-ratchet-audit.sh --range "$base..$local_sha" </dev/null
       else
-        if [ "$local_ref" = "refs/heads/main" ]; then
+        if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "" </dev/null
-          echo "⚠ ratchet audit: no base for $local_ref — skipping" >&2
+          echo "⚠ ratchet audit: no base for $remote_ref — skipping" >&2
         else
-          echo "⚠ ratchet audit: no base for $local_ref — skipping" >&2
+          echo "⚠ ratchet audit: no base for $remote_ref — skipping" >&2
         fi
       fi
       ;;
     refs/tags/v*)
-      tag="${local_ref#refs/tags/}"
+      tag="${remote_ref#refs/tags/}"
       expected="${tag#v}"
 
       # Skip non-release tags (e.g. v1-archive). Only enforce on semver-shaped tags.
