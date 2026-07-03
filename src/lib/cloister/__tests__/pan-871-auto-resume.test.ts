@@ -801,6 +801,43 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     );
   });
 
+  it('re-delivers an undelivered kickoff for an old live flywheel orchestrator', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T00:05:00.000Z'));
+    const state = {
+      id: 'flywheel-orchestrator',
+      issueId: 'RUN-55',
+      workspace: '/home/eltmon/Projects/overdeck',
+      harness: 'claude-code',
+      role: 'flywheel',
+      model: 'claude-opus-4-7',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      kickoffDelivered: false,
+    };
+    mockListAgentStates
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([state]);
+    mockSessionExists.mockResolvedValue(true);
+    mockReadFileSync.mockReturnValue('flywheel kickoff prompt');
+
+    const actions = await redeliverUndeliveredKickoffs();
+
+    expect(actions).toEqual(['Re-delivered undelivered kickoff to flywheel-orchestrator (RUN-55)']);
+    expect(mockListAgentStates).toHaveBeenCalledWith({ status: 'running', role: 'work' });
+    expect(mockListAgentStates).toHaveBeenCalledWith({ status: 'running', role: 'flywheel' });
+    expect(mockDeliverInitialPromptWithRetry).toHaveBeenCalledWith(
+      'flywheel-orchestrator',
+      'flywheel kickoff prompt',
+      'deacon:redeliver-undelivered-kickoff',
+      undefined,
+    );
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'flywheel-orchestrator',
+      kickoffDelivered: true,
+    }));
+  });
+
   it('skips young, paused, closed, orphaned, already-delivered, and cooldown-gated kickoff candidates', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-10T00:05:00.000Z'));
