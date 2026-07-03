@@ -30633,6 +30633,7 @@ function ensureOverdeckTmuxServerSync(cleanEnv) {
 				MANAGED_TMUX_SERVER_UNIT,
 				"--collect",
 				"--quiet",
+				"--service-type=forking",
 				"tmux",
 				...args
 			], {
