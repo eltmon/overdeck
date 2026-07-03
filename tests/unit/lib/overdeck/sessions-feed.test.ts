@@ -81,6 +81,34 @@ describe('sessions feed', () => {
     expect(page.nextCursor).toBeNull();
   });
 
+  it('carries conversation refs on discovered rows', async () => {
+    const { createConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
+    const { listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');
+    const base = Date.now();
+
+    createConversation({
+      name: 'managed-discovered-ref',
+      tmuxSession: 'conv-managed-discovered-ref',
+      cwd: '/managed',
+      claudeSessionId: 'sess-managed-discovered-ref',
+      title: 'Managed Discovered Ref',
+      harness: 'claude-code',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/tmp/managed-discovered-ref.jsonl',
+      sessionId: 'sess-managed-discovered-ref',
+      lastTs: iso(base - 1_000),
+      firstTs: iso(base - 2_000),
+    });
+
+    expect(listSessionsFeed({ limit: 10 }).rows[0]).toMatchObject({
+      source: 'discovered',
+      conversationName: 'managed-discovered-ref',
+      conversationTitle: 'Managed Discovered Ref',
+    });
+  });
+
   it('walks a keyset cursor exactly once even when newer rows arrive', async () => {
     const { upsertDiscoveredSession } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
     const { listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');
@@ -143,6 +171,29 @@ describe('sessions feed', () => {
     expect(first.rows).toHaveLength(1);
     expect(second.rows).toHaveLength(1);
     expect(new Set([first.rows[0].source, second.rows[0].source])).toEqual(new Set(['discovered', 'managed-archived']));
+  });
+
+  it('continues from non-null cursors into null last_ts rows', async () => {
+    const { upsertDiscoveredSession } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
+    const { listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');
+    const base = Date.now();
+
+    upsertDiscoveredSession({
+      jsonlPath: '/tmp/non-null-last-ts.jsonl',
+      sessionId: 'non-null-last-ts',
+      lastTs: iso(base - 1_000),
+      firstTs: iso(base - 2_000),
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/tmp/null-last-ts.jsonl',
+      sessionId: 'null-last-ts',
+    });
+
+    const first = listSessionsFeed({ limit: 1 });
+    const second = listSessionsFeed({ limit: 1, cursor: first.nextCursor! });
+
+    expect(first.rows[0].sessionId).toBe('non-null-last-ts');
+    expect(second.rows[0].sessionId).toBe('null-last-ts');
   });
 
   it('deduplicates archived conversations over their discovered row and carries discoveredId', async () => {
