@@ -160,95 +160,26 @@
     "recordedAt": "2026-07-03T14:14:06.848Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T15:28:22.590Z",
+  "updated": "2026-07-03T15:43:27.172Z",
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:28:22.498Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed test",
-    "verificationNotes": "Verification FAILED at test (96543ms):\n\nhook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts:23:1\n     21| }));\n     22|\n     23| beforeEach(() => {\n       | ^\n     24|   odb = setupOverdeckTestDb();\n     25| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/28]⎯\n\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract > 400: returns httpStatus=400 even when a non-stuck status row exists\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > returns no advice when project main matches origin/main and is clean\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > tells operators to commit or explicitly discard dirty project repo changes\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > tells operators to push local-only main commits when main is ahead\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/dashboard/server/routes/unstick-route.test.ts:30:1\n     28| let odb: OverdeckTestDb;\n     29|\n     30| beforeEach(() => {\n       | ^\n     31|   odb = setupOverdeckTestDb();\n     32| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/28]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/agent-projection.test.ts > saveAgentStateAndEmitEventWithDeps > persists the full current state even when the event payload is partial\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/dashboard/server/services/agent-projection.test.ts:38:1\n     36| let odb: OverdeckTestDb;\n     37|\n     38| beforeEach(() => {\n       | ^\n     39|   odb = setupOverdeckTestDb();\n     40| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/28]⎯\n\n",
-    "inspectNotes": "workspace-06h3z passed. The diff implements the requested App REST Promise and Effect helpers in src/lib/github-app.ts, with tests covering owner-qualified PR head lookup, issue state lookup, paginated issue-label listing, PR filtering, and wrapper exports. No constraint violations found in the changed files.",
+    "updatedAt": "2026-07-03T15:43:27.051Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-03T15:43:27.043Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "lastVerifiedCommit": "b3425106c96f542c8c8b2186545356de47c008f7",
-    "reviewRequestedAt": "2026-07-03T14:14:16.629Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".beads/issues.jsonl",
-        ".pan/drafts/PAN-2265.md",
-        ".pan/records/pan-2265.json",
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/server/routes/webhooks.ts",
-        "src/lib/cloister/__tests__/issue-closed.test.ts",
-        "src/lib/cloister/merged-pr-verification.ts",
-        "src/lib/github-pr-lookup.ts",
-        "src/lib/overdeck/discussions.ts",
-        "src/lib/overdeck/pull-requests.ts",
-        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
-        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
-        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/server/routes/issues.ts",
-        "src/lib/cloister/__tests__/merge-agent.test.ts",
-        "tests/unit/lib/cloister/issue-closed.test.ts"
-      ],
-      "declaredScope": [
-        "src/cli/commands/flywheel-surfaces.ts",
-        "src/dashboard/server/routes/issues.ts",
-        "src/dashboard/server/services/pr-tab-cache.ts",
-        "src/lib/cloister/__tests__/merge-agent.test.ts",
-        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
-        "src/lib/cloister/issue-closed.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/orphan-proposed-reconciler.ts",
-        "src/lib/forge.ts",
-        "src/lib/github-app.ts",
-        "src/lib/github-graphql-cooldown.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
-        "tests/unit/lib/cloister/issue-closed.test.ts",
-        "tests/unit/lib/forge.test.ts",
-        "tests/unit/lib/github-app.test.ts",
-        "tests/unit/lib/github-graphql-cooldown.test.ts"
-      ],
-      "actualChangedFiles": [
-        ".beads/issues.jsonl",
-        ".pan/drafts/PAN-2265.md",
-        ".pan/records/pan-2265.json",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/flywheel-surfaces.ts",
-        "src/dashboard/server/routes/webhooks.ts",
-        "src/dashboard/server/services/pr-tab-cache.ts",
-        "src/lib/cloister/__tests__/issue-closed.test.ts",
-        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
-        "src/lib/cloister/issue-closed.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/merged-pr-verification.ts",
-        "src/lib/cloister/orphan-proposed-reconciler.ts",
-        "src/lib/forge.ts",
-        "src/lib/github-app.ts",
-        "src/lib/github-graphql-cooldown.ts",
-        "src/lib/github-pr-lookup.ts",
-        "src/lib/overdeck/discussions.ts",
-        "src/lib/overdeck/pull-requests.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
-        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
-        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
-        "tests/unit/lib/forge.test.ts",
-        "tests/unit/lib/github-app.test.ts",
-        "tests/unit/lib/github-graphql-cooldown.test.ts",
-        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "recordedAt": "2026-07-03T14:14:06.848Z"
-    }
+    "reviewedAtCommit": "f7d56be6e15ce7669479f97a3ab2d4a9e86035ef",
+    "lastVerifiedCommit": "b3425106c96f542c8c8b2186545356de47c008f7"
   },
   "closeOut": {
     "usage": {
@@ -300,7 +231,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.974399,
-        "pricingAsOf": "2026-07-03T15:28:22.588Z"
+        "pricingAsOf": "2026-07-03T15:43:27.129Z"
       }
     },
     "merges": [
