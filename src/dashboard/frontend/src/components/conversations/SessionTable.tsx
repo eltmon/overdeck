@@ -47,7 +47,7 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
         </thead>
         <tbody>
           {sessions.map((session) => {
-            const key = `${session.source}-${session.id}`;
+            const key = `${session.source}:${session.id}`;
             const isSelected = key === selectedId;
             const workspace = session.workspacePath ?? session.jsonlPath ?? 'Unknown session path';
             const shortWorkspace = workspace.split('/').slice(-2).join('/');

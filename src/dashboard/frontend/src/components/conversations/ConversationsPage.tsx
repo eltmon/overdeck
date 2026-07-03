@@ -93,6 +93,10 @@ interface SearchResponse {
   error?: string;
 }
 
+interface ConversationsPageProps {
+  initialSessionKey?: string | null;
+}
+
 interface ArchivedConversationResponse extends Omit<DiscoveredSession, 'source' | 'harness'> {
   source: 'managed-archived';
   harness?: string;
@@ -163,7 +167,7 @@ function countTimeFacets(sessions: DiscoveredSession[]): FacetValue[] {
 }
 
 function sessionKey(session: DiscoveredSession): string {
-  return `${session.source}-${session.id}`;
+  return `${session.source}:${session.id}`;
 }
 
 function compareSessionsByLastTs(a: DiscoveredSession, b: DiscoveredSession): number {
@@ -353,11 +357,11 @@ async function triggerScan(): Promise<ScanResult> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationsPage() {
+export function ConversationsPage({ initialSessionKey = null }: ConversationsPageProps) {
   const queryClient = useQueryClient();
   const scanProgress = useDashboardStore(selectScanProgress);
   const [query, setQuery] = useState('');
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(initialSessionKey);
   const [showFacets, setShowFacets] = useState(false);
   const [searchOffset, setSearchOffset] = useState(0);
   const [semanticSearch, setSemanticSearch] = useState(false);
@@ -392,6 +396,10 @@ export function ConversationsPage() {
     const timer = window.setTimeout(() => setDebouncedSemanticQuery(trimmedQuery), 350);
     return () => window.clearTimeout(timer);
   }, [semanticSearch, trimmedQuery]);
+
+  useEffect(() => {
+    setSelectedKey(initialSessionKey);
+  }, [initialSessionKey]);
 
   const listParams = new URLSearchParams({ limit: '50' });
   const archivedParams = new URLSearchParams({ limit: '50' });
@@ -497,6 +505,18 @@ export function ConversationsPage() {
   const handleFilterChange = useCallback((key: string, value: string | boolean | undefined) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setSearchOffset(0);
+  }, []);
+
+  const handleSelectSession = useCallback((key: string | null) => {
+    setSelectedKey(key);
+    const params = new URLSearchParams(window.location.search);
+    if (key) {
+      params.set('session', key);
+    } else {
+      params.delete('session');
+    }
+    const queryString = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${queryString ? `?${queryString}` : ''}`);
   }, []);
 
   return (
@@ -635,7 +655,7 @@ export function ConversationsPage() {
               <SessionTable
                 sessions={sessions}
                 selectedId={selectedKey}
-                onSelect={setSelectedKey}
+                onSelect={handleSelectSession}
               />
               {effectiveQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
                 <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 shrink-0 text-xs text-gray-400">
@@ -669,7 +689,7 @@ export function ConversationsPage() {
           <div className="min-w-[28rem] flex-[1.15] overflow-hidden">
             <SessionDetail
               session={selected}
-              onClose={() => setSelectedKey(null)}
+              onClose={() => handleSelectSession(null)}
             />
           </div>
         )}
