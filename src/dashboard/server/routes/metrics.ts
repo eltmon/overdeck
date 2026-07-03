@@ -20,6 +20,7 @@ import { listRunningAgents } from '../../../lib/agents.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { getTodayCostSync } from '../../../lib/overdeck/cost-sync.js';
 import { getEventLoopDelaySample } from '../services/event-loop-monitor.js';
+import { readDurableCloisterStatus } from '../services/cloister-control-surface.js';
 
 // ─── Cached review statuses ───────────────────────────────────────────────────
 // loadReviewStatuses() hits SQLite with SELECT * FROM review_status on every
@@ -131,7 +132,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
   '/api/metrics/summary',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = service.getStatus();
+    const status = readDurableCloisterStatus();
 
     const costSummary = service.getCostSummary();
     const todayCost = getTodayCostSync();
@@ -174,7 +175,7 @@ const getMetricsStuckRoute = HttpRouter.add(
   '/api/metrics/stuck',
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
-    const status = service.getStatus();
+    const status = readDurableCloisterStatus();
     const runningAgents = yield* listRunningAgents();
     const current = computeStuckCount(
       status.agentsNeedingAttention,

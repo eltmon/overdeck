@@ -23,6 +23,13 @@ import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
 import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { getAgentState } from '../../../lib/agents.js';
 import { httpHandler } from './http-handler.js';
+import {
+  areDurableSpawnsPaused,
+  readDurableCloisterStatus,
+  resumeDurableSpawns,
+  startDurableCloister,
+  stopDurableCloister,
+} from '../services/cloister-control-surface.js';
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
@@ -42,8 +49,7 @@ const getCloisterStatusRoute = HttpRouter.add(
   '/api/cloister/status',
   httpHandler(Effect.try({
     try: () => {
-      const service = getCloisterService();
-      return jsonResponse(service.getStatus());
+      return jsonResponse(readDurableCloisterStatus());
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
@@ -56,7 +62,7 @@ const postCloisterStartRoute = HttpRouter.add(
   '/api/cloister/start',
   httpHandler(Effect.gen(function* () {
     yield* Effect.tryPromise({
-      try: () => getCloisterService().start(),
+      try: () => startDurableCloister(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse({ success: true, message: 'Cloister started' });
@@ -68,12 +74,14 @@ const postCloisterStartRoute = HttpRouter.add(
 const postCloisterStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/stop',
-  httpHandler(Effect.try({
-    try: () => {
-      getCloisterService().stop();
-      return jsonResponse({ success: true, message: 'Cloister stopped' });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  httpHandler(Effect.gen(function* () {
+    yield* Effect.tryPromise({
+      try: async () => {
+        await stopDurableCloister();
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse({ success: true, message: 'Cloister stopped' });
   })),
 );
 
@@ -143,7 +151,7 @@ const postCloisterResumeSpawnsRoute = HttpRouter.add(
   '/api/cloister/resume-spawns',
   httpHandler(Effect.try({
     try: () => {
-      getCloisterService().resumeSpawns();
+      resumeDurableSpawns();
       return jsonResponse({ success: true, message: 'Agent spawns resumed' });
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
@@ -157,8 +165,7 @@ const getCloisterSpawnStatusRoute = HttpRouter.add(
   '/api/cloister/spawn-status',
   httpHandler(Effect.try({
     try: () => {
-      const isPaused = getCloisterService().isSpawnPaused();
-      return jsonResponse({ spawnsPaused: isPaused });
+      return jsonResponse({ spawnsPaused: areDurableSpawnsPaused() });
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
@@ -185,7 +192,6 @@ const putCloisterConfigRoute = HttpRouter.add(
     yield* Effect.try({
       try: () => {
         saveCloisterConfigSync(updates);
-        getCloisterService().reloadConfig();
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });

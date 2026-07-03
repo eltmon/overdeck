@@ -19,7 +19,12 @@ import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { setDeaconGloballyPaused, setFlywheelGloballyPaused } from '../overdeck/control-settings.js';
+import {
+  isCloisterSpawnsPausedSync,
+  setCloisterSpawnsPausedSync,
+  setDeaconGloballyPaused,
+  setFlywheelGloballyPaused,
+} from '../overdeck/control-settings.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEventSync, createHandoffEvent } from './handoff-logger.js';
@@ -1543,6 +1548,7 @@ export class CloisterService {
    */
   private pauseSpawns(reason: string): void {
     this.spawnsPaused = true;
+    setCloisterSpawnsPausedSync(true);
     this.emit({ type: 'spawn_paused', reason });
     console.log(`🔔 Agent spawns paused: ${reason}`);
   }
@@ -1554,6 +1560,7 @@ export class CloisterService {
    */
   resumeSpawns(): void {
     this.spawnsPaused = false;
+    setCloisterSpawnsPausedSync(false);
     this.deathTimestamps = []; // Clear death window
     this.emit({ type: 'spawn_resumed' });
     console.log(`🔔 Agent spawns resumed`);
@@ -1563,7 +1570,7 @@ export class CloisterService {
    * Check if spawns are currently paused
    */
   isSpawnPaused(): boolean {
-    return this.spawnsPaused;
+    return this.spawnsPaused || isCloisterSpawnsPausedSync();
   }
 
   /**
