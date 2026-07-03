@@ -103,6 +103,7 @@ interface ConversationRpcFilter {
   tools?: string[];
   files?: string[];
   enrichmentLevel?: number;
+  query?: string;
   source?: SessionSource;
 }
 
@@ -200,6 +201,7 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   const maxCost = params.get('maxCost');
   const enrichmentLevel = params.get('enrichmentLevel');
   const source = params.get('source');
+  const query = params.get('query');
   if (harness) payload.harness = harness;
   if (workspacePath) payload.workspacePath = workspacePath;
   if (primaryModel) payload.primaryModel = primaryModel;
@@ -213,6 +215,7 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   if (maxCost && Number.isFinite(Number(maxCost))) payload.maxCost = Number(maxCost);
   if (enrichmentLevel && Number.isFinite(Number(enrichmentLevel))) payload.enrichmentLevel = Number(enrichmentLevel);
   if (source === 'discovered' || source === 'managed-archived') payload.source = source;
+  if (query) payload.query = query;
   return payload;
 }
 
@@ -365,8 +368,8 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
   const sourceFilter = filters.source ?? 'all';
   const trimmedQuery = query.trim();
   const [debouncedSemanticQuery, setDebouncedSemanticQuery] = useState(trimmedQuery);
-  const searchVisible = sourceFilter !== 'managed-archived';
-  const effectiveQuery = searchVisible ? (semanticSearch ? debouncedSemanticQuery : trimmedQuery) : '';
+  const semanticQuery = semanticSearch ? debouncedSemanticQuery : '';
+  const feedQueryText = semanticSearch ? '' : trimmedQuery;
   const filterParams = buildFilterParams(filters);
 
   useEffect(() => {
@@ -386,28 +389,29 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
   for (const [key, value] of filterParams) {
     feedParams.set(key, value);
   }
+  if (feedQueryText) feedParams.set('query', feedQueryText);
 
   const feedQuery = useInfiniteQuery({
     queryKey: ['sessions-feed', feedParams.toString()],
     queryFn: ({ pageParam }) => fetchFeed(feedParams, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !effectiveQuery,
+    enabled: !semanticQuery,
   });
 
   const { data: feedFacets } = useQuery({
     queryKey: ['sessions-feed-facets', feedParams.toString()],
     queryFn: () => fetchFeedFacets(feedParams),
-    enabled: !effectiveQuery,
+    enabled: !semanticQuery,
     staleTime: 30_000,
   });
 
   const SEARCH_PAGE_SIZE = 50;
 
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    queryKey: ['discovered-sessions-search', effectiveQuery, filterParams.toString(), searchOffset, semanticSearch],
-    queryFn: () => fetchSearch(effectiveQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset, semanticSearch),
-    enabled: !!effectiveQuery,
+    queryKey: ['discovered-sessions-search', semanticQuery, filterParams.toString(), searchOffset, semanticSearch],
+    queryFn: () => fetchSearch(semanticQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset, semanticSearch),
+    enabled: !!semanticQuery,
   });
 
   const { data: stats } = useQuery({
@@ -431,11 +435,11 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
     },
   });
 
-  const isLoading = effectiveQuery
+  const isLoading = semanticQuery
     ? isSearchLoading
     : feedQuery.isLoading;
   const feedSessions = accumulateFeedPages(feedQuery.data?.pages);
-  const sessions = effectiveQuery
+  const sessions = semanticQuery
     ? (searchData?.sessions ?? [])
     : feedSessions;
 
@@ -459,7 +463,7 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
 
   useEffect(() => {
     if (
-      effectiveQuery
+      semanticQuery
       || selectedKey == null
       || selected != null
       || !feedQuery.hasNextPage
@@ -468,7 +472,7 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
       return;
     }
     void feedQuery.fetchNextPage();
-  }, [effectiveQuery, feedQuery, selected, selectedKey]);
+  }, [semanticQuery, feedQuery, selected, selectedKey]);
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
@@ -510,35 +514,31 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
 
         <div className="flex-1" />
 
-        {searchVisible && (
-          <>
-            {/* Search bar */}
-            <div className="relative w-72">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search sessions…"
-                value={query}
-                onChange={(e) => handleQueryChange(e.target.value)}
-                className="w-full bg-card border border-border rounded pl-8 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
-              />
-            </div>
+        {/* Search bar */}
+        <div className="relative w-72">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search sessions…"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            className="w-full bg-card border border-border rounded pl-8 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
+          />
+        </div>
 
-            <button
-              onClick={() => {
-                setSemanticSearch((v) => !v);
-                setSearchOffset(0);
-              }}
-              className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-                semanticSearch
-                  ? 'bg-signal-review/8 border-signal-review/32 text-signal-review-foreground'
-                  : 'bg-card border-border text-muted-foreground hover:border-border'
-              }`}
-            >
-              {semanticSearch ? 'Semantic' : 'Keyword'}
-            </button>
-          </>
-        )}
+        <button
+          onClick={() => {
+            setSemanticSearch((v) => !v);
+            setSearchOffset(0);
+          }}
+          className={`px-3 py-1.5 rounded text-xs border transition-colors ${
+            semanticSearch
+              ? 'bg-signal-review/8 border-signal-review/32 text-signal-review-foreground'
+              : 'bg-card border-border text-muted-foreground hover:border-border'
+          }`}
+        >
+          {semanticSearch ? 'Semantic' : 'Keyword'}
+        </button>
 
         {/* Filter toggle */}
         <button
@@ -596,7 +596,7 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
 
         {/* Session list */}
         <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${selected ? 'border-r border-border' : ''}`}>
-          {searchVisible && searchData?.error && (
+          {semanticQuery && searchData?.error && (
             <div className="px-4 py-2 border-b border-warning/32 bg-warning/8 text-warning-foreground text-xs">
               Semantic search unavailable: {searchData.error}
             </div>
@@ -618,13 +618,13 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
                 sessions={sessions}
                 selectedId={selectedKey}
                 onSelect={handleSelectSession}
-                hasMore={!effectiveQuery && feedQuery.hasNextPage}
+                hasMore={!semanticQuery && feedQuery.hasNextPage}
                 isLoadingMore={feedQuery.isFetchingNextPage}
                 onLoadMore={() => {
                   void feedQuery.fetchNextPage();
                 }}
               />
-              {effectiveQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
+              {semanticQuery && searchData && searchData.total > SEARCH_PAGE_SIZE && (
                 <div className="flex items-center justify-between px-4 py-2 border-t border-border shrink-0 text-xs text-muted-foreground">
                   <span>
                     {searchOffset + 1}–{searchOffset + sessions.length} of {searchData.total} results

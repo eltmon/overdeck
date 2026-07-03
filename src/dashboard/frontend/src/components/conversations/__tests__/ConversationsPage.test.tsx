@@ -248,23 +248,25 @@ describe('ConversationsPage endpoint selection', () => {
     expect(screen.getByText('feat: 2')).toBeInTheDocument();
   });
 
-  it('calls the search RPC when query is typed', async () => {
+  it('calls the sessions feed RPC with a query when keyword search is typed', async () => {
     renderPage(makeClient());
 
     const input = screen.getByPlaceholderText('Search sessions…');
     fireEvent.change(input, { target: { value: 'auth bug' } });
 
-    await waitFor(() => expect(rpcMocks.search).toHaveBeenCalled());
-
-    expect(rpcMocks.search).toHaveBeenLastCalledWith({
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({
       query: 'auth bug',
-      semantic: false,
-      limit: 50,
-      offset: 0,
+      limit: 100,
+    }));
+
+    expect(rpcMocks.feedFacets).toHaveBeenLastCalledWith({
+      query: 'auth bug',
+      limit: 100,
     });
+    expect(rpcMocks.search).not.toHaveBeenCalled();
   });
 
-  it('search RPC includes active facet filters', async () => {
+  it('keyword feed search includes active facet filters', async () => {
     renderPage(makeClient());
 
     const filterBtn = screen.getByText('Filters');
@@ -278,14 +280,12 @@ describe('ConversationsPage endpoint selection', () => {
     const input = screen.getByPlaceholderText('Search sessions…');
     fireEvent.change(input, { target: { value: 'memory leak' } });
 
-    await waitFor(() => expect(rpcMocks.search).toHaveBeenCalled());
-    expect(rpcMocks.search).toHaveBeenLastCalledWith({
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({
       workspacePath: '/home/user/Projects/alpha',
       query: 'memory leak',
-      semantic: false,
-      limit: 50,
-      offset: 0,
-    });
+      limit: 100,
+    }));
+    expect(rpcMocks.search).not.toHaveBeenCalled();
   });
 
   it('list RPC includes active facet filters', async () => {
@@ -345,7 +345,7 @@ describe('ConversationsPage endpoint selection', () => {
     });
   });
 
-  it('wires tag, tool, and file filters into search RPC payloads', async () => {
+  it('wires tag, tool, and file filters into keyword feed search payloads', async () => {
     renderPage(makeClient());
 
     const filterBtn = screen.getByText('Filters');
@@ -361,16 +361,14 @@ describe('ConversationsPage endpoint selection', () => {
     const input = screen.getByPlaceholderText('Search sessions…');
     fireEvent.change(input, { target: { value: 'auth' } });
 
-    await waitFor(() => expect(rpcMocks.search).toHaveBeenCalled());
-    expect(rpcMocks.search).toHaveBeenLastCalledWith({
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({
       tags: ['feat'],
       tools: ['Read'],
       files: ['src/auth.ts'],
       query: 'auth',
-      semantic: false,
-      limit: 50,
-      offset: 0,
-    });
+      limit: 100,
+    }));
+    expect(rpcMocks.search).not.toHaveBeenCalled();
   });
 
   it('defaults to all sources and renders feed rows in backend order', async () => {
@@ -384,7 +382,7 @@ describe('ConversationsPage endpoint selection', () => {
     expect(sessionRows()[1]).toHaveTextContent('Fixed the auth bug');
   });
 
-  it('requests managed-archived feed rows and hides search controls when that source is selected', async () => {
+  it('requests managed-archived feed rows and keeps keyword search available when that source is selected', async () => {
     renderPage(makeClient());
 
     fireEvent.click(screen.getByText('Filters'));
@@ -393,7 +391,15 @@ describe('ConversationsPage endpoint selection', () => {
     await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({ source: 'managed-archived', limit: 100 }));
 
     expect(rpcMocks.feedFacets).toHaveBeenLastCalledWith({ source: 'managed-archived', limit: 100 });
-    expect(screen.queryByPlaceholderText('Search sessions…')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search sessions…')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'archive needle' } });
+
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({
+      source: 'managed-archived',
+      query: 'archive needle',
+      limit: 100,
+    }));
   });
 
   it('requests discovered feed rows when the discovered source is selected', async () => {

@@ -232,6 +232,40 @@ describe('sessions feed', () => {
     });
   });
 
+  it('keyword-searches managed archived rows as part of the unified feed', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../src/lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
+    const { listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');
+    const base = Date.now();
+
+    createConversation({
+      name: 'archived-keyword-target',
+      tmuxSession: 'conv-archived-keyword-target',
+      cwd: '/archived',
+      claudeSessionId: 'sess-archived-keyword-target',
+      title: 'Needle Managed Archive',
+      harness: 'claude-code',
+    });
+    archiveConversation('archived-keyword-target');
+    await setConversationTimes('archived-keyword-target', base - 2_000, base - 1_000);
+    upsertDiscoveredSession({
+      jsonlPath: '/tmp/non-matching-discovered.jsonl',
+      sessionId: 'non-matching-discovered',
+      summary: 'ordinary discovered summary',
+      lastTs: iso(base - 500),
+      firstTs: iso(base - 1_000),
+    });
+
+    const rows = listSessionsFeed({ query: 'needle', limit: 10 }).rows;
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      source: 'managed-archived',
+      conversationName: 'archived-keyword-target',
+      conversationTitle: 'Needle Managed Archive',
+    });
+  });
+
   it('computes facets over the full filtered corpus independently from page size', async () => {
     const { upsertDiscoveredSession } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
     const { getSessionsFeedFacets, listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');

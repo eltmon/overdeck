@@ -217,8 +217,12 @@ describe('sessions page no-loss audit', () => {
     expect(rpcMocks.get).toHaveBeenCalledWith({ id: ARCHIVED_ROW.discoveredId });
 
     fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'target' } });
-    expect(await screen.findByRole('button', { name: 'Prev' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({
+      primaryModel: 'claude-sonnet-4-6',
+      query: 'target',
+      limit: 100,
+    }));
+    expect(rpcMocks.search).not.toHaveBeenCalled();
   });
 
   it('keeps the sessions surface on theme tokens instead of the retired gray/pill classes', () => {

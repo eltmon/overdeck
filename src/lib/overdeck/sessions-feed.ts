@@ -5,6 +5,7 @@ export type SessionsFeedSource = 'discovered' | 'managed-archived';
 
 export interface SessionsFeedFilter extends ConversationFilter {
   cursor?: string;
+  query?: string;
   source?: SessionsFeedSource;
 }
 
@@ -65,7 +66,7 @@ interface CursorPayload {
 interface FeedSql {
   cte: string;
   params: unknown[];
-  cursorWhere: string;
+  where: string;
 }
 
 interface BranchSql {
@@ -162,8 +163,17 @@ function decodeCursor(cursor: string | undefined): CursorPayload | null {
 }
 
 function stripPaging(filter: SessionsFeedFilter): ConversationFilter {
-  const { cursor: _cursor, source: _source, limit: _limit, offset: _offset, ...rest } = filter;
+  const { cursor: _cursor, query: _query, source: _source, limit: _limit, offset: _offset, ...rest } = filter;
   return rest;
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function normalizedQuery(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? `%${escapeLike(trimmed.toLowerCase())}%` : null;
 }
 
 function branchSql(source: SessionsFeedSource, filter: ConversationFilter): BranchSql | null {
@@ -195,7 +205,18 @@ function branchSql(source: SessionsFeedSource, filter: ConversationFilter): Bran
           dc.id AS conversation_id,
           dc.name AS conversation_name,
           dc.title AS conversation_title,
-          df.harness
+          df.harness,
+          COALESCE(df.summary, '') || ' ' ||
+            COALESCE(df.summary_detailed, '') || ' ' ||
+            COALESCE(df.tags, '') || ' ' ||
+            COALESCE(df.files_touched, '') || ' ' ||
+            COALESCE(df.jsonl_path, '') || ' ' ||
+            COALESCE(df.workspace_path, '') || ' ' ||
+            COALESCE(df.primary_model, '') || ' ' ||
+            COALESCE(df.pan_issue_id, '') || ' ' ||
+            COALESCE(df.session_id, '') || ' ' ||
+            COALESCE(dc.name, '') || ' ' ||
+            COALESCE(dc.title, '') AS search_text
         FROM discovered_sessions df
         LEFT JOIN conversation_files dcf ON dcf.id = (
           SELECT dcf2.id
@@ -245,7 +266,16 @@ function branchSql(source: SessionsFeedSource, filter: ConversationFilter): Bran
         af.conversation_id,
         af.conversation_name,
         af.conversation_title,
-        af.harness
+        af.harness,
+        COALESCE(af.summary, '') || ' ' ||
+          COALESCE(af.tags, '') || ' ' ||
+          COALESCE(af.jsonl_path, '') || ' ' ||
+          COALESCE(af.workspace_path, '') || ' ' ||
+          COALESCE(af.primary_model, '') || ' ' ||
+          COALESCE(af.pan_issue_id, '') || ' ' ||
+          COALESCE(af.session_id, '') || ' ' ||
+          COALESCE(af.conversation_name, '') || ' ' ||
+          COALESCE(af.conversation_title, '') AS search_text
       FROM (
         SELECT
           ds.id AS id,
@@ -296,18 +326,23 @@ function feedSql(filter: SessionsFeedFilter, includeCursor: boolean): FeedSql {
   ].filter((branch): branch is BranchSql => branch !== null);
 
   if (branches.length === 0) {
-    return { cte: 'WITH feed AS (SELECT NULL AS id WHERE 0 = 1)', params: [], cursorWhere: '' };
+    return { cte: 'WITH feed AS (SELECT NULL AS id WHERE 0 = 1)', params: [], where: '' };
   }
 
   const params = branches.flatMap((branch) => branch.params);
   const cursor = decodeCursor(filter.cursor);
-  const cursorWhere: string[] = [];
+  const conditions: string[] = [];
+  const query = normalizedQuery(filter.query);
+  if (query) {
+    conditions.push("lower(COALESCE(search_text, '')) LIKE ? ESCAPE '\\'");
+    params.push(query);
+  }
   if (includeCursor && cursor) {
     if (cursor.lastTs === null) {
-      cursorWhere.push('(last_ts IS NULL AND (id < ? OR (id = ? AND source < ?)))');
+      conditions.push('(last_ts IS NULL AND (id < ? OR (id = ? AND source < ?)))');
       params.push(cursor.id, cursor.id, cursor.source);
     } else {
-      cursorWhere.push('(last_ts IS NULL OR last_ts < ? OR (last_ts = ? AND (id < ? OR (id = ? AND source < ?))))');
+      conditions.push('(last_ts IS NULL OR last_ts < ? OR (last_ts = ? AND (id < ? OR (id = ? AND source < ?))))');
       params.push(cursor.lastTs, cursor.lastTs, cursor.id, cursor.id, cursor.source);
     }
   }
@@ -319,7 +354,7 @@ function feedSql(filter: SessionsFeedFilter, includeCursor: boolean): FeedSql {
       )
     `,
     params,
-    cursorWhere: cursorWhere.length > 0 ? `WHERE ${cursorWhere.join(' AND ')}` : '',
+    where: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
   };
 }
 
@@ -327,11 +362,11 @@ export function listSessionsFeed(filter: SessionsFeedFilter = {}): SessionsFeedP
   ensureDiscoveredSessionsSchema();
   const limit = Number.isFinite(filter.limit) && filter.limit! > 0 ? Math.floor(filter.limit!) : 50;
   const pageSize = Math.min(limit, 200);
-  const { cte, params, cursorWhere } = feedSql(filter, true);
+  const { cte, params, where } = feedSql(filter, true);
   const rows = getOverdeckDatabaseSync().prepare(`
     ${cte}
     SELECT * FROM feed
-    ${cursorWhere}
+    ${where}
     ORDER BY last_ts DESC NULLS LAST, id DESC, source DESC
     LIMIT ?
   `).all(...params, pageSize + 1) as FeedRowRecord[];
@@ -350,7 +385,7 @@ function bucketRows<T extends string | number>(rows: { value: T; count: number }
 
 export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): SessionsFeedFacets {
   ensureDiscoveredSessionsSchema();
-  const { cte, params } = feedSql({ ...filter, cursor: undefined }, false);
+  const { cte, params, where } = feedSql({ ...filter, cursor: undefined }, false);
   const db = getOverdeckDatabaseSync();
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
@@ -359,6 +394,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${cte}
     SELECT COALESCE(primary_model, '(unknown)') AS value, COUNT(*) AS count
     FROM feed
+    ${where}
     GROUP BY COALESCE(primary_model, '(unknown)')
     ORDER BY count DESC, value ASC
   `).all(...params) as { value: string; count: number }[];
@@ -367,6 +403,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${cte}
     SELECT enrichment_level AS value, COUNT(*) AS count
     FROM feed
+    ${where}
     GROUP BY enrichment_level
     ORDER BY value ASC
   `).all(...params) as { value: number; count: number }[];
@@ -382,6 +419,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
       END AS value,
       COUNT(*) AS count
     FROM feed
+    ${where}
     GROUP BY value
     ORDER BY CASE value WHEN '24h' THEN 1 WHEN '7d' THEN 2 WHEN '30d' THEN 3 ELSE 4 END
   `).all(...params, now - day, now - 7 * day, now - 30 * day) as { value: '24h' | '7d' | '30d' | 'older'; count: number }[];
@@ -397,6 +435,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
       END AS value,
       COUNT(*) AS count
     FROM feed
+    ${where}
     GROUP BY value
     ORDER BY CASE value WHEN '<$0.10' THEN 1 WHEN '$0.10-1' THEN 2 WHEN '$1-10' THEN 3 ELSE 4 END
   `).all(...params) as { value: '<$0.10' | '$0.10-1' | '$1-10' | '>$10'; count: number }[];
@@ -405,6 +444,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${cte}
     SELECT source AS value, COUNT(*) AS count
     FROM feed
+    ${where}
     GROUP BY source
     ORDER BY value ASC
   `).all(...params) as { value: SessionsFeedSource; count: number }[];
@@ -414,6 +454,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     SELECT idx.tag AS value, COUNT(*) AS count
     FROM feed
     JOIN discovered_session_tags idx ON idx.session_id = feed.discovered_id
+    ${where}
     GROUP BY idx.tag
     ORDER BY count DESC, value ASC
   `).all(...params) as { value: string; count: number }[];
@@ -423,6 +464,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     SELECT idx.tool AS value, COUNT(*) AS count
     FROM feed
     JOIN discovered_session_tools idx ON idx.session_id = feed.discovered_id
+    ${where}
     GROUP BY idx.tool
     ORDER BY count DESC, value ASC
   `).all(...params) as { value: string; count: number }[];
@@ -432,6 +474,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     SELECT idx.file_path AS value, COUNT(*) AS count
     FROM feed
     JOIN discovered_session_files idx ON idx.session_id = feed.discovered_id
+    ${where}
     GROUP BY idx.file_path
     ORDER BY count DESC, value ASC
   `).all(...params) as { value: string; count: number }[];

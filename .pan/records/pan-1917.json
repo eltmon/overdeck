@@ -26,9 +26,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T20:01:21.413Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T20:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-03T20:13:49.816Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T20:13:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1917\n\nUnified feed search still uses discovered-only search and leaves managed-archived rows unsearchable.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1917 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-1917.json",
@@ -116,8 +129,8 @@
     ],
     "recordedAt": "2026-07-03T20:00:46.282Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "perf-baseline": "completed",
     "conversation-identity": "completed",
@@ -167,17 +180,17 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T20:07:51.948Z",
-    "reviewNotes": "Review approved; no blocking findings in the PAN-1917 sessions diff.",
+    "updatedAt": "2026-07-03T20:13:49.039Z",
+    "reviewNotes": "Unified feed search still uses discovered-only search and leaves managed-archived rows unsearchable.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
-    "reviewedAtCommit": "fe20a5693c41c7957caafd43b06542e3d2cdf139",
+    "reviewedAtCommit": "e50efa6a00e3999d6780f5ea22e953cf275d723c",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
     "reviewRequestedAt": "2026-07-03T20:01:18.204Z",
     "scopeDrift": {
@@ -340,7 +353,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.557539,
-        "pricingAsOf": "2026-07-03T20:07:51.965Z"
+        "pricingAsOf": "2026-07-03T20:13:49.078Z"
       }
     },
     "merges": [
@@ -374,5 +387,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T20:08:10.087Z"
+  "updated": "2026-07-03T20:13:49.816Z"
 }
