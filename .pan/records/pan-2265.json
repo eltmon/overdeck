@@ -42,6 +42,11 @@
       "reason": "feedback",
       "note": "[2026-07-03T15:06Z] verification-gate → FAILED — seq 6",
       "timestamp": "2026-07-03T15:06:29.959Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T15:28:18.513Z"
     }
   ],
   "feedback": [
@@ -155,21 +160,21 @@
     "recordedAt": "2026-07-03T14:14:06.848Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T15:06:30.325Z",
+  "updated": "2026-07-03T15:28:22.590Z",
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:06:29.796Z",
-    "reviewNotes": "Discussions cache is not invalidated for inline PR review comments",
+    "updatedAt": "2026-07-03T15:28:22.498Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed test",
     "verificationNotes": "Verification FAILED at test (96543ms):\n\nhook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts:23:1\n     21| }));\n     22|\n     23| beforeEach(() => {\n       | ^\n     24|   odb = setupOverdeckTestDb();\n     25| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/28]⎯\n\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract > 400: returns httpStatus=400 even when a non-stuck status row exists\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > returns no advice when project main matches origin/main and is clean\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > tells operators to commit or explicitly discard dirty project repo changes\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > tells operators to push local-only main commits when main is ahead\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/dashboard/server/routes/unstick-route.test.ts:30:1\n     28| let odb: OverdeckTestDb;\n     29|\n     30| beforeEach(() => {\n       | ^\n     31|   odb = setupOverdeckTestDb();\n     32| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/28]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/agent-projection.test.ts > saveAgentStateAndEmitEventWithDeps > persists the full current state even when the event payload is partial\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/dashboard/server/services/agent-projection.test.ts:38:1\n     36| let odb: OverdeckTestDb;\n     37|\n     38| beforeEach(() => {\n       | ^\n     39|   odb = setupOverdeckTestDb();\n     40| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/28]⎯\n\n",
     "inspectNotes": "workspace-06h3z passed. The diff implements the requested App REST Promise and Effect helpers in src/lib/github-app.ts, with tests covering owner-qualified PR head lookup, issue state lookup, paginated issue-label listing, PR filtering, and wrapper exports. No constraint violations found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "lastVerifiedCommit": "65b21b4b5f7a9b50992606d19b267af74cec7f6e",
+    "lastVerifiedCommit": "b3425106c96f542c8c8b2186545356de47c008f7",
     "reviewRequestedAt": "2026-07-03T14:14:16.629Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -295,7 +300,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.974399,
-        "pricingAsOf": "2026-07-03T15:06:30.133Z"
+        "pricingAsOf": "2026-07-03T15:28:22.588Z"
       }
     },
     "merges": [
