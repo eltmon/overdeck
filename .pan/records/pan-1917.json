@@ -53,22 +53,15 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T19:53:28.137Z",
+    "updatedAt": "2026-07-03T08:44:12.582Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-03T19:47:15.809Z"
-      }
-    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
@@ -155,14 +148,6 @@
   "closeOut": {
     "usage": {
       "byStage": {
-        "implementation": {
-          "anthropic/claude-fable-5": {
-            "input": 143,
-            "output": 8932,
-            "cacheRead": 1633269,
-            "cacheWrite": 16290
-          }
-        },
         "inspect": {
           "openai/gpt-5.5": {
             "input": 697278,
@@ -173,8 +158,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 30910,
-            "output": 1882,
+            "input": 29883,
+            "output": 1735,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -186,23 +171,9 @@
             "cacheRead": 6451353,
             "cacheWrite": 476062
           }
-        },
-        "test": {
-          "custom/kimi-k2.7-code": {
-            "input": 428365,
-            "output": 32636,
-            "cacheRead": 15926016,
-            "cacheWrite": 0
-          }
         }
       },
       "totals": {
-        "anthropic/claude-fable-5": {
-          "input": 23717,
-          "output": 57588,
-          "cacheRead": 8084622,
-          "cacheWrite": 492352
-        },
         "openai/gpt-5.5": {
           "input": 697278,
           "output": 44358,
@@ -210,21 +181,21 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 30910,
-          "output": 1882,
+          "input": 29883,
+          "output": 1735,
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "custom/kimi-k2.7-code": {
-          "input": 428365,
-          "output": 32636,
-          "cacheRead": 15926016,
-          "cacheWrite": 0
+        "anthropic/claude-fable-5": {
+          "input": 23574,
+          "output": 48656,
+          "cacheRead": 6451353,
+          "cacheWrite": 476062
         }
       },
       "costAtCloseOut": {
-        "usd": 28.223207,
-        "pricingAsOf": "2026-07-03T19:53:28.204Z"
+        "usd": 22.374843,
+        "pricingAsOf": "2026-07-03T08:44:12.627Z"
       }
     },
     "merges": [
@@ -258,5 +229,12 @@
     }
   },
   "created": "2026-07-03T08:37:35.067Z",
-  "updated": "2026-07-03T19:53:28.219Z"
+  "updated": "2026-07-03T08:44:39.139Z",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T08:44:39.138Z"
+    }
+  ]
 }
