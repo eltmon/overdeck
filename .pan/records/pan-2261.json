@@ -39,6 +39,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T16:14:09.191Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:55:57.634Z"
     }
   ],
   "feedback": [
@@ -97,7 +102,7 @@
     "recordedAt": "2026-07-03T16:10:20.583Z"
   },
   "created": "2026-07-03T03:32:43.537Z",
-  "updated": "2026-07-03T16:15:14.478Z",
+  "updated": "2026-07-03T16:56:03.053Z",
   "pipeline": {
     "issueId": "PAN-2261",
     "reviewStatus": "reviewing",
@@ -105,10 +110,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:15:14.423Z",
-    "reviewNotes": "Deacon batching is keyed by feature workspace, so fleet load can still run one bd list per work agent",
+    "updatedAt": "2026-07-03T16:56:02.970Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2302",
-    "lastVerifiedCommit": "0b1d81ae13765f311af6b5e031d71d65856ea5c6",
+    "lastVerifiedCommit": "e2218d73c5111beb548422a3630247f3248930a6",
     "reviewRequestedAt": "2026-07-03T16:11:52.217Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -172,7 +177,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T16:15:14.456Z"
+        "pricingAsOf": "2026-07-03T16:56:03.036Z"
       }
     },
     "merges": [
