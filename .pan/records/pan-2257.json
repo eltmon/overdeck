@@ -11,9 +11,60 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T12:52:35.626Z"
+    },
+    {
+      "timestamp": "2026-07-03T15:57:51.674Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T15:57:52.482Z"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-2257.json",
+      ".pan/test/result.json",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/conversations/__tests__/enrichment.test.ts",
+      "src/lib/conversations/__tests__/scanner.test.ts",
+      "src/lib/conversations/__tests__/search.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "declaredScope": [
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/records/pan-2257.json",
+      ".pan/test/result.json",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/conversations/__tests__/enrichment.test.ts",
+      "src/lib/conversations/__tests__/scanner.test.ts",
+      "src/lib/conversations/__tests__/search.test.ts"
+    ],
+    "recordedAt": "2026-07-03T15:57:19.225Z"
+  },
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -39,29 +90,36 @@
   "pipeline": {
     "issueId": "PAN-2257",
     "reviewStatus": "reviewing",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T12:53:41.665Z",
+    "updatedAt": "2026-07-03T15:57:52.071Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
     "lastVerifiedCommit": "dccb33b05adcfd5bf3d3a073dfd625fdb6ed6b97",
-    "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
+    "reviewRequestedAt": "2026-07-03T15:57:51.675Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
-        ".pan/drafts/PAN-2257.md",
         ".pan/records/pan-2257.json",
         ".pan/test/result.json",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
-        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts"
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+        "src/lib/conversations/__tests__/enrichment.test.ts",
+        "src/lib/conversations/__tests__/scanner.test.ts",
+        "src/lib/conversations/__tests__/search.test.ts"
       ],
       "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+        "src/dashboard/server/routes/projects.ts",
+        "tests/e2e/styleguide-conformance.spec.ts",
+        "tests/unit/dashboard/server/routes/projects.test.ts"
       ],
       "declaredScope": [
         "packages/contracts/src/types.ts",
@@ -75,22 +133,14 @@
         "tests/unit/dashboard/server/routes/projects.test.ts"
       ],
       "actualChangedFiles": [
-        ".pan/drafts/PAN-2257.md",
         ".pan/records/pan-2257.json",
         ".pan/test/result.json",
-        "packages/contracts/src/types.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
-        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-        "src/dashboard/server/routes/projects.ts",
-        "tests/e2e/styleguide-conformance.spec.ts",
-        "tests/unit/dashboard/server/routes/projects.test.ts"
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+        "src/lib/conversations/__tests__/enrichment.test.ts",
+        "src/lib/conversations/__tests__/scanner.test.ts",
+        "src/lib/conversations/__tests__/search.test.ts"
       ],
-      "recordedAt": "2026-07-03T09:26:20.325Z"
+      "recordedAt": "2026-07-03T15:57:19.225Z"
     }
   },
   "closeOut": {
@@ -115,7 +165,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T12:53:41.719Z"
+        "pricingAsOf": "2026-07-03T15:57:52.354Z"
       }
     },
     "merges": [
@@ -124,5 +174,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T10:06:21.823Z",
-  "updated": "2026-07-03T12:53:41.720Z"
+  "updated": "2026-07-03T15:57:52.482Z"
 }
