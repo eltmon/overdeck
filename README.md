@@ -1,6 +1,9 @@
 <div align="center">
 
-# Overdeck CLI
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="logo/overdeck-dark.svg">
+  <img src="logo/overdeck-light.svg" alt="Overdeck" width="300">
+</picture>
 
 **The IDE for the agent era**
 
@@ -8,18 +11,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/overdeck/pulls)
-
-> *"The Overdeck had six sides, one for each of the Founders of Gallifrey..."*
->
-> — Classic Doctor Who. The Overdeck was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-D4A27F.svg)](https://github.com/sponsors/eltmon)
 
 </div>
 
-IDEs were built for humans who type code. Overdeck is built for humans who **direct** code. Command Deck is a live development environment where you spawn agents, watch them work, and stay in control. You see every file change as it lands, review diffs without leaving the conversation, talk to agents to course-correct, hot-swap the model behind them when the task shifts, and branch a conversation to try a different approach without losing the original. When you like where things are headed, the built-in specialist pipeline picks it up — automated code review, tests, and merge — so you never context-switch to a separate CI tab.
+IDEs were built for humans who type code. Overdeck is built for humans who **direct** it. One agent or twenty, hands-on or hands-off: spawn agents on real issues, watch every diff land live, steer mid-task, and let a built-in specialist pipeline review, test, and merge the work — while you decide exactly how much of that loop runs without you.
 
 <div align="center">
 
-<img src="docs/screenshot-board.png" alt="Overdeck Command Deck" width="800" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-board-dark.png">
+  <img src="docs/screenshot-board-light.png" alt="Overdeck Command Deck" width="800">
+</picture>
 
 </div>
 
@@ -34,6 +37,20 @@ No install step required. `npx @overdeck/core` starts Command Deck and opens the
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
 See the [full documentation](https://docs.overdeck.ai) for detailed setup, configuration, and usage guides.
+
+---
+
+## The Autonomy Dial
+
+Overdeck's core idea is that **how much you supervise should be your choice, per issue, per day** — not a property of the tool. The same pipeline serves three working styles:
+
+| Mode | You do | Overdeck does |
+|:-----|:-------|:--------------|
+| **Pair** | Watch diffs land live, steer the agent in the composer, swap models mid-task | Runs one agent in an isolated workspace with checkpoints and live cost tracking |
+| **Pipeline** | Write the issue, click Merge at the end | Plans with a PRD, implements, runs a four-lens review convoy, tests, UAT, and queues the merge train |
+| **Flywheel** | Review the morning recap | Picks up backlog issues, drives them end-to-end in parallel, files and fixes what it finds along the way |
+
+Most sessions live somewhere between — you pair on the gnarly issue while the pipeline ships three routine ones behind you.
 
 ---
 
@@ -65,10 +82,11 @@ Project tree, activity feed, kanban board, agent status, cost analytics, convoy 
 ## Why Overdeck?
 
 - **You stay in the loop without being in the way.** Watch agents code, review their diffs live, send a message when they drift. You're pair-programming, not babysitting a terminal.
-- **The right model for every phase.** Opus plans the architecture, Kimi or Sonnet writes the code, Haiku handles quick commands. Overdeck routes automatically — or you override with two clicks when you know better.
+- **The right model for every phase.** A frontier model plans the architecture, faster models write the code and handle mechanical steps. Overdeck routes automatically — or you override with two clicks when you know better.
 - **Context that outlasts the conversation.** PRDs, plans, checkpoints, beads, and skills carry forward across sessions. Agents pick up where the last one left off, not from a blank slate.
 - **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI. 70+ ship out of the box.
-- **A pipeline that ships while you move on.** When the implementation looks right, hand it to the specialist pipeline — automated code review, tests, and merge. You click Merge when you're satisfied, or keep working on the next issue.
+- **A pipeline that ships while you move on.** When the implementation looks right, hand it to the specialist pipeline — a four-lens review convoy, automated tests, browser UAT, and a merge train that keeps main green. You click Merge when you're satisfied, or keep working on the next issue.
+- **Built by itself.** Overdeck is developed with Overdeck: its own agents plan, implement, review, test, and merge most of its changes. Every rough edge in the pipeline gets hit by us before it gets hit by you.
 
 ---
 
@@ -77,15 +95,15 @@ Project tree, activity feed, kanban board, agent status, cost analytics, convoy 
 ```
  Issue         PRD           Agent         Review        Test          Merge
 ┌──────┐    ┌──────┐    ┌──────────┐    ┌──────┐    ┌──────┐    ┌──────────┐
-│ Task │ ─► │ Plan │ ─► │ Write    │ ─► │ Code │ ─► │ Run  │ ─► │ PR       │
-│ from │    │ with │    │ code in  │    │ rev. │    │ test │    │ merged   │
-│ any  │    │ Opus │    │ isolated │    │ by   │    │ by   │    │ by       │
-│track-│    │      │    │ worktree │    │ spec-│    │ spec-│    │ spec-    │
-│ er   │    │      │    │          │    │ialist│    │ialist│    │ ialist   │
+│ Task │ ─► │ Plan │ ─► │ Write    │ ─► │ Code │ ─► │ Run  │ ─► │ Merge    │
+│ from │    │ with │    │ code in  │    │ rev. │    │ test │    │ train    │
+│ any  │    │vBRIEF│    │ isolated │    │ conv-│    │ +    │    │ keeps    │
+│track-│    │ beads│    │ worktree │    │ oy ×4│    │ UAT  │    │ main     │
+│ er   │    │      │    │          │    │      │    │      │    │ green    │
 └──────┘    └──────┘    └──────────┘    └──────┘    └──────┘    └──────────┘
- GitHub       Opus        Kimi/Sonnet    Opus        Sonnet       Sonnet
- Linear                   (routed)
- GitLab
+ GitHub
+ Linear      Every stage is model-routed — frontier models plan and review,
+ GitLab      fast models grind — and every stage can be overridden per agent.
  Rally
 ```
 
@@ -93,30 +111,25 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 
 ---
 
-## Agent Auto-Resume Controls
-
-Overdeck auto-recovers stopped work agents, but operators can deliberately gate that behavior:
-
-- `overdeck dev --no-resume` and `overdeck up --no-resume` start the dashboard with boot-scoped no-resume mode. Orphan recovery and stopped-agent auto-resume stay disabled until the dashboard is restarted without `--no-resume`.
-- `pan pause <id> [--reason <text>]` persists a per-agent pause gate and stops the agent if it is running. `pan unpause <id>` clears the gate without spawning; `pan start <id> --force` clears it and starts immediately.
-- If an agent repeatedly crashes or fails to resume, Deacon marks it `troubled` and backs off instead of looping forever. Investigate the root cause, then run `pan untroubled <id>` to clear the troubled gate and failure counters. Run `pan start <id>` only after the issue is safe to retry.
-
-These controls are visible in the dashboard through top-level no-resume warnings and per-agent paused/troubled badges.
-
 ## Key Features
 
 | Feature | Description |
 |:--------|:------------|
 | **Command Deck** | A live workspace where you watch agents code, review diffs inline, send messages, and manage everything from one surface |
 | **Inline Diff Review** | See what changed file-by-file as the agent works, compare any turn against main — no waiting for a PR to review code |
-| **Model Hot-Swap** | Switch an agent from Sonnet to Opus to Kimi mid-conversation. Six providers, automatic routing, or manual override |
+| **Model Hot-Swap** | Switch an agent between providers mid-conversation. Six providers, automatic routing, or manual override |
+| **Multi-Harness** | Agents run on Claude Code or Pi, with Codex support for GPT work agents — pick per role, per spawn |
 | **Conversation Forking** | Branch a conversation to try a different approach. Keep the original, compare both, go with what works |
 | **Automatic Checkpoints** | Agent state is snapshotted as it progresses — roll back to any earlier point if something goes wrong |
 | **Visual Plans** | Work plans render as interactive DAGs so you can see dependencies, track acceptance criteria, and know what's done |
-| **Specialist Pipeline** | Five agents handle code review, testing, inspection, UAT, and merge automatically — you just click Merge |
+| **Specialist Pipeline** | Review convoy (correctness, security, performance, requirements), tests, per-bead inspection, browser UAT, and merge — you just click Merge |
+| **Merge Trains** | Approved work queues onto main in order, each rebase re-verified, so a busy day of merges never breaks the build |
+| **Fix-All Flywheel** | An autonomous orchestrator that pulls from the backlog, runs issues end-to-end in parallel, and files what it finds along the way |
+| **Failsafe Controls** | Pause gates, troubled-agent backoff, boot-scoped no-resume, and a global freeze — autonomy you can always stop |
 | **Cloister** | Lifecycle manager that routes models, detects stuck agents, tracks costs, and orchestrates specialist handoffs |
-| **PRD-Driven Workflow** | Opus writes a detailed plan before any code is written — agents can't start without one |
+| **PRD-Driven Workflow** | A frontier model writes a detailed plan before any code is written — agents can't start without one |
 | **70+ Universal Skills** | Pre-built skills synced on every `overdeck up` — one SKILL.md works across Claude Code, Codex, Cursor, and Gemini CLI |
+| **Context Layers** | One set of rules rendered for every harness — universal, per-project, and per-machine context that agents actually receive |
 | **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all visible in one unified kanban board |
 | **Workspaces** | Isolated git worktrees per issue with optional Docker environments, local or remote via Fly.io |
 | **Convoys** | Run parallel agents on related issues with automatic result synthesis |
@@ -136,7 +149,12 @@ Overdeck started as a CLI and grew into **Command Deck**, a desktop-class develo
 <div align="center">
 <table>
 <tr>
-<td><img src="docs/dashboard-overview.png" alt="Command Deck" width="400" /></td>
+<td>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/dashboard-overview-dark.png">
+  <img src="docs/dashboard-overview-light.png" alt="Command Deck" width="400">
+</picture>
+</td>
 <td><img src="docs/screenshot-agents.png" alt="Agent Management" width="400" /></td>
 </tr>
 <tr>
@@ -159,6 +177,7 @@ Overdeck started as a CLI and grew into **Command Deck**, a desktop-class develo
 | Tool | Support |
 |:-----|:--------|
 | **Claude Code** | Full support — agent runtime, hooks, skills |
+| **Pi** | Alternative multi-provider agent harness |
 | **Codex** | Skills sync and OpenAI subscription login for GPT work agents |
 | **Cursor** | Skills sync |
 | **Gemini CLI** | Skills sync |
@@ -185,13 +204,13 @@ Overdeck started as a CLI and grew into **Command Deck**, a desktop-class develo
 
 ## Maturity
 
-Overdeck is actively used in production to develop itself and multiple other projects.
+Overdeck is actively used in production to develop itself and multiple other projects. Most of the code in this repository was planned, written, reviewed, tested, and merged by Overdeck's own pipeline.
 
+- **2,200+ issues** filed against this repo; hundreds shipped end-to-end through the pipeline
 - **70+ skills** shipped and synced across tools
 - **4 tracker integrations** (GitHub, Linear, GitLab, Rally)
 - **6 AI providers** with capability-based model routing
-- **5 specialist agents** in the automated quality pipeline
-- **Hundreds of issues** completed through the full pipeline
+- **5 specialist roles** in the automated quality pipeline
 
 ---
 
@@ -209,6 +228,14 @@ Full documentation at **[docs.overdeck.ai](https://docs.overdeck.ai)**
 
 ---
 
+## Support Overdeck
+
+Overdeck is free, MIT-licensed, and built by one developer directing a fleet of agents. The fleet isn't free — the model bills behind Overdeck's own development run about **$1,000/month**, all self-funded.
+
+If Overdeck saves you time, [**sponsoring on GitHub**](https://github.com/sponsors/eltmon) directly keeps the agents running. Even $5/month genuinely helps.
+
+---
+
 ## Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -222,5 +249,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/core">npm</a> · <a href="https://docs.overdeck.ai">Documentation</a></p>
+<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/core">npm</a> · <a href="https://docs.overdeck.ai">Documentation</a> · <a href="https://github.com/sponsors/eltmon">Sponsor</a></p>
 </div>

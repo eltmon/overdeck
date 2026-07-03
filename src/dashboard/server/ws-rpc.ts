@@ -417,8 +417,8 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
 
 function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
   return {
-    id: session.id,
-    jsonlPath: session.jsonlPath,
+    id: session.id, jsonlPath: session.jsonlPath,
+    harness: session.harness,
     sessionId: session.sessionId ?? undefined,
     workspacePath: session.workspacePath ?? undefined,
     workspaceHash: session.workspaceHash ?? undefined,
@@ -495,6 +495,7 @@ function normalizeConversationPagination(limit: number | undefined, offset: numb
 }
 
 function normalizeConversationFilter(input: {
+  readonly harness?: string;
   readonly workspacePath?: string;
   readonly primaryModel?: string;
   readonly managed?: boolean;
@@ -516,6 +517,7 @@ function normalizeConversationFilter(input: {
   readonly offset?: number;
 }): ConversationFilter {
   return {
+    harness: input.harness,
     workspacePath: input.workspacePath,
     primaryModel: input.primaryModel,
     managed: input.managed,

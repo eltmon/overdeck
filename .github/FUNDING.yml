@@ -1,0 +1,4 @@
+# Shows the "Sponsor" button on the repo page.
+# Requires the eltmon GitHub Sponsors profile to be enrolled
+# (https://github.com/sponsors/accounts) before the button appears.
+github: [eltmon]

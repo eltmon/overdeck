@@ -4,6 +4,7 @@
 
 interface Filters {
   source?: 'all' | 'discovered' | 'managed-archived';
+  harness?: string;
   workspace?: string;
   since?: string;
   managed?: boolean;
@@ -29,6 +30,7 @@ interface FacetValue {
 interface Props {
   filters: Filters;
   facets: {
+    harnesses: FacetValue[];
     models: FacetValue[];
     workspaces: FacetValue[];
     tags: FacetValue[];
@@ -56,6 +58,8 @@ const SOURCE_OPTIONS = [
 ] as const;
 
 export function FacetPanel({ filters, facets, onChange }: Props) {
+  const showHarnesses = facets.harnesses.some((harness) => harness.value !== 'claude-code');
+
   return (
     <div className="w-48 shrink-0 border-r border-gray-800 bg-gray-950 p-3 overflow-auto">
       <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
@@ -83,6 +87,28 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
           })}
         </div>
       </div>
+
+      {showHarnesses && (
+        <div className="mb-4">
+          <label className="text-xs text-gray-400 block mb-1">Harness</label>
+          <div className="flex flex-wrap gap-1">
+            {facets.harnesses.map((harness) => (
+              <button
+                key={harness.value}
+                onClick={() => onChange('harness', filters.harness === harness.value ? undefined : harness.value)}
+                className={`px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
+                  filters.harness === harness.value
+                    ? 'bg-blue-900 text-blue-100'
+                    : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                }`}
+                title={harness.value}
+              >
+                {harness.value}: {harness.count}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Time range */}
       <div className="mb-4">
@@ -362,6 +388,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
         <button
           onClick={() => {
             onChange('since', undefined);
+            onChange('harness', undefined);
             onChange('workspace', undefined);
             onChange('managed', undefined);
             onChange('enriched', undefined);

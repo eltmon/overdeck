@@ -30676,12 +30676,18 @@ function runOverdeckMigrationSync(db) {
 	}
 }
 /**
-* Idempotent index top-ups for databases created before the index existed in
-* the init migration (the migration only runs on a fresh database). PAN-2220:
-* the conversation ledger-cost query joins cost_events on session_id; without
-* this index SQLite builds an automatic index on every query (~76ms → 7ms).
+* Idempotent schema top-ups for databases created before a field/index existed
+* in the init migration. The init migration only runs on a fresh database.
+* PAN-2220: the conversation ledger-cost query joins cost_events on session_id;
+* without this index SQLite builds an automatic index on every query (~76ms → 7ms).
 */
 function ensureRuntimeIndexesSync(db) {
+	try {
+		db.exec("ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text");
+	} catch {}
+	try {
+		db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
+	} catch {}
 	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
 }
 function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {

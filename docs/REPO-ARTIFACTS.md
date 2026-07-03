@@ -285,7 +285,6 @@ Nothing else belongs there.
 | `vitest.config.ts`, `vitest.workspace.ts` | Test runner config |
 | `typedoc.json`, `commitlint.config.js` | Doc/lint tooling |
 | `.gitignore`, `.gitattributes`, `.eslintrc.json` | Repo metadata |
-| `.env.remote` | Remote workspace env template |
 | `introduction.mdx`, `quickstart.mdx`, `concepts.mdx` | Docs-site top-level entries |
 
 **What does NOT belong at root — and where it goes instead:**
@@ -296,6 +295,7 @@ Nothing else belongs there.
 | Historical writeups / post-mortems | `IMPLEMENTATION_SUMMARY.md`, `PAN-428-CODEX-FEEDBACK.md` | `docs/history/` |
 | Screenshots / screen captures | `dashboard-home.png`, `command-deck.png` | `docs/screenshots/<topic>/` |
 | Temporary debug scripts | `debug-review.mjs`, log files | `.gitignore`'d or deleted after use |
+| Per-workspace env scaffolds | `.env.remote` | Never tracked — generated into the workspace at spawn time; root `.gitignore` blocks it |
 
 When adding a new artifact, ask: *"Is this a canonical project entrypoint or tooling config?"*
 If yes → root. If no → find or create the appropriate `docs/` subdirectory.
