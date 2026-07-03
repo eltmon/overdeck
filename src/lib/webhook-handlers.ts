@@ -10,6 +10,7 @@ import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReaso
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
+import { isInGraphQLCooldown, noteGraphQLRateLimit } from './github-graphql-cooldown.js';
 
 export interface WebhookPayload {
   action?: string;
@@ -229,6 +230,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       checksFailed = prState.checksFailed;
     } else {
       // gh CLI fallback (GraphQL) — only when the App is not configured.
+      if (isInGraphQLCooldown()) return;
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const execFileAsync = promisify(execFile);
@@ -236,11 +238,17 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       // (MERGEABLE | CONFLICTING | UNKNOWN), mergeStateStatus is CLEAN | DIRTY |
       // UNSTABLE | BLOCKED | BEHIND | …, isDraft is a bool, and statusCheckRollup
       // carries the required-check results. PAN-1620.
-      const { stdout } = await execFileAsync(
-        'gh',
-        ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
-        { encoding: 'utf-8', timeout: 15000 },
-      );
+      let stdout: string;
+      try {
+        ({ stdout } = await execFileAsync(
+          'gh',
+          ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
+          { encoding: 'utf-8', timeout: 15000 },
+        ));
+      } catch (err) {
+        noteGraphQLRateLimit(err);
+        throw err;
+      }
       if (!stdout.trim()) return;
       const pr = JSON.parse(stdout) as {
         mergeable?: string | null;
