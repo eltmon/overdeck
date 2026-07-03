@@ -156,15 +156,33 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
   return aId.localeCompare(bId);
 }
 
-/** Read the pause gate from an agent's state (PAN-1779): specialist
- *  sessions are built from review history, not state, so the gate must be
- *  looked up separately for them. Returns {} when not paused. */
-function readSessionPauseFields(
+/** Read agent-state gates for session nodes that are otherwise built from
+ *  history or runtime projection rather than directly from state. */
+async function readSessionGateFields(
   sessionId: string,
-): { paused?: true; pausedReason?: string; pausedAt?: string } {
-  const s = getAgentStateSync(sessionId);
-  if (!s || s.paused !== true) return {};
-  return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
+  state = getAgentStateSync(sessionId),
+): Promise<{
+  paused?: true;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: true;
+  troubledAt?: string;
+  troubledReason?: string;
+  consecutiveFailures?: number;
+  queuedMailCount?: number;
+}> {
+  const s = state;
+  if (!s) return {};
+  return {
+    paused: s.paused === true ? true : undefined,
+    pausedReason: s.paused === true ? s.pausedReason : undefined,
+    pausedAt: s.paused === true ? s.pausedAt : undefined,
+    troubled: s.troubled === true ? true : undefined,
+    troubledAt: s.troubled === true ? s.troubledAt : undefined,
+    troubledReason: s.troubled === true ? s.lastFailureReason : undefined,
+    consecutiveFailures: s.troubled === true ? s.consecutiveFailures : undefined,
+    queuedMailCount: s.troubled === true ? await countQueuedMail(sessionId) : undefined,
+  };
 }
 
 async function countQueuedMail(agentId: string): Promise<number> {
@@ -229,7 +247,6 @@ async function collectSessionTreeNodes(
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
-      const queuedMailCount = await countQueuedMail(checkId);
       sections.push({
         type: sectionType,
         sessionId: checkId,
@@ -257,14 +274,7 @@ async function collectSessionTreeNodes(
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,
-        paused: state.paused === true ? true : undefined,
-        pausedReason: state.paused === true ? state.pausedReason : undefined,
-        pausedAt: state.paused === true ? state.pausedAt : undefined,
-        troubled: state.troubled === true ? true : undefined,
-        troubledAt: state.troubled === true ? state.troubledAt : undefined,
-        troubledReason: state.troubled === true ? state.lastFailureReason : undefined,
-        consecutiveFailures: state.troubled === true ? state.consecutiveFailures : undefined,
-        queuedMailCount: state.troubled === true ? queuedMailCount : undefined,
+        ...await readSessionGateFields(checkId, state),
       });
     } catch {
       // skip malformed state
@@ -319,7 +329,7 @@ async function collectSessionTreeNodes(
         roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
-        ...readSessionPauseFields(orchestratorSessionName),
+        ...await readSessionGateFields(orchestratorSessionName),
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,
@@ -354,7 +364,7 @@ async function collectSessionTreeNodes(
         presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
-        ...readSessionPauseFields(testSessionName),
+        ...await readSessionGateFields(testSessionName),
       });
     }
 
@@ -377,7 +387,7 @@ async function collectSessionTreeNodes(
         presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
-        ...readSessionPauseFields(shipSessionName),
+        ...await readSessionGateFields(shipSessionName),
       });
     }
   }

@@ -45,6 +45,7 @@ vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/routes/reviewer-tree.js', () => ({
   buildReviewerNodes: vi.fn(async () => []),
+  readSynthesisRounds: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
@@ -76,6 +77,7 @@ import { fetchProjectSessionTree, getSlotWorkSessionNumber } from '../../../../.
 import { listProjectsSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
+import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
@@ -377,5 +379,63 @@ describe('fetchProjectSessionTree', () => {
     expect(session?.troubledAt).toBeUndefined();
     expect(session?.consecutiveFailures).toBeUndefined();
     expect(session?.queuedMailCount).toBeUndefined();
+  });
+
+  it('returns troubled metadata and queued mail count for review session nodes', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539-review']));
+    (getReviewStatusSync as any).mockReturnValue({
+      history: [
+        {
+          type: 'review',
+          status: 'reviewing',
+          timestamp: '2026-02-03T04:00:00Z',
+        },
+      ],
+    });
+    mockAgentStates.set('agent-pan-539-review', agentState({
+      id: 'agent-pan-539-review',
+      role: 'review',
+      troubled: true,
+      troubledAt: '2026-02-03T04:05:06Z',
+      consecutiveFailures: 1,
+      lastFailureReason: 'review delivery queued',
+    }));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
+    ]));
+    (readdir as any).mockImplementation((p: string) => {
+      if (p === '/tmp/overdeck/workspaces') return Promise.resolve([FEATURE_PAN_539_DIRENT]);
+      if (p === join(getOverdeckHome(), 'agents')) return Promise.resolve([]);
+      if (p === join(getOverdeckHome(), 'agents', 'agent-pan-539-review', 'mail')) {
+        return Promise.resolve([
+          { name: '2026-02-03T04-06-00-000Z.md', isDirectory: () => false, isFile: () => true },
+        ]);
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    const session = tree.features
+      .find((feature) => feature.issueId === 'PAN-539')
+      ?.sessions.find((candidate) => candidate.sessionId === 'agent-pan-539-review');
+    expect(session).toMatchObject({
+      type: 'review',
+      troubled: true,
+      troubledReason: 'review delivery queued',
+      troubledAt: '2026-02-03T04:05:06Z',
+      consecutiveFailures: 1,
+      queuedMailCount: 1,
+    });
   });
 });
