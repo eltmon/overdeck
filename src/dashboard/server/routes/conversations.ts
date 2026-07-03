@@ -32,13 +32,10 @@ import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
 import {
-  findCommitAtTime,
-  diffSinceCommit,
-  diffFilesAgainstHead,
-  diffPatchSinceCommit,
-  diffPatchFilesAgainstHead,
-  type TurnDiffFileChange,
-} from '../../../lib/checkpoint/checkpoint-manager.js';
+  getConversationDiffs,
+  getConversationDiffFull,
+  getConversationDiffTurn,
+} from '../../../lib/overdeck/conversation-diffs.js';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -4764,6 +4761,11 @@ const postConversationPlanActionRoute = HttpRouter.add(
 
 // ─── Route: GET /api/conversations/:name/diffs ──────────────────────────────
 
+const conversationDiffDependencies = {
+  resolveSessionFile,
+  getCachedMessages,
+};
+
 const getConversationDiffsRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/diffs',
@@ -4776,151 +4778,8 @@ const getConversationDiffsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-
-        const sessionFile = await resolveSessionFile(conv);
-        if (!sessionFile || !existsSync(sessionFile)) {
-          return jsonResponse({ summaries: [] });
-        }
-
-        // Parse JSONL for file-modifying tool_use blocks per turn.
-        // Works for all conversation types: devroot, in-repo, and worktree.
-        // Per-turn git diffs use findCommitAtTime(repoRoot, conv.createdAt) so they
-        // capture committed changes too, not just working-tree modifications.
-        const parsed = await getCachedMessages(sessionFile, false);
-        const { fileEditsByAssistantId } = parsed;
-        if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
-          return jsonResponse({ summaries: [] });
-        }
-
-        // Group file paths by git repo root, then compute per-file diffs
-        const summaries: Array<{
-          turnId: string;
-          completedAt: string;
-          status: string;
-          files: TurnDiffFileChange[];
-          assistantMessageId: string;
-        }> = [];
-
-        // Build a set of assistant messages for timestamp lookup
-        const assistantMessages = parsed.messages.filter(m => m.role === 'assistant');
-        const assistantById = new Map(assistantMessages.map(m => [m.id, m]));
-
-        // Cache git repo root and base-commit lookups (both keyed by repo root)
-        const repoRootCache = new Map<string, string | null>();
-        const baseCommitCache = new Map<string, string | null>();
-
-        for (const [assistantId, edits] of fileEditsByAssistantId) {
-          const asstMsg = assistantById.get(assistantId);
-          const completedAt = asstMsg?.completedAt ?? asstMsg?.createdAt ?? new Date().toISOString();
-
-          // Group files by their git repo
-          const filesByRepo = new Map<string, string[]>();
-
-          for (const edit of edits) {
-            const filePath = edit.filePath;
-            // Find git repo root for this file
-            const dir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath;
-            let repoRoot = repoRootCache.get(dir);
-            if (repoRoot === undefined) {
-              try {
-                const { stdout } = await promisify(exec)(
-                  'git rev-parse --show-toplevel',
-                  { cwd: dir, encoding: 'utf-8' },
-                );
-                repoRoot = stdout.trim();
-              } catch {
-                repoRoot = null;
-              }
-              repoRootCache.set(dir, repoRoot);
-            }
-            if (!repoRoot) continue;
-
-            // Convert absolute path to repo-relative
-            const relativePath = filePath.startsWith(repoRoot + '/')
-              ? filePath.slice(repoRoot.length + 1)
-              : filePath;
-
-            let repoFiles = filesByRepo.get(repoRoot);
-            if (!repoFiles) {
-              repoFiles = [];
-              filesByRepo.set(repoRoot, repoFiles);
-            }
-            if (!repoFiles.includes(relativePath)) {
-              repoFiles.push(relativePath);
-            }
-          }
-
-          // Compute diffs per repo and merge.
-          // Diff against the conversation's base commit (the commit that existed just before
-          // the conversation started) so that committed changes are included in the summary —
-          // not just uncommitted working-tree changes.
-          const allFiles: TurnDiffFileChange[] = [];
-          for (const [repoRoot, filePaths] of filesByRepo) {
-            try {
-              // Resolve base commit once per repo root
-              if (!baseCommitCache.has(repoRoot)) {
-                baseCommitCache.set(repoRoot, await Effect.runPromise(findCommitAtTime(repoRoot, conv.createdAt)));
-              }
-              const baseCommit = baseCommitCache.get(repoRoot) ?? null;
-
-              let diffs: TurnDiffFileChange[];
-              if (baseCommit) {
-                // Diff specific files against the pre-conversation base commit.
-                // This captures changes whether committed or still in the working tree.
-                const { stdout: numstat } = await promisify(exec)(
-                  `git diff --numstat --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
-                  { cwd: repoRoot, encoding: 'utf-8' },
-                );
-                const { stdout: nameStatus } = await promisify(exec)(
-                  `git diff --name-status --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
-                  { cwd: repoRoot, encoding: 'utf-8' },
-                );
-                const statusMap = new Map<string, string>();
-                for (const line of nameStatus.split('\n')) {
-                  if (!line.trim()) continue;
-                  const parts = line.split('\t');
-                  if (parts.length >= 2) statusMap.set(parts[parts.length - 1], parts[0]);
-                }
-                diffs = [];
-                for (const line of numstat.split('\n')) {
-                  if (!line.trim()) continue;
-                  const [addStr, delStr, ...pathParts] = line.split('\t');
-                  const path = pathParts.join('\t');
-                  if (!path) continue;
-                  diffs.push({ path, kind: statusMap.get(path), additions: parseInt(addStr, 10) || 0, deletions: parseInt(delStr, 10) || 0 });
-                }
-              } else {
-                // No base commit (repo too new) — fall back to working-tree-vs-HEAD diff
-                diffs = await Effect.runPromise(diffFilesAgainstHead(repoRoot, filePaths));
-              }
-              allFiles.push(...diffs);
-            } catch {
-              // git diff failed — skip this repo
-            }
-          }
-
-          if (allFiles.length > 0) {
-            summaries.push({
-              turnId: `conv-turn-${assistantId}`,
-              completedAt,
-              status: 'completed',
-              files: allFiles,
-              assistantMessageId: assistantId,
-            });
-          }
-        }
-
-        return jsonResponse({ summaries });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] diffs failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationDiffs(name, conversationDiffDependencies);
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
 );
@@ -4939,64 +4798,8 @@ const getConversationDiffFullRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-
-        const cwd = conv.cwd;
-        const isInRepo = existsSync(join(cwd, '.git'));
-
-        if (isInRepo) {
-          const baseCommit = await Effect.runPromise(findCommitAtTime(cwd, conv.createdAt));
-          if (!baseCommit) return jsonResponse({ diff: '' });
-          const diff = await Effect.runPromise(diffPatchSinceCommit(cwd, baseCommit));
-          return jsonResponse({ diff });
-        }
-
-        // Devroot: aggregate all file edits across all turns
-        const sessionFile = await resolveSessionFile(conv);
-        if (!sessionFile || !existsSync(sessionFile)) return jsonResponse({ diff: '' });
-
-        const parsed = await getCachedMessages(sessionFile, false);
-        const { fileEditsByAssistantId } = parsed;
-        if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) return jsonResponse({ diff: '' });
-
-        const repoRootCache = new Map<string, string | null>();
-        const filesByRepo = new Map<string, string[]>();
-
-        for (const [, edits] of fileEditsByAssistantId) {
-          for (const edit of edits) {
-            const dir = edit.filePath.substring(0, edit.filePath.lastIndexOf('/')) || edit.filePath;
-            let repoRoot = repoRootCache.get(dir);
-            if (repoRoot === undefined) {
-              try {
-                const { stdout } = await promisify(exec)('git rev-parse --show-toplevel', { cwd: dir, encoding: 'utf-8' });
-                repoRoot = stdout.trim();
-              } catch { repoRoot = null; }
-              repoRootCache.set(dir, repoRoot);
-            }
-            if (!repoRoot) continue;
-            const relativePath = edit.filePath.startsWith(repoRoot + '/') ? edit.filePath.slice(repoRoot.length + 1) : edit.filePath;
-            let repoFiles = filesByRepo.get(repoRoot);
-            if (!repoFiles) { repoFiles = []; filesByRepo.set(repoRoot, repoFiles); }
-            if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
-          }
-        }
-
-        const patches: string[] = [];
-        for (const [repoRoot, filePaths] of filesByRepo) {
-          try {
-            const patch = await Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
-            if (patch) patches.push(patch);
-          } catch { /* file may have been committed */ }
-        }
-
-        return jsonResponse({ diff: patches.join('\n') });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] diff full failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationDiffFull(name, conversationDiffDependencies);
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
 );
@@ -5018,82 +4821,8 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     const reqUrl = new URL(request.url, 'http://localhost');
     const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
-        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-
-        const cwd = conv.cwd;
-        const isInRepo = existsSync(join(cwd, '.git'));
-
-        if (isInRepo) {
-          // For in-repo conversations, try single diff since conversation start.
-          // Falls through to per-turn JSONL path if no base commit (cwd is in a repo
-          // with no commits before the conversation started).
-          const baseCommit = await Effect.runPromise(findCommitAtTime(cwd, conv.createdAt));
-          if (baseCommit) {
-            const diff = await Effect.runPromise(diffPatchSinceCommit(cwd, baseCommit, fileFilter));
-            return jsonResponse({ turnId, diff });
-          }
-        }
-
-        // Devroot: extract assistant ID from turnId (format: conv-turn-<assistantId>)
-        const assistantId = turnId.startsWith('conv-turn-') ? turnId.slice('conv-turn-'.length) : turnId;
-        const sessionFile = await resolveSessionFile(conv);
-        if (!sessionFile || !existsSync(sessionFile)) return jsonResponse({ diff: '' });
-
-        const parsed = await getCachedMessages(sessionFile, false);
-        const edits = parsed.fileEditsByAssistantId?.get(assistantId);
-        if (!edits || edits.length === 0) return jsonResponse({ diff: '' });
-
-        const repoRootCache = new Map<string, string | null>();
-        const filesByRepo = new Map<string, string[]>();
-
-        for (const edit of edits) {
-          const dir = edit.filePath.substring(0, edit.filePath.lastIndexOf('/')) || edit.filePath;
-          let repoRoot = repoRootCache.get(dir);
-          if (repoRoot === undefined) {
-            try {
-              const { stdout } = await promisify(exec)('git rev-parse --show-toplevel', { cwd: dir, encoding: 'utf-8' });
-              repoRoot = stdout.trim();
-            } catch { repoRoot = null; }
-            repoRootCache.set(dir, repoRoot);
-          }
-          if (!repoRoot) continue;
-          const relativePath = edit.filePath.startsWith(repoRoot + '/') ? edit.filePath.slice(repoRoot.length + 1) : edit.filePath;
-          if (fileFilter && relativePath !== fileFilter) continue;
-          let repoFiles = filesByRepo.get(repoRoot);
-          if (!repoFiles) { repoFiles = []; filesByRepo.set(repoRoot, repoFiles); }
-          if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
-        }
-
-        const baseCommitByRepo = new Map<string, string | null>();
-        const patches: string[] = [];
-        for (const [repoRoot, filePaths] of filesByRepo) {
-          try {
-            if (!baseCommitByRepo.has(repoRoot)) {
-              baseCommitByRepo.set(repoRoot, await Effect.runPromise(findCommitAtTime(repoRoot, conv.createdAt)));
-            }
-            const baseCommit = baseCommitByRepo.get(repoRoot) ?? null;
-            let patch: string;
-            if (baseCommit) {
-              const { stdout } = await promisify(exec)(
-                `git diff --patch --minimal --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
-                { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
-              );
-              patch = stdout;
-            } else {
-              patch = await Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
-            }
-            if (patch) patches.push(patch);
-          } catch { /* file may have been committed or repo unavailable */ }
-        }
-
-        return jsonResponse({ turnId, diff: patches.join('\n') });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] diff turn failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationDiffTurn(name, turnId, fileFilter, conversationDiffDependencies);
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
 );
