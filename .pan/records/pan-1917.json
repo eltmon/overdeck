@@ -116,8 +116,8 @@
     ],
     "recordedAt": "2026-07-03T20:00:46.282Z"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "perf-baseline": "completed",
     "conversation-identity": "completed",
@@ -168,12 +168,12 @@
   "pipeline": {
     "issueId": "PAN-1917",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T20:07:16.258Z",
+    "updatedAt": "2026-07-03T20:07:51.948Z",
     "reviewNotes": "Review approved; no blocking findings in the PAN-1917 sessions diff.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
@@ -289,8 +289,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 31937,
-            "output": 2044,
+            "input": 32964,
+            "output": 2206,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -326,8 +326,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 31937,
-          "output": 2044,
+          "input": 32964,
+          "output": 2206,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -340,7 +340,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.557539,
-        "pricingAsOf": "2026-07-03T20:07:16.288Z"
+        "pricingAsOf": "2026-07-03T20:07:51.965Z"
       }
     },
     "merges": [
@@ -374,5 +374,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T20:07:16.879Z"
+  "updated": "2026-07-03T20:08:10.087Z"
 }
