@@ -7,12 +7,36 @@
 
 set -e
 
+# PAN-2227: ratchets enforce at the write point — catch god-file growth
+# before origin does. Checks the WORKING TREE (what a direct-to-main
+# writer is about to make main), not each pushed commit.
+bash scripts/lint-file-size.sh </dev/null
+
 read_version() {
   git show "$1:$2" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))"
 }
 
 while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_ref" in
+    refs/heads/*)
+      # PAN-2227: audited ratchet bumps — every pushed commit that raises a
+      # baseline entry or adds an eslint-any-allowlist entry must reference
+      # an issue in its message.
+      zero=0000000000000000000000000000000000000000
+      if [ "$local_sha" = "$zero" ]; then
+        continue  # branch deletion — nothing to audit
+      fi
+      if [ "$remote_sha" = "$zero" ]; then
+        base=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
+      else
+        base="$remote_sha"
+      fi
+      if [ -n "$base" ]; then
+        bash scripts/lint-ratchet-audit.sh --range "$base..$local_sha" </dev/null
+      else
+        echo "⚠ ratchet audit: no base for $local_ref — skipping" >&2
+      fi
+      ;;
     refs/tags/v*)
       tag="${local_ref#refs/tags/}"
       expected="${tag#v}"
