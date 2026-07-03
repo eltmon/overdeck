@@ -6,10 +6,15 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T17:40:19.819Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T18:10:02.176Z"
     }
   ],
   "feedback": [],
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.5",
   "statusOverrides": {
     "app-rest-helpers": "completed",
@@ -54,18 +59,19 @@
   },
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T18:05:02.355Z",
-    "reviewNotes": "Verification failed at test",
-    "testNotes": "npm run typecheck: clean; npm run lint: clean; focused vitest suites: tests/unit/lib/github-app.test.ts, tests/unit/cli/commands/flywheel-surfaces.test.ts, src/lib/cloister/__tests__/issue-closed.test.ts, src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts, tests/unit/lib/forge.test.ts, tests/unit/lib/github-graphql-cooldown.test.ts, tests/unit/lib/webhook-handlers.test.ts, tests/unit/dashboard/server/routes/issue-pr.test.ts, tests/unit/dashboard/server/routes/issue-discussions.test.ts — 9 files, 135 tests passed. Browser UAT not required: spec NonGoals exclude frontend changes and the issue is backend-only GitHub GraphQL/App-REST routing.",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T18:27:26.697Z",
+    "reviewNotes": "Review passed; no blocking findings",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "reviewedAtCommit": "c8b4a79f8098abbc248a1f395da71d33c1e6fb63",
-    "lastVerifiedCommit": "9db21d4f6b87fa07f2a64f80581fd34816683ea2",
+    "reviewedAtCommit": "c84d1cd5c22bc41fa85a8e2cacb8ff651b720b05",
+    "lastVerifiedCommit": "c84d1cd5c22bc41fa85a8e2cacb8ff651b720b05",
     "reviewRequestedAt": "2026-07-03T17:35:27.728Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -223,7 +229,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.380945,
-        "pricingAsOf": "2026-07-03T18:05:02.473Z"
+        "pricingAsOf": "2026-07-03T18:27:26.740Z"
       }
     },
     "merges": [
@@ -232,5 +238,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:40:19.407Z",
-  "updated": "2026-07-03T18:05:02.494Z"
+  "updated": "2026-07-03T19:15:25.030Z"
 }
