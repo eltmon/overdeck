@@ -89,6 +89,12 @@ function createSnapshot(severity: SystemHealthSnapshot['severity']): SystemHealt
     reasons: severity === 'critical' ? ['Available RAM below critical threshold'] : [],
     agents: [],
     leakedSpecialists: severity === 'critical' ? [{ name: 'specialist-pan-1', currentIssue: 'PAN-1', reason: 'parent agent missing' }] : [],
+    smeeRelay: {
+      configured: true,
+      running: severity !== 'warning',
+      status: severity === 'warning' ? 'stopped' : 'running',
+      message: severity === 'warning' ? 'Configured but not running' : 'Running',
+    },
     topConsumers: severity === 'critical'
       ? [
           {
@@ -214,6 +220,7 @@ describe('SystemHealthPill', () => {
     expect(screen.getByText('System health')).toBeInTheDocument();
     expect(screen.getByText('Top consumers')).toBeInTheDocument();
     expect(screen.getByText('Overdeck')).toBeInTheDocument();
+    expect(screen.getByText('Webhook relay')).toBeInTheDocument();
     expect(screen.getByText(/Overcommit 40.0%/)).toBeInTheDocument();
     expect(screen.getByText('Remove')).toBeInTheDocument();
     expect(screen.getAllByText('Kill').length).toBeGreaterThan(0);
