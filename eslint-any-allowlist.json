@@ -72,6 +72,7 @@
   "src/dashboard/server/pending-lifecycle.ts",
   "src/dashboard/server/read-model.ts",
   "src/dashboard/server/routes/agents.ts",
+  "src/dashboard/server/routes/agents/conversation.ts",
   "src/dashboard/server/routes/agents/listing.ts",
   "src/dashboard/server/routes/command-deck.ts",
   "src/dashboard/server/routes/diffs.ts",
