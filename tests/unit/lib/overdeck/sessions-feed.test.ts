@@ -235,7 +235,7 @@ describe('sessions feed', () => {
   it('keyword-searches managed archived rows as part of the unified feed', async () => {
     const { createConversation, archiveConversation } = await import('../../../../src/lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../src/lib/overdeck/discovered-sessions.js');
-    const { listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');
+    const { getSessionsFeedFacets, listSessionsFeed } = await import('../../../../src/lib/overdeck/sessions-feed.js');
     const base = Date.now();
 
     createConversation({
@@ -264,6 +264,10 @@ describe('sessions feed', () => {
       conversationName: 'archived-keyword-target',
       conversationTitle: 'Needle Managed Archive',
     });
+
+    const facets = getSessionsFeedFacets({ query: 'needle', workspacePath: '/archived' });
+    expect(facets.sources).toEqual([{ value: 'managed-archived', count: 1 }]);
+    expect(facets.timeBuckets.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(1);
   });
 
   it('computes facets over the full filtered corpus independently from page size', async () => {

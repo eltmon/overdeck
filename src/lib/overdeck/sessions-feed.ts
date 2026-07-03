@@ -65,7 +65,8 @@ interface CursorPayload {
 
 interface FeedSql {
   cte: string;
-  params: unknown[];
+  cteParams: unknown[];
+  whereParams: unknown[];
   where: string;
 }
 
@@ -326,24 +327,25 @@ function feedSql(filter: SessionsFeedFilter, includeCursor: boolean): FeedSql {
   ].filter((branch): branch is BranchSql => branch !== null);
 
   if (branches.length === 0) {
-    return { cte: 'WITH feed AS (SELECT NULL AS id WHERE 0 = 1)', params: [], where: '' };
+    return { cte: 'WITH feed AS (SELECT NULL AS id WHERE 0 = 1)', cteParams: [], whereParams: [], where: '' };
   }
 
-  const params = branches.flatMap((branch) => branch.params);
+  const cteParams = branches.flatMap((branch) => branch.params);
+  const whereParams: unknown[] = [];
   const cursor = decodeCursor(filter.cursor);
   const conditions: string[] = [];
   const query = normalizedQuery(filter.query);
   if (query) {
     conditions.push("lower(COALESCE(search_text, '')) LIKE ? ESCAPE '\\'");
-    params.push(query);
+    whereParams.push(query);
   }
   if (includeCursor && cursor) {
     if (cursor.lastTs === null) {
       conditions.push('(last_ts IS NULL AND (id < ? OR (id = ? AND source < ?)))');
-      params.push(cursor.id, cursor.id, cursor.source);
+      whereParams.push(cursor.id, cursor.id, cursor.source);
     } else {
       conditions.push('(last_ts IS NULL OR last_ts < ? OR (last_ts = ? AND (id < ? OR (id = ? AND source < ?))))');
-      params.push(cursor.lastTs, cursor.lastTs, cursor.id, cursor.id, cursor.source);
+      whereParams.push(cursor.lastTs, cursor.lastTs, cursor.id, cursor.id, cursor.source);
     }
   }
 
@@ -353,7 +355,8 @@ function feedSql(filter: SessionsFeedFilter, includeCursor: boolean): FeedSql {
         ${branches.map((branch) => branch.sql).join('\nUNION ALL\n')}
       )
     `,
-    params,
+    cteParams,
+    whereParams,
     where: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
   };
 }
@@ -362,14 +365,14 @@ export function listSessionsFeed(filter: SessionsFeedFilter = {}): SessionsFeedP
   ensureDiscoveredSessionsSchema();
   const limit = Number.isFinite(filter.limit) && filter.limit! > 0 ? Math.floor(filter.limit!) : 50;
   const pageSize = Math.min(limit, 200);
-  const { cte, params, where } = feedSql(filter, true);
+  const { cte, cteParams, whereParams, where } = feedSql(filter, true);
   const rows = getOverdeckDatabaseSync().prepare(`
     ${cte}
     SELECT * FROM feed
     ${where}
     ORDER BY last_ts DESC NULLS LAST, id DESC, source DESC
     LIMIT ?
-  `).all(...params, pageSize + 1) as FeedRowRecord[];
+  `).all(...cteParams, ...whereParams, pageSize + 1) as FeedRowRecord[];
 
   const pageRows = rows.slice(0, pageSize);
   const last = pageRows.at(-1);
@@ -385,7 +388,7 @@ function bucketRows<T extends string | number>(rows: { value: T; count: number }
 
 export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): SessionsFeedFacets {
   ensureDiscoveredSessionsSchema();
-  const { cte, params, where } = feedSql({ ...filter, cursor: undefined }, false);
+  const { cte, cteParams, whereParams, where } = feedSql({ ...filter, cursor: undefined }, false);
   const db = getOverdeckDatabaseSync();
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
@@ -397,7 +400,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY COALESCE(primary_model, '(unknown)')
     ORDER BY count DESC, value ASC
-  `).all(...params) as { value: string; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: string; count: number }[];
 
   const enrichmentLevels = db.prepare(`
     ${cte}
@@ -406,7 +409,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY enrichment_level
     ORDER BY value ASC
-  `).all(...params) as { value: number; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: number; count: number }[];
 
   const timeBuckets = db.prepare(`
     ${cte}
@@ -422,7 +425,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY value
     ORDER BY CASE value WHEN '24h' THEN 1 WHEN '7d' THEN 2 WHEN '30d' THEN 3 ELSE 4 END
-  `).all(now - day, now - 7 * day, now - 30 * day, ...params) as { value: '24h' | '7d' | '30d' | 'older'; count: number }[];
+  `).all(...cteParams, now - day, now - 7 * day, now - 30 * day, ...whereParams) as { value: '24h' | '7d' | '30d' | 'older'; count: number }[];
 
   const costBuckets = db.prepare(`
     ${cte}
@@ -438,7 +441,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY value
     ORDER BY CASE value WHEN '<$0.10' THEN 1 WHEN '$0.10-1' THEN 2 WHEN '$1-10' THEN 3 ELSE 4 END
-  `).all(...params) as { value: '<$0.10' | '$0.10-1' | '$1-10' | '>$10'; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: '<$0.10' | '$0.10-1' | '$1-10' | '>$10'; count: number }[];
 
   const sources = db.prepare(`
     ${cte}
@@ -447,7 +450,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY source
     ORDER BY value ASC
-  `).all(...params) as { value: SessionsFeedSource; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: SessionsFeedSource; count: number }[];
 
   const tags = db.prepare(`
     ${cte}
@@ -457,7 +460,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY idx.tag
     ORDER BY count DESC, value ASC
-  `).all(...params) as { value: string; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: string; count: number }[];
 
   const tools = db.prepare(`
     ${cte}
@@ -467,7 +470,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY idx.tool
     ORDER BY count DESC, value ASC
-  `).all(...params) as { value: string; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: string; count: number }[];
 
   const files = db.prepare(`
     ${cte}
@@ -477,7 +480,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY idx.file_path
     ORDER BY count DESC, value ASC
-  `).all(...params) as { value: string; count: number }[];
+  `).all(...cteParams, ...whereParams) as { value: string; count: number }[];
 
   return {
     primaryModels: bucketRows(primaryModels),

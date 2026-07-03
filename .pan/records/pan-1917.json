@@ -182,11 +182,11 @@
     "issueId": "PAN-1917",
     "reviewStatus": "blocked",
     "testStatus": "testing",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T20:13:49.039Z",
+    "updatedAt": "2026-07-03T20:20:11.521Z",
     "reviewNotes": "Unified feed search still uses discovered-only search and leaves managed-archived rows unsearchable.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
@@ -353,7 +353,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.557539,
-        "pricingAsOf": "2026-07-03T20:13:49.078Z"
+        "pricingAsOf": "2026-07-03T20:20:11.543Z"
       }
     },
     "merges": [
@@ -387,5 +387,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T20:13:49.816Z"
+  "updated": "2026-07-03T20:20:11.545Z"
 }
