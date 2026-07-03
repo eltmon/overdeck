@@ -10,6 +10,7 @@ import { listAllAgentsSync } from '../overdeck/agents.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
 import { isExplicitNoResumeRequest } from './no-resume-mode.js';
+import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 
 export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 30;
 
@@ -48,6 +49,7 @@ export function isBootReconciliationCandidate(agent: ReconciliationAgent): boole
   if (agent.role !== 'work' || agent.status !== 'stopped') return false;
   if (agent.paused === true || agent.troubled === true) return false;
   if (agent.stoppedByUser === true && !hasCompletionMarker(agent.workspace)) return false;
+  if (bootReconciliationSkipReason(agent) !== null) return false;
   return true;
 }
 
