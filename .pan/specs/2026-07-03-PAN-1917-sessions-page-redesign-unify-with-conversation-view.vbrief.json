@@ -4,17 +4,17 @@
     "created": "2026-07-03T01:03:19.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1917: /sessions page redesign: unify with conversation view",
-    "updated": "2026-07-03T01:18:32.783Z"
+    "updated": "2026-07-03T02:33:34.590Z"
   },
   "plan": {
     "id": "pan-1917",
     "title": "/sessions page redesign: unify with conversation view",
-    "status": "proposed",
+    "status": "running",
     "uid": "d4d53978-aa5e-4ea6-92d7-8a6c9819e372",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-03T01:03:19.000Z",
-    "updated": "2026-07-03T01:18:32.783Z",
+    "updated": "2026-07-03T02:33:34.590Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1917",
@@ -846,5 +846,5 @@
       "canonicalFilename": "2026-07-03-PAN-1917-sessions-page-redesign-unify-with-conversation-view.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
