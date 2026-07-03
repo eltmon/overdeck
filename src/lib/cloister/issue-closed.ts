@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 
 import { getShadowState } from '../shadow-state.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { getIssueState, isGitHubAppConfigured } from '../github-app.js';
 
 const execFileAsync = promisify(execFile);
 export const TRACKER_CLOSED_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -30,6 +31,13 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
   }
 
   try {
+    if (isGitHubAppConfigured()) {
+      const issue = await Effect.runPromise(getIssueState(resolved.owner, resolved.repo, resolved.number));
+      const closed = issue.state === 'closed';
+      trackerClosedCache.set(issueId, { closed, checkedAt: now });
+      return closed;
+    }
+
     const { stdout } = await execFileAsync('gh', [
       'issue',
       'view',
