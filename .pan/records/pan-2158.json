@@ -6,11 +6,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T15:32:13.254Z"
+    },
+    {
+      "timestamp": "2026-07-03T15:35:02.465Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T15:35:03.886Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "auto-start": "completed",
     "auto-start.ac1": "completed",
@@ -20,57 +30,56 @@
   },
   "pipeline": {
     "issueId": "PAN-2158",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:32:25.586Z",
+    "updatedAt": "2026-07-03T15:39:36.503Z",
     "reviewNotes": "No blocking findings; focused tests and typecheck passed",
-    "testNotes": "TypeScript typecheck passed; eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit lints passed. `npm test` failed: root vitest reported 32 test files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests (tests/unit/lib/overdeck/*, src/cli/commands/conversations/*, tests/unit/dashboard/server/routes/unstick-route.test.ts, tests/unit/dashboard/server/services/agent-projection.test.ts). Targeted PAN-2158-related tests passed: src/lib/planning/__tests__/spawn-planning-session.test.ts, src/lib/cloister/__tests__/pan-871-auto-resume.test.ts, src/lib/cloister/__tests__/stuck-remediation.test.ts, tests/integration/agent-spawning.test.ts (4 files, 107 tests passed). No browser UAT required: PAN-2158 is a CLI planning auto-mode behavior fix with no dashboard/UI acceptance criteria and no frontend files changed. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2303",
     "reviewedAtCommit": "de65dfecf4b9692d9b97564007bf1d9536dba18a",
-    "lastVerifiedCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
-    "reviewRequestedAt": "2026-07-03T15:30:37.784Z"
+    "lastVerifiedCommit": "31df0d7ef9debd5fbbb76e91a5da74cc324034bc",
+    "reviewRequestedAt": "2026-07-03T15:35:02.491Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 13929,
-            "output": 1313,
+            "input": 15502,
+            "output": 2042,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 668207,
-            "output": 15463,
-            "cacheRead": 5713152,
+            "input": 1036133,
+            "output": 22767,
+            "cacheRead": 7960320,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 13929,
-          "output": 1313,
+          "input": 15502,
+          "output": 2042,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 668207,
-          "output": 15463,
-          "cacheRead": 5713152,
+          "input": 1036133,
+          "output": 22767,
+          "cacheRead": 7960320,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 1.782147,
-        "pricingAsOf": "2026-07-03T15:32:25.612Z"
+        "usd": 2.587857,
+        "pricingAsOf": "2026-07-03T15:39:36.527Z"
       }
     },
     "merges": [
@@ -79,5 +88,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T15:32:13.088Z",
-  "updated": "2026-07-03T15:32:25.612Z"
+  "updated": "2026-07-03T15:39:36.527Z"
 }
