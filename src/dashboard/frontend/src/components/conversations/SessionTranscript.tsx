@@ -97,7 +97,7 @@ export function SessionTranscript({ session }: { session: Session }) {
 
 function TranscriptNotice({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full min-h-48 items-center justify-center px-6 text-center text-sm text-gray-500">
+    <div className="flex h-full min-h-48 items-center justify-center px-6 text-center text-sm text-muted-foreground">
       {children}
     </div>
   );

@@ -54,7 +54,7 @@ export function SessionTable({ sessions, selectedId, onSelect, hasMore = false, 
 
   return (
     <div ref={parentRef} className="flex-1 overflow-auto" role="table">
-      <div className="grid grid-cols-[1.25rem_minmax(14rem,1fr)_8rem_4rem_5rem_7rem] gap-3 border-b border-gray-800 bg-gray-950 px-3 py-2 text-xs font-medium text-gray-500 sticky top-0 z-10" role="row">
+      <div className="grid grid-cols-[1.25rem_minmax(14rem,1fr)_8rem_4rem_5rem_7rem] gap-3 border-b border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground sticky top-0 z-10" role="row">
         <div />
         <div>Session</div>
         <div>Model</div>
@@ -79,56 +79,56 @@ export function SessionTable({ sessions, selectedId, onSelect, hasMore = false, 
               role="row"
               data-session-key={key}
               onClick={() => onSelect(isSelected ? null : key)}
-              className={`absolute left-0 right-0 grid cursor-pointer grid-cols-[1.25rem_minmax(14rem,1fr)_8rem_4rem_5rem_7rem] items-center gap-3 border-b border-gray-900 px-3 text-xs transition-colors ${
-                isSelected ? 'bg-blue-950 border-blue-900' : 'hover:bg-gray-900'
+              className={`absolute left-0 right-0 grid cursor-pointer grid-cols-[1.25rem_minmax(14rem,1fr)_8rem_4rem_5rem_7rem] items-center gap-3 border-b border-border px-3 text-xs transition-colors ${
+                isSelected ? 'bg-primary/8 border-primary/32' : 'hover:bg-card'
               }`}
               style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}
             >
               <div className="text-center">
                 {session.source === 'managed-archived' ? (
-                  <Anchor className="inline h-3 w-3 text-amber-400" />
+                  <Anchor className="inline h-3 w-3 text-muted-foreground" />
                 ) : session.overdeckManaged ? (
-                  <Star className="inline h-3 w-3 text-cyan-400" />
+                  <Star className="inline h-3 w-3 text-primary" />
                 ) : session.enrichmentLevel > 0 ? (
-                  <CheckCircle className="inline h-3 w-3 text-green-500" />
+                  <CheckCircle className="inline h-3 w-3 text-success" />
                 ) : (
-                  <Circle className="inline h-3 w-3 text-gray-700" />
+                  <Circle className="inline h-3 w-3 text-muted-foreground/50" />
                 )}
               </div>
               <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-gray-100" title={`${title} — ${subtitle}`}>{title}</span>
-                {subtitle && <span className="min-w-0 truncate text-gray-500">{subtitle}</span>}
+                <span className="truncate text-foreground" title={`${title} — ${subtitle}`}>{title}</span>
+                {subtitle && <span className="min-w-0 truncate text-muted-foreground">{subtitle}</span>}
                 {session.source === 'managed-archived' ? (
-                  <span className="shrink-0 rounded-full border border-amber-700 bg-amber-950 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+                  <span className="shrink-0 rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                     Archived{session.panIssueId ? ` · ${session.panIssueId}` : ''}
                   </span>
                 ) : session.overdeckManaged && (
-                  <span className="shrink-0 rounded-full border border-cyan-700 bg-cyan-950 px-1.5 py-0.5 text-[10px] font-medium text-cyan-200">
+                  <span className="shrink-0 rounded-sm border border-primary/32 bg-primary/8 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                     Managed{session.panIssueId ? ` · ${session.panIssueId}` : ''}
                   </span>
                 )}
                 {session.harness !== 'claude-code' && (
-                  <span className="shrink-0 border border-gray-700 bg-gray-900 px-1.5 py-0.5 font-mono text-[10px] text-gray-300">
+                  <span className="shrink-0 rounded-sm border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-foreground">
                     {session.harness}
                   </span>
                 )}
               </div>
-              <div className="truncate text-gray-400">{session.primaryModel ? session.primaryModel.split('-').slice(-2).join('-') : '—'}</div>
-              <div className="text-right font-mono text-gray-400">{session.messageCount}</div>
+              <div className="truncate text-muted-foreground">{session.primaryModel ? session.primaryModel.split('-').slice(-2).join('-') : '—'}</div>
+              <div className="text-right font-mono text-muted-foreground">{session.messageCount}</div>
               <div className="text-right font-mono">
                 {session.estimatedCost > 0 ? (
-                  <span className="text-yellow-500">${session.estimatedCost.toFixed(4)}</span>
+                  <span className="text-signal-cost-foreground">${session.estimatedCost.toFixed(4)}</span>
                 ) : (
-                  <span className="text-gray-700">—</span>
+                  <span className="text-muted-foreground/50">—</span>
                 )}
               </div>
-              <div className="text-gray-500">{session.lastTs ? formatRelative(session.lastTs) : '—'}</div>
+              <div className="text-muted-foreground">{session.lastTs ? formatRelative(session.lastTs) : '—'}</div>
             </div>
           );
         })}
       </div>
       {isLoadingMore && (
-        <div className="px-3 py-2 text-center text-xs text-gray-500">Loading more…</div>
+        <div className="px-3 py-2 text-center text-xs text-muted-foreground">Loading more…</div>
       )}
     </div>
   );

@@ -61,13 +61,13 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
   const showHarnesses = facets.harnesses.some((harness) => harness.value !== 'claude-code');
 
   return (
-    <div className="w-48 shrink-0 border-r border-gray-800 bg-gray-950 p-3 overflow-auto">
-      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
+    <div className="w-48 shrink-0 border-r border-border bg-background p-3 overflow-auto">
+      <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-3">
         Filters
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">Source</label>
+        <label className="text-xs text-muted-foreground block mb-1">Source</label>
         <div className="flex flex-wrap gap-1">
           {SOURCE_OPTIONS.map((source) => {
             const active = (filters.source ?? 'all') === source.value;
@@ -77,8 +77,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
                 onClick={() => onChange('source', source.value === 'all' ? undefined : source.value)}
                 className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                   active
-                    ? 'bg-blue-900 text-blue-100'
-                    : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {source.label}
@@ -90,7 +90,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
 
       {showHarnesses && (
         <div className="mb-4">
-          <label className="text-xs text-gray-400 block mb-1">Harness</label>
+          <label className="text-xs text-muted-foreground block mb-1">Harness</label>
           <div className="flex flex-wrap gap-1">
             {facets.harnesses.map((harness) => (
               <button
@@ -98,8 +98,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
                 onClick={() => onChange('harness', filters.harness === harness.value ? undefined : harness.value)}
                 className={`px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
                   filters.harness === harness.value
-                    ? 'bg-blue-900 text-blue-100'
-                    : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
                 }`}
                 title={harness.value}
               >
@@ -112,11 +112,11 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
 
       {/* Time range */}
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">Time range</label>
+        <label className="text-xs text-muted-foreground block mb-1">Time range</label>
         <select
           value={filters.since ?? ''}
           onChange={(e) => onChange('since', e.target.value || undefined)}
-          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+          className="w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary"
         >
           {SINCE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -131,8 +131,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               onClick={() => onChange('since', filters.since === range.value ? undefined : range.value)}
               className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                 filters.since === range.value
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
             >
               {range.label ?? range.value}: {range.count}
@@ -143,14 +143,14 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
 
       {/* Workspace filter */}
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">Workspace path</label>
+        <label className="text-xs text-muted-foreground block mb-1">Workspace path</label>
         <input
           type="text"
           list="conversation-workspaces"
           value={filters.workspace ?? ''}
           onChange={(e) => onChange('workspace', e.target.value || undefined)}
           placeholder="e.g. /Projects/myapp"
-          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+          className="w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
         />
         <datalist id="conversation-workspaces">
           {facets.workspaces.map((workspace) => <option key={workspace.value} value={workspace.value} />)}
@@ -158,11 +158,11 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">Model</label>
+        <label className="text-xs text-muted-foreground block mb-1">Model</label>
         <select
           value={filters.model ?? ''}
           onChange={(e) => onChange('model', e.target.value || undefined)}
-          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+          className="w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary"
         >
           <option value="">All models</option>
           {facets.models.map((model) => <option key={model.value} value={model.value}>{model.value} ({model.count})</option>)}
@@ -174,8 +174,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               onClick={() => onChange('model', filters.model === model.value ? undefined : model.value)}
               className={`w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] transition-colors ${
                 filters.model === model.value
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
               title={model.value}
             >
@@ -186,14 +186,14 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">Tag</label>
+        <label className="text-xs text-muted-foreground block mb-1">Tag</label>
         <input
           type="text"
           list="conversation-tags"
           value={filters.tag ?? ''}
           onChange={(e) => onChange('tag', e.target.value || undefined)}
           placeholder="e.g. bugfix"
-          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+          className="w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
         />
         <datalist id="conversation-tags">
           {facets.tags.map((tag) => <option key={tag.value} value={tag.value} />)}
@@ -205,8 +205,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               onClick={() => onChange('tag', filters.tag === tag.value ? undefined : tag.value)}
               className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                 filters.tag === tag.value
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
               title={tag.value}
             >
@@ -217,14 +217,14 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">Tool</label>
+        <label className="text-xs text-muted-foreground block mb-1">Tool</label>
         <input
           type="text"
           list="conversation-tools"
           value={filters.tool ?? ''}
           onChange={(e) => onChange('tool', e.target.value || undefined)}
           placeholder="e.g. Read"
-          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+          className="w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
         />
         <datalist id="conversation-tools">
           {facets.tools.map((tool) => <option key={tool.value} value={tool.value} />)}
@@ -236,8 +236,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               onClick={() => onChange('tool', filters.tool === tool.value ? undefined : tool.value)}
               className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                 filters.tool === tool.value
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
               title={tool.value}
             >
@@ -248,14 +248,14 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-gray-400 block mb-1">File touched</label>
+        <label className="text-xs text-muted-foreground block mb-1">File touched</label>
         <input
           type="text"
           list="conversation-files"
           value={filters.file ?? ''}
           onChange={(e) => onChange('file', e.target.value || undefined)}
           placeholder="e.g. src/index.ts"
-          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+          className="w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary"
         />
         <datalist id="conversation-files">
           {facets.files.map((file) => <option key={file.value} value={file.value} />)}
@@ -267,8 +267,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               onClick={() => onChange('file', filters.file === file.value ? undefined : file.value)}
               className={`w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] transition-colors ${
                 filters.file === file.value
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
               title={file.value}
             >
@@ -279,13 +279,13 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <div className="text-xs text-gray-400 block mb-1">Workspace cost</div>
+        <div className="text-xs text-muted-foreground block mb-1">Workspace cost</div>
         <div className="space-y-1 max-h-24 overflow-auto">
           {facets.workspaces.slice(0, 8).map((workspace) => (
             <button
               key={workspace.value}
               onClick={() => onChange('workspace', workspace.value)}
-              className="w-full text-left text-[10px] text-gray-500 hover:text-gray-300 truncate"
+              className="w-full text-left text-[10px] text-muted-foreground hover:text-foreground truncate"
               title={workspace.value}
             >
               {workspace.count} · ${(workspace.cost ?? 0).toFixed(4)} · {workspace.value}
@@ -295,7 +295,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <div className="text-xs text-gray-400 block mb-1">Cost ranges</div>
+        <div className="text-xs text-muted-foreground block mb-1">Cost ranges</div>
         <div className="flex flex-wrap gap-1">
           {facets.costRanges.map((range) => (
             <button
@@ -307,8 +307,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               }}
               className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                 filters.minCost === range.minCost && filters.maxCost === range.maxCost
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
               title={`Estimated total $${(range.cost ?? 0).toFixed(4)}`}
             >
@@ -319,7 +319,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
-        <div className="text-xs text-gray-400 block mb-1">Enrichment levels</div>
+        <div className="text-xs text-muted-foreground block mb-1">Enrichment levels</div>
         <div className="flex flex-wrap gap-1">
           {facets.enrichmentLevels.map((level) => (
             <button
@@ -327,8 +327,8 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               onClick={() => onChange('enrichmentLevel', filters.enrichmentLevel === level.value ? undefined : level.value)}
               className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
                 filters.enrichmentLevel === level.value
-                  ? 'bg-blue-900 text-blue-100'
-                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-muted-foreground hover:text-foreground'
               }`}
             >
               L{level.value}: {level.count}
@@ -338,24 +338,24 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2">
-        <label className="text-xs text-gray-400 block">
+        <label className="text-xs text-muted-foreground block">
           Min cost
           <input
             type="number"
             step="0.001"
             value={filters.minCost ?? ''}
             onChange={(e) => onChange('minCost', e.target.value || undefined)}
-            className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+            className="mt-1 w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary"
           />
         </label>
-        <label className="text-xs text-gray-400 block">
+        <label className="text-xs text-muted-foreground block">
           Max cost
           <input
             type="number"
             step="0.001"
             value={filters.maxCost ?? ''}
             onChange={(e) => onChange('maxCost', e.target.value || undefined)}
-            className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+            className="mt-1 w-full bg-card border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary"
           />
         </label>
       </div>
@@ -367,9 +367,9 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             type="checkbox"
             checked={filters.managed === true}
             onChange={(e) => onChange('managed', e.target.checked ? true : undefined)}
-            className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-0"
+            className="rounded border-border bg-muted text-primary focus:ring-0"
           />
-          <span className="text-xs text-gray-400">Overdeck-managed</span>
+          <span className="text-xs text-muted-foreground">Overdeck-managed</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -377,9 +377,9 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             type="checkbox"
             checked={filters.enriched === true}
             onChange={(e) => onChange('enriched', e.target.checked ? true : undefined)}
-            className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-0"
+            className="rounded border-border bg-muted text-primary focus:ring-0"
           />
-          <span className="text-xs text-gray-400">Enriched only</span>
+          <span className="text-xs text-muted-foreground">Enriched only</span>
         </label>
       </div>
 
@@ -400,7 +400,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             onChange('maxCost', undefined);
             onChange('enrichmentLevel', undefined);
           }}
-          className="mt-4 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+          className="mt-4 text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
         >
           Clear filters
         </button>
