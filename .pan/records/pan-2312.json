@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2312",
   "schemaVersion": 2,
-  "created": "2026-07-03T16:48:06.323Z",
-  "updated": "2026-07-03T16:48:06.744Z",
-  "pipeline": {
-    "issueId": "PAN-2312",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:48:06.323Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,60 @@
       "timestamp": "2026-07-03T16:48:06.323Z"
     }
   ],
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "feedback": [],
+  "created": "2026-07-03T16:48:06.323Z",
+  "updated": "2026-07-03T17:15:03.590Z",
+  "pipeline": {
+    "issueId": "PAN-2312",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T17:15:03.565Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7900,
+            "output": 169,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 20015,
+            "output": 21338,
+            "cacheRead": 2639355,
+            "cacheWrite": 126697
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7900,
+          "output": 169,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 20015,
+          "output": 21338,
+          "cacheRead": 2639355,
+          "cacheWrite": 126697
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 2.7450609999999998,
+        "pricingAsOf": "2026-07-03T17:15:03.588Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
 }
