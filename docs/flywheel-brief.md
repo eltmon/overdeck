@@ -28,6 +28,10 @@ exists lives in `vision.mdx`. Read both before acting.
     up to `maxAgents`. `vetoed`/`parked`/`objection`/relevance-vet still gate.
 - **`require_uat_before_merge` (default ON):** ON — assemble the UAT candidate each tick, never
   schedule merges. OFF — schedule eligible auto-merges. (See the role's Merge policy.)
+- **Strike merge ownership:** whoever spawns a strike owns its merge. On a strike readiness
+  signal, review the `strike/<id>` diff, run the quality gates, land via gh-API squash-merge
+  (`gh pr create` if needed, then `gh pr merge --squash`) — never a local git push to
+  `origin/main` — then run `pan done <id> --strike`.
 - **Run-specific focus:** none unless given at launch.
 
 ## Stop
