@@ -40,7 +40,7 @@ import {
   sessionExists,
   sessionExistsSync,
 } from '../tmux.js';
-import { queryReadyBeadsByIssueLabels, type BeadEntry } from '../beads-query.js';
+import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type BeadEntry } from '../beads-query.js';
 
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
@@ -492,7 +492,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
   const actions: string[] = [];
 
   const states = listAgentStates({ status: 'running', role: 'work' });
-  const eligibleByWorkspace = new Map<string, AgentState[]>();
+  const eligibleByQueryRoot = new Map<string, AgentState[]>();
 
   for (const state of states) {
     const agentId = state.id;
@@ -518,14 +518,15 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
       } catch { /* fall through and nudge */ }
     }
 
-    const workspaceStates = eligibleByWorkspace.get(state.workspace) ?? [];
+    const queryRoot = resolveBeadsQueryRoot(state.workspace);
+    const workspaceStates = eligibleByQueryRoot.get(queryRoot) ?? [];
     workspaceStates.push(state);
-    eligibleByWorkspace.set(state.workspace, workspaceStates);
+    eligibleByQueryRoot.set(queryRoot, workspaceStates);
   }
 
-  for (const [workspace, workspaceStates] of eligibleByWorkspace) {
+  for (const [queryRoot, workspaceStates] of eligibleByQueryRoot) {
     const issues = workspaceStates.map((state) => state.issueId);
-    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(workspace, issues, { acquisitionTimeoutMs: 500 }));
+    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(queryRoot, issues, { acquisitionTimeoutMs: 500 }));
 
     for (const state of workspaceStates) {
       const agentId = state.id;

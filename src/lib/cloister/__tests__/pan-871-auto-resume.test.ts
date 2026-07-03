@@ -137,7 +137,15 @@ vi.mock('child_process', () => ({
 
 vi.mock('../../../lib/beads-query.js', async () => {
   const { Effect } = await import('effect');
+  const { basename, dirname } = await import('node:path');
   return {
+    resolveBeadsQueryRoot: vi.fn((workspacePath: string) => {
+      const workspaceName = basename(workspacePath);
+      const workspacesDir = dirname(workspacePath);
+      return workspaceName.startsWith('feature-') && basename(workspacesDir) === 'workspaces'
+        ? dirname(workspacesDir)
+        : workspacePath;
+    }),
     queryReadyBeadsByIssueLabels: vi.fn((_workspace: string, issueIds: readonly string[]) => Effect.succeed({
       byIssue: Object.fromEntries(issueIds.map((issueId) => [
         issueId.toLowerCase(),
@@ -607,12 +615,12 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-pan-871 PAN-871: Continue work'));
   });
 
-  it('nudges two idle work agents in one workspace from one ready-beads read', async () => {
+  it('nudges two idle work agents in one project fleet from one ready-beads read', async () => {
     mockListAgentStates.mockReturnValue([
       {
         id: 'agent-pan-871',
         issueId: 'PAN-871',
-        workspace: '/tmp/workspace',
+        workspace: '/tmp/project/workspaces/feature-pan-871',
         harness: 'claude-code',
         role: 'work',
         model: 'claude-sonnet-4-6',
@@ -622,7 +630,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       {
         id: 'agent-pan-872',
         issueId: 'PAN-872',
-        workspace: '/tmp/workspace',
+        workspace: '/tmp/project/workspaces/feature-pan-872',
         harness: 'claude-code',
         role: 'work',
         model: 'claude-sonnet-4-6',
@@ -646,7 +654,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       'Nudged idle agent-pan-872 (PAN-872) — 1 open bead(s)',
     ]);
     expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledTimes(1);
-    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledWith('/tmp/workspace', ['PAN-871', 'PAN-872'], { acquisitionTimeoutMs: 500 });
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledWith('/tmp/project', ['PAN-871', 'PAN-872'], { acquisitionTimeoutMs: 500 });
     expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-a PAN-871: First'));
     expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-872', expect.stringContaining('Next ready bead: workspace-b PAN-872: Second'));
   });

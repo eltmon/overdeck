@@ -96,6 +96,14 @@ vi.mock('../agent-death.js', () => ({
 }));
 
 vi.mock('../../beads-query.js', () => ({
+  resolveBeadsQueryRoot: vi.fn((workspacePath: string) => {
+    const parts = workspacePath.split('/');
+    const workspaceName = parts.at(-1) ?? '';
+    const parent = parts.at(-2) ?? '';
+    return workspaceName.startsWith('feature-') && parent === 'workspaces'
+      ? parts.slice(0, -2).join('/') || '/'
+      : workspacePath;
+  }),
   queryReadyBeadsByIssueLabels: vi.fn((_workspace: string, issueIds: readonly string[]) => Effect.succeed({
     byIssue: Object.fromEntries(issueIds.map((issueId) => [issueId.toLowerCase(), []])),
   })),
@@ -406,6 +414,35 @@ describe('checkStuckAgentRemediation', () => {
       '[deacon] stuck-remediation agent=agent-pan-1415 error=send failed',
     );
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+
+  it('queries ready beads once for work agents across one project fleet', async () => {
+    mocks.listRunningAgentsSync.mockReturnValue([
+      agent({
+        id: 'agent-pan-1415',
+        issueId: 'PAN-1415',
+        workspace: '/tmp/project/workspaces/feature-pan-1415',
+      }),
+      agent({
+        id: 'agent-pan-1416',
+        issueId: 'PAN-1416',
+        workspace: '/tmp/project/workspaces/feature-pan-1416',
+      }),
+    ]);
+    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toEqual([
+      '[deacon] stuck-remediation stage=1 issue=PAN-1415 idleMin=25 action=poked',
+      '[deacon] stuck-remediation stage=1 issue=PAN-1416 idleMin=25 action=poked',
+    ]);
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledTimes(1);
+    expect(mockQueryReadyBeadsByIssueLabels).toHaveBeenCalledWith(
+      '/tmp/project',
+      ['PAN-1415', 'PAN-1416'],
+      { acquisitionTimeoutMs: 500 },
+    );
   });
 });
 

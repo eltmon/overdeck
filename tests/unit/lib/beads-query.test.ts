@@ -136,4 +136,11 @@ describe('queryBeadsForIssuePromise', () => {
     expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
+
+  it('resolves feature workspaces to one project-level beads query root', async () => {
+    const { resolveBeadsQueryRoot } = await import('../../../src/lib/beads-query.js');
+
+    expect(resolveBeadsQueryRoot('/repo/workspaces/feature-pan-2261')).toBe('/repo');
+    expect(resolveBeadsQueryRoot('/repo')).toBe('/repo');
+  });
 });

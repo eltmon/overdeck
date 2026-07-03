@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { existsSync } from 'fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'path';
+import { basename, dirname, join } from 'path';
 import { promisify } from 'util';
 import { Data, Effect } from 'effect';
 import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
@@ -32,6 +32,15 @@ export class BeadsMissingError extends Data.TaggedError('BeadsMissingError')<{
 
 function normalizeIssueLabel(issueId: string): string {
   return issueId.toLowerCase();
+}
+
+export function resolveBeadsQueryRoot(workspacePath: string): string {
+  const workspaceName = basename(workspacePath);
+  const workspacesDir = dirname(workspacePath);
+  if (workspaceName.startsWith('feature-') && basename(workspacesDir) === 'workspaces') {
+    return dirname(workspacesDir);
+  }
+  return workspacePath;
 }
 
 function beadLabels(entry: unknown): string[] {
