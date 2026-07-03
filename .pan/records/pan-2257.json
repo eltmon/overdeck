@@ -39,7 +39,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:53:09.339Z",
+    "updatedAt": "2026-07-03T12:10:22.568Z",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
     "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
@@ -90,8 +90,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 77886,
-            "output": 1457,
+            "input": 78415,
+            "output": 1641,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -99,15 +99,15 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 77886,
-          "output": 1457,
+          "input": 78415,
+          "output": 1641,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T11:53:09.362Z"
+        "pricingAsOf": "2026-07-03T12:10:24.579Z"
       }
     },
     "merges": [
@@ -116,5 +116,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T10:06:21.823Z",
-  "updated": "2026-07-03T11:53:09.363Z"
+  "updated": "2026-07-03T12:10:24.648Z"
 }
