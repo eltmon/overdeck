@@ -123,6 +123,19 @@ describe('isStartupSyncNeededSync', () => {
     expect(result.needed).toBe(true);
   });
 
+  it('returns needed when a project-local skill changes', async () => {
+    const projectPath = join(dirs.base, 'project-skills');
+    mkdirSync(join(projectPath, '.pan', 'skills', 'local-skill'), { recursive: true });
+    write(join(projectPath, '.pan', 'skills', 'local-skill', 'SKILL.md'), '# local skill\n');
+    dirs.projects = [{ config: { path: projectPath, name: 'project-skills' } }];
+
+    const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
+    writeSyncManifestSync();
+    write(join(projectPath, '.pan', 'skills', 'local-skill', 'SKILL.md'), '# local skill changed\n');
+    const result = isStartupSyncNeededSync();
+    expect(result.needed).toBe(true);
+  });
+
   it('falls back to needed when a sync source directory is missing', async () => {
     rmSync(join(dirs.syncSources, 'rules'), { recursive: true, force: true });
     const { isStartupSyncNeededSync } = await import('../../../src/lib/sync.js');

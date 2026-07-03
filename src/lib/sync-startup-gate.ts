@@ -21,7 +21,7 @@ function computeSyncInputHash(): string {
   // Dev mode affects which skills are copied from sync-sources/dev-skills.
   hash.update(String(isDevMode()));
 
-  // mirrorProjectSkillsSync depends on the cwd.
+  // mirrorProjectSkillsSync depends on the cwd and registered project-local skills.
   hash.update(process.cwd());
 
   for (const [key, dir] of Object.entries(SYNC_SOURCES)) {
@@ -41,6 +41,11 @@ function computeSyncInputHash(): string {
     const projectMd = join(config.path, '.pan', 'context', 'project.md');
     if (existsSync(projectMd)) {
       updateHashFromFile(hash, projectMd);
+    }
+
+    const projectSkills = join(config.path, '.pan', 'skills');
+    if (existsSync(projectSkills)) {
+      updateHashFromDirectory(hash, projectSkills);
     }
   }
 

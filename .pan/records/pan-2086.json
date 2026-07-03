@@ -119,22 +119,52 @@
       "timestamp": "2026-07-03T16:57:20.277Z",
       "reason": "end",
       "note": "Completed PAN-2086. Verified sync --if-changed wiring, recorded cold-boot breakdown and no-go decision for partial ReadModel hydration, closed remaining beads, merged current main, fixed the feature-branch ratchet pre-push range blocker, and pushed feature/pan-2086. Gates: typecheck, lint, focused Vitest, full npm test."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T16:59Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T16:59:48.146Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:59:48.591Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T17:01:11.053Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T17:02Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T17:02:14.904Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T17:02:14Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2086\n\nstartup sync gate still misses the top-level skills mirror input\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2086 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-03T16:57:42.925Z",
+  "updated": "2026-07-03T17:02:14.905Z",
   "pipeline": {
     "issueId": "PAN-2086",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:57:42.865Z",
+    "updatedAt": "2026-07-03T17:02:12.068Z",
+    "reviewNotes": "startup sync gate still misses the top-level skills mirror input",
     "inspectNotes": "Bead workspace-h51bn PASS. Implements Task 1 Step 1 (profile via time/timeAsync helpers + [sync-timing] summary) and Step 2 (content-hash gate: isStartupSyncNeededSync + writeSyncManifestSync at ~/.overdeck/.sync-manifest.json). Hash covers SYNC_SOURCES tree + global.md + per-project project.md + devMode + cwd; missing input falls back to needed=true (conservative). 6 unit tests cover all gate branches. Manual pan sync / pan sync --force behavior unchanged. Follow-up bead expected to wire the gate into the deferred startup spawn in src/cli/index.ts and add the --if-changed flag per the Task 1 guardrail.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2313",
+    "lastVerifiedCommit": "5cfb20ebb6d47c78ae7f76b4ce0cebfd01d56f60",
     "reviewRequestedAt": "2026-07-03T16:57:20.281Z"
   },
   "closeOut": {
@@ -213,7 +243,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.01451,
-        "pricingAsOf": "2026-07-03T16:57:42.924Z"
+        "pricingAsOf": "2026-07-03T17:02:12.168Z"
       }
     },
     "merges": [
