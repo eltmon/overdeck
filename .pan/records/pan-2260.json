@@ -1,41 +1,26 @@
 {
   "issueId": "PAN-2260",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "timestamp": "2026-07-03T04:20:16.616Z",
-      "reason": "end",
-      "note": "bd sync was blocked by the approval reviewer because the configured beads sync remote is an external git+ssh destination; I did not retry or work around it. The sandboxed npm test run failed with EPERM on child processes/socket binds, then the escalated npm test run passed. No plan deviations. Implemented squash-aware close-out verification by accepting a merged GitHub PR only when the feature branch tip predates mergedAt, preventing ancestry-only false positives after squash merge. Added lifecycle regression coverage. Gates: npx vitest run tests/unit/lib/lifecycle/workflows.test.ts; npm run typecheck; npm run lint; npm test."
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-03T04:22Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-03T04:22:02.932Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-03T04:22Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-03T04:22:10.717Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T04:39:31.703Z"
-    }
-  ],
   "feedback": [],
-  "created": "2026-07-03T04:04:30.342Z",
-  "updated": "2026-07-03T04:39:33.620Z",
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed"
+  },
   "pipeline": {
     "issueId": "PAN-2260",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:39:33.552Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-03T04:41:22.611Z",
+    "reviewNotes": "Review passed; merged PR head verification addresses the prior squash-merge close-out blocker",
+    "testNotes": "Verification did not complete. Context discovery attempted from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2260: cat .pan/continue.json failed missing file; cat .pan/spec.vbrief.json failed missing file; bd show PAN-2260 failed opening redirected Dolt database with read-only file system. No configured typecheck, lint, test, build, or Playwright UAT gate reached a passing result, so the role-based verification verdict is failed.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
+    "reviewedAtCommit": "3b348f4f8bf46eb99467058cf1f4fc14e61a6de8",
     "lastVerifiedCommit": "9cdc8d0e49d0bb0b797180a642d5d579b4e24d52",
     "reviewRequestedAt": "2026-07-03T04:20:16.617Z"
   },
@@ -44,8 +29,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 6715,
-            "output": 299,
+            "input": 7717,
+            "output": 435,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -53,15 +38,15 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 6715,
-          "output": 299,
+          "input": 7717,
+          "output": 435,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:39:33.619Z"
+        "pricingAsOf": "2026-07-03T04:41:22.643Z"
       }
     },
     "merges": [
@@ -69,10 +54,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "auto-start": "completed",
-    "auto-start.ac1": "completed"
-  }
+  "created": "2026-07-03T04:41:22.632Z",
+  "updated": "2026-07-03T04:41:22.645Z"
 }
