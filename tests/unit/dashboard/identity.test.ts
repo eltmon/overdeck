@@ -9,6 +9,7 @@ describe('dashboard identity port guard', () => {
       mode: 'peer',
       port: 3011,
       hostDashboardApiPort: 3011,
+      runningInContainer: false,
     })).toBe(true);
   });
 
@@ -18,6 +19,7 @@ describe('dashboard identity port guard', () => {
       mode: 'peer',
       port: 4011,
       hostDashboardApiPort: 3011,
+      runningInContainer: false,
     })).toBe(false);
   });
 
@@ -27,6 +29,7 @@ describe('dashboard identity port guard', () => {
       mode: 'primary',
       port: 3011,
       hostDashboardApiPort: 3011,
+      runningInContainer: false,
     })).toBe(true);
   });
 
@@ -34,6 +37,26 @@ describe('dashboard identity port guard', () => {
     expect(shouldRefuseHostDashboardPort({
       repoRoot: '/repo',
       mode: 'primary',
+      port: 3011,
+      hostDashboardApiPort: 3011,
+      runningInContainer: false,
+    })).toBe(false);
+  });
+
+  it('allows a peer dashboard on the host dashboard API port inside a container', () => {
+    expect(shouldRefuseHostDashboardPort({
+      repoRoot: '/repo',
+      mode: 'peer',
+      port: 3011,
+      hostDashboardApiPort: 3011,
+      runningInContainer: true,
+    })).toBe(false);
+  });
+
+  it('allows the canonical workspace container repo root on the host dashboard API port', () => {
+    expect(shouldRefuseHostDashboardPort({
+      repoRoot: '/workspaces/overdeck',
+      mode: 'peer',
       port: 3011,
       hostDashboardApiPort: 3011,
     })).toBe(false);
