@@ -196,6 +196,49 @@ export function loadReviewStatusesForIssues(issueIds: string[]): Record<string, 
   return getReviewStatusesFromDb(issueIds);
 }
 
+export function loadReadyForMergeFlags(issueIds: string[]): Map<string, boolean> {
+  const normalizedIds = [...new Set(issueIds.map((id) => id.toUpperCase()).filter(Boolean))];
+  const dbStatuses = loadReviewStatusesForIssues(normalizedIds);
+  const flags = new Map<string, boolean>();
+
+  for (const issueId of normalizedIds) {
+    const dbStatus = dbStatuses[issueId] ?? null;
+    const journal = readJournalStatusSync(issueId);
+    let status = dbStatus;
+
+    if (journal) {
+      if ((journal.durable as { closedOut?: boolean }).closedOut === true) {
+        flags.set(issueId, false);
+        continue;
+      }
+
+      if (!dbStatus || (dbStatus.updatedAt ?? '') < journal.updatedAt) {
+        const merged: ReviewStatus = {
+          ...(dbStatus ?? {
+            issueId,
+            reviewStatus: 'pending' as const,
+            testStatus: 'pending' as const,
+            updatedAt: journal.updatedAt,
+            readyForMerge: false,
+          }),
+        };
+        for (const [key, value] of Object.entries(journal.durable)) {
+          if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
+        }
+        merged.issueId = issueId;
+        merged.updatedAt = journal.updatedAt;
+        const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+        merged.readyForMerge = hasBlockers ? false : reviewGatesPassedSync(merged);
+        status = normalizeReviewStatusSync(merged);
+      }
+    }
+
+    flags.set(issueId, status?.readyForMerge ?? false);
+  }
+
+  return flags;
+}
+
 export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
   // SQLite is the authoritative store for the default (server) path.
   // Mirrors the old JSON overwrite semantics: upsert every entry in the map and
