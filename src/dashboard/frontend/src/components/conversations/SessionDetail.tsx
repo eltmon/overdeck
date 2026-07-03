@@ -9,6 +9,7 @@ import { WS_METHODS } from '@overdeck/contracts';
 import type { DiscoveredSessionSnapshot } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore } from '../../lib/store';
+import { buildConversationUrl } from '../../App/routes';
 import { SessionTranscript } from './SessionTranscript';
 
 export interface Session {
@@ -151,6 +152,7 @@ export function SessionDetail({ session, onClose }: Props) {
     enabled: !isArchived,
   });
   const displaySession = isArchived ? session : freshSession ?? session;
+  const commandDeckConversationId = displaySession.conversationId ?? (isArchived ? String(displaySession.id) : null);
 
   const invalidateSessionQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ['discovered-session', session.id] });
@@ -193,6 +195,11 @@ export function SessionDetail({ session, onClose }: Props) {
     const model = customModel.trim();
     enrichMutation.mutate({ tier, ...(model ? { model } : {}) });
   };
+  const openInCommandDeck = () => {
+    if (!commandDeckConversationId) return;
+    window.history.pushState(null, '', buildConversationUrl(String(commandDeckConversationId)));
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
 
   return (
     <div className="flex flex-col h-full border-l border-gray-800 bg-gray-950">
@@ -209,9 +216,19 @@ export function SessionDetail({ session, onClose }: Props) {
             {displaySession.overdeckManaged ? `Managed${displaySession.panIssueId ? ` · ${displaySession.panIssueId}` : ''}` : 'Ad-hoc'}
           </span>
         </div>
-        <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors">
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {commandDeckConversationId && (
+            <button
+              onClick={openInCommandDeck}
+              className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-300 transition-colors hover:border-gray-500 hover:bg-gray-900"
+            >
+              Open in Command Deck
+            </button>
+          )}
+          <button onClick={onClose} aria-label="Close session detail" className="text-gray-600 hover:text-gray-300 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <details open className="shrink-0 border-b border-gray-800">

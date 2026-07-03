@@ -25,6 +25,10 @@ const rpcMocks = vi.hoisted(() => ({
   })),
 }));
 
+const componentMocks = vi.hoisted(() => ({
+  sessionDetail: vi.fn(),
+}));
+
 vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => ({ request: rpcMocks.request }),
 }));
@@ -59,7 +63,12 @@ vi.mock('../SessionTable', async () => {
     ),
   };
 });
-vi.mock('../SessionDetail', () => ({ SessionDetail: () => null }));
+vi.mock('../SessionDetail', () => ({
+  SessionDetail: (props: unknown) => {
+    componentMocks.sessionDetail(props);
+    return <div data-testid="session-detail" />;
+  },
+}));
 vi.mock('../ScanButton', () => ({
   ScanButton: ({ onScan }: { onScan: () => void }) => (
     <button data-testid="scan-btn" onClick={onScan}>Scan</button>
@@ -121,10 +130,10 @@ function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-function renderPage(client: QueryClient) {
+function renderPage(client: QueryClient, props: ComponentProps<typeof ConversationsPage> = {}) {
   return render(
     <QueryClientProvider client={client}>
-      <ConversationsPage />
+      <ConversationsPage {...props} />
     </QueryClientProvider>,
   );
 }
@@ -138,6 +147,8 @@ function sessionRows() {
 describe('ConversationsPage endpoint selection', () => {
   beforeEach(() => {
     capturedOnChange = null;
+    componentMocks.sessionDetail.mockClear();
+    window.history.replaceState(null, '', '/sessions');
     rpcMocks.list.mockResolvedValue(LIST_RESPONSE);
     rpcMocks.search.mockResolvedValue(SEARCH_RESPONSE);
     rpcMocks.stats.mockResolvedValue(STATS_RESPONSE);
@@ -349,5 +360,27 @@ describe('ConversationsPage endpoint selection', () => {
 
     expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('Encountered two children with the same key'))).toBe(false);
     errorSpy.mockRestore();
+  });
+
+  it('selects a row from the initial session URL key', async () => {
+    renderPage(makeClient(), { initialSessionKey: 'discovered:1' });
+
+    await screen.findByTestId('session-detail');
+
+    expect(componentMocks.sessionDetail).toHaveBeenLastCalledWith(expect.objectContaining({
+      session: expect.objectContaining({ id: 1, source: 'discovered' }),
+    }));
+  });
+
+  it('clicking a row updates the session query param with replaceState', async () => {
+    const replaceSpy = vi.spyOn(window.history, 'replaceState');
+    renderPage(makeClient());
+
+    await waitFor(() => expect(sessionRows()).toHaveLength(2));
+    fireEvent.click(sessionRows()[1]!);
+
+    expect(replaceSpy).toHaveBeenLastCalledWith(null, '', '/sessions?session=discovered%3A1');
+    expect(window.location.search).toBe('?session=discovered%3A1');
+    replaceSpy.mockRestore();
   });
 });
