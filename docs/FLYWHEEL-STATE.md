@@ -207,6 +207,13 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 7 (2026-07-03) — planning DOWN for codex-routed agents (PAN-2274); PAN-2258 convoy vanished twice
+
+- **All 3 routed planning sessions (2257/2261/2255) crashed at spawn:** `error: unexpected argument '--append-system-prompt-file'` from the **codex** binary. Root cause: `roleSystemPromptInjectionSync()` (src/lib/agents/runtime-command.ts:604, the PAN-2087 --agent replacement) builds claude-code-only flags harness-blind; the plan spawn splices them into the codex command line. Filed **PAN-2274** + struck. After it lands, re-run `pan plan --auto` for all three. REUSABLE: a planning pane showing "Usage: codex ... try '--help'" + instant exit = this bug, zero planning happened despite the session existing.
+- **PAN-2258's entire convoy (strike/review/test sessions) vanished without verdicts** — record still pending/pending. Cause unknown (deacon reap vs crash vs operator); re-issued `pan review restart` (one dashboard "fetch failed" hiccup mid-tick, recovered). If it vanishes again, check deacon.log — possibly the PAN-2270 workspace-origin mismatch family.
+- **NO_RESUME survives restarts:** dashboard has a NEW pid (1675489) since tick 2 but still OVERDECK_NO_RESUME=1 with OVERDECK_RESUME_GATE_SOURCE=default — the env is inherited from the restarting parent (watchdog env trap, known from memory). A plain restart does NOT clear it; needs OVERDECK_RESUME=1 or a clean shell. Surfaced with mechanism.
+- PAN-2254/2260 work agents live and progressing (2254 finished a 17m turn; 2260 mid-turn). PAN-2224 record shows review+test PASSED but readyForMerge=false — some gate holding it, watch. PAN-2181 test idle, verdict unconfirmed. Main GREEN (e5031ed09a). UAT bundle unchanged (MIN-831/846).
+
 ## RUN-53 tick 6 (2026-07-03) — operator routing sweep: holds lifted, 5 issues routed, 2 review-queue unsticks
 
 - **Operator lifted all holds** and handed a routing list: PAN-2254/2257/2260/2261 (bugs/features), PAN-2255 (needs planning), PAN-2265 RESERVED (operator GLM-5.2 strike — untouched), PAN-2258 + PAN-1917 done-pending-review.
