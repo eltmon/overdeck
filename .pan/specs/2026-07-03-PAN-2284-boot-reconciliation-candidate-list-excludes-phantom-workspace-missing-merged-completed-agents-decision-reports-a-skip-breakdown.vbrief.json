@@ -4,7 +4,7 @@
     "created": "2026-07-03T11:06:28.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2284: boot-reconciliation Resume All reports 0 resumed — candidate list is full of stale (workspace-missing) and already-completed agents",
-    "updated": "2026-07-03T11:11:52.436Z"
+    "updated": "2026-07-03T11:15:19.002Z"
   },
   "plan": {
     "id": "pan-2284",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "86450946-a930-4bbc-b72a-fd23356b1267",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-03T11:06:28.000Z",
-    "updated": "2026-07-03T11:11:52.436Z",
+    "updated": "2026-07-03T11:15:19.002Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2284",
@@ -55,7 +55,7 @@
       {
         "id": "shared-classifier",
         "title": "Add shared synchronous bootReconciliationSkipReason(agent) classifier",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-07-03T11:06:28.000Z",
         "metadata": {
