@@ -1647,18 +1647,22 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId, passed: true },
         })));
-        try {
-          const agentId = `agent-${issueId.toLowerCase()}`;
-          yield* Effect.promise(() => messageAgent(
-            agentId,
-            `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`
-          ));
-          console.log(`[review-status] Notified ${agentId} that all checks passed`);
-        } catch (err) {
-          console.log(
-            `[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`
-          );
-        }
+        // Notify the whole-issue work agent when one exists. This MUST be an
+        // Effect-level catch: a try/catch around `yield*` does not intercept a
+        // failed Effect — the failure propagated and 500'd the entire verdict
+        // POST after readyForMerge was only partially applied. Swarm issues
+        // have no `agent-<issue>` at all, so this path failed on every
+        // swarm test-pass (observed live on PAN-1791).
+        const notifyAgentId = `agent-${issueId.toLowerCase()}`;
+        yield* Effect.tryPromise(() => messageAgent(
+          notifyAgentId,
+          `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`
+        )).pipe(
+          Effect.tap(() => Effect.sync(() => console.log(`[review-status] Notified ${notifyAgentId} that all checks passed`))),
+          Effect.catchAll((err) => Effect.sync(() => console.log(
+            `[review-status] Could not notify work agent for ${issueId} (may not be running): ${err instanceof Error ? err.message : String(err)}`
+          ))),
+        );
       }
     }
 

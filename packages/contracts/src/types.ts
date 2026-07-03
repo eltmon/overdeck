@@ -603,6 +603,13 @@ export const SessionNode = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
+  // Troubled gate (PAN-2257): message delivery queues mail while this is true,
+  // so session-tree rows need the gate state and its queue count.
+  troubled: Schema.optional(Schema.Boolean),
+  troubledAt: Schema.optional(Schema.String),
+  troubledReason: Schema.optional(Schema.String),
+  consecutiveFailures: Schema.optional(Schema.Number),
+  queuedMailCount: Schema.optional(Schema.Number),
   // PAN-2053: read-only model-origin for the right-click MODEL inspector. Set
   // only when the agent's role uses a weighted model distribution.
   modelOrigin: Schema.optional(ModelOrigin),
@@ -628,6 +635,7 @@ export type ProjectSessionTree = typeof ProjectSessionTree.Type
 export const DiscoveredSessionSnapshot = Schema.Struct({
   id: Schema.Number,
   jsonlPath: Schema.String,
+  harness: Schema.optional(Schema.String),
   sessionId: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   workspaceHash: Schema.optional(Schema.String),
@@ -660,6 +668,7 @@ export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
 
 /** Filter parameters for conversation search */
 export const ConversationFilter = Schema.Struct({
+  harness: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   primaryModel: Schema.optional(Schema.String),
   managed: Schema.optional(Schema.Boolean),

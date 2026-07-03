@@ -1,0 +1,57 @@
+{
+  "issueId": "PAN-2248",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-03T00:33:53.505Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-07-03T00:26:37.987Z",
+  "updated": "2026-07-03T00:33:53.560Z",
+  "pipeline": {
+    "issueId": "PAN-2248",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T00:33:53.507Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2256",
+    "reviewRequestedAt": "2026-07-03T00:33:53.506Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 118,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 118,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-03T00:33:53.560Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2256"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}

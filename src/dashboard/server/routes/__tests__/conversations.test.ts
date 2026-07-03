@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 /**
  * Tests for conversations route helpers.
  *
@@ -189,6 +190,22 @@ function decodeJsonResponse(response: { status: number; body: unknown }) {
 function decodeTextResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
+}
+
+async function getConversationMessages(name: string) {
+  const { conversationsRouteLayer } = await import('../conversations.js');
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/conversations/${name}/messages`, {
+    method: 'GET',
+    headers: { Origin: 'http://localhost:3011' },
+  }));
+
+  return Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(conversationsRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
+      ),
+    ),
+  );
 }
 
 async function readPendingControlCommand(agentId: string): Promise<Record<string, unknown>> {
@@ -939,7 +956,7 @@ describe('conversations route — DB integration', () => {
 
     createConversation({ name: 'older-archived', tmuxSession: 'conv-older', cwd: '/cwd/older', title: 'Older archived' });
     createConversation({ name: 'active-conv', tmuxSession: 'conv-active', cwd: '/cwd/active', title: 'Active' });
-    createConversation({ name: 'newer-archived', tmuxSession: 'conv-newer', cwd: '/cwd/newer', title: 'Newer archived' });
+    createConversation({ name: 'newer-archived', tmuxSession: 'conv-newer', cwd: '/cwd/newer', title: 'Newer archived', harness: 'codex' });
     archiveConversation('older-archived');
     archiveConversation('newer-archived');
     db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run('2026-05-22T00:00:00.000Z', 'older-archived');
@@ -953,6 +970,7 @@ describe('conversations route — DB integration', () => {
     expect(rows.map((row) => row.conversationName)).not.toContain('active-conv');
     expect(rows[0]).toMatchObject({
       source: 'managed-archived',
+      harness: 'codex',
       overdeckManaged: true,
       archivedAt: '2026-05-23T00:00:00.000Z',
     });
@@ -1017,6 +1035,43 @@ describe('conversations route — DB integration', () => {
     expect(rows.map((row) => row.conversationName)).toEqual(['matching-archived']);
   });
 
+  it('preserves and filters archived conversations by harness', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({ name: 'codex-archived', tmuxSession: 'conv-codex', cwd: '/cwd/codex', harness: 'codex' });
+    createConversation({ name: 'pi-archived', tmuxSession: 'conv-pi', cwd: '/cwd/pi', harness: 'ohmypi' });
+    archiveConversation('codex-archived');
+    archiveConversation('pi-archived');
+
+    const response = await handleArchivedConversationsList({ harness: 'codex' });
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['codex-archived']);
+    expect(rows[0]).toMatchObject({ harness: 'codex' });
+  });
+
+  it('includes legacy null-harness archived conversations when filtering for claude-code', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { getOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+    const db = getOverdeckDatabaseSync();
+
+    createConversation({ name: 'legacy-claude-archived', tmuxSession: 'conv-legacy-claude', cwd: '/cwd/legacy' });
+    createConversation({ name: 'codex-archived', tmuxSession: 'conv-codex', cwd: '/cwd/codex', harness: 'codex' });
+    archiveConversation('legacy-claude-archived');
+    archiveConversation('codex-archived');
+    db.prepare(`UPDATE conversations SET harness = NULL WHERE name = ?`).run('legacy-claude-archived');
+
+    const response = await handleArchivedConversationsList({ harness: 'claude-code' });
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows.map((row) => row.conversationName)).toEqual(['legacy-claude-archived']);
+    expect(rows[0]).toMatchObject({ harness: null });
+  });
+
   it('normalizes relative since values when parsing archived conversation filters', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-23T12:00:00.000Z'));
@@ -1024,9 +1079,10 @@ describe('conversations route — DB integration', () => {
     try {
       const { parseArchivedConversationListOptions } = await import('../conversations.js');
 
-      const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50'));
+      const options = parseArchivedConversationListOptions(new URLSearchParams('since=7d&limit=50&harness=codex'));
 
       expect(options.since).toBe('2026-05-16T12:00:00.000Z');
+      expect(options.harness).toBe('codex');
     } finally {
       vi.useRealTimers();
     }
@@ -1071,6 +1127,31 @@ describe('conversations route — DB integration', () => {
       lastTs: '2026-05-23T01:00:00.000Z',
     });
     expect(rows[0].jsonlPath).toEqual(expect.stringContaining('sparse-session.jsonl'));
+  });
+
+  it('returns null jsonlPath for archived non-Claude conversations without discovered_sessions enrichment', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({
+      name: 'ohmypi-archived',
+      tmuxSession: 'conv-ohmypi-archived',
+      cwd: '/cwd/ohmypi',
+      claudeSessionId: 'ohmypi-session',
+      harness: 'ohmypi',
+      model: 'gpt-5.5',
+    });
+    archiveConversation('ohmypi-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'ohmypi-archived',
+      jsonlPath: null,
+    });
   });
 
   it('merges discovered_sessions enrichment for archived conversations', async () => {
@@ -1132,6 +1213,100 @@ describe('conversations route — DB integration', () => {
       enrichmentLevel: 2,
       enrichmentFailed: true,
     });
+  });
+
+  it('returns the discovered jsonlPath for archived non-Claude conversations after discovery', async () => {
+    const { createConversation, archiveConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const { handleArchivedConversationsList } = await import('../conversations.js');
+
+    createConversation({
+      name: 'codex-archived',
+      tmuxSession: 'conv-codex-archived',
+      cwd: '/cwd/codex',
+      claudeSessionId: 'codex-session',
+      harness: 'codex',
+      model: 'gpt-5.5-codex',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/codex/sessions/rollout-codex-session.jsonl',
+      sessionId: 'codex-session',
+      workspacePath: '/cwd/codex',
+      messageCount: 3,
+      primaryModel: 'gpt-5.5-codex',
+    });
+    archiveConversation('codex-archived');
+
+    const response = await handleArchivedConversationsList();
+    const rows = decodeJsonResponse(response) as unknown as Array<Record<string, unknown>>;
+
+    expect(response.status).toBe(200);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      conversationName: 'codex-archived',
+      jsonlPath: '/codex/sessions/rollout-codex-session.jsonl',
+    });
+  });
+
+  it('serves pi messages through discovered_sessions when the agent dir transcript is gone', async () => {
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const sessionFile = join(TEST_HOME, '.overdeck', 'agents', 'agent-cleaned-up', 'sessions', '-cwd-pi', '20260702_pi-fallback-session.jsonl');
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, piSessionFixture('pi-fallback-session', '/cwd/pi-fallback'), 'utf8');
+
+    createConversation({
+      name: 'pi-fallback',
+      tmuxSession: 'conv-pi-fallback',
+      cwd: '/cwd/pi-fallback',
+      claudeSessionId: 'pi-fallback-session',
+      harness: 'ohmypi',
+      model: 'anthropic/claude-sonnet-4-6',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: sessionFile,
+      harness: 'ohmypi',
+      sessionId: 'pi-fallback-session',
+      workspacePath: '/cwd/pi-fallback',
+      messageCount: 2,
+      primaryModel: 'anthropic/claude-sonnet-4-6',
+    });
+
+    const response = await getConversationMessages('pi-fallback');
+    const body = decodeJsonResponse(response) as { messages?: Array<{ role: string; text: string }>; workLog?: Array<{ label?: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.messages?.map((message) => message.text)).toEqual(['Please read the file', 'I will read it.']);
+    expect(body.workLog?.some((entry) => entry.label === 'Read')).toBe(true);
+  });
+
+  it('ignores a discovered_sessions fallback path that no longer exists', async () => {
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+    const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const missingFile = join(TEST_HOME, 'missing', 'pi-session.jsonl');
+
+    createConversation({
+      name: 'pi-missing-discovered',
+      tmuxSession: 'conv-pi-missing-discovered',
+      cwd: '/cwd/pi-missing',
+      claudeSessionId: 'pi-missing-session',
+      harness: 'ohmypi',
+      model: 'anthropic/claude-sonnet-4-6',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: missingFile,
+      harness: 'ohmypi',
+      sessionId: 'pi-missing-session',
+      workspacePath: '/cwd/pi-missing',
+      messageCount: 2,
+      primaryModel: 'anthropic/claude-sonnet-4-6',
+    });
+
+    const response = await getConversationMessages('pi-missing-discovered');
+    const body = decodeJsonResponse(response) as { messages?: unknown[]; workLog?: unknown[]; streaming?: boolean };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ messages: [], workLog: [], streaming: false });
   });
 
   it('excludes non-archived conversations from the archived list', async () => {
@@ -1467,3 +1642,55 @@ describe('transformMessageForHarness (PAN-1535)', () => {
     expect(out).not.toContain(`@${path}`);
   });
 });
+
+function piSessionFixture(sessionId: string, cwd: string): string {
+  return [
+    {
+      type: 'session',
+      version: 3,
+      id: sessionId,
+      timestamp: '2026-07-02T10:00:00.000Z',
+      cwd,
+    },
+    {
+      type: 'message',
+      id: 'msg-user',
+      parentId: null,
+      timestamp: '2026-07-02T10:00:01.000Z',
+      message: {
+        role: 'user',
+        content: [{ type: 'text', text: 'Please read the file' }],
+      },
+    },
+    {
+      type: 'message',
+      id: 'msg-assistant',
+      parentId: 'msg-user',
+      timestamp: '2026-07-02T10:00:02.000Z',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'I will read it.' },
+          {
+            type: 'toolCall',
+            id: 'tool-1',
+            name: 'Read',
+            arguments: { file_path: `${cwd}/src/index.ts` },
+          },
+        ],
+      },
+    },
+    {
+      type: 'message',
+      id: 'msg-tool',
+      parentId: 'msg-assistant',
+      timestamp: '2026-07-02T10:00:03.000Z',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'tool-1',
+        toolName: 'Read',
+        content: [{ type: 'text', text: 'file contents' }],
+      },
+    },
+  ].map((line) => JSON.stringify(line)).join('\n') + '\n';
+}

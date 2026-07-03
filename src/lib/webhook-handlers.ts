@@ -205,43 +205,68 @@ function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumbe
 
 export async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
   try {
-    const { execFile } = await import('child_process');
-    const { promisify } = await import('util');
-    const execFileAsync = promisify(execFile);
-    // gh GraphQL fields (NOT the REST webhook shape): mergeable is an enum
-    // (MERGEABLE | CONFLICTING | UNKNOWN), mergeStateStatus is CLEAN | DIRTY |
-    // UNSTABLE | BLOCKED | BEHIND | …, isDraft is a bool, and statusCheckRollup
-    // carries the required-check results. The previous query used `mergeableState`
-    // (no such gh field) so the call threw on every invocation and this reconciler
-    // silently did nothing — leaving readyForMerge PRs with stale/empty blockers. PAN-1620.
-    const { stdout } = await execFileAsync(
-      'gh',
-      ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
-      { encoding: 'utf-8', timeout: 15000 },
-    );
-    if (!stdout.trim()) return;
-    const pr = JSON.parse(stdout) as {
-      mergeable?: string | null;
-      mergeStateStatus?: string | null;
-      isDraft?: boolean;
-      statusCheckRollup?: Array<{ conclusion?: string | null; state?: string | null }>;
-    };
+    // Resolve PR merge state. Prefer the GitHub App REST path (installation
+    // token, separate rate-limit budget, no GraphQL) when configured; fall back
+    // to `gh pr view` (GraphQL) only when the App is not set up. Previously this
+    // unconditionally used `gh` GraphQL even with the App configured, which
+    // burned the GraphQL budget on every pull_request webhook + every
+    // merge-blocker poll. PAN-2265.
+    const [owner, repoName] = repo.split('/');
+    if (!owner || !repoName) return;
+
+    let mergeable: string;
+    let mergeState: string;
+    let isDraft: boolean;
+    let checksFailed: boolean;
+
+    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
+    if (isGitHubAppConfigured()) {
+      // App REST path — installation token, separate rate-limit budget, no GraphQL.
+      const prState = await Effect.runPromise(getPullRequestState(owner, repoName, prNumber));
+      mergeable = prState.mergeable === null ? 'UNKNOWN' : prState.mergeable ? 'MERGEABLE' : 'CONFLICTING';
+      mergeState = (prState.mergeableState ?? '').toUpperCase();
+      isDraft = prState.draft;
+      checksFailed = prState.checksFailed;
+    } else {
+      // gh CLI fallback (GraphQL) — only when the App is not configured.
+      const { execFile } = await import('child_process');
+      const { promisify } = await import('util');
+      const execFileAsync = promisify(execFile);
+      // gh GraphQL fields (NOT the REST webhook shape): mergeable is an enum
+      // (MERGEABLE | CONFLICTING | UNKNOWN), mergeStateStatus is CLEAN | DIRTY |
+      // UNSTABLE | BLOCKED | BEHIND | …, isDraft is a bool, and statusCheckRollup
+      // carries the required-check results. PAN-1620.
+      const { stdout } = await execFileAsync(
+        'gh',
+        ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
+        { encoding: 'utf-8', timeout: 15000 },
+      );
+      if (!stdout.trim()) return;
+      const pr = JSON.parse(stdout) as {
+        mergeable?: string | null;
+        mergeStateStatus?: string | null;
+        isDraft?: boolean;
+        statusCheckRollup?: Array<{ conclusion?: string | null; state?: string | null }>;
+      };
+      mergeable = (pr.mergeable ?? '').toUpperCase();
+      mergeState = (pr.mergeStateStatus ?? '').toUpperCase();
+      isDraft = pr.isDraft === true;
+      checksFailed = (pr.statusCheckRollup ?? []).some((c) =>
+        FAILING_CHECK_CONCLUSIONS.has((c.conclusion || c.state || '').toUpperCase()),
+      );
+    }
+
     const status = await Effect.runPromise(getReviewStatus(issueId));
     if (!status) return;
 
-    const mergeable = (pr.mergeable ?? '').toUpperCase();
-    const mergeState = (pr.mergeStateStatus ?? '').toUpperCase();
     const isConflicting = mergeable === 'CONFLICTING' || mergeState === 'DIRTY';
-    const checksFailed = (pr.statusCheckRollup ?? []).some((c) =>
-      FAILING_CHECK_CONCLUSIONS.has((c.conclusion || c.state || '').toUpperCase()),
-    );
 
     // Rebuild the GitHub-native blockers from live state, preserving any
     // non-GitHub-native ones (e.g. unresolved_conversations, changes_requested).
     const GH_NATIVE = new Set<BlockerReason['type']>(['merge_conflict', 'not_mergeable', 'failing_checks', 'draft_pr']);
     const now = new Date().toISOString();
     const blockers: BlockerReason[] = (status.blockerReasons ?? []).filter((b) => !GH_NATIVE.has(b.type));
-    if (pr.isDraft) blockers.push({ type: 'draft_pr', summary: 'Pull request is in draft state', detectedAt: now });
+    if (isDraft) blockers.push({ type: 'draft_pr', summary: 'Pull request is in draft state', detectedAt: now });
     if (isConflicting) {
       blockers.push({ type: 'merge_conflict', summary: 'Merge conflict with target branch', detectedAt: now });
     } else if (mergeState === 'BLOCKED' && !checksFailed) {

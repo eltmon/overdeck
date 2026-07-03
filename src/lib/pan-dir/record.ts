@@ -59,6 +59,27 @@ export interface PanIssueCloseOutRecord {
   closedAt?: string;
 }
 
+export interface PanIssueSwarmFailedMergeBlock {
+  issueId: string;
+  itemId: string;
+  slotIndex: number;
+  branch?: string;
+  note: string;
+}
+
+export interface PanIssueSwarmSlotAssignment {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+  assignedAt?: string;
+}
+
+export interface PanIssueSwarmRecord {
+  failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
+  slotAssignments?: PanIssueSwarmSlotAssignment[];
+}
+
 export interface PanIssuePipelineRecord {
   issueId: string;
   reviewStatus: string;
@@ -124,6 +145,7 @@ export interface PanIssueRecord {
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
+  swarm?: PanIssueSwarmRecord;
 
   pipeline: PanIssuePipelineRecord;
   closeOut: PanIssueCloseOutRecord;
@@ -165,12 +187,44 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
 
 // ─── Read / write ─────────────────────────────────────────────────────────────
 
+/**
+ * Synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
   record: PanIssueRecord,
 ): string {
   const path = getIssueRecordPath(project, issueId);
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const now = new Date().toISOString();
+  const next: PanIssueRecord = {
+    ...record,
+    issueId: issueId.toUpperCase(),
+    schemaVersion: RECORD_SCHEMA_VERSION,
+    created: record.created || now,
+    updated: now,
+  };
+  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  return path;
+}
+
+/**
+ * Workspace-scoped synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
+export function writeIssueRecordForWorkspaceSync(
+  workspacePath: string,
+  issueId: string,
+  record: PanIssueRecord,
+): string {
+  const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   const dir = dirname(path);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -202,6 +256,16 @@ export async function readIssueRecord(
 
 export function readIssueRecordSync(project: ProjectConfig, issueId: string): PanIssueRecord | null {
   const path = getIssueRecordPath(project, issueId);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    return JSON.parse(raw) as PanIssueRecord;
+  } catch {
+    return null;
+  }
+}
+
+export function readIssueRecordForWorkspaceSync(workspacePath: string, issueId: string): PanIssueRecord | null {
+  const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   try {
     const raw = readFileSync(path, 'utf-8');
     return JSON.parse(raw) as PanIssueRecord;

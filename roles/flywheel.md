@@ -137,8 +137,11 @@ It sets how aggressively you START backlog work:
   NOT chain into work); the auto-pickable predicate starts it on a later tick.
 - **Start:** `pan start <id>` / `pan plan <id> --auto --auto-start` for auto-pickable items,
   in-pipeline recovery (startup-triage restart, merge-conflict re-plan), and trivial issues.
-- **Strike:** `pan strike <id>` for `blocks-main` emergencies — bypasses the pipeline, lands
-  on `main`, verifies there.
+- **Strike:** `pan strike <id>` for `blocks-main` emergencies — bypasses the pipeline, but
+  whoever spawns a strike owns its merge. On the strike's readiness signal, review the
+  `strike/<id>` diff, run the quality gates (typecheck, lint including file-size, tests),
+  land via gh-API squash-merge (`gh pr create` if needed, then `gh pr merge --squash`) —
+  never a local git push to `origin/main` — then run `pan done <id> --strike`.
 
 **Vet before every launch (PAN-2059).** Before you plan/start/strike *any* item, vet it
 against current `main` **and the resolved-tenets registry (`docs/DECISIONS.md`)**: already

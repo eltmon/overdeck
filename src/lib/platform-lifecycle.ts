@@ -201,7 +201,11 @@ async function describePid(pid: number): Promise<string> {
   }
 }async function waitForDashboardHealthPromise(
   apiPort: number,
-  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  opts: {
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+    expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+  } = {},
 ): Promise<void> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const pollIntervalMs = opts.pollIntervalMs ?? 250;
@@ -212,8 +216,17 @@ async function describePid(pid: number): Promise<string> {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) return;
-      lastError = `HTTP ${res.status}`;
+      if (res.ok) {
+        if (!opts.expectedIdentity) return;
+        const body = await res.json().catch(() => null) as unknown;
+        const payload = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+        const repoRoot = typeof payload.repoRoot === 'string' ? payload.repoRoot : '(missing)';
+        const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
+        if (repoRoot === opts.expectedIdentity.repoRoot && mode === opts.expectedIdentity.mode) return;
+        lastError = `port held by non-${opts.expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`;
+      } else {
+        lastError = `HTTP ${res.status}`;
+      }
     } catch (err: any) {
       lastError = err?.message || String(err);
     }
@@ -285,12 +298,16 @@ export interface RestartResult {
 }async function restartDashboardPromise(
   config: PlatformConfig,
   startDashboardFn: () => Promise<void> | void,
-  opts: { healthTimeoutMs?: number } = {},
+  opts: {
+    healthTimeoutMs?: number;
+    expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+  } = {},
 ): Promise<void> {
   await Effect.runPromise(stopDashboard(config));
   await startDashboardFn();
   await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
+    expectedIdentity: opts.expectedIdentity,
   }));
 }async function restartCliproxyPromise(
   cliproxy: {
@@ -370,7 +387,11 @@ export const stopDashboard = (
 /** Effect variant of {@link waitForDashboardHealth}. */
 export const waitForDashboardHealth = (
   apiPort: number,
-  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  opts: {
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+    expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+  } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => waitForDashboardHealthPromise(apiPort, opts), catch: stageErrorOf('waitForDashboardHealth') });
 
@@ -397,7 +418,10 @@ export const stopTraefik = (config: PlatformConfig): Effect.Effect<void, never> 
 export const restartDashboard = (
   config: PlatformConfig,
   startDashboardFn: () => Promise<void> | void,
-  opts: { healthTimeoutMs?: number } = {},
+  opts: {
+    healthTimeoutMs?: number;
+    expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+  } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({
     try: () => restartDashboardPromise(config, startDashboardFn, opts),

@@ -3,16 +3,39 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getUatCandidatePayload, getUatGenerationsPayload } from '../uat-train.js';
+import {
+  canStartUatTrainReconciler,
+  getUatCandidatePayload,
+  getUatGenerationsPayload,
+  resolveUatProjectRoot,
+} from '../uat-train.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
 
 const mocks = vi.hoisted(() => ({
+  findProjectByPathSync: vi.fn(),
+  getDashboardIdentity: vi.fn(),
   readCurrentFlywheelStatusForDashboard: vi.fn(),
   listUatGenerationsSync: vi.fn(),
   probeUatStack: vi.fn(),
   findVBriefByIssue: vi.fn(),
   readVBriefDocument: vi.fn(),
 }));
+
+vi.mock('../../../../lib/projects.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/projects.js')>();
+  return {
+    ...original,
+    findProjectByPathSync: mocks.findProjectByPathSync,
+  };
+});
+
+vi.mock('../../identity.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../identity.js')>();
+  return {
+    ...original,
+    getDashboardIdentity: mocks.getDashboardIdentity,
+  };
+});
 
 vi.mock('../flywheel-actions.js', () => ({
   readCurrentFlywheelStatusForDashboard: mocks.readCurrentFlywheelStatusForDashboard,
@@ -84,6 +107,8 @@ describe('getUatGenerationsPayload', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: process.cwd(), mode: 'primary' });
     mocks.probeUatStack.mockResolvedValue({ status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.pan.localhost' });
   });
 
@@ -149,6 +174,8 @@ describe('getUatGenerationsPayload', () => {
 describe('getUatCandidatePayload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.findProjectByPathSync.mockReturnValue(null);
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: process.cwd(), mode: 'primary' });
   });
 
   it('returns the newest ready generation as the active UAT candidate', async () => {
@@ -163,7 +190,7 @@ describe('getUatCandidatePayload', () => {
       status: 'ready',
     });
     expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith({
-      projectRoot: process.cwd(),
+      projectRoot: resolveUatProjectRoot(),
       statuses: ['ready'],
       limit: 1,
     });
@@ -173,5 +200,36 @@ describe('getUatCandidatePayload', () => {
     mocks.listUatGenerationsSync.mockReturnValue([]);
 
     await expect(getUatCandidatePayload()).resolves.toBeNull();
+  });
+});
+
+describe('UAT train project root and startup gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.findProjectByPathSync.mockReturnValue(null);
+  });
+
+  it('resolves feature workspace cwd back to the project root', () => {
+    expect(resolveUatProjectRoot('/repo/workspaces/feature-pan-2148')).toBe('/repo');
+    expect(resolveUatProjectRoot('/repo/workspaces/feature-pan-2148/workspaces/uat-pan-cobalt-0703')).toBe('/repo');
+  });
+
+  it('prefers the registered project root when the registry matches the cwd', () => {
+    mocks.findProjectByPathSync.mockReturnValue({ path: '/registered/repo' });
+
+    expect(resolveUatProjectRoot('/registered/repo/workspaces/feature-pan-2148')).toBe('/registered/repo');
+  });
+
+  it('lets only the primary dashboard process start the UAT reconciler', () => {
+    mocks.findProjectByPathSync.mockReturnValue({ path: '/repo' });
+
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
+    expect(canStartUatTrainReconciler()).toBe(true);
+
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo/workspaces/feature-pan-2148', mode: 'primary' });
+    expect(canStartUatTrainReconciler()).toBe(false);
+
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'peer' });
+    expect(canStartUatTrainReconciler()).toBe(false);
   });
 });

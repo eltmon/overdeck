@@ -167,13 +167,14 @@ describe('SupervisorWatchdog', () => {
     expect(recovered.status().restartAttempts).toEqual([]);
   });
 
-  it('restarts when dashboard health is OK but deacon patrol heartbeat is stale', async () => {
+  it('defers restart when dashboard health is OK but deacon patrol heartbeat is stale', async () => {
     const spawns = { count: 0 };
     const logs: string[] = [];
     const watchdog = makeWatchdog({
       spawns,
       logs,
       fetchOk: true,
+      config: { ...config, failThreshold: 1, busyFailThreshold: 3 },
       now: () => Date.parse('2026-05-17T15:35:00.000Z'),
       deaconStatus: {
         isRunning: true,
@@ -183,11 +184,22 @@ describe('SupervisorWatchdog', () => {
     });
 
     await watchdog.checkOnce();
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 2,
+      consecutiveHardFailures: 0,
+    });
+    expect(logs.some((msg) => msg.includes('deferring restart until 3'))).toBe(true);
+
+    await watchdog.checkOnce();
 
     expect(spawns.count).toBe(1);
     expect(watchdog.status()).toMatchObject({
       healthy: false,
-      consecutiveFailures: 1,
+      consecutiveFailures: 3,
       consecutiveHardFailures: 0,
     });
     expect(watchdog.status().lastError).toContain('deacon patrol heartbeat stale');
@@ -200,6 +212,7 @@ describe('SupervisorWatchdog', () => {
     const watchdog = makeWatchdog({
       spawns,
       fetchOk: true,
+      config: { ...config, busyFailThreshold: 3 },
       now: () => now,
       deaconStatus: {
         isRunning: true,
@@ -218,6 +231,39 @@ describe('SupervisorWatchdog', () => {
 
     expect(spawns.count).toBe(1);
     expect(watchdog.status().lastError).toContain('deacon patrol heartbeat missing');
+  });
+
+  it('grants a fresh patrol-grace window after a triggered restart (PAN-2219)', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    const spawns = { count: 0 };
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: { ...config, busyFailThreshold: 1 },
+      now: () => now,
+      deaconStatus: {
+        isRunning: true,
+        config: { patrolIntervalMs: 60_000 },
+        state: {},
+      },
+    });
+
+    await watchdog.checkOnce(); // starts the missing-heartbeat clock
+    now += 180_001;
+    await watchdog.checkOnce(); // exceeds grace → restart #1
+    expect(spawns.count).toBe(1);
+
+    // The freshly restarted server must get its own full grace window; the
+    // pre-restart staleness clock must not carry over and kill it instantly.
+    now += 1_000;
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(1);
+    now += 170_000; // 171s into the new window — still within grace
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(1);
+    now += 10_001; // past 180s since the restart → second restart is legitimate
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(2);
   });
 
   it('preserves the restart cap across supervisor restarts', async () => {

@@ -1,316 +1,149 @@
-# Swarm — Per-Item DAG Dispatch
+# Swarm v2
 
-**Reference for Overdeck's parallel-dispatch system: per-item DAG readiness, synthesis agents at convergence points, file-overlap serialization, and slot-merge auto-advance.**
+Swarm v2 runs one work agent per vBRIEF item when the plan DAG, file scope, and global capacity allow safe parallel work. It is coordinated by Deacon, not by a durable sidecar runtime file.
 
-PAN-970 shipped wave-based swarm v1. PAN-977 evolves the dispatcher to per-item readiness and moves runtime state out of the `~/.overdeck/swarms/*.json` sidecar into the continue vBRIEF.
+The shipped operator entry point is:
 
----
+```bash
+pan swarm <id>
+```
+
+The shipped recovery entry point is:
+
+```bash
+pan swarm recover <id> <slotIndex> --action retry
+```
+
+`CLAUDE.md` and agent context references to `pan swarm <id>` are now accurate: the command exists, checks plan eligibility, ensures the feature workspace, dispatches the first wave through the same selection path Deacon uses, and then leaves ongoing coordination to Deacon.
 
 ## Mental Model
 
-A vBRIEF plan's `plan.items[]` form a DAG via `blocks` edges. The swarm runtime dispatches **one work agent per item** ("slot") on its own git worktree and branch, in parallel where the DAG allows.
+A swarm issue has one normal feature workspace:
 
-| Surface | Single-agent (default) | Swarm slot |
-|---|---|---|
-| Branch | `feature/<issue>` | `feature/<issue>-slot-<N>` |
-| Worktree | `workspaces/feature-<issue>/` | per-slot worktree under `workspaces/` |
-| tmux session | `agent-<issue>` | per-slot session, recorded in `SwarmSlotRuntime.sessionName` |
-| Plan visibility | Full plan | Active-slice (bounded) prompt |
+```text
+workspaces/feature-<issue>/
+feature/<issue>
+agent-<issue>
+```
 
-An item is **dispatchable** when every parent in its `blocks` edges is either merged into the feature branch or has plan status `completed` / `cancelled`. An item with **>1 unresolved blocking parents** is a DAG convergence point and gets a **synthesis agent** before the work agent. Two ready items whose `files_scope` patterns overlap are **serialized**, not parallelized.
+Each slot gets its own worktree, branch, and work-agent identity:
 
-When a slot branch merges into the feature branch, the merge-agent fires a loopback `POST /api/swarm/slot-merged` and dispatchable items re-evaluate.
+```text
+workspaces/feature-<issue>-slot-<N>/
+feature/<issue>-slot-<N>
+agent-<issue>-slot-<N>
+```
 
-![Per-item DAG dispatch with synthesis](./swarm-diagrams/dag-dispatch.png)
+The vBRIEF DAG decides what can run. `getDispatchableItems(doc, mergedItemIds)` returns items whose blocking parents are merged or already terminal in the plan. `analyzeSwarmReadiness(doc)` decides which of those items are safe slot candidates based on item readiness, `files_scope`, `files_scope_confidence`, verify commands, and expected outputs.
 
-*Item A has merged; B and D are running in parallel slots; C is ready but its `files_scope` overlaps B's, so it is deferred. E has two blocking parents (B and D), so a synthesis agent runs at the convergence point and writes a `SynthesisOutput` that the E work-agent reads from its active-slice prompt.*
+Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may dispatch a later item only after the overlapping item is merged.
 
----
+## coordinateSwarmSlots Loop
+
+`coordinateSwarmSlots()` in `src/lib/cloister/deacon-swarm.ts` is the host-side orchestrator. The loop is intentionally derive-first:
+
+1. Enumerate feature workspaces.
+   Deacon lists regular `feature-*` workspaces and skips `feature-*-slot-N` workspaces for swarm enumeration.
+
+2. Load and check the plan.
+   Deacon loads the main-side vBRIEF spec with `findSpecByIssue()` and runs `analyzeSwarmReadiness()`. Non-eligible plans are ignored by the patrol; the CLI prints the reason.
+
+3. Reconcile slot state.
+   `reconcileSlotState()` derives merged, in-flight, pending, branch, and agent state from git branches, worktrees, agent state, and vBRIEF item status. Runtime truth is not stored in a swarm JSON file.
+
+4. Detect slot lifecycle.
+   `classifyInFlightSlots()` classifies slots as `running`, `ready-to-merge`, `failed`, or `stalled`. A pane exit code of 0 makes a slot ready to merge. A missing session, missing agent, non-zero pane exit, or unknown dead-pane exit makes it failed. A live pane with no branch-tip commit progress and no pane-output progress past the stall threshold becomes stalled.
+
+5. Verify and merge ready slots.
+   `mergeReadySlots()` calls `verifyAndMergeSlot()`. On success it writes the item `done` through `applyTaskOperationToPlanFile()`. On merge conflicts it records a failed-merge recovery block.
+
+6. Garbage collect merged slots.
+   `gcMergedSlots()` removes merged slot worktrees and branches after the slot has been incorporated into the parent feature branch.
+
+7. Dispatch the next wave.
+   `dispatchNextWave()` calls `getDispatchableItems(doc, mergedItemIds)`, filters to slot-eligible items, applies file-overlap serialization, checks global capacity, allocates the lowest free slot index, claims the vBRIEF item through the write door, and spawns `agent-<issue>-slot-N`.
+
+8. Recover failed or stalled slots.
+   Failed merge and stalled-slot records pause automatic advancement for that issue until `pan swarm recover` applies an operator-selected action.
 
 ## CLI
 
-All swarm operations go through `pan swarm <id>`. Mutating operations forward to the dashboard's `POST /api/swarm` endpoint over the internal-token authenticated path; read-only and task-mutation operations resolve the workspace directly. `--host` is a confirmed break-glass path for unhealthy Docker-backed workspace stacks; with `--auto-advance`, the confirmed override is persisted in swarm runtime state so later auto-dispatched slots use the same operator decision.
-
-### Dispatch
+### Start
 
 ```bash
-pan swarm <id>                       # Spawn dispatchable items now
-pan swarm <id> --dry-run             # Print dispatch plan; no spawns
-pan swarm <id> --wave <n>            # Restrict dispatch to wave N (visualization)
-pan swarm <id> --max-slots <n>       # Cap concurrency
-pan swarm <id> --model <model>       # Override slot-agent model (default kimi-k2.6)
-pan swarm <id> --auto-advance        # Auto-dispatch newly-ready items as slots merge
-pan swarm <id> --no-auto-advance     # Manual mode; explicit `pan swarm <id>` per wave
-pan swarm <id> --host                # Confirmed break-glass: bypass workspace stack-health gate
-pan swarm <id> --host --yes          # Non-interactive host override confirmation
+pan swarm PAN-2203
 ```
 
-### Task operations (vBRIEF item state)
+`pan swarm <id>`:
 
-The plan document is the **single mutation authority** for item status. Every task mutation bumps `plan.sequence` (CAS); the swarm runtime and Beads mirror state but do not own it.
+- resolves the issue to its project;
+- loads the main-side vBRIEF plan;
+- runs `analyzeSwarmReadiness()`;
+- exits non-zero with reasons when the plan is not swarm eligible;
+- ensures `workspaces/feature-<issue>/` exists;
+- dispatches wave 0 by calling `dispatchNextWave()`; and
+- prints the dispatched slot actions.
+
+It does not stay resident. After the first dispatch, Deacon continues merge, garbage collection, next-wave dispatch, stall detection, and recovery blocking.
+
+### Recover
 
 ```bash
-pan swarm <id> --task next                        # List dispatchable items
-pan swarm <id> --task show   --item <itemId>      # Show one item
-pan swarm <id> --task claim  --item <itemId> [--sequence <n>]
-pan swarm <id> --task done   --item <itemId> [--sequence <n>]
-pan swarm <id> --task block  --item <itemId> --reason "<text>" [--sequence <n>]
-pan swarm <id> --task unblock --item <itemId> [--sequence <n>]
-pan swarm <id> --task cancel --item <itemId> [--sequence <n>]
+pan swarm recover PAN-2203 1 --action retry
+pan swarm recover PAN-2203 1 --action drop
+pan swarm recover PAN-2203 1 --action handoff
 ```
 
-`--sequence` is optional; supply the last-seen `plan.sequence` value to enforce compare-and-set. A mismatch raises `vBRIEF sequence conflict: expected X, found Y` and the write is rejected.
+`pan swarm recover <id> <slotIndex> --action retry|drop|handoff` calls the same recovery path used by Deacon:
 
-Operation → status mapping (`statusForOperation` in `dag.ts`):
+| Action | Effect |
+| --- | --- |
+| `retry` | Unblocks the item, clears the failed-slot block, and redispatches through `dispatchNextWave()`. |
+| `drop` | Marks the item done through the vBRIEF write door and clears the block. Use only when the operator has verified the slot output is no longer needed. |
+| `handoff` | Keeps advancement paused and records an operator handoff note for manual resolution. |
 
-| `--task` | Resulting `item.status` | Subitem behavior |
-|---|---|---|
-| `claim` | `running` | unchanged |
-| `done` | `completed` | all subItems set to `completed` unless `subItemIds` provided |
-| `block` | `blocked` | unchanged; `--reason` recorded in `metadata.statusReason` |
-| `unblock` | `pending` | unchanged |
-| `cancel` | `cancelled` | unchanged |
+## Derive, Do Not Store
 
-`next` and `show` read the canonical merged view (main spec + workspace continue `statusOverrides`). Mutations write to the canonical spec on main and mirror to the workspace continue file.
+Swarm v2 does not keep a canonical `SwarmRuntime` sidecar. The durable sources of truth are:
 
----
+- the vBRIEF spec and item status;
+- git branches and worktrees;
+- agent state and tmux sessions; and
+- review or merge evidence written through existing writer surfaces.
 
-## HTTP Routes
+Everything else is derived on patrol. This keeps recovery simple: if Deacon restarts, it re-enumerates workspaces, branches, agents, panes, and plan status instead of trusting a separate runtime file that can drift.
 
-All three routes live in `src/dashboard/server/routes/swarm.ts`.
+Writes still go through the existing write doors. Deacon claims, unblocks, and completes items with `applyTaskOperationToPlanFile()`. It does not directly edit ad-hoc runtime state to make an item appear done.
 
-![Swarm HTTP surface and trust boundary](./swarm-diagrams/http-surface.png)
+## Duplicate-Spawn Guard
 
-*The two mutating routes require `INTERNAL_TOKEN_HEADER`; `POST /api/swarm` additionally accepts same-origin dashboard requests. `POST /api/swarm/slot-merged` is token-only — the merge-agent is the only legitimate caller. All writes flow into the canonical spec on main and the per-issue continue file.*
+Before any slot spawn, `dispatchNextWave()` refuses to claim and spawn when it detects that the target slot is already occupied by:
 
-### `POST /api/swarm`
+- a live `agent-<issue>-slot-N` tmux session;
+- an unmerged `feature/<issue>-slot-N` branch; or
+- an existing `workspaces/feature-<issue>-slot-N/` worktree.
 
-Dispatch one or more slots for an issue. Privileged.
+This protects reconnecting or paused slots from being double-spawned onto the same worktree.
 
-- **Auth:** `INTERNAL_TOKEN_HEADER` (CLI callers) **or** same-origin (dashboard callers). Other requests are rejected before any side effect.
-- **Body:** `{ issueId, wave?, model?, maxSlots?, autoAdvance? }`
-- **Response (200):** `{ success, wavePlan?, dispatched, autoAdvance, slots: [{ slot, itemId, sessionName }] }`
-- **Side effects:** Mutates plan item status to `running` (CAS), creates per-slot worktrees and branches, spawns slot agents, writes `SwarmRuntime` into the issue's continue vBRIEF.
+## Stalled Slots
 
-### `POST /api/swarm/slot-merged`
+Pane exit alone is not enough. A model can leave a pane alive while making no progress. Swarm v2 tracks per-slot progress by observing both:
 
-Loopback signal that a slot branch has merged into its parent feature branch.
+- the branch-tip commit time for the slot branch; and
+- the captured pane output digest.
 
-- **Auth:** `INTERNAL_TOKEN_HEADER` only (no same-origin alternative).
-- **Caller:** `postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`, when it parses a merged source branch matching `SLOT_BRANCH_PATTERN` (`^feature/(.+)-slot-(\d+)$`). The Deacon's `detectMergedSwarmSlots` patrol is a host-side safety net that drives the same loopback when the merge-agent callback is lost (PAN-1178).
-- **Body:** `{ issueId, itemId, slotId, synthesisOutput? }`. `slotId` is a positive integer (the field is `slotId`, **not** `slot`). `itemId` is a string that may be empty — when empty the route resolves the canonical item id from runtime state by matching `slotId`. `synthesisOutput` is optional and size-capped.
-- **Side effects:** Updates the slot's `SwarmSlotRuntime.status` to `merged`, re-evaluates `getDispatchableItems`, dispatches any newly-ready items (respecting capacity + overlap rules), and persists `SynthesisOutput` records.
+If neither changes before the stall threshold elapses, the slot becomes `stalled`. Deacon records a recovery block and stops advancing that issue until the operator chooses `retry`, `drop`, or `handoff`.
 
-### `GET /api/swarm/:issueId`
+The default stall threshold is 30 minutes. It can be overridden with `PAN_SWARM_STALL_THRESHOLD_MS` for test or operational tuning.
 
-Read-only swarm runtime state for the dashboard's swarm view.
+## Synthesis Slots
 
-- **Response:** `SwarmRuntime` (slots, currentWave, totalWaves, synthesisOutputs, deferred items, timestamps) or 404 if no runtime exists for the issue.
+When a vBRIEF item is a convergence point, Deacon may dispatch a synthesis slot before implementation. The synthesis slot writes concise context into item metadata. The following implementation slot receives an active-slice prompt containing that synthesis context.
 
----
+This keeps downstream implementation prompts bounded while preserving the relevant outputs from multiple parent items.
 
-## vBRIEF Item Metadata (Plan)
+## Out of Scope
 
-`VBriefItem.metadata` (in `src/lib/vbrief/types.ts`) gained two PAN-977 fields. Both are planner-authored and survive on the canonical spec on `main`.
+Remote Fly slots from PAN-1773 are layered on top of this model. Swarm v2 currently describes local slot worktrees and local tmux-backed agents.
 
-| Field | Type | Meaning |
-|---|---|---|
-| `files_scope` | `string[]` | Files/globs this item touches. Globs support `**` (any path segment), `*` (any chars within a segment), `?`. Used by `hasFileOverlap()` to serialize file-conflicting parallel dispatch. Items without a scope are treated as non-overlapping. |
-| `requiresSynthesis` | `boolean` | True when this item has >1 blocking parent (DAG convergence point). Auto-derived by `deriveSynthesisMetadata(doc)` during planning; do not hand-set. |
-
----
-
-## Continue vBRIEF (Runtime State)
-
-The PAN-970 sidecar `~/.overdeck/swarms/<issueId>.json` is gone. Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.vbrief.json` under `ContinueState.swarmRuntime`, defined in `src/lib/vbrief/continue-state.ts`.
-
-```ts
-interface SwarmRuntime {
-  model: string;                                      // Slot-agent model
-  currentWave?: number;                               // Current dependency wave
-  totalWaves?: number;                                // Total waves at dispatch time
-  autoAdvance?: boolean;
-  autoAdvanceFailureCount?: number;
-  autoAdvanceRetryAfter?: string;                     // ISO 8601
-  lastAutoAdvanceError?: string;
-  deferred?: { itemId: string; itemTitle: string }[]; // Ready but held (overlap, capacity)
-  slots: SwarmSlotRuntime[];                          // All slots, all cycles
-  synthesisOutputs: Record<string, SynthesisOutput>;  // Keyed by target itemId
-  createdAt: string;                                  // ISO 8601
-  updatedAt: string;                                  // ISO 8601
-}
-
-interface SwarmSlotRuntime {
-  slotId: number;
-  itemId: string;
-  itemTitle: string;
-  sessionName: string;
-  workspace: string;
-  status: 'pending' | 'running' | 'merged' | 'failed';
-  dispatchedAt?: string;
-  mergedAt?: string;
-}
-
-interface SynthesisOutput {
-  targetItemId: string;          // The downstream convergence item
-  writtenAt: string;             // ISO 8601
-  contextUpdate: string;         // Markdown — passed to the downstream work agent
-}
-```
-
-Only `'merged'` slots satisfy DAG dependencies (round-14 review blocker). A `'failed'` slot does not unblock its dependents.
-
----
-
-## Library API
-
-All under `src/lib/vbrief/`.
-
-### `dag.ts` — async + pure helpers (dashboard-safe)
-
-**DAG analysis**
-
-| Symbol | Purpose |
-|---|---|
-| `groupItemsByWave(doc) → Wave[]` | Kahn-partition items into dependency waves. Visualization only — dispatch uses per-item readiness. Excludes `completed`, `cancelled`, `blocked`, `running` from waves. |
-| `criticalPath(doc) → string[]` | Longest-path through `blocks` edges. |
-| `getDispatchableItems(doc, mergedItemIds) → VBriefItem[]` | Items whose every blocking parent is in `mergedItemIds` or has plan status `completed`/`cancelled`. Excludes items in `completed`/`cancelled`/`running`/`blocked` status. |
-| `blockingParentCount(doc, itemId) → number` | Unresolved blocking parents. >1 ⇒ convergence point requiring a synthesis agent. |
-| `blockingParentTotal(doc, itemId) → number` | Total blocking parents (ignores status). |
-| `deriveSynthesisMetadata(doc) → VBriefDocument` | Returns a cloned doc with `metadata.requiresSynthesis: true` stamped on every item that has >1 blocking parent. |
-
-**File-overlap**
-
-| Symbol | Purpose |
-|---|---|
-| `compileGlob(pattern) → CompiledGlob` | Compile once, match many. Supports `**`, `*`, `?`. |
-| `hasFileOverlap(running, candidate, precompiled?) → boolean` | Bidirectional overlap check between a candidate item and the currently-running set. Pre-compiled glob map is optional but recommended for large plans. |
-
-**Active-slice prompts** (bounded work-agent context)
-
-| Symbol | Purpose |
-|---|---|
-| `createActiveSlice(doc, opts) → ActiveSlice` | Bounded context for a single item: current work set, blockers, dependencies, unlocks, nearby context, acceptance criteria, optional synthesis context. |
-| `renderActiveSlicePrompt(slice) → string` | Minimal markdown payload for work-agent prompts. |
-| `verifyActiveSlicePromptReduction(doc, slice) → PromptSizeVerification` | Sanity-check the slice is bounded vs. the full plan. |
-| `activeSlicePromptSize(slice) → number` | Byte size of the rendered prompt. |
-
-`ActiveSliceOptions` accepts `synthesisOutputs?: Record<itemId, { contextUpdate }>` — when an item is a convergence point with a persisted synthesis output, the work-agent prompt includes that context block.
-
-**Task operations (mutation authority)**
-
-| Symbol | Purpose |
-|---|---|
-| `TaskOperationType` | `'claim' \| 'done' \| 'block' \| 'unblock' \| 'cancel'` |
-| `TaskCommand` | `'next' \| 'show' \| TaskOperationType` (CLI-facing union) |
-| `isTaskOperationType(v)`, `isTaskCommand(v)` | Type guards. |
-| `applyTaskOperation(doc, op) → TaskOperationResult` | Pure transform. Enforces `expectedSequence` CAS. Bumps `plan.sequence` and `plan.updated`. `done` cascades to all subItems unless `subItemIds` provided. Optional `pipeline` field mirrors pipeline status into `plan.pipeline` for the canonical doc. |
-| `applyTaskOperationToPlanFileAsync(planPath, op)` | Async write with writer-lock (`lockPathForPlan`/`lockOwnerPath`). Recovers stale locks; orphan lock-dir cleanup on owner-write failure. |
-
-**Pipeline mirror** — pipeline status (review/test/merge) mirrored into the plan doc
-
-| Symbol | Purpose |
-|---|---|
-| `PlanPipelineMirror`, `NestedPlanPipelineMirror` | Mirror shapes. |
-| `getPipelineMirror(doc) → PlanPipelineMirror?` | Read current mirror. |
-| `setPipelineMirror(doc, pipeline) → VBriefDocument` | Returns cloned doc with mirror applied. |
-| `buildPipelineMirrorFromStatus(issueId, status, now?) → NestedPlanPipelineMirror` | Build a mirror from a review-status record. |
-| `writePipelineMirrorToPlanFileAsync(planPath, mirror)` | Async write. |
-
-**Task-graph view**
-
-| Symbol | Purpose |
-|---|---|
-| `getTaskGraphView(doc, mergedItemIds?) → TaskGraphView` | DAG view annotated with current dispatchability. Used by the dashboard. |
-| `actionableDoc(doc) → VBriefDocument` | Filter out non-actionable items (completed/cancelled). |
-
-**Writer-lock primitives**
-
-| Symbol | Purpose |
-|---|---|
-| `activePlanWriters: Map<planPath, writerId>` | In-process writer registry. |
-| `lockPathForPlan(planPath) → string` | Lock-directory path. |
-| `lockOwnerPath(planPath) → string` | Owner-file path inside the lock directory. |
-| `validatePlanIssue(doc, issueId)` | Throws if the plan's `id` doesn't match `issueId`. |
-| `workspacePlanPath(workspacePath) → string` | Conventional plan path inside a workspace. |
-
-### `dag-cli.ts` — sync helpers (CLI only)
-
-These use sync FS calls and **must not** be imported by dashboard server code (PAN-446).
-
-| Symbol | Purpose |
-|---|---|
-| `runTaskCommand(command, options) → VBriefItem \| VBriefItem[] \| TaskOperationResult` | Top-level CLI dispatcher used by `pan swarm --task ...`. Returns dispatchable items for `next`, a single item for `show`, an operation result for mutations. |
-| `applyTaskOperationToPlanFile(planPath, op, workspacePath?)` | Sync write variant of the async function. |
-| `writePipelineMirrorToPlanFile(planPath, mirror)` | Sync write variant. |
-
-### `continue-state.ts` — async helpers
-
-| Symbol | Purpose |
-|---|---|
-| `readWorkspaceContinueAsync(workspacePath) → ContinueState?` | Read the per-issue continue file. |
-| `writeWorkspaceContinueAsync(workspacePath, state)` | Atomic write. |
-| `continueFilename(issueId)` / `continueFilePath(projectRoot, issueId)` | Canonical lowercase filename (`<issue>.vbrief.json`). |
-
----
-
-## Slot Lifecycle
-
-![Slot lifecycle and auto-advance loopback](./swarm-diagrams/slot-lifecycle.png)
-
-*Each slot-branch merge fires `/api/swarm/slot-merged`, which marks the slot `merged` and re-runs `getDispatchableItems`. The per-issue `postMergeLifecycle` only fires when `feature/<issue>` itself merges to main — slot merges return early.*
-
-```
-plan dispatch
-  ├─ getDispatchableItems(doc, mergedItemIds) → ready[]
-  ├─ filter by hasFileOverlap(runningItems, candidate) → ready_no_overlap[]
-  ├─ partition by blockingParentCount(doc, itemId)
-  │   ├─ count ≤ 1 → spawn work-agent slot directly
-  │   └─ count  > 1 → spawn synthesis agent first; on completion the work-agent
-  │                    slot is spawned with the persisted SynthesisOutput in its
-  │                    active-slice prompt
-  └─ for each spawned slot:
-        create worktree at `workspaces/feature-<issue>-slot-<N>/`
-        check out `feature/<issue>-slot-<N>` branched from `feature/<issue>`
-        applyTaskOperation(doc, { type: 'claim', itemId, expectedSequence })
-        SwarmSlotRuntime.status = 'running'
-        spawn agent in per-slot tmux session
-
-slot work done
-  └─ slot merges its branch into the feature branch (review/test/merge pipeline)
-        └─ merge-agent: postMergeLifecycle sees sourceBranch matches
-                        ^feature/<parent>-slot-(\d+)$
-              └─ POST /api/swarm/slot-merged (internal-token authenticated)
-                    ├─ SwarmSlotRuntime.status = 'merged' (or 'failed')
-                    ├─ persist SynthesisOutput (size-capped) if provided
-                    └─ re-run dispatch cycle:
-                          getDispatchableItems(doc, {...mergedItemIds, this})
-                          → newly-ready items spawn (subject to overlap + capacity)
-```
-
-The whole feature branch's per-issue `postMergeLifecycle` only fires when `feature/<issue>` itself merges to `main` — slot-branch merges route to `/api/swarm/slot-merged` and return early. This keeps the per-issue pipeline (review → test → ship) decoupled from per-slot churn.
-
----
-
-## Auth: Internal Token
-
-All mutating swarm routes require `INTERNAL_TOKEN_HEADER`, defined in `src/lib/internal-token.js`. CLI callers (`pan swarm`) attach the token automatically via `ensureInternalToken()`. Dashboard same-origin callers are allowed on `POST /api/swarm` only; `POST /api/swarm/slot-merged` is token-only. If the token is not configured at server start, the route returns `503 internal token not configured` rather than degrading to unauthenticated.
-
----
-
-## Sequence Numbers (CAS)
-
-`plan.sequence` is a monotonic integer bumped on every successful `applyTaskOperation`. Operations may pass `expectedSequence` to assert "I read sequence N; only apply if it's still N." Mismatches throw and the write is rejected. The continue-file `statusOverrides` mirror is updated only after a successful canonical write — there is no scenario where the mirror advances past the canonical doc.
-
----
-
-## Related
-
-- [VBRIEF.md](./VBRIEF.md) — plan format, the four-artifact model, lifecycle.
-- [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) — tracker-level planning, vBRIEF positioning.
-- [PRD-CLOISTER.md](./PRD-CLOISTER.md) — Cloister orchestration model.
-- [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) — review synthesis pattern (separate from swarm synthesis).
-- `docs/prds/planned/PAN-970-swarm.md` — v1 wave-based dispatch (superseded by per-item readiness in PAN-977).
-- `src/lib/vbrief/dag.ts`, `src/lib/vbrief/dag-cli.ts`, `src/lib/vbrief/continue-state.ts` — implementation.
-- `src/dashboard/server/routes/swarm.ts` — HTTP surface.
-- `src/lib/cloister/merge-agent.ts` — slot-branch detection (`SLOT_BRANCH_PATTERN`) and the loopback POST to `/api/swarm/slot-merged`.
+Difficulty-tier and model-routing behavior from PAN-1791 is also layered on top. The current coordinator enforces readiness, file scope, capacity, duplicate-spawn, merge, and recovery rules. Future routing can choose different models or tiers for a slot without changing the core derive/reconcile/dispatch loop.

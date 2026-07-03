@@ -138,6 +138,57 @@ describe('waitForDashboardHealth', () => {
     expect(calls).toBeGreaterThanOrEqual(2);
   });
 
+  it('rejects a 200 health response from a non-primary dashboard identity', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'ok',
+          repoRoot: '/repo/workspaces/feature-pan-2252',
+          mode: 'peer',
+        }),
+      }),
+    );
+
+    await expect(Effect.runPromise(
+      waitForDashboardHealth(43991, {
+        timeoutMs: 200,
+        pollIntervalMs: 50,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      }),
+    )).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringContaining('port held by non-primary server (cwd=/repo/workspaces/feature-pan-2252, mode=peer)'),
+      },
+    });
+  });
+
+  it('accepts a 200 health response matching the expected dashboard identity', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'ok',
+          repoRoot: '/repo',
+          mode: 'primary',
+        }),
+      }),
+    );
+
+    await expect(Effect.runPromise(
+      waitForDashboardHealth(43991, {
+        timeoutMs: 200,
+        pollIntervalMs: 50,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      }),
+    )).resolves.toBeUndefined();
+  });
+
   it('StageError reports the dashboard stage on timeout', async () => {
     vi.stubGlobal(
       'fetch',

@@ -1,23 +1,156 @@
 {
   "issueId": "PAN-2156",
   "schemaVersion": 2,
-  "created": "2026-06-30T01:20:18.743Z",
-  "updated": "2026-06-30T01:20:18.743Z",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-02T20:15:25.260Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T20:15:26.999Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T20:40:07.086Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T20:49:50.613Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T21:13:51.648Z"
+    }
+  ],
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "finalize-baseline": "completed",
+    "finalize-baseline.ac1": "completed",
+    "finalize-baseline.ac2": "completed",
+    "finalize-baseline.ac3": "completed",
+    "extract-watch": "completed",
+    "extract-watch.ac1": "completed",
+    "extract-watch.ac2": "completed",
+    "extract-watch.ac3": "completed",
+    "extract-activity-summary": "completed",
+    "extract-activity-summary.ac1": "completed",
+    "extract-activity-summary.ac2": "completed",
+    "extract-activity-summary.ac3": "completed",
+    "extract-context-usage": "completed",
+    "extract-context-usage.ac1": "completed",
+    "extract-context-usage.ac2": "completed",
+    "extract-context-usage.ac3": "completed",
+    "extract-context-usage.ac4": "completed",
+    "extract-parser": "completed",
+    "extract-parser.ac1": "completed",
+    "extract-parser.ac2": "completed",
+    "extract-parser.ac3": "completed",
+    "extract-compact-boundary": "completed",
+    "extract-compact-boundary.ac1": "completed",
+    "extract-compact-boundary.ac2": "completed",
+    "extract-compact-boundary.ac3": "completed",
+    "extract-session-files": "completed",
+    "extract-session-files.ac1": "completed",
+    "extract-session-files.ac2": "completed",
+    "extract-session-files.ac3": "completed",
+    "extract-message-filters": "completed",
+    "extract-message-filters.ac1": "completed",
+    "extract-message-filters.ac2": "completed",
+    "extract-message-filters.ac3": "completed",
+    "extract-provider": "completed",
+    "extract-provider.ac1": "completed",
+    "extract-provider.ac2": "completed",
+    "extract-provider.ac3": "completed",
+    "extract-types": "completed",
+    "extract-types.ac1": "completed",
+    "extract-types.ac2": "completed",
+    "extract-types.ac3": "completed"
+  },
   "pipeline": {
     "issueId": "PAN-2156",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "passed",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-30T01:20:18.743Z"
+    "updatedAt": "2026-07-02T21:30:38.162Z",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-02T20:26:57.889Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
+    "lastVerifiedCommit": "8d54abe8b7ef92067bdf5cc9e19bd1b2e9c5698d"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 38397,
+            "output": 3050,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 34005,
+            "output": 118282,
+            "cacheRead": 9901245,
+            "cacheWrite": 407273
+          }
+        },
+        "review": {
+          "anthropic/claude-sonnet-4-6": {
+            "input": 55,
+            "output": 24752,
+            "cacheRead": 3600043,
+            "cacheWrite": 908108
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 38397,
+          "output": 3050,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 34005,
+          "output": 118282,
+          "cacheRead": 9901245,
+          "cacheWrite": 407273
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "input": 55,
+          "output": 24752,
+          "cacheRead": 3600043,
+          "cacheWrite": 908108
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 15.48002,
+        "pricingAsOf": "2026-07-02T21:30:38.316Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2235"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "created": "2026-07-02T19:43:33.248Z",
+  "updated": "2026-07-02T21:30:38.330Z"
 }

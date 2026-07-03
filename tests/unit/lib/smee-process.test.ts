@@ -15,6 +15,8 @@ const mockReadFileSync = vi.fn();
 const mockWriteFileSync = vi.fn();
 const mockUnlinkSync = vi.fn();
 const mockOpenSync = vi.fn();
+const mockCloseSync = vi.fn();
+const mockReaddirSync = vi.fn();
 
 vi.mock('node:fs', () => ({
   existsSync: (...args: Parameters<typeof mockExistsSync>) => mockExistsSync(...args),
@@ -22,6 +24,8 @@ vi.mock('node:fs', () => ({
   writeFileSync: (...args: Parameters<typeof mockWriteFileSync>) => mockWriteFileSync(...args),
   unlinkSync: (...args: Parameters<typeof mockUnlinkSync>) => mockUnlinkSync(...args),
   openSync: (...args: Parameters<typeof mockOpenSync>) => mockOpenSync(...args),
+  closeSync: (...args: Parameters<typeof mockCloseSync>) => mockCloseSync(...args),
+  readdirSync: (...args: Parameters<typeof mockReaddirSync>) => mockReaddirSync(...args),
 }));
 
 const mockSpawnReturn = {
@@ -53,15 +57,18 @@ beforeEach(() => {
   mockReadFileSync.mockImplementation((path: string) => {
     if (path.includes('smee-url')) return 'https://smee.io/abc123';
     if (path.includes('smee.pid')) return '12345';
+    if (path.includes('/proc/12345/cmdline')) return '';
     return '';
   });
   mockOpenSync.mockReturnValue(3);
+  mockReaddirSync.mockReturnValue([]);
   mockSpawnReturn.pid = 12345;
   mockSpawnReturn.unref.mockClear();
   mockSpawnReturn.on.mockClear();
   mockSpawn.mockClear();
   mockWriteFileSync.mockClear();
   mockUnlinkSync.mockClear();
+  mockCloseSync.mockClear();
 });
 
 afterEach(() => {
@@ -123,6 +130,15 @@ describe('startSmeeProcess', () => {
   it('is idempotent when already running', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const killSpy = vi.spyOn(process, 'kill').mockReturnValue(undefined);
+    mockReaddirSync.mockReturnValue(['12345']);
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.includes('smee-url')) return 'https://smee.io/abc123';
+      if (path.includes('smee.pid')) return '12345';
+      if (path.includes('/proc/12345/cmdline')) {
+        return 'node\0/home/eltmon/project/node_modules/smee-client/bin/smee.js\0--url\0https://smee.io/abc123\0--target\0http://localhost:3011/api/webhooks/github\0';
+      }
+      return '';
+    });
 
     startSmeeProcessSync();
 
@@ -131,6 +147,67 @@ describe('startSmeeProcess', () => {
 
     killSpy.mockRestore();
     logSpy.mockRestore();
+  });
+
+  it('adopts an orphaned matching relay instead of spawning a duplicate', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (signal === 0 && pid === 22222) return true;
+      throw new Error('ESRCH');
+    });
+    mockReaddirSync.mockReturnValue(['22222']);
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.includes('smee-url')) return 'https://smee.io/abc123';
+      if (path.includes('smee.pid')) return '12345';
+      if (path.includes('/proc/22222/cmdline')) {
+        return 'bun\0/home/eltmon/project/node_modules/smee-client/bin/smee.js\0--url\0https://smee.io/abc123\0--target\0http://localhost:3011/api/webhooks/github\0';
+      }
+      return '';
+    });
+
+    startSmeeProcessSync();
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(mockWriteFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('smee.pid'),
+      '22222',
+    );
+    expect(logSpy).toHaveBeenCalledWith('[smee] Process already running');
+    killSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+
+  it('keeps one matching relay and terminates duplicates', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (signal === 0 && (pid === 11111 || pid === 22222)) return true;
+      if (signal === 'SIGTERM' && pid === 22222) return true;
+      throw new Error('ESRCH');
+    });
+    mockReaddirSync.mockReturnValue(['11111', '22222']);
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.includes('smee-url')) return 'https://smee.io/abc123';
+      if (path.includes('smee.pid')) return '11111';
+      if (path.includes('/proc/11111/cmdline') || path.includes('/proc/22222/cmdline')) {
+        return 'node\0/home/eltmon/project/node_modules/smee-client/bin/smee.js\0--url\0https://smee.io/abc123\0--target\0http://localhost:3011/api/webhooks/github\0';
+      }
+      return '';
+    });
+
+    startSmeeProcessSync();
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(killSpy).toHaveBeenCalledWith(22222, 'SIGTERM');
+    expect(mockWriteFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('smee.pid'),
+      '11111',
+    );
+    expect(warnSpy).toHaveBeenCalledWith('[smee] Removed duplicate process(es): 22222');
+    expect(logSpy).toHaveBeenCalledWith('[smee] Process already running');
+    killSpy.mockRestore();
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it('handles spawn failure gracefully', () => {

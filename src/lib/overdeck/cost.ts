@@ -7,7 +7,7 @@ import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from './infra.js';
-import { IssueId } from './issues.js';
+import { IssueId, type IssueId as IssueIdType } from './issues.js';
 import {
   getAllBudgetsSync,
   checkBudgetSync,
@@ -15,9 +15,10 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
-import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js';
+import { parseOhmypiSessionCostEventsSync } from '../cost-parsers/ohmypi-parser.js';
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
 import { getOverdeckHome } from '../paths.js';
+import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export type CostEvent = typeof CostEvent.Type;
 
 export const Rollup = Schema.Struct({
   key:    Schema.String,
+  role:   Schema.optional(Schema.String),
   cost:   Schema.Number,
   tokens: Tokens,
 });
@@ -180,8 +182,23 @@ function toTokens(r: TokenRow): Tokens {
   };
 }
 
-function toRollup(key: string, r: TokenRow & { cost: number | null }): Rollup {
-  return { key, cost: r.cost ?? 0, tokens: toTokens(r) };
+function toRollup(key: string, r: TokenRow & { cost: number | null }, role?: string): Rollup {
+  return { key, ...(role ? { role } : {}), cost: r.cost ?? 0, tokens: toTokens(r) };
+}
+
+function issueIdFromAgentName(agentName: string): IssueIdType | null {
+  const match = agentName.match(/(?:^|-)((?:pan|min|aud|krux|cli)-\d+)(?:-|$)/i);
+  return match ? match[1]!.toUpperCase() as IssueIdType : null;
+}
+
+function inferPiProvider(model: string, provider: string | null): string | null {
+  if (provider) return provider;
+  const lower = model.toLowerCase();
+  if (lower.includes('kimi') || lower.startsWith('minimax')) return 'custom';
+  if (lower.includes('claude')) return 'anthropic';
+  if (lower.includes('gpt')) return 'openai';
+  if (lower.includes('gemini')) return 'google';
+  return null;
 }
 
 // ── CostResolver — the read door ──────────────────────────────────────────────
@@ -351,7 +368,10 @@ export const CostResolverLive = Layer.effect(
           .from(costEventsTable)
           .where(issue ? eq(costEventsTable.issueId, issue) : undefined)
           .groupBy(costEventsTable.agentId);
-        return rows.map((r) => toRollup(r.key ?? 'unattributed', r));
+        return rows.map((r) => {
+          const key = r.key ?? 'unattributed';
+          return toRollup(key, r, deriveTieredAgentCostRole(key, issue));
+        });
       });
 
     const byBackgroundSource = (hours: number) =>
@@ -538,16 +558,40 @@ export const CostWriterLive = Layer.effect(
           const sessionFiles = yield* Effect.sync(() => walkJsonl(sessionRoot));
 
           for (const sessionFile of sessionFiles) {
-            const session = yield* Effect.sync(() =>
-              source === 'ohmypi'
-                ? parseOhmypiSessionSync(sessionFile)
-                : parseCodexSessionSync(sessionFile),
-            );
+            if (source === 'ohmypi') {
+              const events = yield* Effect.sync(() => parseOhmypiSessionCostEventsSync(sessionFile));
+              for (const usage of events) {
+                const event: CostEvent = {
+                  ts:          new Date(usage.timestamp),
+                  issueId:     issueIdFromAgentName(agentName),
+                  agentId:     agentName,
+                  sessionId:   usage.sessionId,
+                  sessionType: source,
+                  provider:    inferPiProvider(usage.model, usage.provider),
+                  model:       usage.model,
+                  input:       usage.input,
+                  output:      usage.output,
+                  cacheRead:   usage.cacheRead,
+                  cacheWrite:  usage.cacheWrite,
+                  cost:        usage.cost,
+                  requestId:   usage.requestId,
+                  sourceFile:  sessionFile,
+                };
+
+                const wasDuplicate = yield* checkDuplicate(event);
+                if (!wasDuplicate) {
+                  if (yield* record(event)) imported++;
+                }
+              }
+              continue;
+            }
+
+            const session = yield* Effect.sync(() => parseCodexSessionSync(sessionFile));
             if (!session) continue;
 
             const event: CostEvent = {
               ts:          new Date(session.startTime),
-              issueId:     null,
+              issueId:     issueIdFromAgentName(agentName),
               agentId:     agentName,
               sessionId:   session.sessionId,
               sessionType: source,

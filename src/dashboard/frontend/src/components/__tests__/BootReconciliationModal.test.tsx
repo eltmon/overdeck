@@ -89,7 +89,19 @@ function renderModal(fetchMock: ReturnType<typeof vi.fn>) {
 describe('BootReconciliationModal', () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('formats a 120-second auto-resume countdown as 2:00', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-29T15:00:00.000Z').getTime());
+    renderModal(vi.fn(async () => jsonResponse({
+      ...pendingState,
+      graceDeadline: '2026-06-29T15:02:00.000Z',
+    })));
+
+    expect(await screen.findByText('Auto-resuming all in 2:00')).toBeInTheDocument();
   });
 
   it('renders grouped held agents and keeps read-only rows non-resumable', async () => {
@@ -167,5 +179,70 @@ describe('BootReconciliationModal', () => {
         }),
       }),
     ));
+  });
+
+  it('shows the held banner for a hold_all decision and resumes all from it (PAN-2278)', async () => {
+    const holdState: BootReconciliationState = {
+      ...pendingState,
+      decision: 'hold_all',
+      decidedAt: '2026-06-29T15:00:00.253Z',
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === '/api/boot-reconciliation') return jsonResponse(holdState);
+      if (url === '/api/boot-reconciliation/decision') {
+        return jsonResponse({ ok: true, count: 3, resumed: [] });
+      }
+      return jsonResponse({ error: 'not found' }, 404);
+    });
+    renderModal(fetchMock);
+
+    const banner = await screen.findByTestId('boot-reconciliation-held-banner');
+    // 3 held: the 4-agent set minus the read-only PAN-2078 row.
+    expect(within(banner).getByText(/holding 3 stopped agents/)).toBeInTheDocument();
+    expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('boot-reconciliation-held-resume-all'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/boot-reconciliation/decision',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ decision: 'resume_all' }),
+      }),
+    ));
+  });
+
+  it('counts only agents still held by a per_agent decision, and hides when none are', async () => {
+    const perAgentState: BootReconciliationState = {
+      ...pendingState,
+      decision: 'per_agent',
+      perAgent: { 'PAN-2076': 'resume', 'PAN-2077': 'hold', 'PAN-2079': 'resume' },
+    };
+    renderModal(vi.fn(async () => jsonResponse(perAgentState)));
+
+    const banner = await screen.findByTestId('boot-reconciliation-held-banner');
+    expect(within(banner).getByText(/holding 1 stopped agent\b/)).toBeInTheDocument();
+
+    cleanup();
+    vi.unstubAllGlobals();
+
+    const allResumedState: BootReconciliationState = {
+      ...pendingState,
+      decision: 'per_agent',
+      perAgent: { 'PAN-2076': 'resume', 'PAN-2077': 'resume', 'PAN-2079': 'resume' },
+    };
+    renderModal(vi.fn(async () => jsonResponse(allResumedState)));
+    await waitFor(() => {
+      expect(screen.queryByTestId('boot-reconciliation-held-banner')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders nothing after a resume_all decision', async () => {
+    renderModal(vi.fn(async () => jsonResponse({ ...pendingState, decision: 'resume_all' })));
+    await waitFor(() => {
+      expect(screen.queryByTestId('boot-reconciliation-held-banner')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+    });
   });
 });

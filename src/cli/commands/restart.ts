@@ -221,6 +221,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
         await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
+          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
         }));
         await recordRestartStatus(startedAt, true);
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
@@ -337,6 +338,7 @@ async function runFullRestart(
   spawnDashboardDetached(config, opts.bootGateOptions);
   await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
+    expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
   }));
 
   try {

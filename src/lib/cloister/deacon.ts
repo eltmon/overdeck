@@ -33,7 +33,10 @@ import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
-import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { coordinateSwarmSlots } from './deacon-swarm.js';
+import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
+import { listFeatureWorkspaces } from './deacon-workspaces.js';
+import { createInFlightGuard } from './in-flight-guard.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
 // keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
 // Deferred review re-dispatch for, Deferred post-review re-dispatch for.
@@ -140,7 +143,8 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
 export { reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
-export { nudgeStalledResumeWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
+export { coordinateSwarmSlots } from './deacon-swarm.js';
+export { nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
@@ -285,6 +289,7 @@ const STATE_FILE = join(DEACON_DIR, 'health-state.json');
 const CONFIG_FILE = join(DEACON_DIR, 'config.json');
 
 let deaconInterval: NodeJS.Timeout | null = null;
+const deaconPatrolGuard = createInFlightGuard();
 let config: DeaconConfig = { ...DEFAULT_CONFIG };
 
 /**
@@ -347,6 +352,25 @@ export function loadState(): DeaconState {
   };
 }
 
+function newestPersistedPatrolHeartbeat(incomingLastPatrol: string | undefined): string | undefined {
+  if (!incomingLastPatrol || !existsSync(STATE_FILE)) return incomingLastPatrol;
+
+  try {
+    const content = readFileSync(STATE_FILE, 'utf-8');
+    const persisted = JSON.parse(content) as { lastPatrol?: unknown };
+    if (typeof persisted.lastPatrol !== 'string') return incomingLastPatrol;
+
+    const incomingMs = Date.parse(incomingLastPatrol);
+    const persistedMs = Date.parse(persisted.lastPatrol);
+    if (!Number.isFinite(persistedMs)) return incomingLastPatrol;
+    if (!Number.isFinite(incomingMs) || persistedMs > incomingMs) return persisted.lastPatrol;
+  } catch {
+    // Fall through to the incoming state; saveState's write error handling remains below.
+  }
+
+  return incomingLastPatrol;
+}
+
 /**
  * Save health check state to disk
  */
@@ -354,10 +378,23 @@ export function saveState(state: DeaconState): void {
   ensureDeaconDir();
 
   try {
+    const newestLastPatrol = newestPersistedPatrolHeartbeat(state.lastPatrol);
+    if (newestLastPatrol) {
+      state.lastPatrol = newestLastPatrol;
+    } else {
+      delete state.lastPatrol;
+    }
     writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
   } catch (error) {
     console.error('[deacon] Failed to save state:', error);
   }
+}
+
+function refreshPatrolHeartbeat(state: DeaconState): void { state.lastPatrol = new Date().toISOString(); saveState(state); }
+
+function startPatrolHeartbeatTicker(state: DeaconState): NodeJS.Timeout {
+  const ticker = setInterval(() => refreshPatrolHeartbeat(state), Math.max(10_000, Math.floor(config.patrolIntervalMs / 2)));
+  ticker.unref?.(); return ticker;
 }
 
 /**
@@ -875,34 +912,6 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
-function listFeatureWorkspaces(): Array<{ issueId: string; workspacePath: string }> {
-  const projects = listProjectsSync();
-  const workspaces: Array<{ issueId: string; workspacePath: string }> = [];
-
-  for (const { config: projectConfig } of projects) {
-    const workspacesRoot = join(projectConfig.path, 'workspaces');
-    if (!existsSync(workspacesRoot)) continue;
-
-    let entries: string[];
-    try {
-      entries = readdirSync(workspacesRoot, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
-        .map(e => e.name);
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      workspaces.push({
-        issueId: entry.replace(/^feature-/, '').toUpperCase(),
-        workspacePath: join(workspacesRoot, entry),
-      });
-    }
-  }
-
-  return workspaces;
-}
-
 export async function cleanupAbandonedFeedback(): Promise<string[]> {
   const actions: string[] = [];
 
@@ -2086,7 +2095,8 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
       const resolution = runtimeState.resolution;
       const count = runtimeState.resolutionCount || 0;
-      const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+      const slotAgentMatch = /^agent-(.+)-slot-\d+$/.exec(agent.id);
+      const issueId = (agent.issueId || slotAgentMatch?.[1] || agent.id.replace('agent-', '')).toUpperCase();
 
       // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
       // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
@@ -2101,6 +2111,20 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
       }
 
       if (resolution === 'done' && count >= 1) {
+        if (slotAgentMatch) {
+          console.log(`[deacon] Slot ${agent.id} (${issueId}) reported done: coordinating swarm slot merge instead of issue-level review`);
+          const swarmActions = await coordinateSwarmSlots({ issueId });
+          saveAgentRuntimeState(agent.id, {
+            resolution: 'completed',
+            resolutionCount: count + 1,
+            resolutionUpdatedAt: new Date().toISOString(),
+          });
+          actions.push(`Deacon routed completed slot ${agent.id} (${issueId}) to swarm coordination`);
+          actions.push(...swarmActions);
+          addLog('action', `Routed completed slot ${agent.id} (${issueId}) to swarm coordination`, undefined);
+          continue;
+        }
+
         // PAN-534: lowered from >= 2 to >= 1. A single done signal is sufficient
         // evidence. The old threshold deadlocked when review failed and reset to
         // pending — the agent never re-signaled done, so count stayed at 1 forever.
@@ -2565,13 +2589,10 @@ export async function checkAwaitingTestWorkSessions(): Promise<string[]> {
   return actions;
 }
 
-/**
- * Run a single patrol cycle
- */
 export async function runPatrol(): Promise<PatrolResult> {
   const state = loadState();
   state.patrolCycle++;
-  state.lastPatrol = new Date().toISOString();
+  refreshPatrolHeartbeat(state);
 
   // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];
@@ -2581,8 +2602,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Persisted in app_settings; survives restarts. Per-cycle check so flipping
   // the toggle at runtime takes effect on the next tick without restarting.
   if (isDeaconGloballyPaused()) {
-    state.lastPatrol = new Date().toISOString();
-    saveState(state);
+    refreshPatrolHeartbeat(state);
     if (!hasLoggedGlobalPauseSkip) {
       console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
       addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
@@ -2590,7 +2610,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     }
     const skipped: PatrolResult = {
       cycle: state.patrolCycle,
-      timestamp: state.lastPatrol,
+      timestamp: state.lastPatrol!,
       specialists: [],
       actionsToken: ['skipped: globally_paused'],
       massDeathDetected: false,
@@ -2604,9 +2624,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   // patrol's combined spawns stay under the concurrency ceiling.
   resetPatrolDispatchBudget();
 
+  const patrolHeartbeatTicker = startPatrolHeartbeatTicker(state);
+  try {
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
+
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
@@ -2679,6 +2705,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stalledResumeActions = await nudgeStalledResumeWorkAgents();
   actions.push(...stalledResumeActions);
   for (const a of stalledResumeActions) addLog('action', a, state.patrolCycle);
+
+  const kickoffRedeliveryActions = await redeliverUndeliveredKickoffs();
+  actions.push(...kickoffRedeliveryActions);
+  for (const a of kickoffRedeliveryActions) addLog('action', a, state.patrolCycle);
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
@@ -2900,6 +2930,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-2203: deterministic swarm coordination. This pass derives active
+  // swarms from workspaces + vBRIEF readiness; later beads fill in merge,
+  // dispatch, recovery, and cooldown behavior.
+  const swarmActions = await coordinateSwarmSlots();
+  actions.push(...swarmActions);
+  for (const a of swarmActions) addLog('action', a, state.patrolCycle);
+
   // Reconcile stale merge status: detect branches merged to main outside the dashboard
   const staleMergeActions = await reconcileStaleMergeStatus();
   actions.push(...staleMergeActions);
@@ -2977,10 +3014,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
-
-  const stuckRemediationActions = await checkStuckAgentRemediation();
-  actions.push(...stuckRemediationActions);
-  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
   // that lost the port but keep running — and can run a second Deacon). Low
@@ -3144,14 +3177,11 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.error('[deacon] Error during per-project specialist patrol:', msg);
   }
 
-  // Single save for the entire patrol cycle — all mutations from
-  // checkSpecialistHealth, forceKillSpecialist, and checkMassDeath
-  // accumulate in the shared state object and are persisted once here.
-  saveState(state);
+  refreshPatrolHeartbeat(state);
 
   const result: PatrolResult = {
     cycle: state.patrolCycle,
-    timestamp: state.lastPatrol,
+    timestamp: state.lastPatrol!,
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
@@ -3159,11 +3189,34 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   lastPatrolResult = result;
   return result;
+  } finally {
+    clearInterval(patrolHeartbeatTicker);
+  }
 }
 
 // Store the most recent patrol result for API access
 let lastPatrolResult: PatrolResult | null = null;
 let hasLoggedGlobalPauseSkip = false;
+
+function runScheduledPatrol(source: 'startup' | 'interval'): void {
+  const started = deaconPatrolGuard.run(
+    'deacon-patrol',
+    async () => {
+      await runPatrol();
+    },
+    (err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[deacon] Patrol error:', err);
+      logDeaconEventSync(`patrol error: ${msg}`);
+    },
+  );
+
+  if (!started) {
+    const msg = `patrol ${source} skipped — previous patrol still in flight`;
+    console.warn(`[deacon] ${msg}`);
+    logDeaconEventSync(`startDeacon: ${msg}`);
+  }
+}
 
 // ============================================================================
 // Deacon Log Buffer
@@ -3301,7 +3354,7 @@ export function startDeacon(): void {
   // first patrol. PAN-1908: use the thin table-query reconcile instead of directory scans.
   void (async () => {
     await reconcileAgentLiveness();
-    await runPatrol();
+    runScheduledPatrol('startup');
   })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[deacon] Startup recovery/patrol error:', err);
@@ -3310,11 +3363,7 @@ export function startDeacon(): void {
 
   // Schedule regular patrols
   deaconInterval = setInterval(() => {
-    runPatrol().catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[deacon] Patrol error:', err);
-      logDeaconEventSync(`patrol error: ${msg}`);
-    });
+    runScheduledPatrol('interval');
   }, config.patrolIntervalMs);
 
   logDeaconEventSync('startDeacon: health monitor started');

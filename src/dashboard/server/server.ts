@@ -1,4 +1,5 @@
 import { jsonResponse } from "./http-helpers.js";
+import { getDashboardIdentity } from './identity.js';
 /**
  * Dashboard HTTP server — Effect-based with dual-runtime support (PAN-428 B5)
  *
@@ -7,7 +8,7 @@ import { jsonResponse } from "./http-helpers.js";
  *   - Node (prod): NodeHttpServer + NodeServices
  *
  * Routes:
- *   GET  /api/health  → { status: "ok" }
+ *   GET  /api/health  → { status: "ok", repoRoot, mode }
  *   GET  /ws/rpc      → WebSocket RPC (PanRpcGroup)
  *   GET  /ws/terminal  → Raw WebSocket terminal (bypasses Effect RPC)
  *   GET  *            → static files from OVERDECK_FRONTEND_DIR
@@ -70,6 +71,7 @@ import { artifactsRouteLayer } from './routes/artifacts.js';
 import { backlogRouteLayer } from './routes/backlog.js';
 import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { fsRouteLayer } from './routes/fs.js';
+import { tieredCalloutsRouteLayer } from './routes/tiered-callouts.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
@@ -112,7 +114,7 @@ const PlatformServicesLive = Layer.unwrap(
 const healthRouteLayer = HttpRouter.add(
   'GET',
   '/api/health',
-  jsonResponse({ status: 'ok' }),
+  jsonResponse({ status: 'ok', ...getDashboardIdentity() }),
 );
 
 function requestHeader(request: HttpServerRequest.HttpServerRequest, name: string): string | undefined {
@@ -335,6 +337,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   artifactsRouteLayer,
   featureRegistryRouteLayer,
   fsRouteLayer,
+  tieredCalloutsRouteLayer,
   backlogRouteLayer,
   staticRouteLayer,
 );

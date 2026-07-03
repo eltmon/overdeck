@@ -104,6 +104,8 @@ vi.mock('../concurrency.js', () => ({
   resetPatrolDispatchBudget: vi.fn(),
   tryReserveAdvancingSlot: () => true,
   releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
 }));
 
@@ -521,5 +523,38 @@ describe('reactive Cloister scheduler', () => {
     }));
 
     expect(idleStackReaperMock.handleAgentLifecycleEventForIdleStack).toHaveBeenCalledWith('agent-pan-503');
+  });
+});
+
+describe('PAN-2159: duplicate planner twin on in_planning', () => {
+  it('does not spawn a twin while the canonical planner is freshly starting (tmux session not yet created)', async () => {
+    // The start-planning route writes planning-<issue> state BEFORE the
+    // lifecycle transition; the tmux session is created after it. The guard
+    // must treat this fresh 'starting' state as alive.
+    vi.mocked(getAgentState).mockImplementation(((id: string) => {
+      if (id === 'planning-pan-503') {
+        return { id, issueId: 'PAN-503', role: 'plan', status: 'starting', startedAt: new Date().toISOString() };
+      }
+      return null;
+    }) as never);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('still unsticks a stale crashed spawn (starting past the grace window, no session)', async () => {
+    vi.mocked(getAgentState).mockImplementation(((id: string) => {
+      if (id === 'planning-pan-503') {
+        return { id, issueId: 'PAN-503', role: 'plan', status: 'starting', startedAt: new Date(Date.now() - 10 * 60_000).toISOString() };
+      }
+      return null;
+    }) as never);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', expect.anything());
   });
 });

@@ -7,7 +7,7 @@
  */
 
 import { Effect } from 'effect';
-import { ModelId, AnthropicModel, OpenAIModel, GoogleModel } from './settings.js';
+import { ModelId, AnthropicModel } from './settings.js';
 import { resolveModelIdSync } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 

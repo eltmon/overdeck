@@ -1,0 +1,422 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import type { ModelId } from '../settings.js';
+import type { RuntimeName } from '../runtimes/types.js';
+import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import type { TierOverridesMap } from '../vbrief/io.js';
+import { getModelCapabilitySync, hasModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
+import type { AgentState } from './agent-state.js';
+import type { DeliveryResult } from './delivery.js';
+import { deliverAgentMessage } from './delivery.js';
+import { spawnRun } from './spawn.js';
+import type { SpawnRunOptions } from './spawn-prep.js';
+import { listSlotOwnership } from './slot-reconcile.js';
+import type { InFlightBead } from './standing-tiers.js';
+import { computeTierRunSchedule, tiersNeededForSchedule } from './standing-tiers.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
+import {
+  composeCommitFeedMessage,
+  renderCommitFeedDiff,
+  resolveFeedApiUrl,
+  shouldSkipFeedSubject,
+} from './tier-feed.js';
+import {
+  buildSupervisorReviewMessage,
+  extractAcceptanceCriteria,
+  extractTracedFrText,
+  shouldSupervise,
+  supervisorAgentId as defaultSupervisorAgentId,
+  SUPERVISOR_SUB_ROLE,
+} from './tier-supervisor.js';
+import type { TieredExecutionSupervisorConfig, ValidatedTieredExecutionConfig, ValidatedTieredExecutionFeedConfig } from './tier-table.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG } from './tier-table.js';
+import { stopAgent } from './termination.js';
+
+const execFileAsync = promisify(execFile);
+const DEFAULT_REPLAY_THRESHOLD = 0.5;
+
+export interface ReplayCommit {
+  sha: string;
+  subject: string;
+  diff: string;
+  beadId?: string;
+}
+
+export interface ReplayDelivery {
+  sha: string;
+  result: DeliveryResult;
+}
+
+export interface ReplayResult {
+  agent: AgentState;
+  commits: ReplayCommit[];
+  deliveries: ReplayDelivery[];
+}
+
+export interface ReplayRerouteContext {
+  doc: VBriefDocument;
+  config: ValidatedTieredExecutionConfig;
+  statusOverrides?: Record<string, string>;
+  tierOverrides?: TierOverridesMap;
+}
+
+export interface ReplayTargetBase {
+  issueId: string;
+  workspace: string;
+  /**
+   * Base revision for replay. The feed is reconstructed from
+   * `git log --reverse <base>..HEAD`.
+   */
+  base: string;
+  /** Existing dead/stale agent id, if known. */
+  agentId?: string;
+  /** Optional prompt for the fresh standing session. */
+  prompt?: string;
+  /** Feed filtering/rendering config. Defaults preserve today's raw git-show behavior. */
+  feedConfig?: ValidatedTieredExecutionFeedConfig;
+  /** Dashboard API base URL used when replaying callout-enabled tier feed messages. */
+  apiUrl?: string;
+  /** Optional current scheduling state used only when compaction_reroute is on. */
+  reroute?: ReplayRerouteContext;
+}
+
+export interface ReplayStandingTierTarget extends ReplayTargetBase {
+  kind: 'tier';
+  tierName: string;
+  /** Registered standing slot index. Resolved from slot-reconcile when omitted. */
+  slotIndex?: number;
+  /** First item assigned to the standing slot. Resolved from slot-reconcile when omitted. */
+  slotItemId?: string;
+}
+
+export interface ReplaySupervisorTarget extends ReplayTargetBase {
+  kind: 'supervisor';
+  supervisor: TieredExecutionSupervisorConfig;
+  /** Plan used to apply the supervisor subscription policy to replay commits. */
+  doc: VBriefDocument;
+  /** PRD markdown used to replay traced requirement text, when available. */
+  prdMarkdown?: string;
+  apiUrl?: string;
+}
+
+export type ReplayTarget = ReplayStandingTierTarget | ReplaySupervisorTarget;
+
+export interface TierReplayDeps {
+  spawn?: typeof spawnRun;
+  deliver?: typeof deliverAgentMessage;
+  stop?: typeof stopAgent;
+  gitLog?: (workspace: string, base: string) => Promise<Array<{ sha: string; subject: string }>>;
+  gitShow?: (workspace: string, sha: string) => Promise<string>;
+  renderDiff?: (workspace: string, sha: string, feedConfig: ValidatedTieredExecutionFeedConfig) => Promise<string>;
+  listSlotOwnership?: typeof listSlotOwnership;
+}
+
+export interface TierReplayOptions {
+  deps?: TierReplayDeps;
+}
+
+export interface TierRunCompactionInput {
+  /** True only between tier runs. Compaction is forbidden inside a bead. */
+  atRunBoundary: boolean;
+  /** Any in-flight bead blocks compaction, even if the caller says it is at a boundary. */
+  inFlightBead?: InFlightBead;
+  estimatedContextTokens: number;
+  modelContextWindow: number;
+  replayThreshold?: number;
+}
+
+export interface TierRunCompactionOptions {
+  target: ReplayTarget;
+  compaction: TierRunCompactionInput;
+  deps?: TierReplayDeps;
+}
+
+/**
+ * Replay a dead standing tier agent or standing supervisor:
+ * respawn the registered session and re-deliver its commit feed reconstructed
+ * from `git log <base>..HEAD`, oldest commit first.
+ */
+export async function replayStandingAgent(
+  target: ReplayTarget,
+  options: TierReplayOptions = {},
+): Promise<ReplayResult> {
+  const deps = replayDeps(options.deps);
+  const replayTarget: ReplayTarget = target.kind === 'tier'
+    ? { ...target, ...resolveReplaySlot(target, deps) }
+    : target;
+  const agent = await spawnReplayTarget(replayTarget, deps);
+  const commits = await loadReplayCommits(
+    replayTarget.workspace,
+    replayTarget.base,
+    replayTarget.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed,
+    deps,
+  );
+  const deliveries = replayTarget.kind === 'tier'
+    ? await replayTierFeed(agent.id, replayTarget, commits, deps)
+    : await replaySupervisorFeed(agent.id, replayTarget, commits, deps);
+
+  return { agent, commits, deliveries };
+}
+
+/**
+ * Crash/orphan entry point. The caller has already determined the old session
+ * is dead; replay respawns and reconstructs the feed without human input.
+ */
+export async function replayCrashedStandingAgent(
+  target: ReplayStandingTierTarget & { reroute: ReplayRerouteContext },
+  options?: TierReplayOptions,
+): Promise<ReplayResult | null>;
+export async function replayCrashedStandingAgent(
+  target: ReplayTarget,
+  options?: TierReplayOptions,
+): Promise<ReplayResult>;
+export async function replayCrashedStandingAgent(
+  target: ReplayTarget,
+  options: TierReplayOptions = {},
+): Promise<ReplayResult | null> {
+  const rerouted = resolveReroutedReplayTarget(target);
+  if (!rerouted) return null;
+  return replayStandingAgent(rerouted, options);
+}
+
+/**
+ * Threshold-triggered compaction entry point. It only acts at a tier-run
+ * boundary and only when no bead is in flight; mid-bead compaction returns
+ * `null` by construction.
+ */
+export async function compactAtTierRunBoundary(
+  options: TierRunCompactionOptions,
+): Promise<ReplayResult | null> {
+  if (!shouldReplayCompactAtTierRunBoundary(options.compaction)) return null;
+  const deps = replayDeps(options.deps);
+  const rerouted = resolveReroutedReplayTarget(options.target);
+  if (!rerouted) {
+    if (options.target.agentId) await deps.stop(options.target.agentId);
+    return null;
+  }
+  if (rerouted.agentId) {
+    await deps.stop(rerouted.agentId);
+  }
+  return replayStandingAgent(rerouted, { deps });
+}
+
+export function shouldReplayCompactAtTierRunBoundary(input: TierRunCompactionInput): boolean {
+  if (!input.atRunBoundary) return false;
+  if (input.inFlightBead) return false;
+  if (!Number.isFinite(input.estimatedContextTokens) || input.estimatedContextTokens < 0) return false;
+  if (!Number.isFinite(input.modelContextWindow) || input.modelContextWindow <= 0) return false;
+  const threshold = input.replayThreshold ?? DEFAULT_REPLAY_THRESHOLD;
+  if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 1) return false;
+  return input.estimatedContextTokens / input.modelContextWindow >= threshold;
+}
+
+export function contextWindowForModel(model: string): number | undefined {
+  const resolved = resolveModelIdSync(model);
+  if (!hasModelCapabilitySync(resolved)) return undefined;
+  return getModelCapabilitySync(resolved as ModelId).contextWindow;
+}
+
+async function spawnReplayTarget(target: ReplayTarget, deps: Required<TierReplayDeps>): Promise<AgentState> {
+  if (target.kind === 'supervisor') {
+    return deps.spawn(target.issueId, 'review', {
+      agentId: target.agentId ?? defaultSupervisorAgentId(target.issueId),
+      subRole: SUPERVISOR_SUB_ROLE,
+      model: target.supervisor.model,
+      harness: target.supervisor.harness,
+      workspace: target.workspace,
+      prompt: target.prompt,
+    });
+  }
+
+  const slot = resolveReplaySlot(target, deps);
+  const spawnOptions: SpawnRunOptions = {
+    slotIndex: slot.slotIndex,
+    slotItemId: slot.slotItemId,
+    prompt: target.prompt,
+    ...currentTierSpawnOverride(target),
+  };
+  return deps.spawn(target.issueId, 'work', spawnOptions);
+}
+
+function resolveReroutedReplayTarget(target: ReplayTarget): ReplayTarget | null {
+  if (target.kind !== 'tier') return target;
+  const reroute = target.reroute;
+  if (!reroute || reroute.config.compaction_reroute === 'off') return target;
+
+  const scheduleDoc = remainingScheduleDocument(reroute);
+  const schedule = computeTierRunSchedule(scheduleDoc, reroute.config);
+  if (!tiersNeededForSchedule(schedule).includes(target.tierName)) return null;
+  return target;
+}
+
+function remainingScheduleDocument(reroute: ReplayRerouteContext): VBriefDocument {
+  const statusOverrides = reroute.statusOverrides ?? {};
+  const tierOverrides = reroute.tierOverrides ?? {};
+  return {
+    ...reroute.doc,
+    plan: {
+      ...reroute.doc.plan,
+      items: reroute.doc.plan.items
+        .filter((item) => (statusOverrides[item.id] ?? item.status) !== 'completed')
+        .map((item) => applyEffectiveDifficulty(item, tierOverrides)),
+    },
+  };
+}
+
+function currentTierSpawnOverride(target: ReplayStandingTierTarget): Pick<SpawnRunOptions, 'model' | 'harness'> {
+  const reroute = target.reroute;
+  if (!reroute || reroute.config.compaction_reroute === 'off') return {};
+  const tier = reroute.config.tiers[target.tierName];
+  if (!tier) return {};
+  return { model: tier.model, harness: tier.harness };
+}
+
+function resolveReplaySlot(
+  target: ReplayStandingTierTarget,
+  deps: Required<TierReplayDeps>,
+): { slotIndex: number; slotItemId: string } {
+  if (target.slotIndex !== undefined && target.slotItemId !== undefined) {
+    return { slotIndex: target.slotIndex, slotItemId: target.slotItemId };
+  }
+
+  const ownership = deps.listSlotOwnership(target.issueId, target.workspace);
+  const match = target.slotItemId
+    ? ownership.find((assignment) => assignment.itemId === target.slotItemId)
+    : ownership.find((assignment) => assignment.agentId === target.agentId);
+  if (!match) {
+    throw new Error(
+      `Cannot replay standing tier '${target.tierName}' for ${target.issueId}: slot ownership was not found`,
+    );
+  }
+  return { slotIndex: match.slotIndex, slotItemId: match.itemId };
+}
+
+async function replayTierFeed(
+  agentId: string,
+  target: ReplayStandingTierTarget,
+  commits: ReplayCommit[],
+  deps: Required<TierReplayDeps>,
+): Promise<ReplayDelivery[]> {
+  const deliveries: ReplayDelivery[] = [];
+  const feedConfig = target.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed;
+  const includeCallout = feedConfig.callouts !== 'off';
+  const apiUrl = target.apiUrl ?? resolveFeedApiUrl();
+  for (const commit of commits) {
+    const beadId = commit.beadId;
+    const message = composeCommitFeedMessage(
+      commit.sha,
+      commit.subject,
+      commit.diff,
+      includeCallout && beadId
+        ? {
+          apiUrl,
+          issueId: target.issueId,
+          beadId,
+          tierName: target.tierName,
+          agentId,
+        }
+        : undefined,
+    );
+    deliveries.push({
+      sha: commit.sha,
+      result: await deps.deliver(agentId, message, 'tier-replay:tier'),
+    });
+  }
+  return deliveries;
+}
+
+async function replaySupervisorFeed(
+  agentId: string,
+  target: ReplaySupervisorTarget,
+  commits: ReplayCommit[],
+  deps: Required<TierReplayDeps>,
+): Promise<ReplayDelivery[]> {
+  const deliveries: ReplayDelivery[] = [];
+  for (const commit of commits) {
+    const item = findReplayItem(target.doc, commit);
+    if (!item || !shouldSupervise(item, target.supervisor.subscribe)) continue;
+    const traces = Array.isArray(item.metadata?.traces) ? item.metadata.traces as string[] : [];
+    const frText = target.prdMarkdown && traces.length > 0
+      ? extractTracedFrText(target.prdMarkdown, traces)
+      : undefined;
+    const message = buildSupervisorReviewMessage({
+      issueId: target.issueId,
+      beadId: item.id,
+      beadTitle: item.title,
+      sha: commit.sha,
+      diff: commit.diff,
+      acceptanceCriteria: extractAcceptanceCriteria(item),
+      frText,
+      apiUrl: target.apiUrl ?? 'http://localhost:3011',
+    });
+    deliveries.push({
+      sha: commit.sha,
+      result: await deps.deliver(agentId, message, 'tier-replay:supervisor'),
+    });
+  }
+  return deliveries;
+}
+
+function findReplayItem(doc: VBriefDocument, commit: Pick<ReplayCommit, 'subject'>): VBriefItem | undefined {
+  return doc.plan.items.find((item) => {
+    const subject = commit.subject.toLowerCase();
+    return subject.includes(item.id.toLowerCase()) || subject.includes(item.title.toLowerCase());
+  });
+}
+
+async function loadReplayCommits(
+  workspace: string,
+  base: string,
+  feedConfig: ValidatedTieredExecutionFeedConfig,
+  deps: Required<TierReplayDeps>,
+): Promise<ReplayCommit[]> {
+  const entries = await deps.gitLog(workspace, base);
+  const commits: ReplayCommit[] = [];
+  for (const entry of entries) {
+    if (shouldSkipFeedSubject(entry.subject, feedConfig)) continue;
+    commits.push({
+      ...entry,
+      diff: await deps.renderDiff(workspace, entry.sha, feedConfig),
+    });
+  }
+  return commits;
+}
+
+async function runGitLog(workspace: string, base: string): Promise<Array<{ sha: string; subject: string }>> {
+  const { stdout } = await execFileAsync('git', ['log', '--reverse', '--format=%H%x00%s', `${base}..HEAD`], {
+    cwd: workspace,
+    encoding: 'utf-8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return stdout
+    .split('\n')
+    .map((line) => {
+      const [sha, subject = ''] = line.split('\0');
+      return { sha, subject };
+    })
+    .filter((entry) => entry.sha.trim().length > 0);
+}
+
+async function runGitShow(workspace: string, sha: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['show', sha], {
+    cwd: workspace,
+    encoding: 'utf-8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return stdout;
+}
+
+function replayDeps(deps: TierReplayDeps = {}): Required<TierReplayDeps> {
+  return {
+    spawn: deps.spawn ?? spawnRun,
+    deliver: deps.deliver ?? deliverAgentMessage,
+    stop: deps.stop ?? stopAgent,
+    gitLog: deps.gitLog ?? runGitLog,
+    gitShow: deps.gitShow ?? runGitShow,
+    renderDiff: deps.renderDiff
+      ?? (deps.gitShow
+        ? (workspace, sha) => deps.gitShow!(workspace, sha)
+        : renderCommitFeedDiff),
+    listSlotOwnership: deps.listSlotOwnership ?? listSlotOwnership,
+  };
+}

@@ -276,6 +276,41 @@ describe('SessionNode', () => {
     expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconRunning')).toBeTruthy();
   });
 
+  it('renders registered swarm slots as distinct openable terminal rows', () => {
+    render(
+      <div>
+        <SessionNode
+          issueId="PAN-2203"
+          onViewTerminal={vi.fn()}
+          session={makeSession({
+            sessionId: 'agent-pan-2203-slot-1',
+            tmuxSession: 'agent-pan-2203-slot-1',
+            type: 'work',
+          })}
+        />
+        <SessionNode
+          issueId="PAN-2203"
+          onViewTerminal={vi.fn()}
+          session={makeSession({
+            sessionId: 'agent-pan-2203-slot-2',
+            tmuxSession: 'agent-pan-2203-slot-2',
+            type: 'work',
+          })}
+        />
+      </div>,
+    );
+
+    expect(screen.getByText('Slot 1')).toHaveAttribute(
+      'title',
+      'Registered swarm slot 1 for this issue. Model: sonnet-4-6. Session: agent-pan-2203-slot-1.',
+    );
+    expect(screen.getByText('Slot 2')).toHaveAttribute(
+      'title',
+      'Registered swarm slot 2 for this issue. Model: sonnet-4-6. Session: agent-pan-2203-slot-2.',
+    );
+    expect(screen.getAllByText('View Terminal')).toHaveLength(2);
+  });
+
   it('renders no status pill for quietly-stopped sessions (PAN-1779)', () => {
     render(
       <SessionNode

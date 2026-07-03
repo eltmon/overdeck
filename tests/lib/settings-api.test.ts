@@ -171,6 +171,49 @@ describe('settings-api', () => {
       });
     });
 
+    it('surfaces normalized tiered execution config for read-only Settings visibility', () => {
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['anthropic']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' },
+          conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
+          trackerKeys: {},
+          tts: makeTtsConfig(),
+          tieredExecution: {
+            enabled: true,
+            tiers: {
+              cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+              frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+            },
+            supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+            by_kind: {},
+            byKind: {},
+            feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+            compaction_reroute: 'off',
+            replay_threshold: 0.5,
+            difficultyToTier: {
+              trivial: 'cheap',
+              simple: 'cheap',
+              medium: 'frontier',
+              complex: 'frontier',
+              expert: 'frontier',
+            },
+          },
+        },
+        migration: null,
+      } as any);
+
+      const settings = loadSettingsApi();
+      expect(settings.tiered_execution?.enabled).toBe(true);
+      expect(settings.tiered_execution?.tiers.cheap.model).toBe('claude-haiku-4-5');
+      expect(settings.tiered_execution?.difficultyToTier?.expert).toBe('frontier');
+    });
+
     it('does not surface legacy model-route overrides in the settings API', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {

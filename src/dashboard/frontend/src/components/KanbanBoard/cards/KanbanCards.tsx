@@ -614,6 +614,17 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     }
   }, [pausedAgent, issue.identifier]);
 
+  // Surface the troubled gate on the card — troubled agents were quarantined
+  // by the deacon after repeated resume/crash failures and stay down until an
+  // operator investigates and runs `pan untroubled`. Deliberately no one-click
+  // clear here (unlike Unpause): clearing without investigation just re-enters
+  // the crash loop.
+  const troubledAgent = [...issueWorkAgents, ...(planningAgent ? [planningAgent] : [])]
+    .find((a) => (a as { troubled?: boolean }).troubled === true);
+  const troubledFailures = troubledAgent
+    ? (troubledAgent as { consecutiveFailures?: number }).consecutiveFailures
+    : undefined;
+
   const agentSubText = activeAgent
     ? (reviewSpecialists.length > 0 && activeAgent.role === 'review'
       ? `${reviewSpecialists.length} reviewers · ${getFriendlyModelName(activeAgent.model)}`
@@ -694,6 +705,15 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             <span className="font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
           )}
           <span className="ml-auto flex items-center gap-1.5">
+            {troubledAgent && (
+              <span
+                data-testid={`card-troubled-${issue.identifier}`}
+                className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-destructive badge-bg-destructive text-destructive"
+                title={`Troubled: ${troubledFailures ?? '?'} consecutive failures — investigate, then clear with pan untroubled ${issue.identifier}`}
+              >
+                ⚠ Troubled
+              </span>
+            )}
             {pausedAgent && (
               <>
                 <span

@@ -291,9 +291,12 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
   const startedBySystemd = (() => {
     try {
+      // start-server daemonizes, so the unit must be Type=forking: under the
+      // default Type=simple the founding client's exit deactivates the unit and
+      // the cgroup kill murders the forked server (PAN-1798, 5 dead foundings/boot).
       execFileSync(
         'systemd-run',
-        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', 'tmux', ...args],
+        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', '--service-type=forking', 'tmux', ...args],
         { stdio: 'ignore', env: cleanEnv },
       );
       return true;

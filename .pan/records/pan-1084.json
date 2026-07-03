@@ -45,18 +45,17 @@
     "auto-start.ac3": "completed"
   },
   "created": "2026-06-26T03:33:27.321Z",
-  "updated": "2026-07-01T10:57:46.364Z",
+  "updated": "2026-07-03T03:12:15.109Z",
   "pipeline": {
     "issueId": "PAN-1084",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T10:57:46.299Z",
+    "updatedAt": "2026-07-03T03:12:14.987Z",
     "reviewNotes": "Approved: work-agent tmux guard is scoped and covered by focused tests",
     "testNotes": "Verification complete. All quality gates passed: typecheck (✓), lint (✓), test suite (737 test files, 7510 tests ✓, including focused tmux-send-keys-guard tests). Guard correctly scoped to work agents only; non-work sessions pass through silently. Tests verify: (1) non-work sessions do NOT block tmux, (2) work agent targeting self passes, (3) work agent targeting other session blocked with error, (4) send-keys and paste-buffer both blocked against non-self targets. No browser UAT (backend hook feature). AC1-AC3 covered.",
-    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2107",
     "lastVerifiedCommit": "0eee912cc6f0fa7ebe9cfbd3f7391ad7b2108d9c"
   },
@@ -124,7 +123,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.278977,
-        "pricingAsOf": "2026-07-01T10:57:46.364Z"
+        "pricingAsOf": "2026-07-03T03:12:15.108Z"
       }
     },
     "merges": [

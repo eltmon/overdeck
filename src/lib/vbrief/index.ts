@@ -19,10 +19,11 @@ export type {
   VBriefItemStatus,
   VBriefPriority,
   VBriefDifficulty,
+  VBriefItemKind,
 } from './types.js';
 
 // Date helpers
-export { isRFC3339DateTime, toRFC3339 } from './types.js';
+export { DEFAULT_VBRIEF_ITEM_KIND, isRFC3339DateTime, resolveVBriefItemKind, toRFC3339 } from './types.js';
 
 // Builder
 export { PlanBuilder, planBuilder } from './builder.js';

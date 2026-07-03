@@ -210,3 +210,64 @@ describe('EventStore.compact', () => {
     expect(store.readFrom(0)).toHaveLength(2)
   })
 })
+
+// ─── JSON-normalized payload distribution (PAN-2225) ─────────────────────────
+// The write door must distribute the same JSON round-tripped payload it
+// persists. An explicitly-undefined key (e.g. `details: undefined` from an
+// activity emitter) survives in a raw in-memory object but is dropped by
+// JSON.stringify — the divergence poisons RpcSerialization.layerJson encode
+// of getSnapshot/subscribeDomainEvents ("Reconnecting to the dashboard…").
+
+describe('EventStore payload normalization (PAN-2225)', () => {
+  let store: ReturnType<typeof createEventStore>
+
+  beforeEach(() => {
+    store = createEventStore(makeDb())
+  })
+
+  it('append distributes payload identical to the persisted round-trip', () => {
+    const received: any[] = []
+    store.subscribe((e) => received.push(e))
+
+    store.append({
+      type: 'activity.entry',
+      timestamp: ts(),
+      payload: { id: 'e1', message: 'verification passed', details: undefined, link: undefined },
+    } as any)
+
+    expect(received).toHaveLength(1)
+    expect('details' in received[0].payload).toBe(false)
+    expect('link' in received[0].payload).toBe(false)
+    expect(received[0].payload).toEqual(store.readFrom(0)[0].payload)
+  })
+
+  it('appendAsync distributes payload identical to the persisted round-trip', async () => {
+    const received: any[] = []
+    store.subscribe((e) => received.push(e))
+
+    await store.appendAsync({
+      type: 'activity.entry',
+      timestamp: ts(),
+      payload: { id: 'e2', message: 'review passed', details: undefined },
+    } as any)
+
+    expect(received).toHaveLength(1)
+    expect('details' in received[0].payload).toBe(false)
+    expect(received[0].payload).toEqual(store.readFrom(0)[0].payload)
+  })
+
+  it('emitOnly distributes a JSON-normalized payload', () => {
+    const received: any[] = []
+    store.subscribe((e) => received.push(e))
+
+    store.emitOnly({
+      type: 'activity.entry',
+      timestamp: ts(),
+      payload: { id: 'e3', message: 'in-memory only', details: undefined },
+    } as any)
+
+    expect(received).toHaveLength(1)
+    expect('details' in received[0].payload).toBe(false)
+    expect(received[0].payload).toEqual({ id: 'e3', message: 'in-memory only' })
+  })
+})

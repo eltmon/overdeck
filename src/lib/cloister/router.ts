@@ -7,7 +7,8 @@
 
 import type { ComplexityLevel, BeadsTask, WorkspaceMetadata, ComplexityDetectionResult } from './complexity.js';
 import type { CloisterConfig, ModelSelectionConfig } from './config.js';
-import { detectComplexity, complexityToModel } from './complexity.js';
+import { detectComplexity, legacyComplexityTierConfig } from './complexity.js';
+import { resolveTier } from '../agents/resolve-tier.js';
 import { loadCloisterConfigSync } from './config.js';
 /**
  * Model routing result
@@ -44,8 +45,13 @@ export class ModelRouter {
     // Get model selection config
     const modelSelection = this.config.model_selection;
     if (!modelSelection) {
-      // Fall back to default complexity-based routing
-      const model = complexityToModel(detection.level) as 'opus' | 'sonnet' | 'haiku';
+      // Fall back to default complexity-based routing through the tier
+      // resolution chain (PAN-1791) — one resolution path, legacy mapping.
+      const resolved = resolveTier(
+        { id: task.id, title: task.title, metadata: { difficulty: detection.level } },
+        legacyComplexityTierConfig(),
+      );
+      const model = resolved.model as 'opus' | 'sonnet' | 'haiku';
       return {
         model,
         complexity: detection.level,

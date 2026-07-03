@@ -9,9 +9,9 @@ import {
 import { listAllAgentsSync } from '../overdeck/agents.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
-import { getNoResumeMode } from './no-resume-mode.js';
+import { isExplicitNoResumeRequest } from './no-resume-mode.js';
 
-export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 30;
+export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 120;
 
 type ReconciliationAgent = ReturnType<typeof listAllAgentsSync>[number];
 
@@ -137,10 +137,10 @@ export function startBootReconciliation(
 
   stampBootReconciliation(bootId, graceDeadline);
 
-  if (getNoResumeMode().active) {
+  if (isExplicitNoResumeRequest()) {
     clearBootReconciliationGraceTimer();
     setBootReconciliationDecision('hold_all');
-    logDeaconEventSync(`boot reconciliation stamped ${bootId}: OVERDECK_NO_RESUME requested hold_all`);
+    logDeaconEventSync(`boot reconciliation stamped ${bootId}: explicit OVERDECK_NO_RESUME requested hold_all`);
     return { bootId, graceDeadline, candidateIds, decision: 'hold_all', timerArmed: false };
   }
 

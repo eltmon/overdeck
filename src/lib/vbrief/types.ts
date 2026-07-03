@@ -15,8 +15,9 @@
  *
  * Overdeck extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
+ *   - metadata.kind: docs | api | backend | frontend | infra | test | refactor | design | spike
  *   - metadata.issueLabel: issue ID for beads label filtering
- *   - metadata.kind: "acceptance_criterion" on child items
+ *   - child metadata.kind: "acceptance_criterion" on child items
  */
 
 export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
@@ -27,6 +28,10 @@ export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | '
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+
+export type VBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
+
+export const DEFAULT_VBRIEF_ITEM_KIND: VBriefItemKind = 'backend';
 
 export type FilesScopeConfidence = 'high' | 'medium' | 'low';
 
@@ -54,6 +59,7 @@ export interface VBriefSubItem {
 
 export interface VBriefItemMetadata {
   difficulty?: VBriefDifficulty;
+  kind?: VBriefItemKind;
   issueLabel?: string;
   phase?: number;
   /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
@@ -164,6 +170,10 @@ export interface VBriefDocument {
 
 export function subItemsOf(item: VBriefItem): VBriefSubItem[] {
   return item.items ?? item.subItems ?? [];
+}
+
+export function resolveVBriefItemKind(metadata?: Pick<VBriefItemMetadata, 'kind'>): VBriefItemKind {
+  return metadata?.kind ?? DEFAULT_VBRIEF_ITEM_KIND;
 }
 
 /**

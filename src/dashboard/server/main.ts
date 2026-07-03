@@ -420,8 +420,11 @@ startSubstrateBugPoller();
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times (gated per-tick on flywheel.merge_train_enabled; no-op without an
 // active flywheel run).
-startUatTrainReconciler();
-console.log('[overdeck] UAT batch-train reconciler started');
+if (startUatTrainReconciler()) {
+  console.log('[overdeck] UAT batch-train reconciler started');
+} else {
+  console.log('[overdeck] UAT batch-train reconciler skipped — non-primary dashboard process');
+}
 
 // Start cleanup for orphaned conversation attachments (1 min interval)
 const attachmentCleanupTimer = setInterval(() => {

@@ -1370,6 +1370,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       effort: resolvedEffort,
     });
 
+    if (agent.role === 'work' && agent.kickoffDelivered === false) {
+      spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
+      for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
+      process.exitCode = 1; return;
+    }
+
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
@@ -1396,17 +1402,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    // Check shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
 
     if (skipTrackerUpdate) {
-      // Create shadow state instead of updating tracker
       await Effect.runPromise(createShadowState(id, 'open', 'pan start'));
       await Effect.runPromise(updateShadowState(id, 'in_progress', 'pan start'));
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     }
-    // Note: tracker transition for local agents is handled by spawnAgent() → transitionIssueToInProgress()
-    // No duplicate transition needed here.
 
     console.log('');
     console.log(chalk.bold('Agent Details:'));
@@ -1416,8 +1418,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(`  Model:      ${agent.model}`);
     console.log(`  Role:       ${agent.role}`);
     if (resolvedEffort) console.log(`  Effort:     ${resolvedEffort}`);
-
-    // Show context info
     const planningContext = await readPlanningContext(workspace);
     const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
     if (planningContext || beadsTasks.length > 0) {

@@ -167,6 +167,33 @@ describe('promotePlanning', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('omits noPrd from the complete-planning body by default', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await promotePlanning('PAN-1509');
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({});
+  });
+
+  it('posts noPrd: true when opts.noPrd is set (PAN-2234)', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await promotePlanning('PAN-1509', false, { noPrd: true });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ noPrd: true });
+  });
+
+  it('combines noPrd with autoSpawn in the body', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await promotePlanning('PAN-1509', true, { noPrd: true });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ autoSpawn: true, noPrd: true });
+  });
 });
 
 describe('evaluatePlanFinalizeQualityGate', () => {
@@ -343,7 +370,7 @@ describe('planFinalizeCommand', () => {
       Effect.succeed({ success: false, created: [], errors: ['bd timed out'], beadIds: new Map() }),
     );
 
-    await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false }))
+    await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false, prd: false }))
       .rejects.toThrow('process.exit:2');
 
     expect(readDoc(planPath).plan.status).toBe('draft');
@@ -357,7 +384,7 @@ describe('planFinalizeCommand', () => {
       Effect.succeed({ success: true, created: ['PAN-947: Task one'], errors: [], beadIds: new Map() }),
     );
 
-    await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false });
+    await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false, prd: false });
 
     const after = readDoc(planPath);
     expect(after.plan.status).toBe('proposed');
@@ -376,7 +403,7 @@ describe('planFinalizeCommand', () => {
       Effect.succeed({ success: true, created: ['PAN-949: Task one'], errors: [], beadIds: new Map() }),
     );
 
-    await expect(planFinalizeCommand({ workspace: workspacePath, qualityLint: false }))
+    await expect(planFinalizeCommand({ workspace: workspacePath, qualityLint: false, prd: false }))
       .rejects.toThrow('process.exit:1');
 
     const after = readDoc(planPath);
@@ -392,7 +419,7 @@ describe('planFinalizeCommand', () => {
     vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
       Effect.succeed({ success: false, created: [], errors: ['bd timed out'], beadIds: new Map() }),
     );
-    await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false }))
+    await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false, prd: false }))
       .rejects.toThrow('process.exit:2');
     expect(readDoc(planPath).plan.status).toBe('draft');
 
@@ -400,7 +427,61 @@ describe('planFinalizeCommand', () => {
     vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
       Effect.succeed({ success: true, created: ['PAN-948: Task one'], errors: [], beadIds: new Map() }),
     );
-    await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false });
+    await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false, prd: false });
     expect(readDoc(planPath).plan.status).toBe('proposed');
+  });
+
+  describe('PRD-first gate (PAN-2234)', () => {
+    it('exits 4 before creating beads when no PRD draft exists anywhere', async () => {
+      const workspacePath = makeWorkspace('PAN-2234');
+      const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+      vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+        Effect.succeed({ success: true, created: ['PAN-2234: Task one'], errors: [], beadIds: new Map() }),
+      );
+
+      await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false }))
+        .rejects.toThrow('process.exit:4');
+
+      // Gate fires before beads creation — beads must not have run.
+      expect(beadsModule.createBeadsFromVBrief).not.toHaveBeenCalled();
+      // And the plan is untouched.
+      expect(readDoc(planPath).plan.status).toBe('draft');
+    });
+
+    it('stamps plan.status=proposed with --no-prd even with no draft present', async () => {
+      const workspacePath = makeWorkspace('PAN-2235');
+      const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+      vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+        Effect.succeed({ success: true, created: ['PAN-2235: Task one'], errors: [], beadIds: new Map() }),
+      );
+
+      await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false, prd: false });
+
+      expect(readDoc(planPath).plan.status).toBe('proposed');
+    });
+
+    it('proceeds past the gate when a qualifying PRD draft is in the workspace', async () => {
+      const issueId = 'PAN-2236';
+      const workspacePath = makeWorkspace(issueId);
+      const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+      // Write a >=20-line PRD draft in the workspace drafts dir.
+      mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
+      writeFileSync(
+        join(workspacePath, '.pan', 'drafts', `${issueId}.md`),
+        Array.from({ length: 20 }, (_, i) => `PRD line ${i + 1}`).join('\n'),
+        'utf-8',
+      );
+
+      vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+        Effect.succeed({ success: true, created: [`${issueId}: Task one`], errors: [], beadIds: new Map() }),
+      );
+
+      // No prd:false — the gate must pass on its own.
+      await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false });
+
+      expect(readDoc(planPath).plan.status).toBe('proposed');
+    });
   });
 });

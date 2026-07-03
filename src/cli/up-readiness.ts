@@ -13,10 +13,14 @@ export async function resolveDashboardReadyUrl(config: {
   dashboardApiPort: number;
   healthTimeoutMs?: number;
   traefikTimeoutMs?: number;
+  expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
 }): Promise<{ readyUrl: string; apiUrl: string; traefikReady: boolean }> {
   const { waitForDashboardHealth, waitForTraefikHealth } = await import('../lib/platform-lifecycle.js');
   await Effect.runPromise(
-    waitForDashboardHealth(config.dashboardApiPort, { timeoutMs: config.healthTimeoutMs ?? 15_000 }),
+    waitForDashboardHealth(config.dashboardApiPort, {
+      timeoutMs: config.healthTimeoutMs ?? 15_000,
+      expectedIdentity: config.expectedIdentity,
+    }),
   );
   if (config.traefikEnabled) {
     const traefikReady = await Effect.runPromise(

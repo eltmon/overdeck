@@ -15,7 +15,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { promotePlanning, readAutoSpawnOnFinalize } from './plan-finalize.js';
 
-export async function planDoneCommand(id: string): Promise<void> {
+export async function planDoneCommand(id: string, options: { prd?: boolean } = {}): Promise<void> {
   const issueId = id.toUpperCase();
   const spinner = ora(`Completing planning for ${issueId}...`).start();
 
@@ -23,7 +23,7 @@ export async function planDoneCommand(id: string): Promise<void> {
   // with --auto-start, a `pan plan done` retry must carry that intent too, or a
   // once-failed finalize can never relaunch the work agent (PAN-1972).
   const autoSpawn = readAutoSpawnOnFinalize(issueId);
-  const result = await promotePlanning(issueId, autoSpawn);
+  const result = await promotePlanning(issueId, autoSpawn, { noPrd: options.prd === false });
 
   if (!result.success) {
     spinner.fail(chalk.red(`Failed: ${result.error || 'Unknown error'}`));

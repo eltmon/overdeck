@@ -59,6 +59,18 @@ function runOverdeckMigrationSync(db: SqliteDatabase): void {
   }
 }
 
+/**
+ * Idempotent schema top-ups for databases created before a field/index existed
+ * in the init migration. The init migration only runs on a fresh database.
+ * PAN-2220: the conversation ledger-cost query joins cost_events on session_id;
+ * without this index SQLite builds an automatic index on every query (~76ms → 7ms).
+ */
+function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
+  try { db.exec('ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text'); } catch { /* already exists or table absent */ }
+  try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
+  db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
+}
+
 export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
   if (overdeckDbSync?.path === dbPath) {
     return overdeckDbSync.db;
@@ -79,6 +91,7 @@ export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): Sql
   db.pragma('foreign_keys = ON');
   db.pragma('synchronous = NORMAL');
   runOverdeckMigrationSync(db);
+  ensureRuntimeIndexesSync(db);
   overdeckDbSync = { path: dbPath, db };
   return db;
 }

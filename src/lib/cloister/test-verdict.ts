@@ -20,6 +20,7 @@
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { VBriefDocument } from '../vbrief/types.js';
 
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';
@@ -130,4 +131,19 @@ export function decideUnsignaledTestAction(input: {
   // the strand-surfacing path make the stuck state visible.
   if (alreadyNudged) return { action: 'none' };
   return { action: 'nudge-write' };
+}
+
+export function resolveSlotFeedbackAgentId(
+  issueId: string,
+  slotItemId: string | undefined,
+  _doc: VBriefDocument | null | undefined,
+  slotOwnership: Array<{ slotIndex: number; slotItemId?: string; itemId?: string }> = [],
+): string | null {
+  const normalizedItemId = slotItemId?.trim();
+  if (!normalizedItemId) return null;
+
+  const persistedOwner = slotOwnership.find(slot => (slot.slotItemId ?? slot.itemId) === normalizedItemId);
+  if (persistedOwner) return `agent-${issueId.toLowerCase()}-slot-${persistedOwner.slotIndex}`;
+
+  return null;
 }

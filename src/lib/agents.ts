@@ -78,9 +78,25 @@ export {
 export { stopAgentSync, stopAgent } from './agents/termination.js';
 export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionIdSync, getLatestSessionId } from './agents/activity.js';
 export { type AgentResolution, type AgentRuntimeState, getAgentRuntimeStateSync, getAgentRuntimeState, saveAgentRuntimeState } from './agents/runtime-state.js';
-export { deliverAgentMessage, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
+export { deliverAgentMessage, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
 export { messageAgent } from './agents/messaging.js';
 
 export { buildCompactRecoverySeed, resumeAgent } from './agents/resume.js';
 
 export { autoRecoverAgents, detectCrashedAgents, recoverAgent, restartAgent, type RestartAgentOptions } from './agents/recovery.js';
+export {
+  compactAtTierRunBoundary,
+  contextWindowForModel,
+  replayCrashedStandingAgent,
+  replayStandingAgent,
+  shouldReplayCompactAtTierRunBoundary,
+  type ReplayCommit,
+  type ReplayDelivery,
+  type ReplayResult,
+  type ReplayStandingTierTarget,
+  type ReplaySupervisorTarget,
+  type ReplayTarget,
+  type TierReplayDeps,
+  type TierRunCompactionInput,
+  type TierRunCompactionOptions,
+} from './agents/tier-replay.js';

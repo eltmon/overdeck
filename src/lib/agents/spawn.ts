@@ -53,6 +53,8 @@ import {
   defaultRunWorkspace,
   flywheelEnvExports,
   resolveRegisteredSlotSpawn,
+  resolveSlotTierSpawnParams,
+  resolveSingleWorkTierSpawnParams,
   resolveFlywheelSpawnEnv,
   runAgentId,
   transitionIssueToInProgress,
@@ -82,8 +84,19 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   if (role === 'work') {
     const slot = resolveRegisteredSlotSpawn(issueId, workspace, options);
+    // Tiered execution (PAN-1791): when enabled, the slot item's difficulty
+    // selects the worker — the resolved tier's model+harness replace the
+    // parent default in the spawn params. Disabled → both stay as resolved
+    // above, unchanged.
+    let slotModel = selectedModel;
+    let slotHarness = options.harness;
     if (slot) {
       assertRegisteredSlotCap(issueId, options.maxRegisteredSlots);
+      const tierParams = resolveSlotTierSpawnParams(workspace, slot.slotItemId, options.model);
+      if (tierParams.model) {
+        slotModel = determineModel({ model: tierParams.model, role, spawnKey: modelSpawnKey });
+        slotHarness = tierParams.harness;
+      }
       await ensureRegisteredSlotWorktree(workspace, slot);
     }
     const prompt = slot
@@ -93,13 +106,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       issueId,
       workspace: slot?.workspace ?? workspace,
       agentId: slot?.agentId,
-      harness: options.harness,
-      model: selectedModel,
+      harness: slotHarness,
+      model: slot ? slotModel : options.model,
       prompt,
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
       effort: options.effort,
+      slotIndex: slot?.slotIndex,
+      slotItemId: slot?.slotItemId,
     });
   }
 
@@ -146,6 +161,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     startedAt: new Date().toISOString(),
     costSoFar: 0,
     hostOverride: options.allowHost || undefined,
+    slotIndex: options.slotIndex,
+    slotItemId: options.slotItemId,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -172,9 +189,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     : '';
 
   let promptFile: string | undefined;
-  if (prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui) {
+  const tracksKickoffDelivery = role === 'flywheel';
+  if (prompt && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui))) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
+    if (tracksKickoffDelivery) {
+      state.kickoffDelivered = false;
+      await Effect.runPromise(saveAgentState(state));
+    }
   }
 
   checkAndSetupHooks();
@@ -327,18 +349,33 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     if (shouldDeliverPromptViaPi) {
       try {
         await writeOhmypiAgentPrompt(agentId, prompt);
+        if (tracksKickoffDelivery) {
+          state.kickoffDelivered = true;
+          await Effect.runPromise(saveAgentState(state));
+        }
       } catch (err) {
         console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
     } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui) {
-      // PAN-1594: wait for the hook-written ready.json (session-start hook),
-      // not a tmux pane-scrape. No dependency on permission-mode footer text.
-      const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
-      if (ready) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 500));
-        await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+      if (tracksKickoffDelivery) {
+        const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnRun:initial-prompt');
+        if (delivery.ok) {
+          state.kickoffDelivered = true;
+          await Effect.runPromise(saveAgentState(state));
+        } else if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
+          await recordStartupSessionExit(state, issueId, role);
+          return state;
+        }
       } else {
-        console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
+        // PAN-1594: wait for the hook-written ready.json (session-start hook),
+        // not a tmux pane-scrape. No dependency on permission-mode footer text.
+        const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
+        if (ready) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 500));
+          await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+        } else {
+          console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
+        }
       }
     }
   }
@@ -416,7 +453,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Determine model based on role configuration
   const modelSpawnKey = `${role}:${options.issueId}`;
-  const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
+  const singleTierParams = role === 'work' && options.slotItemId === undefined && options.slotIndex === undefined
+    ? resolveSingleWorkTierSpawnParams(options.workspace, options.model)
+    : {};
+  const selectedModel = determineModel({ model: singleTierParams.model ?? options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
@@ -439,7 +479,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   const resolvedHarness: RuntimeName = await resolveHarness({
-    explicit: options.harness,
+    explicit: options.harness ?? singleTierParams.harness,
     role,
     model: selectedModel,
   });

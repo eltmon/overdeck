@@ -36,6 +36,9 @@ vi.mock('../config.js', () => ({
 
 vi.mock('../no-resume-mode.js', () => ({
   getNoResumeMode: vi.fn(() => ({ active: mocks.noResumeActive, since: null })),
+  // PAN-2278: startBootReconciliation short-circuits to hold_all only on an
+  // explicit request; mocks.noResumeActive now models "explicit".
+  isExplicitNoResumeRequest: vi.fn(() => mocks.noResumeActive),
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({
@@ -61,6 +64,8 @@ vi.mock('../../overdeck/control-settings.js', () => ({
 
 import {
   clearBootReconciliationGraceTimer,
+  DEFAULT_BOOT_RECONCILIATION_GRACE_SECS,
+  getBootReconciliationGraceSeconds,
   listBootReconciliationCandidateIds,
   startBootReconciliation,
 } from '../boot-reconciliation.js';
@@ -105,6 +110,19 @@ describe('boot reconciliation', () => {
     delete process.env.OVERDECK_NO_RESUME;
     delete process.env.OVERDECK_BOOT_ID;
     rmSync(testHome, { recursive: true, force: true });
+  });
+
+  it('uses the 120 second default grace when config is invalid', () => {
+    mocks.graceSeconds = 0;
+
+    expect(DEFAULT_BOOT_RECONCILIATION_GRACE_SECS).toBe(120);
+    expect(getBootReconciliationGraceSeconds()).toBe(120);
+  });
+
+  it('keeps a positive configured grace override', () => {
+    mocks.graceSeconds = 45;
+
+    expect(getBootReconciliationGraceSeconds()).toBe(45);
   });
 
   it('lists only stopped work agents that are resumable boot reconciliation candidates', () => {
@@ -156,7 +174,7 @@ describe('boot reconciliation', () => {
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
-  it('uses hold_all immediately when no-resume mode is active at boot', () => {
+  it('uses hold_all immediately when an explicit no-resume request is active at boot', () => {
     mocks.noResumeActive = true;
     mocks.agents = [
       { id: 'agent-pan-2076', role: 'work', status: 'stopped', workspace: join(testHome, 'workspace') },

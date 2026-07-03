@@ -18,6 +18,7 @@ import type {
   ChannelReplyKind,
   WaitingReason,
 } from '@overdeck/contracts'
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js'
 
 // Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
 // (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and
@@ -82,11 +83,22 @@ export const emitAgentEvent = (
   if (!agentId) return Effect.succeed(false)
   const url = `${DASHBOARD_URL}/api/agents/${encodeURIComponent(agentId)}/heartbeat`
   return Effect.gen(function* () {
+    // The heartbeat route requires the internal token
+    // (validateAgentRuntimeEventAuth). Without it every event POSTed from a
+    // CLI process was silently 403'd — a codex slot agent's `pan done`
+    // resolution never reached AgentStateService, so the swarm coordinator
+    // classified finished slots as still running, forever. The bash hooks
+    // attach this same header; the lib emitter must too.
+    const token = yield* Effect.try({
+      try: (): string => ensureInternalTokenSync(),
+      catch: (cause) => new AgentRuntimeFetchError({ url, cause }),
+    }).pipe(Effect.orElseSucceed((): string | null => null))
+    if (!token) return false
     const res = yield* Effect.tryPromise({
       try: () =>
         fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: token },
           body: JSON.stringify({ ...body, timestamp: new Date().toISOString() }),
           signal: abortSignal(DEFAULT_TIMEOUT_MS),
         }),

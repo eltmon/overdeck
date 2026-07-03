@@ -1,8 +1,8 @@
-import { execFile } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
 import { promisify } from 'util';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { join } from 'path';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { augmentCommentWithWaiver, recordTestWaiver, verifyStrikeBranchMergedIntoMain } from '../done.js';
 import { getProjectConfigFromWorkspacePath, readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
@@ -35,14 +35,20 @@ async function createStrikeRepo(issueId = 'PAN-2013'): Promise<{ projectPath: st
 }
 
 describe('pan done CLI options', () => {
-  it('lists --test-waived in pan done --help (AC1)', async () => {
-    const { stdout } = await execFileAsync('node', [CLI, 'done', '--help']);
-    expect(stdout).toContain('--test-waived <reason>');
-    expect(stdout).toContain('Skip the test-requirement gate');
+  beforeAll(async () => {
+    if (!existsSync(CLI)) {
+      await execFileAsync('npm', ['run', 'build:cli'], { cwd: process.cwd(), timeout: 120_000 });
+    }
+  }, 130_000);
+
+  it('lists --test-waived in pan done --help (AC1)', () => {
+    const output = execFileSync('node', [CLI, 'done', '--help'], { encoding: 'utf8' });
+    expect(output).toContain('--test-waived <reason>');
+    expect(output).toContain('Skip the test-requirement gate');
   });
 
-  it('rejects --test-waived without a reason (AC4)', async () => {
-    await expect(execFileAsync('node', [CLI, 'done', 'PAN-1501', '--test-waived'])).rejects.toThrow(
+  it('rejects --test-waived without a reason (AC4)', () => {
+    expect(() => execFileSync('node', [CLI, 'done', 'PAN-1501', '--test-waived'])).toThrow(
       /error: option '--test-waived <reason>' argument missing/i,
     );
   });

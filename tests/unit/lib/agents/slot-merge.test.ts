@@ -56,9 +56,9 @@ describe('verifyAndMergeSlot', () => {
     expect(result.evidence.commandOutputs).toEqual([{ command: 'npm test', stdout: 'ok', stderr: '' }]);
   });
 
-  it('surfaces merge conflicts without reporting the slot merged', async () => {
+  it('aborts the parent workspace merge before reporting slot branch conflicts', async () => {
     const run = vi.fn(async (command: string) => {
-      if (command.startsWith('git merge')) {
+      if (command.startsWith('git merge --no-ff')) {
         throw Object.assign(new Error('conflict'), { stdout: 'CONFLICT', stderr: '' });
       }
       return { stdout: 'ok', stderr: '' };
@@ -73,6 +73,11 @@ describe('verifyAndMergeSlot', () => {
 
     expect(result).toMatchObject({ verified: true, merged: false, conflicts: true });
     expect(result.failure).toContain('did not merge cleanly');
+    expect(run).toHaveBeenNthCalledWith(
+      3,
+      'git merge --abort',
+      '/repo/workspaces/feature-pan-1762',
+    );
   });
 
   it('refuses to verify when the item is missing expected_outputs', async () => {

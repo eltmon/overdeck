@@ -92,6 +92,7 @@ services:
       - CI=true
       - CONTAINER_MODE=true
       - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.pan.localhost
+      - VITE_PROXY_TARGET=http://server:3013
     networks:
       - devnet
       - overdeck
@@ -146,7 +147,7 @@ services:
       - ${HOME}/.codex:/home/node/.codex:ro
     environment:
       - NODE_ENV=development
-      - PORT=3011
+      - PORT=3013
       # Single-deacon invariant: see .claude/rules/single-deacon-invariant.md.
       # The host's `pan up` owns agent lifecycle; container dashboard runs as a read/UI peer only.
       - OVERDECK_DISABLE_DEACON=1
@@ -167,7 +168,7 @@ services:
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.entrypoints=websecure"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.tls=true"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.middlewares=pan-cors-{{FEATURE_FOLDER}}"
-      - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3011"
+      - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3013"
       - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
       - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolalloworiginlist=https://{{FEATURE_FOLDER}}.pan.localhost"
       - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With"

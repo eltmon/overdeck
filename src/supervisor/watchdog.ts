@@ -224,6 +224,15 @@ export class SupervisorWatchdog {
         this.state.consecutiveHardFailures = 0;
         this.state.lastError = patrolFailure.message;
         if (!patrolFailure.restartReady) return;
+        if (this.state.consecutiveFailures < this.config.busyFailThreshold) {
+          if (this.state.consecutiveFailures === this.config.failThreshold) {
+            await this.log(
+              `watchdog: deacon patrol heartbeat stale but dashboard health is OK — `
+              + `${this.state.consecutiveFailures} consecutive patrol failures; deferring restart until ${this.config.busyFailThreshold}`,
+            );
+          }
+          return;
+        }
         restartReason = patrolFailure.reason;
         restartLogReason = patrolFailure.logReason;
       } else {
@@ -327,6 +336,12 @@ export class SupervisorWatchdog {
     } finally {
       await lock.release();
     }
+
+    // PAN-2219: a restart gives the new server a fresh patrol-grace window.
+    // Without this the pre-restart staleness clock carried over, so each new
+    // boot was killed before boot reconciliation + its first patrol could
+    // complete — restart churn until maxRestarts/gaveUp.
+    this.state.patrolUnhealthySince = null;
 
     await Effect.runPromise(writeRestartStatus({
       ts: new Date(startedAt).toISOString(),

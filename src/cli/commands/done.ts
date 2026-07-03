@@ -57,8 +57,51 @@ interface DoneOptions {
   strike?: boolean;
 }
 
+interface SlotCompletionContext {
+  agentId: string;
+  agentState: AgentState | null;
+  slotIndex: number;
+  slotItemId?: string;
+  workspacePath: string | null;
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
+  const match = /^agent-([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
+  if (!match) return null;
+  const slotIndex = Number(match[2]);
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) return null;
+  return {
+    issueId: match[1].toUpperCase(),
+    agentId: `agent-${match[1].toLowerCase()}-slot-${slotIndex}`,
+    slotIndex,
+  };
+}
+
+function parseSlotIndexFromAgentId(agentId: string): number | null {
+  const match = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agentId);
+  if (!match) return null;
+  const slotIndex = Number(match[1]);
+  return Number.isInteger(slotIndex) && slotIndex >= 1 ? slotIndex : null;
+}
+
+function parseSlotWorkspacePath(issueId: string, workspacePath: string): { slotIndex: number } | null {
+  const escapedIssue = issueId.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`(?:^|/)feature-${escapedIssue}-slot-(\\d+)/?$`).exec(workspacePath);
+  if (!match) return null;
+  const slotIndex = Number(match[1]);
+  return Number.isInteger(slotIndex) && slotIndex >= 1 ? { slotIndex } : null;
+}
+
+function isSlotAgentState(agentState: AgentState | null): agentState is AgentState {
+  return !!agentState && (
+    typeof agentState.slotIndex === 'number' ||
+    /^agent-[a-z]+-\d+-slot-\d+$/i.test(agentState.id) ||
+    /-slot-\d+\/?$/.test(agentState.workspace)
+  );
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
@@ -325,6 +368,13 @@ async function resolveDoneWorkspace(
     return { agentState, workspacePath: agentWorkspace };
   }
 
+  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
+  if (cwdSlot) {
+    const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
+    const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
+    return { agentState: slotAgentState, workspacePath: process.cwd() };
+  }
+
   const resolved = resolveProjectFromIssueSync(issueId);
   const workspacePath = resolved
     ? findWorkspacePath(resolved.projectPath, issueId.toLowerCase())
@@ -333,10 +383,95 @@ async function resolveDoneWorkspace(
   return { agentState, workspacePath };
 }
 
+async function resolveSlotCompletionContext(
+  issueId: string,
+  agentId: string,
+  slotInput: { agentId: string; slotIndex: number } | null,
+): Promise<SlotCompletionContext | null> {
+  const { getAgentStateSync } = await import('../../lib/agents.js');
+
+  if (slotInput) {
+    const agentState = getAgentStateSync(slotInput.agentId) ?? null;
+    return {
+      agentId: slotInput.agentId,
+      agentState,
+      slotIndex: slotInput.slotIndex,
+      slotItemId: agentState?.slotItemId,
+      workspacePath: agentState?.workspace ?? null,
+    };
+  }
+
+  const agentState = getAgentStateSync(agentId) ?? null;
+  if (isSlotAgentState(agentState)) {
+    const slotIndex =
+      agentState.slotIndex ??
+      parseSlotIndexFromAgentId(agentState.id) ??
+      parseSlotWorkspacePath(issueId, agentState.workspace)?.slotIndex;
+    if (!slotIndex) return null;
+    return {
+      agentId: agentState.id,
+      agentState,
+      slotIndex,
+      slotItemId: agentState.slotItemId,
+      workspacePath: agentState.workspace,
+    };
+  }
+
+  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
+  if (!cwdSlot) return null;
+
+  const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
+  const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
+  return {
+    agentId: slotAgentId,
+    agentState: slotAgentState,
+    slotIndex: cwdSlot.slotIndex,
+    slotItemId: slotAgentState?.slotItemId,
+    workspacePath: slotAgentState?.workspace ?? process.cwd(),
+  };
+}
+
+async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
+  const now = new Date().toISOString();
+  const { saveAgentStateSync } = await import('../../lib/agents.js');
+
+  if (slot.agentState) {
+    slot.agentState.status = 'stopped';
+    slot.agentState.stoppedByUser = true;
+    slot.agentState.lastActivity = now;
+    saveAgentStateSync(slot.agentState);
+  }
+
+  saveAgentRuntimeState(slot.agentId, {
+    state: 'idle',
+    resolution: 'completed',
+    resolutionCount: 1,
+    resolutionUpdatedAt: now,
+    lastActivity: now,
+  });
+
+  emitActivityEntrySync({
+    source: 'work-agent',
+    level: 'info',
+    issueId,
+    message: `${slot.agentId} slot work complete — awaiting swarm verification and merge`,
+  });
+
+  console.log(chalk.green(`✓ Slot ${slot.slotIndex} work complete for ${issueId}`));
+  if (slot.slotItemId) {
+    console.log(chalk.dim(`  Item: ${slot.slotItemId}`));
+  }
+  if (comment) {
+    console.log(chalk.dim(`  Comment: ${comment}`));
+  }
+  console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
-  const issueId = resolveIssueIdSync(id);
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  const slotInput = parseSlotAgentId(id);
+  const issueId = slotInput?.issueId ?? resolveIssueIdSync(id);
+  const agentId = slotInput?.agentId ?? `agent-${issueId.toLowerCase()}`;
 
   // Strike-agent shape: the strike already merged to main and verified there,
   // so there is no review pipeline to dispatch. Run the same post-merge
@@ -372,6 +507,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       message: `Strike ${issueId} post-merge handoff completed${options.comment ? `: ${options.comment}` : ''}`,
     });
     console.log(chalk.green(`✓ Strike ${issueId} handed off to verifying-on-main (review pipeline skipped)`));
+    return;
+  }
+
+  const slotCompletion = await resolveSlotCompletionContext(issueId, agentId, slotInput);
+  if (slotCompletion) {
+    await completeSlotWork(issueId, slotCompletion, options.comment);
     return;
   }
 

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Effect, Stream } from 'effect';
+import { Effect, Fiber, Stream } from 'effect';
 
 import { createOverdeckDatabase, OVERDECK_TABLE_COUNT } from '../../../../scripts/create-overdeck-db.js';
 import { openDatabase } from '../../../../src/lib/database/driver.js';
@@ -100,13 +100,13 @@ describe('overdeck infra', () => {
     const result = await Effect.runPromise(
       Effect.gen(function* () {
         const bus = yield* EventBus;
-        const streamTake = Stream.runCollect(Stream.take(bus.stream, 1));
+        const streamFiber = yield* Effect.forkChild(Stream.runCollect(Stream.take(bus.stream, 1)));
         const sequence = yield* bus.emit({
           type: 'test.event',
           timestamp: new Date('2026-06-17T12:00:00.000Z'),
           payload: { issueId: 'PAN-1938' },
         });
-        const streamEvents = yield* streamTake;
+        const streamEvents = yield* Fiber.join(streamFiber);
         const events = yield* bus.readFrom(0);
         const latest = yield* bus.getLatestSequence;
         return { sequence, events, latest, streamEvents: Array.from(streamEvents) };

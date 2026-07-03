@@ -12,7 +12,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { getAgentEffectiveLastActivityMs, isAgentIdleForNudge } from './agent-idle.js';
 import { describeAgentDeath } from './agent-death.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
@@ -111,11 +111,10 @@ async function evaluateAgent(
   if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
   if (await hasReadyBeads(agent, issueId.toLowerCase())) return;
 
-  const runtime = getAgentRuntimeStateSync(agentId);
-  if (!runtime?.lastActivity) return;
-
-  const lastActivityMs = new Date(runtime.lastActivity).getTime();
+  const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
+  if (lastActivityMs === null) return;
   if (!Number.isFinite(lastActivityMs)) return;
+  const lastActivity = new Date(lastActivityMs).toISOString();
 
   const stuckState = readStuckRemediationState(agentId);
   if (stuckState) {
@@ -128,7 +127,7 @@ async function evaluateAgent(
 
   const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
   const lastStage = stuckState?.lastStage ?? 0;
-  const firstStuck = firstStuckAt(runtime.lastActivity, stuckState);
+  const firstStuck = firstStuckAt(lastActivity, stuckState);
 
   if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
     markAgentTroubled(agentId);

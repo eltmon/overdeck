@@ -236,9 +236,18 @@ function deriveSessionModel(session: SessionNodeType, resolvedModel?: string | n
   return sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
 }
 
+function slotIndexFromSessionId(sessionId: string): number | null {
+  const match = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(sessionId);
+  if (!match) return null;
+  return Number(match[1]);
+}
+
 function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | null): string {
   // Redesign (PAN-1779): bare role names — the model renders as its own
   // dimmed mono span, never '(model)' inside the label.
+  const slotIndex = session.type === 'work' ? slotIndexFromSessionId(session.sessionId) : null;
+  if (slotIndex !== null) return `Slot ${slotIndex}`;
+
   switch (session.type) {
     case 'ship': return 'Ship';
     case 'merge': return 'Merge';
@@ -254,6 +263,11 @@ function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | 
 }
 
 function describeSessionPurpose(session: SessionNodeType): string {
+  const slotIndex = session.type === 'work' ? slotIndexFromSessionId(session.sessionId) : null;
+  if (slotIndex !== null) {
+    return `Registered swarm slot ${slotIndex} for this issue.`;
+  }
+
   switch (session.type) {
     case 'work':
       return 'Implementation agent for this issue.';

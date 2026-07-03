@@ -31,6 +31,7 @@ import {
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
+import type { ValidatedTieredExecutionConfig } from './agents/tier-table.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
@@ -115,9 +116,6 @@ function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | und
   ) as ApiTtsConfig;
 }
 
-// API format matches frontend SettingsConfig interface
-// Note: No cost_sensitivity - we're opinionated and always pick the best model
-// for each task. Users control cost by which providers they enable.
 export interface ApiSettingsConfig {
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
@@ -267,6 +265,7 @@ export interface ApiSettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  tiered_execution?: ValidatedTieredExecutionConfig;
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -743,6 +742,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       resiliency_tier: config.remote?.resiliencyTier ?? 'ephemeral',
       max_concurrent_agents: config.remote?.maxConcurrentAgents ?? 0,
     },
+    tiered_execution: config.tieredExecution,
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }

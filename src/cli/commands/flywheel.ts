@@ -1,7 +1,7 @@
 import { exec, spawn } from 'node:child_process';
-import { readFile, realpath, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Schema } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
@@ -34,6 +34,7 @@ import {
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
 import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
@@ -207,49 +208,12 @@ export async function flywheelConfigCommand(options: ConfigOptions = {}): Promis
   }
 }
 
-const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONFIG_KEYS = [
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
 ] as const;
 
 type FlywheelConfigKey = typeof FLYWHEEL_CONFIG_KEYS[number];
-
-function isInsideRoot(projectRoot: string, candidate: string): boolean {
-  const relativePath = relative(projectRoot, candidate);
-  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
-}
-
-export function resolveFlywheelStartBriefPath(cwd: string, requestedPath?: string): { absolutePath: string; displayPath: string } {
-  const rawPath = requestedPath?.trim() || DEFAULT_BRIEF_PATH;
-  if (rawPath.includes('\0')) throw new Error('Brief path is invalid');
-
-  const root = resolve(cwd);
-  const absolutePath = isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath);
-  if (!isInsideRoot(root, absolutePath)) throw new Error('Brief path must stay inside the project root');
-
-  const normalizedRoot = root.endsWith(sep) ? root : `${root}${sep}`;
-  const displayPath = absolutePath === root ? '.' : relative(root, absolutePath);
-  return { absolutePath, displayPath: absolutePath.startsWith(normalizedRoot) ? displayPath : absolutePath };
-}
-
-async function assertExistingPathInsideRoot(projectRoot: string, candidate: string): Promise<void> {
-  const [realRoot, realCandidate] = await Promise.all([realpath(projectRoot), realpath(candidate)]);
-  if (!isInsideRoot(realRoot, realCandidate)) throw new Error('Brief path must stay inside the project root');
-}
-
-export async function requireFlywheelBrief(cwd: string, requestedPath?: string): Promise<{ absolutePath: string; displayPath: string }> {
-  const resolved = resolveFlywheelStartBriefPath(cwd, requestedPath);
-  try {
-    await assertExistingPathInsideRoot(cwd, resolved.absolutePath);
-    await readFile(resolved.absolutePath, 'utf8');
-    return resolved;
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-    if (code === 'ENOENT') throw new Error(`Flywheel brief not found: ${resolved.displayPath}`);
-    throw error;
-  }
-}
 
 function mb(bytes: number): number {
   return Math.round(bytes / 1024 / 1024);
@@ -357,7 +321,7 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
 }
 
 export async function startFlywheelRun(options: StartOptions = {}): Promise<StartFlywheelRunResult> {
-  const cwd = options.cwd ?? process.cwd();
+  const cwd = options.cwd ?? await resolvePrimaryWorktreeRoot(process.cwd());
   const brief = await requireFlywheelBrief(cwd, options.brief);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();

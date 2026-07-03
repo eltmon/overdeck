@@ -113,6 +113,7 @@ CREATE TABLE `cost_events` (
 --> statement-breakpoint
 CREATE INDEX `cost_issue_idx` ON `cost_events` (`issue_id`);--> statement-breakpoint
 CREATE INDEX `cost_ts_idx` ON `cost_events` (`ts`);--> statement-breakpoint
+CREATE INDEX `cost_session_id_idx` ON `cost_events` (`session_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `cost_request_id_idx` ON `cost_events` (`request_id`) WHERE request_id IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `events` (
 	`sequence` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -389,6 +390,7 @@ CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);--> statement-brea
 CREATE TABLE `discovered_sessions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`jsonl_path` text NOT NULL UNIQUE,
+	`harness` text,
 	`session_id` text,
 	`workspace_path` text,
 	`workspace_hash` text,

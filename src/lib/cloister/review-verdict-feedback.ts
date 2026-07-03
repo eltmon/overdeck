@@ -11,6 +11,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,6 +23,7 @@ export interface DeliverReviewVerdictFeedbackOptions {
   notes?: string;
   workspacePath?: string;
   prUrl?: string;
+  slotItemId?: string;
 }
 
 export interface DeliverReviewVerdictFeedbackResult {
@@ -81,7 +83,9 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
     { encoding: 'utf-8' },
   );
   return true;
-}async function deliverReviewVerdictFeedbackPromise(
+}
+
+async function deliverReviewVerdictFeedbackPromise(
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Promise<DeliverReviewVerdictFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
@@ -118,13 +122,21 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
-    const agentId = `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
-    try {
-      await messageAgent(agentId, message);
-      agentMessageSent = true;
-    } catch (err) {
-      console.log(`[review-verdict-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+    const target = await resolveIssueFeedbackTarget(issueId, { itemId: opts.slotItemId });
+    if ('agentId' in target) {
+      try {
+        await messageAgent(target.agentId, message);
+        agentMessageSent = true;
+      } catch (err) {
+        console.log(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+        specialist: 'review-agent',
+        feedbackPath: fileResult.filePath,
+        slotItemId: opts.slotItemId,
+      });
     }
   } else if (!fileResult.success) {
     console.error(`[review-verdict-feedback] Failed to write feedback file for ${issueId}: ${fileResult.error}`);

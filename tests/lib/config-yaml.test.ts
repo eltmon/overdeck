@@ -153,6 +153,20 @@ api_keys:
       expect(config.providerHarnesses.openai).toBe('codex');
     });
 
+    it('carries Anthropic auth mode and plan into normalized config (ToS gate input)', () => {
+      const { config } = mergeConfigs({
+        models: {
+          providers: {
+            anthropic: { enabled: true, auth: 'subscription', plan: 'max' },
+          },
+        },
+      });
+
+      expect(config.enabledProviders.has('anthropic')).toBe(true);
+      expect(config.providerAuth.anthropic).toBe('subscription');
+      expect(config.providerPlan.anthropic).toBe('max');
+    });
+
     it('rejects invalid provider default harnesses', () => {
       expect(() => mergeConfigs({
         models: {

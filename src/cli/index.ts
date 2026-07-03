@@ -116,6 +116,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
+import { registerSwarmCommands } from './commands/swarm.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -425,11 +426,13 @@ planCmd
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
+  .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planFinalizeCommand);
 
 planCmd
   .command('done <id>')
   .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
 // Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
@@ -472,11 +475,11 @@ program
   .command('handoff [conv] [focus...]')
   .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters. Very large source conversations are auto-degraded (truncated smart summary → heuristic → focus-only) and still hand off without aborting.')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
-  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code, pi, or codex')
+  .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
-  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code, pi, or codex (only when --author=external)')
+  .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')
   .action(handoffCommand);
 
 program
@@ -578,12 +581,9 @@ program
     strikeCommand(ids, options),
   );
 
-// Register workspace commands (pan workspace create, pan workspace list, etc.)
+registerSwarmCommands(program);
 registerWorkspaceCommands(program);
-
-// Register test commands (pan test run, pan test list)
 registerTestCommands(program);
-
 registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)
@@ -1054,6 +1054,7 @@ program
           traefikDomain,
           dashboardPort,
           dashboardApiPort,
+          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
         });
         readyUrl = resolved.readyUrl;
         apiUrl = resolved.apiUrl;

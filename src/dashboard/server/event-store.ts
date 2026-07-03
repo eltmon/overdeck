@@ -254,7 +254,10 @@ export function createEventStore(db: DbAdapter): EventStore {
       sequence,
       type: event.type,
       timestamp: new Date(timestamp).toISOString(),
-      payload: (event as Record<string, unknown>)['payload'] ?? {},
+      // PAN-2225: distribute the persisted JSON round-trip, not the raw object.
+      // A raw payload can carry undefined-valued keys (dropped by stringify),
+      // which poison RpcSerialization.layerJson encode downstream.
+      payload: JSON.parse(payload),
     };
 
     emitter.emit('event', stored);
@@ -270,7 +273,8 @@ export function createEventStore(db: DbAdapter): EventStore {
         type: event.type,
         timestamp,
         payload,
-        rawPayload: (event as Record<string, unknown>)['payload'] ?? {},
+        // PAN-2225: subscribers get the persisted JSON round-trip (see append).
+        rawPayload: JSON.parse(payload),
         resolve,
       });
 
@@ -284,7 +288,9 @@ export function createEventStore(db: DbAdapter): EventStore {
       sequence: -1, // sentinel: in-memory only, not persisted
       type: event.type,
       timestamp: new Date(timestamp).toISOString(),
-      payload: (event as Record<string, unknown>)['payload'] ?? {},
+      // PAN-2225: same JSON normalization as the persisted paths, so no
+      // undefined-valued keys reach RPC encode via in-memory-only events.
+      payload: JSON.parse(JSON.stringify((event as Record<string, unknown>)['payload'] ?? {})),
     };
     emitter.emit('event', stored);
   }

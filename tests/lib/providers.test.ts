@@ -56,6 +56,10 @@ describe('providers', () => {
     expect(getProviderForModelSync('glm-5.2').name).toBe('zai');
   });
 
+  it('rejects unknown model ids with a nearest-match suggestion', () => {
+    expect(() => getProviderForModelSync('glm5.2')).toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
+  });
+
   it('qualifies kimi-k2.7-code under the pi kimi-coding provider', () => {
     expect(piProviderForModel('kimi-k2.7-code')).toBe('kimi-coding');
     expect(qualifyPiModel('kimi-k2.7-code')).toBe('kimi-coding/kimi-k2.7-code');
