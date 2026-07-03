@@ -1,136 +1,9 @@
 {
   "issueId": "PAN-1917",
   "schemaVersion": 2,
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T16:03:01.578Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T16:57:06.484Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T19:57:55.789Z"
-    },
-    {
-      "timestamp": "2026-07-03T20:01:18.196Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T20:01:21.413Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-03T20:13Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-03T20:13:49.816Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T20:13:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1917\n\nUnified feed search still uses discovered-only search and leaves managed-archived rows unsearchable.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1917 -m \"Fixed review issues\"`"
-    }
-  ],
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".pan/records/pan-1917.json",
-      ".pan/test/result.json",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/App.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
-      "src/dashboard/server/services/dashboard-db-task.ts",
-      "src/dashboard/server/services/sessions-feed-rpc.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/App/__tests__/routes.test.ts"
-    ],
-    "declaredScope": [
-      ".pan/drafts/pan-1917.md",
-      "packages/contracts/src/rpc.ts",
-      "packages/contracts/src/types.ts",
-      "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/App/AppRoutes.tsx",
-      "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
-      "src/dashboard/frontend/src/App/routes.ts",
-      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
-      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
-      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
-      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
-      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
-      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
-      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
-      "src/dashboard/server/routes/discovered-sessions.ts",
-      "src/dashboard/server/services/dashboard-db-worker.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/lib/overdeck/discovered-sessions.ts",
-      "src/lib/overdeck/sessions-feed.ts",
-      "tests/bench/sessions-feed.bench.ts",
-      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
-      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
-      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
-      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
-      "tests/unit/lib/overdeck/sessions-feed.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".pan/drafts/pan-1917.md",
-      ".pan/records/pan-1917.json",
-      ".pan/test/result.json",
-      "packages/contracts/src/rpc.ts",
-      "packages/contracts/src/types.ts",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/App.test.tsx",
-      "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/App/AppRoutes.tsx",
-      "src/dashboard/frontend/src/App/routes.ts",
-      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
-      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
-      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
-      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
-      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
-      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
-      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
-      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
-      "src/dashboard/server/routes/discovered-sessions.ts",
-      "src/dashboard/server/services/dashboard-db-task.ts",
-      "src/dashboard/server/services/dashboard-db-worker.ts",
-      "src/dashboard/server/services/sessions-feed-rpc.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/lib/overdeck/discovered-sessions.ts",
-      "src/lib/overdeck/sessions-feed.ts",
-      "tests/bench/sessions-feed.bench.ts",
-      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
-      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
-      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
-      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts",
-      "tests/unit/lib/overdeck/sessions-feed.test.ts"
-    ],
-    "recordedAt": "2026-07-03T20:00:46.282Z"
-  },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "perf-baseline": "completed",
     "conversation-identity": "completed",
@@ -180,15 +53,15 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "testing",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T20:20:11.521Z",
+    "updatedAt": "2026-07-03T20:23:46.849Z",
     "reviewNotes": "Unified feed search still uses discovered-only search and leaves managed-archived rows unsearchable.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "verificationNotes": "Verification FAILED at test (100223ms):\n\nill suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:436:69\n    434|       }) as { name: string; tmuxSession: string };\n    435|     });\n    436|     await expect.poll(() => sessions.has(conversation.tmuxSession)).to…\n       |                                                                     ^\n    437|     await expect.poll(() => tmuxSessionExists(conversation.tmuxSession…\n    438|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:436:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > delivers through real conversation routes and keeps plain forks off Channels MCP\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:470:63\n    468|     }).not.toBeNull();\n    469|     const parent = await page.evaluate(() => (window as any).current a…\n    470|     await expect.poll(() => sessions.has(parent.tmuxSession)).toBe(tru…\n       |                                                               ^\n    471|     await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toB…\n    472|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:470:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
     "reviewedAtCommit": "e50efa6a00e3999d6780f5ea22e953cf275d723c",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
@@ -353,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.557539,
-        "pricingAsOf": "2026-07-03T20:20:11.543Z"
+        "pricingAsOf": "2026-07-03T20:23:46.883Z"
       }
     },
     "merges": [
@@ -386,6 +259,6 @@
       "note": "Slot branch feature/pan-1917-slot-1 did not merge cleanly"
     }
   },
-  "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T20:20:11.545Z"
+  "created": "2026-07-03T20:23:46.887Z",
+  "updated": "2026-07-03T20:23:46.887Z"
 }
