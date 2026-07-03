@@ -151,16 +151,19 @@
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-03T00:50:22.985Z",
+  "updated": "2026-07-03T00:51:17.451Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T00:50:22.816Z",
+    "updatedAt": "2026-07-03T00:51:17.404Z",
+    "reviewNotes": "No blocking findings; 120s default and modal tokenization review passed at d676bb7.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
+    "reviewedAtCommit": "9591204fa278a315e41162b32a6f28ce7b557b25",
     "lastVerifiedCommit": "8f87be9adc77cd90b3c8705533e83a0d6cf72da9",
     "reviewRequestedAt": "2026-07-03T00:50:22.647Z",
     "deaconIgnored": true,
@@ -239,7 +242,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.403322,
-        "pricingAsOf": "2026-07-03T00:50:22.890Z"
+        "pricingAsOf": "2026-07-03T00:51:17.450Z"
       }
     },
     "merges": [
