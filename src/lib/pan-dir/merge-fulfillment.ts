@@ -3,7 +3,12 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { getPullRequestState, isGitHubAppConfigured } from '../github-app.js';
+import { extractNumberSync } from '../issue-id.js';
+import { cleanupMergedLabels } from '../lifecycle/label-cleanup.js';
+import type { LifecycleContext, StepResult } from '../lifecycle/types.js';
 import type { ProjectConfig } from '../projects.js';
+import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { WORKFLOW_LABELS } from '../lifecycle/close-issue.js';
 import { readIssueRecordSync, type PanIssueRecord } from './record.js';
 
 const execAsync = promisify(exec);
@@ -20,6 +25,8 @@ export interface MergeFulfillmentDeps {
   exec(command: string, options: { cwd: string }): Promise<{ stdout: string; stderr: string }>;
   isGitHubAppConfigured(): boolean;
   getPullRequestState(owner: string, repo: string, number: number): Promise<{ merged: boolean; state?: string }>;
+  setReviewStatus?(issueId: string, update: Partial<ReviewStatus>): ReviewStatus;
+  cleanupMergedLabels?(ctx: LifecycleContext): Promise<StepResult>;
 }
 
 const defaultDeps: MergeFulfillmentDeps = {
@@ -27,10 +34,38 @@ const defaultDeps: MergeFulfillmentDeps = {
   exec: (command, options) => execAsync(command, options),
   isGitHubAppConfigured,
   getPullRequestState: async (owner, repo, number) => Effect.runPromise(getPullRequestState(owner, repo, number)),
+  setReviewStatus: setReviewStatusSync,
+  cleanupMergedLabels: (ctx) => Effect.runPromise(cleanupMergedLabels(ctx)),
 };
+
+type ResolvedMergeFulfillmentDeps = MergeFulfillmentDeps & Required<Pick<MergeFulfillmentDeps, 'setReviewStatus' | 'cleanupMergedLabels'>>;
+
+export interface ReconcileMergedIssueOptions {
+  closed?: boolean;
+  dryRun?: boolean;
+}
+
+export interface ReconcileMergedIssueResult {
+  issueId: string;
+  dryRun: boolean;
+  skipped: boolean;
+  actions: string[];
+  branchActions: Array<{
+    branch: string;
+    status: 'deleted' | 'kept' | 'missing' | 'planned-delete' | 'planned-keep';
+    reason: string;
+  }>;
+}
+
+const CLOSED_OUT_LABEL = 'closed-out';
+const CLOSED_OUT_COLOR = '1d4ed8';
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function resolveDeps(deps: Partial<MergeFulfillmentDeps>): ResolvedMergeFulfillmentDeps {
+  return { ...defaultDeps, ...deps } as ResolvedMergeFulfillmentDeps;
 }
 
 function parseGitHubPullRequestUrl(url: string | undefined): { owner: string; repo: string; number: number } | null {
@@ -116,13 +151,93 @@ async function branchIsMerged(branch: string, project: ProjectConfig, deps: Merg
   }
 }
 
+function lifecycleContext(issueId: string, project: ProjectConfig): LifecycleContext {
+  const github = project.github_repo && extractNumberSync(issueId) !== null
+    ? (() => {
+        const [owner, repo] = project.github_repo!.split('/');
+        const number = extractNumberSync(issueId);
+        return owner && repo && number !== null ? { owner, repo, number } : undefined;
+      })()
+    : undefined;
+
+  return {
+    issueId,
+    projectPath: project.path,
+    projectName: project.name,
+    ...(github ? { github } : {}),
+  };
+}
+
+async function applyClosedOutLabel(issueId: string, project: ProjectConfig, deps: MergeFulfillmentDeps): Promise<string> {
+  if (!project.github_repo) {
+    return 'skipped closed-out label: project has no GitHub repo';
+  }
+  const number = extractNumberSync(issueId);
+  if (number === null) {
+    return 'skipped closed-out label: issue number could not be parsed';
+  }
+  const [owner, repo] = project.github_repo.split('/');
+  if (!owner || !repo) {
+    return 'skipped closed-out label: project GitHub repo is invalid';
+  }
+
+  const repoSlug = `${owner}/${repo}`;
+  await deps.exec(
+    `gh label create ${shellQuote(CLOSED_OUT_LABEL)} --repo ${shellQuote(repoSlug)} --color ${shellQuote(CLOSED_OUT_COLOR)} --description ${shellQuote('Verified and closed out')} --force`,
+    { cwd: project.path },
+  );
+  for (const label of WORKFLOW_LABELS) {
+    await deps.exec(
+      `gh issue edit ${number} --repo ${shellQuote(repoSlug)} --remove-label ${shellQuote(label)}`,
+      { cwd: project.path },
+    ).catch(() => ({ stdout: '', stderr: '' }));
+  }
+  await deps.exec(
+    `gh issue edit ${number} --repo ${shellQuote(repoSlug)} --add-label ${shellQuote(CLOSED_OUT_LABEL)}`,
+    { cwd: project.path },
+  );
+  return `applied closed-out label to ${issueId}`;
+}
+
+async function reconcileBranch(
+  branch: string,
+  project: ProjectConfig,
+  dryRun: boolean,
+  deps: MergeFulfillmentDeps,
+): Promise<ReconcileMergedIssueResult['branchActions'][number]> {
+  const exists = await branchExists(branch, project, deps);
+  if (exists === 'unknown') {
+    return { branch, status: 'kept', reason: 'branch existence could not be resolved' };
+  }
+  if (!exists) {
+    return { branch, status: 'missing', reason: 'branch was not found' };
+  }
+
+  const merged = await branchIsMerged(branch, project, deps);
+  if (merged !== true) {
+    return {
+      branch,
+      status: dryRun ? 'planned-keep' : 'kept',
+      reason: merged === 'unknown' ? 'branch ancestry could not be resolved' : 'branch is not an ancestor of origin/main',
+    };
+  }
+
+  if (dryRun) {
+    return { branch, status: 'planned-delete', reason: 'branch is an ancestor of origin/main' };
+  }
+
+  await deps.exec(`git branch -D ${shellQuote(branch)}`, { cwd: project.path });
+  await deps.exec(`git push origin --delete ${shellQuote(branch)}`, { cwd: project.path }).catch(() => ({ stdout: '', stderr: '' }));
+  return { branch, status: 'deleted', reason: 'branch is an ancestor of origin/main' };
+}
+
 export async function verifyIssueMergeFulfillment(
   issueId: string,
   project: ProjectConfig,
   deps: Partial<MergeFulfillmentDeps> = {},
 ): Promise<MergeFulfillmentResult> {
   const normalized = issueId.toUpperCase();
-  const mergedDeps = { ...defaultDeps, ...deps };
+  const mergedDeps = resolveDeps(deps);
   const record = mergedDeps.readRecord(project, normalized);
 
   const prResult = await prMerged(normalized, project, record, mergedDeps);
@@ -152,4 +267,60 @@ export async function verifyIssueMergeFulfillment(
   }
 
   return { verdict: 'unknown', evidence: `${normalized} has no resolvable merged PR and no feature/strike branch` };
+}
+
+export async function reconcileMergedIssue(
+  issueId: string,
+  project: ProjectConfig,
+  opts: ReconcileMergedIssueOptions = {},
+  deps: Partial<MergeFulfillmentDeps> = {},
+): Promise<ReconcileMergedIssueResult> {
+  const normalized = issueId.toUpperCase();
+  const dryRun = opts.dryRun === true;
+  const mergedDeps = resolveDeps(deps);
+  const record = mergedDeps.readRecord(project, normalized);
+
+  if (record?.pipeline?.mergeStatus === 'merged') {
+    return {
+      issueId: normalized,
+      dryRun,
+      skipped: true,
+      actions: ['skipped: record already has mergeStatus=merged'],
+      branchActions: [],
+    };
+  }
+
+  const actions: string[] = [];
+  if (dryRun) {
+    actions.push('would set mergeStatus=merged, reviewStatus=passed, readyForMerge=false');
+    actions.push('would apply merged label');
+    if (opts.closed) actions.push('would apply closed-out label');
+  } else {
+    mergedDeps.setReviewStatus(normalized, {
+      mergeStatus: 'merged',
+      reviewStatus: 'passed',
+      readyForMerge: false,
+    });
+    actions.push('set mergeStatus=merged, reviewStatus=passed, readyForMerge=false');
+
+    const labelResult = await mergedDeps.cleanupMergedLabels(lifecycleContext(normalized, project));
+    actions.push(labelResult.success ? 'applied merged label' : `merged label cleanup failed: ${labelResult.error ?? 'unknown error'}`);
+
+    if (opts.closed) {
+      actions.push(await applyClosedOutLabel(normalized, project, mergedDeps));
+    }
+  }
+
+  const branchActions: ReconcileMergedIssueResult['branchActions'] = [];
+  for (const branch of [`feature/${normalized.toLowerCase()}`, `strike/${normalized.toLowerCase()}`]) {
+    branchActions.push(await reconcileBranch(branch, project, dryRun, mergedDeps));
+  }
+
+  return {
+    issueId: normalized,
+    dryRun,
+    skipped: false,
+    actions,
+    branchActions,
+  };
 }
