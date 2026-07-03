@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-07-03T07:56Z] verification-gate → FAILED — seq 4",
       "timestamp": "2026-07-03T07:56:05.688Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T08:07:12.800Z"
     }
   ],
   "feedback": [
@@ -162,20 +167,21 @@
     "recordedAt": "2026-07-03T07:20:30.593Z"
   },
   "created": "2026-07-03T01:01:10.061Z",
-  "updated": "2026-07-03T07:56:05.734Z",
+  "updated": "2026-07-03T08:07:17.308Z",
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T07:56:05.681Z",
-    "reviewNotes": "Missing no-loss audit gate and deep-linked sessions outside loaded pages do not select",
+    "updatedAt": "2026-07-03T08:07:17.246Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Verification FAILED at test (102339ms):\n\n default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\n",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
+    "lastVerifiedCommit": "d33acebc9955c402f7f0453c8d8f1a76ae3347ec",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -307,7 +313,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.374843,
-        "pricingAsOf": "2026-07-03T07:56:05.724Z"
+        "pricingAsOf": "2026-07-03T08:07:17.306Z"
       }
     },
     "merges": [
