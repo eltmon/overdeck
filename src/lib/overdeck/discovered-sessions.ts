@@ -69,7 +69,9 @@ export interface DiscoveredSession {
   tags: string[];
   summary: string | null;
   summaryDetailed: string | null;
-  /** Title of the tracked conversation this session belongs to (matched by session id), or null. */
+  /** Tracked conversation this session belongs to (matched by session id), or null. */
+  conversationId: string | null;
+  conversationName: string | null;
   conversationTitle: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentModel: string | null;
@@ -155,6 +157,8 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
     tags: parseJsonArray(row['tags']),
     summary: (row['summary'] as string | null) ?? null,
     summaryDetailed: (row['summary_detailed'] as string | null) ?? null,
+    conversationId: (row['conversation_id'] as string | null) ?? null,
+    conversationName: (row['conversation_name'] as string | null) ?? null,
     conversationTitle: (row['conversation_title'] as string | null) ?? null,
     enrichmentLevel: ((row['enrichment_level'] as number) ?? 0) as 0 | 1 | 2 | 3,
     enrichmentModel: (row['enrichment_model'] as string | null) ?? null,
@@ -224,35 +228,46 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
 // ─── Read operations ──────────────────────────────────────────────────────────
 
 /**
- * Fill in `conversationTitle` for any sessions whose `sessionId` matches a tracked
- * conversation (via conversation_files.locator → conversations.title). One batched
- * query for the whole list — no N+1. Sessions with no matching conversation are
- * returned unchanged (conversationTitle stays null).
+ * Fill in conversation refs for any sessions whose `sessionId` matches a tracked
+ * conversation (via conversation_files.locator → conversations). One batched query
+ * for the whole list — no N+1. Sessions with no matching conversation are returned
+ * unchanged (conversation refs stay null).
  */
-function attachConversationTitles(sessions: DiscoveredSession[]): DiscoveredSession[] {
+function attachConversationRefs(sessions: DiscoveredSession[]): DiscoveredSession[] {
   const ids = [...new Set(sessions.map((s) => s.sessionId).filter((x): x is string => !!x))];
   if (ids.length === 0) return sessions;
   const placeholders = ids.map(() => '?').join(',');
   const rows = overdeckDb()
     .prepare(
-      `SELECT cf.locator AS sid, c.title AS title
+      `SELECT cf.locator AS sid, c.id AS conversationId, c.name AS conversationName, c.title AS title
        FROM conversation_files cf
        JOIN conversations c ON c.id = cf.conversation_id
-       WHERE cf.locator IN (${placeholders}) AND c.title IS NOT NULL`,
+       WHERE cf.locator IN (${placeholders})`,
     )
-    .all(...ids) as { sid: string; title: string }[];
+    .all(...ids) as { sid: string; conversationId: string; conversationName: string; title: string | null }[];
   if (rows.length === 0) return sessions;
-  const byId = new Map<string, string>();
-  for (const r of rows) if (!byId.has(r.sid)) byId.set(r.sid, r.title);
+  const byId = new Map<string, { conversationId: string; conversationName: string; title: string | null }>();
+  for (const r of rows) if (!byId.has(r.sid)) byId.set(r.sid, {
+    conversationId: r.conversationId,
+    conversationName: r.conversationName,
+    title: r.title,
+  });
   return sessions.map((s) =>
-    s.sessionId && byId.has(s.sessionId) ? { ...s, conversationTitle: byId.get(s.sessionId)! } : s,
+    s.sessionId && byId.has(s.sessionId)
+      ? {
+          ...s,
+          conversationId: byId.get(s.sessionId)!.conversationId,
+          conversationName: byId.get(s.sessionId)!.conversationName,
+          conversationTitle: byId.get(s.sessionId)!.title,
+        }
+      : s,
   );
 }
 
 export function getDiscoveredSessionById(id: number): DiscoveredSession | null {
   const db = overdeckDb();
   const row = db.prepare(`SELECT * FROM discovered_sessions WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
-  return row ? attachConversationTitles([rowToSession(row)])[0]! : null;
+  return row ? attachConversationRefs([rowToSession(row)])[0]! : null;
 }
 
 export function findDiscoveredSessions(filter: ConversationFilter = {}): DiscoveredSession[] {
@@ -265,7 +280,7 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
   const rows = db.prepare(
     `SELECT * FROM discovered_sessions ${where} ORDER BY last_ts DESC NULLS LAST ${limit} ${offset}`,
   ).all(...params) as Record<string, unknown>[];
-  return attachConversationTitles(rows.map(rowToSession));
+  return attachConversationRefs(rows.map(rowToSession));
 }
 
 export function countDiscoveredSessions(filter: ConversationFilter = {}): number {
@@ -622,7 +637,7 @@ export function searchFtsSessions(
        ORDER BY sessions_fts.rank
        LIMIT ? OFFSET ?`,
     ).all(...params, query, limit, offset) as Record<string, unknown>[];
-    return attachConversationTitles(rows.map(rowToSession));
+    return attachConversationRefs(rows.map(rowToSession));
   } catch {
     return [];
   }
