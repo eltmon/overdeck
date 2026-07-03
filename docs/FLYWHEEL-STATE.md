@@ -207,6 +207,16 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 6 (2026-07-03) — operator routing sweep: holds lifted, 5 issues routed, 2 review-queue unsticks
+
+- **Operator lifted all holds** and handed a routing list: PAN-2254/2257/2260/2261 (bugs/features), PAN-2255 (needs planning), PAN-2265 RESERVED (operator GLM-5.2 strike — untouched), PAN-2258 + PAN-1917 done-pending-review.
+- **PAN-2258 review-strand unstuck + gap filed (PAN-2270):** strike worked in `feature-pan-2258-strike`, `pan done` created PR #2269 but auto-review warned "Workspace does not exist" and BOTH `pan review restart` and `pan review request` hard-fail on the missing standard workspace. Unblock recipe: `pan workspace create <id>` (materializes worktree on the existing PR branch) → `pan review restart <id>`. Review+test agents now live. REUSABLE: any PR submitted from a non-standard worktree is silently unreviewable until the standard workspace exists.
+- **PAN-1917 is NOT actually done:** agent closed all beads (2 local commits) but never ran `pan done` — no push, no PR, idle at prompt, status=running. No legal flywheel lever (RUN-39 tick-7 gap again). Surfaced to operator.
+- **PAN-2261 (bd lock contention) reproduced live during its own routing:** `pan start --auto` for PAN-2254 timed out 30s on bead creation (workspace rolled back), retried after bd went quiet, lost AGAIN to new fleet bd traffic. Mitigation: background retry loop with 20–40s jittered backoff. Plan sessions (2257/2261/2255) dispatched fine — plan kickoff doesn't touch bd until finalize; only start-with-bead-creation contends.
+- **PAN-2154 (PR #2236) merged.** UAT bundle back to MIN-831 + MIN-846. Main GREEN (0c225880e1).
+- Observed strike-doctrine hardening beads landing (roles/strike.md, roles/flywheel.md, roles/work.md): strike spawner owns the merge via gh-API squash-merge; work agents prohibited from pushing to origin/main — the PAN-2204 family fix in motion.
+- PAN-2234 second strike reported NO-OP between ticks — verified independently (1e82badc32 ancestor of main, record merged/passed/passed) and removed the stale needs-handoff label. LESSON: something re-struck an already-merged issue (PAN-2054 stale-ready class); verify merged-state before dispatching any strike.
+
 ## RUN-53 tick 5 (2026-07-02) — MAIN GREEN (red #3 fixed in one strike cycle); backlog exhausted of safe candidates
 
 - **PAN-2238 fixed + closed:** strike extracted the ohmypi cost lines, `e76506bf3b` green on main incl. lint; `pan done --strike` handoff clean. Red-main #3 lifetime: ~35 min file→fix-landed.
