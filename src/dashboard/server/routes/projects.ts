@@ -29,7 +29,7 @@ import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentDir, getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
@@ -167,6 +167,15 @@ function readSessionPauseFields(
   return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
 }
 
+async function countQueuedMail(agentId: string): Promise<number> {
+  try {
+    const entries = await readdir(join(getAgentDir(agentId), 'mail'), { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
+  } catch {
+    return 0;
+  }
+}
+
 async function collectSessionTreeNodes(
   issueId: string,
   workspacePath: string,
@@ -220,6 +229,7 @@ async function collectSessionTreeNodes(
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
+      const queuedMailCount = await countQueuedMail(checkId);
       sections.push({
         type: sectionType,
         sessionId: checkId,
@@ -250,6 +260,11 @@ async function collectSessionTreeNodes(
         paused: state.paused === true ? true : undefined,
         pausedReason: state.paused === true ? state.pausedReason : undefined,
         pausedAt: state.paused === true ? state.pausedAt : undefined,
+        troubled: state.troubled === true ? true : undefined,
+        troubledAt: state.troubled === true ? state.troubledAt : undefined,
+        troubledReason: state.troubled === true ? state.lastFailureReason : undefined,
+        consecutiveFailures: state.troubled === true ? state.consecutiveFailures : undefined,
+        queuedMailCount: state.troubled === true ? queuedMailCount : undefined,
       });
     } catch {
       // skip malformed state
