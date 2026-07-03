@@ -291,9 +291,17 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
   const startedBySystemd = (() => {
     try {
+      // `--service-type=forking` is required: `start-server` daemonizes and
+      // exits, and under the default Type=simple systemd treats that exit as
+      // the service finishing — it deactivates the unit and the cgroup kill
+      // murders the just-forked server (observed 5x per boot in the user
+      // journal, 2026-07-03; the unit could never win the founding race).
+      // Type=forking adopts the forked daemon as MainPID and keeps the unit
+      // active for its lifetime. (`tmux -D` foreground is not an option: tmux
+      // rejects -D combined with an explicit command.)
       execFileSync(
         'systemd-run',
-        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', 'tmux', ...args],
+        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', '--service-type=forking', 'tmux', ...args],
         { stdio: 'ignore', env: cleanEnv },
       );
       return true;
