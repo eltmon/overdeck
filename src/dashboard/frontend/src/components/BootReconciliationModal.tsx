@@ -93,6 +93,13 @@ function useCountdown(deadline: string | null): number {
   return Math.max(0, Math.ceil(ms / 1000));
 }
 
+function formatCountdown(seconds: number): string {
+  const clampedSeconds = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(clampedSeconds / 60);
+  const remainingSeconds = clampedSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
 function concernLabel(concern: BootReconciliationConcern): string {
   switch (concern) {
     case 'running_remote':
@@ -199,31 +206,31 @@ export function BootReconciliationModal() {
   return (
     <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8 backdrop-blur-sm">
       <section
-        className="w-full max-w-5xl rounded-lg border border-orange-300/40 bg-neutral-950 text-neutral-100 shadow-2xl"
+        className="w-full max-w-5xl rounded-lg border badge-border-warning bg-card text-foreground shadow-2xl"
         data-testid="boot-reconciliation-modal"
         aria-label="Boot reconciliation"
       >
-        <div className="border-b border-orange-300/20 px-5 py-4">
+        <div className="border-b badge-border-warning px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-orange-300">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-warning">
                 <AlertTriangle className="h-4 w-4" />
                 Unverified dashboard boot
               </div>
-              <h2 className="mt-1 text-xl font-semibold text-neutral-50">Boot Reconciliation</h2>
-              <p className="mt-1 max-w-3xl text-sm text-neutral-300">
+              <h2 className="mt-1 text-xl font-semibold text-foreground">Boot Reconciliation</h2>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                 Agents are held from the boot at {formatTime(data.decidedAt ?? data.graceDeadline)}.
                 Resume all now, keep them stopped, or choose per agent. The server timer is
                 authoritative; no agent resumes before this boot decision is applied.
               </p>
             </div>
-            <div className="flex items-center gap-3 rounded-md border border-orange-300/25 bg-orange-400/10 px-3 py-2">
-              <div className="grid h-12 w-12 place-items-center rounded-full border-4 border-orange-400/70 text-sm font-semibold text-orange-100">
+            <div className="flex items-center gap-3 rounded-md border badge-border-warning badge-bg-warning px-3 py-2">
+              <div className="grid h-12 w-12 place-items-center rounded-full border-4 border-warning/70 text-sm font-semibold text-warning-foreground">
                 {secondsLeft}
               </div>
               <div className="text-sm">
-                <div className="font-semibold text-orange-100">Auto-resuming all in 0:{String(secondsLeft).padStart(2, '0')}</div>
-                <div className="text-xs text-orange-100/70">Concurrency brakes cap the rate.</div>
+                <div className="font-semibold text-warning-foreground">Auto-resuming all in {formatCountdown(secondsLeft)}</div>
+                <div className="text-xs text-warning-foreground/70">Concurrency brakes cap the rate.</div>
               </div>
             </div>
           </div>
@@ -236,7 +243,7 @@ export function BootReconciliationModal() {
             return (
               <div key={concern} className="rounded-md border border-border/70 bg-background/60">
                 <div className="flex items-center justify-between border-b border-border/70 px-3 py-2">
-                  <h3 className="text-sm font-semibold text-neutral-100">{concernLabel(concern)}</h3>
+                  <h3 className="text-sm font-semibold text-foreground">{concernLabel(concern)}</h3>
                   <span className="text-xs text-muted-foreground">{agents.length}</span>
                 </div>
                 <div className="divide-y divide-border/60">
@@ -250,12 +257,12 @@ export function BootReconciliationModal() {
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-sm font-semibold text-neutral-50">{agent.issueId}</span>
-                            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-300">{agent.role}</span>
-                            {agent.remote && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-200">remote</span>}
-                            {agent.readOnly && <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[11px] text-zinc-200">read-only</span>}
+                            <span className="font-mono text-sm font-semibold text-foreground">{agent.issueId}</span>
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{agent.role}</span>
+                            {agent.remote && <span className="rounded border badge-border-success badge-bg-success px-1.5 py-0.5 text-[11px] text-success-foreground">remote</span>}
+                            {agent.readOnly && <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">read-only</span>}
                           </div>
-                          <div className="mt-1 text-xs text-neutral-400">
+                          <div className="mt-1 text-xs text-muted-foreground">
                             {agent.model ?? 'unknown model'} - {agent.whyStopped} - last activity {formatRelative(agent.lastActivity)}
                             {agent.cost != null ? ` - $${agent.cost.toFixed(2)}` : ''}
                           </div>
@@ -267,7 +274,7 @@ export function BootReconciliationModal() {
                                 type="button"
                                 onClick={() => setPerAgent((prev) => ({ ...prev, [agent.issueId]: 'resume' }))}
                                 data-testid={`boot-reconciliation-resume-${agent.issueId}`}
-                                className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium ${disposition === 'resume' ? 'bg-emerald-500 text-emerald-950' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}
+                                className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium ${disposition === 'resume' ? 'bg-success text-success-foreground hover:bg-success/90' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
                               >
                                 <Play className="h-3.5 w-3.5" />
                                 Resume
@@ -276,20 +283,20 @@ export function BootReconciliationModal() {
                                 type="button"
                                 onClick={() => setPerAgent((prev) => ({ ...prev, [agent.issueId]: 'hold' }))}
                                 data-testid={`boot-reconciliation-hold-${agent.issueId}`}
-                                className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium ${disposition === 'hold' ? 'bg-sky-500 text-sky-950' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}
+                                className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium ${disposition === 'hold' ? 'bg-warning text-warning-foreground hover:bg-warning/90' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
                               >
                                 <Pause className="h-3.5 w-3.5" />
                                 Keep
                               </button>
                             </>
                           ) : (
-                            <span className="text-xs text-neutral-500">{agent.readOnly ? 'Not resumable here' : 'Resume candidate'}</span>
+                            <span className="text-xs text-muted-foreground">{agent.readOnly ? 'Not resumable here' : 'Resume candidate'}</span>
                           )}
                           <button
                             type="button"
                             disabled
                             title="Kill actions are supplied by the remote inventory contract."
-                            className="inline-flex h-8 items-center rounded-md border border-neutral-700 px-2 text-xs text-neutral-500"
+                            className="inline-flex h-8 items-center rounded-md border border-border px-2 text-xs text-muted-foreground"
                           >
                             Kill
                           </button>
@@ -311,7 +318,7 @@ export function BootReconciliationModal() {
                 onClick={submitReview}
                 disabled={pending}
                 data-testid="boot-reconciliation-apply-per-agent"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-500 px-3 text-sm font-semibold text-emerald-950 hover:bg-emerald-400 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-success px-3 text-sm font-semibold text-success-foreground hover:bg-success/90 disabled:opacity-50"
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Apply per-agent choices
@@ -327,7 +334,7 @@ export function BootReconciliationModal() {
                 onClick={() => decisionMutation.mutate({ decision: 'resume_all' })}
                 disabled={pending}
                 data-testid="boot-reconciliation-resume-all"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-orange-400 px-3 text-sm font-semibold text-orange-950 hover:bg-orange-300 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-warning px-3 text-sm font-semibold text-warning-foreground hover:bg-warning/90 disabled:opacity-50"
               >
                 <Play className="h-4 w-4" />
                 Resume all now
@@ -337,7 +344,7 @@ export function BootReconciliationModal() {
                 onClick={() => decisionMutation.mutate({ decision: 'hold_all' })}
                 disabled={pending}
                 data-testid="boot-reconciliation-hold-all"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-800 px-3 text-sm font-medium text-neutral-100 hover:bg-neutral-700 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-muted px-3 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
               >
                 <Pause className="h-4 w-4" />
                 Keep all stopped
@@ -347,7 +354,7 @@ export function BootReconciliationModal() {
                 onClick={() => setReviewMode(true)}
                 disabled={pending}
                 data-testid="boot-reconciliation-review-each"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-700 px-3 text-sm font-medium text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
               >
                 <Clock3 className="h-4 w-4" />
                 Review each
@@ -357,7 +364,7 @@ export function BootReconciliationModal() {
                 onClick={() => freezeMutation.mutate()}
                 disabled={pending}
                 data-testid="boot-reconciliation-freeze"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-red-500 px-3 text-sm font-semibold text-red-950 hover:bg-red-400 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-destructive px-3 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
               >
                 <Snowflake className="h-4 w-4" />
                 Freeze everything

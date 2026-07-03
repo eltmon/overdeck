@@ -20,6 +20,11 @@ let linkedFrontendNodeModules = false;
 const linkedFrontendPackages: string[] = [];
 const projectRoot = process.cwd();
 const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
+const bootReconciliationSourceFiles = [
+  join(frontendRoot, 'src/components/BootReconciliationModal.tsx'),
+  join(frontendRoot, 'src/components/GraceCountdown.tsx'),
+];
+const forbiddenBootReconciliationColorClass = /\b(?:bg|text|border)-(?:neutral|orange|emerald|gray|zinc|sky|red)-|\btext-(?:white|black)\b/g;
 const packageResolutionRoots = [
   frontendRoot,
   projectRoot,
@@ -195,6 +200,7 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/version') return json({ version: 'test', supervisorUrl: null });
       if (path === '/api/tracker-status') return json({ primary: 'github', configured: [] });
       if (path === '/api/confirmations') return json([]);
+      if (path === '/api/boot-reconciliation') return json({ decision: null, perAgent: {}, decidedAt: null, bootId: null, graceDeadline: null, set: [] });
       if (path === '/api/cloister/status') return json({
         running: true,
         lastCheck: new Date().toISOString(),
@@ -382,6 +388,17 @@ afterAll(async () => {
 });
 
 describe('styleguide rendered surface conformance', () => {
+  it('keeps boot reconciliation countdown surfaces on semantic color tokens', async () => {
+    const violations: string[] = [];
+    for (const file of bootReconciliationSourceFiles) {
+      const source = await readFile(file, 'utf8');
+      const matches = source.match(forbiddenBootReconciliationColorClass) ?? [];
+      violations.push(...matches.map((match) => `${file}: ${match}`));
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
