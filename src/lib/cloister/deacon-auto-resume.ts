@@ -56,23 +56,10 @@ const appliedBootReconciliationDecisions = new Set<string>();
 
 export type BootReconciliationDecisionSkipBreakdown = Record<BootReconciliationSkipReason | 'other', number>;
 
-export interface BootReconciliationDecisionResult {
-  resumed: string[];
-  skipped: BootReconciliationDecisionSkipBreakdown;
-  deferred: number;
-}
+export interface BootReconciliationDecisionResult { resumed: string[]; skipped: BootReconciliationDecisionSkipBreakdown; deferred: number; }
 
 function emptyBootReconciliationDecisionResult(): BootReconciliationDecisionResult {
-  return {
-    resumed: [],
-    skipped: {
-      workspace_missing: 0,
-      merged: 0,
-      completed: 0,
-      other: 0,
-    },
-    deferred: 0,
-  };
+  return { resumed: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 };
 }
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
@@ -879,9 +866,7 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
       break;
     }
     // Stagger spawns so the scheduler can absorb each `claude` before the next.
-    if (resumeAttempts > 0) {
-      await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
-    }
+    if (resumeAttempts > 0) await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
 
     const result = await handleAgentStoppedEvent(agentId, { skipGlobalGates: true, context: 'patrol' }, deps);
     if (result) {
