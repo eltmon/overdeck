@@ -195,11 +195,11 @@ describe('resolveSlotTierSpawnParams', () => {
     expect(() => resolveSlotTierSpawnParams('/ws', 'bead-x')).toThrow("item 'bead-x' was not found");
   });
 
-  it('throws when tiering is enabled but no plan is readable', () => {
+  it('falls through to role-default routing when tiering is enabled but no plan is readable', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(null);
 
-    expect(() => resolveSlotTierSpawnParams('/ws', 'bead-x')).toThrow('no vBRIEF plan is readable');
+    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual({});
   });
 });
 

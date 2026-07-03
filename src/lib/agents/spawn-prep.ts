@@ -220,14 +220,10 @@ export function resolveSlotTierSpawnParams(
   // without a tier table to resolve against.
   if (!tiered) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
+  if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
   if (!resolveTieredExecutionEnabled(tiered, planMetadata)) return {};
   if (explicitModel) return {};
-  if (!doc) {
-    throw new Error(
-      `Tiered execution is enabled but no vBRIEF plan is readable in ${baseWorkspace}.`,
-    );
-  }
   const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
   if (!item) {
     throw new Error(
