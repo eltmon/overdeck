@@ -149,6 +149,11 @@
       "reason": "feedback",
       "note": "[2026-07-03T17:08Z] review-agent → CHANGES-REQUESTED — seq 3",
       "timestamp": "2026-07-03T17:08:20.607Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T17:14:25.467Z"
     }
   ],
   "feedback": [
@@ -168,20 +173,20 @@
     }
   ],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-03T17:08:20.607Z",
+  "updated": "2026-07-03T17:14:30.208Z",
   "pipeline": {
     "issueId": "PAN-2086",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T17:07:56.935Z",
-    "reviewNotes": "startup sync gate still misses the top-level skills mirror input",
+    "updatedAt": "2026-07-03T17:14:30.161Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Bead workspace-h51bn PASS. Implements Task 1 Step 1 (profile via time/timeAsync helpers + [sync-timing] summary) and Step 2 (content-hash gate: isStartupSyncNeededSync + writeSyncManifestSync at ~/.overdeck/.sync-manifest.json). Hash covers SYNC_SOURCES tree + global.md + per-project project.md + devMode + cwd; missing input falls back to needed=true (conservative). 6 unit tests cover all gate branches. Manual pan sync / pan sync --force behavior unchanged. Follow-up bead expected to wire the gate into the deferred startup spawn in src/cli/index.ts and add the --if-changed flag per the Task 1 guardrail.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2313",
-    "lastVerifiedCommit": "6bfb4bdd876e7b1d630b66a4bde1cefee6c413b7",
+    "lastVerifiedCommit": "ea6362b3792ce4cca9b981289534294734593d09",
     "reviewRequestedAt": "2026-07-03T16:57:20.281Z"
   },
   "closeOut": {
@@ -260,7 +265,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.01451,
-        "pricingAsOf": "2026-07-03T17:07:57.022Z"
+        "pricingAsOf": "2026-07-03T17:14:30.207Z"
       }
     },
     "merges": [
