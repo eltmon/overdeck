@@ -47,6 +47,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T05:41:36.016Z"
+    },
+    {
+      "timestamp": "2026-07-03T06:08:10.983Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T06:08:11.320Z"
     }
   ],
   "feedback": [
@@ -102,28 +112,29 @@
       "tests/unit/scripts/lint-ratchet-audit.test.ts",
       "tests/unit/scripts/pre-push-hook.test.ts"
     ],
-    "recordedAt": "2026-07-03T05:45:28.582Z"
+    "recordedAt": "2026-07-03T06:06:39.318Z"
   },
   "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-03T05:45:28.584Z",
+  "updated": "2026-07-03T06:08:11.320Z",
   "pipeline": {
     "issueId": "PAN-2227",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:21:12.189Z",
+    "updatedAt": "2026-07-03T06:08:11.123Z",
     "reviewNotes": "pre-push release tag deletions now fail inside the tag guard",
-    "verificationNotes": "Acceptance criteria check FAILED — 38/38 AC incomplete:\n\n### staleness detection + --update auto-lowering writer in scripts/lint-file-size.sh (4/4 incomplete)\n  - [ ] check mode exits 1 and prints 'stale baseline' naming the entry and the --update fix command when a baselined file's current count is below its entry\n  - [ ] check mode exits 1 for baseline entries whose file is missing from disk or now at or under CEILING (1000)\n  - [ ] --update lowers stale-high entries to current counts, drops missing/sub-ceiling entries, never raises or adds entries, preserves path-sorted '<lines> <path>' format, and prints the lowered/dropped/unchanged summary\n  - [ ] the header comment contains documentation of --update, the sub-ceiling drop rule (D3), and the raising-is-a-manual-audited-edit rule (D4)\n\n### reconcile scripts/file-size-baseline.txt via --update (lowers and drops only) (3/3 incomplete)\n  - [ ] the baseline diff vs main contains only lowered counts and removed lines — no raises, no additions\n  - [ ] bash scripts/lint-file-size.sh prints ✓ and exits 0 at HEAD after the commit\n  - [ ] the reconciliation commit message contains the pan-2227 issue reference\n\n### new scripts/lint-ratchet-audit.sh (range + last-commit modes) wired into the lint chain (5/5 incomplete)\n  - [ ] range mode exits 1 naming the offending commit when a commit in range raises/adds a baseline entry or adds an allowlist path and its full message has no issue reference matching ([A-Z]+-[0-9]+|#[0-9]+)\n  - [ ] the audit exits 0 for lowered baseline entries, removed allowlist paths, and ref-carrying increases\n  - [ ] last-commit mode (no args) audits the newest commit touching each ratchet file; a missing parent (root commit / shallow clone) prints a ⚠ warning and exits 0\n  - [ ] package.json contains a lint:ratchet-audit entry and the lint chain runs it after lint:file-size\n  - [ ] allowlist comparison is set-based via JSON parse — reordering the array without adding paths produces no failure\n\n### pre-push: working-tree file-size guard + per-ref range-mode ratchet audit (4/4 incomplete)\n  - [ ] pre-push runs bash scripts/lint-file-size.sh with stdin detached before the ref loop, so a working tree with a grown baselined file or new >1000-line src file refuses to push\n  - [ ] the refs/heads/* case applies lint-ratchet-audit.sh --range to exactly the pushed range (remote sha as base, or merge-base origin/main for new branches) and skips branch deletions\n  - [ ] the hook preserves the refs/tags/v* release guard unchanged and stays POSIX-sh-compatible\n  - [ ] scratch-clone checkpoint: the hook refuses a push containing a ref-less baseline raise, and accepts a clean push and a tag push exactly as before\n\n### PAN-2204: scripts/guard-agent-main-push.sh + pre-push wiring — agents cannot push code to main (5/5 incomplete)\n  - [ ] a push range to refs/heads/main touching src/, packages/, roles/, skills/, or scripts/ while OVERDECK_AGENT_ID is set or git user.name is panopticon-agent[bot] exits 1 with a message naming 'pan done' and the OVERDECK_OPERATOR_PUSH=1 escape hatch\n  - [ ] a main push touching only state-plane paths (.pan/records/, .beads/, .pan/specs/, .pan/drafts/, docs/FLYWHEEL-STATE.md) exits 0 in agent context\n  - [ ] OVERDECK_OPERATOR_PUSH=1 exits 0 regardless of paths; a non-agent context (no OVERDECK_AGENT_ID, human user.name) exits 0\n  - [ ] the hook invokes the guard only for refs/heads/main — feature-branch pushes (pan done flow) are never evaluated by it\n  - [ ] an empty or undeterminable range on a main push exits 1 (fail closed) with an explanatory message\n\n### CI lint job checkout fetch-depth: 0 for the parent-diff audit (2/2 incomplete)\n  - [ ] the lint job's actions/checkout@v4 step contains fetch-depth: 0 with the PAN-2227 comment\n  - [ ] all other jobs' checkout steps are byte-identical to main (diff shows exactly one hunk)\n\n### fixture-repo unit tests for lint-file-size.sh (six PRD cases) (2/2 incomplete)\n  - [ ] the test file covers all six WI-6 lint-file-size cases (new-god-file fail, grow fail, stale fail with --update hint, update-then-pass, drop deleted/sub-ceiling, never-raise) with assertions on exit status and output text\n  - [ ] npx vitest run on the new file passes; npm run test:unit stays green\n\n### fixture-repo unit tests for lint-ratchet-audit.sh (six PRD cases) (2/2 incomplete)\n  - [ ] the test file exercises all six WI-6 ratchet-audit cases (ref-less raise fails naming sha, ref-carrying raise passes, allowlist add fails/passes by ref, decreases free, last-commit unmasked, root-commit warns+passes) with assertions on exit status and output\n  - [ ] npx vitest run on the new file passes; npm run test:unit stays green\n\n### fixture-repo unit tests for guard-agent-main-push.sh (2/2 incomplete)\n  - [ ] the test file covers agent-blocked, state-plane-allowed, escape-hatch, non-agent-allowed, and empty-range-fail-closed cases with exit-status and output assertions\n  - [ ] npx vitest run on the new file passes; npm run test:unit stays green\n\n### PAN-2204: roles/strike.md — strikes stop after pushing strike/<id>; never self-merge to main (4/4 incomplete)\n  - [ ] the landing procedure contains no git checkout main / git merge to main / git push origin main instructions and instead ends with a branch push + pan tell readiness signal + stop\n  - [ ] the rewritten procedure requires that typecheck, lint (named as including the file-size ratchet), and tests all pass in the workspace before the strike sends the readiness signal\n  - [ ] the role states the spawner (Flywheel/operator) owns review, merge, and pan done <id> --strike, and that the pre-push guard mechanically rejects agent pushes to main\n  - [ ] npm run lint:prompts passes on the edited role file\n\n### PAN-2204: roles/flywheel.md + docs/flywheel-brief.md — the Flywheel owns strike merges (3/3 incomplete)\n  - [ ] roles/flywheel.md's strike bullet contains the new contract — the Flywheel reviews the diff, runs gates, lands via gh-API squash-merge, and runs pan done <id> --strike — and no longer says the strike lands on main\n  - [ ] docs/flywheel-brief.md carries the same strike-merge ownership statement ('whoever spawns a strike owns its merge')\n  - [ ] each of the two files contains the statement that the landing path is gh-API merge, never a local git push to origin/main\n\n### PAN-2204: roles/work.md — explicit prohibition on pushing to origin/main (2/2 incomplete)\n  - [ ] roles/work.md's completion section contains the prohibition that agents never push to or merge into origin/main, and names pan done as the only landing path\n  - [ ] npm run lint:prompts passes on the edited role file",
     "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2268",
-    "reviewRequestedAt": "2026-07-03T03:06:16.984Z",
+    "reviewRequestedAt": "2026-07-03T06:08:10.985Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
+        ".beads/issues.jsonl",
         ".pan/drafts/PAN-2227.md",
-        ".pan/records/pan-2227.json"
+        ".pan/records/pan-2227.json",
+        "tests/unit/scripts/pre-push-hook.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -143,6 +154,7 @@
         "tests/unit/scripts/lint-ratchet-audit.test.ts"
       ],
       "actualChangedFiles": [
+        ".beads/issues.jsonl",
         ".github/workflows/ci.yml",
         ".husky/pre-push",
         ".pan/drafts/PAN-2227.md",
@@ -158,9 +170,10 @@
         "scripts/lint-ratchet-audit.sh",
         "tests/unit/scripts/guard-agent-main-push.test.ts",
         "tests/unit/scripts/lint-file-size.test.ts",
-        "tests/unit/scripts/lint-ratchet-audit.test.ts"
+        "tests/unit/scripts/lint-ratchet-audit.test.ts",
+        "tests/unit/scripts/pre-push-hook.test.ts"
       ],
-      "recordedAt": "2026-07-03T03:05:44.401Z"
+      "recordedAt": "2026-07-03T06:06:39.318Z"
     }
   },
   "closeOut": {
@@ -221,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.472422,
-        "pricingAsOf": "2026-07-03T04:21:12.242Z"
+        "pricingAsOf": "2026-07-03T06:08:11.153Z"
       }
     },
     "merges": [
