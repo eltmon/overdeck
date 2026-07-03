@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
-  <!-- Eye icon -->
-  <ellipse cx="20" cy="20" rx="14" ry="10" stroke="#B8886A" stroke-width="2" fill="none"/>
-  <circle cx="20" cy="20" r="5" fill="#B8886A"/>
-  <circle cx="20" cy="20" r="2" fill="#ffffff"/>
-  <!-- Text -->
-  <text x="42" y="26" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="600" fill="#2d2d2d" letter-spacing="0.5">Overdeck</text>
+  <!-- Overdeck mark: the deck above the decks -->
+  <path d="M19 24.5 L32 31 L19 37.5 L6 31 Z" fill="#B8886A" opacity="0.45"/>
+  <path d="M19 19 L32 25.5 L19 32 L6 25.5 Z" fill="#B8886A" opacity="0.8"/>
+  <path d="M19 3.5 L32 10 L19 16.5 L6 10 Z" fill="#D4A27F"/>
+  <!-- Wordmark -->
+  <text x="44" y="27" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="600" fill="#2d2d2d" letter-spacing="0.5">Overdeck</text>
 </svg>
