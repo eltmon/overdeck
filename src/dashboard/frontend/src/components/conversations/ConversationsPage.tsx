@@ -368,18 +368,27 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
   const sourceFilter = filters.source ?? 'all';
   const trimmedQuery = query.trim();
   const [debouncedSemanticQuery, setDebouncedSemanticQuery] = useState(trimmedQuery);
-  const semanticQuery = semanticSearch ? debouncedSemanticQuery : '';
-  const feedQueryText = semanticSearch ? '' : trimmedQuery;
+  const semanticSearchAvailable = sourceFilter !== 'managed-archived';
+  const effectiveSemanticSearch = semanticSearch && semanticSearchAvailable;
+  const semanticQuery = effectiveSemanticSearch ? debouncedSemanticQuery : '';
+  const feedQueryText = effectiveSemanticSearch ? '' : trimmedQuery;
   const filterParams = buildFilterParams(filters);
 
   useEffect(() => {
-    if (!semanticSearch) {
+    if (!effectiveSemanticSearch) {
       setDebouncedSemanticQuery(trimmedQuery);
       return;
     }
     const timer = window.setTimeout(() => setDebouncedSemanticQuery(trimmedQuery), 350);
     return () => window.clearTimeout(timer);
-  }, [semanticSearch, trimmedQuery]);
+  }, [effectiveSemanticSearch, trimmedQuery]);
+
+  useEffect(() => {
+    if (!semanticSearchAvailable && semanticSearch) {
+      setSemanticSearch(false);
+      setSearchOffset(0);
+    }
+  }, [semanticSearchAvailable, semanticSearch]);
 
   useEffect(() => {
     setSelectedKey(initialSessionKey);
@@ -409,8 +418,8 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
   const SEARCH_PAGE_SIZE = 50;
 
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    queryKey: ['discovered-sessions-search', semanticQuery, filterParams.toString(), searchOffset, semanticSearch],
-    queryFn: () => fetchSearch(semanticQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset, semanticSearch),
+    queryKey: ['discovered-sessions-search', semanticQuery, filterParams.toString(), searchOffset, effectiveSemanticSearch],
+    queryFn: () => fetchSearch(semanticQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset, effectiveSemanticSearch),
     enabled: !!semanticQuery,
   });
 
@@ -528,16 +537,20 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
 
         <button
           onClick={() => {
+            if (!semanticSearchAvailable) return;
             setSemanticSearch((v) => !v);
             setSearchOffset(0);
           }}
+          disabled={!semanticSearchAvailable}
           className={`px-3 py-1.5 rounded text-xs border transition-colors ${
-            semanticSearch
+            !semanticSearchAvailable
+              ? 'bg-muted border-border text-muted-foreground/60 cursor-not-allowed'
+              : effectiveSemanticSearch
               ? 'bg-signal-review/8 border-signal-review/32 text-signal-review-foreground'
               : 'bg-card border-border text-muted-foreground hover:border-border'
           }`}
         >
-          {semanticSearch ? 'Semantic' : 'Keyword'}
+          {effectiveSemanticSearch ? 'Semantic' : 'Keyword'}
         </button>
 
         {/* Filter toggle */}

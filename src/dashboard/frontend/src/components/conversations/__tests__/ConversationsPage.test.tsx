@@ -402,6 +402,34 @@ describe('ConversationsPage endpoint selection', () => {
     }));
   });
 
+  it('forces keyword feed search when managed-archived is selected from semantic mode', async () => {
+    renderPage(makeClient());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keyword' }));
+    fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'archive semantic' } });
+
+    await waitFor(() => expect(rpcMocks.search).toHaveBeenLastCalledWith({
+      query: 'archive semantic',
+      semantic: true,
+      limit: 50,
+      offset: 0,
+    }));
+
+    rpcMocks.search.mockClear();
+    rpcMocks.listFeed.mockClear();
+
+    fireEvent.click(screen.getByText('Filters'));
+    fireEvent.click(await screen.findByText('Managed-archived'));
+
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({
+      source: 'managed-archived',
+      query: 'archive semantic',
+      limit: 100,
+    }));
+    expect(screen.getByRole('button', { name: 'Keyword' })).toBeDisabled();
+    expect(rpcMocks.search).not.toHaveBeenCalled();
+  });
+
   it('requests discovered feed rows when the discovered source is selected', async () => {
     renderPage(makeClient());
 
