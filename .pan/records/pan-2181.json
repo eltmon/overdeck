@@ -132,21 +132,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T23:40:24.585Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T23:43:05.989Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-02T23:40:30.323Z",
+  "updated": "2026-07-03T00:44:26.670Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "running",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T23:40:30.288Z",
+    "updatedAt": "2026-07-03T00:44:26.544Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-03T00:42:33.654Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "reviewRequestedAt": "2026-07-02T23:40:24.153Z",
+    "reviewedAtCommit": "8f87be9adc77cd90b3c8705533e83a0d6cf72da9",
+    "lastVerifiedCommit": "8f87be9adc77cd90b3c8705533e83a0d6cf72da9",
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-07-02T08:07:08.502Z",
     "deaconIgnoredReason": "operator directive: drain pipeline, focus PAN-1791 only"
@@ -223,7 +236,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.403322,
-        "pricingAsOf": "2026-07-02T23:40:30.323Z"
+        "pricingAsOf": "2026-07-03T00:44:26.662Z"
       }
     },
     "merges": [
