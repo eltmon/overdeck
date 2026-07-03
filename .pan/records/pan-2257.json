@@ -6,6 +6,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T10:09:06.969Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T12:52:35.626Z"
     }
   ],
   "feedback": [],
@@ -33,15 +38,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2257",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "reviewing",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T12:10:22.568Z",
+    "updatedAt": "2026-07-03T12:53:41.665Z",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
+    "lastVerifiedCommit": "dccb33b05adcfd5bf3d3a073dfd625fdb6ed6b97",
     "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -107,7 +115,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T12:10:24.579Z"
+        "pricingAsOf": "2026-07-03T12:53:41.719Z"
       }
     },
     "merges": [
@@ -116,5 +124,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T10:06:21.823Z",
-  "updated": "2026-07-03T12:10:24.648Z"
+  "updated": "2026-07-03T12:53:41.720Z"
 }
