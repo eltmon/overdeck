@@ -1,0 +1,53 @@
+{
+  "issueId": "PAN-1456",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-01T05:30:43.175Z",
+  "updated": "2026-07-03T11:09:48.828Z",
+  "pipeline": {
+    "issueId": "PAN-1456",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-01T05:30:43.176Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-7": {
+            "input": 48,
+            "output": 65456,
+            "cacheRead": 3372268,
+            "cacheWrite": 204587
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-7": {
+          "input": 48,
+          "output": 65456,
+          "cacheRead": 3372268,
+          "cacheWrite": 204587
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 4.601447,
+        "pricingAsOf": "2026-07-01T05:30:43.195Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T11:09:48.827Z"
+    }
+  ]
+}
