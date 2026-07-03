@@ -173,22 +173,19 @@
     }
   ],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-07-03T17:29:54.037Z",
+  "updated": "2026-07-03T19:15:25.081Z",
   "pipeline": {
     "issueId": "PAN-2086",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T17:29:53.934Z",
-    "reviewNotes": "review passed; startup sync gate now covers top-level skills mirror input",
-    "testNotes": "Verified after specialist feedback: configured root npm test passed (812 files passed, 4 skipped; 8139 tests passed, 52 skipped) and frontend issue action tests passed (3 files, 32 tests). Previously named suites also passed directly.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T19:05:04.510Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead workspace-h51bn PASS. Implements Task 1 Step 1 (profile via time/timeAsync helpers + [sync-timing] summary) and Step 2 (content-hash gate: isStartupSyncNeededSync + writeSyncManifestSync at ~/.overdeck/.sync-manifest.json). Hash covers SYNC_SOURCES tree + global.md + per-project project.md + devMode + cwd; missing input falls back to needed=true (conservative). 6 unit tests cover all gate branches. Manual pan sync / pan sync --force behavior unchanged. Follow-up bead expected to wire the gate into the deferred startup spawn in src/cli/index.ts and add the --if-changed flag per the Task 1 guardrail.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2313",
-    "reviewedAtCommit": "3821edf7d1f73fc53f0978bccde9eb2e92312e33",
     "lastVerifiedCommit": "ea6362b3792ce4cca9b981289534294734593d09",
     "reviewRequestedAt": "2026-07-03T16:57:20.281Z"
   },
@@ -205,8 +202,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 329530,
-            "output": 11413,
+            "input": 332037,
+            "output": 12173,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -221,9 +218,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 410515,
-            "output": 26617,
-            "cacheRead": 10282625,
+            "input": 412569,
+            "output": 27769,
+            "cacheRead": 11049601,
             "cacheWrite": 0
           }
         },
@@ -250,8 +247,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 329530,
-          "output": 11413,
+          "input": 332037,
+          "output": 12173,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -262,9 +259,9 @@
           "cacheWrite": 478941
         },
         "custom/kimi-k2.7-code": {
-          "input": 1416889,
-          "output": 196961,
-          "cacheRead": 103787137,
+          "input": 1418943,
+          "output": 198113,
+          "cacheRead": 104554113,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -275,8 +272,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 32.464664,
-        "pricingAsOf": "2026-07-03T17:29:54.036Z"
+        "usd": 32.61695,
+        "pricingAsOf": "2026-07-03T19:05:04.574Z"
       }
     },
     "merges": [
@@ -284,8 +281,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "traefik-readiness-gate": "completed",
     "traefik-readiness-gate.ac1": "completed",
