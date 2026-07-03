@@ -66,6 +66,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T22:58:44.916Z"
+    },
+    {
+      "timestamp": "2026-07-03T23:39:29.289Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T23:39:29.678Z"
     }
   ],
   "feedback": [],
@@ -160,7 +170,7 @@
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/webhook-handlers.test.ts"
     ],
-    "recordedAt": "2026-07-03T22:58:33.631Z"
+    "recordedAt": "2026-07-03T23:39:21.820Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -213,111 +223,10 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T23:01:43.330Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-03T22:28:41.016Z"
-      }
-    ],
+    "updatedAt": "2026-07-03T23:46:41.795Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
     "reviewedAtCommit": "3e53ef6759fdaa94140bfd7631273ff0a03ff36c",
-    "lastVerifiedCommit": "264976263948b8869247b34e18f5c11e195ad938",
-    "reviewRequestedAt": "2026-07-03T22:58:44.594Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".beads/issues.jsonl",
-        ".pan/drafts/PAN-2265.md",
-        ".pan/records/pan-2265.json",
-        ".pan/test/result.json",
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/server/routes/webhooks.ts",
-        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
-        "src/lib/cloister/__tests__/issue-closed.test.ts",
-        "src/lib/cloister/merged-pr-verification.ts",
-        "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
-        "src/lib/github-pr-lookup.ts",
-        "src/lib/overdeck/discussions.ts",
-        "src/lib/overdeck/pull-requests.ts",
-        "tests/integration/cli/doctor.test.ts",
-        "tests/lib/cloister/auto-resume-gating.test.ts",
-        "tests/lib/reopen.test.ts",
-        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
-        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
-        "tests/unit/dashboard/server/routes/unstick-route.test.ts",
-        "tests/unit/dashboard/server/services/agent-projection.test.ts",
-        "tests/unit/dashboard/unstick-endpoint.test.ts",
-        "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
-        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/server/routes/issues.ts",
-        "src/lib/cloister/__tests__/merge-agent.test.ts",
-        "tests/unit/lib/cloister/issue-closed.test.ts"
-      ],
-      "declaredScope": [
-        "src/cli/commands/flywheel-surfaces.ts",
-        "src/dashboard/server/routes/issues.ts",
-        "src/dashboard/server/services/pr-tab-cache.ts",
-        "src/lib/cloister/__tests__/merge-agent.test.ts",
-        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
-        "src/lib/cloister/issue-closed.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/orphan-proposed-reconciler.ts",
-        "src/lib/forge.ts",
-        "src/lib/github-app.ts",
-        "src/lib/github-graphql-cooldown.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
-        "tests/unit/lib/cloister/issue-closed.test.ts",
-        "tests/unit/lib/forge.test.ts",
-        "tests/unit/lib/github-app.test.ts",
-        "tests/unit/lib/github-graphql-cooldown.test.ts"
-      ],
-      "actualChangedFiles": [
-        ".beads/issues.jsonl",
-        ".pan/drafts/PAN-2265.md",
-        ".pan/records/pan-2265.json",
-        ".pan/test/result.json",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/flywheel-surfaces.ts",
-        "src/dashboard/server/routes/webhooks.ts",
-        "src/dashboard/server/services/pr-tab-cache.ts",
-        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
-        "src/lib/cloister/__tests__/issue-closed.test.ts",
-        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
-        "src/lib/cloister/issue-closed.ts",
-        "src/lib/cloister/merge-agent.ts",
-        "src/lib/cloister/merged-pr-verification.ts",
-        "src/lib/cloister/orphan-proposed-reconciler.ts",
-        "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
-        "src/lib/forge.ts",
-        "src/lib/github-app.ts",
-        "src/lib/github-graphql-cooldown.ts",
-        "src/lib/github-pr-lookup.ts",
-        "src/lib/overdeck/discussions.ts",
-        "src/lib/overdeck/pull-requests.ts",
-        "src/lib/webhook-handlers.ts",
-        "tests/integration/cli/doctor.test.ts",
-        "tests/lib/cloister/auto-resume-gating.test.ts",
-        "tests/lib/reopen.test.ts",
-        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
-        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
-        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
-        "tests/unit/dashboard/server/routes/unstick-route.test.ts",
-        "tests/unit/dashboard/server/services/agent-projection.test.ts",
-        "tests/unit/dashboard/unstick-endpoint.test.ts",
-        "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
-        "tests/unit/lib/forge.test.ts",
-        "tests/unit/lib/github-app.test.ts",
-        "tests/unit/lib/github-graphql-cooldown.test.ts",
-        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
-        "tests/unit/lib/webhook-handlers.test.ts"
-      ],
-      "recordedAt": "2026-07-03T22:58:33.631Z"
-    }
+    "lastVerifiedCommit": "d9eb3d1722680f5dcca4bad48d7c6aaefc3fd825"
   },
   "closeOut": {
     "usage": {
@@ -383,7 +292,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.972857,
-        "pricingAsOf": "2026-07-03T23:01:43.364Z"
+        "pricingAsOf": "2026-07-03T23:46:41.815Z"
       }
     },
     "merges": [
@@ -392,5 +301,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:40:19.407Z",
-  "updated": "2026-07-03T23:01:43.372Z"
+  "updated": "2026-07-03T23:46:41.816Z"
 }
