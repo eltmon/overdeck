@@ -52,6 +52,7 @@ import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backen
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
+import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { existsSync } from 'node:fs';
@@ -78,6 +79,8 @@ initDashboardLogFile();
 // spawn→listen window attributable. See server.ts for the matching listen mark.
 console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
+startEventLoopMonitor();
+console.log('[overdeck] Event loop delay monitor started');
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
@@ -531,6 +534,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();
+  stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
   stopRestartAnnouncer();
