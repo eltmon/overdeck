@@ -918,6 +918,19 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).not.toMatch(/codex exec/);
   });
 
+  it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'plan',
+      harness: 'codex',
+      model: 'gpt-5.5',
+      codexMode: 'work-tui',
+      appendSystemPromptFiles: ['/workspace/project/.pan/context.md'],
+    });
+    expect(script).toMatch(/^codex -m 'gpt-5\.5'$/m);
+    expect(script).not.toMatch(/--append-system-prompt-file/);
+  });
+
   it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,

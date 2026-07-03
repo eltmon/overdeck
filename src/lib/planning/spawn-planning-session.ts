@@ -29,6 +29,7 @@ import {
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
+import { getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -652,6 +653,13 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
+    const behavior = getHarnessBehavior(effectiveHarness);
+    const piLauncherFields = behavior.usesRpcFifo
+      ? await getOhmypiLauncherFields(sessionName, planningModel)
+      : {};
+    const codexLauncherFields = behavior.usesCodexHome
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath)
+      : {};
 
     const providerExports = await getProviderExportsForModel(planningModel);
 
@@ -665,6 +673,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       launcherScript,
       generateLauncherScriptSync({
         role: 'plan',
+        harness: effectiveHarness,
         workingDir: workspacePath,
         setTerminalEnv: true,
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
@@ -675,6 +684,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         trapHup: true,
         debugLog: '/tmp/pan-launcher-debug.log',
         keepAlive: true,
+        ...piLauncherFields,
+        ...codexLauncherFields,
       }),
       { mode: 0o755 },
     );
