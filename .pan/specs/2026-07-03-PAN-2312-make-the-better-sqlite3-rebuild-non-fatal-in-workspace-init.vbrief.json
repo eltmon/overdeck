@@ -4,17 +4,17 @@
     "created": "2026-07-03T16:52:08.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2312: transient better-sqlite3 prebuilt-binary fetch hard-fails fresh workspace init (no Python for node-gyp fallback on Alpine)",
-    "updated": "2026-07-03T16:55:39.008Z"
+    "updated": "2026-07-03T17:15:11.799Z"
   },
   "plan": {
     "id": "pan-2312",
     "title": "Make the better-sqlite3 rebuild non-fatal in workspace init",
-    "status": "proposed",
+    "status": "running",
     "uid": "a61191d6-48ab-4fd3-9ee5-eef64a02bdf1",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-03T16:52:08.000Z",
-    "updated": "2026-07-03T16:55:39.008Z",
+    "updated": "2026-07-03T17:15:11.799Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2312",
@@ -187,5 +187,5 @@
       "canonicalFilename": "2026-07-03-PAN-2312-make-the-better-sqlite3-rebuild-non-fatal-in-workspace-init.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
