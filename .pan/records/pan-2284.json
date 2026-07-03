@@ -11,53 +11,77 @@
   ],
   "feedback": [],
   "created": "2026-07-03T11:01:31.556Z",
-  "updated": "2026-07-03T11:19:20.196Z",
+  "updated": "2026-07-03T14:30:47.034Z",
   "pipeline": {
     "issueId": "PAN-2284",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:15:24.664Z"
+    "updatedAt": "2026-07-03T12:15:00.418Z",
+    "inspectNotes": "workspace-z23kt passed: applyBootReconciliationDecision now returns resumed/skipped/deferred, route responses pass skipped/deferred through, and no new constraint violations were found."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 187256,
+            "output": 13491,
+            "cacheRead": 4236800,
+            "cacheWrite": 0
+          }
+        },
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 325371,
+            "output": 12027,
+            "cacheRead": 2516992,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 8000,
-            "output": 174,
+            "input": 9310,
+            "output": 347,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "plan": {
           "anthropic/claude-opus-4-8": {
-            "input": 19925,
-            "output": 39533,
-            "cacheRead": 4978568,
-            "cacheWrite": 159304
+            "input": 20490,
+            "output": 43663,
+            "cacheRead": 6576623,
+            "cacheWrite": 166032
           }
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 512627,
+          "output": 25518,
+          "cacheRead": 6753792,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 8000,
-          "output": 174,
+          "input": 9310,
+          "output": 347,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
-          "input": 19925,
-          "output": 39533,
-          "cacheRead": 4978568,
-          "cacheWrite": 159304
+          "input": 20490,
+          "output": 43663,
+          "cacheRead": 6576623,
+          "cacheWrite": 166032
         }
       },
       "costAtCloseOut": {
-        "usd": 4.572888,
-        "pricingAsOf": "2026-07-03T11:15:24.693Z"
+        "usd": 12.225611,
+        "pricingAsOf": "2026-07-03T12:15:00.484Z"
       }
     },
     "merges": [],
@@ -66,7 +90,11 @@
   "harness": "claude-code",
   "model": "claude-opus-4-8",
   "statusOverrides": {
-    "shared-classifier": "running"
+    "shared-classifier": "completed",
+    "shared-classifier.shared-classifier.ac1": "completed",
+    "shared-classifier.shared-classifier.ac2": "completed",
+    "shared-classifier.shared-classifier.ac3": "completed",
+    "shared-classifier.shared-classifier.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [
