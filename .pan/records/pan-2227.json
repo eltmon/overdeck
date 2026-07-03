@@ -83,16 +83,16 @@
     "recordedAt": "2026-07-03T03:05:44.401Z"
   },
   "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-03T03:11:18.121Z",
+  "updated": "2026-07-03T03:17:14.409Z",
   "pipeline": {
     "issueId": "PAN-2227",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T03:11:18.042Z",
+    "updatedAt": "2026-07-03T03:17:11.165Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (105197ms):\n\nplain forks off Channels MCP\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:470:63\n    468|     }).not.toBeNull();\n    469|     const parent = await page.evaluate(() => (window as any).current a…\n    470|     await expect.poll(() => sessions.has(parent.tmuxSession)).toBe(tru…\n       |                                                               ^\n    471|     await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toB…\n    472|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:470:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯\n\n FAIL  |root| src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > allows explicit host override when the workspace stack is unhealthy\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ prepareSupervisorForFreshLaunch src/lib/agents/supervisor-channels.ts:141:11\n    139|   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    140|   if (!existsSync(supervisorScriptPath)) {\n    141|     throw new Error('pty-supervisor build artifact missing — run `npm …\n       |           ^\n    142|   }\n    143|   await writePtyToken(agentId);\n ❯ spawnAgent src/lib/agents/spawn.ts:478:34\n ❯ src/lib/__tests__/agent-state-role.test.ts:486:19\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯\n\n FAIL  |root| src/lib/channels/__tests__/pty-supervisor.test.ts > pty-supervisor subprocess > creates the supervisor socket at mode 0600\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/lib/channels/__tests__/pty-supervisor.test.ts:341:3\n    339|   }, 15_000);\n    340|\n    341|   it('creates the supervisor socket at mode 0600', async () => {\n       |   ^\n    342|     const { socketPath } = await readySupervisor('agent-mode');\n    343|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯\n\n",
     "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed.",
@@ -199,7 +199,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.472422,
-        "pricingAsOf": "2026-07-03T03:11:18.118Z"
+        "pricingAsOf": "2026-07-03T03:17:11.671Z"
       }
     },
     "merges": [
