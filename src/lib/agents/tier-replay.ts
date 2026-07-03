@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import type { TierOverridesMap } from '../vbrief/io.js';
 import { getModelCapabilitySync, hasModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { AgentState } from './agent-state.js';
 import type { DeliveryResult } from './delivery.js';
@@ -11,7 +12,14 @@ import { spawnRun } from './spawn.js';
 import type { SpawnRunOptions } from './spawn-prep.js';
 import { listSlotOwnership } from './slot-reconcile.js';
 import type { InFlightBead } from './standing-tiers.js';
-import { composeCommitFeedMessage } from './tier-feed.js';
+import { computeTierRunSchedule, tiersNeededForSchedule } from './standing-tiers.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
+import {
+  composeCommitFeedMessage,
+  renderCommitFeedDiff,
+  resolveFeedApiUrl,
+  shouldSkipFeedSubject,
+} from './tier-feed.js';
 import {
   buildSupervisorReviewMessage,
   extractAcceptanceCriteria,
@@ -20,7 +28,8 @@ import {
   supervisorAgentId as defaultSupervisorAgentId,
   SUPERVISOR_SUB_ROLE,
 } from './tier-supervisor.js';
-import type { TieredExecutionSupervisorConfig } from './tier-table.js';
+import type { TieredExecutionSupervisorConfig, ValidatedTieredExecutionConfig, ValidatedTieredExecutionFeedConfig } from './tier-table.js';
+import { DEFAULT_TIERED_EXECUTION_CONFIG } from './tier-table.js';
 import { stopAgent } from './termination.js';
 
 const execFileAsync = promisify(execFile);
@@ -30,6 +39,7 @@ export interface ReplayCommit {
   sha: string;
   subject: string;
   diff: string;
+  beadId?: string;
 }
 
 export interface ReplayDelivery {
@@ -41,6 +51,13 @@ export interface ReplayResult {
   agent: AgentState;
   commits: ReplayCommit[];
   deliveries: ReplayDelivery[];
+}
+
+export interface ReplayRerouteContext {
+  doc: VBriefDocument;
+  config: ValidatedTieredExecutionConfig;
+  statusOverrides?: Record<string, string>;
+  tierOverrides?: TierOverridesMap;
 }
 
 export interface ReplayTargetBase {
@@ -55,6 +72,12 @@ export interface ReplayTargetBase {
   agentId?: string;
   /** Optional prompt for the fresh standing session. */
   prompt?: string;
+  /** Feed filtering/rendering config. Defaults preserve today's raw git-show behavior. */
+  feedConfig?: ValidatedTieredExecutionFeedConfig;
+  /** Dashboard API base URL used when replaying callout-enabled tier feed messages. */
+  apiUrl?: string;
+  /** Optional current scheduling state used only when compaction_reroute is on. */
+  reroute?: ReplayRerouteContext;
 }
 
 export interface ReplayStandingTierTarget extends ReplayTargetBase {
@@ -84,6 +107,7 @@ export interface TierReplayDeps {
   stop?: typeof stopAgent;
   gitLog?: (workspace: string, base: string) => Promise<Array<{ sha: string; subject: string }>>;
   gitShow?: (workspace: string, sha: string) => Promise<string>;
+  renderDiff?: (workspace: string, sha: string, feedConfig: ValidatedTieredExecutionFeedConfig) => Promise<string>;
   listSlotOwnership?: typeof listSlotOwnership;
 }
 
@@ -117,11 +141,19 @@ export async function replayStandingAgent(
   options: TierReplayOptions = {},
 ): Promise<ReplayResult> {
   const deps = replayDeps(options.deps);
-  const agent = await spawnReplayTarget(target, deps);
-  const commits = await loadReplayCommits(target.workspace, target.base, deps);
-  const deliveries = target.kind === 'tier'
-    ? await replayTierFeed(agent.id, commits, deps)
-    : await replaySupervisorFeed(agent.id, target, commits, deps);
+  const replayTarget: ReplayTarget = target.kind === 'tier'
+    ? { ...target, ...resolveReplaySlot(target, deps) }
+    : target;
+  const agent = await spawnReplayTarget(replayTarget, deps);
+  const commits = await loadReplayCommits(
+    replayTarget.workspace,
+    replayTarget.base,
+    replayTarget.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed,
+    deps,
+  );
+  const deliveries = replayTarget.kind === 'tier'
+    ? await replayTierFeed(agent.id, replayTarget, commits, deps)
+    : await replaySupervisorFeed(agent.id, replayTarget, commits, deps);
 
   return { agent, commits, deliveries };
 }
@@ -131,10 +163,20 @@ export async function replayStandingAgent(
  * is dead; replay respawns and reconstructs the feed without human input.
  */
 export async function replayCrashedStandingAgent(
+  target: ReplayStandingTierTarget & { reroute: ReplayRerouteContext },
+  options?: TierReplayOptions,
+): Promise<ReplayResult | null>;
+export async function replayCrashedStandingAgent(
+  target: ReplayTarget,
+  options?: TierReplayOptions,
+): Promise<ReplayResult>;
+export async function replayCrashedStandingAgent(
   target: ReplayTarget,
   options: TierReplayOptions = {},
-): Promise<ReplayResult> {
-  return replayStandingAgent(target, options);
+): Promise<ReplayResult | null> {
+  const rerouted = resolveReroutedReplayTarget(target);
+  if (!rerouted) return null;
+  return replayStandingAgent(rerouted, options);
 }
 
 /**
@@ -147,10 +189,15 @@ export async function compactAtTierRunBoundary(
 ): Promise<ReplayResult | null> {
   if (!shouldReplayCompactAtTierRunBoundary(options.compaction)) return null;
   const deps = replayDeps(options.deps);
-  if (options.target.agentId) {
-    await deps.stop(options.target.agentId);
+  const rerouted = resolveReroutedReplayTarget(options.target);
+  if (!rerouted) {
+    if (options.target.agentId) await deps.stop(options.target.agentId);
+    return null;
   }
-  return replayStandingAgent(options.target, { deps });
+  if (rerouted.agentId) {
+    await deps.stop(rerouted.agentId);
+  }
+  return replayStandingAgent(rerouted, { deps });
 }
 
 export function shouldReplayCompactAtTierRunBoundary(input: TierRunCompactionInput): boolean {
@@ -186,8 +233,42 @@ async function spawnReplayTarget(target: ReplayTarget, deps: Required<TierReplay
     slotIndex: slot.slotIndex,
     slotItemId: slot.slotItemId,
     prompt: target.prompt,
+    ...currentTierSpawnOverride(target),
   };
   return deps.spawn(target.issueId, 'work', spawnOptions);
+}
+
+function resolveReroutedReplayTarget(target: ReplayTarget): ReplayTarget | null {
+  if (target.kind !== 'tier') return target;
+  const reroute = target.reroute;
+  if (!reroute || reroute.config.compaction_reroute === 'off') return target;
+
+  const scheduleDoc = remainingScheduleDocument(reroute);
+  const schedule = computeTierRunSchedule(scheduleDoc, reroute.config);
+  if (!tiersNeededForSchedule(schedule).includes(target.tierName)) return null;
+  return target;
+}
+
+function remainingScheduleDocument(reroute: ReplayRerouteContext): VBriefDocument {
+  const statusOverrides = reroute.statusOverrides ?? {};
+  const tierOverrides = reroute.tierOverrides ?? {};
+  return {
+    ...reroute.doc,
+    plan: {
+      ...reroute.doc.plan,
+      items: reroute.doc.plan.items
+        .filter((item) => (statusOverrides[item.id] ?? item.status) !== 'completed')
+        .map((item) => applyEffectiveDifficulty(item, tierOverrides)),
+    },
+  };
+}
+
+function currentTierSpawnOverride(target: ReplayStandingTierTarget): Pick<SpawnRunOptions, 'model' | 'harness'> {
+  const reroute = target.reroute;
+  if (!reroute || reroute.config.compaction_reroute === 'off') return {};
+  const tier = reroute.config.tiers[target.tierName];
+  if (!tier) return {};
+  return { model: tier.model, harness: tier.harness };
 }
 
 function resolveReplaySlot(
@@ -212,12 +293,30 @@ function resolveReplaySlot(
 
 async function replayTierFeed(
   agentId: string,
+  target: ReplayStandingTierTarget,
   commits: ReplayCommit[],
   deps: Required<TierReplayDeps>,
 ): Promise<ReplayDelivery[]> {
   const deliveries: ReplayDelivery[] = [];
+  const feedConfig = target.feedConfig ?? DEFAULT_TIERED_EXECUTION_CONFIG.feed;
+  const includeCallout = feedConfig.callouts !== 'off';
+  const apiUrl = target.apiUrl ?? resolveFeedApiUrl();
   for (const commit of commits) {
-    const message = composeCommitFeedMessage(commit.sha, commit.subject, commit.diff);
+    const beadId = commit.beadId;
+    const message = composeCommitFeedMessage(
+      commit.sha,
+      commit.subject,
+      commit.diff,
+      includeCallout && beadId
+        ? {
+          apiUrl,
+          issueId: target.issueId,
+          beadId,
+          tierName: target.tierName,
+          agentId,
+        }
+        : undefined,
+    );
     deliveries.push({
       sha: commit.sha,
       result: await deps.deliver(agentId, message, 'tier-replay:tier'),
@@ -268,14 +367,16 @@ function findReplayItem(doc: VBriefDocument, commit: Pick<ReplayCommit, 'subject
 async function loadReplayCommits(
   workspace: string,
   base: string,
+  feedConfig: ValidatedTieredExecutionFeedConfig,
   deps: Required<TierReplayDeps>,
 ): Promise<ReplayCommit[]> {
   const entries = await deps.gitLog(workspace, base);
   const commits: ReplayCommit[] = [];
   for (const entry of entries) {
+    if (shouldSkipFeedSubject(entry.subject, feedConfig)) continue;
     commits.push({
       ...entry,
-      diff: await deps.gitShow(workspace, entry.sha),
+      diff: await deps.renderDiff(workspace, entry.sha, feedConfig),
     });
   }
   return commits;
@@ -312,6 +413,10 @@ function replayDeps(deps: TierReplayDeps = {}): Required<TierReplayDeps> {
     stop: deps.stop ?? stopAgent,
     gitLog: deps.gitLog ?? runGitLog,
     gitShow: deps.gitShow ?? runGitShow,
+    renderDiff: deps.renderDiff
+      ?? (deps.gitShow
+        ? (workspace, sha) => deps.gitShow!(workspace, sha)
+        : renderCommitFeedDiff),
     listSlotOwnership: deps.listSlotOwnership ?? listSlotOwnership,
   };
 }

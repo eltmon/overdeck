@@ -27241,6 +27241,23 @@ const TIERED_EXECUTION_SUBSCRIPTIONS = [
 	"flagged",
 	"sampled"
 ];
+const TIERED_EXECUTION_ITEM_KINDS = [
+	"docs",
+	"api",
+	"backend",
+	"frontend",
+	"infra",
+	"test",
+	"refactor",
+	"design",
+	"spike"
+];
+const TIERED_EXECUTION_CALLOUT_POLICIES = [
+	"off",
+	"notify",
+	"corroborate"
+];
+const TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES = ["off", "on"];
 var TieredExecutionConfigError = class extends Error {
 	constructor(message) {
 		super(message);
@@ -27251,6 +27268,21 @@ const DEFAULT_TIERED_EXECUTION_CONFIG = {
 	enabled: false,
 	tiers: {},
 	supervisor: void 0,
+	by_kind: {},
+	byKind: {},
+	feed: {
+		callouts: "off",
+		exclude: [],
+		exclude_subjects: [],
+		max_diff_bytes: null
+	},
+	escalation: {
+		enabled: false,
+		retries_at_tier: 0,
+		max_promotions: 0,
+		flounder_budget_minutes: {}
+	},
+	compaction_reroute: "off",
 	replay_threshold: .5,
 	difficultyToTier: {}
 };
@@ -27262,6 +27294,15 @@ function isDifficulty(value) {
 }
 function isSubscription(value) {
 	return TIERED_EXECUTION_SUBSCRIPTIONS.includes(value);
+}
+function isItemKind(value) {
+	return TIERED_EXECUTION_ITEM_KINDS.includes(value);
+}
+function isCalloutPolicy(value) {
+	return TIERED_EXECUTION_CALLOUT_POLICIES.includes(value);
+}
+function isCompactionReroutePolicy(value) {
+	return TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES.includes(value);
 }
 function knownModelIds() {
 	const ids = /* @__PURE__ */ new Set();
@@ -27287,12 +27328,61 @@ function normalizeTieredExecutionConfig(config) {
 		enabled: config?.enabled ?? false,
 		tiers: config?.tiers ?? {},
 		supervisor: config?.supervisor,
+		by_kind: config?.by_kind ?? {},
+		feed: config?.feed,
+		escalation: config?.escalation,
+		compaction_reroute: config?.compaction_reroute ?? "off",
 		replay_threshold: config?.replay_threshold ?? .5
+	};
+}
+function validateStringArray(value, path) {
+	if (value === void 0) return [];
+	if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new TieredExecutionConfigError(`${path} must be an array of strings`);
+	return [...value];
+}
+function validateNonNegativeInteger(value, path, defaultValue) {
+	if (value === void 0) return defaultValue;
+	if (!Number.isInteger(value) || value < 0) throw new TieredExecutionConfigError(`${path} must be a non-negative integer`);
+	return value;
+}
+function validateFeedConfig(config) {
+	const callouts = config?.callouts ?? "off";
+	if (!isCalloutPolicy(callouts)) throw new TieredExecutionConfigError(`tiered_execution.feed.callouts must be one of ${TIERED_EXECUTION_CALLOUT_POLICIES.join(", ")}`);
+	const maxDiffBytes = config?.max_diff_bytes ?? null;
+	if (maxDiffBytes !== null && (!Number.isInteger(maxDiffBytes) || maxDiffBytes <= 0)) throw new TieredExecutionConfigError("tiered_execution.feed.max_diff_bytes must be a positive integer or null");
+	return {
+		callouts,
+		exclude: validateStringArray(config?.exclude, "tiered_execution.feed.exclude"),
+		exclude_subjects: validateStringArray(config?.exclude_subjects, "tiered_execution.feed.exclude_subjects"),
+		max_diff_bytes: maxDiffBytes
+	};
+}
+function validateEscalationConfig(config) {
+	const flounderBudget = {};
+	for (const [difficulty, budget] of Object.entries(config?.flounder_budget_minutes ?? {})) {
+		if (!isDifficulty(difficulty)) throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty '${difficulty}'`);
+		if (!Number.isFinite(budget) || budget <= 0) throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes.${difficulty} must be positive`);
+		flounderBudget[difficulty] = budget;
+	}
+	return {
+		enabled: config?.enabled ?? false,
+		retries_at_tier: validateNonNegativeInteger(config?.retries_at_tier, "tiered_execution.escalation.retries_at_tier", 0),
+		max_promotions: validateNonNegativeInteger(config?.max_promotions, "tiered_execution.escalation.max_promotions", 0),
+		flounder_budget_minutes: flounderBudget
 	};
 }
 function validateTieredExecutionConfig(rawConfig, context = {}) {
 	const config = normalizeTieredExecutionConfig(rawConfig);
-	if (!(config.enabled || Object.keys(config.tiers).length > 0 || config.supervisor !== void 0)) return { ...DEFAULT_TIERED_EXECUTION_CONFIG };
+	const feed = validateFeedConfig(config.feed);
+	const escalation = validateEscalationConfig(config.escalation);
+	if (!isCompactionReroutePolicy(config.compaction_reroute ?? "off")) throw new TieredExecutionConfigError(`tiered_execution.compaction_reroute must be one of ${TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES.join(", ")}`);
+	const compactionReroute = config.compaction_reroute ?? "off";
+	if (!(config.enabled || Object.keys(config.tiers).length > 0 || Object.keys(config.by_kind ?? {}).length > 0 || config.supervisor !== void 0)) return {
+		...DEFAULT_TIERED_EXECUTION_CONFIG,
+		feed,
+		escalation,
+		compaction_reroute: compactionReroute
+	};
 	if (typeof config.replay_threshold !== "number" || config.replay_threshold <= 0 || config.replay_threshold > 1) throw new TieredExecutionConfigError("tiered_execution.replay_threshold must be a number > 0 and <= 1");
 	const difficultyOwners = {};
 	const normalizedTiers = {};
@@ -27321,6 +27411,12 @@ function validateTieredExecutionConfig(rawConfig, context = {}) {
 		if (owners.length > 1) throw new TieredExecutionConfigError(`tiered_execution difficulty '${difficulty}' is mapped to multiple tiers: ${owners.join(", ")}`);
 		difficultyToTier[difficulty] = owners[0];
 	}
+	const byKind = {};
+	for (const [kind, tierName] of Object.entries(config.by_kind ?? {})) {
+		if (!isItemKind(kind)) throw new TieredExecutionConfigError(`tiered_execution.by_kind contains unknown item kind '${kind}'`);
+		if (!normalizedTiers[tierName]) throw new TieredExecutionConfigError(`tiered_execution.by_kind.${kind} references unknown tier '${tierName}'`);
+		byKind[kind] = tierName;
+	}
 	if (!config.supervisor) throw new TieredExecutionConfigError("tiered_execution.supervisor is required when tiered execution tiers are configured");
 	validateHarness(config.supervisor.harness, "tiered_execution.supervisor");
 	const supervisorModel = validateModel(config.supervisor.model, "tiered_execution.supervisor");
@@ -27332,8 +27428,14 @@ function validateTieredExecutionConfig(rawConfig, context = {}) {
 		supervisor: {
 			model: supervisorModel,
 			harness: config.supervisor.harness,
-			subscribe: config.supervisor.subscribe
+			subscribe: config.supervisor.subscribe,
+			owns_inspection: config.supervisor.owns_inspection ?? false
 		},
+		by_kind: byKind,
+		byKind,
+		feed,
+		escalation,
+		compaction_reroute: compactionReroute,
 		replay_threshold: config.replay_threshold,
 		difficultyToTier
 	};

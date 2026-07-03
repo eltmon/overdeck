@@ -17,6 +17,7 @@ import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { validateAgentRuntimeEventAuth } from '../agents.js';
 import { httpHandler } from '../http-handler.js';
+import { reportTieredInspectFailureEscalation } from '../tiered-inspect-escalation.js';
 import { killSession } from '../../../../lib/tmux.js';
 import {
   _serverManagedMerges,
@@ -217,6 +218,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Apply the update (triggers side effects like idle state, queue processing)
     const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
+    if (specialist === 'inspect' && status === 'failed') yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
 
     // Set specialist state to idle and clear registry write-scope.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.

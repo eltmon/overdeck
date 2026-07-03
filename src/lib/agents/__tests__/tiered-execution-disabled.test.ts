@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { AgentState } from '../agent-state.js';
+import type { DeliveryResult } from '../delivery.js';
 import { chooseDispatchTier, chooseTierAssignment } from '../dispatch-tier.js';
 import { autoMergeFastTrackBatch, groupFastTrack } from '../fast-track.js';
 import { resolveTier } from '../resolve-tier.js';
+import { broadcastCommit, composeCommitFeedMessage } from '../tier-feed.js';
+import { replayCrashedStandingAgent } from '../tier-replay.js';
 import {
   resolveTieredExecutionEnabled,
   validateTieredExecutionConfig,
+  type ValidatedTieredExecutionConfig,
 } from '../tier-table.js';
 import { complexityToModel, legacyComplexityTierConfig, type ComplexityLevel } from '../../cloister/complexity.js';
 import type { VBriefItem } from '../../vbrief/types.js';
@@ -23,6 +28,19 @@ const LEVELS: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'ex
 
 function item(metadata: VBriefItem['metadata'], id = 'item-1'): VBriefItem {
   return { id, title: 't', status: 'pending', metadata };
+}
+
+function enabledWithDefaultKnobs(): ValidatedTieredExecutionConfig {
+  return validateTieredExecutionConfig({
+    enabled: true,
+    tiers: {
+      cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+      standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex'] },
+      frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['expert'] },
+    },
+    supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+    replay_threshold: 0.5,
+  });
 }
 
 describe('tiered execution ships dark (enabled=false)', () => {
@@ -94,5 +112,115 @@ describe('tiered execution ships dark (enabled=false)', () => {
       expect(outcome.result).toBeUndefined();
       expect(calls).toHaveLength(0);
     });
+  });
+});
+
+describe('tiered execution enabled with v2 knobs at defaults', () => {
+  it('normalizes every new knob to current-behavior defaults', () => {
+    const config = enabledWithDefaultKnobs();
+
+    expect(config.feed).toEqual({
+      callouts: 'off',
+      exclude: [],
+      exclude_subjects: [],
+      max_diff_bytes: null,
+    });
+    expect(config.escalation).toEqual({
+      enabled: false,
+      retries_at_tier: 0,
+      max_promotions: 0,
+      flounder_budget_minutes: {},
+    });
+    expect(config.compaction_reroute).toBe('off');
+    expect(config.supervisor?.owns_inspection).toBe(false);
+    expect(config.byKind).toEqual({});
+  });
+
+  it('keeps feed deliveries byte-identical to the baseline when callouts are off by default', async () => {
+    const config = enabledWithDefaultKnobs();
+    const baseline = composeCommitFeedMessage('abc123', 'my bead', 'commit abc123\n+added\n');
+    const deliveries: string[] = [];
+
+    await broadcastCommit({
+      workspace: '/ws',
+      issueId: 'PAN-1',
+      sha: 'abc123',
+      beadTitle: 'my bead',
+      tiers: [{ tierName: 'cheap', agentId: 'agent-pan-1-slot-1' }],
+      feedConfig: config.feed,
+      gitShow: async () => 'commit abc123\n+added\n',
+      deliver: async (_agentId, message): Promise<DeliveryResult> => {
+        deliveries.push(message);
+        return { ok: true, path: 'tmux' };
+      },
+      recordDelivery: async () => undefined,
+    });
+
+    expect(deliveries).toEqual([baseline]);
+  });
+
+  it('keeps replay respawn behavior and feed bytes unchanged when compaction reroute is off by default', async () => {
+    const config = enabledWithDefaultKnobs();
+    const deliveries: string[] = [];
+    const spawnCalls: Array<Record<string, unknown>> = [];
+    const spawn = async (issueId: string, role: string, options: Record<string, unknown>) => {
+      spawnCalls.push(options);
+      return {
+        id: `agent-${issueId.toLowerCase()}-slot-${options.slotIndex}`,
+        issueId,
+        role,
+        status: 'running',
+        workspace: '/ws',
+        startedAt: '2026-07-02T00:00:00.000Z',
+      } as AgentState;
+    };
+
+    const replay = await replayCrashedStandingAgent({
+      kind: 'tier',
+      issueId: 'PAN-1',
+      workspace: '/ws',
+      base: 'main',
+      tierName: 'standard',
+      slotIndex: 7,
+      slotItemId: 'bead-a',
+      feedConfig: config.feed,
+      reroute: {
+        doc: {
+          vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00.000Z' },
+          plan: { id: 'pan-1', title: 'plan', status: 'running', items: [item({ difficulty: 'expert' }, 'bead-a')] },
+        },
+        config,
+        tierOverrides: {
+          'bead-a': {
+            effectiveDifficulty: 'expert',
+            promotions: 1,
+            history: [{ at: '2026-07-02T00:00:00.000Z', from: 'medium', to: 'expert', reason: 'ignored while off' }],
+          },
+        },
+      },
+    }, {
+      deps: {
+        spawn,
+        deliver: async (_agentId, message): Promise<DeliveryResult> => {
+          deliveries.push(message);
+          return { ok: true, path: 'tmux' };
+        },
+        gitLog: async () => [{ sha: 'abc123', subject: 'bead-a' }],
+        gitShow: async () => 'commit abc123\n+added\n',
+      },
+    });
+
+    expect(replay.agent.id).toBe('agent-pan-1-slot-7');
+    expect(spawnCalls).toEqual([{ slotIndex: 7, slotItemId: 'bead-a', prompt: undefined }]);
+    expect(deliveries).toEqual([composeCommitFeedMessage('abc123', 'bead-a', 'commit abc123\n+added\n')]);
+  });
+
+  it('routes by difficulty when by_kind is absent, even for judgment-deliverable kinds', () => {
+    const config = enabledWithDefaultKnobs();
+    const design = item({ kind: 'design', difficulty: 'simple' });
+    const spike = item({ kind: 'spike', difficulty: 'simple' });
+
+    expect(chooseTierAssignment(design, config).tierName).toBe('cheap');
+    expect(chooseTierAssignment(spike, config).tierName).toBe('cheap');
   });
 });

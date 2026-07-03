@@ -137,6 +137,19 @@ describe('tiered execution tier table', () => {
     expect(config.tieredExecution.enabled).toBe(false);
     expect(config.tieredExecution.replay_threshold).toBe(0.5);
     expect(config.tieredExecution.difficultyToTier).toEqual({});
+    expect(config.tieredExecution.feed).toEqual({
+      callouts: 'off',
+      exclude: [],
+      exclude_subjects: [],
+      max_diff_bytes: null,
+    });
+    expect(config.tieredExecution.escalation).toEqual({
+      enabled: false,
+      retries_at_tier: 0,
+      max_promotions: 0,
+      flounder_budget_minutes: {},
+    });
+    expect(config.tieredExecution.compaction_reroute).toBe('off');
   });
 
   it('returns difficulty-to-tier map and supervisor policy for a valid config', () => {
@@ -153,6 +166,90 @@ describe('tiered execution tier table', () => {
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       subscribe: 'flagged',
+      owns_inspection: false,
     });
+    expect(result.byKind).toEqual({});
+  });
+
+  it('preserves supervisor ownership of inspection when configured', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      supervisor: {
+        model: 'claude-opus-4-8',
+        harness: 'claude-code',
+        subscribe: 'all',
+        owns_inspection: true,
+      },
+    }));
+
+    expect(result.supervisor?.owns_inspection).toBe(true);
+  });
+
+  it('validates by_kind item kinds and tier references', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      by_kind: { design: 'frontier' },
+    }));
+
+    expect(result.by_kind).toEqual({ design: 'frontier' });
+    expect(result.byKind).toEqual({ design: 'frontier' });
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      by_kind: { unknown: 'frontier' } as never,
+    }))).toThrow("tiered_execution.by_kind contains unknown item kind 'unknown'");
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      by_kind: { design: 'missing' },
+    }))).toThrow("tiered_execution.by_kind.design references unknown tier 'missing'");
+  });
+
+  it('validates fully populated feed and escalation blocks', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      feed: {
+        callouts: 'corroborate',
+        exclude: ['bun.lock'],
+        exclude_subjects: ['chore(beads):'],
+        max_diff_bytes: 128_000,
+      },
+      escalation: {
+        enabled: true,
+        retries_at_tier: 2,
+        max_promotions: 3,
+        flounder_budget_minutes: { simple: 30, complex: 90 },
+      },
+    }));
+
+    expect(result.feed).toEqual({
+      callouts: 'corroborate',
+      exclude: ['bun.lock'],
+      exclude_subjects: ['chore(beads):'],
+      max_diff_bytes: 128_000,
+    });
+    expect(result.escalation).toEqual({
+      enabled: true,
+      retries_at_tier: 2,
+      max_promotions: 3,
+      flounder_budget_minutes: { simple: 30, complex: 90 },
+    });
+  });
+
+  it('rejects invalid feed and escalation fields with named config errors', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      feed: { callouts: 'loud' as never },
+    }))).toThrow('tiered_execution.feed.callouts');
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      feed: { max_diff_bytes: 0 },
+    }))).toThrow('tiered_execution.feed.max_diff_bytes');
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      escalation: { flounder_budget_minutes: { unknown: 10 } as never },
+    }))).toThrow("tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty 'unknown'");
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      escalation: { retries_at_tier: -1 },
+    }))).toThrow('tiered_execution.escalation.retries_at_tier');
+
+    expect(() => validateTieredExecutionConfig(validConfig({
+      compaction_reroute: 'sometimes' as never,
+    }))).toThrow('tiered_execution.compaction_reroute');
   });
 });
