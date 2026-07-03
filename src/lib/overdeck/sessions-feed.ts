@@ -422,7 +422,7 @@ export function getSessionsFeedFacets(filter: SessionsFeedFilter = {}): Sessions
     ${where}
     GROUP BY value
     ORDER BY CASE value WHEN '24h' THEN 1 WHEN '7d' THEN 2 WHEN '30d' THEN 3 ELSE 4 END
-  `).all(...params, now - day, now - 7 * day, now - 30 * day) as { value: '24h' | '7d' | '30d' | 'older'; count: number }[];
+  `).all(now - day, now - 7 * day, now - 30 * day, ...params) as { value: '24h' | '7d' | '30d' | 'older'; count: number }[];
 
   const costBuckets = db.prepare(`
     ${cte}
