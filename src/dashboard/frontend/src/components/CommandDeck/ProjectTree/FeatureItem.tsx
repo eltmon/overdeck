@@ -30,6 +30,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
 import styles from '../styles/command-deck.module.css';
+
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
 interface FeatureItemProps {
@@ -54,9 +55,6 @@ interface FeatureItemProps {
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
-
-// ContextMenuState removed — migrated to Radix UI ContextMenu
-
 const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'beads', 'pr', 'docker'];
 
 function resourceColor(_feature: ProjectFeature): string {
