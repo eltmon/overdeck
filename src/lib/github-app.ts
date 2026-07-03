@@ -60,6 +60,24 @@ export interface GitHubPullRequestHeadState extends GitHubPullRequestRef {
   headSha: string;
 }
 
+export interface GitHubPullRequestForHead {
+  number: number;
+  state: 'open' | 'closed';
+  merged: boolean;
+  mergedAt: string | null;
+  mergeCommit: string | null;
+  url?: string;
+}
+
+export interface GitHubIssueState {
+  state: 'open' | 'closed';
+}
+
+export interface GitHubOpenIssueLabels {
+  number: number;
+  labels: string[];
+}
+
 export type GitHubCiCheckRunsVerdict = 'green' | 'pending' | 'red';
 
 export interface GitHubCiCheckRunSummary {
@@ -294,6 +312,20 @@ async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitH
   return allRuns;
 }
 
+async function githubApiAllPages<T>(path: string): Promise<T[]> {
+  const token = await getInstallationAccessToken();
+  const allItems: T[] = [];
+  let nextPath: string | null = withPerPage(path, 100);
+
+  while (nextPath) {
+    const { data, headers } = await githubApiWithToken<T[]>(token, nextPath);
+    allItems.push(...data);
+    nextPath = nextPathFromLinkHeader(headers.get('link'));
+  }
+
+  return allItems;
+}
+
 export function parsePullRequestRef(input: {
   url?: string;
   id?: string;
@@ -454,7 +486,67 @@ async function getPullRequestHeadStatePromise(
     merged: pull.merged === true,
     headSha: pull.head?.sha || '',
   };
-}async function mergePullRequestWithAppPromise(
+}
+
+export async function listPullRequestsForHeadPromise(
+  owner: string,
+  repo: string,
+  branch: string,
+  state: 'open' | 'closed' | 'all',
+): Promise<GitHubPullRequestForHead[]> {
+  const params = new URLSearchParams({
+    head: `${owner}:${branch}`,
+    state,
+  });
+  const pulls = await githubApi<Array<{
+    number: number;
+    html_url?: string;
+    state: 'open' | 'closed';
+    merged?: boolean;
+    merged_at?: string | null;
+    merge_commit_sha?: string | null;
+  }>>(`/repos/${owner}/${repo}/pulls?${params.toString()}`);
+
+  return pulls.map((pull) => ({
+    number: pull.number,
+    state: pull.state,
+    merged: pull.merged === true || pull.merged_at != null,
+    mergedAt: pull.merged_at ?? null,
+    mergeCommit: pull.merge_commit_sha ?? null,
+    url: pull.html_url,
+  }));
+}
+
+export async function getIssueStatePromise(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<GitHubIssueState> {
+  const issue = await githubApi<{ state: 'open' | 'closed' }>(`/repos/${owner}/${repo}/issues/${number}`);
+  return { state: issue.state };
+}
+
+export async function listOpenIssuesWithLabelsPromise(
+  owner: string,
+  repo: string,
+): Promise<GitHubOpenIssueLabels[]> {
+  const issues = await githubApiAllPages<{
+    number: number;
+    pull_request?: unknown;
+    labels?: Array<string | { name?: string | null }>;
+  }>(`/repos/${owner}/${repo}/issues?state=open`);
+
+  return issues
+    .filter((issue) => issue.pull_request == null)
+    .map((issue) => ({
+      number: issue.number,
+      labels: (issue.labels ?? [])
+        .map((label) => typeof label === 'string' ? label : label.name)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0),
+    }));
+}
+
+async function mergePullRequestWithAppPromise(
   owner: string,
   repo: string,
   number: number,
@@ -707,6 +799,39 @@ export const getPullRequestHeadState = (
   Effect.tryPromise({
     try: () => getPullRequestHeadStatePromise(owner, repo, number),
     catch: apiCatch('getPullRequestHeadState'),
+  });
+
+/** Effect-native listPullRequestsForHead — App REST head lookup, no GraphQL. */
+export const listPullRequestsForHead = (
+  owner: string,
+  repo: string,
+  branch: string,
+  state: 'open' | 'closed' | 'all',
+): Effect.Effect<GitHubPullRequestForHead[], GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => listPullRequestsForHeadPromise(owner, repo, branch, state),
+    catch: apiCatch('listPullRequestsForHead'),
+  });
+
+/** Effect-native getIssueState — App REST issue state lookup, no GraphQL. */
+export const getIssueState = (
+  owner: string,
+  repo: string,
+  number: number,
+): Effect.Effect<GitHubIssueState, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => getIssueStatePromise(owner, repo, number),
+    catch: apiCatch('getIssueState'),
+  });
+
+/** Effect-native listOpenIssuesWithLabels — paginated App REST issue labels. */
+export const listOpenIssuesWithLabels = (
+  owner: string,
+  repo: string,
+): Effect.Effect<GitHubOpenIssueLabels[], GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => listOpenIssuesWithLabelsPromise(owner, repo),
+    catch: apiCatch('listOpenIssuesWithLabels'),
   });
 
 /**
