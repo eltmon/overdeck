@@ -58,16 +58,16 @@
     "recordedAt": "2026-07-03T03:05:44.401Z"
   },
   "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-03T03:06:17.251Z",
+  "updated": "2026-07-03T03:06:50.462Z",
   "pipeline": {
     "issueId": "PAN-2227",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T03:06:17.137Z",
+    "updatedAt": "2026-07-03T03:06:50.409Z",
     "inspectNotes": "Spec fidelity and constraints checked: guard script implements FR-9 agent main-push guard, hook invokes it only for refs/heads/main before ratchet audit, state-plane/non-code paths remain allowed, and bash/sh syntax checks passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2268",
     "reviewRequestedAt": "2026-07-03T03:06:16.984Z",
@@ -135,8 +135,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 24923,
-            "output": 824,
+            "input": 26929,
+            "output": 961,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -158,8 +158,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 24923,
-          "output": 824,
+          "input": 26929,
+          "output": 961,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -172,7 +172,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.472422,
-        "pricingAsOf": "2026-07-03T03:06:17.171Z"
+        "pricingAsOf": "2026-07-03T03:06:50.462Z"
       }
     },
     "merges": [
