@@ -207,6 +207,11 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 10 (2026-07-03) — planning FULLY restored (PAN-2275 fixed+deployed); codex plan path now works end-to-end
+
+- **PAN-2275 fixed + closed:** 35c9903c89 "fix: deliver codex planning kickoff" (spawn-planning-session.ts again). Deploy chain repeated as documented: pull → npm run build → `OVERDECK_NO_RESUME=1 pan restart --health-timeout 120000` (ms!) → re-kick all three plans → **verified prompts landed** (all three sessions actively Working, not just booted). The codex plan path took TWO stacked fixes: PAN-2274 (flag crash) then PAN-2275 (missing kickoff delivery) — when fixing a spawn path, verify the WHOLE lifecycle (boot AND kickoff AND first activity), not just the first failure mode.
+- PAN-2260 review+test convoys live. UAT bundle: PAN-2254 (#2272) + MIN-831 + MIN-846. PAN-2258 remains operator-owned (retries stopped). PAN-2224 ready=false standing. Main GREEN (35c9903c89 success; 362326972b in progress at tick time). Swap still FULL.
+
 ## RUN-53 tick 9 (2026-07-03) — codex plannings are ZOMBIES (PAN-2275, 2nd gap in same path); PAN-2254 in UAT bundle; 2258 retries stopped
 
 - **PAN-2275 filed + struck:** after the PAN-2274 flag fix, codex plan sessions boot a clean TUI but the planning kickoff prompt is NEVER delivered — idle welcome banner ~20 min, zero activity. Claude plan path injects the task at spawn; codex path lacks the equivalent ([PROMPT] positional or post-boot delivery). PAN-2257/2261/2255 stalled a second time; re-kick all three after the strike lands. LESSON: a booted TUI ≠ a working agent — verify the kickoff prompt landed (scrollback shows actual task text, not just the banner) before counting a plan/work session as dispatched.
