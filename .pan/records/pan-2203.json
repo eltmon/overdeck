@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-opus-4-8",
   "pipeline": {
     "issueId": "PAN-2203",
     "reviewStatus": "passed",
@@ -231,5 +231,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T16:34:27.639Z",
-  "updated": "2026-07-03T07:53:20.556Z"
+  "updated": "2026-07-03T07:53:25.711Z"
 }
