@@ -115,7 +115,13 @@ describe('BootReconciliationModal', () => {
       if (url === '/api/boot-reconciliation') return jsonResponse(pendingState);
       if (url === '/api/deacon/pause') return jsonResponse({ paused: true });
       if (url === '/api/boot-reconciliation/decision') {
-        return jsonResponse({ ok: true, count: 0, resumed: [] });
+        return jsonResponse({
+          ok: true,
+          count: 0,
+          resumed: [],
+          skipped: { workspace_missing: 3, merged: 2, completed: 1, other: 4 },
+          deferred: 5,
+        });
       }
       return jsonResponse({ error: 'not found' }, 404);
     });
@@ -131,6 +137,7 @@ describe('BootReconciliationModal', () => {
         body: JSON.stringify({ decision: 'resume_all' }),
       }),
     ));
+    expect(await screen.findByText(/No agents resumed — 3 workspace missing, 2 already merged, 1 completed, 4 not resumable, 5 deferred\./)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-hold-all'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
@@ -179,7 +186,13 @@ describe('BootReconciliationModal', () => {
       const url = input.toString();
       if (url === '/api/boot-reconciliation') return jsonResponse(holdState);
       if (url === '/api/boot-reconciliation/decision') {
-        return jsonResponse({ ok: true, count: 3, resumed: [] });
+        return jsonResponse({
+          ok: true,
+          count: 3,
+          resumed: ['agent-pan-2076', 'agent-pan-2077', 'agent-pan-2079'],
+          skipped: { workspace_missing: 0, merged: 2, completed: 1, other: 0 },
+          deferred: 0,
+        });
       }
       return jsonResponse({ error: 'not found' }, 404);
     });
@@ -198,6 +211,7 @@ describe('BootReconciliationModal', () => {
         body: JSON.stringify({ decision: 'resume_all' }),
       }),
     ));
+    expect(await screen.findByText(/Resuming 3 agents\. Also skipped 2 already merged, 1 completed\./)).toBeInTheDocument();
   });
 
   it('counts only agents still held by a per_agent decision, and hides when none are', async () => {
