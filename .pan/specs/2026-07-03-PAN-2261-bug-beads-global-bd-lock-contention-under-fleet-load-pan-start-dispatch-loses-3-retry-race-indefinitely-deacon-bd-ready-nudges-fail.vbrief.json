@@ -1,0 +1,185 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T05:38:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2261: bug(beads): global bd lock contention under fleet load — pan start dispatch loses 3-retry race indefinitely, deacon bd-ready nudges fail",
+    "updated": "2026-07-03T06:32:40.830Z"
+  },
+  "plan": {
+    "id": "pan-2261",
+    "title": "bug(beads): global bd lock contention under fleet load — pan start dispatch loses 3-retry race indefinitely, deacon bd-ready nudges fail",
+    "status": "proposed",
+    "uid": "54584dce-4062-434b-902e-64a0d23b9588",
+    "author": "agent:gpt-5.5",
+    "sequence": 4,
+    "created": "2026-07-03T05:38:54Z",
+    "updated": "2026-07-03T06:32:40.830Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2261",
+        "label": "PAN-2261",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "beads",
+      "deacon",
+      "pan-start",
+      "lock-contention"
+    ],
+    "narratives": {
+      "Problem": "Under fleet load, Overdeck creates many concurrent bd child processes. The pan start beads gate uses short shared retry defaults, so it can lose the bd/Dolt lock race repeatedly and abort with a retryable failure even when beads exist. Deacon patrol paths separately call bd ready per issue or per running work agent, multiplying lock waiters and then failing their own nudges/remediation when the global lock queue is saturated.",
+      "Proposal": "Implement one no-loss vertical slice: add a shared async ready-beads query with JSONL fallback, replace both Deacon bd ready callers with that helper, tune pan start's beads gates to be materially more patient while preserving dashboard fast fallback, and expose retryable lock diagnostics. This single-bead consolidation is deliberate because live finalize repeatedly failed to materialize multi-bead plans under the exact bd lock contention PAN-2261 is meant to fix.",
+      "NonGoals": "- Do not replace bd as the canonical beads writer.\n- Do not change Beads/Dolt storage internals or migrate away from JSONL/no-db mode.\n- Do not remove the beads-required gate before work agents start.\n- Do not make dashboard HTTP handlers wait behind long bd lock queues.\n- Do not unskip the existing parity-based concurrent retry test without making its mock deterministic.\n- No browser or Playwright verification is required for this backend/CLI issue."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Consolidate to one implementation bead after repeated live finalize failures on five-bead and three-bead plans.",
+        "rationale": "The issue's own bd lock contention prevented reliable materialization of multiple beads; the single bead preserves every requirement and can be split by the worker later only if bd is healthy enough."
+      },
+      {
+        "summary": "Use direct JSONL parsing only as a read-only fallback/fast path.",
+        "rationale": "bd remains the canonical writer; readiness checks can safely parse `.beads/issues.jsonl` when live bd reads are locked."
+      },
+      {
+        "summary": "Make CLI pan start patient while keeping dashboard/server spawn checks short.",
+        "rationale": "The CLI caller is the cheapest place to wait; server-reachable code must avoid long event-loop-adjacent waits."
+      }
+    ],
+    "items": [
+      {
+        "id": "reduce-bd-lock-contention",
+        "title": "Reduce bd lock contention under fleet load",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T06:29:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2261",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "acJustification": "This intentionally has more than five acceptance criteria because live bd lock contention repeatedly prevented materializing the safer multi-bead decomposition; the single bead preserves the no-loss audit in one dispatchable unit.",
+          "parallelSafeReason": "Single consolidated item has no cross-item parallelism.",
+          "files_scope": [
+            "src/lib/beads-query.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/stuck-remediation.ts",
+            "src/cli/commands/start.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/bd-process-lock.ts",
+            "tests/unit/lib/beads-query.test.ts",
+            "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+            "src/lib/cloister/__tests__/stuck-remediation.test.ts",
+            "tests/cli/commands/work/issue-beads-check.test.ts",
+            "tests/cli/commands/work/start-workspace-rollback.test.ts",
+            "tests/integration/agent-spawning.test.ts",
+            "tests/unit/lib/bd-process-lock.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- tests/unit/lib/beads-query.test.ts src/lib/cloister/__tests__/pan-871-auto-resume.test.ts src/lib/cloister/__tests__/stuck-remediation.test.ts tests/cli/commands/work/issue-beads-check.test.ts tests/cli/commands/work/start-workspace-rollback.test.ts tests/integration/agent-spawning.test.ts tests/unit/lib/bd-process-lock.test.ts"
+          ],
+          "expected_outputs": [
+            "Focused beads-query, Deacon, pan start, spawn integration, and bd-process-lock tests return passing results with fake-timer retry coverage"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement a no-loss vertical fix for PAN-2261: add a shared read-only ready-beads query in src/lib/beads-query.ts; replace Deacon idle-nudge and stuck-remediation bd ready calls with that helper; tune pan start's CLI and spawn-layer beads gates with explicit longer retry/backoff for CLI starts while preserving short dashboard fallback; and carry attempt/holder diagnostics through retryable bd lock failures. Use fake timers for all retry tests and keep dashboard-reachable code async."
+        },
+        "items": [
+          {
+            "id": "reduce-bd-lock-contention.ac1",
+            "title": "Given one bd list --json result with labels for multiple issues, the shared helper returns only open ready beads matching each requested issue label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac2",
+            "title": "When bd fails with database is locked, the shared helper falls back to .beads/issues.jsonl and returns matching open beads without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac3",
+            "title": "Given two idle running work agents in the same workspace, nudgeIdleWorkAgentsWithOpenBeads reads ready beads once and sends nudges for both matching issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac4",
+            "title": "Given a running idle work agent with an open ready bead, checkStuckAgentRemediation returns no stage action and does not call resumeAgent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac5",
+            "title": "When bd returns transient lock failures before succeeding, countBeadsTasksDetailedWithRetry retries using the pan-start budget and returns the bd result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac6",
+            "title": "When transient lock failures exhaust the pan-start budget with no JSONL beads, pan start exits with RETRYABLE_BD_LOCK_EXIT_CODE and prints the retry count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac7",
+            "title": "When spawnAgent is called from dashboard-style code, the beads assertion keeps a short acquisition timeout and falls back without blocking a long request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac8",
+            "title": "When pan start reports a retryable beads lock failure, the message prints the number of attempts and includes holder details when available",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reduce-bd-lock-contention.ac9",
+            "title": "When retry/backoff tests run, they exercise vi.useFakeTimers and advance timers instead of waiting for real setTimeout delays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-2261-bug-beads-global-bd-lock-contention-under-fleet-load-pan-start-dispatch-loses-3-retry-race-indefinitely-deacon-bd-ready-nudges-fail.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

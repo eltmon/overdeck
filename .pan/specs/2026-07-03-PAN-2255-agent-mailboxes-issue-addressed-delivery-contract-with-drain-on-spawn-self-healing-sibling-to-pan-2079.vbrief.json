@@ -4,7 +4,7 @@
     "created": "2026-07-03T05:39:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2255: Agent mailboxes: issue-addressed delivery contract with drain-on-spawn self-healing (sibling to PAN-2079)",
-    "updated": "2026-07-03T06:01:21.596Z"
+    "updated": "2026-07-03T06:24:51.833Z"
   },
   "plan": {
     "id": "pan-2255",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "6a2cb7d5-d01c-4662-a519-e17bc353c3db",
     "author": "agent:gpt-5.5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-03T05:39:39Z",
-    "updated": "2026-07-03T06:01:21.596Z",
+    "updated": "2026-07-03T06:24:51.833Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2255",
@@ -420,56 +420,9 @@
             "metadata": {
               "kind": "acceptance_criterion"
             }
-          }
-        ]
-      },
-      {
-        "id": "reopen-empty-mailbox",
-        "title": "Keep reopened issues on a fresh empty mailbox",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-07-03T05:39:39Z",
-        "metadata": {
-          "difficulty": "simple",
-          "kind": "backend",
-          "issueLabel": "pan-2255",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
-          "files_scope": [
-            "src/cli/commands/reopen.ts",
-            "src/dashboard/server/routes/issues.ts",
-            "src/lib/reopen.ts",
-            "src/dashboard/server/routes/__tests__/issues-reopen.test.ts"
-          ],
-          "files_scope_confidence": "medium",
-          "verify_commands": [
-            "npm test -- src/dashboard/server/routes/__tests__/issues-reopen.test.ts",
-            "npm run typecheck"
-          ],
-          "expected_outputs": [
-            "reopen tests pass and prove no old mailbox files are rehydrated into the new workspace",
-            "typecheck completes without errors"
-          ],
-          "readiness": "sequential",
-          "traces": [
-            "FR-6",
-            "NFR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Verify the reopen path does not restore `.pan/feedback/` files from close-out comments or any archive. If existing code can copy stale workspace `.pan/feedback/` files into a reopened workspace, remove only that behavior. The close-out comment remains visible in tracker history, but new planning/work agents start with no mailbox items unless new feedback is written after reopening."
-        },
-        "items": [
-          {
-            "id": "reopen-empty-mailbox.ac1",
-            "title": "Given an issue closed out with a pending-mail close-out comment, reopening the issue creates or uses a workspace with no restored `.pan/feedback/*.md` mailbox files from the prior run.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
           },
           {
-            "id": "reopen-empty-mailbox.ac2",
+            "id": "closeout-pending-comment.ac5",
             "title": "Given tracker history contains the close-out stale-warning comment, the next planning/work kickoff prompt omits that comment from current mailbox instructions.",
             "status": "pending",
             "metadata": {
@@ -514,11 +467,6 @@
         "from": "feedback-producers",
         "to": "delayed-escalation",
         "type": "blocks"
-      },
-      {
-        "from": "closeout-pending-comment",
-        "to": "reopen-empty-mailbox",
-        "type": "informs"
       }
     ],
     "metadata": {

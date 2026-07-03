@@ -207,6 +207,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 13 (2026-07-03) — ROOT DISK 100% FULL found + fixed (freed 104GB); it explained the whole cascade
+
+- **Root filesystem hit 100% (238MB free of 832GB).** /tmp is on the root disk (NOT tmpfs) — so: bash output capture died (ENOSPC in the harness tasks dir), PAN-2257's docker init failed, PAN-2261's spec promotion stranded, and the "swap full" alarm was a co-symptom of general pressure. **Applied the documented PAN-1674 remedy: `rm -rf workspaces/*/.venv` (regenerable TLDR caches, 7.5GB × ~14 workspaces) → freed 104GB, disk at 87%.** REUSABLE triage: when bash output capture starts failing with ENOSPC, check `df -h /` FIRST — it's disk, not tmpfs; also docker had 12GB reclaimable containers + 9.5GB images (left for operator).
+- **PAN-2255 planned** (spec on main). **PAN-2261 planning done but spec promotion stranded** ("completion already in progress" — the in-flight completion died with the disk; bead workspace-5d14n exists); re-ran `pan plan done`, needs verification, else re-run now that disk is fixed.
+- PAN-2257 + PAN-2255 starts queued in a background retry loop (bd busy but cycling — verified holders live). Swap still pegged 8191/8191 (operator drain suggested). Main GREEN (9dbf84d47c).
+
 ## RUN-53 tick 12 (2026-07-03) — finalizes slow-but-live (verified holder); swap COMPLETELY full
 
 - **Dual finalize (2261/2255) still grinding ~45 min** — diagnosed the lock properly before acting: holder is a LIVE `pan plan finalize` pid (lock file `~/.overdeck/locks/bd-*.lock` carries {pid, ts, caller}; ts advancing, process 3m old) → slow serialization, NOT the frozen-ts hang; no SIGTERM. PAN-2257 start stays deferred. REUSABLE: read the lock file JSON + `ps -o etime` on its pid to distinguish live-holder from hung-holder before intervening.
