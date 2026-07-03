@@ -11,61 +11,86 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T14:12:15.750Z"
+    },
+    {
+      "timestamp": "2026-07-03T14:59:14.662Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T14:59:15.116Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T15:15Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-07-03T15:15:38.403Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T15:15:38Z",
+      "markdownBody": "# Test failure\n\nTypeScript typecheck passed; eslint + custom lints passed. `npm test` failed: root vitest 32 files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests. Targeted PAN-2158-related tests passed (4 files, 107 tests). No browser UAT required. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-2158`."
+    }
+  ],
   "created": "2026-07-03T13:58:27.754Z",
-  "updated": "2026-07-03T14:42:34.059Z",
+  "updated": "2026-07-03T15:15:38.454Z",
   "pipeline": {
     "issueId": "PAN-2158",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T14:42:33.972Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-03T15:15:38.392Z",
+    "reviewNotes": "No blocking findings; focused tests and typecheck passed",
+    "testNotes": "TypeScript typecheck passed; eslint + custom lints passed. `npm test` failed: root vitest 32 files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests. Targeted PAN-2158-related tests passed (4 files, 107 tests). No browser UAT required. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2303",
-    "lastVerifiedCommit": "af335b51e30cabd38b7c0d1c3c675bea186978a5",
-    "reviewRequestedAt": "2026-07-03T14:09:05.814Z"
+    "reviewedAtCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
+    "lastVerifiedCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
+    "reviewRequestedAt": "2026-07-03T14:59:14.663Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 9696,
-            "output": 515,
+            "input": 10723,
+            "output": 679,
             "cacheRead": 0,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 296967,
-            "output": 6029,
-            "cacheRead": 2590720,
+            "input": 666517,
+            "output": 14823,
+            "cacheRead": 5365504,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 9696,
-          "output": 515,
+          "input": 10723,
+          "output": 679,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 296967,
-          "output": 6029,
-          "cacheRead": 2590720,
+          "input": 666517,
+          "output": 14823,
+          "cacheRead": 5365504,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0.798474,
-        "pricingAsOf": "2026-07-03T14:42:34.058Z"
+        "usd": 1.711929,
+        "pricingAsOf": "2026-07-03T15:15:38.453Z"
       }
     },
     "merges": [
