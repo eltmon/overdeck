@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T16:27:54.316Z",
-  "updated": "2026-07-03T17:24:59.156Z",
+  "updated": "2026-07-03T17:44:03.254Z",
   "pipeline": {
     "issueId": "PAN-2311",
     "reviewStatus": "pending",
@@ -80,5 +80,32 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "cli-reconcile-merges": "completed",
+    "cli-reconcile-merges.ac1": "completed",
+    "cli-reconcile-merges.ac2": "completed",
+    "cli-reconcile-merges.ac3": "completed",
+    "cli-reconcile-merges.ac4": "completed",
+    "reconcile-merged-issue-action": "completed",
+    "reconcile-merged-issue-action.ac1": "completed",
+    "reconcile-merged-issue-action.ac2": "completed",
+    "reconcile-merged-issue-action.ac3": "completed",
+    "reconcile-merged-issue-action.ac4": "completed",
+    "uat-batch-member-reconcile": "completed",
+    "uat-batch-member-reconcile.ac1": "completed",
+    "uat-batch-member-reconcile.ac2": "completed",
+    "uat-batch-member-reconcile.ac3": "completed",
+    "uat-batch-member-reconcile.ac4": "completed",
+    "merge-fulfillment-verifier": "completed",
+    "merge-fulfillment-verifier.ac1": "completed",
+    "merge-fulfillment-verifier.ac2": "completed",
+    "merge-fulfillment-verifier.ac3": "completed",
+    "merge-fulfillment-verifier.ac4": "completed",
+    "strike-webhook-reconcile": "completed",
+    "strike-webhook-reconcile.ac1": "completed",
+    "strike-webhook-reconcile.ac2": "completed",
+    "strike-webhook-reconcile.ac3": "completed",
+    "strike-webhook-reconcile.ac4": "completed"
+  }
 }
