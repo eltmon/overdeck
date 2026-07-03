@@ -75,7 +75,7 @@
   "src/dashboard/server/routes/command-deck.ts",
   "src/dashboard/server/routes/diffs.ts",
   "src/dashboard/server/routes/issues.ts",
-  "src/dashboard/server/routes/misc.ts",
+  "src/dashboard/server/routes/misc/meta.ts",
   "src/dashboard/server/routes/show.ts",
   "src/dashboard/server/routes/specialists.ts",
   "src/dashboard/server/routes/workspaces.ts",

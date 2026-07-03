@@ -1,0 +1,142 @@
+{
+  "issueId": "PAN-2151",
+  "schemaVersion": 2,
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "barrel-finalize": "completed",
+    "barrel-finalize.ac1": "completed",
+    "barrel-finalize.ac2": "completed",
+    "barrel-finalize.ac3": "completed",
+    "barrel-finalize.ac4": "completed",
+    "extract-meta": "completed",
+    "extract-meta.ac1": "completed",
+    "extract-meta.ac2": "completed",
+    "extract-meta.ac3": "completed",
+    "extract-meta.ac4": "completed",
+    "extract-tldr": "completed",
+    "extract-tldr.ac1": "completed",
+    "extract-tldr.ac2": "completed",
+    "extract-tldr.ac3": "completed",
+    "extract-planning": "completed",
+    "extract-planning.ac1": "completed",
+    "extract-planning.ac2": "completed",
+    "extract-planning.ac3": "completed",
+    "extract-deacon": "completed",
+    "extract-deacon.ac1": "completed",
+    "extract-deacon.ac2": "completed",
+    "extract-deacon.ac3": "completed",
+    "extract-health": "completed",
+    "extract-health.ac1": "completed",
+    "extract-health.ac2": "completed",
+    "extract-health.ac3": "completed",
+    "extract-project-mappings": "completed",
+    "extract-project-mappings.ac1": "completed",
+    "extract-project-mappings.ac2": "completed",
+    "extract-project-mappings.ac3": "completed",
+    "extract-trackers": "completed",
+    "extract-trackers.ac1": "completed",
+    "extract-trackers.ac2": "completed",
+    "extract-trackers.ac3": "completed",
+    "shared-helpers": "completed",
+    "shared-helpers.ac1": "completed",
+    "shared-helpers.ac2": "completed",
+    "shared-helpers.ac3": "completed",
+    "freeze-barrel-exports": "completed",
+    "freeze-barrel-exports.ac1": "completed",
+    "freeze-barrel-exports.ac2": "completed"
+  },
+  "pipeline": {
+    "issueId": "PAN-2151",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-02T23:12:33.303Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2239",
+    "lastVerifiedCommit": "285e5d1dba92935d60eb50a06372c8cca6ecdec6"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 4,
+            "output": 808,
+            "cacheRead": 777165,
+            "cacheWrite": 1290
+          }
+        },
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 244654,
+            "output": 12016,
+            "cacheRead": 3061248,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 78607,
+            "output": 5552,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 19006,
+            "output": 38492,
+            "cacheRead": 5875803,
+            "cacheWrite": 161065
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 31895,
+            "output": 117076,
+            "cacheRead": 6003236,
+            "cacheWrite": 460410
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 19010,
+          "output": 39300,
+          "cacheRead": 6652968,
+          "cacheWrite": 162355
+        },
+        "openai/gpt-5.5": {
+          "input": 244654,
+          "output": 12016,
+          "cacheRead": 3061248,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 78607,
+          "output": 5552,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 31895,
+          "output": 117076,
+          "cacheRead": 6003236,
+          "cacheWrite": 460410
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 22.917448,
+        "pricingAsOf": "2026-07-02T23:12:33.339Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2239"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-07-02T21:13:43.617Z",
+  "updated": "2026-07-02T23:12:33.346Z"
+}
