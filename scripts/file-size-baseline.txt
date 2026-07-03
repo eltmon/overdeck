@@ -7,14 +7,13 @@
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 1174 src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx
 1488 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
-4071 src/dashboard/server/routes/agents.ts
 1413 src/dashboard/server/routes/command-deck.ts
-5306 src/dashboard/server/routes/conversations.ts
+5291 src/dashboard/server/routes/conversations.ts
 1005 src/dashboard/server/routes/flywheel.ts
 1149 src/dashboard/server/routes/settings.ts
 1753 src/dashboard/server/routes/workspaces.ts
 1924 src/dashboard/server/routes/workspaces/merge-ops.ts
-1466 src/dashboard/server/services/issue-data-service.ts
+1465 src/dashboard/server/services/issue-data-service.ts
 1317 src/dashboard/server/ws-rpc.ts
 3450 src/lib/cloister/deacon.ts
 1414 src/lib/cloister/merge-agent.ts

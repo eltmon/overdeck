@@ -1037,6 +1037,22 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync('agent-pan-nobeads-1')).toBeNull();
     });
 
+    it('uses a short beads assertion timeout for dashboard-style spawn calls', async () => {
+      const beadsQuery = await import('../../src/lib/beads-query.js');
+
+      await spawnAgent({
+        issueId: 'PAN-SHORT-BEADS',
+        workspace: testWorkspace,
+        role: 'work',
+      });
+
+      expect(vi.mocked(beadsQuery.assertIssueHasBeads)).toHaveBeenCalledWith(
+        testWorkspace,
+        'PAN-SHORT-BEADS',
+        { acquisitionTimeoutMs: 500 },
+      );
+    });
+
     // ─── PAN-1215 cleanup block ─────────────────────────────────────────────────
 
     it('untracks workspace .pan/ artifacts when tracked and working tree is clean (AC22)', async () => {

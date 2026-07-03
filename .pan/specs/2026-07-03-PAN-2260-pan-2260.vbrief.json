@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-03T03:58:30.150Z",
-    "updated": "2026-07-03T04:04:37.059Z",
+    "updated": "2026-07-03T17:47:43.275Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2260: PAN-2260",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2260",
     "title": "PAN-2260",
-    "status": "running",
+    "status": "completed",
     "uid": "f6b88869-572c-4d44-b878-6c2d13bc58a4",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-03T03:58:30.150Z",
-    "updated": "2026-07-03T04:04:37.059Z",
+    "updated": "2026-07-03T17:47:43.275Z",
     "references": [],
     "tags": [
       "auto-start"
@@ -58,5 +58,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }

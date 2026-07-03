@@ -448,22 +448,21 @@ export class IssueDataService {
 
     // Augment with mergeStatus from the asynchronous review-status cache.
     allIssues = allIssues.map(issue => {
+      const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
       const key = issue.identifier?.toUpperCase();
       const rs = key ? this.reviewStatusesCache[key] : null;
       if (rs?.mergeStatus) {
         const issueWithMerge = { ...issue, mergeStatus: rs.mergeStatus };
-        if (rs.mergeStatus === 'merged') {
-          const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
-          if (canonical !== 'done' && canonical !== 'canceled') {
-            return {
-              ...issueWithMerge,
-              status: 'Verifying',
-              canonicalStatus: 'verifying_on_main',
-              state: 'verifying_on_main',
-            };
-          }
+        if (canonical === 'done' && issueWithMerge.mergeStatus !== 'merged') {
+          return { ...issueWithMerge, mergeStatus: 'merged' };
+        }
+        if (rs.mergeStatus === 'merged' && canonical !== 'done' && canonical !== 'canceled') {
+          return { ...issueWithMerge, status: 'Verifying', canonicalStatus: 'verifying_on_main', state: 'verifying_on_main' };
         }
         return issueWithMerge;
+      }
+      if (canonical === 'done' && issue.mergeStatus && issue.mergeStatus !== 'merged') {
+        return { ...issue, mergeStatus: 'merged' };
       }
       return issue;
     });

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * Overdeck Supervisor — small external watchdog that survives dashboard crashes.
  *
@@ -17,14 +16,13 @@ import { Effect } from 'effect';
  * Stopped by `pan down`. Independent of the dashboard's own lifecycle.
  */
 
-import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { appendFile } from 'node:fs/promises';
-import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../lib/restart-lock.js';
 import { readPlatformConfigSync } from '../lib/platform-lifecycle.js';
-import { readWatchdogConfig, SupervisorWatchdog, type SpawnRestartResult } from './watchdog.js';
+import { readWatchdogConfig, SupervisorWatchdog } from './watchdog.js';
+import { createSupervisorRestartSpawner } from './restart-spawn.js';
 import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.OVERDECK_SUPERVISOR_PORT || 3012);
@@ -72,74 +70,7 @@ function sendJson(req: http.IncomingMessage, res: http.ServerResponse, status: n
   res.end(JSON.stringify(body));
 }
 
-async function heldRestartMessage(): Promise<string> {
-  const holder = await Effect.runPromise(readRestartLockHolder());
-  const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
-  return `restart in progress (${heldBy})`;
-}
-
-async function spawnRestart(options: {
-  restartLockHeld?: boolean;
-  bootId?: string | null;
-} = {}): Promise<SpawnRestartResult> {
-  let lock: RestartLockHandle | null = null;
-  if (!options.restartLockHeld) {
-    lock = await Effect.runPromise(acquireRestartLock('supervisor restart'));
-    if (!lock) return { pid: null, error: await heldRestartMessage() };
-  }
-
-  const release = async () => {
-    const current = lock;
-    if (!current) return;
-    lock = null;
-    await current.release();
-  };
-
-  try {
-    const child = spawn(PAN_BINARY, ['restart', '--dashboard'], {
-      detached: true,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        OVERDECK_RESTART_LOCK_HELD: '1',
-        OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
-        ...(options.bootId ? { OVERDECK_BOOT_ID: options.bootId } : {}),
-      },
-    });
-
-    let spawnErrorMessage: string | null = null;
-    const done = new Promise<void>((resolve, reject) => {
-      child.once('error', (err) => {
-        void (async () => {
-          spawnErrorMessage = err.message;
-          await log(`spawn error: ${err.message}`);
-          await release();
-          reject(err);
-        })();
-      });
-      child.once('close', (code, signal) => {
-        void (async () => {
-          await release();
-          if (code === 0) {
-            resolve();
-            return;
-          }
-          reject(new Error(`pan restart --dashboard exited ${code ?? `via signal ${signal ?? 'unknown'}`}`));
-        })();
-      });
-    });
-    done.catch(() => {});
-
-    await new Promise((resolve) => setImmediate(resolve));
-    if (spawnErrorMessage) return { pid: null, error: spawnErrorMessage };
-    child.unref();
-    return { pid: child.pid ?? null, error: null, done };
-  } catch (err) {
-    await release();
-    const msg = err instanceof Error ? err.message : String(err);
-    return { pid: null, error: msg };
-  }
-}
+const spawnRestart = createSupervisorRestartSpawner({ panBinary: PAN_BINARY, log });
 
 const watchdog = new SupervisorWatchdog({
   config: watchdogConfig,

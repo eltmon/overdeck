@@ -11,6 +11,7 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
 import { listRunningAgents, getAgentRuntimeState, type AgentState } from '../../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
 import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { initEventStore } from '../event-store.js';
@@ -99,6 +100,13 @@ export interface HealthConsumer {
   };
 }
 
+export interface SmeeRelayHealth {
+  configured: boolean;
+  running: boolean;
+  status: 'not_configured' | 'running' | 'stopped' | 'unknown';
+  message: string;
+}
+
 export interface SystemHealthSnapshot {
   severity: SystemHealthSeverity;
   updatedAt: string;
@@ -129,6 +137,7 @@ export interface SystemHealthSnapshot {
   agents: HealthAgentProcess[];
   leakedSpecialists: HealthLeakedSpecialist[];
   topConsumers: HealthConsumer[];
+  smeeRelay: SmeeRelayHealth;
 }
 
 let dockerStatsCollector: DockerStatsCollector | null = null;
@@ -448,6 +457,7 @@ function evaluateSeverity(
     loadPerCore1m: number;
     overcommitPercent: number;
     leakedSpecialistCount: number;
+    smeeRelay: SmeeRelayHealth;
   },
 ): { severity: SystemHealthSeverity; reasons: string[] } {
   const criticalReasons: string[] = [];
@@ -481,6 +491,10 @@ function evaluateSeverity(
     warningReasons.push(`${data.leakedSpecialistCount} leaked specialist session${data.leakedSpecialistCount === 1 ? '' : 's'} detected.`);
   }
 
+  if (data.smeeRelay.configured && !data.smeeRelay.running) {
+    warningReasons.push('smee-client webhook relay is configured but not running.');
+  }
+
   if (criticalReasons.length > 0) {
     return { severity: 'critical', reasons: criticalReasons.concat(warningReasons) };
   }
@@ -488,6 +502,41 @@ function evaluateSeverity(
     return { severity: 'warning', reasons: warningReasons };
   }
   return { severity: 'normal', reasons: [] };
+}
+
+function collectSmeeRelayHealth(): SmeeRelayHealth {
+  try {
+    if (!isSmeeConfiguredSync()) {
+      return {
+        configured: false,
+        running: false,
+        status: 'not_configured',
+        message: 'Not configured',
+      };
+    }
+
+    const running = isSmeeProcessRunningSync();
+    return running
+      ? {
+          configured: true,
+          running: true,
+          status: 'running',
+          message: 'Running',
+        }
+      : {
+          configured: true,
+          running: false,
+          status: 'stopped',
+          message: 'Configured but not running',
+        };
+  } catch (err) {
+    return {
+      configured: false,
+      running: false,
+      status: 'unknown',
+      message: err instanceof Error ? err.message : 'Status check failed',
+    };
+  }
 }
 
 async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
@@ -591,6 +640,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   ]);
 
   const thresholds = defaultThresholds();
+  const smeeRelay = collectSmeeRelayHealth();
   const coreCount = Math.max(cpus().length, 1);
   const loadPerCore1m = Math.round((loadAverage1m / coreCount) * 100) / 100;
   const usedMemoryBytes = Math.max(memory.memTotal - memory.memAvailable, 0);
@@ -603,6 +653,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     loadPerCore1m,
     overcommitPercent,
     leakedSpecialistCount: leakedSpecialists.length,
+    smeeRelay,
   });
 
   const containerMemoryBytes = containers.reduce((sum, container) => sum + container.memoryUsage, 0);
@@ -667,6 +718,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     agents: sortedAgents,
     leakedSpecialists,
     topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),
+    smeeRelay,
   };
 
   if (previousSeverity && previousSeverity !== result.severity) {

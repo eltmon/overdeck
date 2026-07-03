@@ -45,7 +45,7 @@ peripheral, safe for autonomous pipeline flow once planned.
 | # | Issue | What | PRD |
 |---|---|---|---|
 | 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **MERGED — PR #2268** (2026-07-03; delivered PAN-2204's main-push guard too) |
-| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | PRD on main; queued after Phase 2 kickoff |
+| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | **PLANNING 2026-07-03 (planning-pan-2231, --auto)** — banked ahead of PAN-2145 finishing |
 | 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | PRD on main; queued after Phase 2 kickoff |
 | 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **DONE — landed 1e82badc32, issue closed** |
 | 8b | PAN-2204 | Agent direct-push-to-main guard | **DONE — delivered inside PAN-2227 (PR #2268): `scripts/guard-agent-main-push.sh` wired into `.husky/pre-push`; issue closed** |
@@ -62,8 +62,8 @@ line-count metric while keeping the module shallow — the workspaces split prov
 | # | Issue | Target | Notes |
 |---|---|---|---|
 | 9 | PAN-2148 | `routes/issues.ts` (4,110) | **MERGED 2026-07-03** (UAT batch `uat/pan-cobalt-0703`, PR #2299) — 4,110 → 818 lines, 9 door modules in `src/lib/overdeck/` |
-| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **DISPATCHED 2026-07-03 — GPT-5.5 work agent** |
-| 11 | PAN-2145 | `routes/conversations.ts` (5,316 — grew +418 while gated) | **PRD written — on main** (verify `## Re-verify at execution` against post-2156 main before dispatch) |
+| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **MERGED 2026-07-03 (PR #2316)** — 4,071 → 136 lines, route submodules under `routes/agents/` (largest `spawn.ts` 825), no new god file. Code-level validated on origin/main. |
+| 11 | PAN-2145 | `routes/conversations.ts` (5,291) | **DISPATCHED 2026-07-03 — GPT-5.5 work agent** (`agent-pan-2145`, spec active, 8 beads) |
 
 ## Phase 3 — cloister core (pipeline machinery; supervised, sequenced, never batched)
 

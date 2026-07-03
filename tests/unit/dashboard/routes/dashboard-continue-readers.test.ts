@@ -1,7 +1,7 @@
 /**
  * PAN-1919: dashboard route continue read/write rerouted to per-issue record.
  *
- * AC: routes/agents.ts reads and writes session state through the record
+ * AC: agent start route reads and writes session state through the record
  *     (no inline readWorkspaceContinueState / writeWorkspaceContinueState touching continue.json)
  * AC: routes/workspaces.ts returns continue context from the record
  * AC: routes/agents.ts is removed from CONTINUE_EXCLUDES in lint-state-writes.sh
@@ -23,9 +23,9 @@ describe('PAN-1919: dashboard route continue readers/writers → record', () => 
     expect(result.trim()).toBe('');
   });
 
-  it('AC1: appendSessionEntry is used in routes/agents.ts', () => {
+  it('AC1: appendSessionEntry is used in routes/agents/spawn.ts', () => {
     const result = execSync(
-      `git grep -n "appendSessionEntry" -- src/dashboard/server/routes/agents.ts || true`,
+      `git grep -n "appendSessionEntry" -- src/dashboard/server/routes/agents/spawn.ts || true`,
       { cwd: ROOT, encoding: 'utf-8' },
     );
     expect(result.trim()).not.toBe('');

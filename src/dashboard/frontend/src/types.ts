@@ -366,6 +366,12 @@ export interface SystemHealthSnapshot {
   agents: SystemHealthAgentProcess[];
   leakedSpecialists: SystemHealthLeakedSpecialist[];
   topConsumers: SystemHealthConsumer[];
+  smeeRelay: {
+    configured: boolean;
+    running: boolean;
+    status: 'not_configured' | 'running' | 'stopped' | 'unknown';
+    message: string;
+  };
 }
 
 export interface StartAgentGuardrailWarning {
