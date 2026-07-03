@@ -71,6 +71,7 @@ import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { isGitHubAppConfigured, listPullRequestsForHead } from '../../../lib/github-app.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -3300,6 +3301,15 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
   try {
+    if (isGitHubAppConfigured()) {
+      const prs = await Effect.runPromise(listPullRequestsForHead(githubCheck.owner, githubCheck.repo, branchName, 'all'));
+      const pr = prs[0];
+      if (!pr) {
+        return { issueId: upper, repoArg: null, prNumber: null };
+      }
+      return { issueId: upper, repoArg, prNumber: String(pr.number) };
+    }
+
     const { stdout } = await execFileAsync(
       'gh',
       [
@@ -3319,7 +3329,8 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
     }
     return { issueId: upper, repoArg, prNumber };
   } catch (err: any) {
-    return { issueId: upper, repoArg: null, prNumber: null, error: `gh pr list failed: ${err.message}` };
+    const source = isGitHubAppConfigured() ? 'GitHub App PR lookup' : 'gh pr list';
+    return { issueId: upper, repoArg: null, prNumber: null, error: `${source} failed: ${err.message}` };
   }
 }
 
@@ -3764,6 +3775,13 @@ export async function fetchIssueDiscussions(
       }
       const branchName = `feature/${issueId.toLowerCase()}`;
       try {
+        if (isGitHubAppConfigured() && prOwner && prRepo) {
+          const prs = await Effect.runPromise(listPullRequestsForHead(prOwner, prRepo, branchName, 'all'));
+          const pr = prs[0];
+          if (pr) return pr.number;
+          return null;
+        }
+
         const { stdout } = await execFileAsync(
           'gh',
           [
@@ -3783,7 +3801,8 @@ export async function fetchIssueDiscussions(
           if (Number.isFinite(parsed)) return parsed;
         }
       } catch (err: any) {
-        errors.push(`gh pr list failed: ${err?.message ?? String(err)}`);
+        const source = isGitHubAppConfigured() ? 'GitHub App PR lookup' : 'gh pr list';
+        errors.push(`${source} failed: ${err?.message ?? String(err)}`);
       }
     }
     return null;
