@@ -114,7 +114,7 @@
     "recordedAt": "2026-07-03T14:14:06.848Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T14:36:15.901Z",
+  "updated": "2026-07-03T14:43:27.768Z",
   "pipeline": {
     "issueId": "PAN-2265",
     "reviewStatus": "blocked",
@@ -123,7 +123,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T14:36:13.956Z",
+    "updatedAt": "2026-07-03T14:43:25.836Z",
     "reviewNotes": "PR cache is not invalidated by CI webhooks, leaving statusCheckRollup stale",
     "inspectNotes": "workspace-06h3z passed. The diff implements the requested App REST Promise and Effect helpers in src/lib/github-app.ts, with tests covering owner-qualified PR head lookup, issue state lookup, paginated issue-label listing, PR filtering, and wrapper exports. No constraint violations found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
@@ -252,7 +252,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.974399,
-        "pricingAsOf": "2026-07-03T14:36:15.839Z"
+        "pricingAsOf": "2026-07-03T14:43:27.697Z"
       }
     },
     "merges": [
