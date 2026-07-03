@@ -40,7 +40,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T03:32:00.186Z",
-  "updated": "2026-07-03T07:23:43.651Z",
+  "updated": "2026-07-03T07:59:43.993Z",
   "pipeline": {
     "issueId": "PAN-2257",
     "reviewStatus": "pending",
@@ -81,5 +81,44 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2257.md",
+      ".pan/records/pan-2257.json",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+    ],
+    "declaredScope": [
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2257.md",
+      ".pan/records/pan-2257.json",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/TroubledBadges.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/troubledBadge.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/unit/dashboard/server/routes/projects.test.ts"
+    ],
+    "recordedAt": "2026-07-03T07:59:43.992Z"
+  }
 }
