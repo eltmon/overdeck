@@ -26,6 +26,12 @@ vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => ({ request: rpcMocks.request }),
 }));
 
+vi.mock('../SessionTranscript', () => ({
+  SessionTranscript: ({ session }: { session: { id: number } }) => (
+    <div data-testid="session-transcript">Transcript for {session.id}</div>
+  ),
+}));
+
 type Session = ComponentProps<typeof SessionDetail>['session'];
 
 const BASE_SESSION: Session = {
@@ -43,7 +49,7 @@ const BASE_SESSION: Session = {
   filesTouched: ['/home/user/Projects/alpha/src/auth.ts', '/home/user/Projects/alpha/README.md'],
   tags: ['auth', 'bugfix'],
   summary: 'Fixed the authentication bug',
-  summaryDetailed: null,
+  summaryDetailed: 'Detailed transcript summary',
   enrichmentLevel: 0 as const,
   enrichmentFailed: false,
   overdeckManaged: false,
@@ -54,6 +60,7 @@ const ARCHIVED_SESSION: Session = {
   ...BASE_SESSION,
   id: 7,
   source: 'managed-archived',
+  conversationId: 123,
   conversationName: 'archived session',
   archivedAt: '2025-01-02T00:00:00Z',
   overdeckManaged: true,
@@ -109,6 +116,11 @@ describe('SessionDetail', () => {
     expect(screen.getByText('Fixed the authentication bug')).toBeInTheDocument();
   });
 
+  it('shows detailed summary when present', () => {
+    renderDetail(BASE_SESSION);
+    expect(screen.getByText('Detailed transcript summary')).toBeInTheDocument();
+  });
+
   it('shows ad-hoc and managed badges in the header', () => {
     const { rerender } = renderDetail(BASE_SESSION);
     expect(screen.getByText('Ad-hoc')).toBeInTheDocument();
@@ -124,7 +136,7 @@ describe('SessionDetail', () => {
   it('calls onClose when close button is clicked', () => {
     const onClose = vi.fn();
     renderDetail(BASE_SESSION, onClose);
-    const closeBtn = screen.getByRole('button', { name: '' }); // X icon button
+    const closeBtn = screen.getByRole('button', { name: 'Close session detail' });
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledOnce();
   });

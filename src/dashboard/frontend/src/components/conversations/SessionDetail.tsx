@@ -3,16 +3,18 @@
  */
 
 import { useState } from 'react';
-import { X, ExternalLink, Sparkles } from 'lucide-react';
+import { ChevronDown, X, ExternalLink, Sparkles } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { WS_METHODS } from '@overdeck/contracts';
 import type { DiscoveredSessionSnapshot } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore } from '../../lib/store';
+import { SessionTranscript } from './SessionTranscript';
 
 interface Session {
   id: number;
   source?: 'discovered' | 'managed-archived';
+  conversationId?: string | number | null;
   conversationName?: string | null;
   archivedAt?: string | null;
   jsonlPath: string | null;
@@ -99,6 +101,8 @@ function parseCostThreshold(err: unknown, request: EnrichRequest): CostThreshold
 function fromRpcSession(session: DiscoveredSessionSnapshot): Session {
   return {
     id: session.id,
+    conversationId: session.conversationId ?? null,
+    conversationName: session.conversationName ?? null,
     jsonlPath: session.jsonlPath,
     workspacePath: session.workspacePath ?? null,
     primaryModel: session.primaryModel ?? null,
@@ -131,6 +135,7 @@ export function SessionDetail({ session, onClose }: Props) {
   const queryClient = useQueryClient();
   const [pendingCost, setPendingCost] = useState<CostThresholdDetails | null>(null);
   const [customModel, setCustomModel] = useState('');
+  const [metadataOpen, setMetadataOpen] = useState(true);
   const isArchived = session.source === 'managed-archived';
   const enrichProgress = useDashboardStore((s) => s.enrichProgressBySessionId[session.id]);
 
@@ -186,7 +191,7 @@ export function SessionDetail({ session, onClose }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full border-l border-gray-800 bg-gray-950">
+    <div className="flex h-full min-h-0 flex-col border-l border-gray-800 bg-gray-950">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
         <div className="flex items-center gap-2">
@@ -200,108 +205,122 @@ export function SessionDetail({ session, onClose }: Props) {
             {displaySession.overdeckManaged ? `Managed${displaySession.panIssueId ? ` · ${displaySession.panIssueId}` : ''}` : 'Ad-hoc'}
           </span>
         </div>
-        <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors">
+        <button aria-label="Close session detail" onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto px-3 py-2 space-y-4">
-        {/* Summary */}
-        {displaySession.summary && (
-          <div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Summary
-            </div>
-            <p className="text-xs text-gray-300 leading-relaxed">{displaySession.summary}</p>
-          </div>
-        )}
-
-        {displaySession.summaryDetailed && (
-          <div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Detailed
-            </div>
-            <p className="text-xs text-gray-400 leading-relaxed">{displaySession.summaryDetailed}</p>
-          </div>
-        )}
-
-        {/* Tags */}
-        {displaySession.tags.length > 0 && (
-          <div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Tags
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {displaySession.tags.map((tag) => (
-                <span key={tag} className="px-1.5 py-0.5 bg-gray-800 text-cyan-400 rounded text-[10px]">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Metadata */}
-        <div>
-          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-            Metadata
-          </div>
-          {field('Workspace', displaySession.workspacePath)}
-          {field('Model', displaySession.primaryModel)}
-          {field('Messages', displaySession.messageCount)}
-          {field('Input tokens', displaySession.tokenInput.toLocaleString())}
-          {field('Output tokens', displaySession.tokenOutput.toLocaleString())}
-          {field('Est. cost', displaySession.estimatedCost > 0 ? `$${displaySession.estimatedCost.toFixed(6)}` : null)}
-          {field('First active', displaySession.firstTs ? formatDate(displaySession.firstTs) : null)}
-          {field('Last active', displaySession.lastTs ? formatDate(displaySession.lastTs) : null)}
-          {isArchived && field('Archived at', displaySession.archivedAt ? formatDate(displaySession.archivedAt) : null)}
-          {displaySession.panIssueId && field('Issue', displaySession.panIssueId)}
-          {field('Enrichment', displaySession.enrichmentLevel === 0 ? 'None' : `L${displaySession.enrichmentLevel}`)}
-        </div>
-
-        {/* Tools */}
-        {displaySession.toolsUsed.length > 0 && (
-          <div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Tools Used
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {displaySession.toolsUsed.map((tool) => (
-                <span key={tool} className="px-1.5 py-0.5 bg-gray-900 text-gray-400 rounded text-[10px] font-mono">
-                  {tool}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Files touched */}
-        {displaySession.filesTouched.length > 0 && (
-          <div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Files Touched
-            </div>
-            <div className="space-y-1 max-h-28 overflow-auto">
-              {displaySession.filesTouched.map((file) => (
-                <div key={file} className="text-[10px] text-gray-500 font-mono break-all">
-                  {file}
+      <div className="shrink-0 border-b border-gray-800">
+        <button
+          type="button"
+          onClick={() => setMetadataOpen((open) => !open)}
+          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-gray-300 transition-colors hover:bg-gray-900"
+          aria-expanded={metadataOpen}
+        >
+          <span>Metadata</span>
+          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${metadataOpen ? '' : '-rotate-90'}`} />
+        </button>
+        {metadataOpen && (
+          <div className="max-h-[42vh] overflow-auto px-3 pb-3">
+            <div className="space-y-4">
+              {/* Summary */}
+              {displaySession.summary && (
+                <div>
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Summary
+                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">{displaySession.summary}</p>
                 </div>
-              ))}
+              )}
+
+              {displaySession.summaryDetailed && (
+                <div>
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Detailed
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">{displaySession.summaryDetailed}</p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {displaySession.tags.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Tags
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {displaySession.tags.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 bg-gray-800 text-cyan-400 rounded text-[10px]">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div>
+                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  Metadata
+                </div>
+                {field('Workspace', displaySession.workspacePath)}
+                {field('Model', displaySession.primaryModel)}
+                {field('Messages', displaySession.messageCount)}
+                {field('Input tokens', displaySession.tokenInput.toLocaleString())}
+                {field('Output tokens', displaySession.tokenOutput.toLocaleString())}
+                {field('Est. cost', displaySession.estimatedCost > 0 ? `$${displaySession.estimatedCost.toFixed(6)}` : null)}
+                {field('First active', displaySession.firstTs ? formatDate(displaySession.firstTs) : null)}
+                {field('Last active', displaySession.lastTs ? formatDate(displaySession.lastTs) : null)}
+                {isArchived && field('Archived at', displaySession.archivedAt ? formatDate(displaySession.archivedAt) : null)}
+                {displaySession.panIssueId && field('Issue', displaySession.panIssueId)}
+                {field('Enrichment', displaySession.enrichmentLevel === 0 ? 'None' : `L${displaySession.enrichmentLevel}`)}
+              </div>
+
+              {/* Tools */}
+              {displaySession.toolsUsed.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Tools Used
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {displaySession.toolsUsed.map((tool) => (
+                      <span key={tool} className="px-1.5 py-0.5 bg-gray-900 text-gray-400 rounded text-[10px] font-mono">
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Files touched */}
+              {displaySession.filesTouched.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Files Touched
+                  </div>
+                  <div className="space-y-1 max-h-28 overflow-auto">
+                    {displaySession.filesTouched.map((file) => (
+                      <div key={file} className="text-[10px] text-gray-500 font-mono break-all">
+                        {file}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* JSONL path */}
+              <div>
+                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  File
+                </div>
+                <div className="flex items-start gap-1">
+                  <ExternalLink className="h-3 w-3 text-gray-600 mt-0.5 shrink-0" />
+                  <span className="text-[10px] text-gray-600 font-mono break-all">{displaySession.jsonlPath ?? 'No JSONL path available'}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
-
-        {/* JSONL path */}
-        <div>
-          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-            File
-          </div>
-          <div className="flex items-start gap-1">
-            <ExternalLink className="h-3 w-3 text-gray-600 mt-0.5 shrink-0" />
-            <span className="text-[10px] text-gray-600 font-mono break-all">{displaySession.jsonlPath ?? 'No JSONL path available'}</span>
-          </div>
-        </div>
       </div>
 
       <div className="px-3 py-2 border-t border-gray-800 shrink-0">
@@ -420,6 +439,10 @@ export function SessionDetail({ session, onClose }: Props) {
             {embedMutation.isError && <div className="text-[10px] text-red-400 mt-1">Embedding failed</div>}
           </>
         )}
+      </div>
+
+      <div className="min-h-0 flex-1">
+        <SessionTranscript session={displaySession} />
       </div>
     </div>
   );

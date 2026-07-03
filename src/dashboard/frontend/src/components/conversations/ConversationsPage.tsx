@@ -26,6 +26,7 @@ interface DiscoveredSession {
   id: number;
   source: SessionSource;
   harness: string;
+  conversationId?: string | number | null;
   conversationName?: string | null;
   archivedAt?: string | null;
   jsonlPath: string | null;
@@ -95,6 +96,7 @@ interface SearchResponse {
 interface ArchivedConversationResponse extends Omit<DiscoveredSession, 'source' | 'harness'> {
   source: 'managed-archived';
   harness?: string;
+  conversationId?: string | number | null;
   conversationName: string;
   archivedAt: string;
 }
@@ -261,6 +263,8 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
     id: session.id,
     source: 'discovered',
     harness: session.harness ?? 'claude-code',
+    conversationId: session.conversationId ?? null,
+    conversationName: session.conversationName ?? null,
     jsonlPath: session.jsonlPath,
     workspacePath: session.workspacePath ?? null,
     primaryModel: session.primaryModel ?? null,
@@ -610,7 +614,7 @@ export function ConversationsPage() {
         )}
 
         {/* Session list */}
-        <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${selected ? 'border-r border-gray-800' : ''}`}>
+        <div className={`flex flex-col min-w-0 overflow-hidden ${selected ? 'basis-[48%] border-r border-gray-800' : 'flex-1'}`}>
           {searchVisible && searchData?.error && (
             <div className="px-4 py-2 border-b border-amber-900 bg-amber-950/40 text-amber-200 text-xs">
               Semantic search unavailable: {searchData.error}
@@ -663,7 +667,7 @@ export function ConversationsPage() {
 
         {/* Detail panel */}
         {selected && (
-          <div className="w-96 shrink-0 overflow-auto">
+          <div className="min-w-[420px] flex-1 overflow-hidden">
             <SessionDetail
               session={selected}
               onClose={() => setSelectedKey(null)}
