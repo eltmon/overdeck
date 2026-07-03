@@ -1,4 +1,5 @@
 import { join, basename } from 'path'
+import { existsSync, readFileSync } from 'node:fs'
 import { Effect, FileSystem, Option } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
@@ -134,4 +135,70 @@ export function getIssueDraftInfo(
       modified: mtime,
     }
   }).pipe(Effect.provide(NodeFileSystem.layer))
+}
+
+/**
+ * Minimum line count for a PRD draft to satisfy the PRD-first gate (PAN-2234).
+ * A found-but-thinner draft fails the gate with reason 'too-short'.
+ */
+export const MIN_PRD_LINES = 20
+
+export interface PrdGateResult {
+  ok: boolean
+  path?: string
+  lineCount?: number
+  reason?: 'missing' | 'too-short'
+  searched?: string[]
+}
+
+/**
+ * Sync PRD-first gate predicate (PAN-2234). The surrounding module uses the
+ * Effect FileSystem for read/write/list paths; this predicate is deliberately a
+ * plain sync node:fs read so the CLI caller (`pan plan finalize`) and the
+ * complete-planning route can call it inline in a sync flow. No child-process
+ * sync (no execSync) — fs-sync only, per the repo's server-code rule.
+ *
+ * Search order (first existing file wins): projectRoot uppercase → projectRoot
+ * lowercase → workspacePath uppercase → workspacePath lowercase. A null/empty
+ * root skips its candidates. Non-trivial means at least MIN_PRD_LINES lines.
+ */
+export function checkPrdGateSync(args: {
+  projectRoot?: string | null
+  workspacePath?: string | null
+  issueId: string
+}): PrdGateResult {
+  const { projectRoot, workspacePath, issueId } = args
+  const upperFile = `${issueId.toUpperCase()}.md`
+  const lowerFile = `${issueId.toLowerCase()}.md`
+  const searched: string[] = []
+  const candidates: string[] = []
+  if (projectRoot) {
+    candidates.push(join(getDraftsDir(projectRoot), upperFile))
+    candidates.push(getDraftPath(projectRoot, lowerFile))
+  }
+  if (workspacePath) {
+    const wsDrafts = join(workspacePath, '.pan', 'drafts')
+    candidates.push(join(wsDrafts, upperFile))
+    candidates.push(join(wsDrafts, lowerFile))
+  }
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      let content = ''
+      try {
+        content = readFileSync(candidate, 'utf-8')
+      } catch {
+        // Treat an unreadable file as missing; surface the path so the caller
+        // can diagnose, but fall through to the searched list.
+        searched.push(candidate)
+        continue
+      }
+      const lineCount = content.split('\n').length
+      if (lineCount >= MIN_PRD_LINES) {
+        return { ok: true, path: candidate, lineCount }
+      }
+      return { ok: false, reason: 'too-short', path: candidate, lineCount }
+    }
+    searched.push(candidate)
+  }
+  return { ok: false, reason: 'missing', searched }
 }

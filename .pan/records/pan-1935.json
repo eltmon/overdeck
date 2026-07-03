@@ -1,17 +1,31 @@
 {
   "issueId": "PAN-1935",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-02T21:39:24.315Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-07-02T21:57:44.494Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
   "feedback": [],
   "created": "2026-06-23T16:23:19.109Z",
-  "updated": "2026-07-02T20:19:53.858Z",
+  "updated": "2026-07-02T21:57:44.525Z",
   "pipeline": {
     "issueId": "PAN-1935",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "mergeStatus": "merged",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T20:19:53.798Z",
-    "testNotes": "Skipped: issue is already merged"
+    "updatedAt": "2026-07-02T21:57:44.496Z",
+    "testNotes": "Skipped: issue is already merged",
+    "reviewRequestedAt": "2026-07-02T21:57:44.496Z"
   },
   "closeOut": {
     "usage": {
@@ -35,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-02T20:19:53.858Z"
+        "pricingAsOf": "2026-07-02T21:57:44.524Z"
       }
     },
     "merges": [],
