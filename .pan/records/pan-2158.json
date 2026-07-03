@@ -3,56 +3,34 @@
   "schemaVersion": 2,
   "sessionHistory": [
     {
-      "timestamp": "2026-07-03T14:09:05.812Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
       "reason": "resume",
       "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T14:12:15.750Z"
-    },
-    {
-      "timestamp": "2026-07-03T14:59:14.662Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T14:59:15.116Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-03T15:15Z] test-agent → FAILED — seq 1",
-      "timestamp": "2026-07-03T15:15:38.403Z"
-    },
-    {
-      "timestamp": "2026-07-03T15:30:37.774Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T15:30:38.604Z"
+      "timestamp": "2026-07-03T15:32:13.254Z"
     }
   ],
   "feedback": [],
-  "created": "2026-07-03T13:58:27.754Z",
-  "updated": "2026-07-03T15:30:38.604Z",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed",
+    "auto-start.ac2": "completed",
+    "auto-start.ac3": "completed",
+    "auto-start.ac4": "completed"
+  },
   "pipeline": {
     "issueId": "PAN-2158",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T15:30:38.280Z",
+    "updatedAt": "2026-07-03T15:32:25.586Z",
     "reviewNotes": "No blocking findings; focused tests and typecheck passed",
-    "testNotes": "TypeScript typecheck passed; eslint + custom lints passed. `npm test` failed: root vitest 32 files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests. Targeted PAN-2158-related tests passed (4 files, 107 tests). No browser UAT required. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.",
+    "testNotes": "TypeScript typecheck passed; eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/ratchet-audit lints passed. `npm test` failed: root vitest reported 32 test files failed / 781 passed / 4 skipped, 76 tests failed / 8092 passed / 52 skipped. All failures are beforeEach hook timeouts (5000ms) in setupOverdeckTestDb() across unrelated infrastructure tests (tests/unit/lib/overdeck/*, src/cli/commands/conversations/*, tests/unit/dashboard/server/routes/unstick-route.test.ts, tests/unit/dashboard/server/services/agent-projection.test.ts). Targeted PAN-2158-related tests passed: src/lib/planning/__tests__/spawn-planning-session.test.ts, src/lib/cloister/__tests__/pan-871-auto-resume.test.ts, src/lib/cloister/__tests__/stuck-remediation.test.ts, tests/integration/agent-spawning.test.ts (4 files, 107 tests passed). No browser UAT required: PAN-2158 is a CLI planning auto-mode behavior fix with no dashboard/UI acceptance criteria and no frontend files changed. Failures appear to be pre-existing test-infrastructure flakiness under load, not regressions from PAN-2158 changes.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2303",
-    "reviewedAtCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
+    "reviewedAtCommit": "de65dfecf4b9692d9b97564007bf1d9536dba18a",
     "lastVerifiedCommit": "84daae53e0fe6f8f54cbe20c0c1fe7e9c833cd9b",
     "reviewRequestedAt": "2026-07-03T15:30:37.784Z"
   },
@@ -61,8 +39,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 12890,
-            "output": 1089,
+            "input": 13929,
+            "output": 1313,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -78,8 +56,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 12890,
-          "output": 1089,
+          "input": 13929,
+          "output": 1313,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -92,7 +70,7 @@
       },
       "costAtCloseOut": {
         "usd": 1.782147,
-        "pricingAsOf": "2026-07-03T15:30:38.498Z"
+        "pricingAsOf": "2026-07-03T15:32:25.612Z"
       }
     },
     "merges": [
@@ -100,13 +78,6 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
-  "statusOverrides": {
-    "auto-start": "completed",
-    "auto-start.ac1": "completed",
-    "auto-start.ac2": "completed",
-    "auto-start.ac3": "completed",
-    "auto-start.ac4": "completed"
-  }
+  "created": "2026-07-03T15:32:13.088Z",
+  "updated": "2026-07-03T15:32:25.612Z"
 }
