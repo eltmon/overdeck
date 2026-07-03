@@ -60,19 +60,16 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T16:08:36.865Z",
-    "reviewNotes": "No blocking findings in self-review",
-    "testNotes": "Fixed managed SessionTranscript routing to fetch conversations by conversationName before conversationId. Verified npm --prefix ./src/dashboard/frontend run test -- src/components/conversations/__tests__/SessionTranscript.test.tsx --reporter=dot; npm --prefix ./src/dashboard/frontend run test -- src/components/conversations --reporter=dot; npm run typecheck; npm run lint. Workspace dashboard http://127.0.0.1:3020 was unreachable during read-only check; no pan up/restart was run per operator instruction.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T16:15:50.932Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
-    "reviewedAtCommit": "4f2ed7d0e47f0b78dfcd59e1605ef940fccf6488",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
     "scopeDrift": {
@@ -227,7 +224,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.223207,
-        "pricingAsOf": "2026-07-03T16:08:36.924Z"
+        "pricingAsOf": "2026-07-03T16:15:51.029Z"
       }
     },
     "merges": [
@@ -261,5 +258,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T16:08:36.935Z"
+  "updated": "2026-07-03T16:15:51.041Z"
 }
