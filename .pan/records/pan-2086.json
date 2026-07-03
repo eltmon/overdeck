@@ -24,11 +24,101 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-06-29T02:46:51.558Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:10:07.210Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:15:44.624Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:15:44.940Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:18:57.094Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:22:39.583Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:22:40.720Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:28:53.597Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:32:55.460Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:36:05.160Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:40:16.274Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:40:43.830Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:43:55.096Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:47:34.359Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:47:34.841Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T11:51:15.152Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T12:06:47.111Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T12:10:27.088Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-03T12:14:06.358Z"
     }
   ],
   "feedback": [],
   "created": "2026-06-27T03:24:50.930Z",
-  "updated": "2026-06-29T22:30:42.575Z",
+  "updated": "2026-07-03T12:14:06.359Z",
   "pipeline": {
     "issueId": "PAN-2086",
     "reviewStatus": "pending",
@@ -111,7 +201,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "traefik-readiness-gate": "completed",
     "traefik-readiness-gate.ac1": "completed",
