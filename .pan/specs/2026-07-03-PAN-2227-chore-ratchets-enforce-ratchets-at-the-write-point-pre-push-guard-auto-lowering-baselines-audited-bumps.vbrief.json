@@ -3,8 +3,7 @@
     "version": "0.6",
     "created": "2026-07-03T00:03:01Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-2227: chore(ratchets): enforce ratchets at the write point — pre-push guard, auto-lowering baselines, audited bumps (planned jointly with PAN-2204 per operator directive)",
-    "updated": "2026-07-03T00:23:28.040Z"
+    "description": "Plan for PAN-2227: chore(ratchets): enforce ratchets at the write point — pre-push guard, auto-lowering baselines, audited bumps (planned jointly with PAN-2204 per operator directive)"
   },
   "plan": {
     "id": "pan-2227",
@@ -12,9 +11,9 @@
     "status": "proposed",
     "uid": "bd379d3c-8a4e-4985-b5a2-00564cfeb6f0",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 1,
     "created": "2026-07-03T00:03:01Z",
-    "updated": "2026-07-03T00:23:28.040Z",
+    "updated": "2026-07-03T00:03:01Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2227",
@@ -860,10 +859,7 @@
         "to": "flywheel-owns-strike-merge",
         "type": "informs"
       }
-    ],
-    "metadata": {
-      "canonicalFilename": "2026-07-03-PAN-2227-chore-ratchets-enforce-ratchets-at-the-write-point-pre-push-guard-auto-lowering-baselines-audited-bumps.vbrief.json"
-    }
+    ]
   },
   "status": "proposed"
 }
