@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2261",
   "schemaVersion": 2,
-  "created": "2026-07-03T03:32:43.537Z",
-  "updated": "2026-07-03T05:37:00.664Z",
-  "pipeline": {
-    "issueId": "PAN-2261",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T03:32:43.537Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -38,6 +21,46 @@
       "timestamp": "2026-07-03T05:37:00.663Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-03T03:32:43.537Z",
+  "updated": "2026-07-03T13:39:12.246Z",
+  "pipeline": {
+    "issueId": "PAN-2261",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T13:39:12.217Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 22551,
+            "output": 463,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 22551,
+          "output": 463,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-03T13:39:12.245Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "codex",
   "model": "gpt-5.5"
 }
