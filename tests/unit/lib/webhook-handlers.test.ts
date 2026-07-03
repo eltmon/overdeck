@@ -11,12 +11,17 @@ import {
   handlePullRequestReviewThread,
   handleStatus,
   needsBlockerReconciliation,
+  refreshMergeStateFromGitHub,
   type WebhookPayload,
 } from '../../../src/lib/webhook-handlers.js';
 
 // Mock review-status module
 const mockGetReviewStatus = vi.fn();
 const mockSetReviewStatus = vi.fn();
+const mockIsGitHubAppConfigured = vi.fn();
+const mockGetPullRequestState = vi.fn();
+const mockExecFile = vi.fn();
+let ghPrViewStdout = '';
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatus: (...args: Parameters<typeof mockGetReviewStatus>) => mockGetReviewStatus(...args),
@@ -41,6 +46,16 @@ vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({
 
 vi.mock('../../../src/lib/cloister/ci-failure-feedback.js', () => ({
   relayCiFailureFeedback: () => Effect.succeed({ agentMessageSent: false }),
+}));
+
+vi.mock('../../../src/lib/github-app.js', () => ({
+  isGitHubAppConfigured: () => mockIsGitHubAppConfigured(),
+  getPullRequestState: (owner: string, repo: string, number: number) =>
+    mockGetPullRequestState(owner, repo, number),
+}));
+
+vi.mock('child_process', () => ({
+  execFile: (...args: unknown[]) => mockExecFile(...args),
 }));
 
 beforeEach(() => {
@@ -779,5 +794,100 @@ describe('needsBlockerReconciliation (PAN-1771)', () => {
       mergeStatus: 'pending',
       blockerReasons: [ghBlocker],
     })).toBeNull();
+  });
+});
+
+describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
+  function makeAppPrState(overrides: Partial<{
+    mergeable: boolean | null;
+    mergeableState: string;
+    draft: boolean;
+    checksFailed: boolean;
+  }> = {}) {
+    return Effect.succeed({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      number: 42,
+      state: 'OPEN' as const,
+      merged: false,
+      mergeable: overrides.mergeable ?? true,
+      mergeableState: overrides.mergeableState ?? 'clean',
+      draft: overrides.draft ?? false,
+      headSha: 'abc',
+      baseBranch: 'main',
+      checksPending: false,
+      checksFailed: overrides.checksFailed ?? false,
+    });
+  }
+
+  beforeEach(() => {
+    // default: App configured, clean/mergeable PR
+    mockIsGitHubAppConfigured.mockReturnValue(true);
+    mockGetPullRequestState.mockReturnValue(makeAppPrState());
+    ghPrViewStdout = '';
+  });
+
+  it('uses the App REST path (not gh) when the App is configured', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+    mockGetPullRequestState.mockReturnValue(makeAppPrState({ mergeable: false, mergeableState: 'dirty' }));
+
+    await refreshMergeStateFromGitHub('PAN-1', 'test-owner/test-repo', 42);
+
+    expect(mockGetPullRequestState).toHaveBeenCalledWith('test-owner', 'test-repo', 42);
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([expect.objectContaining({ type: 'merge_conflict' })]),
+    }));
+  });
+
+  it('maps App checksFailed to failing_checks blocker', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+    mockGetPullRequestState.mockReturnValue(makeAppPrState({ checksFailed: true }));
+
+    await refreshMergeStateFromGitHub('PAN-2', 'test-owner/test-repo', 42);
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([expect.objectContaining({ type: 'failing_checks' })]),
+    }));
+  });
+
+  it('maps App draft to draft_pr blocker', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+    mockGetPullRequestState.mockReturnValue(makeAppPrState({ draft: true }));
+
+    await refreshMergeStateFromGitHub('PAN-3', 'test-owner/test-repo', 42);
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-3', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([expect.objectContaining({ type: 'draft_pr' })]),
+    }));
+  });
+
+  it('falls back to gh pr view when the App is not configured', async () => {
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+    ghPrViewStdout = JSON.stringify({
+      mergeable: 'CONFLICTING',
+      mergeStateStatus: 'DIRTY',
+      isDraft: false,
+      statusCheckRollup: [{ conclusion: 'FAILURE' }],
+    });
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[args.length - 1] as (err: unknown, res: { stdout: string; stderr: string }) => void;
+      cb(null, { stdout: ghPrViewStdout, stderr: '' });
+    });
+
+    await refreshMergeStateFromGitHub('PAN-4', 'test-owner/test-repo', 42);
+
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
+    expect(mockExecFile).toHaveBeenCalled();
+    const [cmd, ghArgs] = mockExecFile.mock.calls[0] as [string, string[]];
+    expect(cmd).toBe('gh');
+    expect(ghArgs).toContain('view');
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-4', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'merge_conflict' }),
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
   });
 });
