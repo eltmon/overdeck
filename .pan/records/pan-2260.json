@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-03T04:04:30.342Z",
-  "updated": "2026-07-03T04:04:30.369Z",
+  "updated": "2026-07-03T04:19:38.321Z",
   "pipeline": {
     "issueId": "PAN-2260",
     "reviewStatus": "pending",
@@ -26,5 +26,9 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "auto-start": "completed",
+    "auto-start.ac1": "completed"
+  }
 }
