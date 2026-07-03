@@ -50,7 +50,7 @@ same way.
 
 ## How it works
 
-Conversation and session state lives in the Overdeck SQLite database, but **this skill never reads that DB directly** — the DB location (`~/.overdeck/overdeck.db`) and its schema (UUID conversation ids, `claude_session_id` in `conversation_files`, etc.) are not a stable contract and have already shifted once across the rebrand (PAN-2019). Instead, everything routes through the canonical `pan conv` CLI read door, which is schema-stable:
+Conversation and session state lives in the Overdeck SQLite database, but **this skill never reads that DB directly** — the DB location (`~/.overdeck/overdeck.db`) and its schema (UUID conversation ids, the per-harness session id in `conversation_files.locator`, etc.) are not a stable contract and have already shifted twice (PAN-2019 rebrand; `claude_session_id` column → `locator`). Instead, everything routes through the canonical `pan conv` CLI read door, which is schema-stable:
 
 ```bash
 pan conv jsonl <id>        # alias: pan conv transcript <id>
@@ -59,11 +59,11 @@ pan conv show --json <id>   # conversation metadata (PAN-2018: conversation-firs
 pan conv list --format json # discovered sessions
 ```
 
-`pan conv jsonl` is the canonical resolver. It reads the conversation's `claude_session_id` + `cwd`, resolves through the shared Overdeck transcript-path helper, preserves the one-level `~/.claude/projects/*/<session-id>.jsonl` fallback, and reports one of:
+`pan conv jsonl` is the canonical resolver. It reads the conversation's recorded session id (the `locator` in `conversation_files`) + `cwd`, resolves through the shared Overdeck transcript-path helper, preserves the one-level `~/.claude/projects/*/<session-id>.jsonl` fallback, and reports one of:
 
 - `ok` — path exists on disk
 - `expired` — Claude session id is known, but the JSONL is not present on disk
-- `unknown` — no `claude_session_id` is recorded for this conversation
+- `unknown` — no session locator is recorded for this conversation
 
 `conv-find.py --jsonl <id>` delegates to `pan conv jsonl --json <id>`; do not reimplement path encoding, derivation, or glob fallback in the skill script.
 
@@ -210,9 +210,10 @@ for line in path.read_text().splitlines():
 ## Do not query the DB directly
 
 There is no stable contract for the on-disk DB path or the `conversations`
-schema, and both have already changed once (rebrand: `~/.panopticon` →
+schema, and both have already changed repeatedly (rebrand: `~/.panopticon` →
 `~/.overdeck`; schema: integer → UUID ids, `claude_session_id` moved into
-`conversation_files`). Direct SQL against the DB is what broke this skill in
+`conversation_files`, then renamed to `locator` with a `harness` column
+alongside it). Direct SQL against the DB is what broke this skill in
 the first place (PAN-2019).
 
 Use the CLI doors instead:
