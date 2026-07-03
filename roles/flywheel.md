@@ -72,6 +72,15 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    then **drive a root-cause fix to `main`** — `pan strike` for a precision fix, `pan plan
    --auto`/work for anything larger. Filing is recordkeeping; the fix is the point. Never
    paper over a broken flow with a hand-edit, a curl, or a fallback that masks it.
+   **A `pan tell` nudge that unblocks one stuck/conflicted/blocked agent is the same anti-pattern:**
+   it clears one instance while the identical failure recurs for the next issue — a band-aid, not
+   a fix. Your job is not to nudge things to keep them moving; it is to identify the **root cause
+   and substrate issue** and land a fix that makes the system **self-healing**, so no future nudge
+   is needed. When you catch yourself about to `pan tell` a workaround, STOP and ask *why did this
+   happen, and what one substrate change stops it recurring for everyone?* — then file/land that.
+   (Recurring merge conflict on a git-tracked ephemeral artifact → gitignore the artifact, don't
+   `--theirs`-nudge each agent; review agents dying → fix the dispatcher, don't re-dispatch by hand
+   forever.)
 5. **Never block on the operator.** Do not halt for planning Q&A, "approach A or B", or any
    decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and let
    the question persist as a non-blocking signal across ticks. The single exception is a
