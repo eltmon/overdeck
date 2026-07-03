@@ -192,11 +192,19 @@ function branchSql(source: SessionsFeedSource, filter: ConversationFilter): Bran
           df.overdeck_managed,
           df.pan_issue_id,
           NULL AS archived_at,
-          NULL AS conversation_id,
-          NULL AS conversation_name,
-          NULL AS conversation_title,
+          dc.id AS conversation_id,
+          dc.name AS conversation_name,
+          dc.title AS conversation_title,
           df.harness
         FROM discovered_sessions df
+        LEFT JOIN conversation_files dcf ON dcf.id = (
+          SELECT dcf2.id
+          FROM conversation_files dcf2
+          WHERE dcf2.locator = df.session_id
+          ORDER BY (dcf2.harness = 'claude-code') DESC, dcf2.created_at ASC, dcf2.id ASC
+          LIMIT 1
+        )
+        LEFT JOIN conversations dc ON dc.id = dcf.conversation_id
         ${where}
         ${where ? 'AND' : 'WHERE'} NOT EXISTS (
           SELECT 1
@@ -299,7 +307,7 @@ function feedSql(filter: SessionsFeedFilter, includeCursor: boolean): FeedSql {
       cursorWhere.push('(last_ts IS NULL AND (id < ? OR (id = ? AND source < ?)))');
       params.push(cursor.id, cursor.id, cursor.source);
     } else {
-      cursorWhere.push('(last_ts < ? OR (last_ts = ? AND (id < ? OR (id = ? AND source < ?))))');
+      cursorWhere.push('(last_ts IS NULL OR last_ts < ? OR (last_ts = ? AND (id < ? OR (id = ? AND source < ?))))');
       params.push(cursor.lastTs, cursor.lastTs, cursor.id, cursor.id, cursor.source);
     }
   }
