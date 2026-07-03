@@ -51,6 +51,7 @@ import {
   restartFromPlan,
   startPlanningForIssue,
 } from '../../../lib/overdeck/planning-sessions.js';
+import { generateTasksForIssue } from '../../../lib/overdeck/task-generation.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus, getReviewStatusSync } from '../review-status.js';
@@ -139,18 +140,6 @@ function getGitHubLocalPaths(): Record<string, string> {
     }
   }
   return out;
-}
-
-/** Map Rally child-issue service contract into the planning-context shape. */
-export function buildChildStoriesFromRally(
-  children: readonly { ref: string; title: string; status: string; description: string }[],
-): Array<{ ref: string; title: string; status: string; description: string }> {
-  return children.map((c) => ({
-    ref: c.ref,
-    title: c.title,
-    status: c.status,
-    description: c.description || '',
-  }));
 }
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
@@ -1558,45 +1547,8 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     if (!parseIssueIdSync(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issueLower = id.toLowerCase();
 
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
-      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
-    }
-
-    if (!projectPath) {
-      return jsonResponse({ success: false, error: `Could not resolve project path for ${id}` }, { status: 404 });
-    }
-
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = yield* findPlan(workspacePath);
-    if (!planPath || !existsSync(planPath)) {
-      return jsonResponse(
-        { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },
-        { status: 409 },
-      );
-    }
-
-    const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* createBeadsFromVBrief(workspacePath);
-
-    if (!result.success || result.created.length === 0) {
-      const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
-      return jsonResponse({ success: false, created: result.created, errors }, { status: 500 });
-    }
-
-    return jsonResponse({
-      success: true,
-      created: result.created,
-      count: result.created.length,
-    });
+    return yield* generateTasksForIssue(id);
   })),
 );
 

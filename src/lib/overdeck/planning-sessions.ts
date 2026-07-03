@@ -27,6 +27,7 @@ import { canUseHarnessSync } from '../harness-policy.js';
 import { saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { TrackerApiError } from '../../dashboard/server/services/typed-errors.js';
 import type { GitHubClientError, GitHubClientShape, GitHubIssue } from '../../dashboard/server/services/github-client.js';
+import { buildChildStoriesFromRally } from './task-generation.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -117,17 +118,6 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     }
   }
   return join(homedir(), 'Projects');
-}
-
-function buildChildStoriesFromRallyForPlanning(
-  children: readonly { ref: string; title: string; status: string; description: string }[],
-): Array<{ ref: string; title: string; status: string; description: string }> {
-  return children.map((c) => ({
-    ref: c.ref,
-    title: c.title,
-    status: c.status,
-    description: c.description || '',
-  }));
 }
 
 export function startPlanningForIssue(options: {
@@ -240,7 +230,7 @@ export function startPlanningForIssue(options: {
         const children = yield* rally.getChildIssues(id).pipe(
           Effect.catch(() => Effect.succeed([] as readonly { ref: string; title: string; status: string; description: string }[])),
         );
-        childStories = buildChildStoriesFromRallyForPlanning(children);
+        childStories = buildChildStoriesFromRally(children);
       }
 
       issue = {
