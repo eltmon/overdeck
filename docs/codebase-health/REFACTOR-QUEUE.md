@@ -24,14 +24,14 @@ must list those assumptions in a `## Re-verify at execution` section; if the dep
 is so heavy the PRD would be guesswork, it is **deferred** (marked below) and written
 only when its predecessor lands.
 
-## Phase 0 — already planned, dispatch serially (specs banked in `.pan/specs/`)
+## Phase 0 — COMPLETE (all four merged, 2026-07-02/03)
 
 | # | Issue | Target | Status |
 |---|---|---|---|
-| 1 | PAN-2156 | `services/conversation-service.ts` (1,609) → modules | **in review — PR #2235** (work done 2026-07-02) |
-| 2 | PAN-2154 | `lib/workspace-manager.ts` (1,736) → modules | **in progress — work agent active** (4+ seams committed) |
-| 3 | PAN-2153 | `routes/specialists.ts` (1,753) → modules | spec `proposed`; queued |
-| 4 | PAN-2151 | `routes/misc.ts` (1,832) → modules | re-planned 2026-07-02 (orphan-AUQ transcript archived, fresh fable-5 auto-plan); spec promoted, ready to dispatch |
+| 1 | PAN-2156 | `services/conversation-service.ts` (1,609) → modules | **MERGED — PR #2235** (2026-07-02) |
+| 2 | PAN-2154 | `lib/workspace-manager.ts` (1,736) → modules | **MERGED — PR #2236** (2026-07-02) |
+| 3 | PAN-2153 | `routes/specialists.ts` (1,753) → modules | **MERGED — PR #2250** (2026-07-03) |
+| 4 | PAN-2151 | `routes/misc.ts` (1,832) → modules | **MERGED — PR #2239** (2026-07-03) |
 
 ## Phase 1 — guardrails first (protect the campaign from itself)
 
@@ -40,11 +40,11 @@ peripheral, safe for autonomous pipeline flow once planned.
 
 | # | Issue | What | PRD |
 |---|---|---|---|
-| 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **written — on main** |
-| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | **written — on main** |
-| 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | **written — on main** |
+| 5 | PAN-2227 | Ratchets enforced at write point: pre-push guard, auto-lowering baselines, audited bumps | **MERGED — PR #2268** (2026-07-03; delivered PAN-2204's main-push guard too) |
+| 6 | PAN-2231 | Lint ban on source-introspection tests (red-main #2124 class) | PRD on main; queued after Phase 2 kickoff |
+| 7 | PAN-2230 | Circular-dependency ratchet (madge baseline in lint) | PRD on main; queued after Phase 2 kickoff |
 | 8 | PAN-2234 | Mechanical PRD-first gate in `pan plan finalize` / complete-planning | **DONE — landed 1e82badc32, issue closed** |
-| 8b | PAN-2204 | Agent direct-push-to-main guard (pre-push: block agent code pushes, allow state-plane paths) | design in issue comment 2026-07-02; **most urgent guardrail** — 3 unreviewed pushes + red-main #4 today |
+| 8b | PAN-2204 | Agent direct-push-to-main guard | **DONE — delivered inside PAN-2227 (PR #2268): `scripts/guard-agent-main-push.sh` wired into `.husky/pre-push`; issue closed** |
 
 ## Phase 2 — route thinning (the three biggest god files, done right)
 
@@ -57,7 +57,7 @@ line-count metric while keeping the module shallow — the workspaces split prov
 
 | # | Issue | Target | Notes |
 |---|---|---|---|
-| 9 | PAN-2148 | `routes/issues.ts` (4,065) | **PRD written — on main** |
+| 9 | PAN-2148 | `routes/issues.ts` (4,065) | **DISPATCHED 2026-07-03 — GPT-5.5 work agent** (spec promoted, 9 items; PRD re-verified against post-Phase-0 main) |
 | 10 | PAN-2147 | `routes/agents.ts` (4,071) | **PRD written — on main** |
 | 11 | PAN-2145 | `routes/conversations.ts` (5,316 — grew +418 while gated) | **PRD written — on main** (verify `## Re-verify at execution` against post-2156 main before dispatch) |
 
@@ -86,8 +86,10 @@ time, full suite before merge, verify against origin HEAD.
 ## Related in-pipeline items being shepherded alongside (not queue members)
 
 - PAN-2150 — RE-CLOSED 2026-07-02 with goal-met evidence (all Settings modules < 1,000 lines).
-- `strike/pan-1935` — implemented cost-recording fix stranded off-main; land or re-strike.
-- `feature-pan-1864` workspace/branch — planning-only residue for a now-closed issue; clean up.
+- PAN-2258 — strike agents invisible in issue tree; **FIXED — PR #2271 merged 2026-07-03** (reducer projection + regression test), issue closed.
+- `strike/pan-1935` — implemented cost-recording fix stranded off-main; land or re-strike (still outstanding).
+- `feature-pan-1864` workspace/branch — cleaned up 2026-07-03 (worktree removed, local branch deleted; no remote existed).
+- Close-out label debt: PAN-2153/2154 labels still read `in-review` and PAN-2151/2156/2227 sit `verifying-on-main` post-merge — close-out ceremony blocked on PAN-2260 (squash-blind unmerged-commits check), which is itself in the pipeline.
 
 ## PRD skip list (deliberately not written ahead)
 
