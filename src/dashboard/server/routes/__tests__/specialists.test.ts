@@ -32,6 +32,10 @@ const {
   updateSpecialistHandoffStatusMock,
   queryBeadByIdMock,
   syncBeadStatusToVBriefMock,
+  loadConfigSyncMock,
+  readWorkspacePlanSyncMock,
+  readTierOverridesMock,
+  recordTierPromotionMock,
 } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
   setReviewStatusMock: vi.fn(),
@@ -47,6 +51,10 @@ const {
   updateSpecialistHandoffStatusMock: vi.fn(),
   queryBeadByIdMock: vi.fn(),
   syncBeadStatusToVBriefMock: vi.fn(),
+  loadConfigSyncMock: vi.fn(),
+  readWorkspacePlanSyncMock: vi.fn(),
+  readTierOverridesMock: vi.fn(),
+  recordTierPromotionMock: vi.fn(),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -131,6 +139,24 @@ vi.mock('../../../../lib/vbrief/beads.js', () => ({
   syncBeadStatusToVBrief: syncBeadStatusToVBriefMock,
 }));
 
+vi.mock('../../../../lib/vbrief/io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/vbrief/io.js')>();
+  return {
+    ...actual,
+    readWorkspacePlanSync: readWorkspacePlanSyncMock,
+    readTierOverrides: readTierOverridesMock,
+    recordTierPromotion: recordTierPromotionMock,
+  };
+});
+
+vi.mock('../../../../lib/config-yaml.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/config-yaml.js')>();
+  return {
+    ...actual,
+    loadConfigSync: loadConfigSyncMock,
+  };
+});
+
 import { specialistsRouteLayer } from '../specialists.js';
 import { EventStoreService } from '../../services/domain-services.js';
 
@@ -195,6 +221,21 @@ describe('POST /api/specialists/done — inspect verdict surface', () => {
     updateSpecialistHandoffStatusMock.mockReturnValue(Effect.succeed(false));
     queryBeadByIdMock.mockReturnValue(Effect.succeed(null));
     syncBeadStatusToVBriefMock.mockReturnValue(Effect.succeed(null));
+    loadConfigSyncMock.mockReturnValue({
+      config: {
+        tieredExecution: {
+          enabled: false,
+          escalation: {
+            enabled: false,
+            retries_at_tier: 0,
+            max_promotions: 0,
+            flounder_budget_minutes: {},
+          },
+        },
+      },
+    });
+    readWorkspacePlanSyncMock.mockReturnValue(null);
+    readTierOverridesMock.mockReturnValue({});
   });
 
   it('passed verdict persists inspectStatus and saves the checkpoint via onInspectComplete (ac1)', async () => {
@@ -241,6 +282,56 @@ describe('POST /api/specialists/done — inspect verdict surface', () => {
     // failed → transitionIssueToInProgress rule, and no checkpoint is saved.
     expect(transitionIssueToInProgressMock).not.toHaveBeenCalled();
     expect(onInspectCompleteMock).not.toHaveBeenCalled();
+    expect(recordTierPromotionMock).not.toHaveBeenCalled();
+  });
+
+  it('failed inspect verdict promotes effective difficulty when tiered escalation is enabled', async () => {
+    loadConfigSyncMock.mockReturnValue({
+      config: {
+        tieredExecution: {
+          enabled: true,
+          escalation: {
+            enabled: true,
+            retries_at_tier: 0,
+            max_promotions: 1,
+            flounder_budget_minutes: {},
+          },
+        },
+      },
+    });
+    readWorkspacePlanSyncMock.mockReturnValue({
+      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      plan: {
+        id: 'pan-9999',
+        title: 'plan',
+        status: 'running',
+        metadata: {},
+        items: [{
+          id: 'pan-9999-3',
+          title: 'blocked bead',
+          status: 'running',
+          metadata: { difficulty: 'simple' },
+        }],
+        edges: [],
+      },
+    });
+
+    const { status, body } = await postDone({
+      specialist: 'inspect',
+      issueId: 'pan-9999',
+      status: 'failed',
+      notes: 'Bead pan-9999-3 BLOCKED: widget.ts:12 renders outside the frobnicator panel (ac1 unmet)',
+    });
+
+    expect(status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(recordTierPromotionMock).toHaveBeenCalledWith(
+      WORKSPACE_PATH,
+      'pan-9999-3',
+      'simple',
+      'medium',
+      'supervisor blocked commit unknown',
+    );
   });
 
   it('non-inspect specialist failure still transitions the tracker (the inspect exemption is deliberate)', async () => {

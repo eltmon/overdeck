@@ -15,7 +15,7 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
@@ -31,7 +31,10 @@ import type { ProjectConfig } from '../projects.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import { parseVBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import { subItemsOf, type VBriefDocument, type VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDifficulty, type VBriefDocument, type VBriefItemStatus } from './types.js';
+import type { TierOverridesMap } from './continue-state.js';
+
+export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry } from './continue-state.js';
 
 /**
  * Synchronous spec lookup that mirrors what `findSpecByIssue` did pre-PAN-1249.
@@ -120,6 +123,10 @@ function projectRootFromWorkspace(workspacePath: string): string {
 
 function workspaceDraftPath(workspacePath: string): string {
   return join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+}
+
+function workspaceContinuePath(workspacePath: string): string {
+  return join(workspacePath, PAN_DIRNAME, 'continue.json');
 }
 
 export function findWorkspaceDraftPlanSync(workspacePath: string): string | null {
@@ -242,6 +249,52 @@ function readStatusOverridesSync(workspacePath: string): Record<string, string> 
   const project = resolveProjectForWorkspace(workspacePath);
   if (!project) return undefined;
   return readIssueRecordSync(project, issueId)?.statusOverrides;
+}
+
+export function readTierOverrides(workspacePath: string): TierOverridesMap {
+  const path = workspaceContinuePath(workspacePath);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const parsed = JSON.parse(raw) as { tierOverrides?: TierOverridesMap };
+    return parsed.tierOverrides ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export function recordTierPromotion(
+  workspacePath: string,
+  beadId: string,
+  from: VBriefDifficulty,
+  to: VBriefDifficulty,
+  reason: string,
+): void {
+  const path = workspaceContinuePath(workspacePath);
+  let state: Record<string, unknown> = {};
+  try {
+    state = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    state = {};
+  }
+
+  const current = (state.tierOverrides && typeof state.tierOverrides === 'object')
+    ? state.tierOverrides as TierOverridesMap
+    : {};
+  const existing = current[beadId];
+  const nextOverrides: TierOverridesMap = {
+    ...current,
+    [beadId]: {
+      effectiveDifficulty: to,
+      promotions: (existing?.promotions ?? 0) + 1,
+      history: [
+        ...(existing?.history ?? []),
+        { at: new Date().toISOString(), from, to, reason },
+      ],
+    },
+  };
+
+  mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
+  writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides }, null, 2), 'utf-8');
 }
 
 /**
