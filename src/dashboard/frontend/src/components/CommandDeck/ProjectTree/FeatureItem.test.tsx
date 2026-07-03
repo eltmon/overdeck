@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { DialogProvider } from '../../DialogProvider';
-import { FeatureItem, pickBestSession } from './FeatureItem';
+import { FeatureItem, isWorkOrSpecialistSession, pickBestSession } from './FeatureItem';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 import { resolveUatActions } from '../uat-actions';
 import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
@@ -226,6 +226,19 @@ function renderReadyForMergeFeature() {
 }
 
 // ─── pickBestSession ──────────────────────────────────────────────────────────
+
+describe('isWorkOrSpecialistSession', () => {
+  it.each(['work', 'strike', 'planning', 'review', 'reviewer', 'test', 'ship', 'merge'])(
+    'returns true for %s sessions',
+    (type) => {
+      expect(isWorkOrSpecialistSession({ type } as SessionNodeType)).toBe(true);
+    },
+  );
+
+  it('returns false for non-work and non-specialist sessions', () => {
+    expect(isWorkOrSpecialistSession({ type: 'legacy' } as SessionNodeType)).toBe(false);
+  });
+});
 
 describe('pickBestSession', () => {
   it('returns null for empty sessions', () => {
