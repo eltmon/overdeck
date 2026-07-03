@@ -190,10 +190,14 @@ multica/
 __pycache__/
 .beads/.~issues.jsonl.*
 /.brake-salvage/
-/conv-*.jpeg
-/reconnect-*.jpeg
-/deeplink-*.jpeg
-/overdeck-feature-graph.png
+# Root-level images are debug/UAT artifacts — screenshots belong in docs/screenshots/<topic>/
+# (see docs/REPO-ARTIFACTS.md). Docs-site images live in images/ and logo/.
+/*.png
+/*.jpg
+/*.jpeg
+/excalidraw.log
+# Per-workspace scaffold env, not a template — never track (held a DB password once)
+/.env.remote
 /SYSTEM-RESOURCE-REPORT-*.md
 
 # Pre-launch sensitive marketing strategy (rebrand candidates, fundraising) — keep local
