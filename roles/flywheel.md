@@ -181,6 +181,18 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    runtime truth from sandbox-safe CLI surfaces (they read SQLite/`sequence.md` directly — no
    HTTP, so they work even when your harness sandboxes localhost): `pan review pending --ready`,
    `pan flywheel merge-blockers --json`, `pan backlog forecast`.
+   **Then verify agents are ACTUALLY moving, not merely alive — EVERY tick.** A live tmux
+   session ≠ a working agent (agents idle at a prompt, wedge mid-task, or die with a dead pane
+   while the session persists). Run the two-snapshot activity check (skill `pan-agent-activity`):
+   hash each running agent/review/test/slot pane, wait ~25s, re-hash. A byte-identical pane that
+   is NOT at a done-marker (`pan done completed`, review "no blocking findings", "slot N work
+   complete") is **stalled**. Read the stalled pane and **root-cause** it, don't nudge it: dead
+   pane (crash → why?); `OVERDECK_SPECIALIST_RESULT: review-agent failed` (often a FALSE signal —
+   the verdict was journaled; confirm in `overdeck.db` `review_status`, NOT the stale
+   `panopticon.db`, before re-dispatching); `refresh token was revoked` (a lone stale agent, not
+   fleet-wide — verify with `codex login status`; gpt-5.5 uses the **codex** harness auth
+   `~/.codex/auth.json`, NOT ohmypi); workspace-stack crash. A stalled agent is a substrate bug
+   to fix at the root (Mission #4), never a `pan tell` band-aid.
 2. **Orient.** Classify each issue: healthy, ghost, stuck, stalled, wrong-column, reverting,
    awaiting-UAT, merge-ready, blocked. Relevance-vet every launch candidate (above). An idle
    issue is a bug unless explicitly parked with a concrete reason.
