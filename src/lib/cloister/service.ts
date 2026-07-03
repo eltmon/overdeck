@@ -1,3 +1,4 @@
+/** Cloister service: core monitoring for all running agents. */
 import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
@@ -11,10 +12,9 @@ import {
   getAgentsToKill,
   getAgentsNeedingAttention,
 } from './health.js';
-import {
-  writeHealthEvent,
-  getLatestHealthEvent,
-} from '../overdeck/health-events.js';
+import { writeHealthEvent, getLatestHealthEvent } from '../overdeck/health-events.js';
+// PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
+// are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
@@ -31,16 +31,9 @@ import {
   clearOldViolationsSync,
   type FPPViolation,
 } from './fpp-violations.js';
-import {
-  checkCostLimits,
-  getCostSummary,
-  type CostAlert,
-} from './cost-monitor.js';
+import { checkCostLimits, getCostSummary, type CostAlert } from './cost-monitor.js';
 import { reconcilePiCostEventsForRunningAgents } from './pi-cost-reconciler.js';
-import {
-  checkAndRotateIfNeeded,
-  type SessionRotationResult,
-} from './session-rotation.js';
+import { checkAndRotateIfNeeded, type SessionRotationResult } from './session-rotation.js';
 import {
   startDeacon,
   stopDeacon,
@@ -168,15 +161,6 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
   return ['plan', 'review', 'test'].includes(role) ? role as Role : null;
 }
 
-/**
- * PAN-1048 performance fix: O(1) direct state lookup instead of scanning
- * all agent directories. Roles use canonical IDs: agent-<issue-lower> for
- * work, agent-<issue-lower>-<role> for all others.
- *
- * Intentionally does NOT require tmuxActive — spawn routes write state.json
- * with status:'starting' before the tmux session attaches, so filtering on
- * tmuxActive would race-spawn a second run.
- */
 /**
  * Grace window for `starting` states without a tmux session yet. The
  * start-planning route deliberately writes state.json BEFORE the lifecycle
