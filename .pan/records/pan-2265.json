@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2265",
   "schemaVersion": 2,
-  "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T12:02:02.316Z",
-  "pipeline": {
-    "issueId": "PAN-2265",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T12:02:00.139Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,76 @@
       "timestamp": "2026-07-03T12:02:00.139Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-03T12:02:00.139Z",
+  "updated": "2026-07-03T13:26:21.560Z",
+  "pipeline": {
+    "issueId": "PAN-2265",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T13:26:21.479Z",
+    "inspectNotes": "workspace-06h3z passed. The diff implements the requested App REST Promise and Effect helpers in src/lib/github-app.ts, with tests covering owner-qualified PR head lookup, issue state lookup, paginated issue-label listing, PR filtering, and wrapper exports. No constraint violations found in the changed files."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 252319,
+            "output": 6836,
+            "cacheRead": 2101760,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 27490,
+            "output": 580,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 20527,
+            "output": 54696,
+            "cacheRead": 5610981,
+            "cacheWrite": 170267
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 252319,
+          "output": 6836,
+          "cacheRead": 2101760,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 27490,
+          "output": 580,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 20527,
+          "output": 54696,
+          "cacheRead": 5610981,
+          "cacheWrite": 170267
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.857253,
+        "pricingAsOf": "2026-07-03T13:26:21.559Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "gpt-5.5"
 }
