@@ -56,17 +56,16 @@
     "issueId": "PAN-2265",
     "reviewStatus": "failed",
     "testStatus": "passed",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T17:42:11.150Z",
+    "updatedAt": "2026-07-03T18:05:02.355Z",
     "reviewNotes": "Verification failed at test",
     "testNotes": "npm run typecheck: clean; npm run lint: clean; focused vitest suites: tests/unit/lib/github-app.test.ts, tests/unit/cli/commands/flywheel-surfaces.test.ts, src/lib/cloister/__tests__/issue-closed.test.ts, src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts, tests/unit/lib/forge.test.ts, tests/unit/lib/github-graphql-cooldown.test.ts, tests/unit/lib/webhook-handlers.test.ts, tests/unit/dashboard/server/routes/issue-pr.test.ts, tests/unit/dashboard/server/routes/issue-discussions.test.ts — 9 files, 135 tests passed. Browser UAT not required: spec NonGoals exclude frontend changes and the issue is backend-only GitHub GraphQL/App-REST routing.",
-    "verificationNotes": "Verification FAILED at test (102460ms):\n\nmockResolvedValue\u001b[39m({ success\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/cloister/auto-resume-gating.test.ts\u001b[2m > \u001b[22mauto-resume gates\u001b[2m > \u001b[22mlogs verify-paused instead of manually-paused for merged paused agents\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/lib/cloister/auto-resume-gating.test.ts:\u001b[2m357:3\u001b[22m\u001b[39m\n    \u001b[90m355|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m356|\u001b[39m\n    \u001b[90m357|\u001b[39m   it('logs verify-paused instead of manually-paused for merged paused …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m358|\u001b[39m     \u001b[35mconst\u001b[39m agentId \u001b[33m=\u001b[39m \u001b[32m'agent-pan-1141-verify-paused'\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m359|\u001b[39m     resumeAgentMock\u001b[33m.\u001b[39m\u001b[34mmockResolvedValue\u001b[39m({ success\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/cloister/auto-resume-gating.test.ts\u001b[2m > \u001b[22mauto-resume gates\u001b[2m > \u001b[22mretries stopped work agents whose initial kickoff was never delivered even when runtime is idle\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/lib/cloister/auto-resume-gating.test.ts:\u001b[2m441:3\u001b[22m\u001b[39m\n    \u001b[90m439|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m440|\u001b[39m\n    \u001b[90m441|\u001b[39m   it('retries stopped work agents whose initial kickoff was never deli…\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m442|\u001b[39m     \u001b[35mconst\u001b[39m agentId \u001b[33m=\u001b[39m \u001b[32m'agent-pan-2093'\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m443|\u001b[39m     resumeAgentMock\u001b[33m.\u001b[39m\u001b[34mmockResolvedValue\u001b[39m({ success\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯\u001b[22m\u001b[39m\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
     "reviewedAtCommit": "c8b4a79f8098abbc248a1f395da71d33c1e6fb63",
-    "lastVerifiedCommit": "f47031d77c4684c4cad288ffe85fce8e015e515f",
+    "lastVerifiedCommit": "9db21d4f6b87fa07f2a64f80581fd34816683ea2",
     "reviewRequestedAt": "2026-07-03T17:35:27.728Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -173,8 +172,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 37726,
-            "output": 2843,
+            "input": 45638,
+            "output": 5558,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -189,9 +188,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1207161,
-            "output": 43298,
-            "cacheRead": 10245376,
+            "input": 1209433,
+            "output": 45104,
+            "cacheRead": 10932480,
             "cacheWrite": 0
           }
         }
@@ -204,8 +203,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 37726,
-          "output": 2843,
+          "input": 45638,
+          "output": 5558,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -216,15 +215,15 @@
           "cacheWrite": 170267
         },
         "custom/kimi-k2.7-code": {
-          "input": 1207161,
-          "output": 43298,
-          "cacheRead": 10245376,
+          "input": 1209433,
+          "output": 45104,
+          "cacheRead": 10932480,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.241013,
-        "pricingAsOf": "2026-07-03T17:42:11.247Z"
+        "usd": 11.380945,
+        "pricingAsOf": "2026-07-03T18:05:02.473Z"
       }
     },
     "merges": [
@@ -233,5 +232,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:40:19.407Z",
-  "updated": "2026-07-03T17:42:11.248Z"
+  "updated": "2026-07-03T18:05:02.494Z"
 }
