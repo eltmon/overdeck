@@ -111,9 +111,13 @@ export function surfaceIssueFeedbackNeedsYou(
   reason: string,
   details: Record<string, unknown> = {},
 ): void {
-  markWorkspaceStuck(issueId, 'feedback_delivery_needs_you', {
-    reason,
-    ...details,
-  });
+  try {
+    markWorkspaceStuck(issueId, 'feedback_delivery_needs_you', {
+      reason,
+      ...details,
+    });
+  } catch (err) {
+    console.warn(`[feedback-target] Failed to mark ${issueId} as needing human attention: ${err instanceof Error ? err.message : String(err)}`);
+  }
   console.warn(`[feedback-target] ${reason}`);
 }

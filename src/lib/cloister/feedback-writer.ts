@@ -32,17 +32,6 @@ export interface WriteFeedbackResult {
 }
 
 /**
- * Resolve workspace path from an issue ID.
- */
-function resolveWorkspacePath(issueId: string): string | null {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) return null;
-
-  const wsPath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  return existsSync(wsPath) ? wsPath : null;
-}
-
-/**
  * Get the next sequence number from existing files in the feedback directory.
  */
 async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
@@ -104,19 +93,21 @@ async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<Wri
   const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
 
   const resolved = resolveProjectFromIssueSync(opts.issueId);
-  if (!resolved) {
-    return { success: false, error: `Project not found for ${opts.issueId}` };
+  const workspacePath = opts.workspacePath || (resolved ? join(resolved.projectPath, 'workspaces', `feature-${opts.issueId.toLowerCase()}`) : undefined);
+  const projectRoot = resolved?.projectPath ?? (workspacePath ? join(workspacePath, '..', '..') : null);
+
+  if (!projectRoot) {
+    return { success: false, error: `Workspace or project not found for ${opts.issueId}` };
   }
 
   // Derive sequence number from continue-file feedback first, then keep the
   // workspace mirror numbering aligned if feedback files already exist.
   let seq = 1;
   try {
-    const existing = readContinueStateForIssue(resolved.projectPath, opts.issueId);
+    const existing = readContinueStateForIssue(projectRoot, opts.issueId);
     seq = (existing?.feedback?.length ?? 0) + 1;
   } catch { /* fall back to 1 */ }
 
-  const workspacePath = opts.workspacePath || resolveWorkspacePath(opts.issueId);
   if (workspacePath) {
     const { feedbackDir } = getWorkspacePanPaths(workspacePath);
     if (existsSync(feedbackDir)) {
@@ -142,7 +133,7 @@ async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<Wri
   // never reached the work agent → agent sat idle waiting).
   let continueStateWritten = false;
   try {
-    appendFeedbackEntryForIssue(resolved.projectPath, opts.issueId, {
+    appendFeedbackEntryForIssue(projectRoot, opts.issueId, {
       seq,
       specialist: opts.specialist,
       outcome: opts.outcome,
@@ -157,7 +148,7 @@ async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<Wri
     );
   }
   try {
-    appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
+    appendContinueSessionEntryForIssue(projectRoot, opts.issueId, {
       reason: 'feedback',
       note: `[${shortTimestamp}] ${opts.specialist} → ${opts.outcome.toUpperCase()} — seq ${seq}`,
     });
