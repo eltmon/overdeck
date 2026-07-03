@@ -42,6 +42,11 @@
       "reason": "feedback",
       "note": "[2026-06-29T21:25Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-06-29T21:25:14.762Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T07:33Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-07-03T07:33:31.100Z"
     }
   ],
   "feedback": [
@@ -58,10 +63,17 @@
       "outcome": "changes-requested",
       "timestamp": "2026-06-29T21:25:14Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2146\n\nWorkspace is detached and has unresolved conflict in .pan/records/pan-2146.json\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2146 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T07:33:31Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2146\n\nWorkspace is detached and has unresolved conflict in .pan/records/pan-2146.json\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2146 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-06-29T17:48:06.928Z",
-  "updated": "2026-06-29T21:26:41.702Z",
+  "updated": "2026-07-03T07:33:31.100Z",
   "pipeline": {
     "issueId": "PAN-2146",
     "reviewStatus": "blocked",
