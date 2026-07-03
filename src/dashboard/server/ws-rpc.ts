@@ -435,6 +435,8 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
     tags: session.tags,
     summary: session.summary ?? undefined,
     summaryDetailed: session.summaryDetailed ?? undefined,
+    conversationId: session.conversationId ?? undefined,
+    conversationName: session.conversationName ?? undefined,
     conversationTitle: session.conversationTitle ?? undefined,
     enrichmentLevel: session.enrichmentLevel,
     enrichmentModel: session.enrichmentModel ?? undefined,
