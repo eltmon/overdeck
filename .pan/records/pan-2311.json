@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2311",
   "schemaVersion": 2,
-  "created": "2026-07-03T16:27:54.316Z",
-  "updated": "2026-07-03T16:27:55.256Z",
-  "pipeline": {
-    "issueId": "PAN-2311",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:27:54.316Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,76 @@
       "timestamp": "2026-07-03T16:27:54.315Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-03T16:27:54.316Z",
+  "updated": "2026-07-03T17:24:59.156Z",
+  "pipeline": {
+    "issueId": "PAN-2311",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T17:24:58.800Z",
+    "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 316011,
+            "output": 9380,
+            "cacheRead": 2099712,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 22409,
+            "output": 319,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 41641,
+            "output": 57884,
+            "cacheRead": 7213371,
+            "cacheWrite": 227601
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 316011,
+          "output": 9380,
+          "cacheRead": 2099712,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 22409,
+          "output": 319,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 41641,
+          "output": 57884,
+          "cacheRead": 7213371,
+          "cacheWrite": 227601
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.59581,
+        "pricingAsOf": "2026-07-03T17:24:59.030Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "gpt-5.5"
 }
