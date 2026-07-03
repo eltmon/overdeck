@@ -11,23 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-03T01:01:10.061Z",
-  "updated": "2026-07-03T02:33:27.281Z",
+  "updated": "2026-07-03T05:22:18.024Z",
   "pipeline": {
     "issueId": "PAN-1917",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:33:27.250Z"
+    "updatedAt": "2026-07-03T05:22:17.770Z",
+    "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 695576,
+            "output": 44040,
+            "cacheRead": 4789760,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 7547,
-            "output": 225,
+            "input": 24531,
+            "output": 1024,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -42,9 +52,15 @@
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 695576,
+          "output": 44040,
+          "cacheRead": 4789760,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 7547,
-          "output": 225,
+          "input": 24531,
+          "output": 1024,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -56,13 +72,27 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 15.070673,
-        "pricingAsOf": "2026-07-03T02:33:27.280Z"
+        "usd": 22.264633,
+        "pricingAsOf": "2026-07-03T05:22:17.917Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "claude-code",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "perf-baseline": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "perf-baseline",
+        "agentId": "agent-pan-1917-slot-1",
+        "branch": "feature/pan-1917-slot-1",
+        "assignedAt": "2026-07-03T03:28:28.878Z"
+      }
+    ]
+  }
 }
