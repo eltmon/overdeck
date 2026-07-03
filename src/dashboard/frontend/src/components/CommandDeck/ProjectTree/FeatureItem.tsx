@@ -319,6 +319,25 @@ function formatPausedAge(pausedAt?: string): string | null {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function getTroubledBadgeLabel(session: SessionNodeType): string {
+  const queued = session.queuedMailCount ?? 0;
+  return queued > 0 ? `Troubled · ${queued} queued` : 'Troubled';
+}
+
+function getTroubledBadgeTitle(session: SessionNodeType): string {
+  const parts = [
+    `Session: ${session.sessionId}.`,
+    session.troubledReason ? `Reason: ${session.troubledReason}.` : 'Reason: unavailable.',
+    `Failures: ${session.consecutiveFailures ?? 0}.`,
+    session.troubledAt ? `Troubled at: ${session.troubledAt}.` : 'Troubled at: unavailable.',
+    `Queued deliveries: ${session.queuedMailCount ?? 0}.`,
+  ];
+  if ((session.consecutiveFailures ?? 0) === 0) {
+    parts.push('Likely spurious: troubled with 0 failures.');
+  }
+  return parts.join(' ');
+}
+
 function formatRoleList(roles: readonly string[]): string {
   if (roles.length === 0) return '';
   if (roles.length === 1) return roles[0]!;
@@ -993,6 +1012,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   // deliberately parked and must never read as generic "stopped".
   const pausedSession = feature.sessions?.find((s) => s.paused === true);
   const pausedAge = formatPausedAge(pausedSession?.pausedAt);
+  const troubledSessions = feature.sessions?.filter((s) => s.troubled === true) ?? [];
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -1121,6 +1141,21 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                   title={getAggregateBadgeTitle(badge, aggregateSessions)}
                 >
                   {badge.label}
+                </span>
+              ))}
+            </span>
+          )}
+          {troubledSessions.length > 0 && (
+            <span className={styles.featureBadgeGroup}>
+              {troubledSessions.map((session) => (
+                <span
+                  key={`troubled-${session.sessionId}`}
+                  className={`${styles.featureBadge} ${styles.featureBadge_troubled}`}
+                  data-testid="feature-troubled"
+                  title={getTroubledBadgeTitle(session)}
+                >
+                  <AlertTriangle size={10} aria-hidden />
+                  {getTroubledBadgeLabel(session)}
                 </span>
               ))}
             </span>

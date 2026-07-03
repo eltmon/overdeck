@@ -100,6 +100,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureBadge_running: 'featureBadge_running',
     featureBadge_stopped: 'featureBadge_stopped',
     featureBadge_error: 'featureBadge_error',
+    featureBadge_troubled: 'featureBadge_troubled',
     featureActivityError: 'featureActivityError',
     featureState: 'featureState',
     featureState_done: 'featureState_done',
@@ -414,6 +415,97 @@ describe('FeatureItem', () => {
     );
     expect(screen.getByText('▸ work')).toHaveAttribute('title', 'Work agent sessions for this issue: 1 total. 1 running.');
     expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
+  });
+
+  it('shows a warning troubled badge on the parent row', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              troubled: true,
+              troubledReason: 'PTY echo-confirm timed out',
+              troubledAt: '2026-07-02T18:30:00Z',
+              consecutiveFailures: 2,
+              queuedMailCount: 0,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    const badge = screen.getByTestId('feature-troubled');
+    expect(badge).toHaveTextContent('Troubled');
+    expect(badge).toHaveClass('featureBadge_troubled');
+  });
+
+  it('includes troubled details in the badge title', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              sessionId: 'agent-pan-821-slot-1',
+              troubled: true,
+              troubledReason: 'PTY echo-confirm timed out',
+              troubledAt: '2026-07-02T18:30:00Z',
+              consecutiveFailures: 3,
+              queuedMailCount: 4,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-troubled')).toHaveAttribute(
+      'title',
+      'Session: agent-pan-821-slot-1. Reason: PTY echo-confirm timed out. Failures: 3. Troubled at: 2026-07-02T18:30:00Z. Queued deliveries: 4.',
+    );
+  });
+
+  it('flags zero-failure troubled badges as likely spurious', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              troubled: true,
+              troubledReason: 'gate was set manually',
+              troubledAt: '2026-07-02T18:30:00Z',
+              consecutiveFailures: 0,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-troubled')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Likely spurious: troubled with 0 failures.'),
+    );
+  });
+
+  it('shows queued delivery count on troubled badges', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              troubled: true,
+              troubledReason: 'feedback queued',
+              consecutiveFailures: 1,
+              queuedMailCount: 3,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-troubled')).toHaveTextContent('Troubled · 3 queued');
   });
 
   it('shows a review error badge when a review session failed', () => {

@@ -373,6 +373,13 @@
   border-color: color-mix(in srgb, var(--warning) 32%, transparent);
 }
 
+.featureBadge_troubled {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning-foreground, var(--warning));
+  border-color: color-mix(in srgb, var(--warning) 46%, transparent);
+  font-weight: 700;
+}
+
 .featureBadge_stopped {
   background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
   color: var(--muted-foreground);
