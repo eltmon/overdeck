@@ -67,4 +67,16 @@ describe('.husky/pre-push', () => {
     expect(result.ok).toBe(true);
     expect(existsSync(join(root, 'guard-args.txt'))).toBe(false);
   });
+
+  it('skips the release guard for deleted release tags', () => {
+    const { root, hook } = makeHookFixture();
+    const zeroSha = '0000000000000000000000000000000000000000';
+    const remoteSha = '2222222222222222222222222222222222222222';
+
+    const result = runHook(root, hook, `${zeroSha} ${zeroSha} refs/tags/v1.2.3 ${remoteSha}\n`);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).not.toContain('Refusing to push v1.2.3');
+    expect(result.output).not.toContain('Release guard passed for v1.2.3');
+  });
 });
