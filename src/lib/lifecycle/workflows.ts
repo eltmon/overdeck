@@ -454,6 +454,9 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
           // diff failed — fall through to unmerged report
         }
 
+        const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, branchName);
+        if (githubMerged) return githubMerged;
+
         const { stdout: unmerged } = await execAsync(
           `git log main..${branchName} --oneline 2>/dev/null || true`,
           { cwd: ctx.projectPath, encoding: 'utf-8' },
@@ -506,6 +509,9 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
           // diff failed — fall through
         }
 
+        const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, `origin/${branchName}`);
+        if (githubMerged) return githubMerged;
+
         const { stdout: remoteUnmerged } = await execAsync(
           `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
           { cwd: ctx.projectPath, encoding: 'utf-8' },
@@ -534,6 +540,53 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
     return stepOk(step, ['Branch already cleaned up (squash-merged)']);
   } catch (err) {
     return stepFailed(step, `Could not verify merge: ${(err as Error).message}`);
+  }
+}
+
+type GitHubMergedPr = {
+  number?: number;
+  mergedAt?: string | null;
+  url?: string | null;
+};
+
+async function verifySquashMergedPrByBranch(
+  ctx: LifecycleContext,
+  branchName: string,
+  branchRef: string,
+): Promise<StepResult | null> {
+  if (!ctx.github) return null;
+
+  const step = 'close-out:verify-merged';
+  const { owner, repo } = ctx.github;
+
+  try {
+    const { stdout: prJson } = await execAsync(
+      `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(branchName)} --json number,mergedAt,url`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    const prs = JSON.parse(prJson) as GitHubMergedPr[];
+    const mergedPr = prs
+      .filter((pr) => typeof pr.mergedAt === 'string' && pr.mergedAt.length > 0)
+      .sort((a, b) => Date.parse(String(b.mergedAt)) - Date.parse(String(a.mergedAt)))[0];
+    if (!mergedPr?.mergedAt) return null;
+
+    const { stdout: tipDateRaw } = await execAsync(
+      `git show -s --format=%cI ${branchRef} 2>/dev/null`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    const tipDateMs = Date.parse(tipDateRaw.trim());
+    const mergedAtMs = Date.parse(mergedPr.mergedAt);
+    if (!Number.isFinite(tipDateMs) || !Number.isFinite(mergedAtMs)) return null;
+
+    if (tipDateMs <= mergedAtMs) {
+      const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+      return stepOk(step, [`${prLabel} is squash-merged and ${branchName} has no post-merge commits`]);
+    }
+
+    const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
+    return stepFailed(step, `${branchName} has commits newer than merged ${prLabel}; inspect before closing out.`);
+  } catch {
+    return null;
   }
 }
 

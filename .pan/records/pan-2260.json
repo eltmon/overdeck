@@ -1,0 +1,30 @@
+{
+  "issueId": "PAN-2260",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-03T04:04:30.342Z",
+  "updated": "2026-07-03T04:04:30.369Z",
+  "pipeline": {
+    "issueId": "PAN-2260",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T04:04:30.344Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-03T04:04:30.368Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}
