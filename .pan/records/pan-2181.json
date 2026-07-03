@@ -157,30 +157,65 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T11:02:23.657Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T11:11:03.893Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T11:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-03T11:12:30.374Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T11:12Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T11:12:31.820Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T11:12:30Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nBootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T11:12:31Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nBootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-03T11:02:23.658Z",
+  "updated": "2026-07-03T11:14:14.486Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "verifying",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:02:03.550Z",
-    "reviewNotes": "No blocking findings; 120s default and modal tokenization review passed at 8cd20df.",
+    "updatedAt": "2026-07-03T11:14:14.461Z",
+    "reviewNotes": "BootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
-    "reviewedAtCommit": "8cd20df7847ca2f2aba6d7297e85ea173aedfa97",
-    "lastVerifiedCommit": "8f87be9adc77cd90b3c8705533e83a0d6cf72da9",
+    "lastVerifiedCommit": "373becf50b32d3f950651c662182db79a45e4792",
     "reviewRequestedAt": "2026-07-03T00:50:22.647Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 282,
+            "output": 4650,
+            "cacheRead": 1702700,
+            "cacheWrite": 7610
+          },
           "anthropic/claude-opus-4-8": {
             "input": 145,
             "output": 8006,
@@ -222,6 +257,12 @@
         }
       },
       "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 282,
+          "output": 4650,
+          "cacheRead": 1702700,
+          "cacheWrite": 7610
+        },
         "anthropic/claude-opus-4-8": {
           "input": 33503,
           "output": 68092,
@@ -248,8 +289,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 16.403322,
-        "pricingAsOf": "2026-07-03T11:02:03.651Z"
+        "usd": 18.436468,
+        "pricingAsOf": "2026-07-03T11:14:14.484Z"
       }
     },
     "merges": [
