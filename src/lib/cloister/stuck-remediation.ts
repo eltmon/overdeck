@@ -1,6 +1,4 @@
-import { execFile } from 'child_process';
 import { Effect } from 'effect';
-import { promisify } from 'util';
 import {
   getAgentRuntimeStateSync,
   listRunningAgentsSync,
@@ -23,8 +21,7 @@ import {
   writeStuckRemediationState,
   type StuckRemediationState,
 } from './stuck-remediation-state.js';
-
-const execFileAsync = promisify(execFile);
+import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type ReadyBeadsByIssue } from '../beads-query.js';
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -41,15 +38,21 @@ function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
   return status.verificationStatus === 'failed' || status.testStatus === 'failed';
 }
 
-async function hasReadyBeads(agent: AgentState, issueLabel: string): Promise<boolean> {
-  const { stdout } = await execFileAsync('bd', ['ready', '-l', issueLabel], {
-    cwd: agent.workspace,
-    encoding: 'utf-8',
-    timeout: 10_000,
-  });
-  return String(stdout)
-    .split('\n')
-    .some((line) => /^[○◐]\s+workspace-/i.test(line.trim()));
+function hasReadyBeads(readyByQueryRoot: Map<string, ReadyBeadsByIssue>, agent: AgentState, issueLabel: string): boolean {
+  return (readyByQueryRoot.get(resolveBeadsQueryRoot(agent.workspace))?.[issueLabel] ?? []).length > 0;
+}
+
+function shouldCheckReadyBeadsForAgent(agent: AgentState, now: number): boolean {
+  const agentId = agent.id;
+  if (!agentId) return false;
+  if (agent.status !== 'running') return false;
+  if (agent.role !== 'work') return false;
+  if (!agent.workspace) return false;
+  const completedAt = (agent as AgentState & { completedAt?: string }).completedAt;
+  if (agent.paused || agent.troubled || completedAt) return false;
+  if (!sessionExistsSync(agentId)) return false;
+  if (shouldSkipReviewStatus(getReviewStatusSync(issueIdForAgent(agent)))) return false;
+  return isAgentIdleForNudge(agentId, 5 * 60 * 1000, now);
 }
 
 function firstStuckAt(runtimeLastActivity: string, stuckState: StuckRemediationState | null): string {
@@ -89,6 +92,7 @@ async function evaluateAgent(
   config: StuckRemediationConfig,
   now: number,
   actions: string[],
+  readyByQueryRoot: Map<string, ReadyBeadsByIssue>,
 ): Promise<void> {
   const agentId = agent.id;
   if (!agentId) return;
@@ -109,13 +113,11 @@ async function evaluateAgent(
     await evaluateAutoPlanningAgent(agent, config, now, actions);
     return;
   }
-  if (agent.role !== 'work') return;
+  if (!shouldCheckReadyBeadsForAgent(agent, now)) return;
+  if (!agent.workspace) return;
 
   const issueId = issueIdForAgent(agent);
-  const reviewStatus = getReviewStatusSync(issueId);
-  if (shouldSkipReviewStatus(reviewStatus)) return;
-  if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
-  if (await hasReadyBeads(agent, issueId.toLowerCase())) return;
+  if (hasReadyBeads(readyByQueryRoot, agent, issueId.toLowerCase())) return;
 
   const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
   if (lastActivityMs === null) return;
@@ -413,14 +415,30 @@ export async function checkStuckAgentRemediation(opts: StuckRemediationOptions =
   const actions: string[] = [];
   const now = opts.now ?? Date.now();
   const runningAgents = listRunningAgentsSync();
+  const readyByQueryRoot = new Map<string, ReadyBeadsByIssue>();
+  const workAgentsByQueryRoot = new Map<string, AgentState[]>();
   let sawFlywheelOrchestrator = false;
+
+  for (const agent of runningAgents) {
+    if (!shouldCheckReadyBeadsForAgent(agent, now)) continue;
+    const queryRoot = resolveBeadsQueryRoot(agent.workspace);
+    const workspaceAgents = workAgentsByQueryRoot.get(queryRoot) ?? [];
+    workspaceAgents.push(agent);
+    workAgentsByQueryRoot.set(queryRoot, workspaceAgents);
+  }
+
+  for (const [queryRoot, workspaceAgents] of workAgentsByQueryRoot) {
+    const issueIds = workspaceAgents.map(issueIdForAgent);
+    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(queryRoot, issueIds, { acquisitionTimeoutMs: 500 }));
+    readyByQueryRoot.set(queryRoot, ready.byIssue);
+  }
 
   for (const agent of runningAgents) {
     if (agent.id === FLYWHEEL_ORCHESTRATOR_AGENT_ID || agent.role === 'flywheel') {
       sawFlywheelOrchestrator = true;
     }
     try {
-      await evaluateAgent(agent, config, now, actions);
+      await evaluateAgent(agent, config, now, actions, readyByQueryRoot);
     } catch (error) {
       const agentId = agent.id || '(unknown)';
       const message = `[deacon] stuck-remediation agent=${agentId} error=${error instanceof Error ? error.message : String(error)}`;
