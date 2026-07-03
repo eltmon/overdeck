@@ -1,28 +1,55 @@
 {
   "issueId": "PAN-2254",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-03T04:19:13.849Z",
+      "reason": "end",
+      "note": "No deviations. Full npm test initially failed under sandbox EPERM; escalated rerun passed. Delivered non-destructive unstick git repair classification and removed reset-hard advice from unstick, approve, and dashboard stuck surfaces."
+    }
+  ],
   "feedback": [],
   "created": "2026-07-03T04:02:51.756Z",
-  "updated": "2026-07-03T04:18:59.218Z",
+  "updated": "2026-07-03T04:19:22.033Z",
   "pipeline": {
     "issueId": "PAN-2254",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:02:51.759Z"
+    "updatedAt": "2026-07-03T04:19:21.919Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2272",
+    "reviewRequestedAt": "2026-07-03T04:19:13.851Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7351,
+            "output": 416,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7351,
+          "output": 416,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:02:51.783Z"
+        "pricingAsOf": "2026-07-03T04:19:22.027Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2272"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
