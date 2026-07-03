@@ -4,7 +4,7 @@
     "created": "2026-07-03T11:06:28.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2284: boot-reconciliation Resume All reports 0 resumed — candidate list is full of stale (workspace-missing) and already-completed agents",
-    "updated": "2026-07-03T11:15:19.002Z"
+    "updated": "2026-07-03T12:59:57.478Z"
   },
   "plan": {
     "id": "pan-2284",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "86450946-a930-4bbc-b72a-fd23356b1267",
     "author": "agent:claude-opus-4-8",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-03T11:06:28.000Z",
-    "updated": "2026-07-03T11:15:19.002Z",
+    "updated": "2026-07-03T12:59:57.478Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2284",
@@ -55,7 +55,7 @@
       {
         "id": "shared-classifier",
         "title": "Add shared synchronous bootReconciliationSkipReason(agent) classifier",
-        "status": "running",
+        "status": "completed",
         "priority": "high",
         "created": "2026-07-03T11:06:28.000Z",
         "metadata": {
@@ -98,36 +98,41 @@
           {
             "id": "shared-classifier.ac1",
             "title": "bootReconciliationSkipReason returns 'workspace_missing' for an agent whose workspace path is null or does not exist on disk, and null for one whose workspace exists (all other fields clean)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-07-03T12:59:57.478Z"
           },
           {
             "id": "shared-classifier.ac2",
             "title": "Returns 'merged' when review.mergeStatus==='merged', when agent.merged===true, and when review is readyForMerge with reviewStatus and testStatus both 'passed'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-07-03T12:59:57.478Z"
           },
           {
             "id": "shared-classifier.ac3",
             "title": "Returns 'completed' only when an agent-dir completed (or completed.processed) marker exists AND review and test both 'passed'; returns null when the marker exists but review is 'blocked' (the resume-flipping case stays out of the classifier)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-07-03T12:59:57.478Z"
           },
           {
             "id": "shared-classifier.ac4",
             "title": "npm run build produces a bundle and logs no ESM import-cycle error, proving the classifier module introduces no cycle",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-07-03T12:59:57.478Z"
           }
-        ]
+        ],
+        "completed": "2026-07-03T12:59:57.478Z"
       },
       {
         "id": "candidate-filter",
