@@ -276,6 +276,49 @@ describe('SessionNode', () => {
     expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconRunning')).toBeTruthy();
   });
 
+  it('renders ended sessions as dead even when the runtime snapshot still says working', () => {
+    runtimeById['planning-dead'] = {
+      activity: 'working',
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'planning-dead',
+          type: 'planning',
+          presence: 'ended',
+          status: 'stopped',
+        })}
+      />,
+    );
+
+    const row = screen.getByText('Planning').closest('button');
+    expect(row?.querySelector('.sessionIconRunning')).toBeNull();
+    expect(screen.queryByText('2m')).toBeNull();
+  });
+
+  it('falls back to ended presence for status dots when stale runtime activity says working', () => {
+    runtimeById['reviewer-dead'] = {
+      activity: 'working',
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'reviewer-dead',
+          type: 'reviewer',
+          role: 'security',
+          presence: 'ended',
+          status: 'stopped',
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'ended');
+  });
+
   it('renders registered swarm slots as distinct openable terminal rows', () => {
     render(
       <div>

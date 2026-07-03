@@ -96,9 +96,11 @@ function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatu
 
 function effectiveActivity(runtime: AgentRuntimeSnapshot | undefined, presence: SessionNodeType['presence']): Activity | undefined {
   if (!runtime?.activity) return undefined;
+  const isEnded = presence === 'ended';
+  if (isEnded) return undefined;
   // agent.stopped sets activity="stopped" but tmux session may still be alive (pan done).
   // If presence says alive, treat as idle — the agent finished work but isn't dead.
-  if (runtime.activity === 'stopped' && presence !== 'ended') return 'idle';
+  if (runtime.activity === 'stopped' && !isEnded) return 'idle';
   return runtime.activity;
 }
 
@@ -661,7 +663,7 @@ export function SessionNode({
         lastHeardLabel,
       });
   const sessionModel = deriveSessionModel(session, defaultModel);
-  const isLiveActivity = !isPaused && (
+  const isLiveActivity = isLive && !isPaused && (
     statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
   );
   const iconStateClass = isPaused
@@ -671,7 +673,7 @@ export function SessionNode({
       : isLiveActivity
         ? (session.type === 'review' || session.type === 'reviewer' ? styles.sessionIconReview : styles.sessionIconRunning)
         : '';
-  const durationLabel = formatDuration(session.duration);
+  const durationLabel = isLive ? formatDuration(session.duration) : null;
 
   const restartLabel = session.type === 'review'
     ? 'Restart review'
