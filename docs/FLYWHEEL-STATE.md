@@ -207,6 +207,12 @@ Per-run detail lives in `~/.overdeck/flywheel/runs/RUN-N/report.md`. This file h
 - **Hands-off PAN-1791** — deacon-ignored, held until PAN-2214 lands. Do not dispatch, restart, or suggest actions for it.
 - **Hands-off PAN-2214** — a whole-issue agent is driving it end-to-end. Do not dispatch or restart anything for it, including its slot-2 kickoff-zombie (drop the watch; the driving agent owns it).
 
+## RUN-53 tick 11 (2026-07-03) — PAN-2257 planned; dual finalize saturates the bd lock (start deferred)
+
+- **PAN-2257 finalized** (spec promoted to .pan/specs/, beads created; the planner itself hit a bd-lock timeout on auto-promotion and self-recovered via `pan plan done`). PAN-2261 mid-finalize (bead 1/5, slow under lock contention — it is planning the fix for the very lock it's fighting). PAN-2255 mid-finalize with self-raised `OVERDECK_BD_TIMEOUT_MS=180000` (useful knob — REUSABLE for lock-heavy windows).
+- **`pan start PAN-2257` hung >5 min** waiting on the bd lock held by the dual finalizes → killed by my command timeout, no partial state (no session/workspace created beyond the existing planning one). Deferred to next tick after finalizes drain. LESSON: never dispatch starts during active finalizes; sequence them.
+- PAN-2260 verdicts pending. UAT bundle unchanged (PAN-2254 #2272 + MIN-831 + MIN-846). Main GREEN (77539c2a96). Swap ~7.7/8.2 GB.
+
 ## RUN-53 tick 10 (2026-07-03) — planning FULLY restored (PAN-2275 fixed+deployed); codex plan path now works end-to-end
 
 - **PAN-2275 fixed + closed:** 35c9903c89 "fix: deliver codex planning kickoff" (spawn-planning-session.ts again). Deploy chain repeated as documented: pull → npm run build → `OVERDECK_NO_RESUME=1 pan restart --health-timeout 120000` (ms!) → re-kick all three plans → **verified prompts landed** (all three sessions actively Working, not just booted). The codex plan path took TWO stacked fixes: PAN-2274 (flag crash) then PAN-2275 (missing kickoff delivery) — when fixing a spawn path, verify the WHOLE lifecycle (boot AND kickoff AND first activity), not just the first failure mode.
