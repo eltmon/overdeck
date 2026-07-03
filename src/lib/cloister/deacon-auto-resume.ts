@@ -436,7 +436,10 @@ export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
 
 export async function redeliverUndeliveredKickoffs(): Promise<string[]> {
   const actions: string[] = [];
-  const states = listAgentStates({ status: 'running', role: 'work' });
+  const states = Array.from(new Map([
+    ...listAgentStates({ status: 'running', role: 'work' }),
+    ...listAgentStates({ status: 'running', role: 'flywheel' }),
+  ].map((state) => [state.id, state])).values());
 
   for (const state of states) {
     const agentId = state.id;

@@ -2630,6 +2630,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
+
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
@@ -3010,10 +3014,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
-
-  const stuckRemediationActions = await checkStuckAgentRemediation();
-  actions.push(...stuckRemediationActions);
-  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
   // that lost the port but keep running — and can run a second Deacon). Low
