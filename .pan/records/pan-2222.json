@@ -224,11 +224,11 @@
     "issueId": "PAN-2222",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:25:17.179Z",
+    "updatedAt": "2026-07-03T02:26:50.420Z",
     "reviewNotes": "feed.exclude is ignored by max_diff_bytes stat fallback",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - sync-sources/hooks/record-cost-event.js.map",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
@@ -312,10 +312,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 9664,
-            "output": 34270,
-            "cacheRead": 28213554,
-            "cacheWrite": 1092840
+            "input": 9803,
+            "output": 36381,
+            "cacheRead": 28989919,
+            "cacheWrite": 1096510
           }
         },
         "inspect": {
@@ -345,10 +345,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 28720,
-          "output": 98503,
-          "cacheRead": 38842686,
-          "cacheWrite": 1446525
+          "input": 28859,
+          "output": 100614,
+          "cacheRead": 39619051,
+          "cacheWrite": 1450195
         },
         "openai/gpt-5.5": {
           "input": 1784346,
@@ -364,8 +364,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 80.682916,
-        "pricingAsOf": "2026-07-03T02:25:17.203Z"
+        "usd": 81.612097,
+        "pricingAsOf": "2026-07-03T02:26:50.481Z"
       }
     },
     "merges": [
@@ -385,5 +385,5 @@
     ]
   },
   "created": "2026-07-02T23:14:10.593Z",
-  "updated": "2026-07-03T02:25:17.210Z"
+  "updated": "2026-07-03T02:26:50.485Z"
 }
