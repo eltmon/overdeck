@@ -35,9 +35,9 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T17:51:06.388Z",
+    "mergeStatus": "pending",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T18:21:39.926Z",
     "reviewNotes": "Review passed; remote branch verification now covers the prior close-out safety blocker",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "mergeNotes": "Workspace does not exist",
@@ -82,7 +82,7 @@
       },
       "costAtCloseOut": {
         "usd": 1.168293,
-        "pricingAsOf": "2026-07-03T17:51:06.918Z"
+        "pricingAsOf": "2026-07-03T18:21:39.965Z"
       }
     },
     "merges": [
@@ -91,5 +91,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T04:41:22.632Z",
-  "updated": "2026-07-03T17:51:06.919Z"
+  "updated": "2026-07-03T18:21:39.966Z"
 }
