@@ -24,7 +24,8 @@ import {
   ContextMenuSeparator,
   ContextMenuLabel,
 } from '../../shared/ContextMenu';
-import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
+import { IssueActionDialogHost, clearTroubledGateForAgent, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
+import { useAlert } from '../../DialogProvider';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
@@ -943,6 +944,7 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
+  const alert = useAlert();
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1086,6 +1088,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     }
   }, [onSelect, expanded, feature.issueId]);
 
+  const handleClearTroubled = useCallback((event: React.MouseEvent, sessionId: string) => {
+    event.stopPropagation();
+    void clearTroubledGateForAgent(sessionId, queryClient, alert).catch(() => undefined);
+  }, [alert, queryClient]);
+
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)
     : null;
@@ -1149,10 +1156,13 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <span className={styles.featureBadgeGroup}>
               {troubledSessions.map((session) => (
                 <span
+                  role="button"
+                  tabIndex={-1}
                   key={`troubled-${session.sessionId}`}
                   className={`${styles.featureBadge} ${styles.featureBadge_troubled}`}
                   data-testid="feature-troubled"
                   title={getTroubledBadgeTitle(session)}
+                  onClick={(event) => handleClearTroubled(event, session.sessionId)}
                 >
                   <AlertTriangle size={10} aria-hidden />
                   {getTroubledBadgeLabel(session)}
