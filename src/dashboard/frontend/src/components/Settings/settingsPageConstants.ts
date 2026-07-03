@@ -47,6 +47,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+  { id: 'tiered-execution', label: 'Tiered Execution', icon: Route },
   { id: 'cloister', label: 'Cloister', icon: Flag },
   { id: 'remote', label: 'Remote', icon: Globe },
   { id: 'voice', label: 'Voice', icon: Mic },

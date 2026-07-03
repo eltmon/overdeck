@@ -24,6 +24,10 @@ must list those assumptions in a `## Re-verify at execution` section; if the dep
 is so heavy the PRD would be guesswork, it is **deferred** (marked below) and written
 only when its predecessor lands.
 
+**Close-out status (2026-07-03):** PAN-2151, PAN-2153, PAN-2154, PAN-2156, and PAN-2227
+are fully closed out (issues closed, review status cleared) — the PAN-2260 squash-blind
+close gate fix landed via UAT batch and unblocked the ceremony.
+
 ## Phase 0 — COMPLETE (all four merged, 2026-07-02/03)
 
 | # | Issue | Target | Status |
@@ -57,8 +61,8 @@ line-count metric while keeping the module shallow — the workspaces split prov
 
 | # | Issue | Target | Notes |
 |---|---|---|---|
-| 9 | PAN-2148 | `routes/issues.ts` (4,065) | **DISPATCHED 2026-07-03 — GPT-5.5 work agent** (spec promoted, 9 items; PRD re-verified against post-Phase-0 main) |
-| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **PRD written — on main** |
+| 9 | PAN-2148 | `routes/issues.ts` (4,110) | **MERGED 2026-07-03** (UAT batch `uat/pan-cobalt-0703`, PR #2299) — 4,110 → 818 lines, 9 door modules in `src/lib/overdeck/` |
+| 10 | PAN-2147 | `routes/agents.ts` (4,071) | **DISPATCHED 2026-07-03 — GPT-5.5 work agent** |
 | 11 | PAN-2145 | `routes/conversations.ts` (5,316 — grew +418 while gated) | **PRD written — on main** (verify `## Re-verify at execution` against post-2156 main before dispatch) |
 
 ## Phase 3 — cloister core (pipeline machinery; supervised, sequenced, never batched)

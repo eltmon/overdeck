@@ -54,6 +54,7 @@ import {
   flywheelEnvExports,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
+  resolveSingleWorkTierSpawnParams,
   resolveFlywheelSpawnEnv,
   runAgentId,
   transitionIssueToInProgress,
@@ -106,7 +107,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       workspace: slot?.workspace ?? workspace,
       agentId: slot?.agentId,
       harness: slotHarness,
-      model: slotModel,
+      model: slot ? slotModel : options.model,
       prompt,
       role: 'work',
       allowHost: options.allowHost,
@@ -432,7 +433,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Determine model based on role configuration
   const modelSpawnKey = `${role}:${options.issueId}`;
-  const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
+  const singleTierParams = role === 'work' && options.slotItemId === undefined && options.slotIndex === undefined
+    ? resolveSingleWorkTierSpawnParams(options.workspace, options.model)
+    : {};
+  const selectedModel = determineModel({ model: singleTierParams.model ?? options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
@@ -455,7 +459,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   const resolvedHarness: RuntimeName = await resolveHarness({
-    explicit: options.harness,
+    explicit: options.harness ?? singleTierParams.harness,
     role,
     model: selectedModel,
   });

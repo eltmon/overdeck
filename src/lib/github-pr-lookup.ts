@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { isGitHubAppConfigured, listPullRequestsForHead } from '../../../lib/github-app.js';
+import { isGitHubAppConfigured, listPullRequestsForHead } from './github-app.js';
 
 const execFileAsync = promisify(execFile);
 

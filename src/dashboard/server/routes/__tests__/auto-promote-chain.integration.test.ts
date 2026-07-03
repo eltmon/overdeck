@@ -22,7 +22,7 @@ vi.mock('../../../../lib/activity-logger.js', () => ({
 import { planFinalizeCommand } from '../../../../cli/commands/plan-finalize.js';
 import { reconcileOrphanProposedSpecs } from '../../../../lib/cloister/orphan-proposed-reconciler.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
-import { completePlanningArtifacts, completePlanningAutoSpawn } from '../issues.js';
+import { completePlanningArtifacts, completePlanningAutoSpawn } from '../../../../lib/overdeck/planning-promotion.js';
 
 let testDir: string;
 let oldDashboardUrl: string | undefined;

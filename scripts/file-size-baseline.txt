@@ -11,10 +11,9 @@
 1413 src/dashboard/server/routes/command-deck.ts
 5306 src/dashboard/server/routes/conversations.ts
 1005 src/dashboard/server/routes/flywheel.ts
-4098 src/dashboard/server/routes/issues.ts
 1149 src/dashboard/server/routes/settings.ts
 1753 src/dashboard/server/routes/workspaces.ts
-1925 src/dashboard/server/routes/workspaces/merge-ops.ts
+1924 src/dashboard/server/routes/workspaces/merge-ops.ts
 1466 src/dashboard/server/services/issue-data-service.ts
 1317 src/dashboard/server/ws-rpc.ts
 3450 src/lib/cloister/deacon.ts

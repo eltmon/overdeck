@@ -47,12 +47,19 @@ export function shouldRefuseHostDashboardPort(input: {
   readonly mode: DashboardMode;
   readonly port: number;
   readonly hostDashboardApiPort?: number;
+  readonly runningInContainer?: boolean;
 }): boolean {
   const hostDashboardApiPort = input.hostDashboardApiPort ?? readHostDashboardApiPort();
   if (input.port !== hostDashboardApiPort) return false;
-  if (input.mode === 'peer') return true;
 
   const repoRoot = resolve(input.repoRoot);
+  const runningInContainer =
+    input.runningInContainer ?? (existsSync('/.dockerenv') || repoRoot === '/workspaces/overdeck');
+  if (runningInContainer) {
+    return false;
+  }
+  if (input.mode === 'peer') return true;
+
   if (isWorkspaceRepoRoot(repoRoot)) return true;
 
   const workspacesDir = resolve(repoRoot, '..');

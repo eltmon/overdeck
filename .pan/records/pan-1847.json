@@ -1288,6 +1288,36 @@
       "reason": "feedback",
       "note": "[2026-07-03T11:55Z] review-agent → FAILED — seq 243",
       "timestamp": "2026-07-03T11:55:43.397Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T12:09Z] review-agent → FAILED — seq 244",
+      "timestamp": "2026-07-03T12:09:32.108Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T12:12Z] review-agent → FAILED — seq 245",
+      "timestamp": "2026-07-03T12:12:45.283Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T12:17Z] review-agent → FAILED — seq 246",
+      "timestamp": "2026-07-03T12:17:24.485Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T12:19Z] review-agent → FAILED — seq 247",
+      "timestamp": "2026-07-03T12:19:31.857Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T12:23Z] review-agent → FAILED — seq 248",
+      "timestamp": "2026-07-03T12:23:12.239Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T12:47Z] review-agent → FAILED — seq 249",
+      "timestamp": "2026-07-03T12:47:52.058Z"
     }
   ],
   "feedback": [
@@ -2991,10 +3021,52 @@
       "outcome": "failed",
       "timestamp": "2026-07-03T11:55:43Z",
       "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 244,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T12:09:32Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 245,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T12:12:45Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 246,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T12:17:24Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 247,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T12:19:31Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 248,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T12:23:12Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 249,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-03T12:47:52Z",
+      "markdownBody": "# Review FAILED for PAN-1847\n\nVerification failed at test\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1847 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-06-16T16:16:39.356Z",
-  "updated": "2026-07-03T11:55:43.398Z",
+  "updated": "2026-07-03T12:47:52.059Z",
   "pipeline": {
     "issueId": "PAN-1847",
     "reviewStatus": "failed",

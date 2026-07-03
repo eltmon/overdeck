@@ -145,6 +145,10 @@ export type UnstickResult =
   | { httpStatus: 409; body: { success: false; error: string } }
   | { httpStatus: 200; body: { success: true; issueId: string; previousReason?: string } };
 
+export type UnstickGitRepairState =
+  | { safe: true }
+  | { safe: false; advice: string };
+
 /**
  * Core logic for POST /api/workspaces/:issueId/unstick.
  *
@@ -152,14 +156,14 @@ export type UnstickResult =
  * repaired), clears the persistent stuck marker, and invalidates stale
  * review/test results by resetting the lifecycle to pending.
  *
- * The recovery path requires `git reset --hard origin/main` which moves the
- * workspace HEAD away from the reviewed commit, making prior passed results
- * invalid. Keeping reviewStatus=passed after that would let the UI present
- * a stale approval. One atomic setReviewStatus() call clears stuck state and
- * resets the lifecycle in a single DB write and a single notifyPipeline event.
+ * The recovery path changes the project's main-branch state by committing,
+ * pushing, fast-forwarding, or otherwise reconciling it. Keeping
+ * reviewStatus=passed after that would let the UI present a stale approval.
+ * One atomic setReviewStatus() call clears stuck state and resets the
+ * lifecycle in a single DB write and a single notifyPipeline event.
  *
- * gitSafeState must be pre-verified by the caller (async git check). Passing
- * false returns 409 with recovery instructions before any DB mutation.
+ * gitRepairState must be pre-verified by the caller (async git check). An
+ * unsafe result returns 409 with recovery instructions before any DB mutation.
  *
  * Exported for unit testing — the route handler calls this and maps the result
  * directly to an HTTP response.
@@ -168,7 +172,7 @@ export function processUnstickRequest(
   issueId: string,
   workspaceExists: boolean,
   currentStatus: ReturnType<typeof getReviewStatusSync>,
-  gitSafeState: boolean,
+  gitRepairState: UnstickGitRepairState,
 ): UnstickResult {
   if (!workspaceExists) {
     return { httpStatus: 404, body: { success: false, error: 'Workspace does not exist' } };
@@ -177,14 +181,15 @@ export function processUnstickRequest(
     return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
   }
   // Enforce that the operator has actually repaired the git state before we
-  // clear the stuck flag. If local main is still ahead of origin/main, Deacon
-  // would immediately re-enter the same broken approve/merge path.
-  if (!gitSafeState) {
+  // clear the stuck flag. If project main still has local-only commits, remote
+  // commits, or uncommitted changes, Deacon would immediately re-enter the same
+  // broken approve/merge path.
+  if (!gitRepairState.safe) {
     return {
       httpStatus: 409,
       body: {
         success: false,
-        error: `Workspace git state is not yet repaired. Run: git reset --hard origin/main in the project repo, then retry.`,
+        error: `Workspace git state is not yet repaired. ${gitRepairState.advice} Then retry Unstick.`,
       },
     };
   }
@@ -208,26 +213,57 @@ export function processUnstickRequest(
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
 }
 
+function buildUnstickRepairAdvice(aheadCount: number, behindCount: number, dirty: boolean): string | null {
+  const steps: string[] = [];
+  if (dirty) {
+    steps.push('commit the project repo changes that should be preserved, or explicitly discard only changes known to be disposable');
+  }
+  if (aheadCount > 0 && behindCount > 0) {
+    steps.push(`reconcile local main with origin/main while preserving the ${aheadCount} local commit(s), then push the reconciled main`);
+  } else if (aheadCount > 0) {
+    steps.push(`push the ${aheadCount} local main commit(s) to origin/main`);
+  } else if (behindCount > 0) {
+    steps.push(`fast-forward local main from origin/main (${behindCount} commit(s) behind)`);
+  }
+  return steps.length > 0 ? `In the project repo, ${steps.join('; ')}.` : null;
+}
+
 /**
- * Check whether the project repo's local main branch is at or behind origin/main.
- * Returns true (safe) if main is not ahead of origin/main — i.e., the operator
- * has already run `git reset --hard origin/main` to discard the orphaned merge commit.
- * Returns false if main is still ahead (orphaned commit still present).
- * Returns true for any git error so a transient failure doesn't permanently block unstick.
+ * Check whether the project repo's local main branch matches origin/main and
+ * has no uncommitted changes. Unsafe states return recoverable instructions:
+ * push local-only commits, commit dirty work, fast-forward behind branches, or
+ * reconcile a true divergence. Never prescribe destructive reset.
+ *
+ * Returns safe for any git error so a transient failure doesn't permanently
+ * block unstick.
  */
-async function checkProjectGitSafeState(projectPath: string): Promise<boolean> {
+async function checkProjectGitRepairState(projectPath: string): Promise<UnstickGitRepairState> {
   try {
-    const { stdout } = await execAsync(
-      'git rev-list origin/main..main --count',
-      { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
-    );
-    const aheadCount = parseInt(stdout.trim(), 10) || 0;
-    return aheadCount === 0;
+    const [divergence, status] = await Promise.all([
+      execAsync(
+        'git rev-list --left-right --count main...origin/main',
+        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
+      ),
+      execAsync(
+        'git status --porcelain',
+        { cwd: projectPath, encoding: 'utf-8', timeout: 5000 }
+      ),
+    ]);
+    const [aheadRaw = '0', behindRaw = '0'] = divergence.stdout.trim().split(/\s+/);
+    const aheadCount = parseInt(aheadRaw, 10) || 0;
+    const behindCount = parseInt(behindRaw, 10) || 0;
+    const dirty = status.stdout.trim().length > 0;
+    const advice = buildUnstickRepairAdvice(aheadCount, behindCount, dirty);
+    return advice ? { safe: false, advice } : { safe: true };
   } catch {
     // If we can't check (no git repo, no origin/main), don't block the operator.
-    return true;
+    return { safe: true };
   }
 }
+
+export const __testInternals = {
+  buildUnstickRepairAdvice,
+};
 const postWorkspaceResetReviewRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/reset',
@@ -434,11 +470,11 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
     const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const skipGitCheck = current?.stuckReason === 'review_infrastructure_failure';
-    const gitSafeState = skipGitCheck
-      ? true
-      : yield* Effect.promise(() => checkProjectGitSafeState(projectPath));
+    const gitRepairState = skipGitCheck
+      ? { safe: true } as const
+      : yield* Effect.promise(() => checkProjectGitRepairState(projectPath));
 
-    const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitSafeState);
+    const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitRepairState);
     return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);
   }))
 );
