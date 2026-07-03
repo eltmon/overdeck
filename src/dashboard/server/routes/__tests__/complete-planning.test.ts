@@ -10,7 +10,7 @@ import {
   completePlanningAutoSpawnAndKill,
   completePlanningFilesToStage,
   completePlanningWorkspaceGitAddCommands,
-} from '../issues.js';
+} from '../../../../lib/overdeck/planning-promotion.js';
 import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 

@@ -125,6 +125,7 @@
   "src/lib/multi-tool-sync.ts",
   "src/lib/overdeck/discussions.ts",
   "src/lib/overdeck/issue-transitions.ts",
+  "src/lib/overdeck/planning-promotion.ts",
   "src/lib/overdeck/pull-requests.ts",
   "src/lib/overdeck/workspace-hygiene.ts",
   "src/lib/pan-dir/specs.ts",
