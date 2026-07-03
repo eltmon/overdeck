@@ -16,11 +16,108 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T19:57:55.789Z"
+    },
+    {
+      "timestamp": "2026-07-03T20:01:18.196Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T20:01:21.413Z"
     }
   ],
   "feedback": [],
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1917.json",
+      ".pan/test/result.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/sessions-feed-rpc.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/App/__tests__/routes.test.ts"
+    ],
+    "declaredScope": [
+      ".pan/drafts/pan-1917.md",
+      "packages/contracts/src/rpc.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+      "src/dashboard/server/routes/discovered-sessions.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/overdeck/discovered-sessions.ts",
+      "src/lib/overdeck/sessions-feed.ts",
+      "tests/bench/sessions-feed.bench.ts",
+      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+      "tests/unit/lib/overdeck/sessions-feed.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-1917.md",
+      ".pan/records/pan-1917.json",
+      ".pan/test/result.json",
+      "packages/contracts/src/rpc.ts",
+      "packages/contracts/src/types.ts",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+      "src/dashboard/server/routes/discovered-sessions.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/services/sessions-feed-rpc.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/overdeck/discovered-sessions.ts",
+      "src/lib/overdeck/sessions-feed.ts",
+      "tests/bench/sessions-feed.bench.ts",
+      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/overdeck/sessions-feed.test.ts"
+    ],
+    "recordedAt": "2026-07-03T20:00:46.282Z"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "perf-baseline": "completed",
     "conversation-identity": "completed",
@@ -70,18 +167,106 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T19:59:11.447Z",
+    "updatedAt": "2026-07-03T20:01:21.118Z",
     "reviewNotes": "No blocking findings in self-review",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
     "reviewedAtCommit": "9126825c00a93855c60e7ae1c32223da00000c56",
-    "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c"
+    "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
+    "reviewRequestedAt": "2026-07-03T20:01:18.204Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/records/pan-1917.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/App.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+        "src/dashboard/server/services/dashboard-db-task.ts",
+        "src/dashboard/server/services/sessions-feed-rpc.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/App/__tests__/routes.test.ts"
+      ],
+      "declaredScope": [
+        ".pan/drafts/pan-1917.md",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/App/AppRoutes.tsx",
+        "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+        "src/dashboard/frontend/src/App/routes.ts",
+        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+        "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+        "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+        "src/dashboard/server/routes/discovered-sessions.ts",
+        "src/dashboard/server/services/dashboard-db-worker.ts",
+        "src/dashboard/server/ws-rpc.ts",
+        "src/lib/overdeck/discovered-sessions.ts",
+        "src/lib/overdeck/sessions-feed.ts",
+        "tests/bench/sessions-feed.bench.ts",
+        "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+        "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+        "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+        "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+        "tests/unit/lib/overdeck/sessions-feed.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-1917.md",
+        ".pan/records/pan-1917.json",
+        ".pan/test/result.json",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/types.ts",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/App.test.tsx",
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/App/AppRoutes.tsx",
+        "src/dashboard/frontend/src/App/routes.ts",
+        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+        "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+        "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+        "src/dashboard/server/routes/discovered-sessions.ts",
+        "src/dashboard/server/services/dashboard-db-task.ts",
+        "src/dashboard/server/services/dashboard-db-worker.ts",
+        "src/dashboard/server/services/sessions-feed-rpc.ts",
+        "src/dashboard/server/ws-rpc.ts",
+        "src/lib/overdeck/discovered-sessions.ts",
+        "src/lib/overdeck/sessions-feed.ts",
+        "tests/bench/sessions-feed.bench.ts",
+        "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+        "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+        "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+        "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts",
+        "tests/unit/lib/overdeck/sessions-feed.test.ts"
+      ],
+      "recordedAt": "2026-07-03T20:00:46.282Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -120,9 +305,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 428365,
-            "output": 32636,
-            "cacheRead": 15926016,
+            "input": 878675,
+            "output": 42325,
+            "cacheRead": 17447936,
             "cacheWrite": 0
           }
         }
@@ -147,15 +332,15 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 428365,
-          "output": 32636,
-          "cacheRead": 15926016,
+          "input": 878675,
+          "output": 42325,
+          "cacheRead": 17447936,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 28.223207,
-        "pricingAsOf": "2026-07-03T19:59:11.485Z"
+        "usd": 28.978921,
+        "pricingAsOf": "2026-07-03T20:01:21.188Z"
       }
     },
     "merges": [
@@ -189,5 +374,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T19:59:11.504Z"
+  "updated": "2026-07-03T20:01:21.414Z"
 }
