@@ -23,7 +23,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T03:32:43.537Z",
-  "updated": "2026-07-03T14:02:34.570Z",
+  "updated": "2026-07-03T16:10:11.711Z",
   "pipeline": {
     "issueId": "PAN-2261",
     "reviewStatus": "pending",
@@ -101,5 +101,17 @@
       "tests/unit/lib/beads-query.test.ts"
     ],
     "recordedAt": "2026-07-03T14:02:34.568Z"
+  },
+  "statusOverrides": {
+    "reduce-bd-lock-contention": "completed",
+    "reduce-bd-lock-contention.ac1": "completed",
+    "reduce-bd-lock-contention.ac2": "completed",
+    "reduce-bd-lock-contention.ac3": "completed",
+    "reduce-bd-lock-contention.ac4": "completed",
+    "reduce-bd-lock-contention.ac5": "completed",
+    "reduce-bd-lock-contention.ac6": "completed",
+    "reduce-bd-lock-contention.ac7": "completed",
+    "reduce-bd-lock-contention.ac8": "completed",
+    "reduce-bd-lock-contention.ac9": "completed"
   }
 }
