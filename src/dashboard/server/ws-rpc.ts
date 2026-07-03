@@ -32,6 +32,7 @@ import { CostThresholdError } from '../../lib/conversations/enrichment/index.js'
 import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
+import type { SessionsFeedFilter, SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
@@ -449,6 +450,39 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
   };
 }
 
+function optional<T>(value: T | null | undefined): T | undefined {
+  return value ?? undefined;
+}
+
+export function toSessionsFeedRowSnapshot(row: SessionsFeedRow) {
+  return {
+    id: row.id,
+    source: row.source,
+    discoveredId: optional(row.discoveredId),
+    jsonlPath: optional(row.jsonlPath),
+    sessionId: optional(row.sessionId),
+    workspacePath: optional(row.workspacePath),
+    messageCount: row.messageCount,
+    firstTs: optional(row.firstTs),
+    lastTs: optional(row.lastTs),
+    primaryModel: optional(row.primaryModel),
+    tokenInput: row.tokenInput,
+    tokenOutput: row.tokenOutput,
+    estimatedCost: row.estimatedCost,
+    tags: row.tags,
+    summary: optional(row.summary),
+    enrichmentLevel: row.enrichmentLevel,
+    enrichmentFailed: row.enrichmentFailed,
+    overdeckManaged: row.overdeckManaged,
+    panIssueId: optional(row.panIssueId),
+    archivedAt: optional(row.archivedAt),
+    conversationId: optional(row.conversationId),
+    conversationName: optional(row.conversationName),
+    conversationTitle: optional(row.conversationTitle),
+    harness: optional(row.harness),
+  };
+}
+
 const DEFAULT_CONVERSATION_LIMIT = 50;
 const MAX_CONVERSATION_LIMIT = 500;
 
@@ -539,6 +573,38 @@ function normalizeConversationFilter(input: {
     notEnriched: input.notEnriched,
     limit: input.limit,
     offset: input.offset,
+  };
+}
+
+function normalizeSessionsFeedFilter(input: {
+  readonly harness?: string;
+  readonly workspacePath?: string;
+  readonly primaryModel?: string;
+  readonly managed?: boolean;
+  readonly unmanaged?: boolean;
+  readonly since?: string;
+  readonly before?: string;
+  readonly after?: string;
+  readonly minCost?: number;
+  readonly maxCost?: number;
+  readonly minMessages?: number;
+  readonly tags?: readonly string[];
+  readonly tools?: readonly string[];
+  readonly files?: readonly string[];
+  readonly issueId?: string;
+  readonly enrichmentLevel?: number;
+  readonly enriched?: boolean;
+  readonly notEnriched?: boolean;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly cursor?: string;
+  readonly source?: SessionsFeedFilter['source'];
+}): SessionsFeedFilter {
+  return {
+    ...normalizeConversationFilter(input),
+    ...normalizeConversationPagination(input.limit, input.offset),
+    cursor: input.cursor,
+    source: input.source,
   };
 }
 
@@ -1186,6 +1252,24 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           const { sessions, total } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter);
           return { sessions: sessions.map(toDiscoveredSessionSnapshot), count: sessions.length, total };
         }),
+
+      [WS_METHODS.listSessionsFeed]: (input) =>
+        Effect.promise(async () => {
+          const result = await runDashboardDbJob<{ rows: SessionsFeedRow[]; nextCursor: string | null }>(
+            'listSessionsFeed',
+            normalizeSessionsFeedFilter(input),
+          );
+          return {
+            rows: result.rows.map(toSessionsFeedRowSnapshot),
+            nextCursor: result.nextCursor,
+          };
+        }),
+
+      [WS_METHODS.getSessionsFeedFacets]: (input) =>
+        Effect.promise(async () => runDashboardDbJob(
+          'getSessionsFeedFacets',
+          normalizeSessionsFeedFilter(input),
+        )),
 
       [WS_METHODS.getDiscoveredSession]: (input) =>
         Effect.promise(async () => {
