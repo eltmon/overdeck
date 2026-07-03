@@ -104,6 +104,11 @@ interface TrackerState {
   lastFetchedAt: string | null;
 }
 
+interface GetIssuesCacheEntry {
+  issues: any[];
+  json: string | null;
+}
+
 /**
  * Cheap change detection for issue arrays.
  * Compares length + the most recent updatedAt timestamp instead of
@@ -281,6 +286,7 @@ export class IssueDataService {
   private planningRefreshActive = 0;
   private reviewStatusRefreshQueued = false;
   private reviewStatusRefreshIssueIds = new Set<string>();
+  private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
@@ -403,6 +409,40 @@ export class IssueDataService {
    * This is the hot path — must be fast.
    */
   getIssues(options?: { cycle?: string; includeCompleted?: boolean }): any[] {
+    return this.getIssuesCacheEntry(options).issues;
+  }
+
+  getIssuesJson(options?: { cycle?: string; includeCompleted?: boolean }): string {
+    const entry = this.getIssuesCacheEntry(options);
+    if (entry.json === null) {
+      entry.json = JSON.stringify(entry.issues);
+    }
+    return entry.json;
+  }
+
+  private getIssuesCacheEntry(options?: { cycle?: string; includeCompleted?: boolean }): GetIssuesCacheEntry {
+    const key = this.getIssuesCacheKey(options);
+    const cached = this.getIssuesCache.get(key);
+    if (cached) return cached;
+
+    const issues = this.computeIssues(options);
+    if (process.env.NODE_ENV !== 'production') {
+      Object.freeze(issues);
+    }
+    const entry: GetIssuesCacheEntry = { issues, json: null };
+    this.getIssuesCache.set(key, entry);
+    return entry;
+  }
+
+  private getIssuesCacheKey(options?: { cycle?: string; includeCompleted?: boolean }): string {
+    return `${options?.cycle ?? 'current'}|${options?.includeCompleted === true}`;
+  }
+
+  private invalidateGetIssuesCache(): void {
+    this.getIssuesCache.clear();
+  }
+
+  private computeIssues(options?: { cycle?: string; includeCompleted?: boolean }): any[] {
     let allIssues = [
       ...this.trackers.github.lastFetchedIssues,
       ...this.trackers.linear.lastFetchedIssues,
@@ -489,10 +529,11 @@ export class IssueDataService {
       };
     });
 
-    // Sort by updatedAt
-    allIssues.sort((a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    const updatedAtMs = new Map<any, number>();
+    for (const issue of allIssues) {
+      updatedAtMs.set(issue, Date.parse(issue.updatedAt) || 0);
+    }
+    allIssues.sort((a, b) => (updatedAtMs.get(b) ?? 0) - (updatedAtMs.get(a) ?? 0));
 
     return allIssues;
   }
@@ -716,10 +757,12 @@ export class IssueDataService {
   }
 
   private pushSnapshot(): void {
+    this.invalidateGetIssuesCache();
     this._onIssuesChanged?.(this.getIssues());
   }
 
   private pushUpdated(): void {
+    this.invalidateGetIssuesCache();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
     this.scheduleReviewStatusRefreshForIssues(cachedIssues);

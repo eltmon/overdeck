@@ -255,3 +255,76 @@ describe('IssueDataService GitHub closed issue window', () => {
     );
   });
 });
+
+describe('IssueDataService getIssues memoization', () => {
+  function makeCache() {
+    return {
+      getBackoffMs: () => 0,
+    };
+  }
+
+  function makeServiceWithIssues(issues: any[]) {
+    const service = new IssueDataService(makeCache() as any);
+    (service as any).trackers.github.lastFetchedIssues = issues;
+    (service as any).trackers.linear.lastFetchedIssues = [];
+    (service as any).trackers.rally.lastFetchedIssues = [];
+    return service;
+  }
+
+  it('returns the identical array instance across repeated getIssues calls without a data change', () => {
+    const service = makeServiceWithIssues([
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+    ]);
+
+    const first = service.getIssues();
+    const second = service.getIssues();
+
+    expect(second).toBe(first);
+  });
+
+  it('invalidates the memo when pushUpdated runs', () => {
+    const service = makeServiceWithIssues([
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+    ]);
+    const first = service.getIssues();
+    (service as any).trackers.github.lastFetchedIssues = [
+      { identifier: 'PAN-1', status: 'In Progress', updatedAt: '2026-07-02T00:00:00.000Z' },
+    ];
+
+    (service as any).pushUpdated();
+    const next = service.getIssues();
+
+    expect(next).not.toBe(first);
+    expect(next[0]?.status).toBe('In Progress');
+  });
+
+  it('reuses the cached serialized JSON string for repeated route responses', () => {
+    const service = makeServiceWithIssues([
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+    ]);
+    const stringifySpy = vi.spyOn(JSON, 'stringify');
+
+    const first = service.getIssuesJson();
+    const second = service.getIssuesJson();
+
+    expect(second).toBe(first);
+    expect(stringifySpy).toHaveBeenCalledTimes(1);
+    stringifySpy.mockRestore();
+  });
+
+  it('sorts with parse-once timestamps in the same order as the old Date comparator', () => {
+    const source = [
+      { identifier: 'PAN-3', status: 'Todo', updatedAt: '2026-06-30T00:00:00.000Z' },
+      { identifier: 'PAN-1', status: 'Todo', updatedAt: '2026-07-01T00:00:00.000Z' },
+      { identifier: 'PAN-2', status: 'Todo', updatedAt: '2026-07-02T00:00:00.000Z' },
+    ];
+    const service = makeServiceWithIssues(source);
+
+    const actual = service.getIssues().map((issue) => issue.identifier);
+    const expected = source
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .map((issue) => issue.identifier);
+
+    expect(actual).toEqual(expected);
+  });
+});
