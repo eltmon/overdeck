@@ -87,6 +87,14 @@ import {
   fetchIssuePullRequestDiff,
 } from '../../../lib/overdeck/pull-requests.js';
 import { fetchIssueDiscussions } from '../../../lib/overdeck/discussions.js';
+import {
+  cleanupAgentStateDirs,
+  cleanupWorkspaceForIssue,
+  copySettingsToWorkspace,
+  deepWipeIssue,
+  removeCompletionMarker,
+} from '../../../lib/overdeck/workspace-hygiene.js';
+import { runDestructiveIssueLifecycle } from '../../../lib/overdeck/issue-transitions.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -97,18 +105,6 @@ const execFileAsync = promisify(execFile);
 
 function getIssueDataService(): IssueDataService {
   return getSharedIssueService();
-}
-
-// ─── Exported async cleanup helpers (used by routes + tests) ─────────────────
-
-export async function cleanupAgentStateDirs(dirs: string[]): Promise<void> {
-  for (const dir of dirs) {
-    if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
-  }
-}
-
-export async function removeCompletionMarker(markerPath: string): Promise<void> {
-  if (existsSync(markerPath)) await rm(markerPath);
 }
 
 export interface CompletePlanningAutoSpawnResult {
@@ -465,201 +461,6 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     }
   }
   return join(homedir(), 'Projects');
-}
-
-async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Overdeck'): Promise<string[]> {
-  const githubCheck = isGitHubIssue(issueId);
-  if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
-    return ['No GitHub PR to close'];
-  }
-
-  const branchName = `feature/${issueId.toLowerCase()}`;
-  try {
-    const { stdout: prListRaw } = await execFileAsync(
-      'gh',
-      [
-        'pr', 'list',
-        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
-        '--head', branchName,
-        '--state', 'open',
-        '--json', 'number',
-        '--jq', '.[0].number',
-      ],
-      { encoding: 'utf-8', timeout: 15000 },
-    );
-    const prNumber = prListRaw.trim();
-    if (!prNumber) {
-      return ['No open PR found for branch'];
-    }
-
-    await execFileAsync(
-      'gh',
-      [
-        'pr', 'close', prNumber,
-        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
-        '--comment', reason,
-      ],
-      { encoding: 'utf-8', timeout: 15000 },
-    );
-    try {
-      const { setReviewStatusSync } = await import('../../../lib/review-status.js');
-      setReviewStatusSync(issueId.toUpperCase(), { prUrl: undefined });
-    } catch { /* non-fatal — validator catches this downstream */ }
-    return [`Closed PR #${prNumber} on ${githubCheck.owner}/${githubCheck.repo}`];
-  } catch (err: any) {
-    return [`PR close warning: ${err.message}`];
-  }
-}
-
-function buildLifecycleContext(id: string, issueSource: string | undefined) {
-  const issuePrefix = extractTeamPrefix(id);
-  const projectPath = getProjectPath(undefined, issuePrefix ?? undefined);
-  const projectConfig = issuePrefix ? findProjectByTeamSync(issuePrefix) : null;
-  const githubCheck = isGitHubIssue(id);
-
-  const ctx: any = {
-    issueId: id,
-    projectPath,
-    projectName: projectConfig?.name || '',
-    ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-      ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-      : {}),
-  };
-
-  if (issueSource === 'rally') {
-    const rallyConfig = getRallyConfig();
-    if (rallyConfig) {
-      ctx.rally = {
-        apiKey: rallyConfig.apiKey,
-        server: rallyConfig.server,
-        workspace: rallyConfig.workspace,
-        project: rallyConfig.project,
-      };
-    }
-  }
-
-  return { ctx, projectConfig, githubCheck };
-}
-
-function isOrphanedIssue(issue: { status?: string; state?: string; rawTrackerState?: string; completedAt?: string | null }): boolean {
-  const status = issue.status?.toLowerCase() ?? '';
-  const state = issue.state?.toLowerCase() ?? '';
-  const rawTrackerState = issue.rawTrackerState?.toLowerCase() ?? '';
-  return Boolean(
-    issue.completedAt
-    || status.includes('closed')
-    || status.includes('done')
-    || status.includes('completed')
-    || state.includes('closed')
-    || state.includes('done')
-    || state.includes('completed')
-    || rawTrackerState.includes('closed')
-    || rawTrackerState.includes('done')
-    || rawTrackerState.includes('completed'),
-  );
-}
-
-function getIssueForCleanup(issueId: string) {
-  const issueDataService = getIssueDataService();
-  return issueDataService.getIssues({ includeCompleted: true }).find((issue: any) => {
-    const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
-    return identifier.toUpperCase() === issueId.toUpperCase();
-  }) as {
-    status?: string;
-    state?: string;
-    rawTrackerState?: string;
-    completedAt?: string | null;
-  } | undefined;
-}
-
-async function runDestructiveIssueLifecycle(
-  id: string,
-  mode: 'reset' | 'cancel',
-  opts: { deleteWorkspace?: boolean; onProgress?: (data: Record<string, unknown>) => void } = {},
-): Promise<{ success: boolean; cleanupLog: string[]; error?: string }> {
-  const cleanupLog: string[] = [];
-  const issueDataService = getIssueDataService();
-  const issueSource = issueDataService.getIssueSource(id);
-  const { ctx, projectConfig } = buildLifecycleContext(id, issueSource ?? undefined);
-  const deleteWorkspace = opts.deleteWorkspace ?? true;
-
-  cleanupLog.push(...await closeIssuePullRequest(
-    id,
-    mode === 'cancel' ? 'Canceled via Overdeck' : 'Reset to Todo via Overdeck',
-  ));
-
-  const { resetToTodo, cancelIssueWorkflow } = await import('../../../lib/lifecycle/index.js');
-  const workflow = mode === 'cancel' ? cancelIssueWorkflow : resetToTodo;
-  const result = await Effect.runPromise(workflow(ctx, {
-    deleteWorkspace,
-    deleteBranches: deleteWorkspace,
-    resetIssue: true,
-    workspaceConfig: projectConfig?.workspace,
-    projectName: projectConfig?.name || '',
-    onProgress: opts.onProgress ? (event) => opts.onProgress?.({ type: 'progress', ...event }) : undefined,
-  }));
-
-  cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
-
-  // vBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
-  if (mode === 'cancel') {
-    try {
-      const { transitionVBriefOnMain } = await import('../../../lib/vbrief/lifecycle-io.js');
-      const tx = await Effect.runPromise(transitionVBriefOnMain(
-        ctx.projectPath,
-        id,
-        'cancelled',
-        'cancelled',
-        `scope: cancel ${id.toUpperCase()} vBRIEF`,
-      ));
-      if (tx.moved) cleanupLog.push(`vBRIEF moved ${tx.fromDir} → cancelled`);
-      if (tx.committed) cleanupLog.push(`Committed vBRIEF cancellation on main`);
-    } catch (err: any) {
-      cleanupLog.push(`vBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
-    }
-  }
-
-  // Kill canonical reviewer/synthesis tmux sessions (PAN-915). They persist
-  // across review rounds to preserve context, so reset/cancel/deep-wipe is the
-  // right place to tear them down — the issue is going back to Todo or being
-  // canceled outright.
-  try {
-    const { killAllReviewerSessions } = await import('../../../lib/cloister/review-agent.js');
-    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-    const resolved = resolveProjectFromIssueSync(id);
-    const projectKey = resolved?.projectKey;
-    if (projectKey) {
-      const { killed } = await Effect.runPromise(killAllReviewerSessions(projectKey, id.toUpperCase()));
-      if (killed.length > 0) {
-        cleanupLog.push(`Killed ${killed.length} reviewer session(s)`);
-      }
-    }
-  } catch (err) {
-    cleanupLog.push(`Reviewer session cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  try {
-    clearReviewStatus(id.toUpperCase());
-    cleanupLog.push('Cleared review status');
-  } catch { /* non-fatal */ }
-
-  try {
-    const { resetPostMergeState } = await import('../../../lib/cloister/merge-agent.js');
-    resetPostMergeState(id);
-    resetPostMergeState(id.toUpperCase());
-    cleanupLog.push('Cleared merge state');
-  } catch { /* non-fatal */ }
-
-  const issueDataServiceAfter = getIssueDataService();
-  issueDataServiceAfter.invalidateTracker('github').catch(() => {});
-  issueDataServiceAfter.invalidateTracker('linear').catch(() => {});
-  issueDataServiceAfter.invalidateTracker('rally').catch(() => {});
-
-  return {
-    success: result.success,
-    cleanupLog,
-    error: result.success ? undefined : result.steps.find((s: any) => !s.success && !s.skipped)?.error,
-  };
 }
 
 // Read the request body as unknown JSON
@@ -2339,78 +2140,8 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const rawId = params['id'] ?? '';
-    const parsedIssueId = parseIssueIdSync(rawId);
-    if (!parsedIssueId) {
-      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
-    }
-    const id = parsedIssueId.raw.toUpperCase();
-    const issue = getIssueForCleanup(id);
-    if (!issue || !isOrphanedIssue(issue)) {
-      return jsonResponse({ error: 'Cleanup is only allowed for closed/orphaned issues' }, { status: 409 });
-    }
-    const cleanupLog: string[] = [];
     const eventStore = yield* EventStoreService;
-
-    const issueLower = id.toLowerCase();
-    const githubCheck = isGitHubIssue(id);
-
-    let projectRoot: string | null = null;
-    if (githubCheck.isGitHub) {
-      const localPaths = getGitHubLocalPaths();
-      const repoKey = `${githubCheck.owner}/${githubCheck.repo}`;
-      projectRoot = localPaths[repoKey] || null;
-    }
-    if (!projectRoot) {
-      const teamPrefix = extractTeamPrefix(id);
-      const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
-      projectRoot = projectConfig?.path || null;
-    }
-
-    // Git worktree/workspace and agent dir cleanup (all async with meaningful branching on error)
-    yield* Effect.promise(async () => {
-      if (projectRoot) {
-        const workspacePath = join(projectRoot, 'workspaces', `feature-${issueLower}`);
-        try {
-          const worktreeList = await execAsync('git worktree list --porcelain', { cwd: projectRoot, encoding: 'utf-8' });
-          if (worktreeList.stdout.includes(workspacePath)) {
-            await execAsync(`git worktree remove "${workspacePath}" --force`, { cwd: projectRoot, encoding: 'utf-8' });
-            cleanupLog.push(`Removed git worktree: ${workspacePath}`);
-          } else if (existsSync(workspacePath)) {
-            await execAsync(`rm -rf "${workspacePath}"`, { encoding: 'utf-8' });
-            cleanupLog.push(`Removed directory: ${workspacePath}`);
-          }
-        } catch {
-          if (existsSync(workspacePath)) {
-            await execAsync(`rm -rf "${workspacePath}"`, { encoding: 'utf-8' });
-            cleanupLog.push(`Removed directory: ${workspacePath}`);
-          }
-        }
-
-        const branchName = `feature/${issueLower}`;
-        try {
-          await execAsync(`git branch -D "${branchName}" 2>/dev/null || true`, { cwd: projectRoot, encoding: 'utf-8' });
-          cleanupLog.push(`Deleted local branch: ${branchName}`);
-        } catch { /* Branch might not exist */ }
-      }
-
-      const agentDir = join(homedir(), '.overdeck', 'agents', `agent-${issueLower}`);
-      if (existsSync(agentDir)) {
-        await execAsync(`rm -rf "${agentDir}"`, { encoding: 'utf-8' });
-        cleanupLog.push(`Removed agent state: ${agentDir}`);
-      }
-    });
-
-    yield* eventStore.append({
-      type: 'workspace.deleted',
-      timestamp: new Date().toISOString(),
-      payload: { issueId: id },
-    });
-
-    return jsonResponse({
-      success: true,
-      message: `Workspace cleaned up for ${id}`,
-      cleanupLog,
-    });
+    return yield* Effect.promise(() => cleanupWorkspaceForIssue(rawId, eventStore));
   })),
 );
 
@@ -2422,95 +2153,9 @@ const postIssueDeepWipeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
-      return jsonResponse({ error: 'Invalid issue id: ' + id }, { status: 400 });
-    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-
-    const { deleteWorkspace = true } = body as any || {};
-
-    // PAN-1908: capture agent state before destruction so the stopped event can
-    // be projected through the transactional boundary after the wipe succeeds.
-    const workAgentId = `agent-${id.toLowerCase()}`;
-    const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeWipe = yield* getAgentState(workAgentId);
-
-    const encoder = new TextEncoder();
-    const nodeStream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const sendEvent = (data: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        };
-
-        sendEvent({ type: 'started', issueId: id });
-
-        await Effect.runPromise(eventStore.append({
-          type: 'workspace.wipe_started',
-          timestamp: new Date().toISOString(),
-          payload: { issueId: id },
-        }));
-
-        const result = await runDestructiveIssueLifecycle(id, 'reset', {
-          deleteWorkspace,
-          onProgress: sendEvent,
-        });
-
-        if (result.success) {
-          await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({
-            issueId: id.toUpperCase(),
-            kind: 'deep_wipe',
-            source: 'dashboard',
-          })));
-          // PAN-1908: write-through projection for the real work agent.
-          if (workAgentStateBeforeWipe) {
-            try {
-              saveAgentStateAndEmitEvent(workAgentStateBeforeWipe, {
-                type: 'agent.stopped',
-                timestamp: new Date().toISOString(),
-                payload: { agentId: workAgentId, issueId: workAgentStateBeforeWipe.issueId },
-              });
-            } catch { /* non-fatal */ }
-          }
-          // Planning sessions are not agents in the runtime registry; keep raw emit.
-          try {
-            await Effect.runPromise(eventStore.append({
-              type: 'agent.stopped',
-              timestamp: new Date().toISOString(),
-              payload: { agentId: planningAgentId },
-            } as any));
-          } catch { /* non-fatal */ }
-          await Effect.runPromise(eventStore.append({
-            type: 'issue.statusChanged',
-            timestamp: new Date().toISOString(),
-            payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
-          }));
-          await Effect.runPromise(eventStore.append({
-            type: 'workspace.destroyed',
-            timestamp: new Date().toISOString(),
-            payload: { issueId: id },
-          }));
-          try { getIssueDataService().patchIssue(id, { status: 'Todo', canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
-          sendEvent({ type: 'complete', message: `Reset completed for ${id}` });
-        } else {
-          sendEvent({ type: 'error', error: result.error || 'Reset failed' });
-        }
-        controller.close();
-      },
-    });
-
-    const effectStream = Stream.fromReadableStream<Uint8Array, unknown>({
-      evaluate: () => nodeStream,
-      onError: (err) => err,
-    });
-
-    return HttpServerResponse.stream(effectStream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
+    return yield* Effect.promise(() => deepWipeIssue(id, body, eventStore));
   })),
 );
 
@@ -2522,39 +2167,7 @@ const postIssueCopySettingsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
-      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
-    }
-
-    const workspacePath = projectPath
-      ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
-      : '';
-
-    if (!workspacePath || !existsSync(workspacePath)) {
-      return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
-    }
-
-    const { copyOverdeckSettingsToWorkspaceSync } = yield* Effect.promise(() =>
-      import('../../../lib/workspace-manager.js')
-    );
-
-    const result = copyOverdeckSettingsToWorkspaceSync(workspacePath);
-    return jsonResponse({
-      success: result.errors.length === 0 || result.copied.length > 0,
-      copied: result.copied.map(p => p.replace(workspacePath + '/', '')),
-      errors: result.errors,
-    });
+    return yield* Effect.promise(() => copySettingsToWorkspace(id));
   })),
 );
 
