@@ -4,7 +4,6 @@ import { getConversationById, getConversationByName } from '../../lib/overdeck/c
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
-import type { RuntimeName } from '../../lib/runtimes/types.js';
 
 interface HandoffOptions {
   model?: string;
@@ -28,12 +27,9 @@ function looksLikeBareFocusText(convRef: string, focusArgs: string[]): boolean {
   return focusArgs.length > 0 || /\s/.test(convRef) || /[.!?]/.test(convRef) || /^[A-Z]/.test(convRef);
 }
 
-function validateHarness(harness: string | undefined): RuntimeName | undefined {
-  if (harness === undefined || harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex') {
-    return harness;
-  }
-  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code, ohmypi, or codex.`));
-  process.exit(1);
+function printIgnoredHarnessNotice(flag: '--harness' | '--author-harness', harness: string | undefined): void {
+  if (harness === undefined) return;
+  console.log(chalk.yellow(`${flag} is provider-default-only (PAN-1984); ignoring "${harness}".`));
 }
 
 export async function handoffCommand(
@@ -76,15 +72,15 @@ export async function handoffCommand(
     console.log(chalk.gray('  e.g. "Read .pan/handoff-brief.md FIRST and follow it exactly. <one-line goal>".'));
     process.exit(1);
   }
-  const harness = validateHarness(options.harness);
-  const authorHarness = validateHarness(options.authorHarness);
+  printIgnoredHarnessNotice('--harness', options.harness);
+  printIgnoredHarnessNotice('--author-harness', options.authorHarness);
   const author = options.author === 'source' ? 'source' : 'external';
   if (options.author !== undefined && options.author !== 'source' && options.author !== 'external') {
     console.log(chalk.yellow(`Invalid --author: ${options.author}. Expected source or external.`));
     process.exit(1);
   }
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
-  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=${authorHarness ?? 'claude-code'})` : ' (in-source agent)'}`));
+  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=provider-default)` : ' (in-source agent)'}`));
   if (focus) {
     console.log(chalk.gray(`  Focus: ${focus}`));
   }
@@ -98,12 +94,10 @@ export async function handoffCommand(
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
       cwd: options.cwd,
-      harness,
       forkMode: 'handoff',
       focus,
       handoffAuthor: author,
       handoffAuthorModel: options.authorModel,
-      handoffAuthorHarness: authorHarness,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {
