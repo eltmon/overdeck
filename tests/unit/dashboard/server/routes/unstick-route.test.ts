@@ -6,7 +6,7 @@
  *
  *   404  workspace does not exist
  *   400  workspace exists but is not stuck
- *   409  workspace is stuck but git state not yet repaired (local main still ahead of origin/main)
+ *   409  workspace is stuck but git state not yet repaired
  *   200  workspace is stuck, git state verified safe → clear stuck + reset lifecycle → success body
  *
  * processUnstickRequest() is exported from workspaces.ts following the project's
@@ -89,7 +89,7 @@ vi.mock('../../../../../src/lib/git/operations.js', () => ({
 
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
-import { processUnstickRequest } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
+import { processUnstickRequest, __testInternals } from '../../../../../src/dashboard/server/routes/workspaces/review-control.js';
 import {
   markWorkspaceStuck,
   getReviewStatusFromDbSync,
@@ -100,7 +100,7 @@ import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib
 
 describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract', () => {
   it('404: returns httpStatus=404 when workspace does not exist', () => {
-    const result = processUnstickRequest('PAN-404', false, null, true);
+    const result = processUnstickRequest('PAN-404', false, null, { safe: true });
 
     expect(result.httpStatus).toBe(404);
     expect(result.body.success).toBe(false);
@@ -111,7 +111,7 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     // workspace exists (workspaceExists=true) but currentStatus has stuck=false/undefined
     const notStuckStatus = getReviewStatusSync('PAN-NOT-STUCK');  // returns null — not stuck
 
-    const result = processUnstickRequest('PAN-NOT-STUCK', true, notStuckStatus, true);
+    const result = processUnstickRequest('PAN-NOT-STUCK', true, notStuckStatus, { safe: true });
 
     expect(result.httpStatus).toBe(400);
     expect(result.body.success).toBe(false);
@@ -123,37 +123,41 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     setReviewStatusSync('PAN-PENDING', { reviewStatus: 'pending', testStatus: 'pending' });
     const status = getReviewStatusSync('PAN-PENDING');  // stuck is falsy
 
-    const result = processUnstickRequest('PAN-PENDING', true, status, true);
+    const result = processUnstickRequest('PAN-PENDING', true, status, { safe: true });
 
     expect(result.httpStatus).toBe(400);
   });
 
-  it('409: returns httpStatus=409 when workspace is stuck but git state not yet repaired', () => {
-    // Simulate operator clicking Unstick before running `git reset --hard origin/main`.
-    // gitSafeState=false means local main is still ahead of origin/main.
+  it('409: returns recoverable advice when local main is ahead and dirty', () => {
     setReviewStatusSync('PAN-NOTRESET', { reviewStatus: 'passed', testStatus: 'passed' });
     markWorkspaceStuck('PAN-NOTRESET', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
     const stuckStatus = getReviewStatusSync('PAN-NOTRESET');
 
-    const result = processUnstickRequest('PAN-NOTRESET', true, stuckStatus, false);
+    const result = processUnstickRequest('PAN-NOTRESET', true, stuckStatus, {
+      safe: false,
+      advice: 'In the project repo, commit the project repo changes that should be preserved; push the 10 local main commit(s) to origin/main.',
+    });
 
     expect(result.httpStatus).toBe(409);
     expect(result.body.success).toBe(false);
-    expect((result.body as { error: string }).error).toMatch(/git reset --hard origin\/main/i);
+    const error = (result.body as { error: string }).error;
+    expect(error).toContain('commit the project repo changes');
+    expect(error).toContain('push the 10 local main commit(s)');
+    expect(error).not.toMatch(/git reset --hard/i);
 
     // Stuck flag must NOT be cleared — workspace is still unrepaired
     expect(getReviewStatusFromDbSync('PAN-NOTRESET')?.stuck).toBe(true);
   });
 
   it('200: returns httpStatus=200 and clears stuck flag for a genuinely stuck workspace', () => {
-    // Set up a stuck workspace with gitSafeState=true (operator has reset main)
+    // Set up a stuck workspace with repaired project main state.
     setReviewStatusSync('PAN-STUCK', { reviewStatus: 'passed', testStatus: 'passed' });
     markWorkspaceStuck('PAN-STUCK', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
 
     const stuckStatus = getReviewStatusSync('PAN-STUCK');
     expect(stuckStatus?.stuck).toBe(true);  // precondition
 
-    const result = processUnstickRequest('PAN-STUCK', true, stuckStatus, true);
+    const result = processUnstickRequest('PAN-STUCK', true, stuckStatus, { safe: true });
 
     expect(result.httpStatus).toBe(200);
     expect(result.body.success).toBe(true);
@@ -166,8 +170,8 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
   });
 
   it('200: resets reviewStatus/testStatus to pending after unstick (lifecycle invalidated)', () => {
-    // Unstick resets lifecycle because recovery requires `git reset --hard origin/main`
-    // which changes HEAD, making prior passed results invalid.
+    // Unstick resets lifecycle because recovery changes project main state,
+    // making prior passed results invalid.
     setReviewStatusSync('PAN-RESET', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -176,12 +180,12 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     markWorkspaceStuck('PAN-RESET', 'main_diverged');
     const stuckStatus = getReviewStatusSync('PAN-RESET');
 
-    processUnstickRequest('PAN-RESET', true, stuckStatus, true);
+    processUnstickRequest('PAN-RESET', true, stuckStatus, { safe: true });
 
     const after = getReviewStatusSync('PAN-RESET');
     // Stuck flag cleared — Deacon will process the issue again
     expect(after?.stuck).toBeFalsy();
-    // Lifecycle reset — prior results are invalid after `git reset --hard origin/main`
+    // Lifecycle reset — prior results are invalid after project main repair.
     expect(after?.reviewStatus).toBe('pending');
     expect(after?.testStatus).toBe('pending');
     expect(after?.readyForMerge).toBe(false);
@@ -192,7 +196,7 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     markWorkspaceStuck('PAN-REASON', 'main_diverged');
     const stuckStatus = getReviewStatusSync('PAN-REASON');
 
-    const result = processUnstickRequest('PAN-REASON', true, stuckStatus, true);
+    const result = processUnstickRequest('PAN-REASON', true, stuckStatus, { safe: true });
 
     expect(result.httpStatus).toBe(200);
     expect((result.body as { previousReason?: string }).previousReason).toBe('main_diverged');
@@ -211,9 +215,49 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     markWorkspaceStuck('PAN-RAC-CLEAR', 'main_diverged');
     const stuckStatus = getReviewStatusSync('PAN-RAC-CLEAR');
 
-    processUnstickRequest('PAN-RAC-CLEAR', true, stuckStatus, true);
+    processUnstickRequest('PAN-RAC-CLEAR', true, stuckStatus, { safe: true });
 
     const after = getReviewStatusSync('PAN-RAC-CLEAR');
     expect(after?.reviewedAtCommit).toBeUndefined();
+  });
+});
+
+describe('buildUnstickRepairAdvice', () => {
+  const { buildUnstickRepairAdvice } = __testInternals;
+
+  it('returns no advice when project main matches origin/main and is clean', () => {
+    expect(buildUnstickRepairAdvice(0, 0, false)).toBeNull();
+  });
+
+  it('tells operators to commit or explicitly discard dirty project repo changes', () => {
+    const advice = buildUnstickRepairAdvice(0, 0, true) ?? '';
+
+    expect(advice).toContain('commit the project repo changes');
+    expect(advice).toContain('explicitly discard only changes known to be disposable');
+    expect(advice).not.toMatch(/git reset --hard/i);
+  });
+
+  it('tells operators to push local-only main commits when main is ahead', () => {
+    const advice = buildUnstickRepairAdvice(10, 0, false) ?? '';
+
+    expect(advice).toContain('push the 10 local main commit(s) to origin/main');
+    expect(advice).not.toMatch(/git reset --hard/i);
+  });
+
+  it('tells operators to fast-forward when local main is behind origin/main', () => {
+    const advice = buildUnstickRepairAdvice(0, 3, false) ?? '';
+
+    expect(advice).toContain('fast-forward local main from origin/main');
+    expect(advice).toContain('3 commit(s) behind');
+    expect(advice).not.toMatch(/git reset --hard/i);
+  });
+
+  it('tells operators to reconcile and push when main has diverged', () => {
+    const advice = buildUnstickRepairAdvice(2, 4, false) ?? '';
+
+    expect(advice).toContain('reconcile local main with origin/main');
+    expect(advice).toContain('preserving the 2 local commit(s)');
+    expect(advice).toContain('push the reconciled main');
+    expect(advice).not.toMatch(/git reset --hard/i);
   });
 });

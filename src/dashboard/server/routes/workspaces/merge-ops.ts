@@ -42,6 +42,7 @@ import { setMergeQueueTriggerHandler } from '../../services/merge-queue-service.
 import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
+import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -320,12 +321,12 @@ export async function pushApproveMain(
       // The stuck flag prevents any further automatic approve attempts; when the
       // user manually unsticks and retries, the approve route's git pull --ff-only
       // step will detect the orphaned merge commit and surface a recoverable error
-      // with instructions to run: git reset --hard origin/main
+      // with instructions to preserve and reconcile the local commits.
       markWorkspaceStuck(issueId, 'main_diverged', {
         localSha: pushErr.localSha,
         remoteSha: pushErr.remoteSha,
       });
-      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover: cd ${projectPath} && git reset --hard origin/main, then unstick and retry.`;
+      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover, preserve local commits: cd ${projectPath} && git fetch origin main && git merge origin/main, resolve any conflicts, push main, then unstick and retry.`;
       return { pushed: false, httpStatus: 409, error };
     }
     const message = pushErr instanceof Error ? pushErr.message : String(pushErr);
@@ -333,7 +334,6 @@ export async function pushApproveMain(
     return { pushed: false, httpStatus: 400, error };
   }
 }
-
 
 // ─── Route: POST /api/issues/:issueId/sync-main ──────────────────────────
 
@@ -1566,17 +1566,16 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         try {
           await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
           await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
-          // Detect orphaned merge commit: local main is AHEAD of origin/main from a
-          // previous approve attempt whose push failed. git pull --ff-only would fail
-          // here with "not possible to fast-forward". Surface a recoverable error
-          // with explicit instructions rather than silently hard-resetting.
-          const { stdout: aheadCountRaw } = await execAsync(
-            'git rev-list origin/main..HEAD --count',
+          // Detect local-only main commits without silently hard-resetting.
+          const { stdout: divergenceRaw } = await execAsync(
+            'git rev-list --left-right --count HEAD...origin/main',
             { cwd: projectPath, encoding: 'utf-8' }
           );
-          const aheadCount = parseInt(aheadCountRaw.trim(), 10) || 0;
+          const [aheadRaw = '0', behindRaw = '0'] = divergenceRaw.trim().split(/\s+/);
+          const aheadCount = parseInt(aheadRaw, 10) || 0;
+          const behindCount = parseInt(behindRaw, 10) || 0;
           if (aheadCount > 0) {
-            const error = `Local main is ${aheadCount} commit(s) ahead of origin/main — a previous approve attempt left an unpushed merge commit. To recover, run:\n  cd ${projectPath} && git reset --hard origin/main\nThen unstick the workspace and retry.`;
+            const error = buildLocalMainRecoveryError(projectPath, aheadCount, behindCount);
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 409 });
           }
