@@ -35,11 +35,12 @@
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T05:17:08.128Z",
+    "mergeStatus": "failed",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T17:51:06.388Z",
     "reviewNotes": "Review passed; remote branch verification now covers the prior close-out safety blocker",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
     "reviewedAtCommit": "6d358f3516ec5e9f64a146ff3b8d034a270cb96d",
     "lastVerifiedCommit": "55f07625b6328f645a5c8addf041b32852da0302",
@@ -50,24 +51,38 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 8707,
-            "output": 681,
+            "input": 11228,
+            "output": 1201,
             "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 436625,
+            "output": 14815,
+            "cacheRead": 3653888,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 8707,
-          "output": 681,
+          "input": 11228,
+          "output": 1201,
           "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 436625,
+          "output": 14815,
+          "cacheRead": 3653888,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-03T05:17:08.272Z"
+        "usd": 1.168293,
+        "pricingAsOf": "2026-07-03T17:51:06.918Z"
       }
     },
     "merges": [
@@ -76,5 +91,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T04:41:22.632Z",
-  "updated": "2026-07-03T05:17:08.273Z"
+  "updated": "2026-07-03T17:51:06.919Z"
 }
