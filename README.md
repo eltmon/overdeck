@@ -11,11 +11,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/overdeck/pulls)
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-D4A27F.svg)](https://github.com/sponsors/eltmon)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-D4A27F.svg)](https://github.com/sponsors/overdeck-ai)
 
 </div>
 
-IDEs were built for humans who type code. Overdeck is built for humans who **direct** it. One agent or twenty, hands-on or hands-off: spawn agents on real issues, watch every diff land live, steer mid-task, and let a built-in specialist pipeline review, test, and merge the work — while you decide exactly how much of that loop runs without you.
+IDEs were built for humans who type code. Overdeck is built for humans who **direct** it — not with prompts, with **loops**. One agent or twenty, hands-on or hands-off: spawn agents on real issues, watch every diff land live, steer mid-task, and let a built-in specialist pipeline review, test, and merge the work — while you decide exactly how much of the loop runs without you.
 
 <div align="center">
 
@@ -40,15 +40,29 @@ See the [full documentation](https://docs.overdeck.ai) for detailed setup, confi
 
 ---
 
-## The Autonomy Dial
+## Loops, Not Prompts
 
-Overdeck's core idea is that **how much you supervise should be your choice, per issue, per day** — not a property of the tool. The same pipeline serves three working styles:
+The industry has caught on to what agent-native developers already knew: the unit of AI-assisted work isn't the prompt, it's the **loop** — act, verify, correct, go again. Models write better prompts than we do now; the scarce skill is designing the loop that keeps agents pointed at the goal, and the verifier that decides whether the work is actually done.
+
+Overdeck is loop machinery, three loops deep:
+
+| Loop | Timescale | What runs |
+|:-----|:----------|:----------|
+| **Inner — the agent** | seconds–minutes | The harness loop: write code, run it, read the result, try again |
+| **Middle — the pipeline** | minutes–hours | The verifier wrapped around every agent: four-lens review convoy, quality gates, tests, browser UAT, per-bead inspection, and a merge train that keeps main green |
+| **Outer — the Flywheel** | continuous | The loop that prompts the loops: pulls the next issue from the backlog, drives it end-to-end, files what it finds along the way, and goes again |
+
+The Flywheel is the part most tools don't have. It doesn't run tasks — it runs **revolutions**: every pass around the loop either ships the work or surfaces a defect that gets filed and fixed. It's the loop that improves the loop, and it's how most of Overdeck itself gets built.
+
+### The Autonomy Dial
+
+How much of the loop runs without you is **your choice, per issue, per day** — not a property of the tool:
 
 | Mode | You do | Overdeck does |
 |:-----|:-------|:--------------|
-| **Pair** | Watch diffs land live, steer the agent in the composer, swap models mid-task | Runs one agent in an isolated workspace with checkpoints and live cost tracking |
-| **Pipeline** | Write the issue, click Merge at the end | Plans with a PRD, implements, runs a four-lens review convoy, tests, UAT, and queues the merge train |
-| **Flywheel** | Review the morning recap | Picks up backlog issues, drives them end-to-end in parallel, files and fixes what it finds along the way |
+| **Pair** | Watch diffs land live, steer the agent in the composer, swap models mid-task | Runs the inner loop with checkpoints and live cost tracking |
+| **Pipeline** | Write the issue, click Merge at the end | Runs the inner and middle loops: plan, implement, review convoy, tests, UAT, merge train |
+| **Flywheel** | Review the morning recap | Runs all three loops across the backlog, in parallel |
 
 Most sessions live somewhere between — you pair on the gnarly issue while the pipeline ships three routine ones behind you.
 
@@ -116,6 +130,7 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 | Feature | Description |
 |:--------|:------------|
 | **Command Deck** | A live workspace where you watch agents code, review diffs inline, send messages, and manage everything from one surface |
+| **Fix-All Flywheel** | The outermost loop — an autonomous orchestrator that runs revolutions across the backlog: plan, implement, verify, merge, file what it finds, go again |
 | **Inline Diff Review** | See what changed file-by-file as the agent works, compare any turn against main — no waiting for a PR to review code |
 | **Model Hot-Swap** | Switch an agent between providers mid-conversation. Six providers, automatic routing, or manual override |
 | **Multi-Harness** | Agents run on Claude Code or Pi, with Codex support for GPT work agents — pick per role, per spawn |
@@ -124,7 +139,6 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 | **Visual Plans** | Work plans render as interactive DAGs so you can see dependencies, track acceptance criteria, and know what's done |
 | **Specialist Pipeline** | Review convoy (correctness, security, performance, requirements), tests, per-bead inspection, browser UAT, and merge — you just click Merge |
 | **Merge Trains** | Approved work queues onto main in order, each rebase re-verified, so a busy day of merges never breaks the build |
-| **Fix-All Flywheel** | An autonomous orchestrator that pulls from the backlog, runs issues end-to-end in parallel, and files what it finds along the way |
 | **Failsafe Controls** | Pause gates, troubled-agent backoff, boot-scoped no-resume, and a global freeze — autonomy you can always stop |
 | **Cloister** | Lifecycle manager that routes models, detects stuck agents, tracks costs, and orchestrates specialist handoffs |
 | **PRD-Driven Workflow** | A frontier model writes a detailed plan before any code is written — agents can't start without one |
@@ -232,7 +246,7 @@ Full documentation at **[docs.overdeck.ai](https://docs.overdeck.ai)**
 
 Overdeck is free, MIT-licensed, and built by one developer directing a fleet of agents. The fleet isn't free — the model bills behind Overdeck's own development run about **$1,000/month**, all self-funded.
 
-If Overdeck saves you time, [**sponsoring on GitHub**](https://github.com/sponsors/eltmon) directly keeps the agents running. Even $5/month genuinely helps.
+If Overdeck saves you time, [**sponsoring on GitHub**](https://github.com/sponsors/overdeck-ai) directly keeps the agents running. Even $5/month genuinely helps.
 
 ---
 
@@ -249,5 +263,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/core">npm</a> · <a href="https://docs.overdeck.ai">Documentation</a> · <a href="https://github.com/sponsors/eltmon">Sponsor</a></p>
+<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/core">npm</a> · <a href="https://docs.overdeck.ai">Documentation</a> · <a href="https://github.com/sponsors/overdeck-ai">Sponsor</a></p>
 </div>
