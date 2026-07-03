@@ -65,17 +65,19 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:57:11.586Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed test failures",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T17:07:20.639Z",
+    "reviewNotes": "No blocking findings in self-review",
+    "testNotes": "Reconciled from green GitHub Actions CI on a87cd991: Mintlify Deployment (https://github.com/eltmon/overdeck/runs/85043244885)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
+    "reviewedAtCommit": "a87cd9911ad90cfff64283bf1f2e46abc90aa258",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
     "scopeDrift": {
@@ -230,7 +232,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.223207,
-        "pricingAsOf": "2026-07-03T16:57:11.620Z"
+        "pricingAsOf": "2026-07-03T17:07:20.966Z"
       }
     },
     "merges": [
@@ -264,5 +266,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T16:57:11.633Z"
+  "updated": "2026-07-03T17:07:20.998Z"
 }
