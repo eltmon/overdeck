@@ -37,37 +37,202 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T07:12:18.566Z"
+    },
+    {
+      "timestamp": "2026-07-03T07:21:05.253Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/records/pan-1917.json",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+      "src/dashboard/server/services/dashboard-db-task.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx"
+    ],
+    "declaredScope": [
+      ".pan/drafts/pan-1917.md",
+      "packages/contracts/src/rpc.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+      "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+      "src/dashboard/server/routes/discovered-sessions.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/overdeck/discovered-sessions.ts",
+      "src/lib/overdeck/sessions-feed.ts",
+      "tests/bench/sessions-feed.bench.ts",
+      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+      "tests/unit/lib/overdeck/sessions-feed.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/pan-1917.md",
+      ".pan/records/pan-1917.json",
+      "packages/contracts/src/rpc.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+      "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+      "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+      "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+      "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+      "src/dashboard/server/routes/discovered-sessions.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/overdeck/discovered-sessions.ts",
+      "src/lib/overdeck/sessions-feed.ts",
+      "tests/bench/sessions-feed.bench.ts",
+      "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+      "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+      "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+      "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+      "tests/unit/lib/overdeck/sessions-feed.test.ts"
+    ],
+    "recordedAt": "2026-07-03T07:20:30.593Z"
+  },
   "created": "2026-07-03T01:01:10.061Z",
-  "updated": "2026-07-03T07:20:25.240Z",
+  "updated": "2026-07-03T07:21:06.424Z",
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T05:22:17.770Z",
-    "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact."
+    "updatedAt": "2026-07-03T07:21:05.971Z",
+    "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
+    "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/records/pan-1917.json",
+        "src/dashboard/frontend/src/App.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+        "src/dashboard/server/services/dashboard-db-task.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+        "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx"
+      ],
+      "declaredScope": [
+        ".pan/drafts/pan-1917.md",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/App/AppRoutes.tsx",
+        "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+        "src/dashboard/frontend/src/App/routes.ts",
+        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+        "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+        "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+        "src/dashboard/server/routes/discovered-sessions.ts",
+        "src/dashboard/server/services/dashboard-db-worker.ts",
+        "src/dashboard/server/ws-rpc.ts",
+        "src/lib/overdeck/discovered-sessions.ts",
+        "src/lib/overdeck/sessions-feed.ts",
+        "tests/bench/sessions-feed.bench.ts",
+        "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+        "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+        "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+        "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+        "tests/unit/lib/overdeck/sessions-feed.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/pan-1917.md",
+        ".pan/records/pan-1917.json",
+        "packages/contracts/src/rpc.ts",
+        "packages/contracts/src/types.ts",
+        "src/dashboard/frontend/src/App.test.tsx",
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/App/AppRoutes.tsx",
+        "src/dashboard/frontend/src/App/routes.ts",
+        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+        "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+        "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
+        "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
+        "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+        "src/dashboard/server/routes/discovered-sessions.ts",
+        "src/dashboard/server/services/dashboard-db-task.ts",
+        "src/dashboard/server/services/dashboard-db-worker.ts",
+        "src/dashboard/server/ws-rpc.ts",
+        "src/lib/overdeck/discovered-sessions.ts",
+        "src/lib/overdeck/sessions-feed.ts",
+        "tests/bench/sessions-feed.bench.ts",
+        "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+        "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
+        "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+        "tests/unit/lib/overdeck/discovered-sessions.test.ts",
+        "tests/unit/lib/overdeck/sessions-feed.test.ts"
+      ],
+      "recordedAt": "2026-07-03T07:20:30.593Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 695576,
-            "output": 44040,
-            "cacheRead": 4789760,
+            "input": 697278,
+            "output": 44358,
+            "cacheRead": 4974080,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 24531,
-            "output": 1024,
+            "input": 25556,
+            "output": 1288,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -83,14 +248,14 @@
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 695576,
-          "output": 44040,
-          "cacheRead": 4789760,
+          "input": 697278,
+          "output": 44358,
+          "cacheRead": 4974080,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 24531,
-          "output": 1024,
+          "input": 25556,
+          "output": 1288,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -102,11 +267,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 22.264633,
-        "pricingAsOf": "2026-07-03T05:22:17.917Z"
+        "usd": 22.374843,
+        "pricingAsOf": "2026-07-03T07:21:06.329Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2279"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
