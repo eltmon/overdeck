@@ -241,7 +241,7 @@ vi.mock('../../../lib/paths.js', () => ({
 // PAN-1908: autoResumeStoppedWorkAgents now reads from the overdeck agents table.
 // Feed the reconcile a deterministic candidate list via the overdeck door.
 vi.mock('../../overdeck/agents.js', () => ({
-  listAllAgentsSync: vi.fn(() => [{ id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' }]),
+  listAllAgentsSync: vi.fn(() => [{ id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work', workspace: '/tmp/workspace' }]),
 }));
 
 vi.mock('fs', () => ({
@@ -334,7 +334,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockWorkResumeSlotsAvailable.mockReturnValue(6);
     mockExistsSync.mockImplementation(noCompletedMarkers);
     vi.mocked(listAllAgentsSync).mockReturnValue([
-      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
+      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
     ] as any);
     appSettingsMocks.getBootReconciliationState.mockReturnValue({
       decision: null,
@@ -462,8 +462,8 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
 
   it('does not let liveness reconciliation resume per-agent hold decisions', async () => {
     vi.mocked(listAllAgentsSync).mockReturnValue([
-      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
-      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work' },
+      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
+      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
     ] as any);
     mockGetAgentState.mockImplementation((agentId: string) => ({
       id: agentId,
@@ -522,8 +522,8 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
 
   it('applies per_agent by resuming only issueIds marked resume', async () => {
     vi.mocked(listAllAgentsSync).mockReturnValue([
-      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
-      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work' },
+      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
+      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
     ] as any);
     mockGetAgentState.mockImplementation((agentId: string) => ({
       id: agentId,
@@ -550,7 +550,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-872');
   });
 
-  it('reports skipped candidates by boot reconciliation category', async () => {
+  it('reports non-terminal skipped candidates after boot reconciliation candidate filtering', async () => {
     const states = {
       'agent-missing': {
         id: 'agent-missing',
@@ -623,15 +623,15 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     const result = await applyBootReconciliationDecision();
 
     expect(result.resumed).toEqual([]);
-    expect(result.skipped).toEqual({ workspace_missing: 1, merged: 1, completed: 1, other: 1 });
+    expect(result.skipped).toEqual({ workspace_missing: 0, merged: 0, completed: 0, other: 1 });
     expect(result.deferred).toBe(0);
     expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 
   it('reports candidates deferred by the boot reconciliation concurrency gate', async () => {
     vi.mocked(listAllAgentsSync).mockReturnValue([
-      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work' },
-      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work' },
+      { id: 'agent-pan-871', issueId: 'PAN-871', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
+      { id: 'agent-pan-872', issueId: 'PAN-872', status: 'stopped', role: 'work', workspace: '/tmp/workspace' },
     ] as any);
     mockWorkResumeSlotsAvailable.mockReturnValue(0);
     appSettingsMocks.getBootReconciliationState.mockReturnValue({
