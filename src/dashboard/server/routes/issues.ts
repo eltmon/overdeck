@@ -55,6 +55,11 @@ import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
+import {
+  getCachedIssuePrTabResponse,
+  getIssuePrTabCacheGeneration,
+  setCachedIssuePrTabResponse,
+} from '../services/pr-tab-cache.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
@@ -3361,8 +3366,14 @@ async function fetchIssuePullRequestFromRef(
 }
 
 export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const generation = getIssuePrTabCacheGeneration(issueId);
+  const cached = getCachedIssuePrTabResponse<IssuePrEndpointResponse>('pr', issueId, generation);
+  if (cached) return cached;
+
   const prRef = await resolveIssuePullRequestRef(issueId);
-  return fetchIssuePullRequestFromRef(prRef);
+  const result = await fetchIssuePullRequestFromRef(prRef);
+  setCachedIssuePrTabResponse('pr', issueId, generation, result);
+  return result;
 }
 
 async function fetchIssuePullRequestDiffFromRef(
@@ -3667,6 +3678,10 @@ export async function fetchIssueDiscussions(
   issueId: string,
   deps: FetchDiscussionsDeps = {},
 ): Promise<IssueDiscussionsResponse> {
+  const generation = getIssuePrTabCacheGeneration(issueId);
+  const cached = getCachedIssuePrTabResponse<IssueDiscussionsResponse>('discussions', issueId, generation);
+  if (cached) return cached;
+
   const upper = issueId.toUpperCase();
   const items: DiscussionItem[] = [];
   const errors: string[] = [];
@@ -3933,12 +3948,14 @@ export async function fetchIssueDiscussions(
     return a.createdAt.localeCompare(b.createdAt);
   });
 
-  return {
+  const result = {
     issueId: upper,
     items,
     prNumber,
     ...(errors.length > 0 ? { errors } : {}),
   };
+  setCachedIssuePrTabResponse('discussions', issueId, generation, result);
+  return result;
 }
 
 const getIssueDiscussionsRoute = HttpRouter.add(

@@ -18,6 +18,7 @@ import { httpHandler } from './http-handler.js';
 import {
   handleCheckSuite,
   handleCheckRun,
+  handleIssueComment,
   handlePullRequest,
   handlePullRequestReview,
   handlePullRequestReviewThread,
@@ -92,6 +93,9 @@ async function dispatchWebhook(eventType: string, payload: WebhookPayload): Prom
       break;
     case 'pull_request_review_thread':
       await Effect.runPromise(handlePullRequestReviewThread(payload));
+      break;
+    case 'issue_comment':
+      await Effect.runPromise(handleIssueComment(payload));
       break;
     case 'status':
       await Effect.runPromise(handleStatus(payload));
