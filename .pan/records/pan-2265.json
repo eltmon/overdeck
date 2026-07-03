@@ -157,20 +157,17 @@
     "recordedAt": "2026-07-03T16:39:12.519Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T16:43:58.577Z",
+  "updated": "2026-07-03T17:00:52.621Z",
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T16:43:58.337Z",
-    "reviewNotes": "Review passed; new delta is test/result metadata and runtime surface remains approved",
-    "testNotes": "npm run typecheck: clean; npm run lint: clean; focused vitest suites: tests/unit/lib/github-app.test.ts, tests/unit/cli/commands/flywheel-surfaces.test.ts, src/lib/cloister/__tests__/issue-closed.test.ts, src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts, tests/unit/lib/forge.test.ts, tests/unit/lib/github-graphql-cooldown.test.ts, tests/unit/lib/webhook-handlers.test.ts, tests/unit/dashboard/server/routes/issue-pr.test.ts, tests/unit/dashboard/server/routes/issue-discussions.test.ts — 9 files, 135 tests passed. Browser UAT not required: spec NonGoals exclude frontend changes and the issue is backend-only GitHub GraphQL/App-REST routing.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T17:00:52.519Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "reviewedAtCommit": "f47031d77c4684c4cad288ffe85fce8e015e515f",
     "lastVerifiedCommit": "f47031d77c4684c4cad288ffe85fce8e015e515f",
     "reviewRequestedAt": "2026-07-03T16:39:24.422Z",
     "scopeDrift": {
@@ -278,8 +275,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 35120,
-            "output": 1999,
+            "input": 36699,
+            "output": 2649,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -294,9 +291,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 770549,
-            "output": 20783,
-            "cacheRead": 5814016,
+            "input": 771097,
+            "output": 21983,
+            "cacheRead": 5998848,
             "cacheWrite": 0
           }
         }
@@ -309,8 +306,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 35120,
-          "output": 1999,
+          "input": 36699,
+          "output": 2649,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -321,15 +318,15 @@
           "cacheWrite": 170267
         },
         "custom/kimi-k2.7-code": {
-          "input": 770549,
-          "output": 20783,
-          "cacheRead": 5814016,
+          "input": 771097,
+          "output": 21983,
+          "cacheRead": 5998848,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.894214,
-        "pricingAsOf": "2026-07-03T16:43:58.576Z"
+        "usd": 9.934652,
+        "pricingAsOf": "2026-07-03T17:00:52.609Z"
       }
     },
     "merges": [
