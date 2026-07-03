@@ -315,6 +315,56 @@ describe('workflows', () => {
       expect(verifyStep.error).toBe('feature/pan-100 does not match the head commit of merged PR #2182; inspect before closing out.');
     });
 
+    it('rejects local squash-merge success when the remote branch has advanced past the merged PR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'merged-head\n', stderr: '' };
+        }
+        if (command.startsWith('git ls-remote --heads origin')) {
+          return { stdout: 'remote-sha\trefs/heads/feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git fetch origin feature/pan-100')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (command.startsWith('git diff main...origin/feature/pan-100')) {
+          return { stdout: 'diff --git a/src/remote.ts b/src/remote.ts\n', stderr: '' };
+        }
+        if (command.startsWith('git rev-parse origin/feature/pan-100')) {
+          return { stdout: 'advanced-remote-head\n', stderr: '' };
+        }
+        if (command.startsWith('git log main..origin/feature/pan-100')) {
+          throw new Error('should fail immediately on mismatched remote merged PR head');
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.step).toBe('close-out:verify-merged');
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('origin/feature/pan-100 does not match the head commit of merged PR #2182; inspect before closing out.');
+    });
+
     it('should abort if archive fails', async () => {
       // Since there's no active PRD, it will skip — that's success
       const ctx = { issueId: 'PAN-100', projectPath: testDir };

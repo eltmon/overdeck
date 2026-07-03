@@ -439,7 +439,12 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
           `git merge-base --is-ancestor ${branchName} main`,
           { cwd: ctx.projectPath, encoding: 'utf-8' },
         );
-        return stepOk(step, ['All commits merged to main']);
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+        if (remoteCheck && !remoteCheck.success) return remoteCheck;
+        return stepOk(step, [
+          'All commits merged to main',
+          ...(remoteCheck?.details ?? []),
+        ]);
       } catch {
         // --is-ancestor fails for squash merges where the branch still exists.
         try {
@@ -448,13 +453,26 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
             { cwd: ctx.projectPath, encoding: 'utf-8' },
           );
           if (!codeDiff.trim()) {
-            return stepOk(step, ['Code changes squash-merged to main (only planning artifacts remain on branch)']);
+            const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+            if (remoteCheck && !remoteCheck.success) return remoteCheck;
+            return stepOk(step, [
+              'Code changes squash-merged to main (only planning artifacts remain on branch)',
+              ...(remoteCheck?.details ?? []),
+            ]);
           }
         } catch {
           // diff failed — fall through to unmerged report
         }
 
         const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, branchName);
+        if (githubMerged?.success) {
+          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+          if (remoteCheck && !remoteCheck.success) return remoteCheck;
+          return stepOk(step, [
+            ...(githubMerged.details ?? []),
+            ...(remoteCheck?.details ?? []),
+          ]);
+        }
         if (githubMerged) return githubMerged;
 
         const { stdout: unmerged } = await execAsync(
@@ -489,51 +507,8 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
 
     if (remoteBranch.trim()) {
       await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
-      try {
-        await execAsync(
-          `git merge-base --is-ancestor origin/${branchName} main`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
-        );
-        return stepOk(step, ['Remote branch fully merged']);
-      } catch {
-        // Squash-merge detection for remote branch
-        try {
-          const { stdout: codeDiff } = await execAsync(
-            `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
-            { cwd: ctx.projectPath, encoding: 'utf-8' },
-          );
-          if (!codeDiff.trim()) {
-            return stepOk(step, ['Remote code changes squash-merged to main (only planning artifacts remain on branch)']);
-          }
-        } catch {
-          // diff failed — fall through
-        }
-
-        const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, `origin/${branchName}`);
-        if (githubMerged) return githubMerged;
-
-        const { stdout: remoteUnmerged } = await execAsync(
-          `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
-        );
-        const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
-
-        if (ctx.github) {
-          try {
-            const { stdout: issueState } = await execAsync(
-              `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
-              { cwd: ctx.projectPath, encoding: 'utf-8' },
-            );
-            if (issueState.trim().toUpperCase() === 'CLOSED') {
-              return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
-            }
-          } catch {
-            // gh check failed — fall through to hard fail
-          }
-        }
-
-        return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
-      }
+      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+      if (remoteCheck) return remoteCheck;
     }
 
     // No branch at all — assume squash-merged and branch deleted
@@ -549,6 +524,68 @@ type GitHubMergedPr = {
   headRefOid?: string | null;
   url?: string | null;
 };
+
+async function verifyRemoteBranchIfPresent(
+  ctx: LifecycleContext,
+  branchName: string,
+): Promise<StepResult | null> {
+  const step = 'close-out:verify-merged';
+  const remoteRef = `origin/${branchName}`;
+
+  const { stdout: remoteBranch } = await execAsync(
+    `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
+    { cwd: ctx.projectPath, encoding: 'utf-8' },
+  );
+  if (!remoteBranch.trim()) return null;
+
+  await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
+
+  try {
+    await execAsync(
+      `git merge-base --is-ancestor ${remoteRef} main`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    return stepOk(step, ['Remote branch fully merged']);
+  } catch {
+    // Squash-merge detection for remote branch
+    try {
+      const { stdout: codeDiff } = await execAsync(
+        `git diff main...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      if (!codeDiff.trim()) {
+        return stepOk(step, ['Remote code changes squash-merged to main (only planning artifacts remain on branch)']);
+      }
+    } catch {
+      // diff failed — fall through
+    }
+
+    const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, remoteRef);
+    if (githubMerged) return githubMerged;
+
+    const { stdout: remoteUnmerged } = await execAsync(
+      `git log main..${remoteRef} --oneline 2>/dev/null || true`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
+
+    if (ctx.github) {
+      try {
+        const { stdout: issueState } = await execAsync(
+          `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        if (issueState.trim().toUpperCase() === 'CLOSED') {
+          return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
+        }
+      } catch {
+        // gh check failed — fall through to hard fail
+      }
+    }
+
+    return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
+  }
+}
 
 async function verifySquashMergedPrByBranch(
   ctx: LifecycleContext,
@@ -585,11 +622,11 @@ async function verifySquashMergedPrByBranch(
 
     if (tipSha === mergedPr.headRefOid) {
       const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
-      return stepOk(step, [`${prLabel} is squash-merged and ${branchName} matches the merged PR head`]);
+      return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
     }
 
     const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
-    return stepFailed(step, `${branchName} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
+    return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
   } catch {
     return null;
   }
