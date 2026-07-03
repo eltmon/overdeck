@@ -22,6 +22,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T22:58:33.122Z"
+    },
+    {
+      "timestamp": "2026-07-03T23:39:24.239Z",
+      "reason": "end",
+      "note": "No skipped work. Re-running completion signal on operator nudge; implementation remains complete. Branch includes .pan/test/ ignore, untracked preserved verdict artifact, and regression coverage. Gates previously passed: targeted vitest, npm run typecheck, npm run lint, npm test."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T23:39:24.527Z"
     }
   ],
   "feedback": [],
@@ -43,10 +53,10 @@
       ".pan/test/result.json",
       "src/lib/cloister/__tests__/test-verdict.test.ts"
     ],
-    "recordedAt": "2026-07-03T22:58:26.617Z"
+    "recordedAt": "2026-07-03T23:39:17.250Z"
   },
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-03T23:00:40.409Z",
+  "updated": "2026-07-03T23:41:52.878Z",
   "pipeline": {
     "issueId": "PAN-2325",
     "reviewStatus": "reviewing",
@@ -54,10 +64,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T23:00:40.383Z",
+    "updatedAt": "2026-07-03T23:41:52.540Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2328",
-    "lastVerifiedCommit": "bf96bda81bf0f63f22e5b514afabab70b996f363",
-    "reviewRequestedAt": "2026-07-03T22:58:32.881Z",
+    "lastVerifiedCommit": "63f8311a51b9062573eea7de8d3de42ee0c188be",
+    "reviewRequestedAt": "2026-07-03T23:39:24.241Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2325.md",
@@ -76,7 +86,7 @@
         ".pan/test/result.json",
         "src/lib/cloister/__tests__/test-verdict.test.ts"
       ],
-      "recordedAt": "2026-07-03T22:58:26.617Z"
+      "recordedAt": "2026-07-03T23:39:17.250Z"
     }
   },
   "closeOut": {
@@ -115,7 +125,7 @@
       },
       "costAtCloseOut": {
         "usd": 1.6202400000000001,
-        "pricingAsOf": "2026-07-03T23:00:40.408Z"
+        "pricingAsOf": "2026-07-03T23:41:52.804Z"
       }
     },
     "merges": [
