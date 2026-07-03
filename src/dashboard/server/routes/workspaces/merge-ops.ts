@@ -320,12 +320,12 @@ export async function pushApproveMain(
       // The stuck flag prevents any further automatic approve attempts; when the
       // user manually unsticks and retries, the approve route's git pull --ff-only
       // step will detect the orphaned merge commit and surface a recoverable error
-      // with instructions to run: git reset --hard origin/main
+      // with instructions to preserve and reconcile the local commits.
       markWorkspaceStuck(issueId, 'main_diverged', {
         localSha: pushErr.localSha,
         remoteSha: pushErr.remoteSha,
       });
-      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover: cd ${projectPath} && git reset --hard origin/main, then unstick and retry.`;
+      const error = `Push aborted: origin/main has advanced past your local ancestor (remote: ${pushErr.remoteSha?.slice(0, 7)}, local: ${pushErr.localSha?.slice(0, 7)}). A hotfix may have landed. Workspace marked stuck — to recover, preserve local commits: cd ${projectPath} && git fetch origin main && git merge origin/main, resolve any conflicts, push main, then unstick and retry.`;
       return { pushed: false, httpStatus: 409, error };
     }
     const message = pushErr instanceof Error ? pushErr.message : String(pushErr);
@@ -1576,7 +1576,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           );
           const aheadCount = parseInt(aheadCountRaw.trim(), 10) || 0;
           if (aheadCount > 0) {
-            const error = `Local main is ${aheadCount} commit(s) ahead of origin/main — a previous approve attempt left an unpushed merge commit. To recover, run:\n  cd ${projectPath} && git reset --hard origin/main\nThen unstick the workspace and retry.`;
+            const error = `Local main is ${aheadCount} commit(s) ahead of origin/main — a previous approve attempt left unpushed work. To recover, preserve it:\n  cd ${projectPath} && git push origin main\nIf those commits should not land, revert them explicitly instead of resetting. Then unstick the workspace and retry.`;
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 409 });
           }

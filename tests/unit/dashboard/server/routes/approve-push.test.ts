@@ -9,8 +9,8 @@
  *   1. Return HTTP 409 (not 400 or 500)
  *   2. Mark the workspace stuck via markWorkspaceStuck()
  *   3. Include the diverged SHAs in the error message
- *   4. NOT reset local main automatically — the operator must run
- *      `git reset --hard origin/main` manually before retrying (see stuckDetails)
+ *   4. NOT reset local main automatically — the operator must preserve and
+ *      reconcile local commits before retrying.
  *
  * The approve route deliberately refuses to auto-reset because a reset on the
  * project repo would destroy work in the projectPath. The orphaned merge commit
@@ -119,7 +119,7 @@ const PROJECT_PATH = '/tmp/test-project';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // exec succeeds by default (covers the git reset --hard origin/main call)
+  // exec succeeds by default for unrelated route helpers imported at module scope.
   mockExec.mockResolvedValue(undefined);
 });
 
@@ -189,8 +189,8 @@ describe('pushApproveMain — approve route divergence guard', () => {
   });
 
   // Regression: approve → divergence → workspace marked stuck, NO implicit hard-reset.
-  // Recovery instructions are surfaced in the error message; the user must explicitly
-  // run `git reset --hard origin/main` before retrying (not done automatically).
+  // Recovery instructions are surfaced in the error message without prescribing
+  // destructive reset.
   it('marks workspace stuck on divergence without resetting local main', async () => {
     const localSha = 'aaa1111aaaa';
     const remoteSha = 'bbb2222bbbb';
@@ -213,7 +213,9 @@ describe('pushApproveMain — approve route divergence guard', () => {
     );
     // Error message must include recovery instructions so the user knows what to do
     if (!result.pushed) {
-      expect(result.error).toMatch(/git reset --hard origin\/main/);
+      expect(result.error).toContain('preserve local commits');
+      expect(result.error).toContain('git merge origin/main');
+      expect(result.error).not.toMatch(/git reset --hard/i);
     }
   });
 });
