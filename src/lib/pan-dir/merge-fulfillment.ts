@@ -23,6 +23,11 @@ export interface MergeFulfillmentResult {
   evidence: string;
 }
 
+interface PullRequestMergeProbe {
+  result: MergeFulfillmentResult | null;
+  errorEvidence?: string;
+}
+
 export interface MergeFulfillmentDeps {
   readRecord(project: ProjectConfig, issueId: string): PanIssueRecord | null;
   exec(command: string, options: { cwd: string }): Promise<{ stdout: string; stderr: string }>;
@@ -121,21 +126,21 @@ async function prMerged(
   project: ProjectConfig,
   record: PanIssueRecord | null,
   deps: MergeFulfillmentDeps,
-): Promise<MergeFulfillmentResult | null> {
+): Promise<PullRequestMergeProbe> {
   const pr = prRefFromRecord(project, record);
-  if (!pr) return null;
+  if (!pr) return { result: null };
 
   if (deps.isGitHubAppConfigured()) {
     try {
       const state = await deps.getPullRequestState(pr.owner, pr.repo, pr.number);
       if (state.merged) {
-        return { verdict: 'merged', evidence: `${issueId} PR #${pr.number} reports merged via GitHub App` };
+        return { result: { verdict: 'merged', evidence: `${issueId} PR #${pr.number} reports merged via GitHub App` } };
       }
-      return null;
+      return { result: null };
     } catch (err) {
       return {
-        verdict: 'unknown',
-        evidence: `${issueId} PR #${pr.number} state could not be resolved via GitHub App: ${err instanceof Error ? err.message : String(err)}`,
+        result: null,
+        errorEvidence: `${issueId} PR #${pr.number} state could not be resolved via GitHub App: ${err instanceof Error ? err.message : String(err)}`,
       };
     }
   }
@@ -147,13 +152,13 @@ async function prMerged(
     );
     const parsed = JSON.parse(stdout || '{}') as { merged?: boolean; mergedAt?: string | null; mergeCommit?: unknown; state?: string };
     if (parsed.merged === true || parsed.mergedAt || parsed.mergeCommit) {
-      return { verdict: 'merged', evidence: `${issueId} PR #${pr.number} reports merged via gh` };
+      return { result: { verdict: 'merged', evidence: `${issueId} PR #${pr.number} reports merged via gh` } };
     }
-    return null;
+    return { result: null };
   } catch (err) {
     return {
-      verdict: 'unknown',
-      evidence: `${issueId} PR #${pr.number} state could not be resolved via gh: ${err instanceof Error ? err.message : String(err)}`,
+      result: null,
+      errorEvidence: `${issueId} PR #${pr.number} state could not be resolved via gh: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 }
@@ -257,6 +262,26 @@ function shouldApplyClosedOutLabel(record: PanIssueRecord | null): boolean {
   return record?.pipeline?.closedOut === true || Boolean(record?.closeOut?.closedAt);
 }
 
+async function issueIsClosed(issueId: string, project: ProjectConfig, record: PanIssueRecord, deps: MergeFulfillmentDeps): Promise<boolean | 'unknown'> {
+  if (shouldApplyClosedOutLabel(record)) return true;
+  if (!project.github_repo) return 'unknown';
+  const number = extractNumberSync(issueId);
+  if (number === null) return 'unknown';
+
+  try {
+    const { stdout } = await deps.exec(
+      `gh issue view ${number} --repo ${shellQuote(project.github_repo)} --json state`,
+      { cwd: project.path },
+    );
+    const parsed = JSON.parse(stdout || '{}') as { state?: string };
+    if (parsed.state === 'CLOSED') return true;
+    if (parsed.state === 'OPEN') return false;
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 async function applyClosedOutLabel(issueId: string, project: ProjectConfig, deps: MergeFulfillmentDeps): Promise<string> {
   if (!project.github_repo) {
     return 'skipped closed-out label: project has no GitHub repo';
@@ -330,7 +355,7 @@ export async function verifyIssueMergeFulfillment(
   const record = mergedDeps.readRecord(project, normalized);
 
   const prResult = await prMerged(normalized, project, record, mergedDeps);
-  if (prResult) return prResult;
+  if (prResult.result) return prResult.result;
 
   const branches = [`feature/${normalized.toLowerCase()}`, `strike/${normalized.toLowerCase()}`];
   let sawExistingBranch = false;
@@ -353,6 +378,10 @@ export async function verifyIssueMergeFulfillment(
 
   if (sawExistingBranch) {
     return { verdict: 'stranded', evidence: `${normalized} has a branch that is not an ancestor of origin/main and no merged PR was found` };
+  }
+
+  if (prResult.errorEvidence) {
+    return { verdict: 'unknown', evidence: prResult.errorEvidence };
   }
 
   return { verdict: 'unknown', evidence: `${normalized} has no resolvable merged PR and no feature/strike branch` };
@@ -436,6 +465,15 @@ async function reconcileOneFulfilledMerge(
   }
   if (record.pipeline?.mergeStatus === 'merged') {
     return { issueId: normalized, action: 'skipped', reason: 'record already has mergeStatus=merged' };
+  }
+
+  const closed = await issueIsClosed(normalized, project, record, resolveDeps(deps));
+  if (closed !== true) {
+    return {
+      issueId: normalized,
+      action: closed === false ? 'skipped' : 'flagged',
+      reason: closed === false ? 'issue is not closed' : 'issue closed state could not be resolved',
+    };
   }
 
   const verdict = await verifyIssueMergeFulfillment(normalized, project, {

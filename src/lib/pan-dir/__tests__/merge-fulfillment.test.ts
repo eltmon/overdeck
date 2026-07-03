@@ -53,6 +53,8 @@ function makeDeps(options: {
   existingBranches?: string[];
   mergedBranches?: string[];
   prMerged?: boolean;
+  prError?: boolean;
+  issueState?: 'OPEN' | 'CLOSED';
   appConfigured?: boolean;
 } = {}): MergeFulfillmentDeps & { commands: string[]; setReviewStatus: ReturnType<typeof vi.fn>; cleanupMergedLabels: ReturnType<typeof vi.fn> } {
   const commands: string[] = [];
@@ -66,6 +68,9 @@ function makeDeps(options: {
     exec: vi.fn(async (command: string) => {
       commands.push(command);
       if (command.startsWith('gh pr view')) {
+        if (options.prError) {
+          throw new Error('gh unavailable');
+        }
         return {
           stdout: JSON.stringify({
             merged: options.prMerged === true,
@@ -75,6 +80,9 @@ function makeDeps(options: {
           }),
           stderr: '',
         };
+      }
+      if (command.startsWith('gh issue view')) {
+        return { stdout: JSON.stringify({ state: options.issueState ?? 'CLOSED' }), stderr: '' };
       }
       if (command.startsWith('git rev-parse --verify')) {
         const branch = command.match(/'([^']+)'/)?.[1];
@@ -128,6 +136,20 @@ describe('verifyIssueMergeFulfillment', () => {
     });
   });
 
+  it('continues to branch evidence when tracked PR state cannot be resolved', async () => {
+    const deps = makeDeps({
+      record: record({ prUrl: 'https://github.com/eltmon/overdeck/pull/123', prNumber: 123 }),
+      prError: true,
+      existingBranches: ['feature/pan-123'],
+      mergedBranches: ['feature/pan-123'],
+    });
+
+    await expect(verifyIssueMergeFulfillment('PAN-123', project, deps)).resolves.toEqual({
+      verdict: 'merged',
+      evidence: 'feature/pan-123 is an ancestor of origin/main',
+    });
+  });
+
   it('returns stranded when a branch exists but is not an ancestor of origin/main', async () => {
     const deps = makeDeps({
       existingBranches: ['strike/pan-123'],
@@ -174,6 +196,35 @@ describe('reconcileMergeFulfillment', () => {
           action: 'would-reconcile',
           verdict: 'merged',
           evidence: 'PAN-123 PR #123 reports merged via gh',
+        }],
+      });
+      expect(deps.setReviewStatus).not.toHaveBeenCalled();
+      expect(deps.cleanupMergedLabels).not.toHaveBeenCalled();
+    } finally {
+      projectMock.current.path = previousPath;
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('skips fulfilled merge reconciliation when the issue is still open', async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'merge-fulfillment-'));
+    const previousPath = projectMock.current.path;
+    projectMock.current.path = tempRoot;
+    try {
+      writeTempRecord(tempRoot, 'PAN-123', record({ prUrl: 'https://github.com/eltmon/overdeck/pull/123', prNumber: 123 }));
+      const deps = makeDeps({ prMerged: true, issueState: 'OPEN' });
+
+      const result = await reconcileMergeFulfillment({ issueId: 'PAN-123' }, deps);
+
+      expect(result).toEqual({
+        reconciled: 0,
+        flagged: 0,
+        skipped: 1,
+        failed: 0,
+        details: [{
+          issueId: 'PAN-123',
+          action: 'skipped',
+          reason: 'issue is not closed',
         }],
       });
       expect(deps.setReviewStatus).not.toHaveBeenCalled();
