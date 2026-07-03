@@ -207,16 +207,16 @@
     "recordedAt": "2026-07-03T12:29:10.111Z"
   },
   "created": "2026-07-03T02:32:35.471Z",
-  "updated": "2026-07-03T12:30:57.587Z",
+  "updated": "2026-07-03T14:00:27.226Z",
   "pipeline": {
     "issueId": "PAN-2148",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T12:30:57.507Z",
+    "updatedAt": "2026-07-03T14:00:27.169Z",
     "inspectNotes": "Spec fidelity passed: added issues no-loss audit test for the 29 route method/path pairs from the PAN-2148 PRD, and the live regex enumeration matches 29 routes. Constraint compliance passed: the test follows the sanctioned source-introspection pattern, no delay/retry fake-timer requirement applies, no destructive endpoint is invoked, routes/issues.ts is under 1000 lines, door modules are under 1000 lines, baseline no longer carries routes/issues.ts, and routes/issues.js remains referenced only by server.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2299",
     "reviewRequestedAt": "2026-07-03T12:30:36.829Z",
@@ -287,10 +287,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 1724,
-            "output": 17880,
-            "cacheRead": 6755121,
-            "cacheWrite": 38745
+            "input": 2709,
+            "output": 28479,
+            "cacheRead": 12577121,
+            "cacheWrite": 54220
           }
         },
         "inspect": {
@@ -303,8 +303,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 25688,
-            "output": 1010,
+            "input": 28551,
+            "output": 1755,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -316,14 +316,22 @@
             "cacheRead": 13087893,
             "cacheWrite": 393616
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 353044,
+            "output": 16740,
+            "cacheRead": 4859392,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 23439,
-          "output": 87720,
-          "cacheRead": 19843014,
-          "cacheWrite": 432361
+          "input": 24424,
+          "output": 98319,
+          "cacheRead": 25665014,
+          "cacheWrite": 447836
         },
         "openai/gpt-5.5": {
           "input": 1083346,
@@ -332,15 +340,21 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 25688,
-          "output": 1010,
+          "input": 28551,
+          "output": 1755,
           "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 353044,
+          "output": 16740,
+          "cacheRead": 4859392,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 42.967902,
-        "pricingAsOf": "2026-07-03T12:30:57.586Z"
+        "usd": 50.84878,
+        "pricingAsOf": "2026-07-03T14:00:27.226Z"
       }
     },
     "merges": [
