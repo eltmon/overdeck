@@ -12,6 +12,8 @@ const {
   listProjectsMock,
   restoreTrackedBeadsExportMock,
   loadWorkspaceMetadataMock,
+  messageAgentMock,
+  saveAgentRuntimeStateMock,
   transitionIssueToInReviewMock,
   spawnReviewRoleForIssueMock,
 } = vi.hoisted(() => {
@@ -38,6 +40,8 @@ const {
     listProjectsMock: vi.fn(),
     restoreTrackedBeadsExportMock: vi.fn(),
     loadWorkspaceMetadataMock: vi.fn(),
+    messageAgentMock: vi.fn(),
+    saveAgentRuntimeStateMock: vi.fn(),
     transitionIssueToInReviewMock: vi.fn(),
     spawnReviewRoleForIssueMock: vi.fn(),
   };
@@ -89,6 +93,8 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>();
   return {
     ...actual,
+    messageAgent: messageAgentMock,
+    saveAgentRuntimeState: saveAgentRuntimeStateMock,
     transitionIssueToInReview: transitionIssueToInReviewMock,
   };
 });
@@ -140,6 +146,29 @@ async function postRequestReview(issueId: string, options: { query?: string; bod
   return { status: response.status, body: JSON.parse(text), appendedEvents };
 }
 
+async function postReviewStatus(issueId: string, body: Record<string, unknown>) {
+  const appendedEvents: Record<string, unknown>[] = [];
+  const request = HttpServerRequest.fromWeb(new Request(
+    `http://localhost/api/review/${issueId}/status`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  ));
+
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(workspacesRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
+      ).pipe(Effect.provide(eventStoreLayerFor(appendedEvents))),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text), appendedEvents };
+}
+
 function passedStatus(overrides: Record<string, unknown> = {}) {
   return {
     reviewStatus: 'passed',
@@ -168,6 +197,8 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     listProjectsMock.mockReturnValue([{ config: { path: '/tmp/overdeck' } }]);
     loadWorkspaceMetadataMock.mockReturnValue(null);
     restoreTrackedBeadsExportMock.mockReturnValue(Effect.succeed(undefined));
+    messageAgentMock.mockResolvedValue(undefined);
+    saveAgentRuntimeStateMock.mockReturnValue(undefined);
     transitionIssueToInReviewMock.mockResolvedValue(undefined);
     spawnReviewRoleForIssueMock.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
     setReviewStatusMock.mockImplementation((_issueId, update) => update);
@@ -359,5 +390,53 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     expect(result.body).toMatchObject({ success: true, alreadyPassed: true });
     expect(console.warn).not.toHaveBeenCalledWith(expect.stringContaining('HEAD lookup failed'));
     expect(setReviewStatusMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/review/:id/status', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    messageAgentMock.mockRejectedValue(new Error('agent is not running'));
+    saveAgentRuntimeStateMock.mockReturnValue(undefined);
+    resolveProjectFromIssueMock.mockReturnValue(null);
+    setReviewStatusMock.mockImplementation((issueId, update) => ({
+      issueId,
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      ...update,
+    }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('persists passed test verdicts even when the optional work-agent notification fails', async () => {
+    const result = await postReviewStatus('PAN-2329', { testStatus: 'passed' });
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      issueId: 'PAN-2329',
+      testStatus: 'passed',
+      readyForMerge: false,
+    });
+    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-2329', { testStatus: 'passed' });
+    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-2329', { readyForMerge: true });
+    expect(messageAgentMock).toHaveBeenCalledWith(
+      'agent-pan-2329',
+      expect.stringContaining('ALL CHECKS PASSED for PAN-2329'),
+    );
+    expect(result.appendedEvents).toEqual([
+      expect.objectContaining({
+        type: 'pipeline.test-completed',
+        payload: { issueId: 'PAN-2329', passed: true },
+      }),
+    ]);
   });
 });
