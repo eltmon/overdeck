@@ -72,6 +72,23 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    then **drive a root-cause fix to `main`** — `pan strike` for a precision fix, `pan plan
    --auto`/work for anything larger. Filing is recordkeeping; the fix is the point. Never
    paper over a broken flow with a hand-edit, a curl, or a fallback that masks it.
+   **A `pan tell` nudge that unblocks one stuck/conflicted/blocked agent is the same anti-pattern:**
+   it clears one instance while the identical failure recurs for the next issue — a band-aid, not
+   a fix. Your job is not to nudge things to keep them moving; it is to identify the **root cause
+   and substrate issue** and land a fix that makes the system **self-healing**, so no future nudge
+   is needed. When you catch yourself about to `pan tell` a workaround, STOP and ask *why did this
+   happen, and what one substrate change stops it recurring for everyone?* — then file/land that.
+   (Recurring merge conflict on a git-tracked ephemeral artifact → gitignore the artifact, don't
+   `--theirs`-nudge each agent; review agents dying → fix the dispatcher, don't re-dispatch by hand
+   forever.)
+   **Root-causing means going to the CODE, not the symptom — DEEP-DIVE every time.** When an agent
+   surfaces an error (a stack trace, `SQLITE_READONLY`, `Effect.catchAll is not a function`,
+   `Project not found`, a readonly-DB write), open the source, follow the trace to the exact
+   `file:line`, and confirm the *mechanism* (which DB/connection/handler/env — e.g. "it writes the
+   correct `overdeck.db` but `markWorkspaceStuck` at `review-status-sync.ts:370` lacks the
+   readonly try/catch that `review-status.ts:367` has") BEFORE you file or dispatch. A filed issue
+   that only restates the error message is a symptom log, not a diagnosis — and a strike aimed at a
+   guessed cause wastes a revolution. Read the code; then strike/fix the real defect.
 5. **Never block on the operator.** Do not halt for planning Q&A, "approach A or B", or any
    decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and let
    the question persist as a non-blocking signal across ticks. The single exception is a
@@ -172,6 +189,20 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    runtime truth from sandbox-safe CLI surfaces (they read SQLite/`sequence.md` directly — no
    HTTP, so they work even when your harness sandboxes localhost): `pan review pending --ready`,
    `pan flywheel merge-blockers --json`, `pan backlog forecast`.
+   **Then verify agents are ACTUALLY progressing — EVERY tick — by READING each agent's real
+   output**, not just checking the session is alive or that the pane changed (a live session ≠ a
+   working agent; a *changed* pane ≠ progress — agents loop on duplicate notifications, re-ask the
+   same question, or churn). Run skill `pan-agent-activity`: capture each running
+   agent/review/test/slot pane (`-S -22`) and **read its last real action** — is it advancing its
+   bead, done, or stalled/errored? **Root-cause every stalled/errored one, never nudge it:** dead
+   pane / `token_revoked` (a lone stale agent, not fleet-wide — verify the codex fleet with `codex
+   login status`; gpt-5.5 uses the **codex** harness auth `~/.codex/auth.json`, NOT ohmypi);
+   `OVERDECK_SPECIALIST_RESULT: review-agent failed` that still produced a verdict (a FALSE signal —
+   confirm in `overdeck.db` `review_status`, NOT the deprecated `panopticon.db`); POST errors like
+   `Effect.catchAll is not a function` / `Project not found for PAN-x` (broken status endpoint /
+   project resolver); a **cross-wired kickoff** (agent reads a brief for a *different* issue and
+   stops); a **workspace-container crash-loop** spamming the agent. Each is a substrate bug to fix
+   at the root (Mission #4), never a `pan tell` band-aid.
 2. **Orient.** Classify each issue: healthy, ghost, stuck, stalled, wrong-column, reverting,
    awaiting-UAT, merge-ready, blocked. Relevance-vet every launch candidate (above). An idle
    issue is a bug unless explicitly parked with a concrete reason.

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-07-03T13:54:06.377Z",
-    "updated": "2026-07-03T13:58:35.031Z",
+    "updated": "2026-07-03T21:04:02.897Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-2158: bug(plan): pan plan --auto escalates to interactive on a PRD-defaulted decision, stalling a critical-path agent the flywheel can't unblock",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-2158",
     "title": "bug(plan): pan plan --auto escalates to interactive on a PRD-defaulted decision, stalling a critical-path agent the flywheel can't unblock",
-    "status": "running",
+    "status": "completed",
     "uid": "e2981851-cee3-4874-a036-21acf9604c41",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-03T13:54:06.377Z",
-    "updated": "2026-07-03T13:58:35.031Z",
+    "updated": "2026-07-03T21:04:02.897Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2158",
@@ -91,5 +91,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }
