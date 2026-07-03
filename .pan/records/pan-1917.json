@@ -42,9 +42,22 @@
       "timestamp": "2026-07-03T07:21:05.253Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T07:24Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T07:24:22.050Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T07:24:21Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1917\n\nMissing no-loss audit gate and deep-linked sessions outside loaded pages do not select\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1917 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/records/pan-1917.json",
@@ -125,16 +138,17 @@
     "recordedAt": "2026-07-03T07:20:30.593Z"
   },
   "created": "2026-07-03T01:01:10.061Z",
-  "updated": "2026-07-03T07:21:06.424Z",
+  "updated": "2026-07-03T07:24:37.222Z",
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T07:21:05.971Z",
+    "updatedAt": "2026-07-03T07:24:35.468Z",
+    "reviewNotes": "Missing no-loss audit gate and deep-linked sessions outside loaded pages do not select",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
@@ -231,8 +245,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 25556,
-            "output": 1288,
+            "input": 27903,
+            "output": 1416,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -254,8 +268,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 25556,
-          "output": 1288,
+          "input": 27903,
+          "output": 1416,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -268,7 +282,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.374843,
-        "pricingAsOf": "2026-07-03T07:21:06.329Z"
+        "pricingAsOf": "2026-07-03T07:24:36.958Z"
       }
     },
     "merges": [

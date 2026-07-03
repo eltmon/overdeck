@@ -454,6 +454,19 @@ export function ConversationsPage({ initialSessionKey = null }: ConversationsPag
     filters.enrichmentLevel ? { key: 'enrichmentLevel', label: `Enrichment: L${filters.enrichmentLevel}` } : null,
   ].filter((chip): chip is { key: string; label: string } => chip !== null);
 
+  useEffect(() => {
+    if (
+      effectiveQuery
+      || selectedKey == null
+      || selected != null
+      || !feedQuery.hasNextPage
+      || feedQuery.isFetchingNextPage
+    ) {
+      return;
+    }
+    void feedQuery.fetchNextPage();
+  }, [effectiveQuery, feedQuery, selected, selectedKey]);
+
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
     setSearchOffset(0);

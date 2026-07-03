@@ -66,17 +66,69 @@ vi.mock('../FacetPanel', () => ({
   },
 }));
 
-vi.mock('../SessionTable', async () => {
-  const actual = await vi.importActual<typeof import('../SessionTable')>('../SessionTable');
-  const SessionTable = actual.SessionTable;
-  return {
-    SessionTable: (props: ComponentProps<typeof SessionTable>) => (
-      <div data-testid="session-table">
-        <SessionTable {...props} />
+vi.mock('../SessionTable', () => ({
+  SessionTable: ({
+    sessions,
+    selectedId,
+    onSelect,
+    hasMore,
+    isLoadingMore,
+    onLoadMore,
+  }: {
+    sessions: Array<{
+      id: number;
+      source: 'discovered' | 'managed-archived';
+      workspacePath: string | null;
+      jsonlPath: string | null;
+      primaryModel: string | null;
+      messageCount: number;
+      estimatedCost: number;
+      lastTs: string | null;
+      summary: string | null;
+      conversationTitle?: string | null;
+      conversationName?: string | null;
+    }>;
+    selectedId: string | null;
+    onSelect: (id: string | null) => void;
+    hasMore?: boolean;
+    isLoadingMore?: boolean;
+    onLoadMore?: () => void;
+  }) => (
+    <div data-testid="session-table" role="table">
+      <div role="row">
+        <span>Session</span>
+        <span>Model</span>
+        <span>Msgs</span>
+        <span>Cost</span>
+        <span>Last Active</span>
       </div>
-    ),
-  };
-});
+      {sessions.map((session) => {
+        const key = `${session.source}:${session.id}`;
+        const workspace = session.workspacePath ?? session.jsonlPath ?? 'Unknown session path';
+        return (
+          <div
+            key={key}
+            role="row"
+            aria-selected={selectedId === key}
+            onClick={() => onSelect(selectedId === key ? null : key)}
+          >
+            <span>{session.conversationTitle ?? session.conversationName ?? workspace.split('/').slice(-2).join('/')}</span>
+            <span>{session.summary ?? workspace}</span>
+            <span>{session.primaryModel}</span>
+            <span>{session.messageCount}</span>
+            <span>{session.estimatedCost}</span>
+            <span>{session.lastTs}</span>
+          </div>
+        );
+      })}
+      {hasMore && (
+        <button type="button" disabled={isLoadingMore} onClick={onLoadMore}>
+          {isLoadingMore ? 'Loading more…' : 'Load more'}
+        </button>
+      )}
+    </div>
+  ),
+}));
 vi.mock('../SessionDetail', () => ({
   SessionDetail: (props: unknown) => {
     componentMocks.sessionDetail(props);
@@ -374,6 +426,33 @@ describe('ConversationsPage endpoint selection', () => {
 
     expect(componentMocks.sessionDetail).toHaveBeenLastCalledWith(expect.objectContaining({
       session: expect.objectContaining({ id: 1, source: 'discovered' }),
+    }));
+  });
+
+  it('fetches subsequent feed pages until an initial session URL key is selectable', async () => {
+    rpcMocks.listFeed
+      .mockResolvedValueOnce({
+        rows: [{ ...SESSION_STUB, id: 1, source: 'discovered' }],
+        nextCursor: 'page-2',
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          ...SESSION_STUB,
+          id: 99,
+          source: 'discovered',
+          workspacePath: '/home/user/Projects/deep',
+          summary: 'Deep-linked target',
+        }],
+        nextCursor: null,
+      });
+
+    renderPage(makeClient(), { initialSessionKey: 'discovered:99' });
+
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({ limit: 100, cursor: 'page-2' }));
+    await screen.findByTestId('session-detail');
+
+    expect(componentMocks.sessionDetail).toHaveBeenLastCalledWith(expect.objectContaining({
+      session: expect.objectContaining({ id: 99, source: 'discovered', summary: 'Deep-linked target' }),
     }));
   });
 
