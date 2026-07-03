@@ -144,5 +144,12 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T19:43:33.248Z",
-  "updated": "2026-07-02T23:38:06.305Z"
+  "updated": "2026-07-03T00:31:09.170Z",
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Behavior-preserving extraction; existing src/dashboard/server/services/__tests__/conversation-service.test.ts covers the unchanged conversation-service barrel exports and moved parser/context/activity behavior at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9.",
+      "recordedAt": "2026-07-03T00:31:09.170Z"
+    }
+  ]
 }
