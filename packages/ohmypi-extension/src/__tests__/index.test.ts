@@ -11,6 +11,7 @@ import overdeckOhmypiExtension, {
   handleConversationControlSessionStart,
   handleWorkspaceContext,
   overdeckPathsFor,
+  drainConversationControlCommands,
   processControlCommandFile,
   probeOhmypiExtensionCapabilities,
   setThinkingLevelIfSupported,
@@ -309,6 +310,54 @@ describe('extension control capabilities', () => {
       expect(sendUserMessage).toHaveBeenCalledWith('pivot', { deliverAs: 'steer' })
     } finally {
       warn.mockRestore()
+      h.cleanup()
+    }
+  })
+
+  it('silently ignores watcher events for already-processed (missing) command files', async () => {
+    const h = makeFakeHome()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const paths = overdeckPathsFor('conv-gone', h.home)
+      mkdirSync(paths.controlDir, { recursive: true })
+      const sendUserMessage = vi.fn()
+      const runtime: OhmypiExtensionAPI = {
+        on: () => {},
+        registerCommand: () => {},
+        sendUserMessage,
+      }
+
+      // The directory watcher also fires for the unlink of a processed file;
+      // that late event must not warn or dispatch anything.
+      await expect(processControlCommandFile({ agentId: 'conv-gone', home: h.home, now }, runtime, {}, join(paths.controlDir, 'gone.json'))).resolves.toBeUndefined()
+
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+      h.cleanup()
+    }
+  })
+
+  it('removes stale .claimed leftovers at drain time without re-dispatching them', async () => {
+    const h = makeFakeHome()
+    try {
+      const paths = overdeckPathsFor('conv-stale', h.home)
+      mkdirSync(paths.controlDir, { recursive: true })
+      const stale = join(paths.controlDir, 'old.json.claimed')
+      writeFileSync(stale, JSON.stringify({ id: 'cmd-stale', type: 'prompt', message: 'zombie', source: 'operator' }))
+      const sendUserMessage = vi.fn()
+      const runtime: OhmypiExtensionAPI = {
+        on: () => {},
+        registerCommand: () => {},
+        sendUserMessage,
+      }
+
+      await drainConversationControlCommands({ agentId: 'conv-stale', home: h.home, now }, runtime, {})
+
+      expect(sendUserMessage).not.toHaveBeenCalled()
+      expect(existsSync(stale)).toBe(false)
+    } finally {
       h.cleanup()
     }
   })
