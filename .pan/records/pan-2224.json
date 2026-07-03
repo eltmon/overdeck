@@ -16,6 +16,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T21:30:23.431Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T23:26:28.439Z"
     }
   ],
   "feedback": [],
@@ -71,14 +76,22 @@
   },
   "pipeline": {
     "issueId": "PAN-2224",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T20:52:39.667Z",
+    "updatedAt": "2026-07-03T00:56:14.307Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-03T00:52:34.990Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
+    "reviewedAtCommit": "f737b5223ab0e3e729f07524ca8571d115c9fd83",
     "lastVerifiedCommit": "37c29e29f75f2a40d32956f7b3d80cf76df21c15"
   },
   "closeOut": {
@@ -86,10 +99,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 8,
-            "output": 1561,
-            "cacheRead": 1022190,
-            "cacheWrite": 3275
+            "input": 151,
+            "output": 6672,
+            "cacheRead": 3093602,
+            "cacheWrite": 9672
           }
         },
         "inspect": {
@@ -102,8 +115,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 31176,
-            "output": 1841,
+            "input": 32178,
+            "output": 1963,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -119,10 +132,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 17991,
-          "output": 44495,
-          "cacheRead": 4561486,
-          "cacheWrite": 172617
+          "input": 18134,
+          "output": 49606,
+          "cacheRead": 6632898,
+          "cacheWrite": 179014
         },
         "openai/gpt-5.5": {
           "input": 1089597,
@@ -131,15 +144,15 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 31176,
-          "output": 1841,
+          "input": 32178,
+          "output": 1963,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.378016,
-        "pricingAsOf": "2026-07-02T20:52:39.737Z"
+        "usd": 21.786371,
+        "pricingAsOf": "2026-07-03T00:56:14.529Z"
       }
     },
     "merges": [
@@ -151,5 +164,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-02T16:48:03.302Z",
-  "updated": "2026-07-02T21:30:23.431Z"
+  "updated": "2026-07-03T00:56:14.613Z"
 }
