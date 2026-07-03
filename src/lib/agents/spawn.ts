@@ -189,9 +189,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     : '';
 
   let promptFile: string | undefined;
-  if (prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui) {
+  const tracksKickoffDelivery = role === 'flywheel';
+  if (prompt && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui))) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
+    if (tracksKickoffDelivery) {
+      state.kickoffDelivered = false;
+      await Effect.runPromise(saveAgentState(state));
+    }
   }
 
   checkAndSetupHooks();
@@ -344,18 +349,33 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     if (shouldDeliverPromptViaPi) {
       try {
         await writeOhmypiAgentPrompt(agentId, prompt);
+        if (tracksKickoffDelivery) {
+          state.kickoffDelivered = true;
+          await Effect.runPromise(saveAgentState(state));
+        }
       } catch (err) {
         console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
     } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui) {
-      // PAN-1594: wait for the hook-written ready.json (session-start hook),
-      // not a tmux pane-scrape. No dependency on permission-mode footer text.
-      const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
-      if (ready) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 500));
-        await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+      if (tracksKickoffDelivery) {
+        const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnRun:initial-prompt');
+        if (delivery.ok) {
+          state.kickoffDelivered = true;
+          await Effect.runPromise(saveAgentState(state));
+        } else if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
+          await recordStartupSessionExit(state, issueId, role);
+          return state;
+        }
       } else {
-        console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
+        // PAN-1594: wait for the hook-written ready.json (session-start hook),
+        // not a tmux pane-scrape. No dependency on permission-mode footer text.
+        const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
+        if (ready) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 500));
+          await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+        } else {
+          console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
+        }
       }
     }
   }

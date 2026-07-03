@@ -390,6 +390,13 @@ export function saveState(state: DeaconState): void {
   }
 }
 
+function refreshPatrolHeartbeat(state: DeaconState): void { state.lastPatrol = new Date().toISOString(); saveState(state); }
+
+function startPatrolHeartbeatTicker(state: DeaconState): NodeJS.Timeout {
+  const ticker = setInterval(() => refreshPatrolHeartbeat(state), Math.max(10_000, Math.floor(config.patrolIntervalMs / 2)));
+  ticker.unref?.(); return ticker;
+}
+
 /**
  * Clear the persisted patrol heartbeat at dashboard startup so the supervisor
  * watchdog gives the first deacon patrol its normal startup grace window.
@@ -2582,18 +2589,10 @@ export async function checkAwaitingTestWorkSessions(): Promise<string[]> {
   return actions;
 }
 
-/**
- * Run a single patrol cycle
- */
 export async function runPatrol(): Promise<PatrolResult> {
   const state = loadState();
   state.patrolCycle++;
-  state.lastPatrol = new Date().toISOString();
-  // PAN-2219: persist the heartbeat at cycle START, not only at cycle end.
-  // getDeaconStatus() reads state from disk, so a multi-minute patrol cycle
-  // was invisible to the supervisor watchdog, which killed healthy servers
-  // mid-patrol ("deacon patrol heartbeat stale" restart churn).
-  saveState(state);
+  refreshPatrolHeartbeat(state);
 
   // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];
@@ -2603,8 +2602,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Persisted in app_settings; survives restarts. Per-cycle check so flipping
   // the toggle at runtime takes effect on the next tick without restarting.
   if (isDeaconGloballyPaused()) {
-    state.lastPatrol = new Date().toISOString();
-    saveState(state);
+    refreshPatrolHeartbeat(state);
     if (!hasLoggedGlobalPauseSkip) {
       console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
       addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
@@ -2612,7 +2610,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     }
     const skipped: PatrolResult = {
       cycle: state.patrolCycle,
-      timestamp: state.lastPatrol,
+      timestamp: state.lastPatrol!,
       specialists: [],
       actionsToken: ['skipped: globally_paused'],
       massDeathDetected: false,
@@ -2626,9 +2624,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   // patrol's combined spawns stay under the concurrency ceiling.
   resetPatrolDispatchBudget();
 
+  const patrolHeartbeatTicker = startPatrolHeartbeatTicker(state);
+  try {
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
+
+  const stuckRemediationActions = await checkStuckAgentRemediation();
+  actions.push(...stuckRemediationActions);
+  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
@@ -3011,10 +3015,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
 
-  const stuckRemediationActions = await checkStuckAgentRemediation();
-  actions.push(...stuckRemediationActions);
-  for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
-
   // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
   // that lost the port but keep running — and can run a second Deacon). Low
   // cadence (~10 min). Never touches the live server, the port owner, a
@@ -3177,14 +3177,11 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.error('[deacon] Error during per-project specialist patrol:', msg);
   }
 
-  // Single save for the entire patrol cycle — all mutations from
-  // checkSpecialistHealth, forceKillSpecialist, and checkMassDeath
-  // accumulate in the shared state object and are persisted once here.
-  saveState(state);
+  refreshPatrolHeartbeat(state);
 
   const result: PatrolResult = {
     cycle: state.patrolCycle,
-    timestamp: state.lastPatrol,
+    timestamp: state.lastPatrol!,
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
@@ -3192,6 +3189,9 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   lastPatrolResult = result;
   return result;
+  } finally {
+    clearInterval(patrolHeartbeatTicker);
+  }
 }
 
 // Store the most recent patrol result for API access
