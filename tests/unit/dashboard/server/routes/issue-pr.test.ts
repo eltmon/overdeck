@@ -79,7 +79,7 @@ import {
   fetchIssueCheckRuns,
   fetchIssuePullRequest,
   fetchIssuePullRequestDiff,
-} from '../../../../../src/dashboard/server/routes/issues.js';
+} from '../../../../../src/lib/overdeck/pull-requests.js';
 
 beforeEach(() => {
   vi.clearAllMocks();

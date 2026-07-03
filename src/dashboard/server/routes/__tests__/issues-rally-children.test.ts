@@ -2,7 +2,7 @@
  * Route-level test for Rally child-story mapping into planning context.
  */
 import { describe, it, expect } from 'vitest';
-import { buildChildStoriesFromRally } from '../issues.js';
+import { buildChildStoriesFromRally } from '../../../../lib/overdeck/task-generation.js';
 
 describe('buildChildStoriesFromRally', () => {
   it('maps status from the service contract exactly', () => {
