@@ -54,6 +54,11 @@
       "reason": "feedback",
       "note": "[2026-07-03T16:56Z] review-agent → CHANGES-REQUESTED — seq 4",
       "timestamp": "2026-07-03T16:56:58.284Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T17:04:47.013Z"
     }
   ],
   "feedback": [
@@ -126,18 +131,18 @@
     "recordedAt": "2026-07-03T16:10:20.583Z"
   },
   "created": "2026-07-03T03:32:43.537Z",
-  "updated": "2026-07-03T16:56:58.285Z",
+  "updated": "2026-07-03T17:04:55.514Z",
   "pipeline": {
     "issueId": "PAN-2261",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:56:54.277Z",
-    "reviewNotes": "Stuck remediation still performs eager ready-beads reads before cheap skip guards",
+    "updatedAt": "2026-07-03T17:04:55.053Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2302",
-    "lastVerifiedCommit": "e2218d73c5111beb548422a3630247f3248930a6",
+    "lastVerifiedCommit": "eed29fc9d525fc0360f8af847d2bc7f5ddf020d9",
     "reviewRequestedAt": "2026-07-03T16:11:52.217Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -201,7 +206,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T16:56:54.357Z"
+        "pricingAsOf": "2026-07-03T17:04:55.335Z"
       }
     },
     "merges": [
