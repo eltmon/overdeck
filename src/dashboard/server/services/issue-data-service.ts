@@ -24,6 +24,7 @@ import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/rev
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
 
 /**
  * Compute bead progress counts from a cached plan document.
@@ -164,6 +165,7 @@ const planningStateCache = new Map<string, PlanningStateCacheEntry>();
 const planningStateRefreshInFlight = new Set<string>();
 const PLANNING_REFRESH_CONCURRENCY = 4;
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+const DAY_MS = 86_400_000;
 
 function getCachedPlanningState(identifier: string): {
   hasPlan: boolean;
@@ -263,6 +265,7 @@ function updatePlanningStateCache(identifier: string, entry: PlanningStateCacheE
 
 export class IssueDataService {
   private cache: CacheService;
+  private loadConfig: typeof loadConfigSync;
   private trackers: Record<string, TrackerState> = {};
   private linearLastFullRefresh = 0;
   private started = false;
@@ -284,8 +287,9 @@ export class IssueDataService {
     this._onIssuesChanged = fn;
   }
 
-  constructor(cache: CacheService) {
+  constructor(cache: CacheService, options?: { loadConfig?: typeof loadConfigSync }) {
     this.cache = cache;
+    this.loadConfig = options?.loadConfig ?? loadConfigSync;
 
     for (const tracker of ['github', 'linear', 'rally'] as const) {
       this.trackers[tracker] = {
@@ -869,9 +873,12 @@ export class IssueDataService {
       requestParams.headers = { 'If-None-Match': cachedEtag };
     }
 
-    // Fetch ALL closed issues (no date filter) so Done column is complete after restarts
+    // Fetch recently updated closed issues; SQLite L2 cache keeps older closed
+    // issues visible within TTL across restarts while the windowed fetch runs.
     if (state === 'closed') {
       requestParams.per_page = 100;
+      const windowDays = this.loadConfig().config.issues.closedWindowDays;
+      requestParams.since = new Date(Date.now() - windowDays * DAY_MS).toISOString();
     }
 
     try {
