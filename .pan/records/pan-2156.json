@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-2156",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Behavior-preserving extraction; existing src/dashboard/server/services/__tests__/conversation-service.test.ts covers the unchanged conversation-service barrel exports and moved parser/context/activity behavior at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9.",
+      "recordedAt": "2026-07-03T00:31:09.170Z"
+    }
+  ],
   "sessionHistory": [
     {
       "timestamp": "2026-07-02T20:15:25.260Z",
@@ -26,6 +33,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-02T21:13:51.648Z"
+    },
+    {
+      "timestamp": "2026-07-03T01:06:40.989Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T01:06:41.973Z"
     }
   ],
   "feedback": [],
@@ -76,14 +93,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2156",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "running",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T23:38:06.180Z",
+    "updatedAt": "2026-07-03T01:06:57.915Z",
+    "testNotes": "Skipped: issue is already merged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2235",
-    "lastVerifiedCommit": "8d54abe8b7ef92067bdf5cc9e19bd1b2e9c5698d"
+    "lastVerifiedCommit": "8d54abe8b7ef92067bdf5cc9e19bd1b2e9c5698d",
+    "reviewRequestedAt": "2026-07-03T01:06:40.990Z"
   },
   "closeOut": {
     "usage": {
@@ -135,7 +154,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.48002,
-        "pricingAsOf": "2026-07-02T23:38:06.257Z"
+        "pricingAsOf": "2026-07-03T01:06:58.037Z"
       }
     },
     "merges": [
@@ -144,12 +163,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T19:43:33.248Z",
-  "updated": "2026-07-03T00:31:09.170Z",
-  "decisions": [
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: Behavior-preserving extraction; existing src/dashboard/server/services/__tests__/conversation-service.test.ts covers the unchanged conversation-service barrel exports and moved parser/context/activity behavior at 6d6d822cd04b60332c00059f18f95aaf7ad7e8a9.",
-      "recordedAt": "2026-07-03T00:31:09.170Z"
-    }
-  ]
+  "updated": "2026-07-03T01:06:58.281Z"
 }
