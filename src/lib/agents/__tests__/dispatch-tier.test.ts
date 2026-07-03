@@ -21,7 +21,7 @@ vi.mock('../../vbrief/io.js', () => ({
 
 import { loadConfigSync } from '../../config-yaml.js';
 import { readWorkspacePlanSync } from '../../vbrief/io.js';
-import { applyTierAssignment, resolveSlotTierSpawnParams } from '../spawn-prep.js';
+import { applyTierAssignment, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
   enabled: true,
@@ -200,6 +200,83 @@ describe('resolveSlotTierSpawnParams', () => {
     vi.mocked(readWorkspacePlanSync).mockReturnValue(null);
 
     expect(() => resolveSlotTierSpawnParams('/ws', 'bead-x')).toThrow('no vBRIEF plan is readable');
+  });
+});
+
+describe('resolveSingleWorkTierSpawnParams', () => {
+  function planDoc(items: VBriefItem[], planMetadata?: Record<string, unknown>): VBriefDocument {
+    return {
+      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      plan: {
+        id: 'plan-1',
+        title: 'test plan',
+        status: 'running',
+        metadata: planMetadata,
+        items,
+        edges: [],
+      },
+    };
+  }
+
+  function planItem(id: string, metadata: VBriefItem['metadata'], status: VBriefItem['status'] = 'pending'): VBriefItem {
+    return { id, title: id, status, metadata };
+  }
+
+  function mockConfig(tieredExecution: TierAssignmentConfig): void {
+    vi.mocked(loadConfigSync).mockReturnValue({
+      config: { tieredExecution },
+    } as unknown as ReturnType<typeof loadConfigSync>);
+  }
+
+  beforeEach(() => {
+    vi.mocked(loadConfigSync).mockReset();
+    vi.mocked(readWorkspacePlanSync).mockReset();
+  });
+
+  it('routes tiered when global config is off but plan metadata opts in', () => {
+    mockConfig({ ...TIER_CONFIG, enabled: false });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('cheap', { difficulty: 'simple' }),
+      planItem('frontier', { difficulty: 'expert' }),
+    ], { tiered_execution: 'on' }));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      tierName: 'cheap',
+    });
+  });
+
+  it('leaves single work-agent routing untouched when global config is on but plan metadata opts out', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('frontier', { difficulty: 'expert' }),
+    ], { tiered_execution: 'off' }));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
+  });
+
+  it('uses the first dispatchable item and skips completed blockers', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('done', { difficulty: 'simple' }, 'completed'),
+      planItem('frontier', { difficulty: 'expert' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+    });
+  });
+
+  it('lets an explicit per-spawn model override outrank single work-agent tier routing', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('frontier', { difficulty: 'expert' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5')).toEqual({});
   });
 });
 
