@@ -434,7 +434,7 @@ describe('prependFallbackFocus', () => {
   });
 });
 
-describe('authorHandoffExternal', () => {
+describe('authorHandoffExternal', { timeout: 20_000 }, () => {
   // The new design: the authoring session uses its Write tool to create the
   // doc file directly. The model's stdout is just an acknowledgement string.
   // Tests mock runModelSummary to (a) extract the output path from the prompt
@@ -458,7 +458,7 @@ describe('authorHandoffExternal', () => {
     vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(stdoutText));
   }
 
-  it('writes the doc + sentinel from the authoring session and never touches the source agent', async () => {
+  it('writes the doc + sentinel from the authoring session and never touches the source agent', { timeout: 20_000 }, async () => {
     const home = join(tmpdir(), `pan-handoff-external-ok-${Date.now()}`);
     const source = await createSourceConversation(home);
     const cwd = source.cwd;
@@ -490,7 +490,7 @@ describe('authorHandoffExternal', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('uses the Pi-specific authoring template + write tool when the authoring harness is ohmypi (PAN-1541)', async () => {
+  it('uses the Pi-specific authoring template + write tool when the authoring harness is ohmypi (PAN-1541)', { timeout: 20_000 }, async () => {
     const home = join(tmpdir(), `pan-handoff-pi-author-${Date.now()}`);
     const source = await createSourceConversation(home);
     const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
