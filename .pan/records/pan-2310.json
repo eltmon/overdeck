@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T16:26:56.719Z",
-  "updated": "2026-07-03T16:40:52.129Z",
+  "updated": "2026-07-03T16:59:40.119Z",
   "pipeline": {
     "issueId": "PAN-2310",
     "reviewStatus": "pending",
@@ -64,5 +64,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "inverse-done-merged-reconciliation": "completed",
+    "inverse-done-merged-reconciliation.ac1": "completed",
+    "inverse-done-merged-reconciliation.ac2": "completed",
+    "inverse-done-merged-reconciliation.ac3": "completed",
+    "inverse-done-merged-reconciliation.ac4": "completed"
+  }
 }
