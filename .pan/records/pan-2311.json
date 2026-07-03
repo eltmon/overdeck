@@ -35,11 +35,11 @@
     "issueId": "PAN-2311",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T17:49:02.577Z",
+    "updatedAt": "2026-07-03T17:51:06.098Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (71452ms):\n\n\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/pan-dir/__tests__/merge-fulfillment.test.ts:\u001b[2m167:22\u001b[22m\u001b[39m\n    \u001b[90m166|\u001b[39m     \u001b[35mconst\u001b[39m deps \u001b[33m=\u001b[39m \u001b[34mmakeDeps\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m167|\u001b[39m\n    \u001b[90m168|\u001b[39m     const result = await verifyIssueMergeFulfillment('PAN-123', projec…\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m169|\u001b[39m\n    \u001b[90m170|\u001b[39m     \u001b[34mexpect\u001b[39m(result)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m({\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/pan-dir/__tests__/merge-fulfillment.test.ts\u001b[2m > \u001b[22mreconcileMergeFulfillment\u001b[2m > \u001b[22mflags stranded single-issue records without reconciling them\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { issueId: 'PAN-123', …(2) } to deeply equal { issueId: 'PAN-123', …(4) }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[2m    \"action\": \"flagged\",\u001b[22m\n\u001b[32m-   \"evidence\": \"PAN-123 has a branch that is not an ancestor of origin/main and no merged PR was found\",\u001b[39m\n\u001b[2m    \"issueId\": \"PAN-123\",\u001b[22m\n\u001b[32m-   \"reason\": \"stranded: PAN-123 has a branch that is not an ancestor of origin/main and no merged PR was found\",\u001b[39m\n\u001b[32m-   \"verdict\": \"stranded\",\u001b[39m\n\u001b[31m+   \"reason\": \"issue closed state could not be resolved\",\u001b[39m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/pan-dir/__tests__/merge-fulfillment.test.ts:\u001b[2m202:33\u001b[22m\u001b[39m\n    \u001b[90m200|\u001b[39m       })\u001b[33m;\u001b[39m\n    \u001b[90m201|\u001b[39m       \u001b[34mexpect\u001b[39m(deps\u001b[33m.\u001b[39msetReviewStatus)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m202|\u001b[39m       \u001b[34mexpect\u001b[39m(deps\u001b[33m.\u001b[39mcleanupMergedLabels)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                 \u001b[31m^\u001b[39m\n    \u001b[90m203|\u001b[39m     } \u001b[35mfinally\u001b[39m {\n    \u001b[90m204|\u001b[39m       projectMock\u001b[33m.\u001b[39mcurrent\u001b[33m.\u001b[39mpath \u001b[33m=\u001b[39m previousPath\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n",
     "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files.",
@@ -139,7 +139,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.708286,
-        "pricingAsOf": "2026-07-03T17:49:02.616Z"
+        "pricingAsOf": "2026-07-03T17:51:06.545Z"
       }
     },
     "merges": [
@@ -148,5 +148,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:48:55.082Z",
-  "updated": "2026-07-03T17:49:02.618Z"
+  "updated": "2026-07-03T17:51:06.989Z"
 }
