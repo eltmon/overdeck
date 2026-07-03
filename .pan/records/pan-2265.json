@@ -41,6 +41,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T21:07:48.984Z"
+    },
+    {
+      "timestamp": "2026-07-03T22:18:24.083Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T22:18:24.537Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T22:51:06.294Z"
     }
   ],
   "feedback": [],
@@ -49,6 +64,7 @@
       ".beads/issues.jsonl",
       ".pan/drafts/PAN-2265.md",
       ".pan/records/pan-2265.json",
+      ".pan/test/result.json",
       "scripts/file-size-baseline.txt",
       "src/dashboard/server/routes/webhooks.ts",
       "src/lib/__tests__/agents-spawn-supervisor.test.ts",
@@ -98,6 +114,7 @@
       ".beads/issues.jsonl",
       ".pan/drafts/PAN-2265.md",
       ".pan/records/pan-2265.json",
+      ".pan/test/result.json",
       "scripts/file-size-baseline.txt",
       "src/cli/commands/flywheel-surfaces.ts",
       "src/dashboard/server/routes/webhooks.ts",
@@ -133,7 +150,7 @@
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/webhook-handlers.test.ts"
     ],
-    "recordedAt": "2026-07-03T21:07:19.614Z"
+    "recordedAt": "2026-07-03T22:18:17.511Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -186,17 +203,17 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T22:17:41.212Z",
+    "updatedAt": "2026-07-03T22:28:41.017Z",
     "blockerReasons": [
       {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-03T22:17:41.212Z"
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-03T22:28:41.016Z"
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "reviewedAtCommit": "c3ca63eb4cb04391da23b1db67f34949756a8dee",
-    "lastVerifiedCommit": "c3ca63eb4cb04391da23b1db67f34949756a8dee"
+    "reviewedAtCommit": "3e53ef6759fdaa94140bfd7631273ff0a03ff36c",
+    "lastVerifiedCommit": "3e53ef6759fdaa94140bfd7631273ff0a03ff36c"
   },
   "closeOut": {
     "usage": {
@@ -211,8 +228,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 49322,
-            "output": 6377,
+            "input": 51838,
+            "output": 6773,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -227,9 +244,9 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 1947133,
-            "output": 60829,
-            "cacheRead": 15018240,
+            "input": 2401000,
+            "output": 85365,
+            "cacheRead": 17768704,
             "cacheWrite": 0
           }
         }
@@ -242,8 +259,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 49322,
-          "output": 6377,
+          "input": 51838,
+          "output": 6773,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -254,15 +271,15 @@
           "cacheWrite": 170267
         },
         "custom/kimi-k2.7-code": {
-          "input": 1947133,
-          "output": 60829,
-          "cacheRead": 15018240,
+          "input": 2401000,
+          "output": 85365,
+          "cacheRead": 17768704,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 12.920958,
-        "pricingAsOf": "2026-07-03T22:17:41.233Z"
+        "usd": 13.972857,
+        "pricingAsOf": "2026-07-03T22:28:41.042Z"
       }
     },
     "merges": [
@@ -271,5 +288,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T17:40:19.407Z",
-  "updated": "2026-07-03T22:17:41.234Z"
+  "updated": "2026-07-03T22:51:06.294Z"
 }
