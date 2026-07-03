@@ -12,6 +12,16 @@
       "timestamp": "2026-07-03T21:35:58.225Z",
       "reason": "end",
       "note": "No skipped work. Deviations/anomalies: bd sync is unavailable in this bd binary (unknown command), so I used bd close/list state and committed the workflow record; first full npm test run had three unrelated 5s timeouts, each failed file passed individually, and a second full npm test passed. Delivered: .pan/test/ is ignored, .pan/test/result.json is untracked but preserved on disk, and regression tests cover ignore/untracked plus workspace verdict recovery. Gates passed: targeted vitest, npm run typecheck, npm run lint, npm test."
+    },
+    {
+      "timestamp": "2026-07-03T22:58:32.880Z",
+      "reason": "end",
+      "note": "No skipped work. Re-running completion signal on operator nudge; implementation was already complete and previously submitted. Branch contains .pan/test/ ignore, untracked preserved verdict artifact, and regression coverage. Gates previously passed: targeted vitest, npm run typecheck, npm run lint, npm test."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T22:58:33.122Z"
     }
   ],
   "feedback": [],
@@ -33,10 +43,10 @@
       ".pan/test/result.json",
       "src/lib/cloister/__tests__/test-verdict.test.ts"
     ],
-    "recordedAt": "2026-07-03T21:35:49.161Z"
+    "recordedAt": "2026-07-03T22:58:26.617Z"
   },
   "created": "2026-07-03T21:17:15.683Z",
-  "updated": "2026-07-03T21:38:29.401Z",
+  "updated": "2026-07-03T23:00:40.409Z",
   "pipeline": {
     "issueId": "PAN-2325",
     "reviewStatus": "reviewing",
@@ -44,10 +54,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T21:38:29.382Z",
+    "updatedAt": "2026-07-03T23:00:40.383Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2328",
-    "lastVerifiedCommit": "27e4e6e525a8d346309a54cecd0bd4bd8be5f622",
-    "reviewRequestedAt": "2026-07-03T21:35:58.227Z",
+    "lastVerifiedCommit": "bf96bda81bf0f63f22e5b514afabab70b996f363",
+    "reviewRequestedAt": "2026-07-03T22:58:32.881Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2325.md",
@@ -66,7 +76,7 @@
         ".pan/test/result.json",
         "src/lib/cloister/__tests__/test-verdict.test.ts"
       ],
-      "recordedAt": "2026-07-03T21:35:49.161Z"
+      "recordedAt": "2026-07-03T22:58:26.617Z"
     }
   },
   "closeOut": {
@@ -105,7 +115,7 @@
       },
       "costAtCloseOut": {
         "usd": 1.6202400000000001,
-        "pricingAsOf": "2026-07-03T21:38:29.401Z"
+        "pricingAsOf": "2026-07-03T23:00:40.408Z"
       }
     },
     "merges": [
