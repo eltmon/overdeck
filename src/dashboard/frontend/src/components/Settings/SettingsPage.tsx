@@ -18,6 +18,7 @@ import { ConversationSearchSection } from './sections/ConversationSearchSection'
 import { ConversationSettingsSection } from './sections/ConversationSettingsSection';
 import { ProviderManagementSection } from './sections/ProviderManagementSection';
 import { PermissionsSection } from './sections/PermissionsSection';
+import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { CloisterSection } from './sections/CloisterSection';
 import { RemoteSection } from './sections/RemoteSection';
 import { MemorySection } from './sections/MemorySection';
@@ -522,6 +523,8 @@ export function SettingsPage() {
         onClaudePermissionModeChange={handlePermissionModeChange}
         onCodexPermissionModeChange={handleCodexPermissionModeChange}
       />
+
+      <TieredExecutionSection formData={formData} />
 
       <CloisterSection
         cloisterConfigError={cloisterConfigError}
