@@ -60,8 +60,10 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      ".beads/issues.jsonl",
       ".pan/drafts/PAN-2227.md",
-      ".pan/records/pan-2227.json"
+      ".pan/records/pan-2227.json",
+      "tests/unit/scripts/pre-push-hook.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -81,6 +83,7 @@
       "tests/unit/scripts/lint-ratchet-audit.test.ts"
     ],
     "actualChangedFiles": [
+      ".beads/issues.jsonl",
       ".github/workflows/ci.yml",
       ".husky/pre-push",
       ".pan/drafts/PAN-2227.md",
@@ -96,12 +99,13 @@
       "scripts/lint-ratchet-audit.sh",
       "tests/unit/scripts/guard-agent-main-push.test.ts",
       "tests/unit/scripts/lint-file-size.test.ts",
-      "tests/unit/scripts/lint-ratchet-audit.test.ts"
+      "tests/unit/scripts/lint-ratchet-audit.test.ts",
+      "tests/unit/scripts/pre-push-hook.test.ts"
     ],
-    "recordedAt": "2026-07-03T03:05:44.401Z"
+    "recordedAt": "2026-07-03T05:45:28.582Z"
   },
   "created": "2026-07-02T23:57:46.810Z",
-  "updated": "2026-07-03T05:44:12.559Z",
+  "updated": "2026-07-03T05:45:28.584Z",
   "pipeline": {
     "issueId": "PAN-2227",
     "reviewStatus": "blocked",
