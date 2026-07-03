@@ -33,7 +33,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../runtimes/ohmypi-fifo.js');
     vi.doUnmock('../harness-resolve.js');
     delete process.env.OVERDECK_HOME;
-    rmSync(tempHome, { recursive: true, force: true });
+    rmSync(tempHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
   it('resolves the work role model through role config defaults', async () => {
