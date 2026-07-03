@@ -48,12 +48,13 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2063",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-29T13:29:25.628Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-03T07:58:14.762Z",
+    "reviewNotes": "No blocking findings; UAT collapse behavior meets requirements and non-goals.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2110",
     "reviewedAtCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
     "lastVerifiedCommit": "6f9bb0ced0e256c07bff1131c6855ba7cc6cbaca",
@@ -64,8 +65,8 @@
       "byStage": {
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 41331,
-            "output": 5402,
+            "input": 50595,
+            "output": 7728,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -80,10 +81,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 132,
-            "output": 8800,
-            "cacheRead": 4759866,
-            "cacheWrite": 410408
+            "input": 813,
+            "output": 14407,
+            "cacheRead": 7833241,
+            "cacheWrite": 632769
           }
         },
         "work": {
@@ -97,8 +98,8 @@
       },
       "totals": {
         "cliproxy/gpt-5.4-mini": {
-          "input": 41331,
-          "output": 5402,
+          "input": 50595,
+          "output": 7728,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -109,10 +110,10 @@
           "cacheWrite": 281556
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 132,
-          "output": 8800,
-          "cacheRead": 4759866,
-          "cacheWrite": 410408
+          "input": 813,
+          "output": 14407,
+          "cacheRead": 7833241,
+          "cacheWrite": 632769
         },
         "custom/glm-5.2": {
           "input": 237548,
@@ -122,8 +123,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 9.878839,
-        "pricingAsOf": "2026-06-29T13:29:25.709Z"
+        "usd": 10.492847,
+        "pricingAsOf": "2026-07-03T07:58:14.897Z"
       }
     },
     "merges": [
@@ -132,7 +133,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-27T18:34:19.239Z",
-  "updated": "2026-06-29T13:29:25.797Z",
+  "updated": "2026-07-03T07:58:14.897Z",
   "statusOverrides": {
     "collapse-uat-panel": "completed",
     "collapse-uat-panel.ac1": "completed",
