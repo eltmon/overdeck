@@ -26,22 +26,28 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T04:34:56.512Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:52:58.498Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-03T04:02:51.756Z",
-  "updated": "2026-07-03T04:49:53.584Z",
+  "updated": "2026-07-03T04:53:03.079Z",
   "pipeline": {
     "issueId": "PAN-2254",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:49:52.293Z",
+    "updatedAt": "2026-07-03T04:53:02.893Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed test failures",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2272",
-    "lastVerifiedCommit": "848e7773c5f6c95345c3114dcc16f3ccc2622140",
+    "lastVerifiedCommit": "83476fb582dd42304a64cb4cb443bf93b1b221fc",
     "reviewRequestedAt": "2026-07-03T04:19:13.851Z"
   },
   "closeOut": {
@@ -66,7 +72,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:49:53.443Z"
+        "pricingAsOf": "2026-07-03T04:53:03.046Z"
       }
     },
     "merges": [
