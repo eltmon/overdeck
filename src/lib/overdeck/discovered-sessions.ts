@@ -193,7 +193,7 @@ function arrayIndexCondition(target: ArrayIndexTarget, sessionIdExpression: stri
   };
 }
 
-function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { where: string; params: unknown[] } {
+export function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
   const col = (name: string) => tableAlias ? `${tableAlias}.${name}` : name;

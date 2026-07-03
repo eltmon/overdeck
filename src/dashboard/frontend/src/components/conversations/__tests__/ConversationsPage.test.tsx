@@ -9,24 +9,40 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationsPage } from '../ConversationsPage';
 
 const rpcMocks = vi.hoisted(() => ({
-  list: vi.fn(),
+  listFeed: vi.fn(),
+  feedFacets: vi.fn(),
   search: vi.fn(),
   stats: vi.fn(),
   cost: vi.fn(),
-  costByWorkspace: vi.fn(),
   scan: vi.fn(),
   request: vi.fn((fn: (client: Record<string, unknown>) => unknown) => fn({
-    'pan.listDiscoveredSessions': rpcMocks.list,
+    'pan.listSessionsFeed': rpcMocks.listFeed,
+    'pan.getSessionsFeedFacets': rpcMocks.feedFacets,
     'pan.searchConversations': rpcMocks.search,
     'pan.getConversationStats': rpcMocks.stats,
     'pan.getConversationCost': rpcMocks.cost,
-    'pan.getConversationCostByWorkspace': rpcMocks.costByWorkspace,
     'pan.scanConversations': rpcMocks.scan,
   })),
 }));
 
+const componentMocks = vi.hoisted(() => ({
+  sessionDetail: vi.fn(),
+}));
+
 vi.mock('../../../lib/wsTransport', () => ({
   getTransport: () => ({ request: rpcMocks.request }),
+}));
+
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize?: (index: number) => number }) => ({
+    getVirtualItems: () => Array.from({ length: count }, (_, index) => ({
+      index,
+      key: index,
+      start: index * 36,
+      size: estimateSize?.(index) ?? 36,
+    })),
+    getTotalSize: () => count * 36,
+  }),
 }));
 
 // ─── FacetPanel mock captures onChange so tests can drive filter state ─────
@@ -35,7 +51,7 @@ type FilterOnChange = (key: string, val: string | boolean | undefined) => void;
 let capturedOnChange: FilterOnChange | null = null;
 
 vi.mock('../FacetPanel', () => ({
-  FacetPanel: ({ onChange }: { onChange: FilterOnChange }) => {
+  FacetPanel: ({ onChange, facets }: { onChange: FilterOnChange; facets: { models: Array<{ value: string; count: number }>; tags: Array<{ value: string; count: number }> } }) => {
     capturedOnChange = onChange;
     return (
       <div data-testid="facet-panel">
@@ -43,6 +59,8 @@ vi.mock('../FacetPanel', () => ({
         <button onClick={() => onChange('source', 'discovered')}>Discovered</button>
         <button onClick={() => onChange('source', 'managed-archived')}>Managed-archived</button>
         <button onClick={() => onChange('harness', 'codex')}>Codex</button>
+        {facets.models.map((model) => <div key={model.value}>{model.count} · {model.value}</div>)}
+        {facets.tags.map((tag) => <div key={tag.value}>{tag.value}: {tag.count}</div>)}
       </div>
     );
   },
@@ -59,7 +77,12 @@ vi.mock('../SessionTable', async () => {
     ),
   };
 });
-vi.mock('../SessionDetail', () => ({ SessionDetail: () => null }));
+vi.mock('../SessionDetail', () => ({
+  SessionDetail: (props: unknown) => {
+    componentMocks.sessionDetail(props);
+    return <div data-testid="session-detail" />;
+  },
+}));
 vi.mock('../ScanButton', () => ({
   ScanButton: ({ onScan }: { onScan: () => void }) => (
     <button data-testid="scan-btn" onClick={onScan}>Scan</button>
@@ -90,9 +113,8 @@ const SESSION_STUB = {
   panIssueId: null,
 };
 
-const LIST_RESPONSE = { sessions: [SESSION_STUB], count: 1, total: 1 };
 const SEARCH_RESPONSE = { sessions: [SESSION_STUB], total: 1, mode: 'fts', durationMs: 2 };
-const ARCHIVED_RESPONSE = [{
+const ARCHIVED_ROW = {
   ...SESSION_STUB,
   id: 1,
   source: 'managed-archived',
@@ -103,28 +125,29 @@ const ARCHIVED_RESPONSE = [{
   archivedAt: '2025-01-02T00:00:00Z',
   overdeckManaged: true,
   panIssueId: 'PAN-1391',
-}];
+};
+const FEED_RESPONSE = { rows: [ARCHIVED_ROW, { ...SESSION_STUB, source: 'discovered' }], nextCursor: null };
+const FEED_FACETS_RESPONSE = {
+  primaryModels: [{ value: 'claude-sonnet-4-6', count: 2 }],
+  tags: [{ value: 'feat', count: 2 }],
+  tools: [{ value: 'Read', count: 1 }],
+  files: [{ value: '/home/user/Projects/alpha/src/auth.ts', count: 1 }],
+  enrichmentLevels: [{ value: 1, count: 2 }],
+  timeBuckets: [{ value: '24h', count: 2 }],
+  costBuckets: [{ value: '<$0.10', count: 2 }],
+  sources: [{ value: 'discovered', count: 1 }, { value: 'managed-archived', count: 1 }],
+};
 const STATS_RESPONSE = { total: 10, enriched: 5, embedded: 2, managedCount: 3 };
 const COST_RESPONSE = { sessionCount: 10, totalCost: 0.25, totalTokensIn: 1000, totalTokensOut: 2000 };
-const WORKSPACE_COST_RESPONSE = {
-  groupBy: 'workspace' as const,
-  entries: [
-    { key: '/home/user/Projects/alpha', totalCost: 0.20, sessionCount: 8, totalTokensIn: 800, totalTokensOut: 1600 },
-    { key: '/home/user/Projects/beta', totalCost: 0.05, sessionCount: 2, totalTokensIn: 200, totalTokensOut: 400 },
-  ],
-  grandTotal: 0.25,
-  totalTokensIn: 1000,
-  totalTokensOut: 2000,
-};
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-function renderPage(client: QueryClient) {
+function renderPage(client: QueryClient, props: ComponentProps<typeof ConversationsPage> = {}) {
   return render(
     <QueryClientProvider client={client}>
-      <ConversationsPage />
+      <ConversationsPage {...props} />
     </QueryClientProvider>,
   );
 }
@@ -138,16 +161,15 @@ function sessionRows() {
 describe('ConversationsPage endpoint selection', () => {
   beforeEach(() => {
     capturedOnChange = null;
-    rpcMocks.list.mockResolvedValue(LIST_RESPONSE);
+    componentMocks.sessionDetail.mockClear();
+    window.history.replaceState(null, '', '/sessions');
+    rpcMocks.listFeed.mockResolvedValue(FEED_RESPONSE);
+    rpcMocks.feedFacets.mockResolvedValue(FEED_FACETS_RESPONSE);
     rpcMocks.search.mockResolvedValue(SEARCH_RESPONSE);
     rpcMocks.stats.mockResolvedValue(STATS_RESPONSE);
     rpcMocks.cost.mockResolvedValue(COST_RESPONSE);
-    rpcMocks.costByWorkspace.mockResolvedValue(WORKSPACE_COST_RESPONSE);
     rpcMocks.scan.mockResolvedValue({ inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(ARCHIVED_RESPONSE),
-    }));
+    vi.stubGlobal('fetch', vi.fn());
   });
 
   afterEach(() => {
@@ -155,23 +177,23 @@ describe('ConversationsPage endpoint selection', () => {
     vi.clearAllMocks();
   });
 
-  it('calls the list RPC on initial render (no query)', async () => {
+  it('calls the sessions feed RPC on initial render (no query)', async () => {
     renderPage(makeClient());
 
     await waitFor(() => expect(screen.queryByTestId('session-table')).toBeInTheDocument());
 
-    expect(rpcMocks.list).toHaveBeenCalledWith({ limit: 50, offset: 0 });
+    expect(rpcMocks.listFeed).toHaveBeenCalledWith({ limit: 100 });
+    expect(rpcMocks.feedFacets).toHaveBeenCalledWith({ limit: 100 });
     expect(rpcMocks.search).not.toHaveBeenCalled();
   });
 
-  it('renders workspace cost aggregates from the backend full-corpus RPC', async () => {
+  it('renders facet counts from the sessions feed facets RPC', async () => {
     renderPage(makeClient());
 
-    await waitFor(() => expect(screen.getByTestId('workspace-cost-breakdown')).toBeInTheDocument());
+    fireEvent.click(await screen.findByText('Filters'));
 
-    expect(rpcMocks.costByWorkspace).toHaveBeenCalledWith({});
-    expect(screen.getByTestId('workspace-cost-breakdown')).toHaveTextContent('/home/user/Projects/alpha $0.2000');
-    expect(screen.getByTestId('workspace-cost-breakdown')).toHaveTextContent('/home/user/Projects/beta $0.0500');
+    expect(screen.getByText('2 · claude-sonnet-4-6')).toBeInTheDocument();
+    expect(screen.getByText('feat: 2')).toBeInTheDocument();
   });
 
   it('calls the search RPC when query is typed', async () => {
@@ -226,7 +248,7 @@ describe('ConversationsPage endpoint selection', () => {
     });
 
     await waitFor(() => {
-      expect(rpcMocks.list).toHaveBeenLastCalledWith({ managed: true, limit: 50, offset: 0 });
+      expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({ managed: true, limit: 100 });
     });
   });
 
@@ -237,11 +259,11 @@ describe('ConversationsPage endpoint selection', () => {
     fireEvent.click(await screen.findByText('Codex'));
 
     await waitFor(() => {
-      expect(rpcMocks.list).toHaveBeenLastCalledWith({ harness: 'codex', limit: 50, offset: 0 });
+      expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({ harness: 'codex', limit: 100 });
     });
   });
 
-  it('archived fetch includes active facet filters and a bounded limit', async () => {
+  it('feed facets include active facet filters and a bounded limit', async () => {
     renderPage(makeClient());
 
     fireEvent.click(screen.getByText('Filters'));
@@ -258,19 +280,16 @@ describe('ConversationsPage endpoint selection', () => {
     });
 
     await waitFor(() => {
-      const calls = vi.mocked(globalThis.fetch).mock.calls.map(([url]) => String(url));
-      expect(calls.some((url) => {
-        const parsed = new URL(url, 'http://localhost');
-        return parsed.pathname === '/api/conversations/archived'
-          && parsed.searchParams.get('limit') === '50'
-          && parsed.searchParams.get('workspacePath') === '/home/user/Projects/archived'
-          && parsed.searchParams.get('primaryModel') === 'claude-sonnet-4-6'
-          && parsed.searchParams.get('tag') === 'feat'
-          && parsed.searchParams.get('tool') === 'Read'
-          && parsed.searchParams.get('file') === '/home/user/Projects/archived/src/auth.ts'
-          && parsed.searchParams.get('minCost') === '0.01'
-          && parsed.searchParams.get('enrichmentLevel') === '1';
-      })).toBe(true);
+      expect(rpcMocks.feedFacets).toHaveBeenLastCalledWith({
+        workspacePath: '/home/user/Projects/archived',
+        primaryModel: 'claude-sonnet-4-6',
+        tags: ['feat'],
+        tools: ['Read'],
+        files: ['/home/user/Projects/archived/src/auth.ts'],
+        minCost: 0.01,
+        enrichmentLevel: 1,
+        limit: 100,
+      });
     });
   });
 
@@ -302,41 +321,38 @@ describe('ConversationsPage endpoint selection', () => {
     });
   });
 
-  it('defaults to all sources and merges archived rows before older discovered rows', async () => {
+  it('defaults to all sources and renders feed rows in backend order', async () => {
     renderPage(makeClient());
 
     await waitFor(() => expect(sessionRows()).toHaveLength(2));
 
-    expect(sessionRows()[0]).toHaveTextContent('Projects/archived');
+    expect(sessionRows()[0]).toHaveTextContent('Archived conversation');
     expect(sessionRows()[0]).toHaveTextContent('Archived summary');
     expect(sessionRows()[1]).toHaveTextContent('Projects/alpha');
     expect(sessionRows()[1]).toHaveTextContent('Fixed the auth bug');
   });
 
-  it('shows only managed-archived rows and hides search controls when that source is selected', async () => {
+  it('requests managed-archived feed rows and hides search controls when that source is selected', async () => {
     renderPage(makeClient());
 
     fireEvent.click(screen.getByText('Filters'));
     fireEvent.click(await screen.findByText('Managed-archived'));
 
-    await waitFor(() => expect(sessionRows()).toHaveLength(1));
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({ source: 'managed-archived', limit: 100 }));
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/conversations/archived?limit=50');
-    expect(sessionRows()[0]).toHaveTextContent('Projects/archived');
-    expect(sessionRows()[0]).not.toHaveTextContent('Projects/alpha');
+    expect(rpcMocks.feedFacets).toHaveBeenLastCalledWith({ source: 'managed-archived', limit: 100 });
     expect(screen.queryByPlaceholderText('Search sessions…')).not.toBeInTheDocument();
   });
 
-  it('shows only discovered rows when the discovered source is selected', async () => {
+  it('requests discovered feed rows when the discovered source is selected', async () => {
     renderPage(makeClient());
 
     fireEvent.click(screen.getByText('Filters'));
     fireEvent.click(await screen.findByText('Discovered'));
 
-    await waitFor(() => expect(sessionRows()).toHaveLength(1));
+    await waitFor(() => expect(rpcMocks.listFeed).toHaveBeenLastCalledWith({ source: 'discovered', limit: 100 }));
 
-    expect(sessionRows()[0]).toHaveTextContent('Projects/alpha');
-    expect(sessionRows()[0]).not.toHaveTextContent('Projects/archived');
+    expect(rpcMocks.feedFacets).toHaveBeenLastCalledWith({ source: 'discovered', limit: 100 });
     expect(screen.getByPlaceholderText('Search sessions…')).toBeInTheDocument();
   });
 
@@ -349,5 +365,27 @@ describe('ConversationsPage endpoint selection', () => {
 
     expect(errorSpy.mock.calls.some((call) => String(call[0]).includes('Encountered two children with the same key'))).toBe(false);
     errorSpy.mockRestore();
+  });
+
+  it('selects a row from the initial session URL key', async () => {
+    renderPage(makeClient(), { initialSessionKey: 'discovered:1' });
+
+    await screen.findByTestId('session-detail');
+
+    expect(componentMocks.sessionDetail).toHaveBeenLastCalledWith(expect.objectContaining({
+      session: expect.objectContaining({ id: 1, source: 'discovered' }),
+    }));
+  });
+
+  it('clicking a row updates the session query param with replaceState', async () => {
+    const replaceSpy = vi.spyOn(window.history, 'replaceState');
+    renderPage(makeClient());
+
+    await waitFor(() => expect(sessionRows()).toHaveLength(2));
+    fireEvent.click(sessionRows()[1]!);
+
+    expect(replaceSpy).toHaveBeenLastCalledWith(null, '', '/sessions?session=discovered%3A1');
+    expect(window.location.search).toBe('?session=discovered%3A1');
+    replaceSpy.mockRestore();
   });
 });

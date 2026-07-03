@@ -2,27 +2,58 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
+
 import { SessionTranscript } from '../SessionTranscript';
 
+const componentMocks = vi.hoisted(() => ({
+  conversationPanel: vi.fn(),
+  messagesTimeline: vi.fn(),
+}));
+
 vi.mock('../../chat/ConversationPanel', () => ({
-  ConversationPanel: ({ conversation, embedded }: { conversation: { name: string }; embedded?: boolean }) => (
-    <div data-testid="conversation-panel">
-      {conversation.name} {embedded ? 'embedded' : 'not embedded'}
-    </div>
-  ),
+  ConversationPanel: (props: unknown) => {
+    componentMocks.conversationPanel(props);
+    return <div data-testid="conversation-panel" />;
+  },
 }));
 
 vi.mock('../../chat/MessagesTimeline', () => ({
-  MessagesTimeline: ({ messages }: { messages: Array<{ text: string }> }) => (
-    <div data-testid="messages-timeline">
-      {messages.map((message) => (
-        <p key={message.text}>{message.text}</p>
-      ))}
-    </div>
-  ),
+  MessagesTimeline: (props: unknown) => {
+    componentMocks.messagesTimeline(props);
+    return <div data-testid="messages-timeline" />;
+  },
 }));
 
-function renderTranscript(session: ComponentProps<typeof SessionTranscript>['session']) {
+vi.mock('../../../hooks/useTheme', () => ({
+  useTheme: () => ({ resolvedTheme: 'dark' }),
+}));
+
+type Session = ComponentProps<typeof SessionTranscript>['session'];
+
+const BASE_SESSION: Session = {
+  id: 42,
+  source: 'discovered',
+  harness: 'claude-code',
+  jsonlPath: '/tmp/session.jsonl',
+  workspacePath: '/workspace',
+  primaryModel: 'claude-sonnet-4-6',
+  messageCount: 2,
+  firstTs: '2026-07-03T01:00:00.000Z',
+  lastTs: '2026-07-03T01:01:00.000Z',
+  estimatedCost: 0.01,
+  tokenInput: 10,
+  tokenOutput: 20,
+  toolsUsed: [],
+  filesTouched: [],
+  tags: [],
+  summary: null,
+  enrichmentLevel: 0,
+  enrichmentFailed: false,
+  overdeckManaged: false,
+  panIssueId: null,
+};
+
+function renderTranscript(session: Session) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -34,55 +65,64 @@ function renderTranscript(session: ComponentProps<typeof SessionTranscript>['ses
 describe('SessionTranscript', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
-  it('renders ConversationPanel embedded for managed rows', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ id: 123, name: 'managed-conv' }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderTranscript({
-      id: 42,
-      conversationId: 123,
-      conversationName: 'managed-conv',
-      workspacePath: '/repo',
-      panIssueId: 'PAN-1917',
-    });
-
-    await waitFor(() => expect(screen.getByTestId('conversation-panel')).toHaveTextContent('managed-conv embedded'));
-    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/managed-conv');
-  });
-
-  it('renders MessagesTimeline for unmanaged discovered rows', async () => {
+  it('renders ConversationPanel for managed rows with conversation identity', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        messages: [{ id: 'm1', role: 'user', text: 'hello from jsonl', createdAt: '2026-07-03T00:00:00Z' }],
+        id: 7,
+        name: 'managed-conv',
+        tmuxSession: 'conv-managed',
+        status: 'ended',
+        cwd: '/workspace',
+        issueId: null,
+        createdAt: '2026-07-03T01:00:00.000Z',
+        endedAt: null,
+        lastAttachedAt: null,
+        sessionAlive: false,
       }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    renderTranscript({
-      id: 42,
-      workspacePath: '/repo',
-      panIssueId: null,
-    });
+    renderTranscript({ ...BASE_SESSION, conversationId: '7', conversationName: 'managed-conv', overdeckManaged: true });
 
-    await waitFor(() => expect(screen.getByTestId('messages-timeline')).toHaveTextContent('hello from jsonl'));
-    expect(fetchMock).toHaveBeenCalledWith('/api/discovered-sessions/42/messages');
+    await screen.findByTestId('conversation-panel');
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/7');
+    expect(componentMocks.conversationPanel).toHaveBeenCalledWith(expect.objectContaining({
+      embedded: true,
+      viewMode: 'conversation',
+      conversation: expect.objectContaining({ name: 'managed-conv' }),
+    }));
   });
 
-  it("renders a missing-file notice when the messages endpoint returns 410", async () => {
+  it('renders MessagesTimeline for unmanaged rows from the discovered messages endpoint', async () => {
+    const messages = [{ id: 'm1', role: 'user', text: 'hello', createdAt: '2026-07-03T01:00:00.000Z' }];
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ messages, workLog: [], streaming: false }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderTranscript(BASE_SESSION);
+
+    await screen.findByTestId('messages-timeline');
+    expect(fetchMock).toHaveBeenCalledWith('/api/discovered-sessions/42/messages');
+    expect(componentMocks.messagesTimeline).toHaveBeenCalledWith(expect.objectContaining({
+      messages,
+      workLog: [],
+      streaming: false,
+      resolvedTheme: 'dark',
+    }));
+  });
+
+  it('renders a missing transcript notice for 410 responses', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 410 }));
 
-    renderTranscript({
-      id: 42,
-      workspacePath: '/repo',
-      panIssueId: null,
-    });
+    renderTranscript(BASE_SESSION);
 
-    await waitFor(() => expect(screen.getByText('transcript file no longer on disk')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Transcript file no longer on disk.')).toBeInTheDocument());
+    expect(screen.queryByTestId('messages-timeline')).not.toBeInTheDocument();
   });
 });

@@ -11,6 +11,10 @@ import type { ComponentProps } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionDetail } from '../SessionDetail';
 
+vi.mock('../SessionTranscript', () => ({
+  SessionTranscript: () => <div data-testid="session-transcript" />,
+}));
+
 const rpcMocks = vi.hoisted(() => ({
   get: vi.fn(),
   enrich: vi.fn().mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 }),
@@ -139,6 +143,20 @@ describe('SessionDetail', () => {
     const closeBtn = screen.getByRole('button', { name: 'Close session detail' });
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('opens managed discovered rows in Command Deck by conversation id', () => {
+    const popStateEvents: Event[] = [];
+    const onPopState = (event: Event) => popStateEvents.push(event);
+    window.history.replaceState(null, '', '/sessions?session=discovered:42');
+    window.addEventListener('popstate', onPopState);
+    renderDetail({ ...BASE_SESSION, conversationId: '87', conversationName: 'managed-conv', overdeckManaged: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Command Deck' }));
+
+    expect(window.location.pathname).toBe('/conv/87');
+    expect(popStateEvents).toHaveLength(1);
+    window.removeEventListener('popstate', onPopState);
   });
 
   it('shows Quick, Detailed, Deep, and Embed controls when enrichmentLevel is 0', () => {
