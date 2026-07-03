@@ -46,7 +46,7 @@
     }
   ],
   "created": "2026-07-03T10:51:14.030Z",
-  "updated": "2026-07-03T11:22:35.925Z",
+  "updated": "2026-07-03T11:25:54.868Z",
   "pipeline": {
     "issueId": "PAN-2283",
     "reviewStatus": "blocked",
@@ -54,7 +54,7 @@
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:22:33.756Z",
+    "updatedAt": "2026-07-03T11:25:53.186Z",
     "reviewNotes": "Global tiered execution now blocks ordinary work-agent starts without a vBRIEF plan",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2290",
     "reviewRequestedAt": "2026-07-03T11:15:54.992Z"
@@ -95,7 +95,7 @@
       },
       "costAtCloseOut": {
         "usd": 2.059281,
-        "pricingAsOf": "2026-07-03T11:22:35.892Z"
+        "pricingAsOf": "2026-07-03T11:25:54.851Z"
       }
     },
     "merges": [
