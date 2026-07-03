@@ -11,11 +11,11 @@
   "pipeline": {
     "issueId": "PAN-2260",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:41:22.611Z",
+    "updatedAt": "2026-07-03T04:51:44.844Z",
     "reviewNotes": "Review passed; merged PR head verification addresses the prior squash-merge close-out blocker",
     "testNotes": "Verification did not complete. Context discovery attempted from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2260: cat .pan/continue.json failed missing file; cat .pan/spec.vbrief.json failed missing file; bd show PAN-2260 failed opening redirected Dolt database with read-only file system. No configured typecheck, lint, test, build, or Playwright UAT gate reached a passing result, so the role-based verification verdict is failed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -46,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:41:22.643Z"
+        "pricingAsOf": "2026-07-03T04:51:44.965Z"
       }
     },
     "merges": [
@@ -55,5 +55,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T04:41:22.632Z",
-  "updated": "2026-07-03T04:41:22.645Z"
+  "updated": "2026-07-03T04:51:44.965Z"
 }
