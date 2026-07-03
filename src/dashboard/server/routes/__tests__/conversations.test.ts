@@ -19,7 +19,7 @@ import {
   recoverStuckForks,
   registerInFlightForkPipeline,
   waitForInFlightForkPipelines,
-} from '../conversations.js';
+} from '../../../../lib/overdeck/conversation-forks.js';
 import {
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
@@ -719,7 +719,7 @@ describe('conversations route — DB integration', () => {
 
   it('returns a persisted handoff document as markdown', async () => {
     const { createConversation, getConversationByName, recordConversationHandoff } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationHandoffDoc } = await import('../conversations.js');
+    const { handleConversationHandoffDoc } = await import('../../../../lib/overdeck/conversation-forks.js');
 
     const docPath = join(TEST_HOME, 'handoffs', 'source-2026-05-23T04-35-00.000Z.md');
     mkdirSync(join(TEST_HOME, 'handoffs'), { recursive: true });
@@ -737,7 +737,7 @@ describe('conversations route — DB integration', () => {
 
   it('returns 404 when a conversation has no handoff document path', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationHandoffDoc } = await import('../conversations.js');
+    const { handleConversationHandoffDoc } = await import('../../../../lib/overdeck/conversation-forks.js');
 
     createConversation({ name: 'plain-conv', tmuxSession: 'conv-plain', cwd: '/cwd' });
 
@@ -749,7 +749,7 @@ describe('conversations route — DB integration', () => {
 
   it('returns 410 when the recorded handoff document is missing on disk', async () => {
     const { createConversation, recordConversationHandoff } = await import('../../../../lib/overdeck/conversations.js');
-    const { handleConversationHandoffDoc } = await import('../conversations.js');
+    const { handleConversationHandoffDoc } = await import('../../../../lib/overdeck/conversation-forks.js');
 
     const docPath = join(TEST_HOME, 'handoffs', 'missing.md');
     createConversation({ name: 'source-conv', tmuxSession: 'conv-source', cwd: '/cwd' });

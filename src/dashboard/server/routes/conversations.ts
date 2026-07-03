@@ -14,7 +14,6 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_P
  *
  * Conversations are NEVER deleted from the database, and JSONL transcript files are never removed.
  */
-import { randomUUID } from 'node:crypto';
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
@@ -44,7 +43,6 @@ import {
   stopConversationRuntime,
   tmuxSessionExists,
   waitForConversationRuntimeReady,
-  waitForPiTuiReady,
   waitForTmuxSession,
 } from '../../../lib/overdeck/conversation-runtime.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
@@ -93,17 +91,18 @@ import {
   handleConversationImageUpload,
   handleConversationMessage,
 } from '../../../lib/overdeck/conversation-message.js';
+import {
+  handleConversationHandoffDoc,
+  handleConversationSummaryFork,
+} from '../../../lib/overdeck/conversation-forks.js';
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import * as Multipart from 'effect/unstable/http/Multipart';
 import {
   listConversations,
   getConversationLedgerCosts,
-  getStuckForks,
-  incrementForkRetryCount,
   getConversationByName,
   getConversationById,
-  createConversation,
   markConversationEnded,
   markConversationRunning,
   markConversationActive,
@@ -114,9 +113,6 @@ import {
   setConversationEffort,
   setConversationHarness,
   setConversationClaudeSessionId,
-  updateConversationForkFallbackReason,
-  setForkRequest,
-  recordConversationHandoff,
   backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
@@ -127,14 +123,12 @@ import {
   updateSpawnError,
   hasOtherActiveConversationOnTmuxSession,
   type LegacyConversation as Conversation,
-  type ForkRequest,
 } from '../../../lib/overdeck/conversations.js';
 import {
   sendRawKeystroke,
   sendKeysAsync,
   MessageDeliveryFailed,
   capturePane,
-  sessionExists,
   isHarnessProcessAlive,
   killSession,
   createSession,
@@ -143,7 +137,7 @@ import {
   listSessionNames,
   findManagedServerPidSync,
 } from '../../../lib/tmux.js';
-import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
+import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -163,7 +157,7 @@ import { resolveDiscoveredSessionFile } from '../../../lib/conversations/discove
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
-import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../../../lib/providers.js';
+import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -185,21 +179,6 @@ import {
 } from '../services/conversation-compaction.js';
 import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
 import { getEventStore } from '../event-store.js';
-import {
-  generateSummaryForFork,
-  generateFallbackSummary,
-  reserveSummaryForkSession,
-  copySessionFromCompactBoundary,
-  requestHandoffFromAgent,
-  authorHandoffExternal,
-  handoffPreconditionFallbackReason,
-  handoffFailureReason,
-  logHandoffFallback,
-  prependFallbackFocus,
-  type SummaryForkMode,
-  type HandoffAuthor,
-} from '../../../lib/conversations/summary-fork.js';
-import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -462,13 +441,6 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
 // Codex rollout resolution (thread-id fast path + PAN-1690 latest-rollout
 // fallback) lives in ./jsonl-resolver.ts as resolveCodexRolloutPath, shared
 // with the work-agent transcript resolver (PAN-1805).
-async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
-  const claudeSessionFile = await resolveSessionFile(conv);
-  if (claudeSessionFile && existsSync(claudeSessionFile)) {
-    return claudeSessionFile;
-  }
-  return claudeSessionFile;
-}
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -479,57 +451,6 @@ const readJsonBody = Effect.gen(function* () {
     return {} as Record<string, unknown>;
   }
 });
-export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
-  if (value === undefined || value === null) return { ok: true, focus: undefined };
-  if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
-  const focus = value.trim();
-  if (!focus) return { ok: true, focus: undefined };
-  if (focus.length > 500) return { ok: false, error: 'focus must be 500 characters or fewer' };
-  if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
-  return { ok: true, focus };
-}
-export function buildForkRequest(params: ForkRequest): ForkRequest {
-  return {
-    parentConversationName: params.parentConversationName,
-    sessionId: params.sessionId,
-    forkMode: params.forkMode,
-    ...(params.summaryModel !== undefined ? { summaryModel: params.summaryModel } : {}),
-    localSummaryOnly: params.localSummaryOnly,
-    ...(params.includeThinkingInSummary !== undefined ? { includeThinkingInSummary: params.includeThinkingInSummary } : {}),
-    ...(params.summaryHarness !== undefined ? { summaryHarness: params.summaryHarness } : {}),
-    ...(params.handoffFocus !== undefined ? { handoffFocus: params.handoffFocus } : {}),
-    handoffAuthor: params.handoffAuthor,
-    ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
-    ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
-  };
-}
-export async function handleConversationHandoffDoc(
-  name: string,
-): Promise<HttpServerResponse.HttpServerResponse> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-  if (!conv.handoffDocPath) {
-    return jsonResponse({ error: 'Handoff document not found' }, { status: 404 });
-  }
-  try {
-    const docText = await readFile(conv.handoffDocPath, 'utf-8');
-    return HttpServerResponse.text(docText, {
-      contentType: 'text/markdown',
-      headers: {
-        'Content-Disposition': `inline; filename="${conv.name}-handoff.md"`,
-      },
-    });
-  } catch (error) {
-    if ((error as { code?: string }).code === 'ENOENT') {
-      return jsonResponse({ error: 'Handoff document is no longer available' }, { status: 410 });
-    }
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`[conversations] failed to read handoff doc for "${name}":`, msg);
-    return jsonResponse({ error: 'Failed to read handoff document' }, { status: 500 });
-  }
-}
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 // PAN-1705 — coalesce concurrent list enrichments. Several dashboard clients
 // poll this endpoint on overlapping intervals; each request used to run its
@@ -1400,418 +1321,6 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
   }),
 );
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
-/**
- * Title a handoff conversation after the WORK it carries (the focus), not the
- * parent's title. A handoff with no focus falls back to "Handoff: <parent>".
- * The focus is collapsed to one line and trimmed to a sane title length; the
- * AI title-refiner can still sharpen it once the successor starts working.
- */
-function handoffTitleFromFocus(focus: string | undefined, fallback: string): string {
-  const f = focus?.replace(/\s+/g, ' ').trim();
-  if (!f) return `Handoff: ${fallback}`;
-  const trimmed = f.length > 70 ? `${f.slice(0, 69).trimEnd()}…` : f;
-  return `Handoff: ${trimmed}`;
-}
-type ForkPipelineRuntimeOverrides = Partial<{
-  sessionExists: (sessionName: string) => Promise<boolean>;
-  isHarnessProcessAlive: (sessionName: string) => Promise<boolean>;
-  spawnConversationSession: typeof spawnConversationSession;
-  waitForTmuxSession: typeof waitForTmuxSession;
-  getAgentRuntimeStateSync: typeof getAgentRuntimeStateSync;
-}>;
-let forkPipelineRuntimeOverrides: ForkPipelineRuntimeOverrides = {};
-export function __setForkPipelineRuntimeOverridesForTest(overrides: ForkPipelineRuntimeOverrides): void {
-  forkPipelineRuntimeOverrides = overrides;
-}
-export function __resetForkPipelineRuntimeOverridesForTest(): void {
-  forkPipelineRuntimeOverrides = {};
-}
-async function forkSessionExists(sessionName: string): Promise<boolean> {
-  return forkPipelineRuntimeOverrides.sessionExists
-    ? forkPipelineRuntimeOverrides.sessionExists(sessionName)
-    : Effect.runPromise(sessionExists(sessionName));
-}
-async function forkHarnessProcessAlive(sessionName: string): Promise<boolean> {
-  return forkPipelineRuntimeOverrides.isHarnessProcessAlive
-    ? forkPipelineRuntimeOverrides.isHarnessProcessAlive(sessionName)
-    : isHarnessProcessAlive(sessionName);
-}
-function forkRuntimeState(sessionName: string): ReturnType<typeof getAgentRuntimeStateSync> {
-  return forkPipelineRuntimeOverrides.getAgentRuntimeStateSync
-    ? forkPipelineRuntimeOverrides.getAgentRuntimeStateSync(sessionName)
-    : getAgentRuntimeStateSync(sessionName);
-}
-async function forkSpawnConversationSession(...args: Parameters<typeof spawnConversationSession>): Promise<void> {
-  return (forkPipelineRuntimeOverrides.spawnConversationSession ?? spawnConversationSession)(...args);
-}
-async function forkWaitForTmuxSession(...args: Parameters<typeof waitForTmuxSession>): Promise<void> {
-  return (forkPipelineRuntimeOverrides.waitForTmuxSession ?? waitForTmuxSession)(...args);
-}
-/**
- * Watch the hook-driven runtime mirror to confirm a delivered fork brief was
- * actually accepted as a prompt. Once a prompt is submitted the agent leaves
- * idle and goes active (UserPromptSubmit hook → 'working'). Returns:
- *   - 'accepted'  : observed active/waiting — the brief landed and was submitted
- *   - 'still-idle': mirror was live and stayed idle for the whole window — the
- *                   paste was dropped (a fresh Claude TUI flushes stdin during
- *                   startup, discarding a paste delivered a beat too early)
- *   - 'unknown'   : mirror never reported a usable state — can't tell, so the
- *                   caller must NOT retry (avoids double-submitting a brief that
- *                   may have landed). No tmux pane scraping — activity hooks only.
- */
-export async function confirmForkPromptAccepted(
-  tmuxSession: string,
-  timeoutMs: number,
-): Promise<'accepted' | 'still-idle' | 'unknown'> {
-  const deadline = Date.now() + timeoutMs;
-  let sawIdle = false;
-  do {
-    const state = forkRuntimeState(tmuxSession)?.state;
-    if (state === 'active' || state === 'waiting-on-human') return 'accepted';
-    if (state === 'idle') sawIdle = true;
-    await new Promise(resolve => setTimeout(resolve, 500));
-  } while (Date.now() < deadline);
-  return sawIdle ? 'still-idle' : 'unknown';
-}
-/**
- * Deliver a forked conversation's brief (summary or handoff doc) into the
- * freshly-spawned successor session, then CONFIRM it actually landed.
- *
- * PAN-1624: a fresh Claude Code TUI drains/flushes its stdin while
- * initializing, so a payload pasted before the input loop is live is silently
- * discarded — the successor sits at an empty welcome screen and never starts.
- * The `ready.json` session-start signal can fire before the input loop has
- * settled, so a single fire-and-forget paste is unreliable. We deliver, then
- * watch the runtime mirror: if it positively reports the agent is still idle
- * after the window, the paste was dropped — re-deliver once. Re-delivery only
- * happens from a confirmed-still-idle state, so a brief that already landed is
- * never double-submitted; when the mirror can't tell us, we fall back to a
- * single delivery (the pre-PAN-1624 behavior).
- */
-export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDocPath'>): Promise<string | null> {
-  if (!conv.handoffDocPath || !existsSync(conv.handoffDocPath)) return null;
-  return readFile(conv.handoffDocPath, 'utf-8');
-}
-export async function ensureForkSessionReady(
-  conv: Conversation,
-  sessionId: string,
-  resume: boolean,
-  plainFork = false,
-): Promise<void> {
-  const tmuxAlive = await forkSessionExists(conv.tmuxSession);
-  if (tmuxAlive) {
-    const harnessAlive = await forkHarnessProcessAlive(conv.tmuxSession);
-    if (harnessAlive) {
-      console.info(`[fork-pipeline] Reusing existing live tmux session ${conv.tmuxSession} for ${conv.name}`);
-      return;
-    }
-    console.warn(`[fork-pipeline] Existing tmux session ${conv.tmuxSession} for ${conv.name} is a keep-alive corpse — recreating`);
-  }
-  await forkSpawnConversationSession(
-    conv.tmuxSession,
-    conv.cwd,
-    sessionId,
-    conv.model ?? undefined,
-    conv.effort ?? undefined,
-    conv.issueId ?? undefined,
-    resume,
-    conv.harness ?? 'claude-code',
-    plainFork,
-  );
-  await forkWaitForTmuxSession(conv.tmuxSession);
-}
-export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
-  updateForkStatus(conv.name, 'injecting');
-  const method = resolveConversationDeliveryMethod(conv);
-  const behavior = getHarnessBehavior(conv.harness);
-  if (behavior.transcriptKind === 'ohmypi-jsonl') {
-    await waitForPiTuiReady(conv.tmuxSession, 60000);
-    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
-    return;
-  }
-  const ready = await waitForReadySignal(conv.tmuxSession, 60);
-  if (!ready) {
-    console.warn(`[${caller}] ready signal not detected for ${conv.name} within 60s — delivering and confirming anyway`);
-  }
-  const MAX_ATTEMPTS = 2;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
-    const outcome = await confirmForkPromptAccepted(conv.tmuxSession, 8000);
-    if (outcome === 'accepted') return;
-    if (outcome === 'unknown') {
-      // Runtime mirror not reporting for this session — we cannot distinguish a
-      // dropped paste from a slow hook, so do not retry (would risk a double
-      // submit). Behaves like the original single delivery.
-      console.warn(`[${caller}] delivery to ${conv.name} could not be confirmed (runtime mirror silent) — not retrying`);
-      return;
-    }
-    // outcome === 'still-idle': the mirror is live and the agent never picked
-    // up the brief — the TUI dropped the paste during startup.
-    if (attempt < MAX_ATTEMPTS) {
-      console.warn(`[${caller}] ${conv.name} still idle 8s after delivery (attempt ${attempt}/${MAX_ATTEMPTS}) — TUI likely dropped the paste during startup, re-delivering`);
-    } else {
-      console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
-    }
-  }
-}
-export function handleForkPipelineFailure(name: string, err: unknown): void {
-  console.error(`[fork-pipeline] Failed for ${name}:`, err);
-  const msg = err instanceof Error ? err.message : String(err);
-  updateForkStatus(name, 'failed', msg);
-  markConversationEnded(name);
-}
-export async function runForkPipeline(
-  convName: string,
-  parentConv: Conversation,
-  sessionId: string,
-  summaryModel?: string,
-  forkMode: SummaryForkMode = 'summary',
-  localSummaryOnly = false,
-  includeThinkingInSummary?: boolean,
-  summaryHarness?: RuntimeName,
-  handoffFocus?: string,
-  handoffAuthor: HandoffAuthor = 'external',
-  handoffAuthorModel?: string,
-  handoffAuthorHarness?: RuntimeName,
-): Promise<void> {
-  const conv = getConversationByName(convName);
-  if (!conv) throw new Error(`Fork conversation ${convName} not found`);
-  const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
-  if (!parentSessionFile) throw new Error(`Parent has no session file`);
-  if (forkMode === 'plain') {
-    if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {
-      // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-      // ohmypi and Codex cannot consume Claude JSONL, so a plain fork would silently start
-      // empty while the pipeline reported success. The summary-fork route already
-      // rejects launchHarness='ohmypi'/'codex'; this guard is defense in depth.
-      throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
-    }
-    const tmuxAlive = await forkSessionExists(conv.tmuxSession);
-    const reusableSession = tmuxAlive && await forkHarnessProcessAlive(conv.tmuxSession);
-    if (!reusableSession) {
-      // Plain Claude Code fork: copy JSONL from last compact boundary into the new
-      // session file, then spawn with --resume so Claude Code loads the history
-      // directly. A tmux keep-alive corpse is not reusable; ensureForkSessionReady()
-      // will recreate it, so refresh the session file before respawning.
-      const forkSessionFile = await resolveSessionFile(conv);
-      if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-      await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
-    }
-    updateForkStatus(convName, 'spawning');
-    await ensureForkSessionReady(
-      conv,
-      sessionId,
-      true, // resume — load the copied JSONL history
-      true, // plainFork — skip channels MCP wiring so it doesn't inflate the
-            // resumed context past Claude Code's auto-compact threshold
-    );
-    // No summary injection needed for plain Claude Code forks.
-    markConversationActive(convName);
-    updateForkStatus(convName, null);
-    return;
-  }
-  let summary: string;
-  let effectiveForkMode = forkMode;
-  let handoffDocPath: string | null = null;
-  let forkFallbackReason: string | null = null;
-  const buildSummary = async (): Promise<string> => {
-    if (localSummaryOnly) {
-      try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
-      } catch (error) {
-        console.warn(
-          `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return '';
-      }
-    }
-    try {
-      const result = await generateSummaryForFork(
-        parentSessionFile,
-        summaryModel,
-        includeThinkingInSummary,
-        summaryHarness,
-        parentConv.harness ?? undefined,
-      );
-      return result.summary;
-    } catch (error) {
-      if (!forkFallbackReason) {
-        forkFallbackReason = `LLM summary failed: ${error instanceof Error ? error.message : String(error)}`;
-      }
-      console.warn(
-        `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
-      } catch (heuristicError) {
-        console.warn(
-          `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
-        );
-        return '';
-      }
-    }
-  };
-  if (forkMode === 'handoff') {
-    const existingHandoffDoc = await readExistingHandoffDoc(conv);
-    if (existingHandoffDoc !== null) {
-      summary = existingHandoffDoc;
-      handoffDocPath = conv.handoffDocPath;
-    } else if (handoffAuthor === 'external') {
-      // External authoring: separate session reads the source JSONL and
-      // writes the doc; source conversation is never touched.
-      try {
-        const handoff = await authorHandoffExternal(
-          parentConv,
-          parentSessionFile,
-          handoffFocus,
-          handoffAuthorModel,
-          handoffAuthorHarness,
-        );
-        summary = handoff.docText;
-        handoffDocPath = handoff.docPath;
-      } catch (error) {
-        forkFallbackReason = handoffFailureReason(error);
-        effectiveForkMode = 'summary';
-        logHandoffFallback(parentConv, forkFallbackReason);
-        summary = prependFallbackFocus(await buildSummary(), handoffFocus, forkFallbackReason);
-      }
-    } else {
-      // Source authoring (legacy): deliver the prompt to the live source agent.
-      const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
-      if (preconditionFallback) {
-        forkFallbackReason = preconditionFallback;
-        effectiveForkMode = 'summary';
-        logHandoffFallback(parentConv, preconditionFallback);
-        summary = prependFallbackFocus(await buildSummary(), handoffFocus, preconditionFallback);
-      } else {
-        try {
-          const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
-          summary = handoff.docText;
-          handoffDocPath = handoff.docPath;
-        } catch (error) {
-          forkFallbackReason = handoffFailureReason(error);
-          effectiveForkMode = 'summary';
-          logHandoffFallback(parentConv, forkFallbackReason);
-          summary = prependFallbackFocus(await buildSummary(), handoffFocus, forkFallbackReason);
-        }
-      }
-    }
-  } else {
-    summary = await buildSummary();
-  }
-  updateConversationForkFallbackReason(convName, forkFallbackReason);
-  updateConversationTitle(
-    convName,
-    effectiveForkMode === 'handoff'
-      ? handoffTitleFromFocus(handoffFocus, parentConv.title || parentConv.name)
-      : `Summary Fork: ${parentConv.title || parentConv.name}`,
-    'manual',
-  );
-  if (handoffDocPath) {
-    recordConversationHandoff(parentConv.name, convName, handoffDocPath);
-  }
-  updateForkStatus(convName, 'spawning');
-  await self.ensureForkSessionReady(conv, sessionId, false);
-  await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
-  markConversationActive(convName);
-  updateForkStatus(convName, null);
-}
-function parsePersistedForkRequest(raw: string): ForkRequest | null {
-  try {
-    const parsed = JSON.parse(raw) as Partial<ForkRequest>;
-    if (typeof parsed.parentConversationName !== 'string') return null;
-    if (typeof parsed.sessionId !== 'string') return null;
-    if (parsed.forkMode !== 'summary' && parsed.forkMode !== 'plain' && parsed.forkMode !== 'handoff') return null;
-    if (typeof parsed.localSummaryOnly !== 'boolean') return null;
-    if (parsed.handoffAuthor !== 'source' && parsed.handoffAuthor !== 'external') return null;
-    return parsed as ForkRequest;
-  } catch {
-    return null;
-  }
-}
-const inFlightForkPipelines = new Set<Promise<void>>();
-export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<void> {
-  const tracked = pipeline.finally(() => {
-    inFlightForkPipelines.delete(tracked);
-  });
-  inFlightForkPipelines.add(tracked);
-  return tracked;
-}
-export function getInFlightForkPipelineCount(): number {
-  return inFlightForkPipelines.size;
-}
-export async function waitForInFlightForkPipelines(timeoutMs = 10_000): Promise<{ completed: boolean; count: number }> {
-  const pipelines = [...inFlightForkPipelines];
-  const count = pipelines.length;
-  if (count === 0) return { completed: true, count: 0 };
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      Promise.allSettled(pipelines).then(() => ({ completed: true, count })),
-      new Promise<{ completed: boolean; count: number }>((resolve) => {
-        timeout = setTimeout(() => resolve({ completed: false, count }), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-export async function recoverStuckForks(): Promise<number> {
-  const forks = getStuckForks();
-  let recovered = 0;
-  for (const fork of forks) {
-    try {
-      if (!fork.forkRequest) {
-        updateForkStatus(fork.name, 'failed', 'Dashboard restarted during fork before recovery metadata was persisted');
-        continue;
-      }
-      const request = parsePersistedForkRequest(fork.forkRequest);
-      if (!request) {
-        updateForkStatus(fork.name, 'failed', 'Persisted fork request is invalid');
-        continue;
-      }
-      const tmuxAlive = await forkSessionExists(fork.tmuxSession);
-      const harnessAlive = tmuxAlive && await forkHarnessProcessAlive(fork.tmuxSession);
-      const runtimeState = harnessAlive ? forkRuntimeState(fork.tmuxSession)?.state : undefined;
-      if (harnessAlive && (runtimeState === 'active' || runtimeState === 'waiting-on-human')) {
-        markConversationActive(fork.name);
-        updateForkStatus(fork.name, null);
-        recovered += 1;
-        continue;
-      }
-      if (fork.forkRetryCount >= 2) {
-        updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
-        continue;
-      }
-      incrementForkRetryCount(fork.name);
-      const parentConv = getConversationByName(request.parentConversationName);
-      if (!parentConv) {
-        updateForkStatus(fork.name, 'failed', `Parent conversation ${request.parentConversationName} not found`);
-        continue;
-      }
-      await registerInFlightForkPipeline(runForkPipeline(
-        fork.name,
-        parentConv,
-        request.sessionId,
-        request.summaryModel,
-        request.forkMode,
-        request.localSummaryOnly,
-        request.includeThinkingInSummary,
-        request.summaryHarness,
-        request.handoffFocus,
-        request.handoffAuthor,
-        request.handoffAuthorModel,
-        request.handoffAuthorHarness,
-      ));
-      recovered += 1;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[fork-recovery] Failed to recover ${fork.name}:`, error);
-      updateForkStatus(fork.name, 'failed', message);
-    }
-  }
-  return recovered;
-}
 const postConversationSummaryForkRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/summary-fork',
@@ -1824,172 +1333,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = decodeURIComponent(params['name'] ?? '');
     const body = yield* readJsonBody;
-    return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
-        const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
-        if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
-          return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
-        }
-        const model = typeof body['model'] === 'string'
-          ? body['model'].trim()
-          : undefined;
-        const summaryModel = typeof body['summaryModel'] === 'string'
-          ? body['summaryModel'].trim()
-          : undefined;
-        const cwd = typeof body['cwd'] === 'string' && body['cwd'].trim()
-          ? body['cwd'].trim()
-          : undefined;
-        const requestedForkMode = body['forkMode'];
-        let forkMode: SummaryForkMode = 'summary';
-        if (requestedForkMode !== undefined) {
-          if (requestedForkMode !== 'summary' && requestedForkMode !== 'plain' && requestedForkMode !== 'handoff') {
-            return jsonResponse({ error: 'Invalid forkMode' }, { status: 400 });
-          }
-          forkMode = requestedForkMode;
-        } else if (body['plain'] === true) {
-          console.debug('[summary-fork] legacy plain=true mapped to forkMode=plain');
-          forkMode = 'plain';
-        }
-        const focusResult = parseSummaryForkFocus(body['focus']);
-        if (!focusResult.ok) {
-          return jsonResponse({ error: focusResult.error }, { status: 400 });
-        }
-        const handoffFocus = focusResult.focus;
-        const requestedHandoffAuthor = body['handoffAuthor'];
-        let handoffAuthor: HandoffAuthor = 'external';
-        if (requestedHandoffAuthor !== undefined) {
-          if (requestedHandoffAuthor !== 'source' && requestedHandoffAuthor !== 'external') {
-            return jsonResponse({ error: 'Invalid handoffAuthor (expected "source" or "external")' }, { status: 400 });
-          }
-          handoffAuthor = requestedHandoffAuthor;
-        }
-        const handoffAuthorModel = typeof body['handoffAuthorModel'] === 'string'
-          ? body['handoffAuthorModel'].trim()
-          : undefined;
-        if (handoffAuthorModel && !SAFE_MODEL_PATTERN.test(handoffAuthorModel)) {
-          return jsonResponse({ error: 'Invalid handoffAuthorModel' }, { status: 400 });
-        }
-        // Capability gates — the source harness must support the requested
-        // fork mode. Plain forks copy raw Claude JSONL and spawn with
-        // --resume, so only Claude Code sources work. Source-authored handoff
-        // requires the source agent to write a sentinel file in response to a
-        // delivered prompt; harnesses without that signaling path (e.g. Pi,
-        // see PAN-1134) cannot author handoff docs in-session. Other modes
-        // (summary, external-authored handoff) work for any harness whose
-        // transcript adapter knows how to read the session file.
-        if (forkMode === 'plain' && !sourceAdapter.supportsPlainForkAsSource) {
-          return jsonResponse({
-            error: `Plain forks are not supported for ${sourceAdapter.name} sources — only Claude Code can be the source of a plain fork. Use a summary or handoff fork instead.`,
-          }, { status: 400 });
-        }
-        if (forkMode === 'handoff' && handoffAuthor === 'source' && !sourceAdapter.supportsSourceAuthoredHandoff) {
-          return jsonResponse({
-            error: `Source-authored handoffs are not supported for ${sourceAdapter.name} sources because the harness has no signaling channel for the .done sentinel. Use external authoring (handoffAuthor: "external") instead.`,
-          }, { status: 400 });
-        }
-        const localSummaryOnly = body['localSummaryOnly'] === true;
-        const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
-        const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
-        if (cwd && !(await validateCwdContainment(cwd))) {
-          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-        }
-        if (typeof body['model'] === 'string' && !model) {
-          return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
-        }
-        if (model && !SAFE_MODEL_PATTERN.test(model)) {
-          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-        }
-        if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {
-          return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
-        }
-        const effectiveCwd = cwd || conv.cwd || process.cwd();
-        // PAN-1624: a handoff whose cwd is not a git work tree spawns a session
-        // that immediately dies (no tmux, no launcher dir). Fail loudly here.
-        if (forkMode === 'handoff' && !(await isInsideGitWorkTree(effectiveCwd))) {
-          return jsonResponse({
-            error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
-          }, { status: 400 });
-        }
-        const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(
-          effectiveCwd,
-        ));
-        const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const suffix = randomUUID().slice(0, 4);
-        const newName = `${timestamp}-${suffix}`;
-        const newTmux = `conv-${newName}`;
-        const launchModel = model || conv.model;
-        const effectiveSummaryModel = summaryModel || 'claude-sonnet-5';
-        const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
-        const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
-        const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
-          ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
-          : undefined;
-        if (forkMode === 'plain' && getHarnessBehavior(launchHarness).transcriptKind !== 'claude-jsonl') {
-          // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-          // ohmypi and Codex cannot consume Claude JSONL history, so a plain fork would silently
-          // start an empty session. Summary forks are fine.
-          return jsonResponse({
-            error: `Plain forks cannot launch under ${launchHarness} — it cannot consume Claude session history. Use a summary fork instead.`,
-          }, { status: 400 });
-        }
-        const defaultTitle = forkMode === 'plain'
-          ? `Fork: ${conv.title || conv.name}`
-          : forkMode === 'handoff'
-            ? handoffTitleFromFocus(handoffFocus, conv.title || conv.name)
-            : `Summary Fork: ${conv.title || conv.name}`;
-        const newConv = createConversation({
-          name: newName,
-          tmuxSession: newTmux,
-          cwd: cwd || conv.cwd || process.cwd(),
-          issueId: conv.issueId ?? undefined,
-          title: customTitle || defaultTitle,
-          titleSource: 'manual',
-          titleSeed: forkMode === 'plain'
-            ? `Fork of ${conv.name}`
-            : forkMode === 'handoff'
-              ? `Handoff of ${conv.name}`
-              : `Summary Fork of ${conv.name}`,
-          claudeSessionId: sessionId,
-          model: launchModel ?? undefined,
-          effort: conv.effort ?? undefined,
-          harness: launchHarness,
-          forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
-        });
-        const forkRequest = buildForkRequest({
-          parentConversationName: conv.name,
-          sessionId,
-          forkMode,
-          ...(summaryModel !== undefined ? { summaryModel } : {}),
-          localSummaryOnly,
-          includeThinkingInSummary,
-          ...(summaryHarness !== undefined ? { summaryHarness } : {}),
-          ...(handoffFocus !== undefined ? { handoffFocus } : {}),
-          handoffAuthor,
-          ...(handoffAuthorModel !== undefined ? { handoffAuthorModel } : {}),
-          ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
-        });
-        setForkRequest(newConv.name, JSON.stringify(forkRequest));
-        markConversationActive(newConv.name);
-        registerInFlightForkPipeline(
-          runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
-        ).catch((err) => {
-          handleForkPipelineFailure(newConv.name, err);
-        });
-        return jsonResponse({
-          success: true,
-          conversation: newConv,
-        });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] create summary fork failed:', msg);
-        return jsonResponse({ error: error instanceof UnknownModelError ? msg : 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
-      }
-    });
+    return yield* Effect.promise(() => handleConversationSummaryFork(name, body));
   }),
 );
 // ─── Route: POST /api/conversations/:name/plan-action ────────────────────────
