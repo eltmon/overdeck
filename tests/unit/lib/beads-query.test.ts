@@ -78,4 +78,62 @@ describe('queryBeadsForIssuePromise', () => {
     expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
+
+  it('returns ready open beads for multiple issue labels from one bd snapshot', async () => {
+    childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      callback(null, {
+        stdout: JSON.stringify([
+          { id: 'workspace-a', title: 'PAN-1094: first', status: 'open', labels: ['pan-1094'], dependency_count: 0 },
+          { id: 'workspace-b', title: 'PAN-1095: second', status: 'open', labels: ['workspace:pan-1095'], dependency_count: 0 },
+          { id: 'workspace-c', title: 'PAN-1094: blocked', status: 'open', labels: ['pan-1094'], dependency_count: 1 },
+          { id: 'workspace-d', title: 'PAN-1095: closed', status: 'closed', labels: ['pan-1095'], dependency_count: 0 },
+          { id: 'workspace-e', title: 'PAN-0000: other', status: 'open', labels: ['pan-0000'], dependency_count: 0 },
+        ]),
+      }, '');
+    });
+    const { queryReadyBeadsByIssueLabelsPromise } = await import('../../../src/lib/beads-query.js');
+
+    const result = await queryReadyBeadsByIssueLabelsPromise(workspacePath, ['PAN-1094', 'PAN-1095']);
+
+    expect(result.byIssue['pan-1094']).toEqual([
+      expect.objectContaining({ id: 'workspace-a', title: 'PAN-1094: first' }),
+    ]);
+    expect(result.byIssue['pan-1095']).toEqual([
+      expect.objectContaining({ id: 'workspace-b', title: 'PAN-1095: second' }),
+    ]);
+    expect(childProcessMocks.execFile).toHaveBeenCalledOnce();
+    expect(childProcessMocks.execFile).toHaveBeenCalledWith(
+      'bd',
+      ['list', '--json', '--status', 'all', '--limit', '0'],
+      expect.objectContaining({ cwd: workspacePath }),
+      expect.any(Function),
+    );
+  });
+
+  it('falls back to jsonl for ready beads after exhausted transient bd failures', async () => {
+    vi.useFakeTimers();
+    childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      callback(new Error('database is locked'), '', 'database is locked');
+    });
+    writeFileSync(join(workspacePath, '.beads', 'issues.jsonl'), [
+      JSON.stringify({ id: 'jsonl-1', title: 'PAN-1094: ready', status: 'open', labels: ['pan-1094'], dependency_count: 0 }),
+      JSON.stringify({ id: 'jsonl-2', title: 'PAN-1094: blocked', status: 'open', labels: ['pan-1094'], dependency_count: 1 }),
+    ].join('\n') + '\n');
+    const { queryReadyBeadsByIssueLabelsPromise } = await import('../../../src/lib/beads-query.js');
+    const { BdTransientFailure } = await import('../../../src/lib/bd-process-lock.js');
+
+    const result = await queryReadyBeadsByIssueLabelsPromise(workspacePath, ['PAN-1094'], {
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    });
+
+    expect(result.byIssue['pan-1094']).toEqual([
+      expect.objectContaining({ id: 'jsonl-1', title: 'PAN-1094: ready' }),
+    ]);
+    expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
+    expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
+  });
 });

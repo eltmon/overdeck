@@ -1,5 +1,3 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import {
   getAgentRuntimeStateSync,
   listRunningAgentsSync,
@@ -8,6 +6,7 @@ import {
   resumeAgent,
   type AgentState,
 } from '../agents.js';
+import { Effect } from 'effect';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
@@ -21,8 +20,7 @@ import {
   writeStuckRemediationState,
   type StuckRemediationState,
 } from './stuck-remediation-state.js';
-
-const execFileAsync = promisify(execFile);
+import { queryReadyBeadsByIssueLabels, type ReadyBeadsByIssue } from '../beads-query.js';
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -39,15 +37,8 @@ function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
   return status.verificationStatus === 'failed' || status.testStatus === 'failed';
 }
 
-async function hasReadyBeads(agent: AgentState, issueLabel: string): Promise<boolean> {
-  const { stdout } = await execFileAsync('bd', ['ready', '-l', issueLabel], {
-    cwd: agent.workspace,
-    encoding: 'utf-8',
-    timeout: 10_000,
-  });
-  return String(stdout)
-    .split('\n')
-    .some((line) => /^[○◐]\s+workspace-/i.test(line.trim()));
+function hasReadyBeads(readyByWorkspace: Map<string, ReadyBeadsByIssue>, agent: AgentState, issueLabel: string): boolean {
+  return (readyByWorkspace.get(agent.workspace)?.[issueLabel] ?? []).length > 0;
 }
 
 function firstStuckAt(runtimeLastActivity: string, stuckState: StuckRemediationState | null): string {
@@ -87,6 +78,7 @@ async function evaluateAgent(
   config: StuckRemediationConfig,
   now: number,
   actions: string[],
+  readyByWorkspace: Map<string, ReadyBeadsByIssue>,
 ): Promise<void> {
   const agentId = agent.id;
   if (!agentId) return;
@@ -109,7 +101,7 @@ async function evaluateAgent(
   const reviewStatus = getReviewStatusSync(issueId);
   if (shouldSkipReviewStatus(reviewStatus)) return;
   if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
-  if (await hasReadyBeads(agent, issueId.toLowerCase())) return;
+  if (hasReadyBeads(readyByWorkspace, agent, issueId.toLowerCase())) return;
 
   const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
   if (lastActivityMs === null) return;
@@ -368,14 +360,29 @@ export async function checkStuckAgentRemediation(opts: StuckRemediationOptions =
   const actions: string[] = [];
   const now = opts.now ?? Date.now();
   const runningAgents = listRunningAgentsSync();
+  const readyByWorkspace = new Map<string, ReadyBeadsByIssue>();
+  const workAgentsByWorkspace = new Map<string, AgentState[]>();
   let sawFlywheelOrchestrator = false;
+
+  for (const agent of runningAgents) {
+    if (agent.role !== 'work' || agent.status !== 'running' || !agent.workspace) continue;
+    const workspaceAgents = workAgentsByWorkspace.get(agent.workspace) ?? [];
+    workspaceAgents.push(agent);
+    workAgentsByWorkspace.set(agent.workspace, workspaceAgents);
+  }
+
+  for (const [workspace, workspaceAgents] of workAgentsByWorkspace) {
+    const issueIds = workspaceAgents.map(issueIdForAgent);
+    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(workspace, issueIds, { acquisitionTimeoutMs: 500 }));
+    readyByWorkspace.set(workspace, ready.byIssue);
+  }
 
   for (const agent of runningAgents) {
     if (agent.id === FLYWHEEL_ORCHESTRATOR_AGENT_ID || agent.role === 'flywheel') {
       sawFlywheelOrchestrator = true;
     }
     try {
-      await evaluateAgent(agent, config, now, actions);
+      await evaluateAgent(agent, config, now, actions, readyByWorkspace);
     } catch (error) {
       const agentId = agent.id || '(unknown)';
       const message = `[deacon] stuck-remediation agent=${agentId} error=${error instanceof Error ? error.message : String(error)}`;

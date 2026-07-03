@@ -125,14 +125,22 @@ describe('pan start post-create validation rollback', () => {
 
   it('exits retryably for transient bead lock failures without planning guidance or rollback', async () => {
     const { __testInternals, RETRYABLE_BD_LOCK_EXIT_CODE } = await import('../../../../src/cli/commands/start.js');
+    const { BdTransientFailure } = await import('../../../../src/lib/bd-process-lock.js');
+    const transientFailure = new BdTransientFailure({
+      operation: 'runBdWithRetry',
+      message: 'bd operation failed after 12 attempts due to transient lock contention',
+      attempts: 12,
+      caller: 'pan start beads count PAN-1094',
+      holder: { pid: 1234, ts: Date.parse('2026-07-03T00:00:00Z'), caller: 'query ready beads for pan-2227' },
+    });
 
     expect(() => __testInternals.failTransientBeadsValidation(
       spinner as never,
       'PAN-1094',
-      { stderr: 'database is locked' },
+      transientFailure,
     )).toThrow(`process.exit:${RETRYABLE_BD_LOCK_EXIT_CODE}`);
 
-    expect(spinner.fail).toHaveBeenCalledWith('Beads database was temporarily locked while checking PAN-1094');
+    expect(spinner.fail).toHaveBeenCalledWith('Beads database was temporarily locked while checking PAN-1094; retried 12 times; holder pid=1234 caller="query ready beads for pan-2227"');
     expect(childProcessMocks.execFile).not.toHaveBeenCalled();
     expect(logSpy.mock.calls.flat().join('\n')).toContain('retryable');
     expect(logSpy.mock.calls.flat().join('\n')).not.toContain('Planning must create');

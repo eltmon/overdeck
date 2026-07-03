@@ -32,6 +32,7 @@ import {
 } from '../../lib/bd-process-lock.js';
 
 export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
+const PAN_START_BD_RETRY_OPTIONS: Omit<RunBdWithRetryOptions, 'workspacePath'> = { maxAttempts: 12, initialDelayMs: 1_000, maxDelayMs: 5_000, acquisitionTimeoutMs: 60_000 };
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -665,7 +666,7 @@ export async function countBeadsTasksDetailedWithRetry(
         encoding: 'utf-8',
         timeout: 10000,
       }),
-      { ...retryOptions, workspacePath },
+      { ...PAN_START_BD_RETRY_OPTIONS, ...retryOptions, workspacePath },
     );
     const tasks = JSON.parse(stdout.trim() || '[]');
     return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
@@ -839,10 +840,9 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
 }
 
 function transientBeadsFailureMessage(issueId: string, cause?: unknown): string {
-  if (cause instanceof BdTransientFailure) {
-    return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times`;
-  }
-  return `Beads database was temporarily locked while checking ${issueId}`;
+  if (!(cause instanceof BdTransientFailure)) return `Beads database was temporarily locked while checking ${issueId}`;
+  const holder = cause.holder ? `; holder pid=${cause.holder.pid} caller="${cause.holder.caller}"` : '';
+  return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times${holder}`;
 }
 
 function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unknown): never {
