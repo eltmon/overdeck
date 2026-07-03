@@ -1,4 +1,7 @@
 import { exec } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
@@ -6,10 +9,10 @@ import { getPullRequestState, isGitHubAppConfigured } from '../github-app.js';
 import { extractNumberSync } from '../issue-id.js';
 import { cleanupMergedLabels } from '../lifecycle/label-cleanup.js';
 import type { LifecycleContext, StepResult } from '../lifecycle/types.js';
-import type { ProjectConfig } from '../projects.js';
+import { getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { WORKFLOW_LABELS } from '../lifecycle/close-issue.js';
-import { readIssueRecordSync, type PanIssueRecord } from './record.js';
+import { readIssueRecordSync, RECORD_DIRNAME, type PanIssueRecord } from './record.js';
 
 const execAsync = promisify(exec);
 
@@ -55,6 +58,28 @@ export interface ReconcileMergedIssueResult {
     status: 'deleted' | 'kept' | 'missing' | 'planned-delete' | 'planned-keep';
     reason: string;
   }>;
+}
+
+export interface ReconcileMergeFulfillmentOptions {
+  issueId?: string;
+  dryRun?: boolean;
+  verbose?: boolean;
+}
+
+export interface ReconcileMergeFulfillmentDetail {
+  issueId: string;
+  action: 'reconciled' | 'would-reconcile' | 'flagged' | 'skipped' | 'failed';
+  verdict?: MergeFulfillmentVerdict;
+  evidence?: string;
+  reason?: string;
+}
+
+export interface ReconcileMergeFulfillmentResult {
+  reconciled: number;
+  flagged: number;
+  skipped: number;
+  failed: number;
+  details: ReconcileMergeFulfillmentDetail[];
 }
 
 const CLOSED_OUT_LABEL = 'closed-out';
@@ -166,6 +191,70 @@ function lifecycleContext(issueId: string, project: ProjectConfig): LifecycleCon
     projectName: project.name,
     ...(github ? { github } : {}),
   };
+}
+
+async function collectRecordIssueIdsFromDir(dir: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (!existsSync(dir)) return ids;
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const match = entry.name.match(/^([a-z]+-\d+)\.json$/i);
+      if (match) ids.add(match[1]!.toUpperCase());
+    }
+  } catch {
+    // Directory may be unreadable; skip it.
+  }
+  return ids;
+}
+
+async function collectRecordIssueIds(projects: ProjectConfig[]): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (const project of projects) {
+    for (const id of await collectRecordIssueIdsFromDir(join(project.path, '.pan', RECORD_DIRNAME))) ids.add(id);
+
+    const workspacesDir = join(project.path, project.workspace?.workspaces_dir ?? 'workspaces');
+    if (!existsSync(workspacesDir)) continue;
+    try {
+      const workspaces = await readdir(workspacesDir, { withFileTypes: true });
+      for (const workspace of workspaces) {
+        if (!workspace.isDirectory()) continue;
+        const recordsDir = join(workspacesDir, workspace.name, '.pan', RECORD_DIRNAME);
+        for (const id of await collectRecordIssueIdsFromDir(recordsDir)) ids.add(id);
+      }
+    } catch {
+      // Workspaces directory may be absent or unreadable; skip it.
+    }
+  }
+  return ids;
+}
+
+async function readIssueRecordFromKnownPaths(project: ProjectConfig, issueId: string): Promise<PanIssueRecord | null> {
+  const direct = readIssueRecordSync(project, issueId);
+  if (direct) return direct;
+
+  const workspacesDir = join(project.path, project.workspace?.workspaces_dir ?? 'workspaces');
+  if (!existsSync(workspacesDir)) return null;
+  try {
+    const workspaces = await readdir(workspacesDir, { withFileTypes: true });
+    for (const workspace of workspaces) {
+      if (!workspace.isDirectory()) continue;
+      const path = join(workspacesDir, workspace.name, '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+      try {
+        return JSON.parse(await readFile(path, 'utf-8')) as PanIssueRecord;
+      } catch {
+        // Try the next workspace.
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function shouldApplyClosedOutLabel(record: PanIssueRecord | null): boolean {
+  return record?.pipeline?.closedOut === true || Boolean(record?.closeOut?.closedAt);
 }
 
 async function applyClosedOutLabel(issueId: string, project: ProjectConfig, deps: MergeFulfillmentDeps): Promise<string> {
@@ -323,4 +412,100 @@ export async function reconcileMergedIssue(
     actions,
     branchActions,
   };
+}
+
+async function reconcileOneFulfilledMerge(
+  issueId: string,
+  options: ReconcileMergeFulfillmentOptions,
+  deps: Partial<MergeFulfillmentDeps>,
+): Promise<ReconcileMergeFulfillmentDetail> {
+  const normalized = issueId.toUpperCase();
+  const resolved = resolveProjectFromIssueSync(normalized);
+  if (!resolved) {
+    return { issueId: normalized, action: 'failed', reason: 'could not resolve project' };
+  }
+
+  const project = getProjectSync(resolved.projectKey);
+  if (!project) {
+    return { issueId: normalized, action: 'failed', reason: 'project not found' };
+  }
+
+  const record = await readIssueRecordFromKnownPaths(project, normalized);
+  if (!record) {
+    return { issueId: normalized, action: 'skipped', reason: 'no record' };
+  }
+  if (record.pipeline?.mergeStatus === 'merged') {
+    return { issueId: normalized, action: 'skipped', reason: 'record already has mergeStatus=merged' };
+  }
+
+  const verdict = await verifyIssueMergeFulfillment(normalized, project, {
+    ...deps,
+    readRecord: () => record,
+  });
+  if (verdict.verdict !== 'merged') {
+    return {
+      issueId: normalized,
+      action: 'flagged',
+      verdict: verdict.verdict,
+      evidence: verdict.evidence,
+      reason: `${verdict.verdict}: ${verdict.evidence}`,
+    };
+  }
+
+  await reconcileMergedIssue(
+    normalized,
+    project,
+    { closed: shouldApplyClosedOutLabel(record), dryRun: options.dryRun },
+    {
+      ...deps,
+      readRecord: () => record,
+    },
+  );
+
+  return {
+    issueId: normalized,
+    action: options.dryRun ? 'would-reconcile' : 'reconciled',
+    verdict: verdict.verdict,
+    evidence: verdict.evidence,
+  };
+}
+
+export async function reconcileMergeFulfillment(
+  options: ReconcileMergeFulfillmentOptions = {},
+  deps: Partial<MergeFulfillmentDeps> = {},
+): Promise<ReconcileMergeFulfillmentResult> {
+  const config = loadProjectsConfigSync();
+  const projects = Object.values(config.projects);
+
+  const issueIds = options.issueId
+    ? new Set([options.issueId.toUpperCase()])
+    : await collectRecordIssueIds(projects);
+
+  const result: ReconcileMergeFulfillmentResult = {
+    reconciled: 0,
+    flagged: 0,
+    skipped: 0,
+    failed: 0,
+    details: [],
+  };
+
+  for (const issueId of issueIds) {
+    if (options.verbose) {
+      console.log(`[merge-fulfillment] ${issueId} ...`);
+    }
+
+    const detail = await reconcileOneFulfilledMerge(issueId, options, deps);
+    result.details.push(detail);
+
+    if (detail.action === 'reconciled' || detail.action === 'would-reconcile') result.reconciled++;
+    else if (detail.action === 'flagged') result.flagged++;
+    else if (detail.action === 'skipped') result.skipped++;
+    else result.failed++;
+
+    if (options.verbose) {
+      console.log(`[merge-fulfillment] ${issueId} -> ${detail.action}${detail.reason ? ` (${detail.reason})` : ''}`);
+    }
+  }
+
+  return result;
 }

@@ -1,14 +1,31 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { reconcileMergedIssue, verifyIssueMergeFulfillment, type MergeFulfillmentDeps } from '../merge-fulfillment.js';
+const projectMock = vi.hoisted(() => ({
+  current: {
+    name: 'Overdeck',
+    path: '/repo',
+    github_repo: 'eltmon/overdeck',
+  },
+}));
+
+vi.mock('../../projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../projects.js')>();
+  return {
+    ...actual,
+    loadProjectsConfigSync: () => ({ projects: { overdeck: projectMock.current } }),
+    resolveProjectFromIssueSync: () => ({ projectKey: 'overdeck', projectPath: projectMock.current.path }),
+    getProjectSync: () => projectMock.current,
+  };
+});
+
+import { reconcileMergeFulfillment, reconcileMergedIssue, verifyIssueMergeFulfillment, type MergeFulfillmentDeps } from '../merge-fulfillment.js';
 import type { ProjectConfig } from '../../projects.js';
 import type { PanIssueRecord } from '../record.js';
 
-const project: ProjectConfig = {
-  name: 'Overdeck',
-  path: '/repo',
-  github_repo: 'eltmon/overdeck',
-};
+const project = projectMock.current as ProjectConfig;
 
 function record(overrides: Partial<PanIssueRecord['pipeline']> = {}): PanIssueRecord {
   return {
@@ -80,6 +97,12 @@ function makeDeps(options: {
   };
 }
 
+function writeTempRecord(tempRoot: string, issueId: string, value: PanIssueRecord): void {
+  const recordsDir = join(tempRoot, '.pan', 'records');
+  mkdirSync(recordsDir, { recursive: true });
+  writeFileSync(join(recordsDir, `${issueId.toLowerCase()}.json`), JSON.stringify(value), 'utf-8');
+}
+
 describe('verifyIssueMergeFulfillment', () => {
   it('returns merged with branch evidence when feature branch is an ancestor of origin/main', async () => {
     const deps = makeDeps({
@@ -127,6 +150,68 @@ describe('verifyIssueMergeFulfillment', () => {
       evidence: 'PAN-123 has no resolvable merged PR and no feature/strike branch',
     });
     expect(deps.commands.join('\n')).not.toContain('git log');
+  });
+});
+
+describe('reconcileMergeFulfillment', () => {
+  it('dry-runs a fulfilled merge for a single issue without writing', async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'merge-fulfillment-'));
+    const previousPath = projectMock.current.path;
+    projectMock.current.path = tempRoot;
+    try {
+      writeTempRecord(tempRoot, 'PAN-123', record({ prUrl: 'https://github.com/eltmon/overdeck/pull/123', prNumber: 123 }));
+      const deps = makeDeps({ prMerged: true });
+
+      const result = await reconcileMergeFulfillment({ issueId: 'PAN-123', dryRun: true }, deps);
+
+      expect(result).toEqual({
+        reconciled: 1,
+        flagged: 0,
+        skipped: 0,
+        failed: 0,
+        details: [{
+          issueId: 'PAN-123',
+          action: 'would-reconcile',
+          verdict: 'merged',
+          evidence: 'PAN-123 PR #123 reports merged via gh',
+        }],
+      });
+      expect(deps.setReviewStatus).not.toHaveBeenCalled();
+      expect(deps.cleanupMergedLabels).not.toHaveBeenCalled();
+    } finally {
+      projectMock.current.path = previousPath;
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('flags stranded single-issue records without reconciling them', async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'merge-fulfillment-'));
+    const previousPath = projectMock.current.path;
+    projectMock.current.path = tempRoot;
+    try {
+      writeTempRecord(tempRoot, 'PAN-123', record());
+      const deps = makeDeps({
+        existingBranches: ['feature/pan-123'],
+        mergedBranches: [],
+      });
+
+      const result = await reconcileMergeFulfillment({ issueId: 'PAN-123' }, deps);
+
+      expect(result.reconciled).toBe(0);
+      expect(result.flagged).toBe(1);
+      expect(result.details[0]).toEqual({
+        issueId: 'PAN-123',
+        action: 'flagged',
+        verdict: 'stranded',
+        evidence: 'PAN-123 has a branch that is not an ancestor of origin/main and no merged PR was found',
+        reason: 'stranded: PAN-123 has a branch that is not an ancestor of origin/main and no merged PR was found',
+      });
+      expect(deps.setReviewStatus).not.toHaveBeenCalled();
+      expect(deps.cleanupMergedLabels).not.toHaveBeenCalled();
+    } finally {
+      projectMock.current.path = previousPath;
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });
 

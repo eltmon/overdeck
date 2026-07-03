@@ -139,6 +139,7 @@ import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
 
 const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -272,68 +273,6 @@ const _postMergeInFlight = new Map<string, Promise<void>>();
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
-
-export interface PostMergeLifecycleOptions {
-  skipDeploy?: boolean;
-  allowVerifiedNoPrMerge?: boolean;
-  markReviewPassed?: boolean;
-  verifiedMergedRef?: string;
-}
-
-async function verifyMergedBeforeLifecycle(
-  issueId: string,
-  projectPath: string,
-  sourceBranch?: string,
-  options?: Pick<PostMergeLifecycleOptions, 'allowVerifiedNoPrMerge' | 'verifiedMergedRef'>,
-): Promise<{ merged: boolean; reason: string }> {
-  // PAN-1531: single merge oracle — GitHub PR API is the authoritative answer
-  // for "is this PR merged." The prior ancestor-of-main and diff-fallback
-  // heuristics were retired because they produced "the oracles disagree"
-  // bugs (PAN-1024) and made the meaning of "merged" muddy. For non-GitHub
-  // projects the operator confirms manually.
-  const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
-  const quotedBranch = shellQuote(branchName);
-
-  const ghResolved = resolveGitHubIssueSync(issueId);
-  if (!ghResolved.isGitHub) {
-    return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
-  }
-
-  const { owner, repo } = ghResolved;
-  try {
-    const { stdout } = await execAsync(
-      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
-      { cwd: projectPath },
-    );
-    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
-    const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
-    if (mergedPr) {
-      return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
-    }
-    const verifiedMergedRef = options?.verifiedMergedRef?.trim();
-    if (verifiedMergedRef) {
-      try {
-        await execAsync(
-          `git merge-base --is-ancestor ${shellQuote(verifiedMergedRef)} origin/main`,
-          { cwd: projectPath },
-        );
-        return { merged: true, reason: `${verifiedMergedRef} is an ancestor of origin/main` };
-      } catch {
-        // Fall through to the normal PR/no-PR refusal below. The caller-provided
-        // ref is only proof when git confirms it is reachable from origin/main.
-      }
-    }
-    if (prs.length === 0) {
-      if (options?.allowVerifiedNoPrMerge) {
-        return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
-      }
-      return { merged: false, reason: `No PR found for ${branchName}; refusing to infer merge from branch state alone` };
-    }
-    return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
-  } catch (err: any) {
-    return { merged: false, reason: `Unable to verify merge state for ${branchName} via GitHub PR API: ${err?.message?.slice(0, 200) || 'unknown'}` };
-  }
 }
 
 export async function postMergeLifecycle(
