@@ -172,49 +172,43 @@
       "reason": "feedback",
       "note": "[2026-07-03T11:12Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-03T11:12:31.820Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T11:12:30Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nBootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T11:12:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2181\n\nBootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2181 -m \"Fixed review issues\"`"
+      "timestamp": "2026-07-03T11:19:56.705Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T11:19:57.246Z"
     }
   ],
+  "feedback": [],
   "created": "2026-06-29T21:42:04.849Z",
-  "updated": "2026-07-03T11:15:42.827Z",
+  "updated": "2026-07-03T11:19:57.246Z",
   "pipeline": {
     "issueId": "PAN-2181",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:15:41.756Z",
+    "updatedAt": "2026-07-03T11:19:56.994Z",
     "reviewNotes": "BootReconciliationModal still contains hardcoded orange classes in held-state banner, violating AC2 token-clean requirement.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2183",
     "lastVerifiedCommit": "373becf50b32d3f950651c662182db79a45e4792",
-    "reviewRequestedAt": "2026-07-03T00:50:22.647Z"
+    "reviewRequestedAt": "2026-07-03T11:19:56.707Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 282,
-            "output": 4650,
-            "cacheRead": 1702700,
-            "cacheWrite": 7610
+            "input": 435,
+            "output": 10910,
+            "cacheRead": 3400984,
+            "cacheWrite": 149952
           },
           "anthropic/claude-opus-4-8": {
             "input": 145,
@@ -258,10 +252,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 282,
-          "output": 4650,
-          "cacheRead": 1702700,
-          "cacheWrite": 7610
+          "input": 435,
+          "output": 10910,
+          "cacheRead": 3400984,
+          "cacheWrite": 149952
         },
         "anthropic/claude-opus-4-8": {
           "input": 33503,
@@ -289,8 +283,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 18.436468,
-        "pricingAsOf": "2026-07-03T11:15:42.761Z"
+        "usd": 22.228558,
+        "pricingAsOf": "2026-07-03T11:19:57.114Z"
       }
     },
     "merges": [
