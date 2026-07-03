@@ -44,10 +44,10 @@
     "issueId": "PAN-2260",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:57:18.766Z",
+    "updatedAt": "2026-07-03T05:05:03.187Z",
     "reviewNotes": "Local squash-merge success can skip an advanced remote branch before close-out",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
@@ -76,7 +76,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:57:18.821Z"
+        "pricingAsOf": "2026-07-03T05:05:03.685Z"
       }
     },
     "merges": [
@@ -85,5 +85,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T04:41:22.632Z",
-  "updated": "2026-07-03T04:57:22.988Z"
+  "updated": "2026-07-03T05:05:03.820Z"
 }
