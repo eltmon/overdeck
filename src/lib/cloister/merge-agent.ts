@@ -274,11 +274,18 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+export interface PostMergeLifecycleOptions {
+  skipDeploy?: boolean;
+  allowVerifiedNoPrMerge?: boolean;
+  markReviewPassed?: boolean;
+  verifiedMergedRef?: string;
+}
+
 async function verifyMergedBeforeLifecycle(
   issueId: string,
   projectPath: string,
   sourceBranch?: string,
-  options?: { allowVerifiedNoPrMerge?: boolean },
+  options?: Pick<PostMergeLifecycleOptions, 'allowVerifiedNoPrMerge' | 'verifiedMergedRef'>,
 ): Promise<{ merged: boolean; reason: string }> {
   // PAN-1531: single merge oracle — GitHub PR API is the authoritative answer
   // for "is this PR merged." The prior ancestor-of-main and diff-fallback
@@ -304,6 +311,19 @@ async function verifyMergedBeforeLifecycle(
     if (mergedPr) {
       return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
     }
+    const verifiedMergedRef = options?.verifiedMergedRef?.trim();
+    if (verifiedMergedRef) {
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor ${shellQuote(verifiedMergedRef)} origin/main`,
+          { cwd: projectPath },
+        );
+        return { merged: true, reason: `${verifiedMergedRef} is an ancestor of origin/main` };
+      } catch {
+        // Fall through to the normal PR/no-PR refusal below. The caller-provided
+        // ref is only proof when git confirms it is reachable from origin/main.
+      }
+    }
     if (prs.length === 0) {
       if (options?.allowVerifiedNoPrMerge) {
         return { merged: true, reason: `No PR found for ${branchName}; accepting caller-verified non-PR merge` };
@@ -320,7 +340,7 @@ export async function postMergeLifecycle(
   issueId: string,
   projectPath: string,
   sourceBranch?: string,
-  options?: { skipDeploy?: boolean; allowVerifiedNoPrMerge?: boolean; markReviewPassed?: boolean },
+  options?: PostMergeLifecycleOptions,
 ): Promise<void> {
   // PAN-1517: the per-slot swarm runtime is gone. Slot branches no longer exist
   // — parallelism is an in-context concern owned by the work agent (see

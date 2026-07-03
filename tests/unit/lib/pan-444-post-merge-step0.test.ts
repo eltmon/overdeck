@@ -245,6 +245,44 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
+  it('accepts an open PR when caller verified the member ref is on origin/main', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"mergedAt":null,"mergeCommit":null}]', stderr: '' };
+      }
+      if (cmd.includes("git merge-base --is-ancestor 'member-sha' origin/main")) {
+        return { stdout: '', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      verifiedMergedRef: 'member-sha',
+    });
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('refuses an open PR when caller verified ref is not on origin/main', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"mergedAt":null,"mergeCommit":null}]', stderr: '' };
+      }
+      if (cmd.includes("git merge-base --is-ancestor 'member-sha' origin/main")) {
+        throw new Error('not ancestor');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      verifiedMergedRef: 'member-sha',
+    });
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
   it('persists reviewStatus passed in the merge status write when requested', async () => {
     await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { markReviewPassed: true });
 

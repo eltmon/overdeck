@@ -54,7 +54,7 @@ export interface UatPromoteDeps {
    * Kick off the per-issue post-merge lifecycle (through the PAN-328 guard).
    * Returns false when a run for that issue is already in flight.
    */
-  firePostMerge(issueId: string): boolean;
+  firePostMerge(issueId: string, options?: { sourceBranch?: string; verifiedMergedRef?: string }): boolean;
   /**
    * Authoritative per-member merge eligibility (PAN-1759), checked at promote
    * time as defense-in-depth: batch membership is computed from orchestrator
@@ -184,7 +184,10 @@ export async function promoteUatGeneration(
   // Standard per-issue post-merge handoff, exactly once each (PAN-328 guard).
   const postMergeStarted: string[] = [];
   for (const member of gen.members) {
-    if (deps.firePostMerge(member.issueId)) postMergeStarted.push(member.issueId);
+    if (deps.firePostMerge(member.issueId, {
+      sourceBranch: member.branch,
+      verifiedMergedRef: member.headSha || member.branch,
+    })) postMergeStarted.push(member.issueId);
     else log(`[uat-promote] ${name}: post-merge for ${member.issueId} already in flight — skipped`);
   }
 
