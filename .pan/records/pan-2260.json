@@ -16,24 +16,14 @@
       "reason": "feedback",
       "note": "[2026-07-03T04:57Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-03T04:57:22.988Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T04:57:18Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2260\n\nLocal squash-merge success can skip an advanced remote branch before close-out\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2260 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T04:57:22Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2260\n\nLocal squash-merge success can skip an advanced remote branch before close-out\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2260 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T05:08:43.988Z"
     }
   ],
+  "feedback": [],
   "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
@@ -42,16 +32,16 @@
   },
   "pipeline": {
     "issueId": "PAN-2260",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T05:05:03.187Z",
-    "reviewNotes": "Local squash-merge success can skip an advanced remote branch before close-out",
+    "updatedAt": "2026-07-03T05:08:48.474Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
-    "lastVerifiedCommit": "a25d86a55974d73f0573bcb010a601df46a96028",
+    "lastVerifiedCommit": "55f07625b6328f645a5c8addf041b32852da0302",
     "reviewRequestedAt": "2026-07-03T04:20:16.617Z"
   },
   "closeOut": {
@@ -76,7 +66,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T05:05:03.685Z"
+        "pricingAsOf": "2026-07-03T05:08:48.498Z"
       }
     },
     "merges": [
@@ -85,5 +75,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T04:41:22.632Z",
-  "updated": "2026-07-03T05:05:03.820Z"
+  "updated": "2026-07-03T05:08:48.498Z"
 }
