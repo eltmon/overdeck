@@ -14,7 +14,6 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_P
  *
  * Conversations are NEVER deleted from the database, and JSONL transcript files are never removed.
  */
-
 import { randomUUID } from 'node:crypto';
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
@@ -23,11 +22,31 @@ import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
-
 import { readLauncherPinnedSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
-import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
+import {
+  backfillConversationModels,
+  conversationNeedsRunningRepair,
+  conversationRuntimeRootPids,
+  conversationSessionAliveFromState,
+  handleConversationCreate,
+  handleConversationDelete,
+  handleConversationRestartAll,
+  handleConversationResume,
+  handleConversationStop,
+  handleConversationSwitchModel,
+  piConversationSystemPromptFiles,
+  resolveAllowedHarness,
+  shouldReportUnresolvedLiveSession,
+  spawnConversationSession,
+  startConversationModelBackfill,
+  stopConversationRuntime,
+  tmuxSessionExists,
+  waitForConversationRuntimeReady,
+  waitForPiTuiReady,
+  waitForTmuxSession,
+} from '../../../lib/overdeck/conversation-runtime.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import {
   archiveConversationByName,
@@ -74,11 +93,9 @@ import {
   handleConversationImageUpload,
   handleConversationMessage,
 } from '../../../lib/overdeck/conversation-message.js';
-
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import * as Multipart from 'effect/unstable/http/Multipart';
-
 import {
   listConversations,
   getConversationLedgerCosts,
@@ -143,7 +160,6 @@ import {
   type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
 import { resolveDiscoveredSessionFile } from '../../../lib/conversations/discovered-session-file.js';
-
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
@@ -193,148 +209,12 @@ import {
   cleanupUnreferencedConversationAttachments,
   cleanupConversationAttachments,
 } from '../services/conversation-attachments.js';
-
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
 const CONVERSATION_LIST_ENRICHMENT_CONCURRENCY = 8;
-const PROCESS_CLEANUP_GRACE_MS = 750;
-
-type ProcessTableRow = {
-  pid: number;
-  ppid: number;
-  args: string;
-};
-
-function parseProcessTable(output: string): ProcessTableRow[] {
-  return output
-    .split('\n')
-    .map((line) => {
-      const match = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
-      if (!match) return null;
-      return {
-        pid: Number(match[1]),
-        ppid: Number(match[2]),
-        args: match[3] ?? '',
-      };
-    })
-    .filter((row): row is ProcessTableRow => row !== null && Number.isFinite(row.pid) && Number.isFinite(row.ppid));
-}
-
-async function readProcessTable(): Promise<ProcessTableRow[]> {
-  const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,args='], {
-    encoding: 'utf-8',
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  return parseProcessTable(stdout);
-}
-
-function collectProcessTree(rootPids: number[], rows: ProcessTableRow[]): number[] {
-  const childrenByParent = new Map<number, number[]>();
-  for (const row of rows) {
-    const children = childrenByParent.get(row.ppid) ?? [];
-    children.push(row.pid);
-    childrenByParent.set(row.ppid, children);
-  }
-
-  const seen = new Set<number>();
-  const ordered: number[] = [];
-  const visit = (pid: number) => {
-    if (seen.has(pid) || pid === process.pid) return;
-    seen.add(pid);
-    for (const child of childrenByParent.get(pid) ?? []) visit(child);
-    ordered.push(pid);
-  };
-
-  for (const pid of rootPids) visit(pid);
-  return ordered;
-}
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function terminatePids(pids: number[]): Promise<void> {
-  if (pids.length === 0) return;
-
-  for (const pid of pids) {
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
-      // Already gone.
-    }
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, PROCESS_CLEANUP_GRACE_MS));
-
-  for (const pid of pids) {
-    if (!isProcessAlive(pid)) continue;
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // Already gone or permission denied; callers log the cleanup attempt.
-    }
-  }
-}
-
-export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
-  const launcherScript = join(getOverdeckHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
-  const sessionId = conv.claudeSessionId?.trim();
-  const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
-  // PAN-1798: never let conversation cmdline matching catch the shared tmux
-  // server. If the server was founded implicitly by a conversation, its
-  // cmdline embeds that conversation's session name and a pkill/pgrep-style
-  // match would destroy every session on the socket. Exclude the live server
-  // PID explicitly; teardown already starts with tmux kill-session on the
-  // target session, so this cleanup only mops up orphan runtime processes.
-  const serverPid = findManagedServerPidSync();
-
-  return rows
-    .filter((row) => {
-      if (row.pid === process.pid) return false;
-      if (serverPid !== undefined && row.pid === serverPid) return false;
-      if (row.args.includes(launcherScript)) return true;
-      return sessionNeedles.some((needle) => row.args.includes(needle));
-    })
-    .map((row) => row.pid);
-}
-
-async function killConversationRuntimeProcesses(conv: Conversation): Promise<void> {
-  const rows = await readProcessTable();
-  const rootPids = conversationRuntimeRootPids(conv, rows);
-  const pids = collectProcessTree(rootPids, rows);
-  await terminatePids(pids);
-}
-
-async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
-  // PAN-1458: post-/clear sibling rows share one tmux pane. If another active
-  // conversation still owns that pane, only end this DB row.
-  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-    return;
-  }
-
-  await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-  try {
-    await killConversationRuntimeProcesses(conv);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
-  }
-}
-
-/** Quote a string for safe use in a bash script using single-quote wrapping. */
-function shellQuote(str: string): string {
-  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
-}
-
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 const PI_CONVERSATION_SOURCE_CONTRACT = [
@@ -342,32 +222,16 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
   "A message marked source:'extension' was injected by the Overdeck orchestrator or another agent, not typed by the human operator.",
   'Treat it as coordination guidance; do not attribute it to the human operator.',
 ].join(' ');
-
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
-
-export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
-  // Conversation runtime only honors non-default harnesses when a concrete model is
-  // passed through to getAgentRuntimeBaseCommand(). Without a model,
-  // spawnConversationSession() intentionally launches the default Claude Code
-  // command, so persist the matching default harness as the effective value.
-  if (!model) return 'claude-code';
-  const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
-  return resolveHarness({ model, explicit });
-}
-
 // ─── Rate limiting ────────────────────────────────────────────────────────────
-
 const UPLOAD_RATE_LIMIT_WINDOW_MS = 60_000;
 const UPLOAD_RATE_LIMIT_MAX = 10;
 const UPLOAD_RATE_LIMIT_MAP_MAX = 1_000;
 const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
-
 function isLoopbackAddress(addr: string): boolean {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
-
 function getHeader(
   request: HttpServerRequest.HttpServerRequest,
   name: string,
@@ -376,7 +240,6 @@ function getHeader(
   if (Array.isArray(value)) return value[0];
   return value;
 }
-
 function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
   const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
   // Only trust X-Forwarded-From when the direct connection comes from a
@@ -390,11 +253,8 @@ function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
   }
   return remoteAddress;
 }
-
 const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
-
 let lastRateLimitPruneAt = 0;
-
 function checkUploadRateLimit(remoteAddress: string): boolean {
   const now = Date.now();
   // Prune stale entries at most once per rate-limit window to avoid O(n)
@@ -428,12 +288,9 @@ function checkUploadRateLimit(remoteAddress: string): boolean {
   entry.count++;
   return true;
 }
-
 // ─── Favorites cache ───────────────────────────────────────────────────────────
-
 const FAVORITES_CACHE_TTL_MS = 5000;
 let favoritesCache: { timestamp: number; ids: Set<string> } | null = null;
-
 function getCachedFavoritedIds(): Set<string> {
   const now = Date.now();
   if (favoritesCache && now - favoritesCache.timestamp < FAVORITES_CACHE_TTL_MS) {
@@ -443,19 +300,29 @@ function getCachedFavoritedIds(): Set<string> {
   favoritesCache = { timestamp: now, ids };
   return ids;
 }
-
 function invalidateFavoritesCache(): void {
   favoritesCache = null;
 }
-
+const conversationReadDependencies = {
+  resolveSessionFile,
+  tmuxSessionExists,
+  listSessionNames: () => Effect.runPromise(listSessionNames()),
+  shouldReportUnresolvedLiveSession,
+};
+const conversationMessageDependencies = {
+  resolveSessionFile,
+  generateAiTitle: (name: string, message: string) => generateAiTitle(name, message, conversationReadDependencies),
+};
+startConversationModelBackfill(resolveSessionFile);
+function conversationReadJson(response: { body: unknown; status?: number }): ReturnType<typeof jsonResponse> {
+  return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
+}
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
-
 /** Validate a caller-supplied cwd is an existing directory under the user's home. */
 async function validateCwdContainment(cwd: string): Promise<boolean> {
   if (!cwd.startsWith('/')) return false;
   const segments = cwd.split('/').filter(Boolean);
   if (segments.includes('..')) return false;
-
   try {
     const resolved = await realpath(cwd);
     const stats = await stat(resolved);
@@ -468,72 +335,6 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
     return false;
   }
 }
-
-/**
- * PAN-1624: a handoff spawned with a cwd that is not inside a git work tree
- * (e.g. the repo's parent directory) produces a session that immediately ends
- * with no tmux session at all — a silent dead conversation. Validate up front
- * so the caller gets a clear error instead of a vanished session.
- */
-export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
-  try {
-    const { stdout } = await execAsync('git rev-parse --is-inside-work-tree', { cwd: dir, encoding: 'utf-8' });
-    return stdout.trim() === 'true';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
- * Polls every 500ms for up to 30 seconds. Claude Code takes a few seconds to start.
- */
-async function waitForClaudeReady(tmuxSession: string): Promise<void> {
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    const output = await Effect.runPromise(capturePane(tmuxSession, 200));
-    if (output.includes('❯')) {
-      console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
-      return;
-    }
-    await new Promise<void>((r) => setTimeout(r, 500));
-  }
-  console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
-}
-
-function isPiTuiInputReady(snapshot: string): boolean {
-  return /^\s*[❯›>]\s/m.test(snapshot)
-    || /(?:^|\s)0(?:\.\d+)?%\s+context\s+used\b/i.test(snapshot);
-}
-
-/**
- * Wait until Pi's TUI is accepting input in the tmux pane.
- *
- * Pi TUI mode does not write a ready.json marker (that was an RPC-mode
- * artifact). Splash/header output can appear before the prompt is wired; wait
- * for the actual prompt/context footer so first-turn handoff delivery is not
- * pasted into a not-yet-ready TUI.
- */
-// piProviderForModel moved to src/lib/providers.ts so the work-agent launcher
-// (launcher-generator.ts buildPiCommand) and conversations share one source of
-// truth for the Pi provider taxonomy (PAN-1799 follow-up).
-
-export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const snapshot = await Effect.runPromise(
-      capturePane(tmuxSession, 40).pipe(Effect.catch(() => Effect.succeed(''))),
-    );
-    if (isPiTuiInputReady(snapshot)) {
-      console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
-      return true;
-    }
-    await new Promise<void>((r) => setTimeout(r, 250));
-  }
-  console.warn(`[conversations] Timed out waiting for Pi TUI to render in ${tmuxSession}`);
-  return false;
-}
-
 /**
  * Find a Claude Code session JSONL by its (globally-unique) session id, searching
  * every project dir under ~/.claude/projects/. Claude keys session files by the
@@ -553,7 +354,6 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000)
 // that appears later is still discovered.
 const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
 const SESSION_FILE_MISS_TTL_MS = 60_000;
-
 async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
   if (!SAFE_SESSION_ID_PATTERN.test(sessionId)) return null;
   const cached = sessionFileByIdCache.get(sessionId);
@@ -597,7 +397,6 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
   sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
   return null;
 }
-
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
@@ -643,7 +442,6 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
   );
   return null;
 }
-
 /**
  * Decide whether an unresolved session file should surface the loud
  * "Session could not be resolved — needs attention" banner.
@@ -661,17 +459,9 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
  * friendly "How can I help you?" first-message state instead of a scary banner
  * (PAN-1919 follow-up: codex/GPT-5.5 conversations flashed the banner on spawn).
  */
-export function shouldReportUnresolvedLiveSession(
-  conv: Pick<Conversation, 'status' | 'harness'> | null | undefined,
-): boolean {
-  if (!conv || conv.status !== 'active') return false;
-  return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
-}
-
 // Codex rollout resolution (thread-id fast path + PAN-1690 latest-rollout
 // fallback) lives in ./jsonl-resolver.ts as resolveCodexRolloutPath, shared
 // with the work-agent transcript resolver (PAN-1805).
-
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
   const claudeSessionFile = await resolveSessionFile(conv);
   if (claudeSessionFile && existsSync(claudeSessionFile)) {
@@ -679,9 +469,7 @@ async function resolveForkSourceSessionFile(conv: Conversation): Promise<string 
   }
   return claudeSessionFile;
 }
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -691,7 +479,6 @@ const readJsonBody = Effect.gen(function* () {
     return {} as Record<string, unknown>;
   }
 });
-
 export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string | undefined } | { ok: false; error: string } {
   if (value === undefined || value === null) return { ok: true, focus: undefined };
   if (typeof value !== 'string') return { ok: false, error: 'focus must be a string' };
@@ -701,7 +488,6 @@ export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string
   if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
   return { ok: true, focus };
 }
-
 export function buildForkRequest(params: ForkRequest): ForkRequest {
   return {
     parentConversationName: params.parentConversationName,
@@ -717,7 +503,6 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
   };
 }
-
 export async function handleConversationHandoffDoc(
   name: string,
 ): Promise<HttpServerResponse.HttpServerResponse> {
@@ -728,7 +513,6 @@ export async function handleConversationHandoffDoc(
   if (!conv.handoffDocPath) {
     return jsonResponse({ error: 'Handoff document not found' }, { status: 404 });
   }
-
   try {
     const docText = await readFile(conv.handoffDocPath, 'utf-8');
     return HttpServerResponse.text(docText, {
@@ -746,645 +530,7 @@ export async function handleConversationHandoffDoc(
     return jsonResponse({ error: 'Failed to read handoff document' }, { status: 500 });
   }
 }
-
-/** Generate a default conversation name, e.g. 20260404-1234 */
-function generateConversationName(): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
-}
-
-/** Sanitize a user-provided name to be safe for tmux session names */
-function sanitizeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 64);
-}
-
-/** Check if a tmux session exists (async, non-blocking) */
-async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(sessionExists(sessionName));
-}
-
-const conversationReadDependencies = {
-  resolveSessionFile,
-  tmuxSessionExists,
-  listSessionNames: () => Effect.runPromise(listSessionNames()),
-  shouldReportUnresolvedLiveSession,
-};
-
-const conversationMessageDependencies = {
-  resolveSessionFile,
-  generateAiTitle: (name: string, message: string) => generateAiTitle(name, message, conversationReadDependencies),
-};
-
-function conversationReadJson(response: { body: unknown; status?: number }): ReturnType<typeof jsonResponse> {
-  return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
-}
-
-async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (await Effect.runPromise(sessionExists(sessionName))) return;
-    await new Promise(r => setTimeout(r, 250));
-  }
-  throw new Error(`Timed out waiting for tmux session ${sessionName}`);
-}
-
-function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
-  return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
-}
-
-async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
-  const transcriptKind = getHarnessBehavior(harness).transcriptKind;
-  if (transcriptKind === 'ohmypi-jsonl') await waitForPiTuiReady(tmuxSession);
-  else if (transcriptKind !== 'codex-rollout-jsonl' && mode === 'spawn') {
-    await waitForClaudeReady(tmuxSession);
-    console.log(`[conversations] Claude ready in ${tmuxSession}`);
-  } else if (transcriptKind !== 'codex-rollout-jsonl') await waitForReadySignal(tmuxSession, 30);
-}
-
-export async function handleConversationSwitchModel(
-  name: string,
-  body: Record<string, unknown>,
-): Promise<ReturnType<typeof jsonResponse>> {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-  }
-
-  const model = typeof body['model'] === 'string' && body['model'].trim()
-    ? body['model'].trim()
-    : (conv.model ?? undefined);
-
-  const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
-  const requestedHarness = body['harness'];
-  let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
-    if (requestedHarness !== currentHarness) {
-      const policyModel = model ?? conv.model ?? '';
-      const decision = canUseHarnessSync(
-        requestedHarness,
-        policyModel,
-        await getProviderAuthMode(policyModel),
-      );
-      if (!decision.allowed) {
-        return jsonResponse(
-          { error: decision.reason ?? 'Harness not allowed for this model' },
-          { status: 400 },
-        );
-      }
-    }
-    harness = requestedHarness;
-  }
-  const harnessChanged = harness !== currentHarness;
-
-  if (!(await validateCwdContainment(conv.cwd))) {
-    return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-  }
-
-  if (model && !SAFE_MODEL_PATTERN.test(model)) {
-    return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-  }
-
-  const livePiSwitch = isPiControlChannelHarness(currentHarness) && conv.status !== 'ended';
-  if (conv.claudeSessionId && harnessChanged) {
-    return jsonResponse(
-      { error: 'Conversation harness is locked once a conversation has started' },
-      { status: 409 },
-    );
-  }
-  if (conv.claudeSessionId && !livePiSwitch) {
-    return jsonResponse(
-      { error: 'Conversation model is locked once a conversation has started' },
-      { status: 409 },
-    );
-  }
-
-  if (model) {
-    if (livePiSwitch) {
-      await sendConversationControlCommand(conv, { type: 'set_model', model });
-    }
-    setConversationModel(name, model);
-  }
-  if (harnessChanged) setConversationHarness(name, harness);
-
-  const updated = getConversationByName(name) ?? conv;
-  return jsonResponse({
-    ...updated,
-    model: model ?? updated.model,
-    harness,
-    sessionAlive: false,
-  });
-}
-
-function resolvePtySupervisorScriptPath(): string {
-  return join(packageRoot, 'dist', 'pty-supervisor.js');
-}
-
-function getPtySupervisorSocketPath(agentId: string): string {
-  return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
-}
-
-async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
-  const socketPath = getPtySupervisorSocketPath(agentId);
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const info = await stat(socketPath);
-      if ((info.mode & 0o777) === 0o600) return;
-    } catch {
-      // not bound yet
-    }
-    await new Promise(r => setTimeout(r, 250));
-  }
-  throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath}`);
-}
-
-/**
- * Extract the model from a Claude Code JSONL session file by reading
- * until the first assistant message with a model field.
- * Reads line-by-line to avoid loading the entire file into memory.
- */
-async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
-  try {
-    if (!existsSync(sessionFile)) return null;
-    const stream = createReadStream(sessionFile, { encoding: 'utf-8' });
-    const rl = createInterface({ input: stream, crlfDelay: Infinity });
-    try {
-      for await (const line of rl) {
-        if (!line.trim()) continue;
-        const entry = JSON.parse(line);
-        if (entry.type === 'assistant' && entry.message?.model) {
-          return entry.message.model as string;
-        }
-      }
-    } finally {
-      rl.close();
-      stream.destroy();
-    }
-  } catch {
-    // Corrupt or unreadable file — skip
-  }
-  return null;
-}
-
-let backfillRunning = false;
-
-/**
- * Backfill model column for existing conversations that have a session file
- * but no model stored. Runs once on server startup (async, non-blocking).
- * Guarded against concurrent runs to prevent races.
- */
-async function backfillConversationModels(): Promise<void> {
-  if (backfillRunning) return;
-  backfillRunning = true;
-  try {
-    const convs = listConversations();
-    // Async filter — resolveSessionFile may need to glob the agent dir for Pi.
-    const probe = await Promise.all(
-      convs.map(async (conv) => (!conv.model ? await resolveSessionFile(conv) : null)),
-    );
-    const candidates = convs.filter((_, i) => probe[i] !== null);
-    const BATCH_SIZE = 10;
-    let backfilled = 0;
-    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-      const batch = candidates.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(async (conv) => {
-          const sessionFile = await resolveSessionFile(conv);
-          if (!sessionFile) return false;
-          const model = await extractModelFromSessionFile(sessionFile);
-          if (model && SAFE_MODEL_PATTERN.test(model)) {
-            backfillConversationModel(conv.name, model);
-            return true;
-          }
-          return false;
-        }),
-      );
-      backfilled += results.filter(Boolean).length;
-    }
-    if (backfilled > 0) {
-      console.log(`[conversations] Backfilled model for ${backfilled} conversation(s)`);
-    }
-  } finally {
-    backfillRunning = false;
-  }
-}
-
-// Fire-and-forget backfill on module load
-void backfillConversationModels().catch((err: unknown) => {
-  console.error('[conversations] Model backfill failed:', err);
-});
-
-/**
- * Spawn a new tmux session running claude.
- * Uses a minimal launcher script for proper terminal env setup.
- * Accepts a claudeSessionId to deterministically control the JSONL file path.
- */
-// ─── Compaction helpers ───────────────────────────────────────────────────────
-//
-// Dashboard-owned compaction is Overdeck-native. We append the compact
-// boundary and continuation summary directly to the JSONL so subsequent
-// `--resume` calls load only the summarized context forward.
-
-async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(cwd);
-  try {
-    await stat(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-  return files;
-}
-
-async function ensurePiConversationSourceContractFile(): Promise<string> {
-  const contextDir = join(getOverdeckHome(), 'context');
-  await mkdir(contextDir, { recursive: true });
-  const path = join(contextDir, 'pi-conversation-source-contract.md');
-  await writeFile(path, `${PI_CONVERSATION_SOURCE_CONTRACT}\n`, 'utf-8');
-  return path;
-}
-
-// PAN-1566: Pi conversations are launched with --no-context-files and the
-// extension fold no-ops (no ctx.appendSystemPrompt), so the global rules layer
-// must be delivered as launcher --append-system-prompt files. Mirror the Claude
-// conversation files but prepend the Pi-rendered global layer (pi-global.md)
-// and the source-attribution contract used by extension-delivered messages.
-export async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
-  const files: string[] = [];
-  const globalFile = piGlobalContextFile();
-  try {
-    await stat(globalFile);
-    files.push(globalFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensurePiConversationSourceContractFile());
-  const contextFile = workspaceContextFile(cwd);
-  try {
-    await stat(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-  return files;
-}
-
-function isNotFound(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-}
-
-export async function spawnConversationSession(
-  tmuxSession: string,
-  cwd: string,
-  claudeSessionId: string,
-  model?: string,
-  effort?: string,
-  issueId?: string,
-  resume = false,
-  harness: RuntimeName = 'claude-code',
-  plainFork = false,
-): Promise<void> {
-  const behavior = getHarnessBehavior(harness);
-  const stateDir = join(getOverdeckHome(), 'conversations', tmuxSession);
-  await mkdir(stateDir, { recursive: true });
-
-  // PAN-1596: clear any stale ready.json before launch so waitForReadySignal()
-  // (reattach/fork readiness) only observes the session-start signal from THIS
-  // launch. The conversation's session-start hook rewrites it when the new
-  // Claude session reaches the prompt.
-  clearReadySignal(tmuxSession);
-
-  const launcherScript = join(stateDir, 'launcher.sh');
-
-  const permissionFlags = getClaudePermissionFlagsStringSync();
-  let runtimeCommand = `claude ${permissionFlags}`;
-  let providerExportsStr = '';
-  let providerEnv: Record<string, string> = {};
-  let piFields: {
-    harness: 'ohmypi';
-    piMode: 'tui';
-    piExtensionPath: string;
-    piSessionDir: string;
-    resumeSessionId?: string;
-  } | undefined;
-  let codexFields: {
-    harness: 'codex';
-    codexMode: 'tui';
-    codexHome: string;
-    codexSessionDir: string;
-    resumeSessionId?: string;
-  } | undefined;
-  if (model) {
-    if (!SAFE_MODEL_PATTERN.test(model)) {
-      throw new Error('Invalid model name');
-    }
-    runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
-    // Defensive permission-flag injection.
-    // getAgentRuntimeBaseCommand already emits the correct flags for every code path
-    // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
-    // no-ops. They exist as a belt-and-braces guard for future code paths that might
-    // forget to thread the resolved mode through. The critical safety property:
-    // The bypass CLI flag was removed; only --permission-mode is ever appended.
-    const mode = resolvePermissionModeSync();
-    if (!runtimeCommand.includes('--permission-mode')) {
-      runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
-    }
-    providerExportsStr = (await getProviderExportsForModel(model)).trim();
-    providerEnv = await getProviderEnvForModel(model);
-
-    if (behavior.transcriptKind === 'ohmypi-jsonl') {
-      // Preflight: ohmypi GPT-5.x conversations authenticate with the user's
-      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, omp
-      // fails mid-session with the opaque "No API key for provider:
-      // openai-codex". Proactively refresh it, and if it can't be revived,
-      // fail here with an actionable message. Stays silent (fail-open) when
-      // the auth state can't be determined (e.g. omp's OAuth module is absent).
-      if (getProviderForModelSync(model).name === 'openai') {
-        const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
-        if (auth.status === 'missing' || auth.status === 'expired') {
-          throw new Error(
-            'ohmypi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
-            'Re-authenticate with `pan pi-auth login`, then retry.',
-          );
-        }
-      }
-
-      // Conversations run Pi in TUI mode (the default Pi terminal UI). This
-      // gives users an actual terminal in the tmux pane — they can type
-      // directly into Pi, while dashboard-composer messages and live controls
-      // are delivered through the acknowledged extension control channel. Pi
-      // still writes JSONL session files to --session-dir, so cost parsing and
-      // resume keep working.
-      //
-      // Work-agents (spawned elsewhere) keep --mode rpc + FIFO because
-      // Cloister needs the structured delivery primitive. See PAN-1067.
-      const paths = piFifoPaths(tmuxSession);
-      const piSessionDir = join(paths.agentDir, 'sessions');
-      await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-      await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
-      // No FIFO needed in TUI mode — Pi reads from the pane stdin.
-      const storedPiSessionId = resume
-        ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
-        : undefined;
-      piFields = {
-        harness: 'ohmypi',
-        piMode: 'tui',
-        piExtensionPath: resolveOhmypiExtensionPath() ?? resolve(process.cwd(), 'packages/ohmypi-extension/dist/index.js'),
-        piSessionDir,
-        resumeSessionId: storedPiSessionId || undefined,
-      };
-    } else if (behavior.usesCodexHome) {
-      // Codex conversations run in TUI mode — bare `codex` interactive terminal.
-      // Users type directly in the pane; dashboard messages arrive via the PTY
-      // supervisor when available, with tmux as the delivery fallback.
-      //
-      // Pre-seed the per-agent config so Codex never shows its first-run
-      // "Decide how much autonomy" / folder-trust wizard (which otherwise fires
-      // on every fresh CODEX_HOME and blocks the pane). Autonomy follows the
-      // codex.permissionMode setting (separate from Claude's permission mode):
-      //   read-only   → approval_policy=on-request + sandbox_mode=read-only
-      //   workspace   → approval_policy=on-request + sandbox_mode=workspace-write (default)
-      //   full-access → approval_policy=never + sandbox_mode=danger-full-access
-      // This is the Codex analog of preTrustDirectory(cwd) below, which only
-      // pre-accepts Claude Code trust.
-      const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home');
-      const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
-      const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
-      const codexSandboxMode =
-        codexPermMode === 'full-access' ? 'danger-full-access'
-        : codexPermMode === 'read-only' ? 'read-only'
-        : 'workspace-write';
-      const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
-      const { initCodexHome, extractThreadIdFromRollout } = await import('../../../lib/runtimes/codex.js');
-      initCodexHome(codexHome, {
-        trustedDir: cwd,
-        approvalPolicy: codexApprovalPolicy,
-        sandboxMode: codexSandboxMode,
-        approvalsReviewer: codexApprovalsReviewer,
-      });
-      const resumeSessionId = resume
-        ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getOverdeckHome(), 'agents') })
-          .then((rollout) => rollout ? extractThreadIdFromRollout(rollout) ?? undefined : undefined)
-        : undefined;
-      codexFields = {
-        harness: 'codex',
-        codexMode: 'tui',
-        codexHome,
-        codexSessionDir: join(codexHome, 'sessions'),
-        resumeSessionId,
-      };
-    }
-  }
-
-  // Pi's CLI matches `--model <id>` against its full registry; with
-  // ambiguous IDs like "gpt-5.4" (which exist under multiple providers),
-  // the first registry hit wins — and that hit can be a provider the user
-  // has no auth for (e.g. azure-openai-responses). Pass the model as
-  // `<pi-provider>/<id>` so Pi's resolveCliModel locks in the intended
-  // provider. The user's pi auth (`~/.pi/agent/auth.json`) determines
-  // whether the call actually succeeds.
-  let launcherModel = model;
-  if (behavior.contextLayerKind === 'pi' && model) {
-    const piProvider = piProviderForModel(model);
-    if (piProvider) launcherModel = `${piProvider}/${model}`;
-  }
-
-  if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
-    throw new Error('Invalid effort level');
-  }
-
-  const useSupervisor = shouldUseSupervisorForConversation(harness);
-  let supervisorScriptPath: string | undefined;
-  if (useSupervisor) {
-    supervisorScriptPath = resolvePtySupervisorScriptPath();
-    if (!existsSync(supervisorScriptPath)) {
-      throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
-    }
-    await writePtyToken(tmuxSession);
-  }
-
-  // Channels setup for Claude Code conversations when the experimental flag
-  // is on. Writes a per-session bridge token and MCP config so Claude loads
-  // the overdeck-bridge stdio server on startup.
-  //
-  // TRAP — this relay is NOT how conversations handle "Do you want to proceed?".
-  // The bridge handles Claude's `notifications/claude/channel/permission_request`
-  // (a channel-level event) plus out-of-band message delivery. It does NOT
-  // intercept the in-terminal tool-approval prompt. That prompt is governed by
-  // the resolved `--permission-mode` (see permissionFlags above): under `auto`
-  // it fires and a human at the dashboard terminal answers it; under `bypass`
-  // it is suppressed. Either way this bridge is orthogonal — "make a session
-  // interactive like a conversation" does not mean "wire this bridge".
-  //
-  // Plain forks skip channels wiring entirely. Two reasons:
-  //   1. The overdeck-bridge MCP server registers its tool schema into
-  //      Claude's context budget. On a plain fork the whole source JSONL is
-  //      loaded via --resume; pushing borderline-sized conversations across
-  //      Claude Code's ~200K auto-compact threshold defeats the entire
-  //      purpose of plain fork (pick up exactly where you left off).
-  //   2. dismissDevChannelsDialog spams Enter to clear the dev-channels
-  //      warning. If the resumed session shows an auto-compact suggestion in
-  //      the same window, a stray Enter confirms it — silently triggering
-  //      /compact on the brand-new fork.
-  // Subsequent messages to the fork can still reach the agent via tmux,
-  // which is the channels delivery fallback anyway.
-  let channelsBridgeMcpConfig: string | undefined;
-  if (
-    !piFields &&
-    !codexFields &&
-    !plainFork &&
-    isClaudeCodeChannelsEnabled() &&
-    (!model || getProviderForModelSync(model).name === 'anthropic') &&
-    process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
-    process.env.CLAUDE_CODE_USE_VERTEX !== '1' &&
-    process.env.CLAUDE_CODE_USE_FOUNDRY !== '1' &&
-    process.env.OVERDECK_DOCKER_WORKSPACE !== '1' &&
-    process.env.PAN_DOCKER !== '1'
-  ) {
-    channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
-    writeBridgeTokenSync(tmuxSession);
-    await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
-  }
-
-  // Atomic write: a concurrent resume/switch-model for the same conversation
-  // reuses this exact path. Writing in place lets the other spawn read a
-  // half-written launcher; write to a unique temp file then rename (atomic on
-  // the same filesystem).
-  const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
-  await writeFile(
-    launcherTmp,
-    generateLauncherScriptSync({
-      role: 'work',
-      spawnMode: 'conversation',
-      workingDir: cwd,
-      setTerminalEnv: true,
-      unsetProviderEnv: true,
-      overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
-      // Point the agent's hook/heartbeat POSTs at THIS server's loopback API.
-      // Without it the Pi extension falls back to http://localhost:3010
-      // (index.ts:120) — which in dev is the Vite dev server, whose /api proxy
-      // targets the unresolvable docker host `server`, spamming ENOTFOUND on
-      // every tool/turn. Resolve the port exactly as the server does so this is
-      // correct in dev (3011) and prod (whatever API_PORT/PORT is set to).
-      extraEnvExports: [
-        `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
-      ],
-      providerExports: providerExportsStr || undefined,
-      trapHup: true,
-      baseCommand: runtimeCommand,
-      appendSystemPromptFiles: piFields
-        ? await piConversationSystemPromptFiles(cwd)
-        : codexFields
-          ? []
-          : await claudeConversationSystemPromptFiles(cwd),
-      model: launcherModel,
-      ...(piFields ?? codexFields ?? {
-        resumeSessionId: resume ? claudeSessionId : undefined,
-        sessionId: resume ? undefined : claudeSessionId,
-      }),
-      extraArgs: !piFields && effort ? `--effort "${effort}"` : undefined,
-      keepAlive: true,
-      fileMode: 0o700,
-      channelsBridgeMcpConfig,
-      useSupervisor,
-      supervisorScriptPath,
-    }),
-    { mode: 0o700 },
-  );
-  await rename(launcherTmp, launcherScript);
-
-  // Kill any stale session with the same name
-  try {
-    await Effect.runPromise(killSession(tmuxSession));
-  } catch {
-    // ignore missing stale session
-  }
-
-  console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
-
-  // Pre-accept Claude Code's trust + bypass-permissions disclaimers BEFORE
-  // spawn so the new claude process reads acceptance from ~/.claude.json on
-  // startup and skips both dialogs. Without this, the "Bypass Permissions
-  // mode" prompt blocks the session in the tmux pane — its default option
-  // is "No, exit", so any Enter (including from dismissDevChannelsDialog)
-  // tears the session down and the user sees "Conversation session ended"
-  // immediately after launch. Work/specialist spawns already do this in
-  // src/lib/agents.ts; conversations were the only spawn path missing it.
-  try {
-    const { preTrustDirectory } = await import('../../../lib/workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(cwd);
-  } catch { /* non-fatal */ }
-
-  // Spawn the session — blank out provider env vars (ANTHROPIC_BASE_URL,
-  // ANTHROPIC_API_KEY, etc.) via tmux -e flags so the launcher script's
-  // exports are the sole source of provider configuration. The tmux server
-  // inherits the parent's env and -e can only SET, not UNSET, so we set
-  // provider vars to empty strings to override stale inherited values.
-  try {
-    await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
-      env: {
-        ...BLANKED_PROVIDER_ENV,
-        TERM: 'xterm-256color',
-      },
-    }));
-  } catch (err) {
-    if ((err as { code?: string })?.code === 'ENOENT') {
-      throw new Error(
-        'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
-      );
-    }
-    throw err;
-  }
-
-  if (useSupervisor) {
-    await waitForPtySupervisorSocket(tmuxSession);
-  }
-
-  // For codex TUI conversations, poll for the first rollout JSONL in the
-  // background and persist the thread-id so transcript/cost lookups can
-  // locate the session. Non-blocking — resolves after codex writes its first
-  // rollout, which happens once the user starts the first conversation turn.
-  if (behavior.usesCodexHome && codexFields?.codexHome) {
-    const codexHomeDir = codexFields.codexHome;
-    void (async () => {
-      try {
-        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
-          await import('../../../lib/runtimes/codex.js');
-        const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
-        if (rollout) {
-          const threadId = extractThreadIdFromRollout(rollout);
-          if (threadId) writeThreadId(tmuxSession, threadId);
-        }
-      } catch {
-        // non-fatal
-      }
-    })();
-  }
-
-  // Channels: dismiss the dev-channels confirmation dialog so the bridge MCP
-  // server starts and the socket is created. Fire-and-forget — the helper
-  // self-polls for the dialog and presses Enter. Awaiting it here blocked the
-  // POST /api/conversations response (and therefore the conversation appearing
-  // in the list) for up to 20s. waitForClaudeReady below naturally waits for
-  // the prompt, which only appears once this dismissal lands, so the two run
-  // concurrently without a race.
-  if (channelsBridgeMcpConfig) {
-    void dismissDevChannelsDialog(tmuxSession).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[conversations] dismissDevChannelsDialog failed for ${tmuxSession}: ${msg}`);
-    });
-  }
-
-  // Keep session alive when clients disconnect
-  await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
-}
-
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
-
 // PAN-1705 — coalesce concurrent list enrichments. Several dashboard clients
 // poll this endpoint on overlapping intervals; each request used to run its
 // own full per-row enrichment (session-file resolution, stats, JSONL scans
@@ -1398,22 +544,6 @@ interface ListEnrichmentEntry {
   promise: Promise<unknown[]>;
 }
 const listEnrichmentInFlight = new Map<string, ListEnrichmentEntry>();
-
-export function conversationSessionAliveFromState(
-  conv: Pick<Conversation, 'status' | 'forkStatus'>,
-  tmuxSessionAlive: boolean,
-): boolean {
-  return conv.status === 'active' && !conv.forkStatus && tmuxSessionAlive;
-}
-
-export function conversationNeedsRunningRepair(
-  conv: Pick<Conversation, 'status' | 'forkStatus'>,
-  tmuxSessionAlive: boolean,
-  harnessProcessAlive: boolean,
-): boolean {
-  return conv.status === 'ended' && !conv.forkStatus && tmuxSessionAlive && harnessProcessAlive;
-}
-
 function getEnrichedConversationList(limit: number, offset: number): Promise<unknown[]> {
   const key = `${limit}:${offset}`;
   const now = Date.now();
@@ -1441,7 +571,6 @@ function getEnrichedConversationList(limit: number, offset: number): Promise<unk
   }
   return entry.promise;
 }
-
 async function enrichConversationList(limit: number, offset: number): Promise<unknown[]> {
   const conversations = listConversations({ limit, offset });
   const favoritedNames = getCachedFavoritedIds();
@@ -1449,7 +578,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
   // stale conversations.total_cost cache — see getConversationLedgerCosts. Computed
   // once per list build; conversations with no ledger rows fall back to the cache.
   const ledgerCosts = getConversationLedgerCosts();
-
   // Enrich with live tmux status
   // Grace period removed (PAN-826): POST /api/conversations now waits for
   // Claude to be ready before returning 201, so newly-created conversations
@@ -1471,7 +599,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
             let isWorking = false;
             let currentTool: string | null = null;
             const convSf = await resolveSessionFile(row);
-
             // Context usage is intentionally NOT computed here — it requires a
             // full JSONL scan per row (cold cache) and made the list endpoint
             // O(seconds) on dashboards with hundreds of conversations. The
@@ -1509,7 +636,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
                 }
               }
             }
-
             // PAN-1520 — scan the conv JSONL for any pending blocking surface
             // (AskUserQuestion, ExitPlanMode, EnterPlanMode) so the dashboard
             // can fire the unified indicator/notification/modal for conv
@@ -1536,7 +662,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
             }
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(row.cwd);
-
             // PAN-1556: surface the transcript's last-write time as the
             // conversation's last-activity signal. The JSONL is appended on
             // every message (including the user's), so its mtime — unlike
@@ -1552,7 +677,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
                 // non-fatal — fall back to lastAttachedAt/createdAt downstream
               }
             }
-
             // PAN-1690 — Codex pane-detected approval fallback (TUI prompts
             // aren't in the JSONL). Use the transcript mtime as a stable
             // askedAt so the 4s poll doesn't churn the timestamp.
@@ -1568,7 +692,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
                 if (codex.approval) pendingAskUserQuestion = codex.approval;
               }
             }
-
             const ledger = ledgerCosts.get(String(row.id));
             return {
               ...row,
@@ -1591,7 +714,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
   ));
 }
-
 const getConversationsRoute = HttpRouter.add(
   'GET',
   '/api/conversations',
@@ -1618,9 +740,7 @@ const getConversationsRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/pending-input ─────────────────────────────
-
 // PAN-1705 — lightweight feed for the needs-you modal (PAN-1520). The previous
 // implementation polled the full enriched list (≈0.5 MB, full per-row
 // enrichment server-side) every 4s per client just to filter for
@@ -1642,7 +762,6 @@ const getConversationsPendingInputRoute = HttpRouter.add(
     });
   }),
 );
-
 const getArchivedConversationsRoute = HttpRouter.add(
   'GET',
   '/api/conversations/archived',
@@ -1659,9 +778,7 @@ const getArchivedConversationsRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:id ────────────────────────────────────────
-
 const getConversationRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:id',
@@ -1679,9 +796,7 @@ const getConversationRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/handoff-doc ─────────────────────────
-
 const getConversationHandoffDocRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/handoff-doc',
@@ -1696,13 +811,11 @@ const getConversationHandoffDocRoute = HttpRouter.add(
     return yield* Effect.promise(() => handleConversationHandoffDoc(name));
   }),
 );
-
 // ─── Route: POST /api/conversations ──────────────────────────────────────────
 //
 // Unified spawn + create endpoint. Called on first message from draft mode.
 // Spawns Claude Code with selected model/effort, creates DB record, sends message.
 // Accepts: { message, model?, effort?, issueId? }
-
 const postConversationRoute = HttpRouter.add(
   'POST',
   '/api/conversations',
@@ -1713,7 +826,6 @@ const postConversationRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const body = yield* readJsonBody;
-
     // Log request origin to trace who is creating conversations
     const reqOrigin = getHeader(request, 'origin') ?? 'none';
     const reqReferer = getHeader(request, 'referer') ?? 'none';
@@ -1721,140 +833,17 @@ const postConversationRoute = HttpRouter.add(
     const reqXff = getHeader(request, 'x-forwarded-for') ?? 'none';
     const reqIp = request.headers['x-real-ip'] ?? 'local';
     console.log(`[conversations] POST /api/conversations origin=${reqOrigin} referer=${reqReferer} ua=${reqUserAgent.slice(0, 80)} xff=${reqXff} ip=${reqIp}`);
-
-    return yield* Effect.promise(async () => {
-      try {
-        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-        const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
-        const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
-        const harness = await resolveAllowedHarness(body['harness'], model);
-        const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
-        const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
-        const applyProviderOverride = body['applyProviderOverride'] === true;
-        if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
-          return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
-        }
-        if (model && !SAFE_MODEL_PATTERN.test(model)) {
-          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-        }
-        if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
-          return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
-        }
-        let cwd = getDefaultCwd();
-        if (projectKey) {
-          const projectConfig = getProjectSync(projectKey);
-          if (projectConfig?.path && existsSync(projectConfig.path)) {
-            cwd = projectConfig.path;
-          } else {
-            return jsonResponse({ error: `Unknown project: ${projectKey}` }, { status: 400 });
-          }
-        }
-
-        if (message && message.length > MAX_MESSAGE_LENGTH) {
-          return jsonResponse(
-            { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
-            { status: 400 },
-          );
-        }
-
-        // Generate identifiers — retry on UNIQUE collision (extremely unlikely
-        // with HHMMSS+random, but cheap insurance against sub-second races).
-        let name = generateConversationName();
-        for (let i = 0; i < 5 && getConversationByName(name); i++) {
-          name = generateConversationName();
-        }
-        const tmuxSession = `conv-${name}`;
-        const claudeSessionId = randomUUID();
-
-        console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
-
-        // Title = truncated first message (T3Code pattern), or default
-        const MAX_TITLE_LEN = 60;
-        const title = message
-          ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '')
-          : 'New conversation';
-
-        // Create the DB record FIRST — before spawning the tmux session and
-        // waiting up to 30s for the runtime to render. Previously the row was
-        // inserted last, so a brand-new conversation did not exist in the DB
-        // (and could not appear in the list) for the entire spawn+ready window.
-        // Insert immediately, emit a realtime event, then spawn.
-        const conv = createConversation({
-          name,
-          tmuxSession,
-          cwd,
-          issueId,
-          claudeSessionId,
-          title,
-          titleSource: message ? 'auto' : 'default',
-          titleSeed: title,
-          model,
-          effort,
-          harness,
-        });
-        getEventStore().emitOnly({
-          type: 'conversation.created',
-          timestamp: new Date().toISOString(),
-          payload: { conversationName: name },
-        });
-
-        // Spawn the tmux session, wait for the runtime to render, and deliver
-        // the initial message in the BACKGROUND. The POST returns as soon as
-        // the DB row exists so the client can both render AND select the new
-        // conversation immediately — previously the response was held for the
-        // whole spawn + up-to-30s ready wait, so the conversation appeared in
-        // the list but could not be auto-opened until spawn finished.
-        void (async () => {
-          try {
-            await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
-            console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
-
-            await waitForConversationRuntimeReady(tmuxSession, harness, 'spawn');
-
-            // If a message was provided, send it now that the runtime is ready.
-            if (message) {
-              await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
-            }
-          } catch (spawnErr: unknown) {
-            const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
-            console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
-            updateSpawnError(name, msg);
-            getEventStore().emitOnly({
-              type: 'conversation.created',
-              timestamp: new Date().toISOString(),
-              payload: { conversationName: name },
-            });
-          }
-        })();
-
-        // Generate AI title in background (non-blocking)
-        if (message) {
-          void generateAiTitle(name, message, conversationReadDependencies).catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
-          });
-        }
-
-        // sessionAlive is false at response time — the tmux session spawns in
-        // the background task above. The list query and terminal panel both
-        // pick up liveness on their own once the session exists.
-        return jsonResponse({ ...conv, sessionAlive: false }, { status: 201 });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] create conversation failed:', msg);
-        return jsonResponse({ error: msg || 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
-      }
-    });
+    return yield* Effect.promise(async () => handleConversationCreate(body, {
+      generateAiTitle: (name: string, message: string) => generateAiTitle(name, message, conversationReadDependencies),
+    }));
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/stop ────────────────────────────────
 //
 // Stop the agent for a conversation: kill the tmux session and mark the
 // conversation ended. The conversation row is preserved — it stays in the list
 // (with a gray dot) and can be resumed later. Conversations are NEVER deleted;
 // the only removal verb is `archive`.
-
 const postConversationStopRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/stop',
@@ -1866,35 +855,12 @@ const postConversationStopRoute = HttpRouter.add(
     }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-
-        await stopConversationRuntime(conv, name);
-        markConversationEnded(name);
-        // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
-        // Do NOT await — attachment pruning can read the entire JSONL and must
-        // not block the HTTP response critical path.
-        void (async () => {
-          await new Promise((r) => setTimeout(r, 500));
-          await cleanupUnreferencedConversationAttachments({ name: conv.name, sessionFile: (conv as { sessionFile?: string | null }).sessionFile ?? null });
-        })();
-
-        return jsonResponse({ success: true });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] stop conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
-    });
+    return yield* Effect.promise(async () => handleConversationStop(name, {
+      resolveSessionFileForCleanup: (conv) => (conv as { sessionFile?: string | null }).sessionFile ?? null,
+    }));
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/resume ─────────────────────────────
-
 const postConversationResumeRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/resume',
@@ -1907,110 +873,14 @@ const postConversationResumeRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
-    return yield* Effect.promise(async () => {
-    try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-
-        // Allow model/effort override from request body; fall back to stored values
-        const model = typeof body['model'] === 'string' && body['model'].trim()
-          ? body['model'].trim()
-          : (conv.model ?? undefined);
-        const effort = typeof body['effort'] === 'string' && body['effort'].trim()
-          ? body['effort'].trim()
-          : (conv.effort ?? undefined);
-
-        // Reattach only when the harness process is genuinely alive. The tmux
-        // session existing is NOT sufficient: the launcher's keep-alive loop
-        // (`while true; do sleep 60; done`) outlives Claude, so a crashed/exited
-        // session lingers as a "corpse" with the same name. Reattaching to that
-        // drops the user into a dead shell loop. When Claude is alive we
-        // reattach (continue the same session); when it's a corpse we fall
-        // through to the respawn branch, which relaunches `claude --resume
-        // <sessionId>` into the SAME session/transcript (no history loss) and
-        // kills the stale tmux session first. PAN-1637.
-        const claudeAlive = await isHarnessProcessAlive(conv.tmuxSession);
-
-        if (claudeAlive) {
-          // Reattach: just update last_attached_at and mark active
-          updateLastAttached(name);
-          markConversationActive(name);
-          return jsonResponse({ ...conv, status: 'active', reattached: true });
-        }
-
-        // Respawn: resume the previous Claude Code session using --resume
-        // Resume must never mutate the JSONL — `claude --resume` loads the full raw
-        // transcript. Auto-compaction here would fork the conversation (PAN-802).
-        const oldSessionId = conv.claudeSessionId;
-        // Harness is PINNED per conversation. A resume must never re-derive it
-        // from the model — that silently flipped Pi conversations to Claude Code
-        // and orphaned their transcripts (P0, 2026-05-14). Changing the runtime
-        // for an existing conversation only happens through the explicit
-        // switch-model path, which converts the transcript format.
-        const harness: RuntimeName = conv.harness ?? 'claude-code';
-        const modelChanged = !!model && model !== conv.model;
-
-        if (!(await validateCwdContainment(conv.cwd))) {
-          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-        }
-
-        // Validate model before persisting so invalid values never reach the DB.
-        if (model && modelChanged && !SAFE_MODEL_PATTERN.test(model)) {
-          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-        }
-
-        // Persist the new model so the dropdown reflects what we're respawning
-        // with. Harness is unchanged on resume — no write needed.
-        if (model && modelChanged) setConversationModel(name, model);
-
-        // Resume only if the transcript actually exists. A conversation with a
-        // session id but no resolvable file means its history was lost or
-        // orphaned (e.g. an earlier bad harness flip) — log it loudly rather
-        // than silently `--resume`-ing into a "No conversation found" error.
-        let canResume = !!oldSessionId;
-        if (oldSessionId) {
-          const resumeFile = await resolveSessionFile(conv);
-          if (!resumeFile || !existsSync(resumeFile)) {
-            canResume = false;
-            console.error(
-              `[conversations] SESSION-LOST ${name} harness=${harness} ` +
-              `claudeSessionId=${oldSessionId} resolved=${resumeFile ?? 'null'} — ` +
-              `resuming with a fresh session`,
-            );
-          }
-        }
-
-        // Mark the session as mid-respawn so terminal WS reconnects landing
-        // in the tmux-down window don't get a fatal 4404. The tmux session
-        // is already dead here (sessionAlive was false) — this guards the
-        // window between now and `waitForTmuxSession` returning.
-        const respawn = markRespawnPending(conv.tmuxSession);
-        try {
-          await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
-          await waitForTmuxSession(conv.tmuxSession);
-          await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
-
-          markConversationActive(name);
-          return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
-        } finally {
-          respawn.done();
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] resume conversation failed:', msg);
-        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
-        }})
+    return yield* Effect.promise(async () => handleConversationResume(name, body, { resolveSessionFile }));
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/switch-model ───────────────────────
 //
 // Update the model/harness for a brand-new conversation before any runtime
 // session exists. Pi conversations can also receive live model changes through
 // the control channel; Claude conversations remain locked after start.
-
 const postConversationSwitchModelRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/switch-model',
@@ -2034,7 +904,6 @@ const postConversationSwitchModelRoute = HttpRouter.add(
     });
   }),
 );
-
 const postConversationThinkingLevelRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/thinking-level',
@@ -2058,7 +927,6 @@ const postConversationThinkingLevelRoute = HttpRouter.add(
     });
   }),
 );
-
 const postConversationCompactRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/compact',
@@ -2081,7 +949,6 @@ const postConversationCompactRoute = HttpRouter.add(
     });
   }),
 );
-
 const postConversationAbortRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/abort',
@@ -2104,9 +971,7 @@ const postConversationAbortRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/messages ────────────────────────────
-
 const getConversationMessagesRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/messages',
@@ -2124,9 +989,7 @@ const getConversationMessagesRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/message-locator ─────────────────────
-
 const getConversationMessageLocatorRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/message-locator',
@@ -2144,16 +1007,13 @@ const getConversationMessageLocatorRoute = HttpRouter.add(
     if (!Number.isInteger(byteOffset) || byteOffset < 0) {
       return jsonResponse({ error: 'byteOffset must be a non-negative integer' }, { status: 400 });
     }
-
     return yield* Effect.promise(async () => {
       const response = await getConversationMessageLocator(name, byteOffset, conversationReadDependencies);
       return conversationReadJson(response);
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/upload-image ───────────────────────
-
 const postConversationUploadImageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/upload-image',
@@ -2163,12 +1023,10 @@ const postConversationUploadImageRoute = HttpRouter.add(
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
-
     const remoteAddress = getClientIp(request);
     if (!checkUploadRateLimit(remoteAddress)) {
       return jsonResponse({ error: 'Rate limit exceeded' }, { status: 429 });
     }
-
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const multipart = yield* Effect.provideContext(
@@ -2183,11 +1041,9 @@ const postConversationUploadImageRoute = HttpRouter.add(
     const files = multipart['file'] as Multipart.PersistedFile[] | undefined;
     const filenameField = multipart['filename'] as string | string[] | undefined;
     const mimeTypeField = multipart['mimeType'] as string | string[] | undefined;
-
     const file = files?.[0];
     const filenameRaw = Array.isArray(filenameField) ? filenameField[0] : filenameField;
     const mimeTypeRaw = Array.isArray(mimeTypeField) ? mimeTypeField[0] : mimeTypeField;
-
     if (typeof filenameRaw !== 'string') {
       return jsonResponse({ error: 'filename is required' }, { status: 400 });
     }
@@ -2196,11 +1052,9 @@ const postConversationUploadImageRoute = HttpRouter.add(
     }
     const filename = filenameRaw;
     const mimeType = mimeTypeRaw;
-
     if (!file || !file.path) {
       return jsonResponse({ error: 'file is required' }, { status: 400 });
     }
-
     return yield* Effect.promise(async () => {
       try {
         const UPLOAD_READ_TIMEOUT_MS = 10_000;
@@ -2219,9 +1073,7 @@ const postConversationUploadImageRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/message ────────────────────────────
-
 const postConversationDeleteImageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/delete-image',
@@ -2257,7 +1109,6 @@ const postConversationDeleteImageRoute = HttpRouter.add(
     });
   }),
 );
-
 const postConversationMessageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/message',
@@ -2291,7 +1142,6 @@ const postConversationMessageRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:id/codex-approval ────────────────────────
 //
 // PAN-1690 — answer a Codex TUI approval menu from the dashboard. The body
@@ -2351,9 +1201,7 @@ const postConversationCodexApprovalRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/delivery-method ─────────────────────
-
 const postConversationDeliveryMethodRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/delivery-method',
@@ -2377,9 +1225,7 @@ const postConversationDeliveryMethodRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/control-ack ────────────────────────
-
 const postConversationControlAckRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/control-ack',
@@ -2402,9 +1248,7 @@ const postConversationControlAckRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
-
 const patchConversationRoute = HttpRouter.add(
   'PATCH',
   '/api/conversations/:name',
@@ -2429,7 +1273,6 @@ const patchConversationRoute = HttpRouter.add(
     });
   }),
 );
-
 const deleteConversationRoute = HttpRouter.add(
   'DELETE',
   '/api/conversations/:name',
@@ -2441,38 +1284,15 @@ const deleteConversationRoute = HttpRouter.add(
     }
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-
-        await stopConversationRuntime(conv, name);
-        markConversationEnded(name);
-        archiveConversation(name);
-        removeFavorite('conversation', name);
-        invalidateFavoritesCache();
-        await cleanupConversationAttachments(name);
-
-        return jsonResponse({ success: true });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] delete conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
-    });
+    return yield* Effect.promise(async () => handleConversationDelete(name, { invalidateFavoritesCache }));
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/archive ───────────────────────────
-
 const conversationArchiveDependencies = {
   stopConversationRuntime,
   invalidateFavoritesCache,
   cleanupConversationAttachments,
 };
-
 const postConversationArchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/archive',
@@ -2490,9 +1310,7 @@ const postConversationArchiveRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/unarchive ─────────────────────────
-
 const postConversationUnarchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/unarchive',
@@ -2510,13 +1328,11 @@ const postConversationUnarchiveRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/restart-all ─────────────────────────────
 //
 // Kill all active conversation tmux sessions and re-spawn them with
 // their stored model/effort. Useful when model persistence was fixed
 // and existing sessions need to pick up the correct model.
-
 const postConversationRestartAllRoute = HttpRouter.add(
   'POST',
   '/api/conversations/restart-all',
@@ -2526,63 +1342,10 @@ const postConversationRestartAllRoute = HttpRouter.add(
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
-    return yield* Effect.promise(async () => {
-      try {
-        const allConvs = listConversations();
-        // Filter to conversations with a live tmux session — use a single
-        // listSessionNamesAsync() call instead of N subprocess spawns.
-        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
-        const convs = allConvs.filter((c) => liveSessionNames.has(c.tmuxSession));
-        const results: { name: string; model: string | null; status: string }[] = [];
-
-        for (const conv of convs) {
-          // Mark mid-respawn so terminal WS reconnects don't 4404 in the
-          // kill→spawn gap. Cleared in finally so failures still release it.
-          const respawn = markRespawnPending(conv.tmuxSession);
-          try {
-            // Kill existing tmux session
-            await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-            // Re-spawn with stored model
-            const oldSessionId = conv.claudeSessionId;
-            const sessionFileForResume = await resolveSessionFile(conv);
-            const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
-            const harness = await resolveAllowedHarness(conv.harness, conv.model);
-            await spawnConversationSession(
-              conv.tmuxSession,
-              conv.cwd,
-              oldSessionId ?? randomUUID(),
-              conv.model ?? undefined,
-              conv.effort ?? undefined,
-              conv.issueId ?? undefined,
-              canResume,
-              harness,
-            );
-            setConversationHarness(conv.name, harness);
-            markConversationActive(conv.name);
-            results.push({ name: conv.name, model: conv.model, status: 'restarted' });
-          } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
-            results.push({ name: conv.name, model: conv.model, status: 'failed' });
-          } finally {
-            respawn.done();
-          }
-        }
-
-        console.log(`[conversations] Restarted ${results.filter(r => r.status === 'restarted').length}/${convs.length} conversations`);
-        return jsonResponse({ restarted: results.length, results });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] restart conversations failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
-    });
+    return yield* Effect.promise(async () => handleConversationRestartAll({ resolveSessionFile }));
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/favorite ───────────────────────────
-
 const postConversationFavoriteRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/favorite',
@@ -2609,9 +1372,7 @@ const postConversationFavoriteRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: DELETE /api/conversations/:name/favorite ─────────────────────────
-
 const deleteConversationFavoriteRoute = HttpRouter.add(
   'DELETE',
   '/api/conversations/:name/favorite',
@@ -2638,9 +1399,7 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
-
 /**
  * Title a handoff conversation after the WORK it carries (the focus), not the
  * parent's title. A handoff with no focus falls back to "Handoff: <parent>".
@@ -2653,7 +1412,6 @@ function handoffTitleFromFocus(focus: string | undefined, fallback: string): str
   const trimmed = f.length > 70 ? `${f.slice(0, 69).trimEnd()}…` : f;
   return `Handoff: ${trimmed}`;
 }
-
 type ForkPipelineRuntimeOverrides = Partial<{
   sessionExists: (sessionName: string) => Promise<boolean>;
   isHarnessProcessAlive: (sessionName: string) => Promise<boolean>;
@@ -2661,43 +1419,34 @@ type ForkPipelineRuntimeOverrides = Partial<{
   waitForTmuxSession: typeof waitForTmuxSession;
   getAgentRuntimeStateSync: typeof getAgentRuntimeStateSync;
 }>;
-
 let forkPipelineRuntimeOverrides: ForkPipelineRuntimeOverrides = {};
-
 export function __setForkPipelineRuntimeOverridesForTest(overrides: ForkPipelineRuntimeOverrides): void {
   forkPipelineRuntimeOverrides = overrides;
 }
-
 export function __resetForkPipelineRuntimeOverridesForTest(): void {
   forkPipelineRuntimeOverrides = {};
 }
-
 async function forkSessionExists(sessionName: string): Promise<boolean> {
   return forkPipelineRuntimeOverrides.sessionExists
     ? forkPipelineRuntimeOverrides.sessionExists(sessionName)
     : Effect.runPromise(sessionExists(sessionName));
 }
-
 async function forkHarnessProcessAlive(sessionName: string): Promise<boolean> {
   return forkPipelineRuntimeOverrides.isHarnessProcessAlive
     ? forkPipelineRuntimeOverrides.isHarnessProcessAlive(sessionName)
     : isHarnessProcessAlive(sessionName);
 }
-
 function forkRuntimeState(sessionName: string): ReturnType<typeof getAgentRuntimeStateSync> {
   return forkPipelineRuntimeOverrides.getAgentRuntimeStateSync
     ? forkPipelineRuntimeOverrides.getAgentRuntimeStateSync(sessionName)
     : getAgentRuntimeStateSync(sessionName);
 }
-
 async function forkSpawnConversationSession(...args: Parameters<typeof spawnConversationSession>): Promise<void> {
   return (forkPipelineRuntimeOverrides.spawnConversationSession ?? spawnConversationSession)(...args);
 }
-
 async function forkWaitForTmuxSession(...args: Parameters<typeof waitForTmuxSession>): Promise<void> {
   return (forkPipelineRuntimeOverrides.waitForTmuxSession ?? waitForTmuxSession)(...args);
 }
-
 /**
  * Watch the hook-driven runtime mirror to confirm a delivered fork brief was
  * actually accepted as a prompt. Once a prompt is submitted the agent leaves
@@ -2724,7 +1473,6 @@ export async function confirmForkPromptAccepted(
   } while (Date.now() < deadline);
   return sawIdle ? 'still-idle' : 'unknown';
 }
-
 /**
  * Deliver a forked conversation's brief (summary or handoff doc) into the
  * freshly-spawned successor session, then CONFIRM it actually landed.
@@ -2744,7 +1492,6 @@ export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDo
   if (!conv.handoffDocPath || !existsSync(conv.handoffDocPath)) return null;
   return readFile(conv.handoffDocPath, 'utf-8');
 }
-
 export async function ensureForkSessionReady(
   conv: Conversation,
   sessionId: string,
@@ -2760,7 +1507,6 @@ export async function ensureForkSessionReady(
     }
     console.warn(`[fork-pipeline] Existing tmux session ${conv.tmuxSession} for ${conv.name} is a keep-alive corpse — recreating`);
   }
-
   await forkSpawnConversationSession(
     conv.tmuxSession,
     conv.cwd,
@@ -2774,23 +1520,19 @@ export async function ensureForkSessionReady(
   );
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
-
 export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
   const behavior = getHarnessBehavior(conv.harness);
-
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
     await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
     return;
   }
-
   const ready = await waitForReadySignal(conv.tmuxSession, 60);
   if (!ready) {
     console.warn(`[${caller}] ready signal not detected for ${conv.name} within 60s — delivering and confirming anyway`);
   }
-
   const MAX_ATTEMPTS = 2;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
@@ -2812,14 +1554,12 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
     }
   }
 }
-
 export function handleForkPipelineFailure(name: string, err: unknown): void {
   console.error(`[fork-pipeline] Failed for ${name}:`, err);
   const msg = err instanceof Error ? err.message : String(err);
   updateForkStatus(name, 'failed', msg);
   markConversationEnded(name);
 }
-
 export async function runForkPipeline(
   convName: string,
   parentConv: Conversation,
@@ -2836,10 +1576,8 @@ export async function runForkPipeline(
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
-
   const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
-
   if (forkMode === 'plain') {
     if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {
       // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
@@ -2859,7 +1597,6 @@ export async function runForkPipeline(
       if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
       await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
     }
-
     updateForkStatus(convName, 'spawning');
     await ensureForkSessionReady(
       conv,
@@ -2868,18 +1605,15 @@ export async function runForkPipeline(
       true, // plainFork — skip channels MCP wiring so it doesn't inflate the
             // resumed context past Claude Code's auto-compact threshold
     );
-
     // No summary injection needed for plain Claude Code forks.
     markConversationActive(convName);
     updateForkStatus(convName, null);
     return;
   }
-
   let summary: string;
   let effectiveForkMode = forkMode;
   let handoffDocPath: string | null = null;
   let forkFallbackReason: string | null = null;
-
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
       try {
@@ -2917,7 +1651,6 @@ export async function runForkPipeline(
       }
     }
   };
-
   if (forkMode === 'handoff') {
     const existingHandoffDoc = await readExistingHandoffDoc(conv);
     if (existingHandoffDoc !== null) {
@@ -2966,7 +1699,6 @@ export async function runForkPipeline(
   } else {
     summary = await buildSummary();
   }
-
   updateConversationForkFallbackReason(convName, forkFallbackReason);
   updateConversationTitle(
     convName,
@@ -2978,16 +1710,12 @@ export async function runForkPipeline(
   if (handoffDocPath) {
     recordConversationHandoff(parentConv.name, convName, handoffDocPath);
   }
-
   updateForkStatus(convName, 'spawning');
   await self.ensureForkSessionReady(conv, sessionId, false);
-
   await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
-
   markConversationActive(convName);
   updateForkStatus(convName, null);
 }
-
 function parsePersistedForkRequest(raw: string): ForkRequest | null {
   try {
     const parsed = JSON.parse(raw) as Partial<ForkRequest>;
@@ -3001,9 +1729,7 @@ function parsePersistedForkRequest(raw: string): ForkRequest | null {
     return null;
   }
 }
-
 const inFlightForkPipelines = new Set<Promise<void>>();
-
 export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<void> {
   const tracked = pipeline.finally(() => {
     inFlightForkPipelines.delete(tracked);
@@ -3011,16 +1737,13 @@ export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<v
   inFlightForkPipelines.add(tracked);
   return tracked;
 }
-
 export function getInFlightForkPipelineCount(): number {
   return inFlightForkPipelines.size;
 }
-
 export async function waitForInFlightForkPipelines(timeoutMs = 10_000): Promise<{ completed: boolean; count: number }> {
   const pipelines = [...inFlightForkPipelines];
   const count = pipelines.length;
   if (count === 0) return { completed: true, count: 0 };
-
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -3033,24 +1756,20 @@ export async function waitForInFlightForkPipelines(timeoutMs = 10_000): Promise<
     if (timeout) clearTimeout(timeout);
   }
 }
-
 export async function recoverStuckForks(): Promise<number> {
   const forks = getStuckForks();
   let recovered = 0;
-
   for (const fork of forks) {
     try {
       if (!fork.forkRequest) {
         updateForkStatus(fork.name, 'failed', 'Dashboard restarted during fork before recovery metadata was persisted');
         continue;
       }
-
       const request = parsePersistedForkRequest(fork.forkRequest);
       if (!request) {
         updateForkStatus(fork.name, 'failed', 'Persisted fork request is invalid');
         continue;
       }
-
       const tmuxAlive = await forkSessionExists(fork.tmuxSession);
       const harnessAlive = tmuxAlive && await forkHarnessProcessAlive(fork.tmuxSession);
       const runtimeState = harnessAlive ? forkRuntimeState(fork.tmuxSession)?.state : undefined;
@@ -3060,19 +1779,16 @@ export async function recoverStuckForks(): Promise<number> {
         recovered += 1;
         continue;
       }
-
       if (fork.forkRetryCount >= 2) {
         updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
         continue;
       }
-
       incrementForkRetryCount(fork.name);
       const parentConv = getConversationByName(request.parentConversationName);
       if (!parentConv) {
         updateForkStatus(fork.name, 'failed', `Parent conversation ${request.parentConversationName} not found`);
         continue;
       }
-
       await registerInFlightForkPipeline(runForkPipeline(
         fork.name,
         parentConv,
@@ -3094,10 +1810,8 @@ export async function recoverStuckForks(): Promise<number> {
       updateForkStatus(fork.name, 'failed', message);
     }
   }
-
   return recovered;
 }
-
 const postConversationSummaryForkRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/summary-fork',
@@ -3116,13 +1830,11 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
-
         const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
         const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
         if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
           return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
         }
-
         const model = typeof body['model'] === 'string'
           ? body['model'].trim()
           : undefined;
@@ -3162,7 +1874,6 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         if (handoffAuthorModel && !SAFE_MODEL_PATTERN.test(handoffAuthorModel)) {
           return jsonResponse({ error: 'Invalid handoffAuthorModel' }, { status: 400 });
         }
-
         // Capability gates — the source harness must support the requested
         // fork mode. Plain forks copy raw Claude JSONL and spawn with
         // --resume, so only Claude Code sources work. Source-authored handoff
@@ -3184,25 +1895,19 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
         const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
-
         if (cwd && !(await validateCwdContainment(cwd))) {
           return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
         }
-
         if (typeof body['model'] === 'string' && !model) {
           return jsonResponse({ error: 'model must not be blank' }, { status: 400 });
         }
-
         if (model && !SAFE_MODEL_PATTERN.test(model)) {
           return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
-
         if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {
           return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
         }
-
         const effectiveCwd = cwd || conv.cwd || process.cwd();
-
         // PAN-1624: a handoff whose cwd is not a git work tree spawns a session
         // that immediately dies (no tmux, no launcher dir). Fail loudly here.
         if (forkMode === 'handoff' && !(await isInsideGitWorkTree(effectiveCwd))) {
@@ -3210,11 +1915,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
             error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
           }, { status: 400 });
         }
-
         const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(
           effectiveCwd,
         ));
-
         const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const suffix = randomUUID().slice(0, 4);
         const newName = `${timestamp}-${suffix}`;
@@ -3239,7 +1942,6 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           : forkMode === 'handoff'
             ? handoffTitleFromFocus(handoffFocus, conv.title || conv.name)
             : `Summary Fork: ${conv.title || conv.name}`;
-
         const newConv = createConversation({
           name: newName,
           tmuxSession: newTmux,
@@ -3273,13 +1975,11 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
         setForkRequest(newConv.name, JSON.stringify(forkRequest));
         markConversationActive(newConv.name);
-
         registerInFlightForkPipeline(
           runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
         ).catch((err) => {
           handleForkPipelineFailure(newConv.name, err);
         });
-
         return jsonResponse({
           success: true,
           conversation: newConv,
@@ -3292,15 +1992,12 @@ const postConversationSummaryForkRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/plan-action ────────────────────────
-
 const PLAN_ACTION_KEYSTROKES: Record<string, string> = {
   'approve-auto': '1',
   'approve-manual': '2',
   'reject-ultraplan': '3',
 };
-
 const postConversationPlanActionRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/plan-action',
@@ -3319,10 +2016,8 @@ const postConversationPlanActionRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
-
         const action = typeof body['action'] === 'string' ? body['action'] : '';
         const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
-
         if (action === 'reject-feedback') {
           await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, '4', 'plan-action-reject'));
           if (feedback) {
@@ -3331,12 +2026,10 @@ const postConversationPlanActionRoute = HttpRouter.add(
           }
           return jsonResponse({ ok: true });
         }
-
         const keystroke = PLAN_ACTION_KEYSTROKES[action];
         if (!keystroke) {
           return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
         }
-
         await Effect.runPromise(sendRawKeystroke(conv.tmuxSession, keystroke, `plan-action-${action}`));
         return jsonResponse({ ok: true });
       } catch (error: unknown) {
@@ -3347,14 +2040,11 @@ const postConversationPlanActionRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/diffs ──────────────────────────────
-
 const conversationDiffDependencies = {
   resolveSessionFile,
   getCachedMessages,
 };
-
 const getConversationDiffsRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/diffs',
@@ -3372,9 +2062,7 @@ const getConversationDiffsRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/diffs/full ─────────────────────────
-
 const getConversationDiffFullRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/diffs/full',
@@ -3392,9 +2080,7 @@ const getConversationDiffFullRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/diffs/:turnId ──────────────────────
-
 const getConversationDiffTurnRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/diffs/:turnId',
@@ -3415,13 +2101,11 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: POST /api/conversations/:name/retitle ────────────────────────────
 //
 // Regenerate the conversation title from the *whole* transcript (not just the
 // opening message). This is an explicit user action, so it overrides even a
 // manually-set title and records the new title with source 'ai'.
-
 const postConversationRetitleRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/retitle',
@@ -3439,13 +2123,11 @@ const postConversationRetitleRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Route: GET /api/conversations/:name/about ───────────────────────────────
 //
 // A few-sentence description of what the conversation has been about, derived
 // from the transcript. Cached by transcript size — re-opening the drawer is
 // free until the conversation grows. Pass ?refresh=1 to force regeneration.
-
 const getConversationAboutRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/about',
@@ -3465,9 +2147,7 @@ const getConversationAboutRoute = HttpRouter.add(
     });
   }),
 );
-
 // ─── Compose all routes into a single Layer ───────────────────────────────────
-
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
   getConversationsPendingInputRoute,
@@ -3504,5 +2184,4 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationRetitleRoute,
   getConversationAboutRoute,
 );
-
 export default conversationsRouteLayer;

@@ -13,18 +13,20 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
-  conversationNeedsRunningRepair,
-  conversationSessionAliveFromState,
   getInFlightForkPipelineCount,
-  handleConversationSwitchModel,
   parseSummaryForkFocus,
   readExistingHandoffDoc,
   recoverStuckForks,
   registerInFlightForkPipeline,
-  piConversationSystemPromptFiles,
-  shouldReportUnresolvedLiveSession,
   waitForInFlightForkPipelines,
 } from '../conversations.js';
+import {
+  conversationNeedsRunningRepair,
+  conversationSessionAliveFromState,
+  handleConversationSwitchModel,
+  piConversationSystemPromptFiles,
+  shouldReportUnresolvedLiveSession,
+} from '../../../../lib/overdeck/conversation-runtime.js';
 import {
   clearPendingConversationControlAcksForTests,
   deliverConversationViaControlChannel,

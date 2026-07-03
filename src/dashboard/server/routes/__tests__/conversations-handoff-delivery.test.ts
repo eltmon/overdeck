@@ -36,7 +36,8 @@ vi.mock('../../../../lib/tmux.js', async () => {
   };
 });
 
-import { confirmForkPromptAccepted, isInsideGitWorkTree, waitForPiTuiReady } from '../conversations.js';
+import { confirmForkPromptAccepted } from '../conversations.js';
+import { isInsideGitWorkTree, waitForPiTuiReady } from '../../../../lib/overdeck/conversation-runtime.js';
 
 describe('confirmForkPromptAccepted (PAN-1624)', () => {
   beforeEach(() => {
