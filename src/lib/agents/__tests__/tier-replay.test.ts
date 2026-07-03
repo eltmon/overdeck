@@ -288,7 +288,7 @@ describe('tier replay', () => {
     expect(replaySeams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
   });
 
-  it('uses resolved slot ownership as the replay call-out bead id', async () => {
+  it('suppresses replay call-out curls when real git log entries lack per-commit bead ids', async () => {
     const seams = deps();
 
     await replayCrashedStandingAgent({
@@ -303,8 +303,11 @@ describe('tier replay', () => {
     }, { deps: seams });
 
     expect(seams.listSlotOwnership).toHaveBeenCalledWith('PAN-1791', '/ws');
-    expect(seams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
-    expect(seams.deliveries[0].message).toContain('"beadId":"bead-a"');
+    expect(seams.deliveries).toHaveLength(2);
+    expect(seams.deliveries[0].message).not.toContain('http://api.test/api/tiered/callouts');
+    expect(seams.deliveries[1].message).not.toContain('http://api.test/api/tiered/callouts');
+    expect(seams.deliveries[0].message).toContain('Do NOT respond to this message');
+    expect(seams.deliveries[1].message).toContain('Do NOT respond to this message');
   });
 
   it('decommissions a tier during compaction and crash replay when reroute removes it from the remaining schedule', async () => {

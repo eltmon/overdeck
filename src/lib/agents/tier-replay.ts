@@ -302,7 +302,7 @@ async function replayTierFeed(
   const includeCallout = feedConfig.callouts !== 'off';
   const apiUrl = target.apiUrl ?? resolveFeedApiUrl();
   for (const commit of commits) {
-    const beadId = commit.beadId ?? target.slotItemId;
+    const beadId = commit.beadId;
     const message = composeCommitFeedMessage(
       commit.sha,
       commit.subject,
