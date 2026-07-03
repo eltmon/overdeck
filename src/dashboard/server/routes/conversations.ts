@@ -26,11 +26,16 @@ import { promisify } from 'node:util';
 
 import { readLauncherPinnedSessionId, resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
-import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
+import {
+  archiveConversationByName,
+  handleArchivedConversationsList,
+  parseArchivedConversationListOptions,
+  unarchiveConversationByName,
+} from '../../../lib/overdeck/conversation-archive.js';
 import {
   getConversationDiffs,
   getConversationDiffFull,
@@ -44,7 +49,6 @@ import * as Multipart from 'effect/unstable/http/Multipart';
 import {
   listConversations,
   getConversationLedgerCosts,
-  listArchivedConversationsWithEnrichment,
   getStuckForks,
   incrementForkRetryCount,
   getConversationByName,
@@ -75,8 +79,6 @@ import {
   updateForkStatus,
   updateSpawnError,
   hasOtherActiveConversationOnTmuxSession,
-  type ArchivedConversationListOptions,
-  type ArchivedConversationWithEnrichment,
   type LegacyConversation as Conversation,
   type ForkRequest,
 } from '../../../lib/overdeck/conversations.js';
@@ -2296,119 +2298,6 @@ interface ConversationAboutSummary {
 const aboutSummaryCache = new Map<string, { transcriptSize: number; data: ConversationAboutSummary }>();
 const ABOUT_SUMMARY_CACHE_MAX = 100;
 
-type ArchivedConversationResponse = {
-  id: number;
-  source: 'managed-archived';
-  conversationName: string;
-  harness: ArchivedConversationWithEnrichment['harness'];
-  jsonlPath: string | null;
-  workspacePath: string;
-  primaryModel: string | null;
-  messageCount: number;
-  firstTs: string;
-  lastTs: string;
-  estimatedCost: number;
-  tokenInput: number;
-  tokenOutput: number;
-  toolsUsed: string[];
-  filesTouched: string[];
-  tags: string[];
-  summary: string | null;
-  enrichmentLevel: 0 | 1 | 2 | 3;
-  enrichmentFailed: boolean;
-  overdeckManaged: true;
-  panIssueId: string | null;
-  archivedAt: string;
-};
-
-function parseStringArrayColumn(value: string | null): string[] {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
-  const canUseClaudePathFallback = row.harness === null || row.harness === 'claude-code';
-  return {
-    id: row.id,
-    source: 'managed-archived',
-    conversationName: row.name,
-    harness: row.harness,
-    jsonlPath: row.discoveredJsonlPath ?? (canUseClaudePathFallback && row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
-    workspacePath: row.cwd,
-    primaryModel: row.primaryModel ?? row.model,
-    messageCount: row.messageCount ?? 0,
-    firstTs: row.firstTs ?? row.createdAt,
-    lastTs: row.lastTs ?? row.archivedAt,
-    estimatedCost: row.estimatedCost ?? row.totalCost,
-    tokenInput: row.tokenInput ?? 0,
-    tokenOutput: row.tokenOutput ?? 0,
-    toolsUsed: parseStringArrayColumn(row.toolsUsed),
-    filesTouched: parseStringArrayColumn(row.filesTouched),
-    tags: parseStringArrayColumn(row.tags),
-    summary: row.summary ?? row.title,
-    enrichmentLevel: ((row.enrichmentLevel ?? 0) as 0 | 1 | 2 | 3),
-    enrichmentFailed: Boolean(row.enrichmentFailed),
-    overdeckManaged: true,
-    panIssueId: row.issueId,
-    archivedAt: row.archivedAt,
-  };
-}
-
-function parseOptionalNumberParam(params: URLSearchParams, name: string): number | undefined {
-  const value = params.get(name);
-  if (value === null) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-export function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
-  const options: ArchivedConversationListOptions = {};
-  const workspacePath = params.get('workspacePath');
-  const harness = params.get('harness');
-  const primaryModel = params.get('primaryModel');
-  const since = params.get('since');
-  const tag = params.get('tag');
-  const tool = params.get('tool');
-  const file = params.get('file');
-  const minCost = parseOptionalNumberParam(params, 'minCost');
-  const maxCost = parseOptionalNumberParam(params, 'maxCost');
-  const enrichmentLevel = parseOptionalNumberParam(params, 'enrichmentLevel');
-  const rawLimit = parseOptionalNumberParam(params, 'limit');
-  const rawOffset = parseOptionalNumberParam(params, 'offset');
-
-  if (workspacePath) options.workspacePath = workspacePath;
-  if (harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex') options.harness = harness;
-  if (primaryModel) options.primaryModel = primaryModel;
-  if (since) options.since = parseRelativeTime(since);
-  if (params.get('managed') === 'true') options.managed = true;
-  if (params.get('enriched') === 'true') options.enriched = true;
-  if (tag) options.tags = [tag];
-  if (tool) options.tools = [tool];
-  if (file) options.files = [file];
-  if (minCost !== undefined) options.minCost = minCost;
-  if (maxCost !== undefined) options.maxCost = maxCost;
-  if (enrichmentLevel !== undefined) options.enrichmentLevel = enrichmentLevel;
-  options.limit = rawLimit === undefined ? 50 : Math.min(Math.max(rawLimit, 0), 100);
-  if (rawOffset !== undefined) options.offset = Math.max(rawOffset, 0);
-  return options;
-}
-
-export async function handleArchivedConversationsList(options: ArchivedConversationListOptions = {}): Promise<ReturnType<typeof jsonResponse>> {
-  try {
-    const rows = listArchivedConversationsWithEnrichment(options).map(mapArchivedConversation);
-    return jsonResponse(rows);
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[conversations] list archived conversations failed:', msg);
-    return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
 /** PAN-1520/PAN-1705 — build the AskUserQuestion snapshot from a pending-input
@@ -2744,7 +2633,10 @@ const getArchivedConversationsRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const url = new URL(request.url, 'http://localhost');
-    return yield* Effect.promise(() => handleArchivedConversationsList(parseArchivedConversationListOptions(url.searchParams)));
+    return yield* Effect.promise(async () => {
+      const response = await handleArchivedConversationsList(parseArchivedConversationListOptions(url.searchParams));
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
+    });
   }),
 );
 
@@ -3846,6 +3738,12 @@ const deleteConversationRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/archive ───────────────────────────
 
+const conversationArchiveDependencies = {
+  stopConversationRuntime,
+  invalidateFavoritesCache,
+  cleanupConversationAttachments,
+};
+
 const postConversationArchiveRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/archive',
@@ -3858,32 +3756,8 @@ const postConversationArchiveRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        if (conv.archivedAt) {
-          return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
-        }
-
-        await stopConversationRuntime(conv, name);
-
-        // Mark as ended and archived, unfavorite if starred
-        markConversationEnded(name);
-        archiveConversation(name);
-        removeFavorite('conversation', name);
-        invalidateFavoritesCache();
-        // Unconditionally remove all attachments — archiving is permanent and
-        // unsent paste uploads should not leak.
-        await cleanupConversationAttachments(name);
-
-        return jsonResponse({ success: true });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] archive conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await archiveConversationByName(name, conversationArchiveDependencies);
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
 );
@@ -3902,22 +3776,8 @@ const postConversationUnarchiveRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        if (!conv.archivedAt) {
-          return jsonResponse({ error: 'Conversation is not archived' }, { status: 400 });
-        }
-
-        unarchiveConversation(name);
-        return jsonResponse({ success: true });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] unarchive conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await unarchiveConversationByName(name);
+      return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
     });
   }),
 );
