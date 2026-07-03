@@ -16,7 +16,7 @@ import {
   type DeaconConfig,
   type DeaconState,
 } from '../../../src/lib/cloister/deacon.js';
-import { existsSync, unlinkSync, mkdirSync } from 'fs';
+import { existsSync, unlinkSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { OVERDECK_HOME } from '../../../src/lib/paths.js';
 
@@ -154,6 +154,35 @@ describe('Deacon State Management', () => {
     expect(final.specialists['merge-agent']).toBeDefined();
   });
 
+  it('does not let an older patrol heartbeat clobber a newer persisted heartbeat', () => {
+    const first: DeaconState = {
+      specialists: {},
+      patrolCycle: 11,
+      recentDeaths: [],
+      lastPatrol: '2026-07-03T05:44:06.000Z',
+    };
+    saveState(first);
+
+    const staleEndOfCycle: DeaconState = {
+      specialists: {},
+      patrolCycle: 10,
+      recentDeaths: [],
+      lastPatrol: '2026-07-03T05:43:06.000Z',
+      containerRestarts: {
+        workspace: {
+          count: 1,
+          firstRestart: '2026-07-03T05:43:10.000Z',
+          lastRestart: '2026-07-03T05:43:10.000Z',
+        },
+      },
+    };
+    saveState(staleEndOfCycle);
+
+    const loaded = loadState();
+    expect(loaded.lastPatrol).toBe('2026-07-03T05:44:06.000Z');
+    expect(loaded.containerRestarts?.workspace?.count).toBe(1);
+  });
+
   it('clears persisted lastPatrol for dashboard startup without losing state', () => {
     const state: DeaconState = {
       specialists: {
@@ -176,6 +205,13 @@ describe('Deacon State Management', () => {
     expect(loaded.patrolCycle).toBe(7);
     expect(loaded.recentDeaths).toEqual(['2026-06-24T08:00:00.000Z']);
     expect(loaded.specialists['review-agent']).toEqual(state.specialists['review-agent']);
+  });
+
+  it('schedules patrol ticks through the in-flight guard', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
+    expect(source).toContain('const deaconPatrolGuard = createInFlightGuard();');
+    expect(source).toContain("runScheduledPatrol('interval');");
+    expect(source).toContain("patrol ${source} skipped — previous patrol still in flight");
   });
 });
 
