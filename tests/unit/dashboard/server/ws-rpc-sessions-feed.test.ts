@@ -4,7 +4,7 @@ import { Schema } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import { SessionsFeedFacetsSnapshot, SessionsFeedRowSnapshot, WS_METHODS } from '@overdeck/contracts';
-import { toSessionsFeedRowSnapshot } from '../../../../src/dashboard/server/ws-rpc.js';
+import { toSessionsFeedRowSnapshot } from '../../../../src/dashboard/server/sessions-feed-rpc.js';
 import type { SessionsFeedRow } from '../../../../src/lib/overdeck/sessions-feed.js';
 
 describe('sessions feed websocket RPC contracts', () => {

@@ -32,7 +32,6 @@ import { CostThresholdError } from '../../lib/conversations/enrichment/index.js'
 import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
-import type { SessionsFeedFilter, SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
@@ -40,6 +39,8 @@ import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from '
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
+import { sessionsFeedRpcHandlers } from './sessions-feed-rpc.js';
+import { toDiscoveredSessionSnapshot } from './discovered-session-rpc.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -416,73 +417,6 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
   return null;
 }
 
-function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
-  return {
-    id: session.id, jsonlPath: session.jsonlPath,
-    harness: session.harness,
-    sessionId: session.sessionId ?? undefined,
-    workspacePath: session.workspacePath ?? undefined,
-    workspaceHash: session.workspaceHash ?? undefined,
-    messageCount: session.messageCount,
-    firstTs: session.firstTs ?? undefined,
-    lastTs: session.lastTs ?? undefined,
-    modelsUsed: session.modelsUsed,
-    primaryModel: session.primaryModel ?? undefined,
-    tokenInput: session.tokenInput,
-    tokenOutput: session.tokenOutput,
-    estimatedCost: session.estimatedCost,
-    toolsUsed: session.toolsUsed,
-    filesTouched: session.filesTouched,
-    tags: session.tags,
-    summary: session.summary ?? undefined,
-    summaryDetailed: session.summaryDetailed ?? undefined,
-    conversationId: session.conversationId ?? undefined,
-    conversationName: session.conversationName ?? undefined,
-    conversationTitle: session.conversationTitle ?? undefined,
-    enrichmentLevel: session.enrichmentLevel,
-    enrichmentModel: session.enrichmentModel ?? undefined,
-    enrichedAt: session.enrichedAt ?? undefined,
-    enrichmentFailed: session.enrichmentFailed,
-    overdeckManaged: session.overdeckManaged,
-    panIssueId: session.panIssueId ?? undefined,
-    panAgentId: session.panAgentId ?? undefined,
-    scannedAt: session.scannedAt,
-  };
-}
-
-function optional<T>(value: T | null | undefined): T | undefined {
-  return value ?? undefined;
-}
-
-export function toSessionsFeedRowSnapshot(row: SessionsFeedRow) {
-  return {
-    id: row.id,
-    source: row.source,
-    discoveredId: optional(row.discoveredId),
-    jsonlPath: optional(row.jsonlPath),
-    sessionId: optional(row.sessionId),
-    workspacePath: optional(row.workspacePath),
-    messageCount: row.messageCount,
-    firstTs: optional(row.firstTs),
-    lastTs: optional(row.lastTs),
-    primaryModel: optional(row.primaryModel),
-    tokenInput: row.tokenInput,
-    tokenOutput: row.tokenOutput,
-    estimatedCost: row.estimatedCost,
-    tags: row.tags,
-    summary: optional(row.summary),
-    enrichmentLevel: row.enrichmentLevel,
-    enrichmentFailed: row.enrichmentFailed,
-    overdeckManaged: row.overdeckManaged,
-    panIssueId: optional(row.panIssueId),
-    archivedAt: optional(row.archivedAt),
-    conversationId: optional(row.conversationId),
-    conversationName: optional(row.conversationName),
-    conversationTitle: optional(row.conversationTitle),
-    harness: optional(row.harness),
-  };
-}
-
 const DEFAULT_CONVERSATION_LIMIT = 50;
 const MAX_CONVERSATION_LIMIT = 500;
 
@@ -573,38 +507,6 @@ function normalizeConversationFilter(input: {
     notEnriched: input.notEnriched,
     limit: input.limit,
     offset: input.offset,
-  };
-}
-
-function normalizeSessionsFeedFilter(input: {
-  readonly harness?: string;
-  readonly workspacePath?: string;
-  readonly primaryModel?: string;
-  readonly managed?: boolean;
-  readonly unmanaged?: boolean;
-  readonly since?: string;
-  readonly before?: string;
-  readonly after?: string;
-  readonly minCost?: number;
-  readonly maxCost?: number;
-  readonly minMessages?: number;
-  readonly tags?: readonly string[];
-  readonly tools?: readonly string[];
-  readonly files?: readonly string[];
-  readonly issueId?: string;
-  readonly enrichmentLevel?: number;
-  readonly enriched?: boolean;
-  readonly notEnriched?: boolean;
-  readonly limit?: number;
-  readonly offset?: number;
-  readonly cursor?: string;
-  readonly source?: SessionsFeedFilter['source'];
-}): SessionsFeedFilter {
-  return {
-    ...normalizeConversationFilter(input),
-    ...normalizeConversationPagination(input.limit, input.offset),
-    cursor: input.cursor,
-    source: input.source,
   };
 }
 
@@ -1253,23 +1155,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           return { sessions: sessions.map(toDiscoveredSessionSnapshot), count: sessions.length, total };
         }),
 
-      [WS_METHODS.listSessionsFeed]: (input) =>
-        Effect.promise(async () => {
-          const result = await runDashboardDbJob<{ rows: SessionsFeedRow[]; nextCursor: string | null }>(
-            'listSessionsFeed',
-            normalizeSessionsFeedFilter(input),
-          );
-          return {
-            rows: result.rows.map(toSessionsFeedRowSnapshot),
-            nextCursor: result.nextCursor,
-          };
-        }),
-
-      [WS_METHODS.getSessionsFeedFacets]: (input) =>
-        Effect.promise(async () => runDashboardDbJob(
-          'getSessionsFeedFacets',
-          normalizeSessionsFeedFilter(input),
-        )),
+      ...sessionsFeedRpcHandlers,
 
       [WS_METHODS.getDiscoveredSession]: (input) =>
         Effect.promise(async () => {

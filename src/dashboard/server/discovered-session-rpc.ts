@@ -1,0 +1,35 @@
+import type { DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
+
+export function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
+  return {
+    id: session.id, jsonlPath: session.jsonlPath,
+    harness: session.harness,
+    sessionId: session.sessionId ?? undefined,
+    workspacePath: session.workspacePath ?? undefined,
+    workspaceHash: session.workspaceHash ?? undefined,
+    messageCount: session.messageCount,
+    firstTs: session.firstTs ?? undefined,
+    lastTs: session.lastTs ?? undefined,
+    modelsUsed: session.modelsUsed,
+    primaryModel: session.primaryModel ?? undefined,
+    tokenInput: session.tokenInput,
+    tokenOutput: session.tokenOutput,
+    estimatedCost: session.estimatedCost,
+    toolsUsed: session.toolsUsed,
+    filesTouched: session.filesTouched,
+    tags: session.tags,
+    summary: session.summary ?? undefined,
+    summaryDetailed: session.summaryDetailed ?? undefined,
+    conversationId: session.conversationId ?? undefined,
+    conversationName: session.conversationName ?? undefined,
+    conversationTitle: session.conversationTitle ?? undefined,
+    enrichmentLevel: session.enrichmentLevel,
+    enrichmentModel: session.enrichmentModel ?? undefined,
+    enrichedAt: session.enrichedAt ?? undefined,
+    enrichmentFailed: session.enrichmentFailed,
+    overdeckManaged: session.overdeckManaged,
+    panIssueId: session.panIssueId ?? undefined,
+    panAgentId: session.panAgentId ?? undefined,
+    scannedAt: session.scannedAt,
+  };
+}
