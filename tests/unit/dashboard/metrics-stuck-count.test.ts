@@ -23,6 +23,7 @@ const mockGetCloisterService = vi.fn(() => ({
 
 vi.mock('../../../src/lib/cloister/service.js', () => ({
   getCloisterService: (...args: unknown[]) => mockGetCloisterService(...args),
+  readCloisterStateFile: vi.fn(() => ({ running: false })),
 }));
 
 const mockListRunningAgents = vi.fn();
