@@ -14,8 +14,8 @@
     }
   ],
   "feedback": [],
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "perf-baseline": "completed",
     "conversation-identity": "completed",
@@ -70,95 +70,18 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T17:07:20.639Z",
-    "reviewNotes": "No blocking findings in self-review",
-    "testNotes": "Reconciled from green GitHub Actions CI on a87cd991: Mintlify Deployment (https://github.com/eltmon/overdeck/runs/85043244885)",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T19:50:54.503Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-03T19:47:15.809Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
-    "reviewedAtCommit": "a87cd9911ad90cfff64283bf1f2e46abc90aa258",
-    "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
-    "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        ".pan/records/pan-1917.json",
-        "src/dashboard/frontend/src/App.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
-        "src/dashboard/server/services/dashboard-db-task.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
-        "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx"
-      ],
-      "declaredScope": [
-        ".pan/drafts/pan-1917.md",
-        "packages/contracts/src/rpc.ts",
-        "packages/contracts/src/types.ts",
-        "src/dashboard/frontend/src/App.tsx",
-        "src/dashboard/frontend/src/App/AppRoutes.tsx",
-        "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
-        "src/dashboard/frontend/src/App/routes.ts",
-        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
-        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
-        "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
-        "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/feedPages.ts",
-        "src/dashboard/server/routes/discovered-sessions.ts",
-        "src/dashboard/server/services/dashboard-db-worker.ts",
-        "src/dashboard/server/ws-rpc.ts",
-        "src/lib/overdeck/discovered-sessions.ts",
-        "src/lib/overdeck/sessions-feed.ts",
-        "tests/bench/sessions-feed.bench.ts",
-        "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
-        "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
-        "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
-        "tests/unit/lib/overdeck/discovered-sessions.test.ts",
-        "tests/unit/lib/overdeck/sessions-feed.test.ts"
-      ],
-      "actualChangedFiles": [
-        ".pan/drafts/pan-1917.md",
-        ".pan/records/pan-1917.json",
-        "packages/contracts/src/rpc.ts",
-        "packages/contracts/src/types.ts",
-        "src/dashboard/frontend/src/App.test.tsx",
-        "src/dashboard/frontend/src/App.tsx",
-        "src/dashboard/frontend/src/App/AppRoutes.tsx",
-        "src/dashboard/frontend/src/App/routes.ts",
-        "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
-        "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
-        "src/dashboard/frontend/src/components/conversations/ScanButton.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
-        "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTable.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx",
-        "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts",
-        "src/dashboard/frontend/src/components/conversations/feedPages.ts",
-        "src/dashboard/server/routes/discovered-sessions.ts",
-        "src/dashboard/server/services/dashboard-db-task.ts",
-        "src/dashboard/server/services/dashboard-db-worker.ts",
-        "src/dashboard/server/ws-rpc.ts",
-        "src/lib/overdeck/discovered-sessions.ts",
-        "src/lib/overdeck/sessions-feed.ts",
-        "tests/bench/sessions-feed.bench.ts",
-        "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
-        "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl",
-        "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
-        "tests/unit/lib/overdeck/discovered-sessions.test.ts",
-        "tests/unit/lib/overdeck/sessions-feed.test.ts"
-      ],
-      "recordedAt": "2026-07-03T07:20:30.593Z"
-    }
+    "reviewedAtCommit": "7d290b1b37312bad486d41d53f53887bc0faa1b1",
+    "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c"
   },
   "closeOut": {
     "usage": {
@@ -232,7 +155,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.223207,
-        "pricingAsOf": "2026-07-03T17:07:20.966Z"
+        "pricingAsOf": "2026-07-03T19:50:54.979Z"
       }
     },
     "merges": [
@@ -266,5 +189,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T17:07:20.998Z"
+  "updated": "2026-07-03T19:50:54.992Z"
 }
