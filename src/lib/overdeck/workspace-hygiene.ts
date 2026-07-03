@@ -11,17 +11,15 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
-import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
-import { extractPrefixSync, parseIssueIdSync } from '../issue-id.js';
+import { parseIssueIdSync } from '../issue-id.js';
 import { operatorInterventionEvent } from '../operator-interventions.js';
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { getAgentState } from '../agents.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import {
   getIssueForCleanup,
   isOrphanedIssue,
   runDestructiveIssueLifecycle,
 } from './issue-transitions.js';
+import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 const execAsync = promisify(exec);
 
@@ -32,59 +30,6 @@ type EventStoreLike = {
 
 function getIssueDataService() {
   return getSharedIssueService();
-}
-
-function isGitHubIssue(issueId: string): {
-  isGitHub: boolean;
-  owner?: string;
-  repo?: string;
-  number?: number;
-} {
-  const resolved = resolveGitHubIssueSync(issueId);
-  if (resolved.isGitHub) {
-    return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
-  }
-  return { isGitHub: false };
-}
-
-function getGitHubLocalPaths(): Record<string, string> {
-  const ghConfig = getGitHubConfig();
-  if (!ghConfig) return {};
-  const out: Record<string, string> = {};
-  for (const r of ghConfig.repos) {
-    const localPath = (r as { localPath?: unknown }).localPath;
-    if (typeof localPath === 'string') {
-      out[`${r.owner}/${r.repo}`] = localPath;
-    }
-  }
-  return out;
-}
-
-function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
-  if (issuePrefix) {
-    const issueId = `${issuePrefix}-1`;
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (resolved) return resolved.projectPath;
-  }
-  if (issuePrefix) {
-    const config = getGitHubConfig();
-    if (config) {
-      for (const { owner, repo, prefix } of config.repos) {
-        const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
-        if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
-          const possiblePaths = [
-            join(homedir(), 'Projects', repo),
-            join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
-            join(homedir(), 'Projects', owner, repo),
-          ];
-          for (const path of possiblePaths) {
-            if (existsSync(path)) return path;
-          }
-        }
-      }
-    }
-  }
-  return join(homedir(), 'Projects');
 }
 
 export async function cleanupAgentStateDirs(dirs: string[]): Promise<void> {
@@ -110,19 +55,7 @@ export async function cleanupWorkspaceForIssue(rawId: string, eventStore: EventS
   const cleanupLog: string[] = [];
 
   const issueLower = id.toLowerCase();
-  const githubCheck = isGitHubIssue(id);
-
-  let projectRoot: string | null = null;
-  if (githubCheck.isGitHub) {
-    const localPaths = getGitHubLocalPaths();
-    const repoKey = `${githubCheck.owner}/${githubCheck.repo}`;
-    projectRoot = localPaths[repoKey] || null;
-  }
-  if (!projectRoot) {
-    const teamPrefix = extractTeamPrefix(id);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
-    projectRoot = projectConfig?.path || null;
-  }
+  const projectRoot = resolveIssueProjectPathSync(id) || null;
 
   // Git worktree/workspace and agent dir cleanup (all async with meaningful branching on error)
   if (projectRoot) {
@@ -268,16 +201,7 @@ export async function copySettingsToWorkspace(id: string): Promise<HttpServerRes
     return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
   }
 
-  const githubCheck = isGitHubIssue(id);
-  let projectPath = '';
-  if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-    const localPaths = getGitHubLocalPaths();
-    projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-  }
-  if (!projectPath) {
-    const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
-    try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
-  }
+  const projectPath = resolveIssueProjectPathSync(id);
 
   const workspacePath = projectPath
     ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)

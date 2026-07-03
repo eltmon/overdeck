@@ -25,6 +25,7 @@ import { killSession, sessionExists } from '../tmux.js';
 import type { CreateBeadsResult } from '../vbrief/beads.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../vbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../vbrief/quality-lint.js';
+import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -444,17 +445,7 @@ export async function completePlanningForIssue(options: {
 
     // Determine project path
     const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const teamPrefix = extractTeamPrefix(id);
-      const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
-      projectPath = projectConfig?.path || '';
-    }
+    const projectPath = resolveIssueProjectPathSync(id);
 
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
     if (workspacePath) {

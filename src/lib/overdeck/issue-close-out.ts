@@ -1,7 +1,3 @@
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-
 import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
@@ -9,14 +5,14 @@ import { getReviewStatusSync } from '../../dashboard/server/review-status.js';
 import type { IssueDataService } from '../../dashboard/server/services/issue-data-service.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { EventStoreService } from '../../dashboard/server/services/domain-services.js';
-import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
+import { getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../lifecycle/types.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getAgentState, normalizeAgentId } from '../agents.js';
-import { extractPrefixSync } from '../issue-id.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
+import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 function getIssueDataService(): IssueDataService {
   return getSharedIssueService();
@@ -33,46 +29,6 @@ function isGitHubIssue(issueId: string): {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
   return { isGitHub: false };
-}
-
-function getGitHubLocalPaths(): Record<string, string> {
-  const ghConfig = getGitHubConfig();
-  if (!ghConfig) return {};
-  const out: Record<string, string> = {};
-  for (const r of ghConfig.repos) {
-    const localPath = (r as { localPath?: unknown }).localPath;
-    if (typeof localPath === 'string') {
-      out[`${r.owner}/${r.repo}`] = localPath;
-    }
-  }
-  return out;
-}
-
-function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
-  if (issuePrefix) {
-    const issueId = `${issuePrefix}-1`;
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (resolved) return resolved.projectPath;
-  }
-  if (issuePrefix) {
-    const config = getGitHubConfig();
-    if (config) {
-      for (const { owner, repo, prefix } of config.repos) {
-        const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
-        if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
-          const possiblePaths = [
-            join(homedir(), 'Projects', repo),
-            join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
-            join(homedir(), 'Projects', owner, repo),
-          ];
-          for (const path of possiblePaths) {
-            if (existsSync(path)) return path;
-          }
-        }
-      }
-    }
-  }
-  return join(homedir(), 'Projects');
 }
 
 function buildCloseOutContext(id: string): LifecycleContext | null {
@@ -315,18 +271,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
       }
 
       const githubCheck = isGitHubIssue(id);
-      let projectPath = '';
-
-      if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-        const localPaths = getGitHubLocalPaths();
-        projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-      }
-      if (!projectPath) {
-        const issuePrefix = extractPrefixSync(id);
-        if (issuePrefix) {
-          projectPath = getProjectPath(undefined, issuePrefix);
-        }
-      }
+      const projectPath = resolveIssueProjectPathSync(id);
       if (!projectPath) {
         tasks.push({ id, skipped: true, error: `Could not resolve project path for ${id}` });
         continue;

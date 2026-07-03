@@ -11,7 +11,6 @@
 1413 src/dashboard/server/routes/command-deck.ts
 5306 src/dashboard/server/routes/conversations.ts
 1005 src/dashboard/server/routes/flywheel.ts
-1029 src/dashboard/server/routes/issues.ts
 1149 src/dashboard/server/routes/settings.ts
 1753 src/dashboard/server/routes/workspaces.ts
 1924 src/dashboard/server/routes/workspaces/merge-ops.ts

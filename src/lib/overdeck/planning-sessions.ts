@@ -28,6 +28,7 @@ import { saveAgentStateAndEmitEventProgram } from '../../dashboard/server/servic
 import { TrackerApiError } from '../../dashboard/server/services/typed-errors.js';
 import type { GitHubClientError, GitHubClientShape, GitHubIssue } from '../../dashboard/server/services/github-client.js';
 import { buildChildStoriesFromRally } from './task-generation.js';
+import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -466,16 +467,7 @@ export function abortPlanningForIssue(options: {
     if (deleteWorkspace && issueIdentifier) {
       const wipeResult = yield* Effect.promise(async (): Promise<{ deleted: boolean; error?: string }> => {
         try {
-          let projectPath: string | undefined;
-          if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-            const localPaths = getGitHubLocalPaths();
-            projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-          }
-          if (!projectPath) {
-            const prefix = extractPrefixSync(issueIdentifier!) ?? issueIdentifier!.split('-')[0].toUpperCase();
-            const projConfig = findProjectByTeamSync(prefix);
-            if (projConfig) projectPath = projConfig.path;
-          }
+          const projectPath = resolveIssueProjectPathSync(issueIdentifier!) || undefined;
 
           if (projectPath) {
             const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${issueIdentifier!.toLowerCase()}`);
@@ -541,16 +533,7 @@ export function restartFromPlan(options: {
     const issueLower = id.toLowerCase();
 
     // 1. Resolve workspace path
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
-      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
-    }
+    const projectPath = resolveIssueProjectPathSync(id);
 
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
@@ -764,16 +747,7 @@ export function getPlanningState(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
 
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const issuePrefix = extractPrefixSync(id) ?? id.split('-')[0];
-      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
-    }
+    const projectPath = resolveIssueProjectPathSync(id);
 
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
