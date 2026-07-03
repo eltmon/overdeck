@@ -137,21 +137,150 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T12:24:36.096Z"
+    },
+    {
+      "timestamp": "2026-07-03T12:30:36.828Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".pan/drafts/PAN-2148.md",
+      ".pan/records/pan-2148.json",
+      "src/dashboard/server/routes/__tests__/issues-rally-children.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/pan-dir/retire-continues-modules.test.ts"
+    ],
+    "declaredScope": [
+      "eslint-any-allowlist.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts",
+      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/lib/overdeck/discussions.ts",
+      "src/lib/overdeck/issue-close-out.ts",
+      "src/lib/overdeck/issue-reads.ts",
+      "src/lib/overdeck/issue-transitions.ts",
+      "src/lib/overdeck/planning-promotion.ts",
+      "src/lib/overdeck/planning-sessions.ts",
+      "src/lib/overdeck/pull-requests.ts",
+      "src/lib/overdeck/task-generation.ts",
+      "src/lib/overdeck/workspace-hygiene.ts",
+      "src/lib/reconstruct/reconstruct-cache.ts",
+      "tests/dashboard/issues-cleanup.test.ts",
+      "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+      "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/lib/pan-dir/retire-continues-modules.test.ts",
+      "tests/unit/lib/reconstruct/no-loss-superset.test.ts",
+      "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".pan/drafts/PAN-2148.md",
+      ".pan/records/pan-2148.json",
+      "eslint-any-allowlist.json",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts",
+      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/dashboard/server/routes/__tests__/issues-rally-children.test.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/lib/overdeck/discussions.ts",
+      "src/lib/overdeck/issue-close-out.ts",
+      "src/lib/overdeck/issue-reads.ts",
+      "src/lib/overdeck/issue-transitions.ts",
+      "src/lib/overdeck/planning-promotion.ts",
+      "src/lib/overdeck/planning-sessions.ts",
+      "src/lib/overdeck/pull-requests.ts",
+      "src/lib/overdeck/task-generation.ts",
+      "src/lib/overdeck/workspace-hygiene.ts",
+      "src/lib/reconstruct/reconstruct-cache.ts",
+      "tests/dashboard/issues-cleanup.test.ts",
+      "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+      "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/lib/reconstruct/no-loss-superset.test.ts",
+      "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+    ],
+    "recordedAt": "2026-07-03T12:29:10.111Z"
+  },
   "created": "2026-07-03T02:32:35.471Z",
-  "updated": "2026-07-03T12:29:03.267Z",
+  "updated": "2026-07-03T12:30:57.587Z",
   "pipeline": {
     "issueId": "PAN-2148",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T12:28:15.571Z",
-    "inspectNotes": "Spec fidelity passed: added issues no-loss audit test for the 29 route method/path pairs from the PAN-2148 PRD, and the live regex enumeration matches 29 routes. Constraint compliance passed: the test follows the sanctioned source-introspection pattern, no delay/retry fake-timer requirement applies, no destructive endpoint is invoked, routes/issues.ts is under 1000 lines, door modules are under 1000 lines, baseline no longer carries routes/issues.ts, and routes/issues.js remains referenced only by server.ts."
+    "updatedAt": "2026-07-03T12:30:57.507Z",
+    "inspectNotes": "Spec fidelity passed: added issues no-loss audit test for the 29 route method/path pairs from the PAN-2148 PRD, and the live regex enumeration matches 29 routes. Constraint compliance passed: the test follows the sanctioned source-introspection pattern, no delay/retry fake-timer requirement applies, no destructive endpoint is invoked, routes/issues.ts is under 1000 lines, door modules are under 1000 lines, baseline no longer carries routes/issues.ts, and routes/issues.js remains referenced only by server.ts.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2299",
+    "reviewRequestedAt": "2026-07-03T12:30:36.829Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".pan/drafts/PAN-2148.md",
+        ".pan/records/pan-2148.json",
+        "src/dashboard/server/routes/__tests__/issues-rally-children.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "tests/unit/lib/pan-dir/retire-continues-modules.test.ts"
+      ],
+      "declaredScope": [
+        "eslint-any-allowlist.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts",
+        "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/lib/overdeck/discussions.ts",
+        "src/lib/overdeck/issue-close-out.ts",
+        "src/lib/overdeck/issue-reads.ts",
+        "src/lib/overdeck/issue-transitions.ts",
+        "src/lib/overdeck/planning-promotion.ts",
+        "src/lib/overdeck/planning-sessions.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "src/lib/overdeck/task-generation.ts",
+        "src/lib/overdeck/workspace-hygiene.ts",
+        "src/lib/reconstruct/reconstruct-cache.ts",
+        "tests/dashboard/issues-cleanup.test.ts",
+        "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/lib/pan-dir/retire-continues-modules.test.ts",
+        "tests/unit/lib/reconstruct/no-loss-superset.test.ts",
+        "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".pan/drafts/PAN-2148.md",
+        ".pan/records/pan-2148.json",
+        "eslint-any-allowlist.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/__tests__/auto-promote-chain.integration.test.ts",
+        "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+        "src/dashboard/server/routes/__tests__/issues-rally-children.test.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/lib/overdeck/discussions.ts",
+        "src/lib/overdeck/issue-close-out.ts",
+        "src/lib/overdeck/issue-reads.ts",
+        "src/lib/overdeck/issue-transitions.ts",
+        "src/lib/overdeck/planning-promotion.ts",
+        "src/lib/overdeck/planning-sessions.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "src/lib/overdeck/task-generation.ts",
+        "src/lib/overdeck/workspace-hygiene.ts",
+        "src/lib/reconstruct/reconstruct-cache.ts",
+        "tests/dashboard/issues-cleanup.test.ts",
+        "tests/unit/dashboard/routes/issues-no-loss.test.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/lib/reconstruct/no-loss-superset.test.ts",
+        "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+      ],
+      "recordedAt": "2026-07-03T12:29:10.111Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -166,16 +295,16 @@
         },
         "inspect": {
           "openai/gpt-5.5": {
-            "input": 1074952,
-            "output": 61324,
-            "cacheRead": 11242496,
+            "input": 1083346,
+            "output": 63374,
+            "cacheRead": 11564032,
             "cacheWrite": 0
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 21613,
-            "output": 466,
+            "input": 25688,
+            "output": 1010,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -197,27 +326,29 @@
           "cacheWrite": 432361
         },
         "openai/gpt-5.5": {
-          "input": 1074952,
-          "output": 61324,
-          "cacheRead": 11242496,
+          "input": 1083346,
+          "output": 63374,
+          "cacheRead": 11564032,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 21613,
-          "output": 466,
+          "input": 25688,
+          "output": 1010,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 42.703663999999996,
-        "pricingAsOf": "2026-07-03T12:28:15.610Z"
+        "usd": 42.967902,
+        "pricingAsOf": "2026-07-03T12:30:57.586Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2299"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.5",
   "statusOverrides": {
     "wi-9-no-loss-audit": "completed",
