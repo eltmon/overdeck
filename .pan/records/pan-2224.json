@@ -1,23 +1,168 @@
 {
   "issueId": "PAN-2224",
   "schemaVersion": 2,
-  "created": "2026-07-02T14:21:49.264Z",
-  "updated": "2026-07-02T14:21:49.264Z",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T16:52:45.559Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T21:16:56.024Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T21:30:23.431Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-02T23:26:28.439Z"
+    }
+  ],
+  "feedback": [],
+  "harness": "codex",
+  "model": "gpt-5.5",
+  "statusOverrides": {
+    "scan-baseline": "completed",
+    "scan-verify": "completed",
+    "scan-verify.ac1": "completed",
+    "scan-verify.ac2": "completed",
+    "harness-facet-ui": "completed",
+    "harness-facet-ui.ac1": "completed",
+    "harness-facet-ui.ac2": "completed",
+    "harness-facet-ui.ac3": "completed",
+    "enrichment-excerpts": "completed",
+    "enrichment-excerpts.ac1": "completed",
+    "enrichment-excerpts.ac2": "completed",
+    "enrichment-excerpts.ac3": "completed",
+    "enrichment-excerpts.ac4": "completed",
+    "locator-correlation": "completed",
+    "locator-correlation.ac1": "completed",
+    "locator-correlation.ac2": "completed",
+    "locator-correlation.ac3": "completed",
+    "locator-correlation.ac4": "completed",
+    "transcript-fallback": "completed",
+    "transcript-fallback.ac1": "completed",
+    "transcript-fallback.ac2": "completed",
+    "transcript-fallback.ac3": "completed",
+    "codex-metadata-parser": "completed",
+    "codex-metadata-parser.ac1": "completed",
+    "codex-metadata-parser.ac2": "completed",
+    "codex-metadata-parser.ac3": "completed",
+    "pi-metadata-parser": "completed",
+    "pi-metadata-parser.ac1": "completed",
+    "pi-metadata-parser.ac2": "completed",
+    "pi-metadata-parser.ac3": "completed",
+    "discovery-sources": "completed",
+    "discovery-sources.ac1": "completed",
+    "discovery-sources.ac2": "completed",
+    "discovery-sources.ac3": "completed",
+    "discovery-sources.ac4": "completed",
+    "jsonlpath-fix": "completed",
+    "jsonlpath-fix.ac1": "completed",
+    "jsonlpath-fix.ac2": "completed",
+    "jsonlpath-fix.ac3": "completed",
+    "harness-column": "completed",
+    "harness-column.ac1": "completed",
+    "harness-column.ac2": "completed",
+    "harness-column.ac3": "completed",
+    "harness-column.ac4": "completed",
+    "scan-baseline.ac1": "completed",
+    "scan-baseline.ac2": "completed"
+  },
   "pipeline": {
     "issueId": "PAN-2224",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T14:21:49.264Z"
+    "updatedAt": "2026-07-03T00:56:14.307Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-03T00:52:34.990Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2226",
+    "reviewedAtCommit": "f737b5223ab0e3e729f07524ca8571d115c9fd83",
+    "lastVerifiedCommit": "37c29e29f75f2a40d32956f7b3d80cf76df21c15"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 151,
+            "output": 6672,
+            "cacheRead": 3093602,
+            "cacheWrite": 9672
+          }
+        },
+        "inspect": {
+          "openai/gpt-5.5": {
+            "input": 1089597,
+            "output": 69334,
+            "cacheRead": 5452288,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 32178,
+            "output": 1963,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 17983,
+            "output": 42934,
+            "cacheRead": 3539296,
+            "cacheWrite": 169342
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 18134,
+          "output": 49606,
+          "cacheRead": 6632898,
+          "cacheWrite": 179014
+        },
+        "openai/gpt-5.5": {
+          "input": 1089597,
+          "output": 69334,
+          "cacheRead": 5452288,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 32178,
+          "output": 1963,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 21.786371,
+        "pricingAsOf": "2026-07-03T00:56:14.529Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2226"
+    ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "swarm": {
+    "slotAssignments": []
+  },
+  "created": "2026-07-02T16:48:03.302Z",
+  "updated": "2026-07-03T00:56:14.613Z"
 }

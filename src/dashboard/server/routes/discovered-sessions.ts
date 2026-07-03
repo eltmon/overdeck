@@ -116,6 +116,7 @@ const StatsResponseSchema = Schema.Struct({
 const DiscoveredSessionResponseSchema = Schema.Struct({
   id: Schema.Number,
   jsonlPath: Schema.String,
+  harness: Schema.String,
   sessionId: Schema.NullOr(Schema.String),
   workspacePath: Schema.NullOr(Schema.String),
   workspaceHash: Schema.NullOr(Schema.String),
@@ -230,6 +231,7 @@ const listRoute = HttpRouter.add(
       offset: rawOffset,
     };
 
+    if (params.has('harness')) filter.harness = params.get('harness')!;
     if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
     if (params.has('model')) filter.primaryModel = params.get('model')!;
     if (params.has('since')) filter.since = parseRelativeTime(params.get('since')!);
@@ -260,6 +262,7 @@ export function parseSearchParams(
   params: URLSearchParams,
 ): ConversationFilter {
   const filter: ConversationFilter = {};
+  if (params.has('harness')) filter.harness = params.get('harness')!;
   if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
   if (params.has('model')) filter.primaryModel = params.get('model')!;
   if (params.has('since')) filter.since = parseRelativeTime(params.get('since')!);

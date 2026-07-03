@@ -36,6 +36,7 @@ import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileSt
 import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
+import { createInFlightGuard } from './in-flight-guard.js';
 // Review gated-dispatch behavior moved to deacon-review-status.ts:
 // keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
 // Deferred review re-dispatch for, Deferred post-review re-dispatch for.
@@ -288,6 +289,7 @@ const STATE_FILE = join(DEACON_DIR, 'health-state.json');
 const CONFIG_FILE = join(DEACON_DIR, 'config.json');
 
 let deaconInterval: NodeJS.Timeout | null = null;
+const deaconPatrolGuard = createInFlightGuard();
 let config: DeaconConfig = { ...DEFAULT_CONFIG };
 
 /**
@@ -350,6 +352,25 @@ export function loadState(): DeaconState {
   };
 }
 
+function newestPersistedPatrolHeartbeat(incomingLastPatrol: string | undefined): string | undefined {
+  if (!incomingLastPatrol || !existsSync(STATE_FILE)) return incomingLastPatrol;
+
+  try {
+    const content = readFileSync(STATE_FILE, 'utf-8');
+    const persisted = JSON.parse(content) as { lastPatrol?: unknown };
+    if (typeof persisted.lastPatrol !== 'string') return incomingLastPatrol;
+
+    const incomingMs = Date.parse(incomingLastPatrol);
+    const persistedMs = Date.parse(persisted.lastPatrol);
+    if (!Number.isFinite(persistedMs)) return incomingLastPatrol;
+    if (!Number.isFinite(incomingMs) || persistedMs > incomingMs) return persisted.lastPatrol;
+  } catch {
+    // Fall through to the incoming state; saveState's write error handling remains below.
+  }
+
+  return incomingLastPatrol;
+}
+
 /**
  * Save health check state to disk
  */
@@ -357,6 +378,12 @@ export function saveState(state: DeaconState): void {
   ensureDeaconDir();
 
   try {
+    const newestLastPatrol = newestPersistedPatrolHeartbeat(state.lastPatrol);
+    if (newestLastPatrol) {
+      state.lastPatrol = newestLastPatrol;
+    } else {
+      delete state.lastPatrol;
+    }
     writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
   } catch (error) {
     console.error('[deacon] Failed to save state:', error);
@@ -3171,6 +3198,26 @@ export async function runPatrol(): Promise<PatrolResult> {
 let lastPatrolResult: PatrolResult | null = null;
 let hasLoggedGlobalPauseSkip = false;
 
+function runScheduledPatrol(source: 'startup' | 'interval'): void {
+  const started = deaconPatrolGuard.run(
+    'deacon-patrol',
+    async () => {
+      await runPatrol();
+    },
+    (err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[deacon] Patrol error:', err);
+      logDeaconEventSync(`patrol error: ${msg}`);
+    },
+  );
+
+  if (!started) {
+    const msg = `patrol ${source} skipped — previous patrol still in flight`;
+    console.warn(`[deacon] ${msg}`);
+    logDeaconEventSync(`startDeacon: ${msg}`);
+  }
+}
+
 // ============================================================================
 // Deacon Log Buffer
 // ============================================================================
@@ -3307,7 +3354,7 @@ export function startDeacon(): void {
   // first patrol. PAN-1908: use the thin table-query reconcile instead of directory scans.
   void (async () => {
     await reconcileAgentLiveness();
-    await runPatrol();
+    runScheduledPatrol('startup');
   })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[deacon] Startup recovery/patrol error:', err);
@@ -3316,11 +3363,7 @@ export function startDeacon(): void {
 
   // Schedule regular patrols
   deaconInterval = setInterval(() => {
-    runPatrol().catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[deacon] Patrol error:', err);
-      logDeaconEventSync(`patrol error: ${msg}`);
-    });
+    runScheduledPatrol('interval');
   }, config.patrolIntervalMs);
 
   logDeaconEventSync('startDeacon: health monitor started');

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   sessionExistsSync: vi.fn(),
   loadCloisterConfigSync: vi.fn(),
   isAgentIdleForNudge: vi.fn(),
+  getAgentEffectiveLastActivityMs: vi.fn(),
   clearStuckRemediationState: vi.fn(),
   readStuckRemediationState: vi.fn(),
   writeStuckRemediationState: vi.fn(),
@@ -70,6 +71,7 @@ vi.mock('../config.js', () => ({
 
 vi.mock('../agent-idle.js', () => ({
   isAgentIdleForNudge: mocks.isAgentIdleForNudge,
+  getAgentEffectiveLastActivityMs: mocks.getAgentEffectiveLastActivityMs,
 }));
 
 vi.mock('../stuck-remediation-state.js', () => ({
@@ -172,6 +174,10 @@ describe('checkStuckAgentRemediation', () => {
     mocks.getReviewStatusSync.mockReturnValue(null);
     mocks.isAgentIdleForNudge.mockReturnValue(true);
     mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(25));
+    mocks.getAgentEffectiveLastActivityMs.mockImplementation((agentId: string) => {
+      const state = mocks.getAgentRuntimeStateSync(agentId);
+      return state?.lastActivity ? new Date(state.lastActivity).getTime() : null;
+    });
     mocks.readStuckRemediationState.mockReturnValue(null);
     mocks.messageAgent.mockResolvedValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: true });

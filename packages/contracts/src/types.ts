@@ -628,6 +628,7 @@ export type ProjectSessionTree = typeof ProjectSessionTree.Type
 export const DiscoveredSessionSnapshot = Schema.Struct({
   id: Schema.Number,
   jsonlPath: Schema.String,
+  harness: Schema.optional(Schema.String),
   sessionId: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   workspaceHash: Schema.optional(Schema.String),
@@ -660,6 +661,7 @@ export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
 
 /** Filter parameters for conversation search */
 export const ConversationFilter = Schema.Struct({
+  harness: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   primaryModel: Schema.optional(Schema.String),
   managed: Schema.optional(Schema.Boolean),

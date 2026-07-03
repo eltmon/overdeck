@@ -95,17 +95,15 @@
   "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-1982",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T14:46:41.743Z",
-    "reviewNotes": "Agent re-review request (2/25): Completed acceptance criteria",
-    "testNotes": "Ran typecheck (TypeScript strict mode), lint (ESLint + project rules), and full test suite (7,601 tests passed, 52 skipped). No browser UAT required — acceptance criteria are code/config-driven (mode resolution, config merge precedence, spawn behavior, resume-awareness, CLI setter) all verified by automated tests. Feature is internal review configuration, not user-facing UI.",
+    "updatedAt": "2026-07-03T08:29:59.320Z",
+    "reviewNotes": "No blocking findings; focused review suite passed",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "mergeNotes": "github merge failed: Command failed: gh pr merge https://github.com/eltmon/overdeck/pull/2112 --squash\nGraphQL: Pull Request is not mergeable (mergePullRequest)\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2112",
     "reviewedAtCommit": "741cb7dcacb68e622566f900c964ee8cfb767338",
     "lastVerifiedCommit": "741cb7dcacb68e622566f900c964ee8cfb767338",
@@ -132,8 +130,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 66850,
-            "output": 13698,
+            "input": 77802,
+            "output": 16306,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -148,10 +146,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 34916,
-            "output": 28021,
-            "cacheRead": 14770457,
-            "cacheWrite": 1844365
+            "input": 34965,
+            "output": 29952,
+            "cacheRead": 15733310,
+            "cacheWrite": 1999427
           }
         }
       },
@@ -169,21 +167,21 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 66850,
-          "output": 13698,
+          "input": 77802,
+          "output": 16306,
           "cacheRead": 0,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 34916,
-          "output": 28021,
-          "cacheRead": 14770457,
-          "cacheWrite": 1844365
+          "input": 34965,
+          "output": 29952,
+          "cacheRead": 15733310,
+          "cacheWrite": 1999427
         }
       },
       "costAtCloseOut": {
-        "usd": 11.692607,
-        "pricingAsOf": "2026-06-29T14:46:41.849Z"
+        "usd": 11.992424,
+        "pricingAsOf": "2026-07-03T08:29:59.344Z"
       }
     },
     "merges": [
@@ -192,7 +190,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T14:39:48.898Z",
-  "updated": "2026-06-29T14:46:42.002Z",
+  "updated": "2026-07-03T08:29:59.344Z",
   "statusOverrides": {
     "config-review-mode": "completed",
     "config-review-mode.ac1": "completed",

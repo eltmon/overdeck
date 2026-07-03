@@ -179,6 +179,7 @@ describe('tiered execution dogfood e2e fixture', () => {
         issueId: ISSUE_ID,
         sha,
         beadTitle: item.title,
+        beadId: item.id,
         tiers: standingTiers,
         deliver: deliverFeed,
         gitShow: getDiff,

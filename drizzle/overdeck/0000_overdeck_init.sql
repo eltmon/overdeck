@@ -390,6 +390,7 @@ CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);--> statement-brea
 CREATE TABLE `discovered_sessions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`jsonl_path` text NOT NULL UNIQUE,
+	`harness` text,
 	`session_id` text,
 	`workspace_path` text,
 	`workspace_hash` text,

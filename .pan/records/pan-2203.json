@@ -3,17 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "harness": "claude-code",
-  "model": "MiniMax-M3",
+  "model": "claude-opus-4-8",
   "pipeline": {
     "issueId": "PAN-2203",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-01T16:34:27.615Z",
+    "updatedAt": "2026-07-03T07:53:20.507Z",
     "reviewNotes": "pan swarm recover still reads Deacon failed-slot blocks from a CLI-local in-memory map",
+    "testNotes": "Skipped: issue is already merged",
     "verificationNotes": "Verification FAILED at lint (21787ms):\n\n.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  0.80 kB\u001b[22m \u001b[2m│ gzip:   0.37 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 432 files, total: 13.16 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3854ms\u001b[39m\n\n> @overdeck/core@0.41.1 lint:skills\n> bash scripts/lint-skills.sh\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/deacon-api-recovery.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (53%)\n  - tsdown:deps (43%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 255, in <module>\n  File \"<stdin>\", line 204, in main\n  File \"<stdin>\", line 49, in run_pan\nsubprocess.CalledProcessError: Command '['node', '/home/eltmon/Projects/overdeck/workspaces/feature-pan-2203/dist/cli/index.js', '--help']' returned non-zero exit status 1.\n",
     "inspectNotes": "Bead workspace-84id0: dispatchNextWave correctly implements capacity+overlap selection, lowest-free slot allocation, claim-then-spawn flow, and unblock+budget release on throw. All 4 ACs covered by deacon-swarm-dispatch.test.ts. NFR-5 (write door) and NFR-6 (worktree discipline) honored.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2206",
@@ -138,6 +139,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 8,
+            "output": 23465,
+            "cacheRead": 1753786,
+            "cacheWrite": 29452
+          }
+        },
         "inspect": {
           "custom/MiniMax-M3": {
             "input": 267548,
@@ -156,8 +165,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 47530,
-            "output": 1735,
+            "input": 49019,
+            "output": 2316,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -180,6 +189,12 @@
         }
       },
       "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 70242,
+          "output": 256318,
+          "cacheRead": 26907483,
+          "cacheWrite": 913277
+        },
         "custom/MiniMax-M3": {
           "input": 267548,
           "output": 25822,
@@ -193,16 +208,10 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 47530,
-          "output": 1735,
+          "input": 49019,
+          "output": 2316,
           "cacheRead": 0,
           "cacheWrite": 0
-        },
-        "anthropic/claude-opus-4-8": {
-          "input": 70234,
-          "output": 232853,
-          "cacheRead": 25153697,
-          "cacheWrite": 883825
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 48,
@@ -212,8 +221,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 29.450181,
-        "pricingAsOf": "2026-07-01T16:34:27.636Z"
+        "usd": 31.097814,
+        "pricingAsOf": "2026-07-03T07:53:20.556Z"
       }
     },
     "merges": [
@@ -222,5 +231,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-01T16:34:27.639Z",
-  "updated": "2026-07-01T16:34:27.639Z"
+  "updated": "2026-07-03T07:53:25.711Z"
 }

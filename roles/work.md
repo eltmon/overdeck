@@ -144,6 +144,10 @@ git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
 
+Work agents push only their feature branch. Never push to `origin/main` or merge into
+`main`; landing is the review pipeline's job via `pan done`, and the pre-push guard
+mechanically rejects agent code pushes to main.
+
 `pan done` opens the PR and triggers the review pipeline. Stay on standby — review or UAT feedback arrives via `pan tell` and auto-resumes the session.
 
 ## Signal the flywheel before you stall

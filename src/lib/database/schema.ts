@@ -1,19 +1,9 @@
 /**
- * Overdeck Database Schema
- *
- * Defines the unified schema for panopticon.db.
- * All persistent application state lives here.
- *
- * PAN-1249: Schema migration steps still use raw try/catch because each
- * `ALTER TABLE` / `CREATE INDEX` may legitimately fail on a database that
- * already has the column/index, and the cleanest way to detect that is to
- * catch SQLite's "duplicate column"/"index exists" error. Collapsing those
- * into typed errors would be a semantic change, not a migration. The
- * DatabaseError tagged error is available via ./index.js for any future
- * non-migration code paths in this file. Full conversion to
- * @effect/sql-sqlite-bun is deferred to PAN-447.
+ * Overdeck database schema for panopticon.db.
+ * PAN-1249: migration steps still use raw try/catch because ALTER TABLE /
+ * CREATE INDEX may legitimately fail on duplicate columns/indexes; typed
+ * errors for non-migration paths remain deferred to PAN-447.
  */
-
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { SqliteDatabase } from './driver.js';
@@ -21,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 57;
+export const SCHEMA_VERSION = 58;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -68,6 +58,7 @@ export function initDiscoveredSessionsSchema(db: SqliteDatabase): void {
     CREATE TABLE IF NOT EXISTS discovered_sessions (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       jsonl_path        TEXT    NOT NULL UNIQUE,
+      harness           TEXT,
       session_id        TEXT,
       workspace_path    TEXT,
       workspace_hash    TEXT,
@@ -630,6 +621,7 @@ export function initSchema(db: SqliteDatabase): void {
     CREATE TABLE IF NOT EXISTS discovered_sessions (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
       jsonl_path        TEXT    NOT NULL UNIQUE,
+      harness           TEXT,
       session_id        TEXT,
       workspace_path    TEXT,
       workspace_hash    TEXT,
@@ -1026,6 +1018,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       CREATE TABLE IF NOT EXISTS discovered_sessions (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
         jsonl_path        TEXT    NOT NULL UNIQUE,
+        harness           TEXT,
         session_id        TEXT,
         workspace_path    TEXT,
         workspace_hash    TEXT,
@@ -1234,6 +1227,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       CREATE TABLE IF NOT EXISTS discovered_sessions (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
         jsonl_path        TEXT    NOT NULL UNIQUE,
+        harness           TEXT,
         session_id        TEXT,
         workspace_path    TEXT,
         workspace_hash    TEXT,
@@ -1643,6 +1637,12 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       CREATE INDEX IF NOT EXISTS idx_backlog_sequence_project_rank
         ON backlog_sequence(project_key, rank);
     `);
+  }
+
+  // v57 -> v58: record the harness that produced each discovered session.
+  if (currentVersion < 58 && db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'discovered_sessions'`).get()) {
+    try { db.exec(`ALTER TABLE discovered_sessions ADD COLUMN harness TEXT`); } catch { /* already exists */ }
+    db.exec(`UPDATE discovered_sessions SET harness = 'claude-code' WHERE harness IS NULL`);
   }
 
   // After all migrations, set the version

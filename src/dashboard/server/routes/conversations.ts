@@ -113,6 +113,7 @@ import {
   type ControlCommand,
   type ThinkingLevel,
 } from '../../../lib/runtimes/conversation-control.js';
+import { resolveDiscoveredSessionFile } from '../../../lib/conversations/discovered-session-file.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
  * module default when config is unavailable. */
@@ -127,7 +128,7 @@ import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
-import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
+import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../../../lib/providers.js';
 import { getOhmypiCodexAuthStatus } from '../../../lib/ohmypi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -354,11 +355,7 @@ export async function resolveAllowedHarness(requested: unknown, model?: string |
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
     requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
-  try {
-    return await resolveHarness({ model, explicit });
-  } catch {
-    return 'claude-code';
-  }
+  return resolveHarness({ model, explicit });
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -746,39 +743,23 @@ async function findClaudeSessionFileById(sessionId: string): Promise<string | nu
   return null;
 }
 
-async function resolveSessionFile(conv: Conversation): Promise<string | null> {
-  // Pi writes its own JSONL transcript under the per-agent dir using a per-run
-  // timestamped filename (not into ~/.claude/projects/<dir>/<id>.jsonl). Pi
-  // *conversations* write into the agent's `sessions/` subdir, but Pi *work and
-  // review* agents write into the agent-dir ROOT (PAN-1908) — so we must check
-  // both. resolvePiSessionPath is the canonical resolver shared with the non-DB
-  // specialist fallback below; it checks both locations and skips the
-  // cost-events.jsonl / activity.jsonl sidecars.
+export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
+  // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
     const piPath = await resolvePiSessionPath(conv.tmuxSession);
-    // If the ohmypi path resolves, use it. If not, fall through to the claude-code
-    // path — the harness field may be stale (agent was re-run under claude-code
-    // after the conversation record was created with harness='ohmypi').
+    // Fall through if the harness is stale from an earlier ohmypi run.
     if (piPath) return piPath;
   }
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
-  // The thread-id stored in codex-thread-id is the session identifier.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
     const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
     if (codexPath) return codexPath;
     // Fall through if codex path not found — same stale-harness recovery.
   }
-  // claude-code: the launcher pins `--session-id <id>` (or `--resume <id>`) — the
-  // EXACT session the live tmux pane runs. Resolving from that pinned id makes the
-  // Conversation tab match the Terminal tab by construction. We deliberately do
-  // NOT guess via a JSONL-mtime "freshest" heuristic: a conversation accumulates
-  // many session ids in its agent dir's sessions.json (transient relaunches,
-  // sub-sessions), and a compaction summary write-back to an OLD session's file
-  // bumps its mtime ahead of the live one — so the heuristic renders the wrong
-  // transcript while the terminal shows the right one (the reported mismatch bug).
-  // conv.claudeSessionId (the conversation_files-recorded canonical id, resolved at
-  // the read door) is the secondary for ended conversations whose launcher has been
-  // cleaned up — NOT a fall back to the old mtime heuristic.
+  // claude-code: prefer the launcher's pinned live session id, then the recorded
+  // canonical id. Do not guess from JSONL mtime; compaction can make old files
+  // newer than the terminal's current transcript.
   const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
   const sessionId = pinned ?? conv.claudeSessionId;
   if (sessionId) {
@@ -790,8 +771,12 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
     // not found (e.g. a live conversation before its first turn writes the file),
     // return the deterministic path so the live-session banner logic is preserved.
     const found = await findClaudeSessionFileById(sessionId);
-    return found ?? deterministic;
+    if (found) return found;
+    const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
+    return discovered ?? deterministic;
   }
+  const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
+  if (discovered) return discovered;
   // Neither the launcher nor the conversation record yields a session id. For a
   // live conversation this must never happen — scream so it gets attention
   // instead of silently rendering a wrong/empty transcript. The /messages route
@@ -2333,6 +2318,7 @@ type ArchivedConversationResponse = {
   id: number;
   source: 'managed-archived';
   conversationName: string;
+  harness: ArchivedConversationWithEnrichment['harness'];
   jsonlPath: string | null;
   workspacePath: string;
   primaryModel: string | null;
@@ -2364,11 +2350,13 @@ function parseStringArrayColumn(value: string | null): string[] {
 }
 
 function mapArchivedConversation(row: ArchivedConversationWithEnrichment): ArchivedConversationResponse {
+  const canUseClaudePathFallback = row.harness === null || row.harness === 'claude-code';
   return {
     id: row.id,
     source: 'managed-archived',
     conversationName: row.name,
-    jsonlPath: row.discoveredJsonlPath ?? (row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
+    harness: row.harness,
+    jsonlPath: row.discoveredJsonlPath ?? (canUseClaudePathFallback && row.claudeSessionId ? sessionFilePath(row.cwd, row.claudeSessionId) : null),
     workspacePath: row.cwd,
     primaryModel: row.primaryModel ?? row.model,
     messageCount: row.messageCount ?? 0,
@@ -2399,6 +2387,7 @@ function parseOptionalNumberParam(params: URLSearchParams, name: string): number
 export function parseArchivedConversationListOptions(params: URLSearchParams): ArchivedConversationListOptions {
   const options: ArchivedConversationListOptions = {};
   const workspacePath = params.get('workspacePath');
+  const harness = params.get('harness');
   const primaryModel = params.get('primaryModel');
   const since = params.get('since');
   const tag = params.get('tag');
@@ -2411,6 +2400,7 @@ export function parseArchivedConversationListOptions(params: URLSearchParams): A
   const rawOffset = parseOptionalNumberParam(params, 'offset');
 
   if (workspacePath) options.workspacePath = workspacePath;
+  if (harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex') options.harness = harness;
   if (primaryModel) options.primaryModel = primaryModel;
   if (since) options.since = parseRelativeTime(since);
   if (params.get('managed') === 'true') options.managed = true;
@@ -3031,7 +3021,7 @@ const postConversationRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create conversation failed:', msg);
-        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
       }
     });
   }),
@@ -4726,7 +4716,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create summary fork failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: error instanceof UnknownModelError ? msg : 'Internal server error' }, { status: error instanceof UnknownModelError ? 400 : 500 });
       }
     });
   }),

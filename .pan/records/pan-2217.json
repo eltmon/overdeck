@@ -3,18 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-02T06:49:55.068Z",
-  "updated": "2026-07-02T08:07:08.742Z",
+  "updated": "2026-07-03T03:23:15.881Z",
   "pipeline": {
     "issueId": "PAN-2217",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T08:07:08.601Z",
+    "updatedAt": "2026-07-03T03:23:15.722Z",
     "testNotes": "Skipped: issue is already merged",
-    "deaconIgnored": true,
-    "deaconIgnoredAt": "2026-07-02T08:07:08.601Z",
-    "deaconIgnoredReason": "operator directive: drain pipeline, focus PAN-1791 only"
+    "deaconIgnored": false
   },
   "closeOut": {
     "usage": {
@@ -52,7 +50,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.670449,
-        "pricingAsOf": "2026-07-02T08:07:08.742Z"
+        "pricingAsOf": "2026-07-03T03:23:15.881Z"
       }
     },
     "merges": [],

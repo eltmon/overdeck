@@ -15,7 +15,7 @@
  *   isSmeeProcessRunning();
  */
 
-import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, closeSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, closeSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -168,21 +168,114 @@ function readSmeePid(): number | null {
   }
 }
 
+function readProcessArgv(pid: number): string[] | null {
+  try {
+    const raw = readFileSync(`/proc/${pid}/cmdline`);
+    const text = Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw);
+    const argv = text.split('\0').filter(Boolean);
+    return argv.length > 0 ? argv : null;
+  } catch {
+    return null;
+  }
+}
+
+function isSmeeCommand(argv: string[]): boolean {
+  return argv.some((arg) => arg.includes('node_modules/smee-client/bin/smee.js'));
+}
+
+function hasArgValue(argv: string[], flag: string, value: string): boolean {
+  const index = argv.indexOf(flag);
+  return index >= 0 && argv[index + 1] === value;
+}
+
+function isMatchingSmeeProcess(pid: number, smeeUrl: string, target: string): boolean | null {
+  const argv = readProcessArgv(pid);
+  if (!argv) return null;
+  return isSmeeCommand(argv) && hasArgValue(argv, '--url', smeeUrl) && hasArgValue(argv, '--target', target);
+}
+
+function findMatchingSmeeProcesses(smeeUrl: string, target: string): number[] {
+  let entries: string[];
+  try {
+    entries = readdirSync('/proc');
+  } catch {
+    return [];
+  }
+
+  return entries
+    .map((entry) => Number(entry))
+    .filter((pid) => Number.isInteger(pid) && pid > 0)
+    .filter((pid) => isMatchingSmeeProcess(pid, smeeUrl, target) === true)
+    .sort((a, b) => a - b);
+}
+
+function clearSmeePidfile(): void {
+  try { unlinkSync(SMEE_PID_PATH); } catch { /* ignore */ }
+}
+
+function terminateProcess(pid: number): void {
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {
+    // already dead
+  }
+}
+
 export function isSmeeProcessRunningSync(): boolean {
   const pid = readSmeePid();
   if (!pid) return false;
-  if (isProcessAlive(pid)) return true;
-  // Stale pidfile — clean up
-  try { unlinkSync(SMEE_PID_PATH); } catch { /* ignore */ }
+  if (!isProcessAlive(pid)) {
+    clearSmeePidfile();
+    return false;
+  }
+
+  const smeeUrl = getSmeeUrl();
+  if (!smeeUrl) return true;
+
+  const match = isMatchingSmeeProcess(pid, smeeUrl, getWebhookTarget());
+  if (match === true || match === null) return true;
+
+  // The pidfile points at a live process, but not this relay. Treat it as stale
+  // so PID reuse cannot block a needed webhook relay.
+  clearSmeePidfile();
   return false;
 }
 
-export function startSmeeProcessSync(): void {
-  if (isSmeeProcessRunningSync()) {
-    console.log('[smee] Process already running');
+function reconcileExistingSmeeProcesses(smeeUrl: string, target: string): number | null {
+  const matchingPids = findMatchingSmeeProcesses(smeeUrl, target);
+  if (matchingPids.length === 0) return null;
+
+  const pidfilePid = readSmeePid();
+  const ownerPid = pidfilePid !== null && matchingPids.includes(pidfilePid)
+    ? pidfilePid
+    : matchingPids[0];
+
+  for (const pid of matchingPids) {
+    if (pid !== ownerPid) terminateProcess(pid);
+  }
+
+  writeFileSync(SMEE_PID_PATH, String(ownerPid));
+  if (matchingPids.length > 1) {
+    const duplicatePids = matchingPids.filter((pid) => pid !== ownerPid).join(', ');
+    console.warn(`[smee] Removed duplicate process(es): ${duplicatePids}`);
+  }
+
+  return ownerPid;
+}
+
+function removeStaleOrWrongPidfile(smeeUrl: string, target: string): void {
+  const pid = readSmeePid();
+  if (!pid) return;
+  if (!isProcessAlive(pid)) {
+    clearSmeePidfile();
     return;
   }
 
+  const match = isMatchingSmeeProcess(pid, smeeUrl, target);
+  if (match === false) clearSmeePidfile();
+}
+
+export function startSmeeProcessSync(): void {
   const smeeUrl = getSmeeUrl();
   if (!smeeUrl) {
     console.warn('[smee] No smee-url configured — skipping webhook relay');
@@ -190,6 +283,13 @@ export function startSmeeProcessSync(): void {
   }
 
   const target = getWebhookTarget();
+  const existingPid = reconcileExistingSmeeProcesses(smeeUrl, target);
+  if (existingPid !== null) {
+    console.log('[smee] Process already running');
+    return;
+  }
+  removeStaleOrWrongPidfile(smeeUrl, target);
+
   const smeeBin = getSmeeBinaryPath();
 
   let logFd: number;
@@ -218,13 +318,15 @@ export function startSmeeProcessSync(): void {
 }
 
 export function stopSmeeProcessSync(): void {
+  const smeeUrl = getSmeeUrl();
+  const target = smeeUrl ? getWebhookTarget() : null;
+  const matchingPids = smeeUrl && target ? findMatchingSmeeProcesses(smeeUrl, target) : [];
   const pid = readSmeePid();
-  if (pid && isProcessAlive(pid)) {
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
-      // already dead
-    }
+  const pidsToStop = new Set<number>(matchingPids);
+  if (pid) pidsToStop.add(pid);
+
+  for (const pidToStop of pidsToStop) {
+    if (isProcessAlive(pidToStop)) terminateProcess(pidToStop);
   }
 
   try {

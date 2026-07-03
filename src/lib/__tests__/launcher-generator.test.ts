@@ -918,6 +918,19 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).not.toMatch(/codex exec/);
   });
 
+  it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'plan',
+      harness: 'codex',
+      model: 'gpt-5.5',
+      codexMode: 'work-tui',
+      appendSystemPromptFiles: ['/workspace/project/.pan/context.md'],
+    });
+    expect(script).toMatch(/^codex -m 'gpt-5\.5'$/m);
+    expect(script).not.toMatch(/--append-system-prompt-file/);
+  });
+
   it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
@@ -1004,11 +1017,9 @@ describe('pi model provider qualification (PAN-1799)', () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('kimi-k2.6')).toBe('kimi-coding/kimi-k2.6');
   });
-  it('qualifies openai models with openai-codex; unknown ids inherit the anthropic default (parity with conversations)', async () => {
+  it('qualifies openai models with openai-codex and rejects unknown model ids', async () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
-    // getProviderForModelSync falls back to anthropic for unknown ids — the
-    // same behavior conversations.ts has always had for pi model resolution.
-    expect(qualifyPiModel('totally-unknown-model')).toBe('anthropic/totally-unknown-model');
+    expect(() => qualifyPiModel('totally-unknown-model')).toThrow('Unknown model "totally-unknown-model".');
   });
 });

@@ -6,7 +6,7 @@ import { join } from 'path';
 import { selectModelForTier, maxMessagesForTier, DEFAULT_QUICK_MODEL, DEFAULT_DEEP_MODEL } from '../enrichment/model-fallback.js';
 import { enrichSession } from '../enrichment/enrich-session.js';
 import { estimateEnrichmentCost, enrichSessions, CostThresholdError } from '../enrichment/index.js';
-import { upsertDiscoveredSession, findDiscoveredSessions } from '../../overdeck/discovered-sessions.js';
+import { upsertDiscoveredSession, findDiscoveredSessions, searchFtsSessions } from '../../overdeck/discovered-sessions.js';
 import type { EnrichmentResponse } from '../enrichment/enrich-session.js';
 import {
   setupOverdeckTestDb,
@@ -31,6 +31,15 @@ const MOCK_JSONL = [
     content: [{ type: 'text', text: 'Let me look at the auth module.' }],
   }),
 ].join('\n') + '\n';
+
+function extractConversationExcerpt(prompt: string): string {
+  const marker = 'CONVERSATION EXCERPT:\n';
+  const start = prompt.indexOf(marker);
+  if (start < 0) return '';
+  const afterMarker = start + marker.length;
+  const end = prompt.indexOf('\n\nSummarize this conversation', afterMarker);
+  return end < 0 ? prompt.slice(afterMarker) : prompt.slice(afterMarker, end);
+}
 
 function seedSession() {
   return upsertDiscoveredSession({
@@ -440,6 +449,166 @@ describe('enrichSession', () => {
     // The excerpt must contain text from message.content, not be empty
     expect(capturedPrompt).toContain('memory leak');
     expect(capturedPrompt).toContain('retain cycle');
+  });
+
+  it('keeps Claude excerpt output byte-identical while dispatching by harness', async () => {
+    const path = join(odb.home, 'claude-regression.jsonl');
+    writeFileSync(path, MOCK_JSONL, 'utf8');
+    const session = upsertDiscoveredSession({
+      jsonlPath: path,
+      harness: 'claude-code',
+      messageCount: 2,
+    });
+    let capturedPrompt = '';
+
+    await Effect.runPromise(enrichSession({
+      sessionId: session.id,
+      jsonlPath: path,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Claude regression.', tags: ['claude'] };
+      },
+    }));
+
+    expect(extractConversationExcerpt(capturedPrompt)).toBe([
+      '[user]: How do I fix the login bug?',
+      '[assistant]: Let me look at the auth module.',
+    ].join('\n'));
+  });
+
+  it('builds ohmypi excerpts with user text, toolCall names, and toolResult snippets', async () => {
+    const path = join(odb.home, 'ohmypi.jsonl');
+    const jsonl = [
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-07-02T10:00:02.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Please inspect the parser file' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-07-02T10:00:03.000Z',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'I will read it.' },
+            { type: 'toolCall', id: 'tool-1', name: 'Read', arguments: { file_path: '/repo/src/parser.ts' } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-07-02T10:00:04.000Z',
+        message: {
+          role: 'toolResult',
+          toolCallId: 'tool-1',
+          toolName: 'Read',
+          content: [{ type: 'text', text: 'export function parse() {}' }],
+        },
+      }),
+    ].join('\n') + '\n';
+    writeFileSync(path, jsonl, 'utf8');
+    const session = upsertDiscoveredSession({
+      jsonlPath: path,
+      harness: 'ohmypi',
+      messageCount: 3,
+    });
+    let capturedPrompt = '';
+
+    await Effect.runPromise(enrichSession({
+      sessionId: session.id,
+      jsonlPath: path,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Pi excerpt.', tags: ['pi'] };
+      },
+    }));
+
+    const excerpt = extractConversationExcerpt(capturedPrompt);
+    expect(excerpt).toContain('Please inspect the parser file');
+    expect(excerpt).toContain('[toolCall:Read');
+    expect(excerpt).toContain('[toolResult:Read]');
+    expect(excerpt).toContain('export function parse()');
+  });
+
+  it('builds codex excerpts with user and agent text plus function_call names', async () => {
+    const path = join(odb.home, 'codex-rollout.jsonl');
+    const jsonl = [
+      JSON.stringify({
+        type: 'event_msg',
+        timestamp: '2026-07-02T11:00:02.000Z',
+        payload: { type: 'user_message', message: 'fix the codex parser bug' },
+      }),
+      JSON.stringify({
+        type: 'event_msg',
+        timestamp: '2026-07-02T11:00:03.000Z',
+        payload: { type: 'agent_message', message: 'Checking the rollout shape.' },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        timestamp: '2026-07-02T11:00:03.500Z',
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          call_id: 'call-1',
+          arguments: JSON.stringify({ cmd: 'rg parser' }),
+        },
+      }),
+    ].join('\n') + '\n';
+    writeFileSync(path, jsonl, 'utf8');
+    const session = upsertDiscoveredSession({
+      jsonlPath: path,
+      harness: 'codex',
+      messageCount: 2,
+    });
+    let capturedPrompt = '';
+
+    await Effect.runPromise(enrichSession({
+      sessionId: session.id,
+      jsonlPath: path,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Codex excerpt.', tags: ['codex'] };
+      },
+    }));
+
+    const excerpt = extractConversationExcerpt(capturedPrompt);
+    expect(excerpt).toContain('fix the codex parser bug');
+    expect(excerpt).toContain('Checking the rollout shape.');
+    expect(excerpt).toContain('[tool_call:exec_command');
+  });
+
+  it('indexes enriched pi summaries through the unchanged FTS row replacement path', async () => {
+    const path = join(odb.home, 'pi-fts.jsonl');
+    writeFileSync(path, [
+      JSON.stringify({
+        type: 'message',
+        message: { role: 'user', content: [{ type: 'text', text: 'summarize me' }] },
+      }),
+    ].join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({
+      jsonlPath: path,
+      harness: 'pi',
+      messageCount: 1,
+    });
+
+    await Effect.runPromise(enrichSession({
+      sessionId: session.id,
+      jsonlPath: path,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async () => ({ summary: 'needleterm summary.', tags: ['pi'] }),
+    }));
+
+    expect(searchFtsSessions('needleterm').map((result) => result.id)).toContain(session.id);
   });
 });
 

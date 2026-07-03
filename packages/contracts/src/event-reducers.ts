@@ -447,7 +447,17 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'agent.status_changed': {
-      const agent = state.agentsById[event.payload.agentId]
+      const agent = state.agentsById[event.payload.agentId] ?? (
+        event.payload.role === 'strike' && event.payload.issueId
+          ? {
+              id: event.payload.agentId,
+              issueId: event.payload.issueId,
+              status: event.payload.status,
+              role: 'strike' as const,
+              startedAt: event.timestamp,
+            }
+          : undefined
+      )
       if (!agent) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
       const nextTurnDiffSummariesByAgentId = isTerminalTurnDiffSummaryStatus(event.payload.status)
         ? omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId)
@@ -500,6 +510,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           [event.payload.agentId]: nextAgent,
         },
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
+        agentIdBySessionId: event.payload.sessionId
+          ? { ...state.agentIdBySessionId, [event.payload.sessionId]: event.payload.agentId }
+          : state.agentIdBySessionId,
       }
     }
 
