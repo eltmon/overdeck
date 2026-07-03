@@ -124,6 +124,7 @@
   "src/lib/lifecycle/types.ts",
   "src/lib/multi-tool-sync.ts",
   "src/lib/overdeck/discussions.ts",
+  "src/lib/overdeck/issue-close-out.ts",
   "src/lib/overdeck/issue-transitions.ts",
   "src/lib/overdeck/planning-promotion.ts",
   "src/lib/overdeck/planning-sessions.ts",
