@@ -188,6 +188,20 @@ describe('handleCheckSuite', () => {
       ]),
     }));
   });
+
+  it('invalidates PR tab cache for check suite events', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'success',
+        pull_requests: [{ number: 1, head: { ref: 'feature/pan-123' } }],
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
+  });
 });
 
 describe('handleCheckRun', () => {
@@ -233,6 +247,20 @@ describe('handleCheckRun', () => {
         expect.objectContaining({ type: 'failing_checks' }),
       ]),
     }));
+  });
+
+  it('invalidates PR tab cache for check run events', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleCheckRun(makePayload({
+      check_run: {
+        status: 'completed',
+        conclusion: 'success',
+        pull_requests: [{ number: 1, head: { ref: 'feature/pan-123' } }],
+      },
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
   });
 });
 
@@ -809,6 +837,17 @@ describe('handleStatus', () => {
     })));
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('invalidates PR tab cache for status events', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleStatus(makePayload({
+      state: 'success',
+      branches: [{ name: 'feature/pan-333' }],
+    })));
+
+    expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-333');
   });
 });
 

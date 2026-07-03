@@ -314,6 +314,8 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
+    bumpIssuePrTabCacheGeneration(issueId);
+
     const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
     if (!status) continue;
 
@@ -357,6 +359,8 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   for (const pr of run.pull_requests) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
+
+    bumpIssuePrTabCacheGeneration(issueId);
 
     const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
     if (!status) continue;
@@ -616,6 +620,8 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
   for (const branch of branches) {
     const issueId = issueIdFromBranch(branch.name);
     if (issueId) {
+      bumpIssuePrTabCacheGeneration(issueId);
+
       const status = await loadAndValidateStatus(issueId, repo, undefined, payload.sha);
       if (!status) continue;
 

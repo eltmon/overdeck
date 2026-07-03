@@ -12,9 +12,34 @@
       "timestamp": "2026-07-03T14:14:16.627Z",
       "reason": "end",
       "note": "Implemented GraphQL quota defense-in-depth and App REST routing across the planned surfaces. Added the GraphQL cooldown gate, App REST helper APIs, cached PR/discussions tab fetches with webhook invalidation, App REST PR lookup for forge/merge/deacon checks, REST issue-state checks, and REST-backed flywheel label inventory. Verification passed: npm run typecheck; npm run lint; focused vitest suites for github cooldown, github-app, webhook-handlers, forge, merge post-step, issue-closed, orphan proposed reconciler, flywheel surfaces, issue-pr, and issue-discussions. Anomaly: broad npm test was attempted and showed multiple unrelated existing failures/hangs before interruption; focused gates for touched code passed. Deviations: routes/webhooks.ts was touched to dispatch issue_comment cache invalidation; merge-agent tests used existing pan-444 post-merge coverage because no merge-agent.test.ts exists. pan done required --force because the issue-state verification path still uses gh issue view and GitHub GraphQL is exhausted for this token."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T14:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-03T14:16:49.660Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-03T14:16Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-03T14:16:53.795Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T14:16:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2265\n\nPR cache is not invalidated by CI webhooks, leaving statusCheckRollup stale\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2265 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-03T14:16:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2265\n\nPR cache is not invalidated by CI webhooks, leaving statusCheckRollup stale\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2265 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/issues.jsonl",
@@ -89,16 +114,17 @@
     "recordedAt": "2026-07-03T14:14:06.848Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T14:14:23.943Z",
+  "updated": "2026-07-03T14:16:53.795Z",
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T14:14:23.770Z",
+    "updatedAt": "2026-07-03T14:16:49.610Z",
+    "reviewNotes": "PR cache is not invalidated by CI webhooks, leaving statusCheckRollup stale",
     "inspectNotes": "workspace-06h3z passed. The diff implements the requested App REST Promise and Effect helpers in src/lib/github-app.ts, with tests covering owner-qualified PR head lookup, issue state lookup, paginated issue-label listing, PR filtering, and wrapper exports. No constraint violations found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
     "reviewRequestedAt": "2026-07-03T14:14:16.629Z",
@@ -189,8 +215,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 28828,
-            "output": 1025,
+            "input": 31152,
+            "output": 1200,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -212,8 +238,8 @@
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 28828,
-          "output": 1025,
+          "input": 31152,
+          "output": 1200,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -226,7 +252,7 @@
       },
       "costAtCloseOut": {
         "usd": 7.974399,
-        "pricingAsOf": "2026-07-03T14:14:23.866Z"
+        "pricingAsOf": "2026-07-03T14:16:49.652Z"
       }
     },
     "merges": [
