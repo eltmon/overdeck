@@ -3,29 +3,14 @@
   "schemaVersion": 2,
   "sessionHistory": [
     {
-      "timestamp": "2026-07-03T02:38:26.908Z",
+      "timestamp": "2026-07-03T03:05:13.334Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     },
     {
       "reason": "resume",
       "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T02:38:27.228Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-03T02:40Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-07-03T02:40:06.414Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T02:42:43.305Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-07-03T02:46:44.518Z"
+      "timestamp": "2026-07-03T03:05:13.630Z"
     }
   ],
   "feedback": [],
@@ -36,6 +21,7 @@
       "src/dashboard/server/routes/__tests__/specialists.test.ts",
       "src/dashboard/server/routes/specialists/legacy-routes.ts",
       "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+      "src/lib/__tests__/agent-state-role.test.ts",
       "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
       "src/lib/cloister/__tests__/inspect-agent.test.ts",
       "src/lib/vbrief/__tests__/io.test.ts",
@@ -83,6 +69,7 @@
       "src/dashboard/server/routes/tiered-callouts.ts",
       "src/dashboard/server/routes/tiered-inspect-escalation.ts",
       "src/dashboard/server/server.ts",
+      "src/lib/__tests__/agent-state-role.test.ts",
       "src/lib/agents/__tests__/resolve-tier.test.ts",
       "src/lib/agents/__tests__/tier-escalation.test.ts",
       "src/lib/agents/__tests__/tier-feed.test.ts",
@@ -104,7 +91,7 @@
       "tests/unit/dashboard/routes/tiered-callouts.test.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
-    "recordedAt": "2026-07-03T02:38:21.164Z"
+    "recordedAt": "2026-07-03T03:03:41.361Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -167,18 +154,18 @@
   },
   "pipeline": {
     "issueId": "PAN-2222",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T02:49:03.535Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-03T03:05:34.326Z",
+    "testNotes": "npm run typecheck passed; npm run lint initially OOMed during build:cli, rerun passed; npm test under sandbox failed with EPERM for spawn/listen, rerun elevated completed with 1 failed test: src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > PAN-2017: fails and stops a strike spawn when kickoff delivery fails, ENOTEMPTY rmdir /tmp/pan-agent-role-lmi50p. UAT not required: acceptance is backend/library/config/docs with no UI/dashboard criterion.",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
     "lastVerifiedCommit": "29f476e8813f2b18c2a6b7edb0832494e8f661b1",
-    "reviewRequestedAt": "2026-07-03T02:38:26.910Z",
+    "reviewRequestedAt": "2026-07-03T03:05:13.336Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/records/pan-2222.json",
@@ -186,6 +173,7 @@
         "src/dashboard/server/routes/__tests__/specialists.test.ts",
         "src/dashboard/server/routes/specialists/legacy-routes.ts",
         "src/dashboard/server/routes/tiered-inspect-escalation.ts",
+        "src/lib/__tests__/agent-state-role.test.ts",
         "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
         "src/lib/cloister/__tests__/inspect-agent.test.ts",
         "src/lib/vbrief/__tests__/io.test.ts",
@@ -233,6 +221,7 @@
         "src/dashboard/server/routes/tiered-callouts.ts",
         "src/dashboard/server/routes/tiered-inspect-escalation.ts",
         "src/dashboard/server/server.ts",
+        "src/lib/__tests__/agent-state-role.test.ts",
         "src/lib/agents/__tests__/resolve-tier.test.ts",
         "src/lib/agents/__tests__/tier-escalation.test.ts",
         "src/lib/agents/__tests__/tier-feed.test.ts",
@@ -254,7 +243,7 @@
         "tests/unit/dashboard/routes/tiered-callouts.test.ts",
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
-      "recordedAt": "2026-07-03T02:38:21.164Z"
+      "recordedAt": "2026-07-03T03:03:41.361Z"
     }
   },
   "closeOut": {
@@ -262,10 +251,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 9811,
-            "output": 37523,
-            "cacheRead": 29622848,
-            "cacheWrite": 1097788
+            "input": 10084,
+            "output": 47065,
+            "cacheRead": 31444376,
+            "cacheWrite": 1109430
           }
         },
         "inspect": {
@@ -295,10 +284,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 28867,
-          "output": 101756,
-          "cacheRead": 40251980,
-          "cacheWrite": 1451473
+          "input": 29140,
+          "output": 111298,
+          "cacheRead": 42073508,
+          "cacheWrite": 1463115
         },
         "openai/gpt-5.5": {
           "input": 1784346,
@@ -314,8 +303,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 82.318182,
-        "pricingAsOf": "2026-07-03T02:49:03.577Z"
+        "usd": 84.765067,
+        "pricingAsOf": "2026-07-03T03:05:34.380Z"
       }
     },
     "merges": [
@@ -334,6 +323,6 @@
       }
     ]
   },
-  "created": "2026-07-03T02:36:55.911Z",
-  "updated": "2026-07-03T02:49:03.588Z"
+  "created": "2026-07-03T02:56:10.923Z",
+  "updated": "2026-07-03T03:05:34.381Z"
 }
