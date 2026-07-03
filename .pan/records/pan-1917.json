@@ -6,6 +6,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T16:03:01.578Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:57:06.484Z"
     }
   ],
   "feedback": [],
@@ -60,13 +65,14 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:15:50.932Z",
+    "updatedAt": "2026-07-03T16:57:11.586Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed test failures",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
@@ -224,7 +230,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.223207,
-        "pricingAsOf": "2026-07-03T16:15:51.029Z"
+        "pricingAsOf": "2026-07-03T16:57:11.620Z"
       }
     },
     "merges": [
@@ -258,5 +264,5 @@
     }
   },
   "created": "2026-07-03T15:31:39.762Z",
-  "updated": "2026-07-03T16:15:51.041Z"
+  "updated": "2026-07-03T16:57:11.633Z"
 }
