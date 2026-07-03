@@ -120,6 +120,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-wipe', label: 'pan wipe', description: 'Deep wipe: completely reset all state', insert: 'pan wipe ', category: 'Lifecycle' },
   { id: 'pan-close', label: 'pan close', description: 'Close out a completed issue', insert: 'pan close ', category: 'Lifecycle' },
   { id: 'pan-plan', label: 'pan plan', description: 'Create execution plan before spawning', insert: 'pan plan ', category: 'Lifecycle' },
+  { id: 'pan-plan-auto-start', label: 'pan plan --auto --auto-start', description: 'Auto-plan the issue, then auto-start the work agent', insert: 'pan plan --auto --auto-start ', category: 'Lifecycle' },
   { id: 'pan-plan-finalize', label: 'pan plan finalize', description: 'Materialize plan to beads', insert: 'pan plan finalize ', category: 'Lifecycle' },
   { id: 'pan-issues', label: 'pan issues', description: 'List and triage issues from configured trackers', insert: 'pan issues', category: 'Lifecycle' },
 
