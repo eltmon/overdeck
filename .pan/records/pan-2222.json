@@ -55,7 +55,9 @@
       "src/lib/agents/__tests__/tiered-execution-e2e.test.ts",
       "src/lib/cloister/__tests__/inspect-agent.test.ts",
       "src/lib/vbrief/__tests__/io.test.ts",
-      "src/lib/vbrief/continue-state.ts"
+      "src/lib/vbrief/continue-state.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map"
     ],
     "declaredScopeUntouched": [
       "src/lib/agents/__tests__/tier-supervisor.test.ts",
@@ -110,9 +112,11 @@
       "src/lib/vbrief/__tests__/io.test.ts",
       "src/lib/vbrief/continue-state.ts",
       "src/lib/vbrief/io.ts",
+      "sync-sources/hooks/record-cost-event.js",
+      "sync-sources/hooks/record-cost-event.js.map",
       "tests/unit/dashboard/routes/tiered-callouts.test.ts"
     ],
-    "recordedAt": "2026-07-03T00:22:02.226Z"
+    "recordedAt": "2026-07-03T00:58:13.501Z"
   },
   "harness": "codex",
   "model": "gpt-5.5",
@@ -325,5 +329,5 @@
     "slotAssignments": []
   },
   "created": "2026-07-02T23:14:10.593Z",
-  "updated": "2026-07-03T00:48:28.050Z"
+  "updated": "2026-07-03T00:58:13.502Z"
 }
