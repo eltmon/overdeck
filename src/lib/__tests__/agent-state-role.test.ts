@@ -218,6 +218,7 @@ describe('AgentState role persistence', () => {
       isPaneDead: vi.fn(() => false),
     }));
     vi.doMock('../cloister/agent-idle.js', () => ({
+      getAgentEffectiveLastActivityMs: vi.fn(() => Date.now()),
       isAgentIdleForNudge: vi.fn(() => true),
     }));
     vi.doMock('../cloister/issue-closed.js', () => ({

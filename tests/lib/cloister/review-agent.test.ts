@@ -993,7 +993,7 @@ describe('dispatch failure reviewStatus regression', () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/specialists.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/specialists/project-routes.ts'),
       'utf-8',
     );
 

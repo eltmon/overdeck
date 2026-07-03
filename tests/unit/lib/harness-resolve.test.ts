@@ -103,6 +103,14 @@ describe('resolveHarness', () => {
     await expect(resolveHarness({ model: 'glm-5.1' })).resolves.toBe('ohmypi');
   });
 
+  it('rejects unknown model ids before choosing a harness', async () => {
+    const { resolveHarness } = await loadSubject();
+
+    await expect(resolveHarness({ model: 'glm5.2' })).rejects.toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
+    expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
+    expect(mocks.exec).not.toHaveBeenCalled();
+  });
+
   it('passes the resolved provider-default winner through the harness policy gate', async () => {
     mocks.getProviderAuthMode.mockResolvedValue('subscription');
     mocks.canUseHarnessSync.mockReturnValue({ allowed: false, reason: 'blocked' });

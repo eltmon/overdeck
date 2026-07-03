@@ -1,9 +1,9 @@
 import { Effect } from 'effect';
 
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
+import { readIssueRecordSync, writeIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
 import { markWorkspaceStuck } from '../review-status.js';
-import { sessionExists } from '../tmux.js';
+import { listSessionNames, sessionExists } from '../tmux.js';
 
 export type IssueFeedbackTarget =
   | { agentId: string }
@@ -21,6 +21,45 @@ function slotAgentId(issueId: string, slotIndex: number, assignedAgentId?: strin
   return assignedAgentId ?? `agent-${issueId.toLowerCase()}-slot-${slotIndex}`;
 }
 
+async function findLiveUnregisteredSlot(issueId: string): Promise<{ agentId: string; slotIndex: number } | null> {
+  const prefix = `agent-${issueId.toLowerCase()}-slot-`;
+  const sessions = await Effect.runPromise(listSessionNames());
+  for (const session of sessions) {
+    if (!session.startsWith(prefix)) continue;
+    const slotIndex = Number.parseInt(session.slice(prefix.length), 10);
+    if (!Number.isInteger(slotIndex) || slotIndex < 1) continue;
+    if (await isLiveSession(session)) return { agentId: session, slotIndex };
+  }
+  return null;
+}
+
+function selfHealSlotAssignment(record: PanIssueRecord, agentId: string, slotIndex: number, itemId?: string): PanIssueRecord {
+  const assignments = record.swarm?.slotAssignments ?? [];
+  const existing = assignments.find((assignment) => assignment.slotIndex === slotIndex || assignment.agentId === agentId);
+  const assignedAt = new Date().toISOString();
+  const slotAssignments = existing
+    ? assignments.map((assignment) => assignment === existing
+      ? { ...assignment, agentId, itemId: itemId ?? assignment.itemId, assignedAt: assignment.assignedAt ?? assignedAt }
+      : assignment)
+    : [
+      ...assignments,
+      {
+        slotIndex,
+        itemId: itemId ?? `slot-${slotIndex}`,
+        agentId,
+        assignedAt,
+      },
+    ];
+
+  return {
+    ...record,
+    swarm: {
+      ...record.swarm,
+      slotAssignments,
+    },
+  };
+}
+
 export async function resolveIssueFeedbackTarget(
   issueId: string,
   opts: ResolveIssueFeedbackTargetOptions = {},
@@ -35,9 +74,8 @@ export async function resolveIssueFeedbackTarget(
 
   const resolved = resolveProjectFromIssueSync(normalizedIssue);
   const project = resolved ? getProjectSync(resolved.projectKey) : null;
-  const assignments = project
-    ? readIssueRecordSync(project, normalizedIssue)?.swarm?.slotAssignments ?? []
-    : [];
+  const record = project ? readIssueRecordSync(project, normalizedIssue) : null;
+  const assignments = record?.swarm?.slotAssignments ?? [];
 
   const requestedItemId = opts.itemId?.trim();
   if (requestedItemId) {
@@ -51,6 +89,14 @@ export async function resolveIssueFeedbackTarget(
   for (const assignment of assignments) {
     const agentId = slotAgentId(normalizedIssue, assignment.slotIndex, assignment.agentId);
     if (await isLiveSession(agentId)) return { agentId };
+  }
+
+  if (project && record) {
+    const fallback = await findLiveUnregisteredSlot(normalizedIssue);
+    if (fallback) {
+      writeIssueRecordSync(project, normalizedIssue, selfHealSlotAssignment(record, fallback.agentId, fallback.slotIndex, requestedItemId));
+      return { agentId: fallback.agentId };
+    }
   }
 
   const suffix = requestedItemId ? ` for item ${requestedItemId}` : '';

@@ -1,0 +1,850 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-07-03T01:03:19.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1917: /sessions page redesign: unify with conversation view",
+    "updated": "2026-07-03T01:18:32.783Z"
+  },
+  "plan": {
+    "id": "pan-1917",
+    "title": "/sessions page redesign: unify with conversation view",
+    "status": "proposed",
+    "uid": "d4d53978-aa5e-4ea6-92d7-8a6c9819e372",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-03T01:03:19.000Z",
+    "updated": "2026-07-03T01:18:32.783Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1917",
+        "label": "PAN-1917",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-1917.md",
+        "label": "PRD (verified refs, decisions D-1..D-8)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "sessions",
+      "performance",
+      "redesign"
+    ],
+    "narratives": {
+      "Problem": "The /sessions page is an off-theme, non-paginated UI disconnected from the canonical conversation view. It caps browsing at 50 rows per source with client-side merging, computes facet counts from only the loaded slice (wrong at 6,861 discovered rows), renders no transcript at all (SessionDetail is metadata-only), uses hardcoded gray styling, and offers no deep-linking. Users cannot review agent transcripts from /sessions the way they can everywhere else in the dashboard.",
+      "Proposal": "Follow the PRD at .pan/drafts/pan-1917.md exactly (all decisions D-1..D-8 are made there; do not re-litigate). Build a unified server-side-paginated sessions feed (keyset cursor, new module src/lib/overdeck/sessions-feed.ts) with server-side facet aggregates; expose it over new WS RPC methods through the dashboard-db-worker; add conversationId/conversationName to discovered-session rows via the existing conversation_files join; add a REST messages endpoint for unmanaged sessions parsed through the existing transcript-adapter stack; rework the detail region into a compact collapsible metadata header above an embedded transcript (ConversationPanel embedded for managed rows, MessagesTimeline for unmanaged); add ?session=<source>:<id> deep-linking and an Open in Command Deck action; virtualize the list with useVirtualizer + useInfiniteQuery; re-skin all five components to theme tokens per the style guide; gate deletion of legacy affordances behind a no-loss audit test; measure performance baseline before and after.",
+      "NonGoals": "- Multi-harness discovery/parsing (PAN-2224); WI-4 endpoint is shaped for a future harness parameter but implements Claude Code parsing only\n- Optimizing the semantic-search O(N) cosine scan (topKCosine)\n- Deleting the legacy data-layer twins src/lib/database/discovered-sessions-db.ts and conversations-db.ts (PAN-1983/PAN-1984); they are frozen — do not modify them\n- Removing the REST GET /api/conversations/archived endpoint (stays per D-5, CLI/API compat)\n- Background rescan scheduling; the ScanButton/POST /scan trigger model is unchanged"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the PRD's decisions D-1 through D-8 verbatim without re-opening them",
+        "rationale": "The PRD was authored 2026-07-02 with every file/line reference verified; this planning session re-verified key references (attachConversationTitles:228, summaryDetailed ws-rpc.ts:437, bg-gray-950 ConversationsPage.tsx:488, ListDiscoveredSessionsRpc rpc.ts:480) and they all hold in this workspace."
+      },
+      {
+        "summary": "Split WI-10 into two beads: perf-baseline (before the feed lands) and perf-verify (after virtualization)",
+        "rationale": "The issue AC requires measuring the baseline first; a single bead could not be sequenced both before WI-1 and after WI-7."
+      },
+      {
+        "summary": "Only the feed data layer bead requires inspection",
+        "rationale": "Its row shape, cursor semantics, and dedup rule are the foundation the RPC contract and the frontend list encode assumptions about; all other beads are precisely specified by the PRD and surface defects at typecheck/tests/review."
+      },
+      {
+        "summary": "Serialized theme-reskin after the virtualized list rework",
+        "rationale": "Both beads rewrite SessionTable.tsx and ConversationsPage.tsx; serializing avoids merge conflicts inside one workspace."
+      },
+      {
+        "summary": "conversation-identity (WI-3) blocks the contracts bead (WI-2) rather than following it",
+        "rationale": "SessionsFeedRowSnapshot includes optional conversationId/conversationName, so the DiscoveredSession fields must exist before the snapshot mapper is written; the PRD allows WI-3 to land with WI-1/2 in one PR."
+      },
+      {
+        "summary": "ConversationPanel-embedded checkpoint fallback recorded as a hazard, not a question",
+        "rationale": "The PRD defines the fallback explicitly (render MessagesTimeline via useConversationMessagesStream for managed rows); auto mode records it rather than escalating."
+      }
+    ],
+    "items": [
+      {
+        "id": "perf-baseline",
+        "title": "Record /sessions performance baseline before the feed lands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-1917.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view 1917 --comments"
+          ],
+          "expected_outputs": [
+            "a comment on PAN-1917 containing baseline timings for the current /sessions data path"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ],
+          "acJustification": "Measurement-only bead; two criteria fully cover the deliverable."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 step 1: before any feed code lands, time the current listDiscoveredSessions 50-row worker job and the GET /api/conversations/archived REST call against the live ~6.9k-row DB, and note page TTI from browser devtools. Post the numbers as a comment on PAN-1917 and append them to the PRD draft under WI-10 so perf-verify can compare."
+        },
+        "items": [
+          {
+            "id": "perf-baseline.ac1",
+            "title": "A comment on PAN-1917 records timed listDiscoveredSessions (50-row job) and archived REST call durations plus page TTI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "perf-baseline.ac2",
+            "title": "The PRD draft .pan/drafts/pan-1917.md WI-10 section preserves the same baseline numbers for later comparison",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-data-layer",
+        "title": "Unified sessions feed with keyset pagination and server-side facets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1917",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "feed-contracts-rpc",
+            "virtualized-feed-list"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/sessions-feed.ts",
+            "src/lib/overdeck/discovered-sessions.ts",
+            "tests/unit/lib/overdeck/sessions-feed.test.ts",
+            "tests/bench/sessions-feed.bench.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/sessions-feed.test.ts",
+            "npx vitest run tests/bench/sessions-feed.bench.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sessions-feed.test.ts suite green: ordering, cursor walk, dedup, facet, filter cases all assert",
+            "bench asserts a 50-row page under 100 ms at 10k rows",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1: create NEW module src/lib/overdeck/sessions-feed.ts (D-3 — do not grow discovered-sessions.ts/conversations.ts; the only change to discovered-sessions.ts is exporting buildFilterSql). Implement listSessionsFeed(filter) returning { rows, nextCursor } as a UNION of discovered_sessions (projected columns per WI-1 step 1, source='discovered') and archived conversations LEFT JOIN discovered_sessions enrichment (reuse the join in listArchivedConversationsWithEnrichment, src/lib/overdeck/conversations.ts:1039; source='managed-archived' with archived_at, c.id AS conversation_id, c.name AS conversation_name, c.harness). Order last_ts DESC, id DESC; keyset WHERE (last_ts, id) < (:cursorTs, :cursorId); LIMIT n+1 to derive nextCursor. Dedup: exclude discovered rows whose session_id matches an archived conversation's session locator — the archived row wins and carries discoveredId. Implement getSessionsFeedFacets(filter) with SQL aggregates: GROUP BY primary_model; tag/tool/file counts from discovered_session_tags/tools/files side tables; enrichment_level GROUP BY; time buckets 24h/7d/30d/older and cost buckets <$0.10/$0.10-1/$1-10/>$10 via CASE (D-7, matching existing client buckets); source counts. Both functions accept existing ConversationFilter fields and reuse the exported buildFilterSql. Rows exclude summaryDetailed/toolsUsed/filesTouched (NFR-2). Bench file patterned on src/dashboard/server/services/resource-discovery.bench.ts. No execSync (NFR-4); fake timers if any delay logic appears in tests (NFR-5)."
+        },
+        "items": [
+          {
+            "id": "feed-data-layer.ac1",
+            "title": "listSessionsFeed returns discovered and managed-archived rows in one list globally ordered by last_ts DESC, id DESC",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-data-layer.ac2",
+            "title": "Given concurrent inserts, a keyset cursor walk returns every seeded row exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-data-layer.ac3",
+            "title": "When an archived conversation's JSONL was also discovered, the feed emits only the archived row and it carries discoveredId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-data-layer.ac4",
+            "title": "getSessionsFeedFacets returns counts over the full filtered corpus while rows returns a single page, and each ConversationFilter field narrows both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-data-layer.ac5",
+            "title": "The bench produces a 50-row page (query + mapping) in under 100 ms against a 10,000-row corpus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-identity",
+        "title": "Expose conversationId/conversationName on discovered session rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/discovered-sessions.ts",
+            "packages/contracts/src/types.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "tests/unit/lib/overdeck/discovered-sessions.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck --reporter=dot",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "discovered-sessions data-layer tests assert id+name+title propagation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: in src/lib/overdeck/discovered-sessions.ts, rename attachConversationTitles (line 228) to attachConversationRefs and change its SQL to also select c.id AS conversationId and c.name AS conversationName, dropping the c.title IS NOT NULL guard (identity matters even untitled; title stays optional). Exact before/after SQL is in the PRD WI-3 section. Populate new optional conversationId/conversationName fields on DiscoveredSession, DiscoveredSessionSnapshot (packages/contracts/src/types.ts:628-659), and the toDiscoveredSessionSnapshot mapper (src/dashboard/server/ws-rpc.ts:418). Rebuild contracts after editing packages/contracts (cd packages/contracts && npm run build). Extend the existing discovered-sessions data-layer test file; if no such file exists, create tests/unit/lib/overdeck/discovered-sessions.test.ts."
+        },
+        "items": [
+          {
+            "id": "conversation-identity.ac1",
+            "title": "When a discovered session matches a managed conversation via conversation_files, its row returns conversationId, conversationName, and title over RPC",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-identity.ac2",
+            "title": "An untitled managed conversation still returns conversationId and conversationName on its session row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-identity.ac3",
+            "title": "An unmanaged session row returns no conversationId or conversationName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-contracts-rpc",
+        "title": "Contracts, worker jobs, and WS RPC for the sessions feed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/server/services/dashboard-db-worker.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/ws-rpc-sessions-feed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-rpc-sessions-feed.test.ts asserts schema round-trips and no summaryDetailed key on feed rows",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: (1) in packages/contracts/src/types.ts add SessionsFeedRowSnapshot (WI-1 projected fields + source: 'discovered' | 'managed-archived', optional conversationId, conversationName, conversationTitle, archivedAt, harness, discoveredId) and SessionsFeedFacetsSnapshot, patterned on DiscoveredSessionSnapshot at types.ts:628-659. (2) in packages/contracts/src/rpc.ts add WS_METHODS.listSessionsFeed and WS_METHODS.getSessionsFeedFacets plus their Rpc.make declarations, patterned on listDiscoveredSessions (rpc.ts:26) and ListDiscoveredSessionsRpc (rpc.ts:480). (3) in src/dashboard/server/services/dashboard-db-worker.ts add 'listSessionsFeed' and 'getSessionsFeedFacets' job cases patterned on the 'listDiscoveredSessions' case at line 66, calling the WI-1 module. (4) in src/dashboard/server/ws-rpc.ts add handlers mapping worker results to the snapshots — feed rows MUST NOT include summaryDetailed (NFR-2). Rebuild contracts after editing packages/contracts."
+        },
+        "items": [
+          {
+            "id": "feed-contracts-rpc.ac1",
+            "title": "Each new RPC method returns a schema-valid response in the round-trip test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-contracts-rpc.ac2",
+            "title": "A serialized feed row contains no summaryDetailed key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-contracts-rpc.ac3",
+            "title": "The worker routes listSessionsFeed and getSessionsFeedFacets jobs through the existing runDashboardDbJob path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unmanaged-messages-endpoint",
+        "title": "REST messages endpoint for unmanaged discovered sessions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/discovered-sessions.ts",
+            "tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+            "tests/unit/dashboard/server/routes/fixtures/discovered-session-transcript.jsonl"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "endpoint test asserts fixture parse, 404, 409, and 410 paths",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: add GET /api/discovered-sessions/:id/messages to src/dashboard/server/routes/discovered-sessions.ts (auth-gated like siblings; Layer assembled at line 790). Resolve the row via the existing getDiscoveredSession worker job; 404 if missing. If the row has a conversationName (from conversation-identity), return 409 directing the client to /api/conversations/:name/messages (one transcript door per case). Parse jsonlPath through the same adapter stack as GET /api/conversations/:name/messages — getTranscriptAdapter in src/dashboard/server/services/transcript-adapter.ts:108, Claude Code adapter only (Non-goal: multi-harness is PAN-2224; shape the handler so a harness parameter can be added later). Return the same { messages } response shape so frontend message types are reused unchanged. Cache parsed results keyed (path, mtime, size) in an LRU like messagesCache (routes/conversations.ts:438), max 20 entries. Deleted JSONL (file missing on disk) returns 410 with a clear error body. No execSync; async fs only."
+        },
+        "items": [
+          {
+            "id": "unmanaged-messages-endpoint.ac1",
+            "title": "GET /api/discovered-sessions/:id/messages returns a fixture JSONL parsed to the same { messages } shape as /api/conversations/:name/messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unmanaged-messages-endpoint.ac2",
+            "title": "A missing row returns 404, a managed row returns 409, and a deleted JSONL file returns 410",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unmanaged-messages-endpoint.ac3",
+            "title": "A repeated request for an unchanged file returns the LRU-cached parse keyed by (path, mtime, size)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detail-transcript",
+        "title": "Detail region: compact metadata header above embedded transcript",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+            "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+            "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+            "src/dashboard/frontend/src/components/conversations/__tests__/SessionDetail.test.tsx",
+            "src/dashboard/frontend/src/components/conversations/__tests__/SessionTranscript.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/conversations/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SessionTranscript tests assert ConversationPanel for managed rows and MessagesTimeline for unmanaged rows",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5 and D-4: create SessionTranscript.tsx. Managed row (conversationId present): fetch GET /api/conversations/<conversationId> -> Conversation -> <ConversationPanel conversation embedded /> — copy the recipe from App/StandaloneRoutes.tsx:48-90 (react-query, refetchInterval: 5000). EventRouter is already mounted globally at App.tsx:648 — do NOT mount another. Unmanaged row: fetch the discovered-sessions messages endpoint -> <MessagesTimeline messages={messages} workLog={[]} streaming={false} resolvedTheme={...} /> (props verified at chat/messagesTimeline/types.ts:23-50). Rework SessionDetail.tsx into a collapsible metadata header above SessionTranscript keeping EVERY current field (Summary, Detailed, Tags, Metadata rows, Tools, Files, JSONL path) and EVERY action (enrich L1/L2/L3, embed, Unarchive with its success/error states at SessionDetail.tsx:315-326). In ConversationsPage.tsx the detail region becomes a flexible split, not fixed w-96. IMPLEMENTATION CHECKPOINT: verify ConversationPanel embedded renders acceptably in the right pane for an ended session (static transcript, no composer). FALLBACK if it fights the layout: render MessagesTimeline for managed rows too, fed from /api/conversations/:name/messages via the existing useConversationMessagesStream hook — live streaming is preserved either way; document the fallback in the PR if taken. A 410 from the messages endpoint renders a 'transcript file no longer on disk' notice."
+        },
+        "items": [
+          {
+            "id": "detail-transcript.ac1",
+            "title": "Selecting a managed-archived row renders the canonical ConversationPanel in embedded mode (same renderer as Command Deck)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-transcript.ac2",
+            "title": "Selecting an unmanaged row renders its transcript via MessagesTimeline fed from the discovered-sessions messages endpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-transcript.ac3",
+            "title": "A 410 response renders a 'transcript file no longer on disk' notice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-transcript.ac4",
+            "title": "The metadata header preserves every current SessionDetail field and action, including enrich L1/L2/L3, embed, and Unarchive with its success/error states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deep-link-selection",
+        "title": "Deep-linkable selection and Open in Command Deck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+            "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+            "src/dashboard/frontend/src/App/__tests__/routes.test.ts",
+            "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App src/components/conversations --reporter=dot",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "routes helper tests assert parse/serialize of the session param; page tests assert URL-driven selection",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: URL format /sessions?session=<source>:<id> (e.g. discovered:4123, managed-archived:87). Add a getSessionKeyFromSearch helper in src/dashboard/frontend/src/App/routes.ts (deep-link pattern: getConvIdFromPath at routes.ts:110-119, buildConversationUrl at :143-168). Pass initialSessionKey into the page following the selectedConvId wiring pattern (App.tsx:131-132 -> AppRoutes.tsx:100-103). In ConversationsPage.tsx sync selection <-> ?session= using history.replaceState (no history entry per click). Add an 'Open in Command Deck' button to the detail header for managed rows navigating to buildConversationUrl(String(conversationId))."
+        },
+        "items": [
+          {
+            "id": "deep-link-selection.ac1",
+            "title": "When /sessions?session=discovered:<id> loads, the page marks that row selected on mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deep-link-selection.ac2",
+            "title": "Clicking a row updates the URL via history.replaceState without adding history entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deep-link-selection.ac3",
+            "title": "Open in Command Deck opens buildConversationUrl(conversationId) (/conv/<id>) for a managed row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "virtualized-feed-list",
+        "title": "Virtualized infinite list over the sessions feed RPC",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+            "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+            "src/dashboard/frontend/src/components/conversations/__tests__/ConversationsPage.test.tsx",
+            "src/dashboard/frontend/src/components/conversations/feedPages.ts",
+            "src/dashboard/frontend/src/components/conversations/__tests__/feedPages.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/conversations --reporter=dot",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feedPages pure-function test asserts accumulation and dedup; ConversationsPage tests assert the new query shape",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: rework SessionTable.tsx to useVirtualizer from @tanstack/react-virtual (dependency already in the app via MessagesTimeline). Switch browse in ConversationsPage.tsx to useInfiniteQuery over WS_METHODS.listSessionsFeed with the keyset cursor from feed-data-layer. DELETE the client-side merge ([...discoveredSessions, ...archivedSessions].sort at ConversationsPage.tsx:440-446) and the client facet counting (countFacetValues block at :450-461) in favor of WS_METHODS.getSessionsFeedFacets. Extract the page-merge/accumulation logic into a pure function (feedPages.ts) and unit-test that, avoiding virtualizer DOM flakiness. Compact row target: single line — status dot, title/summary truncated, badges, model, msgs, cost, relative time (kanban-card density per the style guide). FTS search mode keeps its existing offset paging (D-2). Source chips All/Discovered/Managed-archived become a feed filter, not separate queries (D-8)."
+        },
+        "items": [
+          {
+            "id": "virtualized-feed-list.ac1",
+            "title": "Scrolling with load-more renders the last row of the full corpus (no 50-row cap)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "virtualized-feed-list.ac2",
+            "title": "The list renders a bounded number of DOM rows while scrolling a 10,000-row corpus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "virtualized-feed-list.ac3",
+            "title": "The page-accumulation pure function produces a deduplicated row list across pages in its unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "virtualized-feed-list.ac4",
+            "title": "The page renders facet counts from getSessionsFeedFacets and no longer computes them client-side from the loaded slice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "theme-reskin",
+        "title": "Re-skin the five conversations components to theme tokens and style guide",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/conversations/ConversationsPage.tsx",
+            "src/dashboard/frontend/src/components/conversations/SessionTable.tsx",
+            "src/dashboard/frontend/src/components/conversations/SessionDetail.tsx",
+            "src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx",
+            "src/dashboard/frontend/src/components/conversations/FacetPanel.tsx",
+            "src/dashboard/frontend/src/components/conversations/ScanButton.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rn 'bg-gray-950\\|bg-gray-900\\|rounded-full' src/dashboard/frontend/src/components/conversations/ || echo CLEAN",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grep produces CLEAN (zero matches) across the conversations components",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: consult the pan-style-guide skill BEFORE writing. Replace every bg-gray-*/text-gray-*/border-gray-* in the conversations components with theme tokens (bg-background, bg-card, text-foreground, text-muted-foreground, border-border). Badges: rounded-full -> squared rounded (match the already-converted SessionDetail.tsx:196-197); color only as signal (archived = muted, managed = accent), no cyan/amber decoration; drop font-semibold headers; the Scan button uses the standard button style, not bg-blue-700. Visual self-check with Playwright screenshots in BOTH themes using an ISOLATED browser instance/profile (repo rule: verify rendering yourself, never depend on another agent's browser session); attach screenshots to the PR."
+        },
+        "items": [
+          {
+            "id": "theme-reskin.ac1",
+            "title": "Each conversations component contains zero bg-gray-950, bg-gray-900, or rounded-full matches (string scan)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-reskin.ac2",
+            "title": "The page renders correctly in both light and dark themes, evidenced by Playwright screenshots from an isolated browser instance attached to the PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-reskin.ac3",
+            "title": "Every badge renders squared with signal-only color and every header renders without font-semibold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "No-loss audit gate test enumerating every legacy affordance",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/conversations/__tests__/sessions-page-no-loss.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/conversations/__tests__/sessions-page-no-loss.test.tsx"
+          ],
+          "expected_outputs": [
+            "the no-loss suite asserts every FR-7 affordance by role/label and the WI-8 string-scan guard"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ],
+          "acJustification": "Single-file audit deliverable: one criterion enumerates affordances, one locks the style regression guard."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: one RTL test file rendering the redesigned page (mocked queries) asserting the presence of every legacy affordance by role/label: search input; semantic toggle; Filters toggle; ScanButton; stats header; source chips (All/Discovered/Managed-archived); all nine facet groups (model, tags, tools, files, time, cost, enrichment level, source, workspace); active-filter chips; enrich L1/L2/L3 buttons; embed button; Unarchive button (managed-archived row); metadata fields (summary, detailed, tags, tools, files, jsonl path); transcript region; Open in Command Deck; load-more/infinite scroll affordance; search prev/next. Include the WI-8 mechanical guard: assert the conversations components contain no bg-gray-950/bg-gray-900/rounded-full string matches. This test is the deletion gate — legacy component code may only be removed once it goes green (repo no-loss audit rule)."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "sessions-page-no-loss.test.tsx renders the redesigned page and asserts every FR-7 affordance by role or label, including Unarchive, enrich L1/L2/L3, embed, and search prev/next",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "The suite fails when bg-gray-950, bg-gray-900, or rounded-full reappears in any conversations component (string-scan guard)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "perf-verify",
+        "title": "Post-redesign performance verification against baseline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-03T01:03:19.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-1917",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/bench/sessions-feed.bench.ts",
+            ".pan/drafts/pan-1917.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/bench/sessions-feed.bench.ts",
+            "gh issue view 1917 --comments"
+          ],
+          "expected_outputs": [
+            "bench asserts the 50-row page under 100 ms budget",
+            "a comment on PAN-1917 compares post-redesign numbers to the baseline"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ],
+          "acJustification": "Verification-only bead; two criteria fully cover the deliverable."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 step 2: after the virtualized feed list lands, re-measure the same operations as perf-baseline via the new feed path (feed RPC 50-row page, page TTI) and post a comparison comment on PAN-1917. Confirm tests/bench/sessions-feed.bench.ts (created in feed-data-layer) runs in CI and enforces NFR-3 (<100 ms per 50-row page at 10k rows) thereafter."
+        },
+        "items": [
+          {
+            "id": "perf-verify.ac1",
+            "title": "A comment on PAN-1917 records post-redesign measurements side-by-side with the baseline numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "perf-verify.ac2",
+            "title": "sessions-feed.bench.ts produces the 50-row page under the 100 ms budget in the CI test run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "perf-baseline",
+        "to": "feed-data-layer",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-identity",
+        "to": "feed-data-layer",
+        "type": "blocks"
+      },
+      {
+        "from": "deep-link-selection",
+        "to": "virtualized-feed-list",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-data-layer",
+        "to": "feed-contracts-rpc",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-identity",
+        "to": "feed-contracts-rpc",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-contracts-rpc",
+        "to": "virtualized-feed-list",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-contracts-rpc",
+        "to": "detail-transcript",
+        "type": "blocks"
+      },
+      {
+        "from": "unmanaged-messages-endpoint",
+        "to": "detail-transcript",
+        "type": "blocks"
+      },
+      {
+        "from": "detail-transcript",
+        "to": "deep-link-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "virtualized-feed-list",
+        "to": "theme-reskin",
+        "type": "blocks"
+      },
+      {
+        "from": "detail-transcript",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "deep-link-selection",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-reskin",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "virtualized-feed-list",
+        "to": "perf-verify",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-03-PAN-1917-sessions-page-redesign-unify-with-conversation-view.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

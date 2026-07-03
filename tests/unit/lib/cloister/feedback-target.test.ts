@@ -7,12 +7,16 @@ const {
   mockReadIssueRecordSync,
   mockMarkWorkspaceStuck,
   mockSessionExists,
+  mockListSessionNames,
+  mockWriteIssueRecordSync,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockResolveProjectFromIssueSync: vi.fn(),
   mockReadIssueRecordSync: vi.fn(),
   mockMarkWorkspaceStuck: vi.fn(),
   mockSessionExists: vi.fn(),
+  mockListSessionNames: vi.fn(),
+  mockWriteIssueRecordSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -22,6 +26,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
   readIssueRecordSync: mockReadIssueRecordSync,
+  writeIssueRecordSync: mockWriteIssueRecordSync,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -30,6 +35,7 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: (agentId: string) => Effect.succeed(Boolean(mockSessionExists(agentId))),
+  listSessionNames: () => Effect.succeed(mockListSessionNames()),
 }));
 
 import {
@@ -42,6 +48,7 @@ describe('resolveIssueFeedbackTarget', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'test', projectPath: '/repo' });
     mockGetProjectSync.mockReturnValue({ name: 'Test', path: '/repo' });
+    mockListSessionNames.mockReturnValue([]);
     mockReadIssueRecordSync.mockReturnValue({
       issueId: 'PAN-2214',
       schemaVersion: 2,
@@ -100,6 +107,31 @@ describe('resolveIssueFeedbackTarget', () => {
       needsYou: true,
       reason: expect.stringContaining('No live feedback target for PAN-2214 for item item-b'),
     });
+  });
+
+  it('falls back to a live unregistered slot session and self-heals the record', async () => {
+    mockListSessionNames.mockReturnValue(['agent-pan-2214-slot-3']);
+    mockSessionExists.mockImplementation((agentId: string) => agentId === 'agent-pan-2214-slot-3');
+
+    await expect(resolveIssueFeedbackTarget('PAN-2214', { itemId: 'item-c' })).resolves.toEqual({
+      agentId: 'agent-pan-2214-slot-3',
+    });
+
+    expect(mockWriteIssueRecordSync).toHaveBeenCalledWith(
+      { name: 'Test', path: '/repo' },
+      'PAN-2214',
+      expect.objectContaining({
+        swarm: expect.objectContaining({
+          slotAssignments: expect.arrayContaining([
+            expect.objectContaining({
+              slotIndex: 3,
+              itemId: 'item-c',
+              agentId: 'agent-pan-2214-slot-3',
+            }),
+          ]),
+        }),
+      }),
+    );
   });
 
   it('surfaces needs-you feedback as a stuck workspace marker', () => {
