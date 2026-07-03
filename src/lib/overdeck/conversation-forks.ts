@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, realpath, stat } from 'node:fs/promises';
+import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
@@ -32,6 +33,7 @@ import {
 import { resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
+import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
   authorHandoffExternal,
   copySessionFromCompactBoundary,
@@ -52,17 +54,87 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
 import { isHarnessProcessAlive, sessionExists } from '../tmux.js';
+import {
+  readLauncherPinnedSessionId,
+  resolveCodexRolloutPath,
+  resolvePiSessionPath,
+} from '../../dashboard/server/routes/jsonl-resolver.js';
 import * as self from './conversation-forks.js';
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const SESSION_FILE_MISS_TTL_MS = 2000;
+const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
+
+async function findClaudeSessionFileById(sessionId: string): Promise<string | null> {
+  const cached = sessionFileByIdCache.get(sessionId);
+  if (cached) {
+    if (cached.path) {
+      if (existsSync(cached.path)) return cached.path;
+      sessionFileByIdCache.delete(sessionId);
+    } else if (Date.now() - cached.ts < SESSION_FILE_MISS_TTL_MS) {
+      return null;
+    }
+  }
+  try {
+    const claudeProjects = join(homedir(), '.claude', 'projects');
+    const dirs = await readdir(claudeProjects);
+    const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+    const candidates = dirs
+      .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+      .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
+    const STAT_BATCH_SIZE = 50;
+    for (let i = 0; i < candidates.length; i += STAT_BATCH_SIZE) {
+      const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+      const checks = await Promise.all(
+        batch.map(async (candidate) => {
+          try {
+            await stat(candidate);
+            return candidate;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const found = checks.find((candidate): candidate is string => candidate !== null);
+      if (found) {
+        sessionFileByIdCache.set(sessionId, { path: found, ts: Date.now() });
+        return found;
+      }
+    }
+  } catch {
+    /* ~/.claude/projects unreadable */
+  }
+  sessionFileByIdCache.set(sessionId, { path: null, ts: Date.now() });
+  return null;
+}
 
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
-  const adapter = getTranscriptAdapter(conv.harness ?? undefined);
-  const sessionFile = await adapter.resolveSessionFile(conv);
-  if (sessionFile && existsSync(sessionFile)) {
-    return sessionFile;
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
+    const piPath = await resolvePiSessionPath(conv.tmuxSession);
+    if (piPath) return piPath;
   }
-  return sessionFile;
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
+    const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
+    if (codexPath) return codexPath;
+  }
+  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
+  const sessionId = pinned ?? conv.claudeSessionId;
+  if (sessionId) {
+    const deterministic = sessionFilePath(conv.cwd, sessionId);
+    if (existsSync(deterministic)) return deterministic;
+    const found = await findClaudeSessionFileById(sessionId);
+    if (found) return found;
+    const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
+    return discovered ?? deterministic;
+  }
+  const discovered = await resolveDiscoveredSessionFile(conv.claudeSessionId);
+  if (discovered) return discovered;
+  console.error(
+    `[fork-pipeline] UNRESOLVED claude-code session for conversation '${conv.name}' ` +
+      `(tmux=${conv.tmuxSession}, status=${conv.status}, cwd=${conv.cwd}): no --session-id ` +
+      `pinned in launcher.sh and no recorded claudeSessionId. The fork source transcript cannot be trusted.`,
+  );
+  return null;
 }
 
 function resolvePlainForkTargetSessionFile(conv: Conversation): string | null {
@@ -148,7 +220,7 @@ export async function handleConversationHandoffDoc(
 function handoffTitleFromFocus(focus: string | undefined, fallback: string): string {
   const f = focus?.replace(/\s+/g, ' ').trim();
   if (!f) return `Handoff: ${fallback}`;
-  const trimmed = f.length > 70 ? `${f.slice(0, 69).trimEnd()}...` : f;
+  const trimmed = f.length > 70 ? `${f.slice(0, 69).trimEnd()}…` : f;
   return `Handoff: ${trimmed}`;
 }
 
