@@ -53,19 +53,16 @@
   },
   "pipeline": {
     "issueId": "PAN-1917",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "reviewing",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T08:21:54.606Z",
-    "reviewNotes": "No blocking findings in self-review",
-    "testNotes": "npm run typecheck passed. Required remaining verification was not completed before interruption: npm run lint, npm test/targeted suites, dashboard build/run, and /sessions browser UAT paths for selected managed/unmanaged rows, deep link selection, infinite scrolling/load-more, archived metadata, and light/dark theme rendering.",
+    "updatedAt": "2026-07-03T08:29:19.519Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Spec fidelity passed: the diff adds discovered-row conversation refs through conversation_files and fixes keyset pagination into NULL last_ts rows without changing forbidden modules. Constraint compliance passed: no execSync or delay-test patterns in the changed files, and NFR-2 row payload exclusions remain intact.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2279",
-    "reviewedAtCommit": "8a1e37c4512136b27a1011cc9266b1aea8917ad4",
     "lastVerifiedCommit": "69b859680781093c29d4cc16a919c4a271a3812c",
     "reviewRequestedAt": "2026-07-03T07:21:05.256Z",
     "scopeDrift": {
@@ -198,7 +195,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.374843,
-        "pricingAsOf": "2026-07-03T08:21:54.649Z"
+        "pricingAsOf": "2026-07-03T08:29:19.584Z"
       }
     },
     "merges": [
@@ -225,5 +222,12 @@
     ]
   },
   "created": "2026-07-03T08:21:54.636Z",
-  "updated": "2026-07-03T08:21:54.650Z"
+  "updated": "2026-07-03T08:29:19.666Z",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T08:29:19.666Z"
+    }
+  ]
 }
