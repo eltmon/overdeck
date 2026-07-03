@@ -16,36 +16,27 @@
       "reason": "feedback",
       "note": "[2026-07-03T04:22Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-03T04:22:10.717Z"
-    }
-  ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T04:22:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2260\n\nSquash-merge verification trusts timestamps instead of proving the branch ref matches the merged PR head\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2260 -m \"Fixed review issues\"`"
     },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T04:22:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2260\n\nSquash-merge verification trusts timestamps instead of proving the branch ref matches the merged PR head\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2260 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T04:39:31.703Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-03T04:04:30.342Z",
-  "updated": "2026-07-03T04:35:25.607Z",
+  "updated": "2026-07-03T04:39:33.620Z",
   "pipeline": {
     "issueId": "PAN-2260",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:35:24.375Z",
-    "reviewNotes": "Squash-merge verification trusts timestamps instead of proving the branch ref matches the merged PR head",
+    "updatedAt": "2026-07-03T04:39:33.552Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
+    "lastVerifiedCommit": "9cdc8d0e49d0bb0b797180a642d5d579b4e24d52",
     "reviewRequestedAt": "2026-07-03T04:20:16.617Z"
   },
   "closeOut": {
@@ -70,7 +61,7 @@
       },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:35:25.355Z"
+        "pricingAsOf": "2026-07-03T04:39:33.619Z"
       }
     },
     "merges": [
