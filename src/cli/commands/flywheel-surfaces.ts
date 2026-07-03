@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import type { Command } from 'commander';
@@ -26,6 +26,7 @@ import { isGitHubAppConfigured, listOpenIssuesWithLabels } from '../../lib/githu
  */
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function parseGitHubRemoteUrl(remoteUrl: string): { owner: string; repo: string } | null {
   const trimmed = remoteUrl.trim();
@@ -59,8 +60,9 @@ export async function fetchOpenIssueLabels(): Promise<Map<string, string[]>> {
       return byNumber;
     }
 
-    const { stdout } = await execAsync(
-      `gh api --paginate --slurp 'repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=100'`,
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['api', '--paginate', '--slurp', `repos/${repo.owner}/${repo.repo}/issues?state=open&per_page=100`],
       { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
     );
     const pages = JSON.parse(stdout || '[]') as Array<Array<{
