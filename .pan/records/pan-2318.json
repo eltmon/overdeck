@@ -11,23 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-03T18:47:58.596Z",
-  "updated": "2026-07-03T19:10:44.833Z",
+  "updated": "2026-07-03T20:19:26.678Z",
   "pipeline": {
     "issueId": "PAN-2318",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T19:10:44.811Z"
+    "updatedAt": "2026-07-03T20:19:26.631Z",
+    "inspectNotes": "Spec fidelity PASS: diff implements WI-1 deacon child entry, supervisor, tsdown entry, main spawn/shutdown wiring, and single-deacon lock. Constraint compliance PASS: no new execSync/sync tmux/Bun child path violations; deacon-supervisor tests use fake timers."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 409428,
+            "output": 15543,
+            "cacheRead": 2991616,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 8204,
-            "output": 219,
+            "input": 22986,
+            "output": 409,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -42,9 +52,15 @@
         }
       },
       "totals": {
+        "openai/gpt-5.5": {
+          "input": 409428,
+          "output": 15543,
+          "cacheRead": 2991616,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 8204,
-          "output": 219,
+          "input": 22986,
+          "output": 409,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -56,13 +72,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 3.45433,
-        "pricingAsOf": "2026-07-03T19:10:44.832Z"
+        "usd": 7.4635679999999995,
+        "pricingAsOf": "2026-07-03T20:19:26.656Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.5"
 }
