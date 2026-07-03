@@ -81,6 +81,14 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    (Recurring merge conflict on a git-tracked ephemeral artifact → gitignore the artifact, don't
    `--theirs`-nudge each agent; review agents dying → fix the dispatcher, don't re-dispatch by hand
    forever.)
+   **Root-causing means going to the CODE, not the symptom — DEEP-DIVE every time.** When an agent
+   surfaces an error (a stack trace, `SQLITE_READONLY`, `Effect.catchAll is not a function`,
+   `Project not found`, a readonly-DB write), open the source, follow the trace to the exact
+   `file:line`, and confirm the *mechanism* (which DB/connection/handler/env — e.g. "it writes the
+   correct `overdeck.db` but `markWorkspaceStuck` at `review-status-sync.ts:370` lacks the
+   readonly try/catch that `review-status.ts:367` has") BEFORE you file or dispatch. A filed issue
+   that only restates the error message is a symptom log, not a diagnosis — and a strike aimed at a
+   guessed cause wastes a revolution. Read the code; then strike/fix the real defect.
 5. **Never block on the operator.** Do not halt for planning Q&A, "approach A or B", or any
    decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and let
    the question persist as a non-blocking signal across ticks. The single exception is a
