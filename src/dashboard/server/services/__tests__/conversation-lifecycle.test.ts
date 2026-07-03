@@ -207,7 +207,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
   it('logs one summary line per poll tick with sub-counts for sessions gone and keep-alive corpses', async () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { name: 'gone-1', tmuxSession: 'conv-gone-1', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
       { name: 'gone-2', tmuxSession: 'conv-gone-2', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
       { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
