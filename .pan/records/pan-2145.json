@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2145",
   "schemaVersion": 2,
-  "created": "2026-07-03T13:52:41.087Z",
-  "updated": "2026-07-03T14:52:11.561Z",
-  "pipeline": {
-    "issueId": "PAN-2145",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T13:52:41.087Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -31,6 +14,76 @@
       "timestamp": "2026-07-03T14:52:11.561Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-03T13:52:41.087Z",
+  "updated": "2026-07-03T21:59:19.039Z",
+  "pipeline": {
+    "issueId": "PAN-2145",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T21:59:18.640Z",
+    "inspectNotes": "Spec fidelity passed: fork door remains under 1000 lines, uses self import from ./conversation-forks.js, main.ts imports recoverStuckForks/waitForInFlightForkPipelines from lib/overdeck/conversation-forks.js, and routes 5/28 delegate to the fork door. Constraint compliance passed: no routes/conversations.js import, no execSync, no sync tmux sendKeys, no explicit any in the changed fork door."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "inspect-deep": {
+          "openai/gpt-5.5": {
+            "input": 446925,
+            "output": 20501,
+            "cacheRead": 3211264,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 21777,
+            "output": 350,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 17206,
+            "output": 134607,
+            "cacheRead": 21924542,
+            "cacheWrite": 702728
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.5": {
+          "input": 446925,
+          "output": 20501,
+          "cacheRead": 3211264,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 21777,
+          "output": 350,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 17206,
+          "output": 134607,
+          "cacheRead": 21924542,
+          "cacheWrite": 702728
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 23.260822,
+        "pricingAsOf": "2026-07-03T21:59:18.874Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "gpt-5.5"
 }
