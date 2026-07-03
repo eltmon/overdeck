@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2284",
   "schemaVersion": 2,
-  "created": "2026-07-03T11:01:31.556Z",
-  "updated": "2026-07-03T11:01:32.038Z",
-  "pipeline": {
-    "issueId": "PAN-2284",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:01:31.556Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,74 @@
       "timestamp": "2026-07-03T11:01:31.556Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-03T11:01:31.556Z",
+  "updated": "2026-07-03T11:19:20.196Z",
+  "pipeline": {
+    "issueId": "PAN-2284",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T11:15:24.664Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 8000,
+            "output": 174,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 19925,
+            "output": 39533,
+            "cacheRead": 4978568,
+            "cacheWrite": 159304
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 8000,
+          "output": 174,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 19925,
+          "output": 39533,
+          "cacheRead": 4978568,
+          "cacheWrite": 159304
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 4.572888,
+        "pricingAsOf": "2026-07-03T11:15:24.693Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-opus-4-8",
+  "statusOverrides": {
+    "shared-classifier": "running"
+  },
+  "swarm": {
+    "slotAssignments": [
+      {
+        "slotIndex": 1,
+        "itemId": "shared-classifier",
+        "agentId": "agent-pan-2284-slot-1",
+        "branch": "feature/pan-2284-slot-1",
+        "assignedAt": "2026-07-03T11:15:19.004Z"
+      }
+    ]
+  }
 }
