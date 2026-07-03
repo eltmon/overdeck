@@ -24,7 +24,7 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { readLauncherPinnedSessionId, resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
+import { readLauncherPinnedSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import * as self from './conversations.js';
@@ -41,6 +41,19 @@ import {
   getConversationDiffFull,
   getConversationDiffTurn,
 } from '../../../lib/overdeck/conversation-diffs.js';
+import {
+  askUserQuestionSnapshotFromScan,
+  codexConversationPendingInput,
+  generateAiTitle,
+  getCachedMessages,
+  getConversationAbout,
+  getConversationMessageLocator,
+  getConversationMessagesRead,
+  getConversationRead,
+  getConversationsPendingInputFeed,
+  patchConversationTitle,
+  retitleConversation,
+} from '../../../lib/overdeck/conversation-reads.js';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -52,7 +65,6 @@ import {
   getStuckForks,
   incrementForkRetryCount,
   getConversationByName,
-  getConversationByClaudeSessionId,
   getConversationById,
   createConversation,
   markConversationEnded,
@@ -72,7 +84,6 @@ import {
   backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
-  canReplaceTitle,
   listFavoritedIds,
   setFavorite,
   removeFavorite,
@@ -114,16 +125,6 @@ import {
 } from '../../../lib/runtimes/conversation-control.js';
 import { resolveDiscoveredSessionFile } from '../../../lib/conversations/discovered-session-file.js';
 
-/** The configured conversation-title model (PAN-1589) — falls back to the
- * module default when config is unavailable. */
-function configuredTitleModel(): string {
-  try {
-    return loadConfigSync().config.conversations.titleModel || CONVERSATION_TITLE_MODEL;
-  } catch {
-    return CONVERSATION_TITLE_MODEL;
-  }
-}
-import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { resolveHarness } from '../../../lib/harness-resolve.js';
@@ -139,19 +140,11 @@ import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile, piGlobalContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {
-  computeContextUsage,
-  parseConversationMessages,
-  parseFromLastCompactBoundary,
   summarizeConversationActivity,
-  type ParseState,
 } from '../services/conversation-service.js';
 import { resolveConversationGitInfo } from '../services/git-info.js';
-import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
 import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
-import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
-import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../services/ohmypi-conversation-parser.js';
-import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
   compactConversationNative,
   shouldInterceptManualCompact,
@@ -174,14 +167,6 @@ import {
   type HandoffAuthor,
 } from '../../../lib/conversations/summary-fork.js';
 import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
-import {
-  CONVERSATION_TITLE_MODEL,
-  fallbackTranscriptTitle,
-  serializeConversationTranscript,
-  summarizeFirstMessageTitle,
-  summarizeTranscriptTitle,
-  summarizeTranscriptAbout,
-} from '../../../lib/conversations/transcript-summary.js';
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -427,123 +412,6 @@ function checkUploadRateLimit(remoteAddress: string): boolean {
   }
   entry.count++;
   return true;
-}
-
-// ─── Messages cache ───────────────────────────────────────────────────────────
-
-const MESSAGES_CACHE_MAX = 100;
-const messagesCache = new Map<
-  string,
-  {
-    mtimeMs: number;
-    size: number;
-    result: Awaited<ReturnType<typeof parseConversationMessages>>;
-    byteOffset: number;
-    parseState: ParseState | undefined;
-  }
->();
-
-async function getCachedMessages(
-  sessionFile: string,
-  isSpecialist: boolean,
-): Promise<Awaited<ReturnType<typeof parseConversationMessages>>> {
-  const fileStats = await stat(sessionFile);
-  const cacheKey = `${sessionFile}:${isSpecialist}`;
-  const cached = messagesCache.get(cacheKey);
-  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size && cached.byteOffset >= fileStats.size) {
-    return cached.result;
-  }
-
-  let result: Awaited<ReturnType<typeof parseConversationMessages>>;
-
-  // Pi sessions use a different JSONL schema than Claude Code. The Pi parser
-  // produces the same ParseResult shape and we cache by file path, so the
-  // rest of the pipeline (cost rollup, streaming flag, etc.) is unchanged.
-  // Pi files don't support the incremental-parse path — we always do a full
-  // read; chat sessions are small enough that this is fine.
-  if (isCodexSessionFile(sessionFile)) {
-    // Codex rollout JSONL (OpenAI schema). Checked before isPiSessionFile
-    // because a Codex path (.../agents/<id>/codex-home/sessions/...) also
-    // matches the Pi detector's substrings.
-    result = await parseCodexConversationMessages(sessionFile);
-  } else if (isOhmypiSessionFile(sessionFile)) {
-    result = await parseOhmypiConversationMessages(sessionFile);
-  } else if (isPiSessionFile(sessionFile)) {
-    result = await parsePiConversationMessages(sessionFile);
-  } else if (isSpecialist) {
-    result = await parseFromLastCompactBoundary(sessionFile);
-  } else if (
-    cached &&
-    cached.parseState &&
-    cached.byteOffset <= fileStats.size &&
-    cached.size <= fileStats.size
-  ) {
-    // Incremental parse: file grew, continue from where we left off.
-    const incremental = await parseConversationMessages(sessionFile, cached.byteOffset, cached.parseState);
-    if (incremental.byteOffset < cached.byteOffset) {
-      // File was truncated or rotated — fall back to full parse.
-      result = await parseConversationMessages(sessionFile, 0);
-    } else {
-      // Materialize the merged result once and cache concrete structures.
-      // Lazy getters chained across cache entries grew an unbounded wrapper
-      // chain across polls and re-allocated the full history on every read.
-      const cachedResult = cached.result;
-      const mergedMessages = cachedResult.messages.concat(incremental.messages);
-      const mergedWorkLog = cachedResult.workLog.concat(incremental.workLog);
-      const mergedCompactBoundaries = (cachedResult.compactBoundaries ?? []).concat(incremental.compactBoundaries ?? []);
-      const mergedFileEdits = new Map(cachedResult.fileEditsByAssistantId ?? []);
-      for (const [k, v] of incremental.fileEditsByAssistantId ?? []) {
-        const existing = mergedFileEdits.get(k);
-        mergedFileEdits.set(k, existing ? [...existing, ...v] : v);
-      }
-      result = {
-        messages: mergedMessages,
-        workLog: mergedWorkLog,
-        byteOffset: incremental.byteOffset,
-        streaming: incremental.streaming,
-        totalCost: cachedResult.totalCost + incremental.totalCost,
-        totalTokens: cachedResult.totalTokens + incremental.totalTokens,
-        pendingToolUse: incremental.pendingToolUse,
-        unresolvedResults: incremental.unresolvedResults,
-        lastSequence: incremental.lastSequence,
-        mtimeMs: incremental.mtimeMs,
-        proposedPlan: incremental.proposedPlan ?? cachedResult.proposedPlan,
-        compactBoundaries: mergedCompactBoundaries,
-        planToolUseIds: incremental.planToolUseIds,
-        permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
-        fileEditsByAssistantId: mergedFileEdits,
-        // The incremental set was seeded from the cached parseState, so it already
-        // carries every previously-counted id plus any seen in this chunk.
-        countedUsageIds: incremental.countedUsageIds,
-      };
-    }
-  } else {
-    // Full parse (no cache, file shrank, or first time).
-    result = await parseConversationMessages(sessionFile, 0);
-  }
-
-  messagesCache.set(cacheKey, {
-    mtimeMs: fileStats.mtimeMs,
-    size: fileStats.size,
-    result,
-    byteOffset: result.byteOffset,
-    parseState: {
-      pendingToolUse: result.pendingToolUse,
-      unresolvedResults: result.unresolvedResults,
-      lastSequence: result.lastSequence,
-      planToolUseIds: result.planToolUseIds,
-      proposedPlan: result.proposedPlan,
-      permissionMode: result.permissionMode,
-      countedUsageIds: result.countedUsageIds,
-    },
-  });
-  if (messagesCache.size > MESSAGES_CACHE_MAX) {
-    const firstKey = messagesCache.keys().next().value;
-    if (firstKey !== undefined) {
-      messagesCache.delete(firstKey);
-    }
-  }
-  return result;
 }
 
 // ─── Favorites cache ───────────────────────────────────────────────────────────
@@ -810,16 +678,6 @@ export function shouldReportUnresolvedLiveSession(
 ): boolean {
   if (!conv || conv.status !== 'active') return false;
   return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
-}
-
-/**
- * Detect whether a session file path is a Codex rollout JSONL. Codex writes
- * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Overdeck the per-agent
- * CODEX_HOME lives at .../agents/<id>/codex-home, so the path also satisfies
- * {@link isPiSessionFile} — codex must therefore be tested first.
- */
-function isCodexSessionFile(sessionFile: string): boolean {
-  return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
 // Codex rollout resolution (thread-id fast path + PAN-1690 latest-rollout
@@ -1230,7 +1088,7 @@ export async function handleConversationMessage(
 
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
-    void generateAiTitle(name, message).catch((err: unknown) => {
+    void generateAiTitle(name, message, conversationReadDependencies).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
     });
@@ -1253,6 +1111,17 @@ function sanitizeName(name: string): string {
 /** Check if a tmux session exists (async, non-blocking) */
 async function tmuxSessionExists(sessionName: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(sessionName));
+}
+
+const conversationReadDependencies = {
+  resolveSessionFile,
+  tmuxSessionExists,
+  listSessionNames: () => Effect.runPromise(listSessionNames()),
+  shouldReportUnresolvedLiveSession,
+};
+
+function conversationReadJson(response: { body: unknown; status?: number }): ReturnType<typeof jsonResponse> {
+  return jsonResponse(response.body, response.status === undefined ? undefined : { status: response.status });
 }
 
 async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promise<void> {
@@ -1500,57 +1369,6 @@ export async function handleConversationSwitchModel(
     harness,
     sessionAlive: false,
   });
-}
-
-/** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
-const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
-
-/**
- * PAN-1690 — pending-input detection for Codex conversations.
- *
- * Codex is a TUI: its approval prompts ("Would you like to run the following
- * command?") are not AskUserQuestion tool-use events in the JSONL, so the
- * JSONL scan that powers Claude conversations misses them entirely. Detect them
- * off the live tmux pane instead and fold the result into the same unified
- * pending-input signal (`pendingInputKinds`) the dashboard already renders.
- * When the prompt parses into a numbered menu we also synthesize a
- * `pendingAskUserQuestion` so the existing AskUserQuestion modal can render the
- * options and answer them via the codex-approval endpoint. The pane detector is
- * cached + concurrency-limited, so this is cheap per row.
- */
-async function codexConversationPendingInput(
-  conv: Conversation,
-  sessionAlive: boolean,
-  askedAt: string,
-): Promise<{ kinds: PendingInputKind[]; approval?: PendingAskUserQuestionSnapshot }> {
-  if (!sessionAlive || getHarnessBehavior(conv.harness).transcriptKind !== 'codex-rollout-jsonl') return { kinds: [] };
-  try {
-    const detection = await Effect.runPromise(
-      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }),
-    );
-    if (!detection) return { kinds: [] };
-    if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
-
-    const parsed = parseCodexApprovalPrompt(detection.prompt);
-    if (parsed) {
-      const approval: PendingAskUserQuestionSnapshot = {
-        toolUseId: `${CODEX_APPROVAL_TOOL_PREFIX}${conv.tmuxSession}`,
-        askedAt,
-        questions: [{
-          question: parsed.detail ? `${parsed.header}\n\n${parsed.detail}` : parsed.header,
-          header: 'Codex approval',
-          multiSelect: false,
-          options: parsed.options.map((o) => ({ label: `${o.number}. ${o.label}` })),
-        }],
-      };
-      return { kinds: ['permissionRequest'], approval };
-    }
-    // Detected an approval but couldn't parse a menu — still flag it.
-    return { kinds: ['permissionRequest'] };
-  } catch {
-    // pane capture failure — non-fatal, treat as no pending input
-    return { kinds: [] };
-  }
 }
 
 /**
@@ -2119,205 +1937,7 @@ export async function spawnConversationSession(
   await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
 
-/**
- * Generate an AI title for a conversation from its opening message (T3Code pattern).
- * Runs at conversation creation; updates the title only if it hasn't been
- * manually renamed (`canReplaceTitle`). No fallback — if generation fails the
- * error is logged and the existing title is kept.
- *
- * For an explicit, whole-conversation re-title see the retitle route below.
- */
-async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
-  // Background AI gate: low-cost mode (or the conversationTitles toggle) skips
-  // automatic title generation. Manual retitle (below) is unaffected.
-  if (!isBackgroundFeatureEnabled('conversationTitles')) return;
-
-  const conv = getConversationByName(conversationName);
-  if (!conv || !canReplaceTitle(conv)) {
-    return;
-  }
-
-  console.log(`[claude-invoke] purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | source=conversations.ts:generateAiTitle | conversation=${conversationName} | promptChars=${firstMessage.length}`);
-
-  const sanitized = await summarizeFirstMessageTitle(firstMessage, configuredTitleModel());
-  if (!sanitized) {
-    console.warn(`[generateAiTitle] Model returned empty title for "${conversationName}"`);
-    return;
-  }
-
-  // Re-check eligibility (may have been renamed while we waited)
-  const freshConv = getConversationByName(conversationName);
-  if (!freshConv || !canReplaceTitle(freshConv)) {
-    console.log(`[generateAiTitle] Conversation "${conversationName}" was renamed while generating title; skipping update`);
-    return;
-  }
-
-  updateConversationTitle(conversationName, sanitized, 'ai');
-  console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | outputChars=${sanitized.length}`);
-
-  // Schedule a one-shot follow-up retitle once the assistant's first complete
-  // response has landed. The first-message titler only sees the user's opening
-  // prompt; the refined pass uses the whole transcript and almost always
-  // produces a better label.
-  scheduleTitleRefinement(conversationName);
-}
-
-/** Conversations awaiting first-assistant-response title refinement. */
-const refinementScheduled = new Set<string>();
-
-/**
- * After the first-message AI title is set, watch the JSONL for the first
- * complete assistant response, then re-title from the whole transcript.
- * Fires at most once per conversation. Skips if the user has manually renamed
- * the conversation in the meantime or the conversation has already been
- * refined. Times out after 10 minutes — large operations or stalled
- * conversations will simply keep the first-message title.
- */
-function scheduleTitleRefinement(conversationName: string): void {
-  // Background AI gate: low-cost mode (or the titleRefinement toggle) skips the
-  // whole-transcript refinement pass.
-  if (!isBackgroundFeatureEnabled('titleRefinement')) return;
-  if (refinementScheduled.has(conversationName)) return;
-  refinementScheduled.add(conversationName);
-
-  const TIMEOUT_MS = 10 * 60 * 1000;
-  const POLL_INTERVAL_MS = 1500;
-  const startedAt = Date.now();
-
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let running = false;
-  let done = false;
-
-  const stop = () => {
-    done = true;
-    if (timer) clearTimeout(timer);
-    refinementScheduled.delete(conversationName);
-  };
-
-  async function tick(): Promise<void> {
-    if (done) return;
-    if (running) {
-      timer = setTimeout(tick, POLL_INTERVAL_MS);
-      return;
-    }
-    running = true;
-    try {
-      if (Date.now() - startedAt > TIMEOUT_MS) {
-        console.log(`[title-refine] Timed out waiting for first assistant response in "${conversationName}"`);
-        stop();
-        return;
-      }
-
-      const conv = getConversationByName(conversationName);
-      if (!conv) {
-        stop();
-        return;
-      }
-      // Only refine titles that are still AI-generated from the first message.
-      // Manual renames and prior refinements are sacred.
-      if (conv.titleSource !== 'ai') {
-        stop();
-        return;
-      }
-
-      const sessionFile = await resolveSessionFile(conv);
-      if (!sessionFile || !existsSync(sessionFile)) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
-        return;
-      }
-
-      const { messages } = await getCachedMessages(sessionFile, false);
-      const firstCompleteAssistant = messages.find(
-        (m) => m.role === 'assistant' && m.completedAt,
-      );
-      if (!firstCompleteAssistant) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
-        return;
-      }
-
-      const transcript = serializeConversationTranscript(messages);
-      if (!transcript.trim()) {
-        timer = setTimeout(tick, POLL_INTERVAL_MS);
-        return;
-      }
-
-      console.log(`[claude-invoke] purpose=conversation-title-refine | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | transcriptChars=${transcript.length}`);
-      const refined = await summarizeTranscriptTitle(transcript, configuredTitleModel());
-      if (!refined) {
-        console.warn(`[title-refine] Model returned empty refined title for "${conversationName}"`);
-        stop();
-        return;
-      }
-
-      // Re-check eligibility — user may have renamed during the model call.
-      const freshConv = getConversationByName(conversationName);
-      if (!freshConv || freshConv.titleSource !== 'ai') {
-        console.log(`[title-refine] Conversation "${conversationName}" no longer eligible (source=${freshConv?.titleSource ?? 'missing'}); skipping`);
-        stop();
-        return;
-      }
-
-      updateConversationTitle(conversationName, refined, 'ai-refined');
-      console.log(`[claude-invoke] SUCCESS purpose=conversation-title-refine | conversation=${conversationName} | title="${refined}"`);
-      stop();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[title-refine] failed for "${conversationName}":`, msg);
-      stop();
-    } finally {
-      running = false;
-    }
-  }
-
-  timer = setTimeout(tick, POLL_INTERVAL_MS);
-}
-
-// ─── Conversation retitle / about summary ─────────────────────────────────────
-//
-// Both read the conversation's own JSONL transcript on demand. The memory
-// Observation pipeline never observes ad-hoc conversations (it watches only
-// work-role pipeline agents), so there is no pre-computed data to draw on —
-// the transcript itself is the source of truth. A follow-up issue tracks
-// extending the observation pipeline to conversations.
-
-/** Conversations with a retitle currently running — guards against double-clicks. */
-const retitleInFlight = new Set<string>();
-const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
-
-function isClaudeInvocationTimeout(error: unknown): boolean {
-  return error instanceof Error && /claude invocation timed out after \d+ms/.test(error.message);
-}
-
-interface ConversationAboutSummary {
-  summary: string;
-  messageCount: number;
-  generatedAt: string;
-}
-
-/** transcript-size-keyed cache so re-opening the About drawer doesn't re-summarize. */
-const aboutSummaryCache = new Map<string, { transcriptSize: number; data: ConversationAboutSummary }>();
-const ABOUT_SUMMARY_CACHE_MAX = 100;
-
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
-
-/** PAN-1520/PAN-1705 — build the AskUserQuestion snapshot from a pending-input
- *  scan. Shared by the enriched list and the lightweight pending-input feed. */
-function askUserQuestionSnapshotFromScan(
-  scan: Awaited<ReturnType<typeof scanPendingInputsPromise>>,
-): PendingAskUserQuestionSnapshot | undefined {
-  if (scan.askUserQuestions.length === 0) return undefined;
-  const first = scan.askUserQuestions[0];
-  return {
-    toolUseId: first.toolId,
-    askedAt: first.timestamp,
-    questions: first.questions.map(q => ({
-      question: q.question,
-      header: q.header,
-      multiSelect: q.multiSelect,
-      options: q.options.map(o => ({ label: o.label, description: o.description })),
-    })),
-  };
-}
 
 // PAN-1705 — coalesce concurrent list enrichments. Several dashboard clients
 // poll this endpoint on overlapping intervals; each request used to run its
@@ -2571,54 +2191,8 @@ const getConversationsPendingInputRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     return yield* Effect.promise(async () => {
-      try {
-        const conversations = listConversations({ limit: 1000 });
-        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
-        const alive = conversations.filter(
-          (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
-        );
-        const rows = await Effect.runPromise(withConcurrencyLimit(
-          alive.map((conv) => Effect.promise(async () => {
-            const convSf = await resolveSessionFile(conv);
-            let pending: PendingAskUserQuestionSnapshot | undefined;
-            let lastActivityAt: string | null = null;
-            if (convSf && existsSync(convSf)) {
-              try {
-                lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
-              } catch {
-                // non-fatal — askedAt falls back to now for the codex path
-              }
-              try {
-                pending = askUserQuestionSnapshotFromScan(await scanPendingInputsPromise(convSf));
-              } catch {
-                // JSONL scan failure — non-fatal
-              }
-            }
-            if (!pending) {
-              // PAN-1690 — Codex pane-detected approval fallback.
-              const codex = await codexConversationPendingInput(
-                conv,
-                true,
-                lastActivityAt ?? new Date().toISOString(),
-              );
-              if (codex.approval) pending = codex.approval;
-            }
-            if (!pending) return null;
-            return {
-              name: conv.name,
-              title: conv.title ?? null,
-              issueId: conv.issueId ?? null,
-              pendingAskUserQuestion: pending,
-            };
-          })),
-          CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
-        ));
-        return jsonResponse(rows.filter((row) => row !== null));
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] pending-input feed failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationsPendingInputFeed(conversationReadDependencies);
+      return conversationReadJson(response);
     });
   }),
 );
@@ -2653,82 +2227,9 @@ const getConversationRoute = HttpRouter.add(
     }
     const params = yield* HttpRouter.params;
     const rawId = params['id'] ?? '';
-    const numericId = Number(rawId);
     return yield* Effect.promise(async () => {
-      try {
-        // The list endpoint deliberately excludes agent/planning/specialist
-        // rows (kept out of the human-conversations sidebar), but consumers
-        // like AgentOutputPanel still need to fetch a single agent row by
-        // name. When the path param looks like a name rather than a number,
-        // resolve via getConversationByName instead of getConversationById.
-        const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
-          ? getConversationById(numericId)
-          : getConversationByName(rawId);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        const sessionAlive = conversationSessionAliveFromState(conv, await tmuxSessionExists(conv.tmuxSession));
-        const convSf = await resolveSessionFile(conv);
-        let contextUsage = null;
-        if (convSf && existsSync(convSf)) {
-          try {
-            contextUsage = await computeContextUsage(convSf, conv.model);
-          } catch {
-            contextUsage = null;
-          }
-        }
-        const gitInfo = await resolveConversationGitInfo(conv.cwd);
-        // PAN-1520 — pending-input surfaces for this conv.
-        let pendingInputCount = 0;
-        let pendingInputKinds: PendingInputKind[] = [];
-        let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
-        if (sessionAlive && convSf && existsSync(convSf)) {
-          try {
-            const scan = await scanPendingInputsPromise(convSf);
-            const kinds: PendingInputKind[] = [];
-            if (scan.askUserQuestions.length > 0) {
-              kinds.push('askUserQuestion');
-              const first = scan.askUserQuestions[0];
-              pendingAskUserQuestion = {
-                toolUseId: first.toolId,
-                askedAt: first.timestamp,
-                questions: first.questions.map(q => ({
-                  question: q.question,
-                  header: q.header,
-                  multiSelect: q.multiSelect,
-                  options: q.options.map(o => ({ label: o.label, description: o.description })),
-                })),
-              };
-            }
-            if (scan.exitPlanModePending) kinds.push('exitPlanMode');
-            if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
-            pendingInputKinds = kinds;
-            pendingInputCount = kinds.length;
-          } catch { /* non-fatal */ }
-        }
-        if (pendingInputCount === 0) {
-          const codex = await codexConversationPendingInput(conv, sessionAlive, new Date().toISOString());
-          if (codex.kinds.length > 0) {
-            pendingInputKinds = codex.kinds;
-            pendingInputCount = codex.kinds.length;
-            if (codex.approval) pendingAskUserQuestion = codex.approval;
-          }
-        }
-        return jsonResponse({
-          ...conv,
-          sessionAlive,
-          contextUsage,
-          branch: gitInfo.branch,
-          isWorktree: gitInfo.isWorktree,
-          pendingInputCount,
-          pendingInputKinds,
-          pendingAskUserQuestion,
-        });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] get conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationRead(rawId, conversationReadDependencies);
+      return conversationReadJson(response);
     });
   }),
 );
@@ -2882,7 +2383,7 @@ const postConversationRoute = HttpRouter.add(
 
         // Generate AI title in background (non-blocking)
         if (message) {
-          void generateAiTitle(name, message).catch((err: unknown) => {
+          void generateAiTitle(name, message, conversationReadDependencies).catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
           });
@@ -3158,32 +2659,6 @@ const postConversationAbortRoute = HttpRouter.add(
   }),
 );
 
-// Cache specialist session file lookups to avoid O(n) directory scans.
-// TTL ensures restarted sessions (new UUID → new JSONL) don't serve stale data.
-const SPECIALIST_SESSION_CACHE_TTL_MS = 10_000;
-const specialistSessionFileCache = new Map<string, { path: string; timestamp: number }>();
-const SPECIALIST_SESSION_CACHE_MAX = 50;
-
-function getSpecialistSessionCache(name: string): string | undefined {
-  const entry = specialistSessionFileCache.get(name);
-  if (!entry) return undefined;
-  if (Date.now() - entry.timestamp > SPECIALIST_SESSION_CACHE_TTL_MS) {
-    specialistSessionFileCache.delete(name);
-    return undefined;
-  }
-  return entry.path;
-}
-
-function setSpecialistSessionCache(name: string, sessionFile: string): void {
-  specialistSessionFileCache.set(name, { path: sessionFile, timestamp: Date.now() });
-  if (specialistSessionFileCache.size > SPECIALIST_SESSION_CACHE_MAX) {
-    const firstKey = specialistSessionFileCache.keys().next().value;
-    if (firstKey !== undefined) {
-      specialistSessionFileCache.delete(firstKey);
-    }
-  }
-}
-
 // ─── Route: GET /api/conversations/:name/messages ────────────────────────────
 
 const getConversationMessagesRoute = HttpRouter.add(
@@ -3198,155 +2673,8 @@ const getConversationMessagesRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-
-        // Fall back to specialist session file when name is a specialist tmux session
-        // (e.g. specialist-overdeck-merge-agent) and not in the conversations DB.
-        let sessionFile: string | null | undefined = conv ? await resolveSessionFile(conv) : undefined;
-        if (!conv) {
-          const cached = getSpecialistSessionCache(name);
-          if (cached) {
-            sessionFile = cached;
-          } else if (/^(specialist-|agent-|planning-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(name)) {
-            // Non-claude harnesses (no Claude session exists): the transcript
-            // is the harness's own JSONL under the per-agent dir. Codex
-            // (PAN-1805) writes a rollout under CODEX_HOME; pi/kimi (PAN-1908)
-            // writes a timestamped session JSONL — work agents put it in the
-            // agent-dir root, conversations in the sessions/ subdir.
-            try {
-              const agentHarness = await resolveAgentHarness(name);
-              const agentBehavior = getHarnessBehavior(agentHarness);
-              if (agentBehavior.transcriptKind === 'codex-rollout-jsonl') {
-                const rollout = await resolveCodexRolloutPath(name);
-                if (rollout) {
-                  sessionFile = rollout;
-                  setSpecialistSessionCache(name, rollout);
-                }
-              } else if (agentBehavior.transcriptKind === 'ohmypi-jsonl') {
-                const piSession = await resolvePiSessionPath(name);
-                if (piSession) {
-                  sessionFile = piSession;
-                  setSpecialistSessionCache(name, piSession);
-                }
-              }
-            } catch { /* fall through to the Claude lookup */ }
-            // Resolve JSONL via the unified session-id lookup chain
-            // (session.id file → sessions.json → runtime state) in
-            // ~/.overdeck/agents/<name>/. Covers work agents, planning
-            // agents, and all specialist types (reviewers, test, merge).
-            if (!sessionFile) {
-              try {
-                const claudeSessionId = await resolveClaudeSessionId(name);
-                if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
-                  const claudeProjects = join(homedir(), '.claude', 'projects');
-                  const dirs = await readdir(claudeProjects);
-                  const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-                  const candidates = dirs
-                    .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-                    .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
-                  const STAT_BATCH_SIZE = 50;
-                  let found: string | null = null;
-                  for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
-                    const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-                    const checks = await Promise.all(
-                      batch.map(async (candidate) => {
-                        try {
-                          await stat(candidate);
-                          return candidate;
-                        } catch {
-                          return null;
-                        }
-                      }),
-                    );
-                    found = checks.find((c): c is string => c !== null) ?? null;
-                  }
-                  if (found) {
-                    sessionFile = found;
-                    setSpecialistSessionCache(name, found);
-                  }
-                }
-              } catch { /* session resolution failed */ }
-            }
-          }
-          if (!sessionFile) {
-            return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-          }
-        }
-
-        if (!sessionFile) {
-          // For a LIVE claude-code conversation the session file is deterministic
-          // from the launcher's pinned --session-id (resolveSessionFile). If it's
-          // unresolved, the panel would otherwise silently show an empty or wrong
-          // transcript — surface it loudly instead so it gets attention
-          // (resolveSessionFile already screamed server-side). Returned with a
-          // 200 + `error` field so it flows through the normal data path and the
-          // panel can render a banner rather than a generic fetch failure.
-          //
-          // codex/pi conversations write their transcript JSONL only on the first
-          // turn, so a null session file before then is the expected empty state,
-          // not an error — they fall through to the benign empty-messages response.
-          if (shouldReportUnresolvedLiveSession(conv)) {
-            return jsonResponse({
-              messages: [],
-              workLog: [],
-              streaming: false,
-              error:
-                `Could not resolve the live session for this conversation — its launcher pins ` +
-                `no --session-id and no session is recorded. The transcript cannot be shown ` +
-                `reliably; this needs attention.`,
-            });
-          }
-          // Ended/legacy conversation, or a codex/pi conversation that has not yet
-          // written its first-turn transcript — genuinely empty.
-          return jsonResponse({ messages: [], workLog: [], streaming: false });
-        }
-
-        try {
-          // Always parse the full file — compact boundaries render as visual
-          // dividers in MessagesTimeline; truncating at them hides the actual
-          // conversation content (root cause of empty reviewer Conversation tab).
-          const result = await getCachedMessages(sessionFile, false);
-
-          // Cache cost + tokens in DB so the conversation list can show them without re-parsing
-          if (conv && (result.totalCost > 0 || result.totalTokens > 0)) {
-            updateConversationCost(name, result.totalCost, result.totalTokens);
-          }
-
-          let contextUsage = null;
-          if (conv) {
-            try {
-              contextUsage = await computeContextUsage(sessionFile, conv.model);
-            } catch {
-              contextUsage = null;
-            }
-          }
-
-          return jsonResponse({
-            messages: result.messages,
-            workLog: result.workLog,
-            streaming: result.streaming,
-            totalCost: result.totalCost,
-            totalTokens: result.totalTokens,
-            proposedPlan: result.proposedPlan,
-            compactBoundaries: (result.compactBoundaries?.length ?? 0) > 0 ? result.compactBoundaries : undefined,
-            compacting: isCompacting(sessionFile) || undefined,
-            contextUsage,
-          });
-        } catch (parseErr: unknown) {
-          // File may not exist yet — Claude Code is still starting up.
-          // Return empty messages rather than 500.
-          const code = (parseErr as { code?: string })?.code;
-          if (code === 'ENOENT') {
-            return jsonResponse({ messages: [], workLog: [], streaming: false });
-          }
-          throw parseErr;
-        }
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] load messages failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationMessagesRead(name, conversationReadDependencies);
+      return conversationReadJson(response);
     });
   }),
 );
@@ -3372,21 +2700,8 @@ const getConversationMessageLocatorRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name) ?? getConversationByClaudeSessionId(name);
-        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-
-        const sessionFile = await resolveSessionFile(conv);
-        if (!sessionFile) return jsonResponse({ error: 'Conversation transcript not found' }, { status: 404 });
-
-        const locator = await resolveConversationMessageLocator(sessionFile, byteOffset);
-        if (!locator) return jsonResponse({ error: 'Message not found for byteOffset' }, { status: 404 });
-        return jsonResponse(locator);
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] resolve message locator failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const response = await getConversationMessageLocator(name, byteOffset, conversationReadDependencies);
+      return conversationReadJson(response);
     });
   }),
 );
@@ -3652,29 +2967,6 @@ const postConversationControlAckRoute = HttpRouter.add(
 );
 
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
-
-const MAX_TITLE_LENGTH = 200;
-
-export function patchConversationTitle(
-  name: string,
-  body: Record<string, unknown>,
-): { status: number; body: { success: true } | { error: string } } {
-  const conv = getConversationByName(name);
-  if (!conv) {
-    return { status: 404, body: { error: 'Conversation not found' } };
-  }
-
-  if (typeof body.title === 'string' && body.title.trim()) {
-    const trimmed = body.title.trim();
-    if (trimmed.length > MAX_TITLE_LENGTH) {
-      return { status: 400, body: { error: `Title exceeds maximum length of ${MAX_TITLE_LENGTH} characters` } };
-    }
-    // User explicitly renamed → mark as 'manual' so AI won't auto-replace
-    updateConversationTitle(name, trimmed, 'manual');
-  }
-
-  return { status: 200, body: { success: true } };
-}
 
 const patchConversationRoute = HttpRouter.add(
   'PATCH',
@@ -4705,62 +3997,8 @@ const postConversationRetitleRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
-        if (retitleInFlight.has(name)) {
-          return jsonResponse(
-            { error: 'A title regeneration is already running for this conversation' },
-            { status: 409 },
-          );
-        }
-        const sessionFile = await resolveSessionFile(conv);
-        if (!sessionFile || !existsSync(sessionFile)) {
-          return jsonResponse({ error: 'Conversation has no transcript yet' }, { status: 400 });
-        }
-        const { messages } = await getCachedMessages(sessionFile, false);
-        const transcript = serializeConversationTranscript(messages);
-        if (!transcript.trim()) {
-          return jsonResponse(
-            { error: 'Conversation has no messages to summarize yet' },
-            { status: 400 },
-          );
-        }
-
-        retitleInFlight.add(name);
-        try {
-          const model = configuredTitleModel();
-          console.log(`[claude-invoke] purpose=conversation-retitle | model=${model} | conversation=${name} | transcriptChars=${transcript.length}`);
-          let title: string;
-          try {
-            title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
-          } catch (error: unknown) {
-            if (!isClaudeInvocationTimeout(error)) {
-              throw error;
-            }
-            title = fallbackTranscriptTitle(transcript);
-            if (!title) {
-              throw error;
-            }
-            console.warn(`[conversations] retitle timed out for "${name}"; using deterministic fallback title "${title}"`);
-          }
-          if (!title) {
-            return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
-          }
-          // Explicit user action — override any prior title, including manual ones.
-          updateConversationTitle(name, title, 'ai');
-          console.log(`[claude-invoke] SUCCESS purpose=conversation-retitle | conversation=${name} | title="${title}"`);
-          return jsonResponse({ title });
-        } finally {
-          retitleInFlight.delete(name);
-        }
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[conversations] retitle failed for "${name}":`, msg);
-        return jsonResponse({ error: `Failed to regenerate title: ${msg}` }, { status: 500 });
-      }
+      const response = await retitleConversation(name, conversationReadDependencies);
+      return conversationReadJson(response);
     });
   }),
 );
@@ -4783,57 +4021,10 @@ const getConversationAboutRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      try {
-        const conv = getConversationByName(name);
-        if (!conv) {
-          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-        }
         const url = new URL(request.url, 'http://localhost');
         const forceRefresh = url.searchParams.get('refresh') === '1';
-
-        const sessionFile = await resolveSessionFile(conv);
-        if (!sessionFile || !existsSync(sessionFile)) {
-          return jsonResponse({ summary: null, messageCount: 0, generatedAt: null });
-        }
-        const { size } = await stat(sessionFile);
-        const cached = aboutSummaryCache.get(name);
-        if (!forceRefresh && cached && cached.transcriptSize === size) {
-          return jsonResponse({ ...cached.data, cached: true });
-        }
-
-        const { messages } = await getCachedMessages(sessionFile, false);
-        const conversational = messages.filter(
-          (m) => m.role !== 'system' && typeof m.text === 'string' && m.text.trim().length > 0,
-        );
-        if (conversational.length === 0) {
-          return jsonResponse({ summary: null, messageCount: 0, generatedAt: null });
-        }
-
-        const transcript = serializeConversationTranscript(messages);
-        const aboutModel = configuredTitleModel();
-        console.log(`[claude-invoke] purpose=conversation-about | model=${aboutModel} | conversation=${name} | transcriptChars=${transcript.length}`);
-        const summary = await summarizeTranscriptAbout(transcript, aboutModel);
-        if (!summary) {
-          return jsonResponse({ error: 'Summary model returned an empty result' }, { status: 502 });
-        }
-
-        const data: ConversationAboutSummary = {
-          summary,
-          messageCount: conversational.length,
-          generatedAt: new Date().toISOString(),
-        };
-        aboutSummaryCache.set(name, { transcriptSize: size, data });
-        if (aboutSummaryCache.size > ABOUT_SUMMARY_CACHE_MAX) {
-          const firstKey = aboutSummaryCache.keys().next().value;
-          if (firstKey !== undefined) aboutSummaryCache.delete(firstKey);
-        }
-        console.log(`[claude-invoke] SUCCESS purpose=conversation-about | conversation=${name} | summaryChars=${summary.length}`);
-        return jsonResponse({ ...data, cached: false });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[conversations] about summary failed for "${name}":`, msg);
-        return jsonResponse({ error: 'Failed to summarize conversation' }, { status: 500 });
-      }
+        const response = await getConversationAbout(name, forceRefresh, conversationReadDependencies);
+        return conversationReadJson(response);
     });
   }),
 );
