@@ -99,12 +99,11 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-03T08:29:24.793Z",
+    "mergeStatus": "merged",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-03T08:29:59.320Z",
     "reviewNotes": "No blocking findings; focused review suite passed",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2112",
     "reviewedAtCommit": "741cb7dcacb68e622566f900c964ee8cfb767338",
     "lastVerifiedCommit": "741cb7dcacb68e622566f900c964ee8cfb767338",
@@ -182,7 +181,7 @@
       },
       "costAtCloseOut": {
         "usd": 11.992424,
-        "pricingAsOf": "2026-07-03T08:29:24.888Z"
+        "pricingAsOf": "2026-07-03T08:29:59.344Z"
       }
     },
     "merges": [
@@ -191,7 +190,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-06-29T14:39:48.898Z",
-  "updated": "2026-07-03T08:29:24.888Z",
+  "updated": "2026-07-03T08:29:59.344Z",
   "statusOverrides": {
     "config-review-mode": "completed",
     "config-review-mode.ac1": "completed",
