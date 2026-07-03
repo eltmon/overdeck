@@ -17,7 +17,7 @@
 1925 src/dashboard/server/routes/workspaces/merge-ops.ts
 1466 src/dashboard/server/services/issue-data-service.ts
 1317 src/dashboard/server/ws-rpc.ts
-3407 src/lib/cloister/deacon.ts
+3450 src/lib/cloister/deacon.ts
 1414 src/lib/cloister/merge-agent.ts
 2014 src/lib/cloister/service.ts
 1749 src/lib/cloister/specialists.ts
