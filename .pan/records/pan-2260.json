@@ -1,28 +1,55 @@
 {
   "issueId": "PAN-2260",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-03T04:20:16.616Z",
+      "reason": "end",
+      "note": "bd sync was blocked by the approval reviewer because the configured beads sync remote is an external git+ssh destination; I did not retry or work around it. The sandboxed npm test run failed with EPERM on child processes/socket binds, then the escalated npm test run passed. No plan deviations. Implemented squash-aware close-out verification by accepting a merged GitHub PR only when the feature branch tip predates mergedAt, preventing ancestry-only false positives after squash merge. Added lifecycle regression coverage. Gates: npx vitest run tests/unit/lib/lifecycle/workflows.test.ts; npm run typecheck; npm run lint; npm test."
+    }
+  ],
   "feedback": [],
   "created": "2026-07-03T04:04:30.342Z",
-  "updated": "2026-07-03T04:19:38.321Z",
+  "updated": "2026-07-03T04:20:25.440Z",
   "pipeline": {
     "issueId": "PAN-2260",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T04:04:30.344Z"
+    "updatedAt": "2026-07-03T04:20:25.365Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2273",
+    "reviewRequestedAt": "2026-07-03T04:20:16.617Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 6715,
+            "output": 299,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 6715,
+          "output": 299,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-03T04:04:30.368Z"
+        "pricingAsOf": "2026-07-03T04:20:25.433Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2273"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
