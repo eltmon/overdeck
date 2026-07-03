@@ -47,59 +47,42 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-03T15:28:18.513Z"
+    },
+    {
+      "timestamp": "2026-07-03T16:39:24.420Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-03T16:39:25.008Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T14:16:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2265\n\nPR cache is not invalidated by CI webhooks, leaving statusCheckRollup stale\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2265 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T14:16:53Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2265\n\nPR cache is not invalidated by CI webhooks, leaving statusCheckRollup stale\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2265 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-03T14:48:25Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2265 (attempt 1/3):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 30/30 AC incomplete:\n\n### Add shared App-REST helpers to github-app.ts (PR-by-head, issue-state, open-issue-labels) (4/4 incomplete)\n  - [ ] listPullRequestsForHead returns PRs via GET /pulls?head={owner}:{branch}&state={state} (App REST), and its test asserts the head param is owner-qualified — no GraphQL\n  - [ ] getIssueState returns {state} from GET /repos/{owner}/{repo}/issues/{number} (App REST)\n  - [ ] listOpenIssuesWithLabels returns each open issue's number and labels via paginated REST and excludes pull-request entries\n  - [ ] importing each helper returns both a Promise form and an Effect-wrapped form, matching the getPullRequestState convention\n\n### Route flywheel open-issue-label fetch off gh GraphQL (App REST, gh api REST fallback) (4/4 incomplete)\n  - [ ] fetchOpenIssueLabels emits no GraphQL request — it issues only App REST or gh api REST calls, and no gh issue list command remains\n  - [ ] when isGitHubAppConfigured() is true, labels are sourced from listOpenIssuesWithLabels (App REST)\n  - [ ] when the App is not configured, labels are sourced via gh api REST pagination, still issuing no GraphQL call\n  - [ ] on any fetch error the function returns an empty label map and propagates no exception\n\n### Route deacon open-PR-for-branch check through App REST when configured (3/3 incomplete)\n  - [ ] defaultHasOpenPrForBranch returns its boolean from listPullRequestsForHead(state:'open') when isGitHubAppConfigured() is true\n  - [ ] when the App is not configured it falls back to the existing gh pr list --head --state open call\n  - [ ] on a lookup error defaultHasOpenPrForBranch returns false (degraded) and propagates no exception\n\n### Route tracker issue-closed check through App REST, preserving the TTL cache (3/3 incomplete)\n  - [ ] isTrackerIssueClosed reads issue state via getIssueState (App REST) when isGitHubAppConfigured() is true\n  - [ ] isTrackerIssueClosed preserves the 5-minute TTL cache and shadow-state short-circuit, issuing no network read for a warm/known issue\n  - [ ] when the App is not configured it falls back to gh issue view --json state\n\n### Route merge-agent merged-verification through App REST when configured (3/3 incomplete)\n  - [ ] verifyMergedBeforeLifecycle determines merged state from listPullRequestsForHead when isGitHubAppConfigured() is true\n  - [ ] when the App is not configured it falls back to the existing gh pr list --head merged-check\n  - [ ] verifyMergedBeforeLifecycle returns the same merged/not-merged verdict as the gh path for a merged branch and does not alter when postMergeLifecycle fires\n\n### Route forge existing-artifact lookup through App REST when configured (3/3 incomplete)\n  - [ ] getExistingGitHubArtifact resolves the existing PR via listPullRequestsForHead (App REST) when isGitHubAppConfigured() is true\n  - [ ] when the App is not configured it falls back to the existing gh pr view --json url,number call\n  - [ ] getExistingGitHubArtifact returns the same {url, number} artifact shape from both branches that callers already consume\n\n### Route PR + Discussions tab PR-number resolution through App REST when configured (3/3 incomplete)\n  - [ ] resolveIssuePullRequestRef resolves the PR number via listPullRequestsForHead (App REST) when isGitHubAppConfigured() is true\n  - [ ] the Discussions handler resolves its PR number via the same App REST path\n  - [ ] both resolvers fall back to gh pr list --head only when the App is not configured\n\n### Serve PR + Discussions tab data from a webhook-aware server cache (4/4 incomplete)\n  - [ ] GET /api/issues/:id/pr serves the cached response without calling GitHub when the issue's cache generation is unchanged\n  - [ ] after a pull_request / pull_request_review / issue_comment webhook bumps the issue's generation, the next /pr fetch emits a fresh GitHub request\n  - [ ] GET /api/issues/:id/discussions serves its cache on an unchanged generation and emits a fresh GitHub request after a webhook bump\n  - [ ] a cold cache (no prior fetch) still produces a full response on the first request\n\n### Add a GraphQL rate-limit cool-down gate (defense-in-depth) (3/3 incomplete)\n  - [ ] after noteGraphQLRateLimit() with a quota-exceeded error, isInGraphQLCooldown() returns true within ~60s and false thereafter (verified with fake timers)\n  - [ ] while isInGraphQLCooldown() is true, refreshMergeStateFromGitHub's gh fallback emits no gh GraphQL call and returns without hitting GitHub\n  - [ ] after noteGraphQLRateLimit() with an unrelated (non-rate-limit) error, isInGraphQLCooldown() returns false\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with `bd close` — AC statuses sync from closed beads automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-2265 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
-    },
-    {
-      "seq": 5,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-03T14:57:46Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2265\n\nDiscussions cache is not invalidated for inline PR review comments\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2265 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 6,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-03T15:06:29Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2265 (attempt 2/3):\n\nFailed check: test\n\nVerification FAILED at test (96543ms):\n\nhook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts:23:1\n     21| }));\n     22|\n     23| beforeEach(() => {\n       | ^\n     24|   odb = setupOverdeckTestDb();\n     25| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/28]⎯\n\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract > 400: returns httpStatus=400 even when a non-stuck status row exists\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > returns no advice when project main matches origin/main and is clean\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > tells operators to commit or explicitly discard dirty project repo changes\n FAIL  |root| tests/unit/dashboard/server/routes/unstick-route.test.ts > buildUnstickRepairAdvice > tells operators to push local-only main commits when main is ahead\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/dashboard/server/routes/unstick-route.test.ts:30:1\n     28| let odb: OverdeckTestDb;\n     29|\n     30| beforeEach(() => {\n       | ^\n     31|   odb = setupOverdeckTestDb();\n     32| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/28]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/agent-projection.test.ts > saveAgentStateAndEmitEventWithDeps > persists the full current state even when the event payload is partial\nError: Hook timed out in 5000ms.\nIf this is a long-running hook, pass a timeout value as the last argument or configure it globally with \"hookTimeout\".\n ❯ tests/unit/dashboard/server/services/agent-projection.test.ts:38:1\n     36| let odb: OverdeckTestDb;\n     37|\n     38| beforeEach(() => {\n       | ^\n     39|   odb = setupOverdeckTestDb();\n     40| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/28]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2265 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2265 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".beads/issues.jsonl",
       ".pan/drafts/PAN-2265.md",
       ".pan/records/pan-2265.json",
+      ".pan/test/result.json",
       "scripts/file-size-baseline.txt",
       "src/dashboard/server/routes/webhooks.ts",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
       "src/lib/cloister/__tests__/issue-closed.test.ts",
       "src/lib/cloister/merged-pr-verification.ts",
+      "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
       "src/lib/github-pr-lookup.ts",
       "src/lib/overdeck/discussions.ts",
       "src/lib/overdeck/pull-requests.ts",
+      "tests/integration/cli/doctor.test.ts",
+      "tests/lib/reopen.test.ts",
       "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
       "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+      "tests/unit/dashboard/server/services/agent-projection.test.ts",
+      "tests/unit/dashboard/unstick-endpoint.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/webhook-handlers.test.ts"
     ],
@@ -131,16 +114,19 @@
       ".beads/issues.jsonl",
       ".pan/drafts/PAN-2265.md",
       ".pan/records/pan-2265.json",
+      ".pan/test/result.json",
       "scripts/file-size-baseline.txt",
       "src/cli/commands/flywheel-surfaces.ts",
       "src/dashboard/server/routes/webhooks.ts",
       "src/dashboard/server/services/pr-tab-cache.ts",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
       "src/lib/cloister/__tests__/issue-closed.test.ts",
       "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
       "src/lib/cloister/issue-closed.ts",
       "src/lib/cloister/merge-agent.ts",
       "src/lib/cloister/merged-pr-verification.ts",
       "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
       "src/lib/forge.ts",
       "src/lib/github-app.ts",
       "src/lib/github-graphql-cooldown.ts",
@@ -148,31 +134,128 @@
       "src/lib/overdeck/discussions.ts",
       "src/lib/overdeck/pull-requests.ts",
       "src/lib/webhook-handlers.ts",
+      "tests/integration/cli/doctor.test.ts",
+      "tests/lib/reopen.test.ts",
       "tests/unit/cli/commands/flywheel-surfaces.test.ts",
       "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
       "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+      "tests/unit/dashboard/server/services/agent-projection.test.ts",
+      "tests/unit/dashboard/unstick-endpoint.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
       "tests/unit/lib/forge.test.ts",
       "tests/unit/lib/github-app.test.ts",
       "tests/unit/lib/github-graphql-cooldown.test.ts",
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/webhook-handlers.test.ts"
     ],
-    "recordedAt": "2026-07-03T14:14:06.848Z"
+    "recordedAt": "2026-07-03T16:39:12.519Z"
   },
   "created": "2026-07-03T12:02:00.139Z",
-  "updated": "2026-07-03T16:19:36.898Z",
+  "updated": "2026-07-03T16:39:37.966Z",
   "pipeline": {
     "issueId": "PAN-2265",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T16:19:36.684Z",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-03T16:39:37.908Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2304",
-    "lastVerifiedCommit": "cb9346517d7149ae5e128b16de62ce16500fa01a"
+    "lastVerifiedCommit": "cb9346517d7149ae5e128b16de62ce16500fa01a",
+    "reviewRequestedAt": "2026-07-03T16:39:24.422Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/PAN-2265.md",
+        ".pan/records/pan-2265.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/webhooks.ts",
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+        "src/lib/cloister/__tests__/issue-closed.test.ts",
+        "src/lib/cloister/merged-pr-verification.ts",
+        "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+        "src/lib/github-pr-lookup.ts",
+        "src/lib/overdeck/discussions.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "tests/integration/cli/doctor.test.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+        "tests/unit/dashboard/server/services/agent-projection.test.ts",
+        "tests/unit/dashboard/unstick-endpoint.test.ts",
+        "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+        "tests/unit/lib/webhook-handlers.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/server/routes/issues.ts",
+        "src/lib/cloister/__tests__/merge-agent.test.ts",
+        "tests/unit/lib/cloister/issue-closed.test.ts"
+      ],
+      "declaredScope": [
+        "src/cli/commands/flywheel-surfaces.ts",
+        "src/dashboard/server/routes/issues.ts",
+        "src/dashboard/server/services/pr-tab-cache.ts",
+        "src/lib/cloister/__tests__/merge-agent.test.ts",
+        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+        "src/lib/cloister/issue-closed.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/orphan-proposed-reconciler.ts",
+        "src/lib/forge.ts",
+        "src/lib/github-app.ts",
+        "src/lib/github-graphql-cooldown.ts",
+        "src/lib/webhook-handlers.ts",
+        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
+        "tests/unit/lib/cloister/issue-closed.test.ts",
+        "tests/unit/lib/forge.test.ts",
+        "tests/unit/lib/github-app.test.ts",
+        "tests/unit/lib/github-graphql-cooldown.test.ts"
+      ],
+      "actualChangedFiles": [
+        ".beads/issues.jsonl",
+        ".pan/drafts/PAN-2265.md",
+        ".pan/records/pan-2265.json",
+        ".pan/test/result.json",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/flywheel-surfaces.ts",
+        "src/dashboard/server/routes/webhooks.ts",
+        "src/dashboard/server/services/pr-tab-cache.ts",
+        "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+        "src/lib/cloister/__tests__/issue-closed.test.ts",
+        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+        "src/lib/cloister/issue-closed.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/merged-pr-verification.ts",
+        "src/lib/cloister/orphan-proposed-reconciler.ts",
+        "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+        "src/lib/forge.ts",
+        "src/lib/github-app.ts",
+        "src/lib/github-graphql-cooldown.ts",
+        "src/lib/github-pr-lookup.ts",
+        "src/lib/overdeck/discussions.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "src/lib/webhook-handlers.ts",
+        "tests/integration/cli/doctor.test.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/cli/commands/flywheel-surfaces.test.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/dashboard/server/routes/unstick-route.test.ts",
+        "tests/unit/dashboard/server/services/agent-projection.test.ts",
+        "tests/unit/dashboard/unstick-endpoint.test.ts",
+        "tests/unit/lib/cloister/deacon-stuck-readyformerge.test.ts",
+        "tests/unit/lib/forge.test.ts",
+        "tests/unit/lib/github-app.test.ts",
+        "tests/unit/lib/github-graphql-cooldown.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
+        "tests/unit/lib/webhook-handlers.test.ts"
+      ],
+      "recordedAt": "2026-07-03T16:39:12.519Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -238,7 +321,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.351097,
-        "pricingAsOf": "2026-07-03T16:19:36.834Z"
+        "pricingAsOf": "2026-07-03T16:39:37.965Z"
       }
     },
     "merges": [
@@ -246,8 +329,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "app-rest-helpers": "completed",
     "app-rest-helpers.ac1": "completed",
