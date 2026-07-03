@@ -165,6 +165,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
+      expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
     }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));

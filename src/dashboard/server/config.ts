@@ -12,6 +12,7 @@
 import { homedir } from 'node:os';
 import { Effect, Layer, Context } from 'effect';
 import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
+import { getDashboardIdentity, readHostDashboardApiPort, shouldRefuseHostDashboardPort } from './identity.js';
 
 // ─── Config shape ──────────────────────────────────────────────────────────────
 
@@ -69,19 +70,22 @@ export const ServerConfigLayer = Layer.effect(
       throw new ServerConfigError('API_PORT', `Invalid port value: "${portStr}"`);
     }
 
-    // PAN-1416 canonical-path guard. A dashboard started from a workspace cwd
-    // (`workspaces/feature-pan-XXX/`) must NEVER bind the primary port 3011 unless
-    // the operator explicitly opts in. Without this guard, a workspace dashboard
-    // started for Playwright UAT can hijack pan.localhost when the canonical
-    // dashboard is restarting, leaving the user looking at stale workspace code.
-    const cwdIsWorkspace = /\/workspaces\/feature-pan-/i.test(process.cwd());
-    const portWasExplicit = !!(process.env['API_PORT'] ?? process.env['PORT']);
+    // A peer dashboard or workspace checkout must never bind the host dashboard
+    // API port. Workspace/devcontainer peer servers are legitimate only when
+    // they use an explicit non-host port.
+    const identity = getDashboardIdentity();
+    const hostDashboardApiPort = readHostDashboardApiPort();
     const overrideAllowed = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
-    if (cwdIsWorkspace && !portWasExplicit && !overrideAllowed) {
+    if (shouldRefuseHostDashboardPort({
+      repoRoot: identity.repoRoot,
+      mode: identity.mode,
+      port,
+      hostDashboardApiPort,
+    }) && !overrideAllowed) {
       const msg = (
-        `Refusing to bind primary port ${port} from workspace cwd ${process.cwd()} ` +
-        `(PAN-1416). Workspace dashboards must set API_PORT to a non-primary port. ` +
-        `To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
+        `Refusing to bind host dashboard port ${port} from repoRoot=${identity.repoRoot} ` +
+        `mode=${identity.mode}. Peer/workspace dashboards must set PORT or API_PORT ` +
+        `to a non-host port. To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
         `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
       );
       console.error(`[overdeck] ${msg}`);

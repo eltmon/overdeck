@@ -1106,7 +1106,10 @@ program
       // recoverable state (dashboard-side failure, sidecars still usable).
       try {
         const { waitForDashboardHealth } = await import('../lib/platform-lifecycle.js');
-        await Effect.runPromise(waitForDashboardHealth(dashboardApiPort, { timeoutMs: 15_000 }));
+        await Effect.runPromise(waitForDashboardHealth(dashboardApiPort, {
+          timeoutMs: 15_000,
+          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+        }));
         console.log(chalk.green('✓ Dashboard started in background and passed /api/health'));
       } catch (err: any) {
         console.log(chalk.yellow(`⚠ Dashboard health check did not pass: ${err?.message || err}`));
