@@ -66,6 +66,11 @@
       "reason": "feedback",
       "note": "[2026-07-04T14:56Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-04T14:56:24.921Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-04T15:06:24.224Z"
     }
   ],
   "feedback": [
@@ -158,17 +163,17 @@
   },
   "pipeline": {
     "issueId": "PAN-2311",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-04T14:56:23.044Z",
-    "reviewNotes": "remote-only feature/strike branches are not verified or deleted",
+    "updatedAt": "2026-07-04T15:06:28.609Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Inspection passed for bead workspace-qaa0a. Spec fidelity: merge-fulfillment verifier matches the vBRIEF item by reading tracked PR state, checking feature/pan-<id> and strike/pan-<id> ancestry against origin/main, returning merged/stranded/unknown, and never using git log --grep. Constraint compliance: no prohibited workspace/project patterns found in the changed files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2317",
-    "lastVerifiedCommit": "31f08051d2475e3f7dc1a64bf46b9c7c83235ae7",
+    "lastVerifiedCommit": "32b46862a9c718a8f1ef222cfab1730edc02db0f",
     "reviewRequestedAt": "2026-07-04T14:37:01.135Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -264,7 +269,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.708286,
-        "pricingAsOf": "2026-07-04T14:56:23.105Z"
+        "pricingAsOf": "2026-07-04T15:06:28.640Z"
       }
     },
     "merges": [
@@ -273,5 +278,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T18:03:53.979Z",
-  "updated": "2026-07-04T14:56:24.921Z"
+  "updated": "2026-07-04T15:06:28.641Z"
 }
