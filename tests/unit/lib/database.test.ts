@@ -74,6 +74,51 @@ describe('Database schema', () => {
     expect(() => initSchema(db)).not.toThrow();
     db.close();
   });
+
+  it('creates release set tables with cascade delete and unique component keys', () => {
+    const db = createTestDb();
+
+    expect(() => initSchema(db)).not.toThrow();
+
+    const tables = (db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' ORDER BY name
+    `).all() as Array<{ name: string }>).map(r => r.name);
+
+    expect(tables).toContain('release_sets');
+    expect(tables).toContain('release_set_components');
+
+    db.prepare(`
+      INSERT INTO release_sets (issue_id, project_key, project_path, workspace_type, status, created_at, updated_at)
+      VALUES ('PAN-399', 'overdeck', '/tmp/overdeck', 'polyrepo', 'draft', '2026-07-04T12:00:00.000Z', '2026-07-04T12:00:00.000Z')
+    `).run();
+    db.prepare(`
+      INSERT INTO release_set_components (
+        issue_id, component_key, provider, trigger, release_order, required,
+        status, health_status, version_status, smoke_status, rollback_status, notes
+      )
+      VALUES (
+        'PAN-399', 'api', 'render', 'manual', 0, 1,
+        'pending', 'pending', 'pending', 'pending', 'pending', 'deploy api first'
+      )
+    `).run();
+
+    expect(() => db.prepare(`
+      INSERT INTO release_set_components (
+        issue_id, component_key, provider, trigger, release_order, required,
+        status, health_status, version_status, smoke_status, rollback_status
+      )
+      VALUES (
+        'PAN-399', 'api', 'render', 'manual', 1, 1,
+        'pending', 'pending', 'pending', 'pending', 'pending'
+      )
+    `).run()).toThrow();
+
+    db.prepare('DELETE FROM release_sets WHERE issue_id = ?').run('PAN-399');
+    const components = db.prepare('SELECT * FROM release_set_components WHERE issue_id = ?').all('PAN-399');
+    expect(components).toHaveLength(0);
+
+    db.close();
+  });
 });
 
 // ============== Review Status Logic Tests ==============
